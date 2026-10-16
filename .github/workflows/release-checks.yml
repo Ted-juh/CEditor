@@ -141,8 +141,8 @@ jobs:
               Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
               "--- inside the pages of that run"
               Wait-Job $watch -Timeout 60 | Out-Null
-              Receive-Job $watch
               Stop-Job $watch
+              Receive-Job $watch
             }
             "--- opted out, CEDITOR_WEBVIEW2_SHARED=0 (round $round)"
             $env:CEDITOR_WEBVIEW2_SHARED = "0"

@@ -25,6 +25,7 @@
 // WebSocket and fetch, so it needs nothing installed. It exits after --seconds, or 15 s after the
 // last browser it found has gone.
 
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,6 +73,45 @@ function portsNow() {
     } catch { /* being written */ }
   }
   return ports;
+}
+
+/**
+ * When no browser has turned up: what there is to see. The WebView2 browser processes' command lines
+ * (whether --remote-debugging-port reached them), and every DevToolsActivePort under the root
+ * whatever its age, with the folders it would be in.
+ */
+function explainNothingFound() {
+  if (process.platform === 'win32') {
+    try {
+      const lines = execFileSync('powershell', ['-NoProfile', '-Command',
+        "Get-CimInstance Win32_Process -Filter \"name='msedgewebview2.exe'\" | Where-Object { $_.CommandLine -notmatch '--type=' } | ForEach-Object { $_.CommandLine }"],
+        { encoding: 'utf8', timeout: 20000 }).split(/\r?\n/).filter(Boolean);
+      say(`${lines.length} WebView2 browser process(es) running`);
+      for (const line of lines) console.log(`              ${line.slice(0, 600)}`);
+    } catch (error) {
+      say(`could not list the WebView2 processes: ${error.message.split('\n')[0]}`);
+    }
+  }
+  const all = [];
+  (function walk(dir, depth) {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const path = join(dir, entry.name);
+      if (entry.isFile() && entry.name === 'DevToolsActivePort') all.push(path);
+      else if (entry.isDirectory() && depth > 0) walk(path, depth - 1);
+    }
+  })(ROOT, 5);
+  say(`DevToolsActivePort files under ${ROOT}, any age: ${all.length ? all.join(', ') : 'none'}`);
+  try {
+    for (const folder of readdirSync(ROOT)) {
+      let inside = [];
+      try { inside = readdirSync(join(ROOT, folder)); } catch { /* a file */ }
+      console.log(`              ${folder}${inside.length ? `: ${inside.slice(0, 12).join(', ')}` : ''}`);
+    }
+  } catch (error) {
+    say(`${ROOT} cannot be read: ${error.code ?? error.message}`);
+  }
 }
 
 async function pageTargets(port) {
@@ -245,6 +285,7 @@ const sampling = new Map();       // port -> Page doing that browser's heap samp
 let pageCount = 0;
 let lastAlive = Date.now();
 let seenAny = false;
+let explained = false;
 
 const SAMPLING = { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true };
 
@@ -308,6 +349,7 @@ while (Date.now() - started < SECONDS * 1000) {
   if (tick % 10 === 9)
     for (const [port, page] of sampling) await reportAllocations(port, page);
   if (seenAny && pages.size === 0 && Date.now() - lastAlive > 15000) break;
+  if (!seenAny && !explained && Date.now() - started > 20000) { explained = true; explainNothingFound(); }
   tick += 1;
   await new Promise((resolve) => setTimeout(resolve, 1000));
 }
