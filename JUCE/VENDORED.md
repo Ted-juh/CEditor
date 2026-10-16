@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly eight patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly nine patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -238,3 +238,32 @@ sent to a child already reaped.
 **Upstream status (checked 2026-10-16).** Not compared against `develop` from here; check on an
 upgrade. **If you upgrade JUCE:** if `killChild` still waits for `WIFEXITED`, re-apply
 `childHasGone` and the three-step shutdown. The pin test fails while the loop is back.
+
+### 9. Windows WebView2: low memory while hidden, no autofill
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp`,
+`WebView2::setControlVisible` and `WebView2::setWebViewPreferences`.
+
+**Guard:** none. Both ask the WebView2 runtime for an interface and do nothing when it is older than
+the interface (`ICoreWebView2_19`, `ICoreWebView2Settings4`); the SDK in `CE/thirdparty/webview2`
+declares both.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What it does.**
+- `setControlVisible` already set the controller's `IsVisible` from `Component::isShowing`, which is
+  false while the window is minimised (the peer sends a visibility change then) or the host hides
+  it. It now also sets the webview's `MemoryUsageTargetLevel`: low while hidden, normal when shown.
+  Every CEditor host keeps the page loaded while hidden (`withKeepPageLoadedWhenBrowserIsHidden`),
+  so the page keeps running; WebView2 gives back what it can in the meantime. A standalone player
+  minimised beside a DAW is the case it is for.
+- `setWebViewPreferences` turns off general autofill and password saving. A panel's text fields are
+  not a web form: there is nothing to fill them from, and no password for the browser to keep.
+
+JUCE 8.0.7 exposes neither. What the first saves is measured by `CEditorWebViewEngineProbe`, which
+leaves every window open for 10 s, minimises them all for 10 s and restores them, and reports
+WebView2's memory by process at each point (docs/webview2-profiles.md).
+
+**If you upgrade JUCE:** if `setControlVisible` and `setWebViewPreferences` are still there, re-apply
+both hunks; if JUCE grows options for these, use them instead.
+

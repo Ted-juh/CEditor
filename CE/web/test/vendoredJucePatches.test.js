@@ -232,3 +232,21 @@ test('the vendored CLAP wrapper reports a state the player did not recognise as 
   assert.ok(setBody.indexOf('stateLoadAccepted.store (false);') < setBody.indexOf('getXmlFromBinary'), 'cleared before anything can return early');
   assert.ok(setBody.indexOf('stateLoadAccepted.store (true);') > setBody.indexOf('backward-compat: APVTS-only state'), 'set only once a known form was read');
 });
+
+test('a hidden Windows webview is asked to keep its memory low, and a panel has no autofill', () => {
+  // Patch 9: JUCE 8.0.7 sets IsVisible from isShowing (false while minimised) and nothing else, and
+  // leaves autofill and password saving on.
+  const source = readFileSync(join(repoRoot,
+    'JUCE/include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp'), 'utf8');
+  const visible = source.slice(source.indexOf('void setControlVisible (bool shouldBeVisible) const'));
+  const visibleBody = visible.slice(0, visible.indexOf('\n    }\n'));
+  for (const piece of ['put_IsVisible (shouldBeVisible)', 'ComSmartPtr<ICoreWebView2_19>', 'put_MemoryUsageTargetLevel (shouldBeVisible',
+    'COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL', 'COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW'])
+    assert.ok(visibleBody.includes(piece), `Missing ${piece} in setControlVisible. ${REAPPLY}`);
+  const preferences = source.slice(source.indexOf('void setWebViewPreferences()'));
+  const preferencesBody = preferences.slice(0, preferences.indexOf('void createWebView()'));
+  for (const piece of ['ComSmartPtr<ICoreWebView2Settings4>', 'put_IsGeneralAutofillEnabled (FALSE)', 'put_IsPasswordAutosaveEnabled (FALSE)'])
+    assert.ok(preferencesBody.includes(piece), `Missing ${piece} in setWebViewPreferences. ${REAPPLY}`);
+  assert.match(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8'), /### 9\. Windows WebView2: low memory while hidden, no autofill/);
+});
+

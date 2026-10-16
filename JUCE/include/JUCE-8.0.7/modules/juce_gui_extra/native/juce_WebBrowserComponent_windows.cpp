@@ -1039,6 +1039,16 @@ private:
                 if (settings2 != nullptr)
                     settings2->put_UserAgent (userAgent.toWideCharPointer());
             }
+
+            // CEditor: a panel's text fields are not a web form. There is nothing to fill them from
+            // and no password for the browser to offer to keep. JUCE/VENDORED.md, patch 9.
+            ComSmartPtr<ICoreWebView2Settings4> settings4;
+
+            if (SUCCEEDED (settings.QueryInterface (settings4)) && settings4 != nullptr)
+            {
+                settings4->put_IsGeneralAutofillEnabled (FALSE);
+                settings4->put_IsPasswordAutosaveEnabled (FALSE);
+            }
         }
     }
 
@@ -1196,6 +1206,15 @@ private:
     {
         if (webViewController != nullptr)
             webViewController->put_IsVisible (shouldBeVisible);
+
+        // CEditor: a hidden webview (its window minimised, or hidden by the host, with the page kept
+        // loaded) is asked to keep its memory low, and to go back to normal when shown again. The
+        // page keeps running; WebView2 gives back what it can until then. JUCE/VENDORED.md, patch 9.
+        ComSmartPtr<ICoreWebView2_19> webView19;
+
+        if (webView != nullptr && SUCCEEDED (webView.QueryInterface (webView19)) && webView19 != nullptr)
+            webView19->put_MemoryUsageTargetLevel (shouldBeVisible ? COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+                                                                   : COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW);
     }
 
     //==============================================================================
