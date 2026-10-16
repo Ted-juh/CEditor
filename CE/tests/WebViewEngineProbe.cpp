@@ -9,6 +9,9 @@
 // own, and checks each panel came up — then does the things a session does to them.
 //
 //   1. open N copies, all windows at once;
+//   1b. on Windows, minimise every window and restore them, reporting WebView2's memory shown,
+//      minimised and restored: a minimised window's webview is hidden (IsVisible false), and how
+//      much memory WebView2 gives back then is what a standalone player minimised beside a DAW costs;
 //   2. close one window and reopen it while the others stay open;
 //   3. close every window and reopen them all straight away, `cycles` times — with the switch on,
 //      the new webviews ask for a folder whose engine may still be shutting down;
@@ -549,6 +552,29 @@ public:
             check (profiles.size() == 1, stage + ": one profile folder for every window (switch on)");
     }
 
+    /** Every window minimised, then restored: WebView2's private memory shown, after 10 s minimised,
+        and restored, and every panel still there afterwards. The numbers are reported, not judged. */
+    void minimiseAndRestore()
+    {
+       #if JUCE_WINDOWS
+        const auto shown = webViewMegabytes();
+        for (auto& c : copies)
+            if (c.window != nullptr)
+                c.window->setMinimised (true);
+        waitFor ([] { return false; }, 10.0);
+        const auto minimised = webViewMegabytes();
+        for (auto& c : copies)
+            if (c.window != nullptr)
+                c.window->setMinimised (false);
+        waitFor ([] { return false; }, 3.0);
+        say ("        WebView2 processes' private memory: " + juce::String (shown, 0) + " MB shown, " + juce::String (minimised, 0)
+             + " MB minimised for 10 s, " + juce::String (webViewMegabytes(), 0) + " MB restored");
+        const auto lines = log.sinceMark();
+        check (PlayerLog::count (lines, "opened") == openWindows(), "minimise every window and restore them: no webview was made again");
+        expectEngines ("minimise every window and restore them");
+       #endif
+    }
+
     /** With every window open: one engine per profile folder in use. */
     void expectEngines (const juce::String& stage)
     {
@@ -584,6 +610,7 @@ public:
         expectEngines ("open " + juce::String (n));
         if (asChild)
             return;
+        minimiseAndRestore();
 
         if (n > 1)
         {
