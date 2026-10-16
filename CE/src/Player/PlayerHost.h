@@ -14,7 +14,8 @@
  * No editor concerns (no ValueTreeBridge, undo, file dialogs). This is the runtime that
  * an exported VST3/standalone (Phase C/D) wraps.
  */
-class PlayerHost : public juce::Component
+class PlayerHost : public juce::Component,
+                   private juce::Timer
 {
 public:
     // externalService: when the plugin processor owns the MIDI engine (so it persists window-closed),
@@ -88,6 +89,7 @@ public:
     std::function<void (const juce::String& stage)> onWebViewStage;
 
 private:
+    void timerCallback() override;
     void showStatusMessage (const juce::String& title, const juce::String& message);
     void loadPanelIntoWebView();
     void emitToWebView (const juce::String& eventName, const juce::var& payload);

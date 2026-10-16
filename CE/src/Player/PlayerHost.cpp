@@ -8,6 +8,16 @@
 #include <cstring>
 #include <optional>
 
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
+
 namespace
 {
 juce::File getInstalledDistFolder()
@@ -237,7 +247,34 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
    #endif
 
+   #if JUCE_WINDOWS
+    startTimerHz (4);   // whether the host's window is still showing ours (timerCallback)
+   #endif
+
     setSize (800, 480);
+}
+
+void PlayerHost::timerCallback()
+{
+   #if JUCE_WINDOWS
+    // In a plug-in this window is a child of the host's, and Windows tells a child nothing when the
+    // top-level window is minimised, nor when a host hides its plug-in window: JUCE never learns the
+    // webview is not showing, so WebView2 is never told, and the page went on drawing at sixty frames
+    // a second through 30 s minimised (release checks #17, watched from inside the page by
+    // tools/scripts/watch-webview-pages.mjs). So look. While the host's window is minimised, or ours
+    // is hidden with anything above it, the webview component is hidden: the page stays loaded
+    // (withKeepPageLoadedWhenBrowserIsHidden), its document is hidden, and WebView2 throttles it, as
+    // Microsoft asks an app to do on minimise. A standalone's own window is caught as well, which
+    // JUCE already does for it.
+    auto* peer = webView != nullptr ? getPeer() : nullptr;
+    if (peer == nullptr)
+        return;
+    const auto window = static_cast<HWND> (peer->getNativeHandle());
+    const auto top = GetAncestor (window, GA_ROOT);
+    const bool hidden = ! IsWindowVisible (window) || (top != nullptr && IsIconic (top));
+    if (webView->isVisible() == hidden)
+        webView->setVisible (! hidden);
+   #endif
 }
 
 PlayerHost::~PlayerHost()
@@ -260,6 +297,14 @@ void PlayerHost::notifySessionRestored()
 
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)
 {
+    // The player shows no MIDI monitor, and the device service's snapshot of it is the whole log, up
+    // to 500 events, about 120 KB of JSON once full, sent with every MIDI message either way at up to
+    // 20 a second. A panel whose controls send MIDI as they move (QA-08's free-running ones send 17
+    // messages a second) had each window compile and parse 2 MB a second of a log nothing on the
+    // page reads, and keep it until a collection that did not come: release checks #17 watched it
+    // from inside the page, and it was most of what grew.
+    if (eventName == "midiMonitorEvents")
+        return;
     if (webView != nullptr)
         webView->emitEventIfBrowserIsVisible (eventName, payload);
 }
