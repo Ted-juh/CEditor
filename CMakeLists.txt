@@ -1812,6 +1812,7 @@ if (CEDITOR_WEBVIEW_ENGINE_PROBE)
         juce::juce_audio_processors
         juce::juce_gui_basics
         $<$<PLATFORM_ID:Windows>:psapi>
+        $<$<PLATFORM_ID:Windows>:dbghelp>   # the stacks of a second process that does not finish
     )
 endif()
 
