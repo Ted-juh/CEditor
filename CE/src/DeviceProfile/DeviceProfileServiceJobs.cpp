@@ -173,7 +173,7 @@ juce::var DeviceProfileService::startPresetListScan (const juce::var& payload)
     auto result = presetScanJobToVar (presetScanJobs[scanId]);
     if (! dryRun)
     {
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         emitDeviceEvent ("deviceSessionState", getSessionState());
     }
     return result;
@@ -740,7 +740,7 @@ void DeviceProfileService::processBulkSendJobs()
                 updateRoleSessionState (job.deviceRole, "error", "Bulk dump send failed: " + job.error);
 
             emitDeviceEvent ("bulkDumpSendUpdated", bulkSendJobToVar (job));
-            emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+            publishMonitorEvents();
             emitDeviceEvent ("deviceSessionState", getSessionState());
             processedChunk = true;
             break;

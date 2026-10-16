@@ -433,7 +433,7 @@ void DeviceProfileService::processSysexAssemblyTimeouts()
         it = sysexAssemblies.erase (it);
     }
 
-    emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+    publishMonitorEvents();
 }
 
 juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& deviceRole,
@@ -484,7 +484,7 @@ juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& dev
         appendMonitorEvent ("error", role, "sysex", "incoming SysEx chunk", hex, "Discarded chunk without F0 start");
         response->setProperty ("ok", false);
         response->setProperty ("error", "Discarded SysEx continuation without a start byte");
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         return juce::var (response);
     }
 
@@ -499,7 +499,7 @@ juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& dev
         appendMonitorEvent ("error", role, "sysex", "incoming SysEx assembly", hex, "Discarded SysEx over max size");
         response->setProperty ("ok", false);
         response->setProperty ("error", "Incoming SysEx exceeded the maximum size");
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         return juce::var (response);
     }
 
@@ -509,7 +509,7 @@ juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& dev
         response->setProperty ("waitingForSysexEnd", true);
         response->setProperty ("chunks", assembly.chunks);
         response->setProperty ("assembledBytes", assembly.bytes.size());
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         startTimerHz (60);
         return juce::var (response);
     }
@@ -544,7 +544,7 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
     {
         appendMonitorEvent ("in", role, "sysex", "reply to another instance's request", hex,
                             "Left to the instance that asked for it");
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         return;
     }
 
@@ -581,7 +581,7 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
         if (updateBulkSendJobsForProtocolReply (role, hex))
         {
             appendMonitorEvent ("sync", role, "sysex", "bulk protocol reply", hex, "Matched bulk ACK/NAK policy");
-            emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+            publishMonitorEvents();
             emitDeviceEvent ("deviceSessionState", getSessionState());
             return;
         }
@@ -613,7 +613,7 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
                                             identity.matched ? "Identity matched" : identity.error);
                 }
 
-                emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+                publishMonitorEvents();
                 emitDeviceEvent ("deviceSessionState", getSessionState());
                 return;
             }
@@ -719,7 +719,7 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
     if (! highRate || heavyNow - lastInboundHeavyEmitMs >= 40.0)
     {
         lastInboundHeavyEmitMs = heavyNow;
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         emitDeviceEvent ("deviceSessionState", getSessionState());
     }
 }

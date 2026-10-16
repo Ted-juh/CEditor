@@ -549,16 +549,50 @@ juce::var DeviceProfileService::getMonitorEvents() const
 
 void DeviceProfileService::publishMonitorEvents()
 {
-    emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+    emitDeviceEvent ("midiMonitorEvents", {});
+}
+
+/**
+ * The events the UI has not been sent, oldest first, as { events, full: false }.
+ *
+ * Every message either way used to push the WHOLE log, up to 500 events: about 120 KB of JSON once
+ * full, at up to 20 a second while MIDI flowed, for the page to compile and parse each time. A
+ * panel whose controls send MIDI as they move kept that up for as long as it was open. The page
+ * appends what it is sent and keeps the last 500 itself (utils/midiMonitor.js, mergeMonitorEvents).
+ */
+juce::var DeviceProfileService::takeNewMonitorEvents()
+{
+    // Event ids only grow, so the new ones are a run at the end.
+    int first = monitorEvents.size();
+    while (first > 0 && static_cast<juce::int64> (monitorEvents.getReference (first - 1).getProperty ("eventId", 0))
+                            > lastPublishedMonitorEventId)
+        --first;
+    juce::Array<juce::var> fresh;
+    for (int i = first; i < monitorEvents.size(); ++i)
+        fresh.add (monitorEvents.getReference (i));
+    lastPublishedMonitorEventId = monitorEventSequence;
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("events", fresh);
+    payload->setProperty ("full", false);
+    return juce::var (payload);
+}
+
+juce::var DeviceProfileService::takeMonitorSnapshot()
+{
+    lastPublishedMonitorEventId = monitorEventSequence;
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("events", getMonitorEvents());
+    payload->setProperty ("full", true);
+    return juce::var (payload);
 }
 
 /**
  * Forget the monitor log.
  *
- * The engine owns this list, and every inbound and outbound message pushes the WHOLE of it to the
- * UI — so a Clear that emptied only the browser's copy looked like it worked and was undone by the
- * next slider move, which arrived carrying all 500 old events again. Clearing has to happen here or
- * it does not happen.
+ * The engine owns this list, and when every message pushed the WHOLE of it to the UI, a Clear that
+ * emptied only the browser's copy looked like it worked and was undone by the next slider move,
+ * which arrived carrying all 500 old events again. The UI is sent only what is new now, but a page
+ * that opens asks for the whole log, so clearing still has to happen here or it does not happen.
  */
 void DeviceProfileService::clearMonitorEvents()
 {
@@ -765,6 +799,14 @@ void DeviceProfileService::emitDeviceEvent (const juce::String& eventName, const
         }
         lastMonitorEmitMs = now;
         monitorEmitPending = false;
+        if (! eventCallback)
+            return;
+        // What is new is worked out now, not when the call was made: a coalesced call left it for
+        // the timer, and an empty delta is not worth a push.
+        auto fresh = takeNewMonitorEvents();
+        if (auto* events = fresh.getProperty ("events", {}).getArray(); events != nullptr && ! events->isEmpty())
+            eventCallback (eventName, fresh);
+        return;
     }
     if (eventCallback)
         eventCallback (eventName, payload);

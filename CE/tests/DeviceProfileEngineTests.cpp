@@ -1521,7 +1521,7 @@ int runProfileCacheTests()
 /**
  * Clear has to clear the copy that matters.
  *
- * The monitor log lives here, and every message pushes the WHOLE of it to the UI. So a Clear button
+ * The monitor log lives here, and every message used to push the WHOLE of it to the UI. So a Clear button
  * that emptied only the browser's list looked like it worked, right up until the next slider move
  * arrived carrying all five hundred old events back with it. Nothing was broken on the UI side; the
  * list it cleared was never the list.
@@ -1578,6 +1578,43 @@ int runMonitorClearTests()
 
     std::cout << "[PASS] DeviceProfileService :: clearing the monitor log stays cleared\n";
 
+    // The UI is sent what is new, not the log again. A page that opens takes the whole log, and
+    // after that a publish sends only what came after it, and nothing when nothing did.
+    {
+        juce::Array<juce::var> payloads;
+        service.setEventCallback ([&payloads] (const juce::String& name, const juce::var& payload)
+        {
+            if (name == "midiMonitorEvents") payloads.add (payload);
+        });
+        const auto snapshot = service.takeMonitorSnapshot();
+        const auto* whole = snapshot.getProperty ("events", {}).getArray();
+        if (! static_cast<bool> (snapshot.getProperty ("full", false)) || whole == nullptr || whole->size() != monitorCount())
+        {
+            std::cerr << "[FAIL] DeviceProfileService :: the snapshot for a page that opens is not the whole log\n";
+            return 1;
+        }
+        juce::Thread::sleep (60);   // past the 20-a-second coalescing
+        service.publishMonitorEvents();
+        if (! payloads.isEmpty())
+        {
+            std::cerr << "[FAIL] DeviceProfileService :: a publish with nothing new sent " << payloads.size() << " payload(s)\n";
+            return 1;
+        }
+        juce::Thread::sleep (60);
+        ingest ("B0 4B 01");   // the ingest publishes
+        const auto* sent = payloads.isEmpty() ? nullptr : payloads.getLast().getProperty ("events", {}).getArray();
+        if (payloads.size() != 1 || static_cast<bool> (payloads.getLast().getProperty ("full", true))
+            || sent == nullptr || sent->size() != 1
+            || sent->getReference (0).getProperty ("hex", {}).toString() != "B0 4B 01")
+        {
+            std::cerr << "[FAIL] DeviceProfileService :: after a snapshot, one new message was not sent alone ("
+                      << payloads.size() << " payload(s), " << (sent != nullptr ? sent->size() : -1) << " event(s))\n";
+            return 1;
+        }
+        service.setEventCallback (nullptr);
+        std::cout << "[PASS] DeviceProfileService :: the monitor sends a page that opens the whole log, and after that only what is new\n";
+    }
+
     // Housekeeping the instrument sends on its own is not something it said.
     //
     // A Yamaha AN1x emits Active Sensing every ~262ms from the moment it is plugged in. Logged, it
@@ -1631,13 +1668,22 @@ int runRealtimeMonitorTests()
         std::cerr << "[FAIL] a live block read must not chain through the whole startup sync\n";
         return 1;
     }
-    juce::var lastMonitor;
+    // The UI is sent what is new each time ({ events, full: false }), so what it holds is every
+    // payload's events put end to end; a whole log ({ full: true }) would replace it.
+    juce::Array<juce::var> received;
+    bool deltasOnly = true;
     service.setEventCallback ([&] (const juce::String& name, const juce::var& payload)
     {
         if (name == "midiInputMessage") ++rawMessages;
         if (name == "sysexInputMessage") ++sysexMessages;
         if (name == "deviceRuntimeState") ++runtimeSnapshots;
-        if (name == "midiMonitorEvents") { ++monitorSnapshots; lastMonitor = payload; }
+        if (name == "midiMonitorEvents")
+        {
+            ++monitorSnapshots;
+            if (static_cast<bool> (payload.getProperty ("full", false))) { deltasOnly = false; received.clear(); }
+            if (auto* events = payload.getProperty ("events", {}).getArray())
+                received.addArray (*events);
+        }
     });
     for (int i = 0; i < 100; ++i)
     {
@@ -1656,26 +1702,40 @@ int runRealtimeMonitorTests()
     // due before callPendingTimersSynchronously runs it. A fixed 100 ms was enough in a plain build
     // and never under AddressSanitizer (docs/design/checkers-run-2026-10-02.md), so poll for it, up
     // to two seconds, rather than guess how long the timer thread needs.
+    const auto lastIdOf = [] (const juce::Array<juce::var>& events)
+    {
+        return events.isEmpty() ? juce::int64 (-1) : static_cast<juce::int64> (events.getLast().getProperty ("eventId", 0));
+    };
     auto expected = service.getMonitorEvents();
     for (int waited = 0; waited < 2000; waited += 10)
     {
         juce::Thread::sleep (10);
         juce::Timer::callPendingTimersSynchronously();
         expected = service.getMonitorEvents();
-        if (lastMonitor.getArray() != nullptr && expected.getArray() != nullptr
-            && lastMonitor.getArray()->size() == expected.getArray()->size())
+        if (expected.getArray() != nullptr && lastIdOf (received) == lastIdOf (*expected.getArray()))
             break;
     }
-    if (lastMonitor.getArray() == nullptr || expected.getArray() == nullptr
-        || lastMonitor.getArray()->size() != expected.getArray()->size())
+    if (expected.getArray() == nullptr || lastIdOf (received) != lastIdOf (*expected.getArray()))
     {
-        std::cerr << "[FAIL] monitor throttle lost the final snapshot (emitted="
-                  << (lastMonitor.getArray() != nullptr ? lastMonitor.getArray()->size() : -1)
-                  << ", expected="
-                  << (expected.getArray() != nullptr ? expected.getArray()->size() : -1)
-                  << ", snapshots=" << monitorSnapshots << ")\n";
+        std::cerr << "[FAIL] monitor throttle lost the final events (received up to id " << lastIdOf (received)
+                  << ", the log ends at " << (expected.getArray() != nullptr ? lastIdOf (*expected.getArray()) : -1)
+                  << ", payloads=" << monitorSnapshots << ")\n";
         return 1;
     }
+    // What was received, put end to end, is the log: nothing lost to a coalesced call, nothing sent
+    // twice, in order, and none of it a whole log resent.
+    if (! deltasOnly || received.size() != expected.getArray()->size())
+    {
+        std::cerr << "[FAIL] the monitor sent " << received.size() << " events for a log of "
+                  << expected.getArray()->size() << (deltasOnly ? "" : ", and a whole log") << "\n";
+        return 1;
+    }
+    for (int i = 0; i < received.size(); ++i)
+        if (received.getReference (i).getProperty ("eventId", 0) != expected.getArray()->getReference (i).getProperty ("eventId", 0))
+        {
+            std::cerr << "[FAIL] the monitor's events arrived out of order or with a gap at " << i << "\n";
+            return 1;
+        }
     juce::int64 lastId = 0;
     for (const auto& event : *expected.getArray())
     {
@@ -1683,7 +1743,7 @@ int runRealtimeMonitorTests()
         if (id <= lastId) { std::cerr << "[FAIL] monitor event ids are not unique\n"; return 1; }
         lastId = id;
     }
-    std::cout << "[PASS] realtime SysEx retains every message, avoids stale state, and coalesces monitor snapshots\n";
+    std::cout << "[PASS] realtime SysEx retains every message, avoids stale state, and sends the monitor what is new, coalesced, losing none\n";
     return 0;
 }
 

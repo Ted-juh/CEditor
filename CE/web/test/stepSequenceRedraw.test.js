@@ -34,7 +34,8 @@ test('the step sequences read the step they draw, not the frame clock', () => {
   }
 });
 test('what they show is worked out once a frame, after the tickers, with what the value sources draw from', () => {
-  assert.match(source, /sharedAnimationFrame\(\(\) => \{ orbitClock = Date\.now\(\); noteShownSteps\(\); \}\)/);
+  // (Both wait while the host's window is minimised: playerPageTraffic.test.js.)
+  assert.match(source, /sharedAnimationFrame\(\(\) => \{ if \(hostShown\) \{ orbitClock = Date\.now\(\); noteShownSteps\(\); \} \}\)/);
   // Each key comes from the same function its value source injects, so the two cannot disagree on
   // when the drawing changes: the Turing's phase, the Arp's phase and source notes, the Phrase's step.
   assert.match(body('applyTuringValueSource'), /__phase: turingPhaseFor\(control\)/);

@@ -8,6 +8,16 @@
 #include <cstring>
 #include <optional>
 
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
+
 namespace
 {
 juce::File getInstalledDistFolder()
@@ -190,6 +200,7 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     {
         if (onWebViewStage != nullptr) onWebViewStage ("panel shown");
         if (onResyncRequest != nullptr) onResyncRequest();
+        if (! hostWindowShown) sendHostWindow();   // a page loaded behind a minimised host
     });
 
     // A ce.storage write the page made (scriptStores, in PlayerHost.h).
@@ -237,7 +248,43 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
    #endif
 
+   #if JUCE_WINDOWS
+    startTimerHz (4);   // whether the host's window is showing ours (timerCallback)
+   #endif
+
     setSize (800, 480);
+}
+
+void PlayerHost::timerCallback()
+{
+   #if JUCE_WINDOWS
+    // In a plug-in this window is a child of the host's, and Windows tells a child nothing when the
+    // top-level window is minimised, nor when a host hides its plug-in window, so the page goes on
+    // drawing for nobody (release checks #17: sixty frames a second through 30 s minimised). The
+    // page is TOLD, and nothing is hidden: a hidden webview drops every event sent to it, and a
+    // hidden page gets no frames and runs its timers once a second, while with the window open it
+    // is what drives free-running modulators, scripts' timers and automation out to the hardware.
+    // Told, the page stops redrawing what cannot be seen and carries on with the rest
+    // (stores/hostWindow.js).
+    auto* peer = webView != nullptr ? getPeer() : nullptr;
+    if (peer == nullptr)
+        return;
+    const auto window = static_cast<HWND> (peer->getNativeHandle());
+    const auto top = GetAncestor (window, GA_ROOT);
+    const bool shown = IsWindowVisible (window) && ! (top != nullptr && IsIconic (top));
+    if (shown != hostWindowShown)
+    {
+        hostWindowShown = shown;
+        sendHostWindow();
+    }
+   #endif
+}
+
+void PlayerHost::sendHostWindow()
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("shown", hostWindowShown);
+    emitToWebView ("hostWindow", juce::var (obj));
 }
 
 PlayerHost::~PlayerHost()
@@ -260,12 +307,12 @@ void PlayerHost::notifySessionRestored()
 
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)
 {
-    // The player shows no MIDI monitor, and the device service's snapshot of it is the whole log, up
-    // to 500 events, about 120 KB of JSON once full, sent with every MIDI message either way at up to
-    // 20 a second. A panel whose controls send MIDI as they move (QA-08's free-running ones send 17
-    // messages a second) had each window compile and parse 2 MB a second of a log nothing on the
-    // page reads, and keep it until a collection that did not come: release checks #17 watched it
-    // from inside the page, and it was most of what grew.
+    // The player shows no MIDI monitor, so it is sent none of it. When every MIDI message pushed the
+    // whole log, up to 500 events and about 120 KB of JSON at up to 20 a second, a panel whose
+    // controls send MIDI as they move (QA-08's free-running ones send 17 messages a second) had each
+    // window compile and parse 2 MB a second of a log nothing on the page reads: release checks #17
+    // watched it from inside the page, and it was most of what grew. The service now sends only
+    // what is new, but nothing here reads that either.
     if (eventName == "midiMonitorEvents")
         return;
     if (webView != nullptr)
