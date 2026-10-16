@@ -167,7 +167,11 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     // SafePointer the device events above use, so a late post finds nothing to load into.
     options = options.withEventListener ("playerReady", [safe = juce::Component::SafePointer<PlayerHost> (this)] (const juce::var&)
     {
-        juce::MessageManager::callAsync ([safe]() { if (safe != nullptr) safe->loadPanelIntoWebView(); });
+        juce::MessageManager::callAsync ([safe]()
+        {
+            if (safe != nullptr && safe->onWebViewStage != nullptr) safe->onWebViewStage ("page ready");
+            if (safe != nullptr) safe->loadPanelIntoWebView();
+        });
     });
 
     // Host-parameter sync (M2): the user moved a control -> set the matching host parameter so the
@@ -183,6 +187,7 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     // (so the on-screen controls reflect a restored/automated state on open).
     options = options.withEventListener ("requestParamSync", [this] (const juce::var&)
     {
+        if (onWebViewStage != nullptr) onWebViewStage ("panel shown");
         if (onResyncRequest != nullptr) onResyncRequest();
     });
 
@@ -216,6 +221,7 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         return;
     }
 
+    webViewProfileName = userDataFolder.getFileName();
     auto browser = std::make_unique<PlayerWebBrowserComponent> (options);
     browser->onNetworkError = [this] (const juce::String& errorInfo)
     {

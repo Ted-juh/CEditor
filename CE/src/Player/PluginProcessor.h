@@ -310,6 +310,9 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
+    /** A line about the editor's webview, in this instance's log (scriptLogLine, below). */
+    void webViewLogLine (const juce::String& line) const { scriptLogLine ("[webview] " + line); }
+
     const juce::String getName() const override
     {
        #if CEDITOR_SIDECAR_IDENTITY
@@ -2530,6 +2533,21 @@ public:
         addAndMakeVisible (host);
         setResizable (true, true);
         setSize (800, 480);
+
+        // A blank window and a drawn one look the same from outside the page, so the log says which
+        // it was: the profile folder the webview was given (WebViewProfileFolders.h, the switch for
+        // one engine per process included), then when the page answered and when the panel was in
+        // it. A window that logs "opened" and nothing after never got a working webview.
+        const auto opened = juce::Time::getMillisecondCounterHiRes();
+        const auto profile = host.webViewProfile();
+        p.webViewLogLine (profile.isEmpty() ? juce::String ("opened, no webview (runtime unavailable)")
+                                            : "opened, profile " + profile);
+        host.onWebViewStage = [&p, opened, profile] (const juce::String& stage)
+        {
+            p.webViewLogLine (stage + ", profile " + profile + ", "
+                              + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - opened))
+                              + " ms after opening");
+        };
 
         // The DAW playhead -> panel push runs whether or not the value layer is compiled
         // in: a Transport set to "Host / DAW" needs it, and that has nothing to do with
