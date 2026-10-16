@@ -11,11 +11,18 @@ export function initialiseJavascriptSandbox() {
     .then(module => { engine = module; });
 }
 
-// `memoryBytes` is each script's own ceiling. `panelMemoryBytes` is all of them together: every
-// sandbox lives in the one WebAssembly heap the interpreter runs in, and that heap is what the page
-// pays for. It replaces a cap of 32 sandboxes, which was the same 512 MB reached by counting
-// scripts — 32 at 16 MB each — and refused the 33rd script of any panel. The GAIA panel has 232,
-// at about 51 KB apiece; counting stopped 200 of them while the memory was nowhere near the limit.
+// `panelMemoryBytes` is what all of a panel's scripts may grow the one WebAssembly heap the
+// interpreter runs in to, and that heap is what the page pays for. It replaces a cap of 32 sandboxes,
+// which was the same 512 MB reached by counting scripts — 32 at 16 MB each — and refused the 33rd
+// script of any panel. The GAIA panel has 232, at about 51 KB apiece; counting stopped 200 of them
+// while the memory was nowhere near the limit.
+//
+// `memoryBytes` is what one call may allocate (the frames below say how), and in practice it refuses
+// any single allocation larger than that. It was meant as each script's own ceiling and never was
+// one: QuickJS checks an allocation's size against its limit, but under emscripten it adds 8 bytes
+// per allocation to what it says it holds (js_def_malloc_usable_size is 0 there), so a script with a
+// runtime of its own and a 16 MB limit could keep 100 MB in 1 MB pieces. What bounds what scripts
+// keep is the panel budget.
 //
 // `milliseconds` is how long one call into a script may run (a load, a click, a timer's tick), and
 // it is the plug-in's: JsScriptEngine.cpp gives each call 2 seconds, and a panel that works with the
@@ -37,6 +44,15 @@ export function setTimeLimitForTesting(milliseconds = SCRIPT_LIMITS.milliseconds
 /** The shared heap's size now, and how many sandboxes are live: what a test sets a budget against. */
 export const scriptHeapBytesForTesting = () => heapBytes();
 export const sandboxCountForTesting = () => active.size;
+/** Whether the panel's runtime exists: it is made with the first script and freed with the last. */
+export const sharedRuntimeAliveForTesting = () => shared !== null;
+/** The runtime's allocation counter as read here, beside what QuickJS itself reports for it. */
+export function allocationCounterForTesting() {
+  const usage = shared.runtime.computeMemoryUsage();
+  const reported = shared.runtime.getSystemContext().dump(usage);
+  usage.dispose();
+  return { count: word(MALLOC_COUNT), size: word(MALLOC_SIZE), reported };
+}
 
 // The shared heap's size. It only ever grows: what a stopped sandbox gave back is reused from inside
 // it, not returned. So the budget is enforced on growth — whatever made the heap grow past the budget
@@ -44,14 +60,132 @@ export const sandboxCountForTesting = () => active.size;
 const heapBytes = () => engine.getWasmMemory().buffer.byteLength;
 const grewPastBudget = (before) => { const now = heapBytes(); return now > before && now > panelMemoryBytes; };
 const BUDGET_EXCEEDED = 'Script memory limit exceeded: the panel\'s scripts together have reached their budget';
+const LIMIT = /interrupted|out of memory|stack overflow|limit exceeded/i;
 let depth = 0;
 let deadline = 0;
 let calls = 0;
+
+// ONE RUNTIME FOR THE PANEL, A CONTEXT PER SCRIPT. A QuickJS context is a realm: its own global
+// object and built-ins, so a script's names are its own, as they were. A runtime is what contexts
+// share: the allocator, the atom table, the job queue, the interrupt handler and the limits. Each
+// script had one of its own, and on the GAIA panel's 232 scripts that was 8.5 MB of the 27.8 MB heap
+// (19.3 MB with one runtime). The plug-in's engine made the same move (JsScriptEngine.cpp).
+//
+// What a script had to itself and now shares is handled here: the memory limit is set for whichever
+// call is running (frames), the job queue is emptied before a call returns (drain), and a context
+// is freed only when no call is running, when the queue is empty and nothing can still run in it.
+let shared = null;          // { runtime, rt, owners: Map<context, sandbox> }
+const frames = [];
+const releases = [];        // contexts of stopped scripts, freed when no call is running
+let holding = 0;            // inside disposeJavascriptSandboxes, which frees once at the end
+let collect = false;
+let cancelling = false;
+
+// Two fields of QuickJS's JSRuntime that neither QuickJS nor quickjs-emscripten exports: what the
+// runtime has allocated (malloc_state, right after the four allocator functions) and the size past
+// which its next allocation runs the cycle collector (malloc_gc_threshold). Offsets for the pinned
+// @jitl/quickjs-wasmfile-release-sync, checked when the runtime is made: the limit set through the
+// API has to read back from the struct, and a new runtime's threshold has to be QuickJS's 256 KB.
+const MALLOC_COUNT = 16, MALLOC_SIZE = 20, MALLOC_LIMIT = 24, GC_THRESHOLD = 108;
+const view = () => new DataView(engine.getWasmMemory().buffer);
+const word = (offset) => view().getUint32(shared.rt + offset, true);
+
+function sharedRuntime() {
+  if (shared) return shared;
+  const runtime = engine.newRuntime();
+  const rt = runtime.rt.value;
+  runtime.setMemoryLimit(0x5ced17);
+  const fits = view().getUint32(rt + MALLOC_LIMIT, true) === 0x5ced17
+    && view().getUint32(rt + GC_THRESHOLD, true) === 256 * 1024;
+  runtime.setMemoryLimit(-1);
+  if (!fits) {
+    runtime.dispose();
+    throw Error('Script interpreter: this QuickJS build does not keep its runtime where boundedJavascript.js reads it');
+  }
+  runtime.setMaxStackSize(SCRIPT_LIMITS.stackBytes);
+  runtime.setInterruptHandler(() => cancelling || performance.now() >= deadline);
+  return shared = { runtime, rt, owners: new Map() };
+}
+
+// Every call into a script is a frame, and the runtime's memory limit is set for the innermost one:
+// it may allocate `budget` past what the runtime held when it began, not counting what frames inside
+// it took. A script called from another has a budget of its own, as it had a runtime of its own.
+function enterFrame(budget) {
+  const frame = { start: word(MALLOC_SIZE), inner: 0, budget };
+  frames.push(frame);
+  limitMemory();
+  return frame;
+}
+function leaveFrame(frame) {
+  frames.pop();
+  const outer = frames.at(-1);
+  if (outer) outer.inner += word(MALLOC_SIZE) - frame.start;
+  limitMemory();
+}
+function limitMemory() {
+  const frame = frames.at(-1);
+  shared.runtime.setMemoryLimit(frame ? Math.max(1, frame.start + frame.inner + frame.budget) : -1);
+}
+
+// Promise jobs queue on the runtime, not the context: what one call leaves queued, the next call into
+// any script would run. So an outer call empties the queue before it returns, its own jobs and those
+// of any script it called, while it has time. A job that fails is the failure of the script whose
+// context it ran in.
+function drain(caller) {
+  const { runtime, owners } = shared;
+  let jobs = 0;
+  while (runtime.hasPendingJob()) {
+    if (++jobs > 1000 || performance.now() >= deadline) { cancelJobs(); throw Error('Script execution limit exceeded'); }
+    const step = runtime.executePendingJobs(1);
+    if (!step.error) continue;
+    const { context } = step.error;
+    const message = context.dump(step.error);
+    step.error.dispose();
+    const error = Error(String(message?.message ?? message));
+    if (owners.get(context) !== caller) { owners.get(context)?.fail(error); continue; }
+    cancelJobs();
+    throw error;
+  }
+}
+
+// What is still queued when a call runs out of time, or fails on a limit, cannot wait for the next
+// call: it would run there, in whichever script that is, and a runaway's next job is queued by the
+// one before it, for ever. So each job runs with nothing to allocate and the interrupt raised. It
+// fails at its first allocation or loop, cannot queue another (a job is an allocation), and the
+// queue empties. A script that a stopped one had called loses what it had queued in that call.
+function cancelJobs() {
+  const { runtime } = shared;
+  cancelling = true;
+  runtime.setMemoryLimit(1);
+  try {
+    while (runtime.hasPendingJob()) runtime.executePendingJobs(1).error?.dispose();
+  } finally {
+    cancelling = false;
+    limitMemory();
+  }
+}
+
+// Called when no call is running. Freeing a context frees nothing at once: its own functions refer to
+// it, so it goes with the next run of the cycle collector, and memory a stopped script held would sit
+// there until then. So the collector is run now, by lowering its threshold under the next allocation;
+// a runtime per script freed everything when it was disposed. The runtime goes with its last script.
+function settle() {
+  for (const release of releases.splice(0)) release();
+  if (!shared) return;
+  if (!shared.owners.size) { shared.runtime.dispose(); shared = null; collect = false; return; }
+  if (!collect) return;
+  collect = false;
+  view().setUint32(shared.rt + GC_THRESHOLD, 0, true);
+  shared.owners.keys().next().value.newObject().dispose();
+}
 
 // This function's source runs INSIDE QuickJS. Values cross as bounded data, never
 // as host objects/prototypes. Function IDs retain closures, including timer and
 // event callbacks, without granting access to the browser's Function constructor.
 function guestBootstrap(bridge) {
+  // Its callbacks are queued by the collector, outside any call, for contexts that may already be
+  // freed. No panel script uses it.
+  delete globalThis.FinalizationRegistry;
   const stringify = JSON.stringify;
   const parse = JSON.parse;
   const entries = Object.entries;
@@ -115,18 +249,25 @@ function guestBootstrap(bridge) {
 }
 
 export function disposeJavascriptSandboxes(owner) {
-  for (const sandbox of [...active]) if (owner === undefined || sandbox.owner === owner) sandbox.dispose();
+  holding++;
+  try {
+    for (const sandbox of [...active]) if (owner === undefined || sandbox.owner === owner) sandbox.dispose();
+  } finally {
+    if (!--holding && !depth) settle();
+  }
 }
 
 export function evaluateBoundedJavascript(source, api, names, options = {}) {
   if (!engine) throw Error('Script interpreter has not finished loading');
   if (source.length > SCRIPT_LIMITS.text) throw Error('Script source limit exceeded');
   const heapAtStart = heapBytes();
-  const runtime = engine.newRuntime();
-  runtime.setMemoryLimit(options.memoryBytes ?? SCRIPT_LIMITS.memoryBytes);
-  runtime.setMaxStackSize(SCRIPT_LIMITS.stackBytes);
-  runtime.setInterruptHandler(() => performance.now() >= deadline);
+  const { runtime, owners } = sharedRuntime();
+  const budget = options.memoryBytes ?? SCRIPT_LIMITS.memoryBytes;
+  // Unlimited while it is made, even inside another script's call near its budget: a context that
+  // fails to allocate comes back as a null pointer, not an error.
+  runtime.setMemoryLimit(-1);
   const vm = runtime.newContext();
+  limitMemory();
   const handles = [];
   const hostFunctions = new Map();
   const hostIds = new WeakMap();
@@ -142,10 +283,23 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
     disposed = true; active.delete(sandbox);
     for (const reject of pending) reject(Error('Script instance stopped'));
     pending.clear();
-    for (const handle of handles.reverse()) if (handle.alive) handle.dispose();
-    vm.dispose(); runtime.dispose();
+    releases.push(() => {
+      for (const handle of handles.reverse()) if (handle.alive) handle.dispose();
+      owners.delete(vm); vm.dispose(); collect = true;
+    });
+    if (!depth && !holding) settle();
+  }, fail(error) {
+    // A job of this script failed in another script's call.
+    if (disposed) return;
+    if (LIMIT.test(error.message)) {
+      retire = true;
+      error = Error(`Script stopped: execution or memory limit exceeded (${error.message})`);
+    }
+    options.onError?.(error);
+    if (retire) sandbox.dispose();
   } };
   active.add(sandbox);
+  owners.set(vm, sandbox);
   if (grewPastBudget(heapAtStart)) {
     sandbox.dispose();
     throw Error(BUDGET_EXCEEDED);
@@ -156,18 +310,18 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
     const outer = depth === 0;
     if (outer) { deadline = performance.now() + (options.milliseconds ?? callMilliseconds); calls = 0; }
     const heapBefore = heapBytes();
+    const frame = enterFrame(budget);
     depth++; busy++;
     try {
-      const result = fn();
-      if (retire) throw Error('Script instance stopped after its execution limit or approval changed');
+      let result, failure;
+      try { result = fn(); } catch (error) { failure = error; }
+      // A call that was stopped while it ran, or failed on a limit, has its jobs cancelled, not run.
       if (outer) {
-        let jobs = 0;
-        while (runtime.hasPendingJob()) {
-          if (++jobs > 1000 || performance.now() >= deadline) throw Error('Script execution limit exceeded');
-          const step = runtime.executePendingJobs(1);
-          if (step.error) { const message = vm.dump(step.error); step.error.dispose(); throw Error(String(message?.message ?? message)); }
-        }
+        if (retire || performance.now() >= deadline || LIMIT.test(failure?.message ?? '')) cancelJobs();
+        else try { drain(sandbox); } catch (error) { failure = error; }
       }
+      if (failure) throw failure;
+      if (retire) throw Error('Script instance stopped after its execution limit or approval changed');
       if (performance.now() >= deadline) throw Error('Script execution limit exceeded');
       // Checked at every depth, so a script called from another is held to it on its own. The caller
       // grew too, by what the callee took, and is stopped with it: a chain that ran a panel out of
@@ -179,14 +333,16 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
       // the heap past the budget and then threw an error of its own would otherwise keep what it took,
       // and could take it again on the next call.
       const overBudget = grewPastBudget(heapBefore);
-      if (overBudget || /interrupted|out of memory|stack overflow|limit exceeded/i.test(error?.message ?? '')) {
+      if (overBudget || LIMIT.test(error?.message ?? '')) {
         retire = true;
         throw Error(`Script stopped: execution or memory limit exceeded (${overBudget ? BUDGET_EXCEEDED : error.message})`);
       }
       throw error;
     } finally {
       busy--; depth--;
+      leaveFrame(frame);
       if (retire) sandbox.dispose();
+      if (!depth && !holding) settle();
     }
   }
 
@@ -244,6 +400,9 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
   }
   const bridge = vm.newFunction('panelApi', (id, json) => {
     try {
+      // A stopped script's queued jobs can still run, in the call that stopped it, until its context
+      // is freed: they reach nothing.
+      if (disposed) throw Error('Script instance stopped');
       if (++calls > SCRIPT_LIMITS.calls || performance.now() >= deadline) throw Error('Script execution limit exceeded');
       const text = vm.getString(json);
       if (text.length > SCRIPT_LIMITS.text * 2) throw Error('Script data limit exceeded');
