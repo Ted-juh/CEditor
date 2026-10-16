@@ -1,11 +1,13 @@
-// playerPageTraffic.test.js — what the plug-in sends its page, and when the page may rest.
+// playerPageTraffic.test.js — what the plug-in sends its page, and what it must not do to save work.
 //
 // Release checks #17 watched the player's pages from inside (tools/scripts/watch-webview-pages.mjs)
 // and found two things no test here could: each window was pushed the device service's whole MIDI
 // monitor log, up to 120 KB, with every MIDI message, for a page that shows no monitor; and a
 // minimised plug-in window's page went on drawing at sixty frames a second, because a plug-in's
 // window is a child of the host's and Windows tells a child nothing when the host is minimised.
-// Both live in PlayerHost.cpp, which needs WebView2 to run, so this reads the source, the way
+// The first is fixed in PlayerHost.cpp. The second is not, and the way it was first fixed (hiding the
+// webview while the host's window is minimised) is guarded against below, for what it broke. Both
+// live where WebView2 is needed to run them, so this reads the source, the way
 // playerRestorePush.test.js does.
 
 import test from 'node:test';
@@ -38,16 +40,16 @@ test('the player page is not sent the MIDI monitor log', () => {
     assert.ok(!PLAYER.includes(reader), `Player.svelte now uses ${reader}; the log it needs is dropped in PlayerHost::emitToWebView`);
 });
 
-test('a hidden or minimised host window hides the webview, on Windows', () => {
-  assert.match(HOST_H, /class PlayerHost : public juce::Component,\s*private juce::Timer/);
-  const tick = body(HOST_CPP, 'void PlayerHost::timerCallback()');
-  for (const piece of ['GetAncestor (window, GA_ROOT)', 'IsIconic (top)', 'IsWindowVisible (window)', 'webView->setVisible (! hidden)'])
-    assert.ok(tick.includes(piece), `the host-window check lost ${piece}`);
-  assert.ok(tick.indexOf('#if JUCE_WINDOWS') < tick.indexOf('GetAncestor'), 'the check is Windows-only');
-  // Started where the webview is made, on Windows only; and the page must survive being hidden,
-  // which is what keeping it loaded is for.
-  const started = HOST_CPP.indexOf('startTimerHz (4);');
-  assert.ok(started > HOST_CPP.indexOf('addAndMakeVisible (*webView);'), 'the check starts before there is a webview to hide');
-  assert.ok(HOST_CPP.lastIndexOf('#if JUCE_WINDOWS', started) > HOST_CPP.indexOf('addAndMakeVisible (*webView);'), 'the check starts off Windows too');
-  assert.ok(HOST_CPP.includes('.withKeepPageLoadedWhenBrowserIsHidden()'), 'hiding the webview would unload the page');
+test('nothing hides the webview to save work while the window is open', () => {
+  // Tried and taken out (release checks #18 measured it, a review found what it cost). Hidden, the
+  // webview component drops every event emitEventIfBrowserIsVisible would send (paramSync,
+  // hostTransport, MIDI in), while the editor's timer records each as pushed; and a hidden page
+  // asks for no frames and runs its timers once a second, while the window-open page is what drives
+  // free-running modulators, panel scripts' timers and automation out to the hardware (the
+  // processor takes those over only when the editor is closed). A page that should rest while the
+  // host is minimised needs those duties handed over first.
+  assert.ok(!/webView->setVisible\s*\(/.test(HOST_CPP), 'PlayerHost hides the webview again; see above for what that stops');
+  assert.ok(!HOST_CPP.includes('IsIconic'), 'PlayerHost acts on the host window being minimised again; see above');
+  assert.match(HOST_H, /class PlayerHost : public juce::Component\s*\{/);
+  assert.ok(HOST_CPP.includes('.withKeepPageLoadedWhenBrowserIsHidden()'), 'a page hidden by its host would be unloaded');
 });

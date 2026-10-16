@@ -8,16 +8,6 @@
 #include <cstring>
 #include <optional>
 
-#if JUCE_WINDOWS
- #ifndef NOMINMAX
-  #define NOMINMAX
- #endif
- #ifndef WIN32_LEAN_AND_MEAN
-  #define WIN32_LEAN_AND_MEAN
- #endif
- #include <windows.h>
-#endif
-
 namespace
 {
 juce::File getInstalledDistFolder()
@@ -247,34 +237,7 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
    #endif
 
-   #if JUCE_WINDOWS
-    startTimerHz (4);   // whether the host's window is still showing ours (timerCallback)
-   #endif
-
     setSize (800, 480);
-}
-
-void PlayerHost::timerCallback()
-{
-   #if JUCE_WINDOWS
-    // In a plug-in this window is a child of the host's, and Windows tells a child nothing when the
-    // top-level window is minimised, nor when a host hides its plug-in window: JUCE never learns the
-    // webview is not showing, so WebView2 is never told, and the page went on drawing at sixty frames
-    // a second through 30 s minimised (release checks #17, watched from inside the page by
-    // tools/scripts/watch-webview-pages.mjs). So look. While the host's window is minimised, or ours
-    // is hidden with anything above it, the webview component is hidden: the page stays loaded
-    // (withKeepPageLoadedWhenBrowserIsHidden), its document is hidden, and WebView2 throttles it, as
-    // Microsoft asks an app to do on minimise. A standalone's own window is caught as well, which
-    // JUCE already does for it.
-    auto* peer = webView != nullptr ? getPeer() : nullptr;
-    if (peer == nullptr)
-        return;
-    const auto window = static_cast<HWND> (peer->getNativeHandle());
-    const auto top = GetAncestor (window, GA_ROOT);
-    const bool hidden = ! IsWindowVisible (window) || (top != nullptr && IsIconic (top));
-    if (webView->isVisible() == hidden)
-        webView->setVisible (! hidden);
-   #endif
 }
 
 PlayerHost::~PlayerHost()
