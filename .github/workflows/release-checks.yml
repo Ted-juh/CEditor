@@ -10,10 +10,14 @@
 #                      run on Linux, this check is what found the C++ export failing there.
 #                      The same job then opens that plug-in the way a DAW does, in WebView2, with
 #                      CEditorWebViewEngineProbe: three copies in one process, windows closed and
-#                      reopened, a second process beside them, once with the shared-engine switch
-#                      (CEDITOR_WEBVIEW2_SHARED, docs/webview2-profiles.md) off and once on. Every
-#                      window has to show its panel, and the WebView2 engines it owns have to be one
-#                      per profile folder in use.
+#                      reopened, a second process beside them, once sharing one engine per process
+#                      as shipped and once opted out (CEDITOR_WEBVIEW2_SHARED=0,
+#                      docs/webview2-profiles.md). Every window has to show its panel, and the
+#                      WebView2 engines it owns have to be one per profile folder in use. When a
+#                      run fails, the step prints what the machine was doing (disk, CPU, paging),
+#                      crash and hang reports, and any JVM error file; the probe itself prints the
+#                      stacks of a second process that did not finish. `probe_rounds` repeats it,
+#                      for a failure that only shows now and then.
 #   installer          tools/scripts/package-installer.ps1 end to end: the app and the player
 #                      templates built as shipped, staged, and packed by Inno Setup. The installer
 #                      is uploaded as an artifact.
@@ -30,6 +34,10 @@ on:
         description: Also build the installer (two full builds, about two hours)
         type: boolean
         default: true
+      probe_rounds:
+        description: How many times to run the webview engine probe both ways
+        type: number
+        default: 1
 
 permissions:
   contents: read
@@ -98,19 +106,50 @@ jobs:
       # Three copies in one process, every window opened, closed and reopened, and a second process
       # beside them (tests/WebViewEngineProbe.cpp). Each window logs its webview's profile folder and
       # "panel shown" to the same script log, which is kept below.
-      - name: Open several copies in one process, shared WebView2 engine off and on
-        timeout-minutes: 20   # a window that never closes hangs the probe; it should not cost the job
+      - name: Open several copies in one process, one WebView2 engine shared and opted out
+        timeout-minutes: 45   # a window that never closes hangs the probe; it should not cost the job
         run: |
           $probe = (Get-ChildItem -Recurse build/native -Filter CEditorWebViewEngineProbe.exe | Select-Object -First 1).FullName
           $plugin = (Resolve-Path "build/native/CEditorPlayerVST_artefacts/Release/VST3/NH Probe.vst3").Path
-          "--- switch off"
-          & $probe $plugin --copies 3 --cycles 3
-          $off = $LASTEXITCODE
-          "--- switch on"
-          $env:CEDITOR_WEBVIEW2_SHARED = "1"
-          & $probe $plugin --copies 3 --cycles 3
-          $on = $LASTEXITCODE
-          if ($off -or $on) { exit 1 }
+          $began = Get-Date
+          $env:CE_HANDLER_LOG = "1"   # the C# handler host logs each start-up (CeHost.c)
+          # Disk, CPU and paging every few seconds, printed if a run fails (the probe samples memory).
+          $sampler = Start-ThreadJob {
+            while ($true) {
+              $c = (Get-Counter '\Processor(_Total)\% Processor Time', '\PhysicalDisk(_Total)\% Disk Time',
+                    '\PhysicalDisk(_Total)\Current Disk Queue Length', '\Memory\Pages/sec' -ErrorAction SilentlyContinue).CounterSamples
+              if ($c) { "{0:HH:mm:ss}  cpu {1,3:N0}%  disk busy {2,4:N0}%  queue {3,4:N1}  pages/s {4,6:N0}" -f (Get-Date), $c[0].CookedValue, $c[1].CookedValue, $c[2].CookedValue, $c[3].CookedValue }
+              Start-Sleep -Seconds 2
+            }
+          }
+          $failed = 0
+          for ($round = 1; $round -le [int]"${{ inputs.probe_rounds }}"; $round++) {
+            "--- shared, as shipped (round $round)"
+            Remove-Item Env:CEDITOR_WEBVIEW2_SHARED -ErrorAction SilentlyContinue
+            & $probe $plugin --copies 3 --cycles 3
+            if ($LASTEXITCODE) { $failed++ }
+            "--- opted out, CEDITOR_WEBVIEW2_SHARED=0 (round $round)"
+            $env:CEDITOR_WEBVIEW2_SHARED = "0"
+            & $probe $plugin --copies 3 --cycles 3
+            if ($LASTEXITCODE) { $failed++ }
+          }
+          $samples = Receive-Job $sampler
+          Stop-Job $sampler
+          if ($failed) {
+            "--- disk, CPU and paging while the probe ran"
+            $samples
+            "--- crash and hang reports since the step began"
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $began } -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in 'Application Error', 'Application Hang', 'Windows Error Reporting', '.NET Runtime' } |
+              ForEach-Object { "[{0:HH:mm:ss}] {1}: {2}" -f $_.TimeCreated, $_.ProviderName, (($_.Message -split "`r?`n" | Where-Object { $_ } | Select-Object -First 8) -join ' | ') }
+            # A JVM that fails writes hs_err_pid<pid>.log to its working directory.
+            Get-ChildItem -Path $PWD, $env:TEMP -Filter 'hs_err_pid*.log' -ErrorAction SilentlyContinue |
+              ForEach-Object { "--- $($_.FullName)"; Get-Content $_.FullName -TotalCount 80 }
+            "--- C# handler start-ups"
+            Get-Content "$env:TEMP/ce_handlers_csharp.log" -ErrorAction SilentlyContinue | Select-Object -Last 20
+            "--- Defender real-time protection: $((Get-MpComputerStatus -ErrorAction SilentlyContinue).RealTimeProtectionEnabled)"
+            exit 1
+          }
 
       - name: Keep the player's script log
         if: always()
