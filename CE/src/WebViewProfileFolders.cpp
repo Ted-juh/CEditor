@@ -156,7 +156,9 @@ int sweepProfileFolders (const juce::File& base, const SweepContext& context, ju
 
 bool sharedEnginePerProcess()
 {
-    return juce::SystemStats::getEnvironmentVariable ("CEDITOR_WEBVIEW2_SHARED", {}).trim() == "1";
+    // On unless the environment opts out. "1", which testers set while it was off by default, is on.
+    const auto value = juce::SystemStats::getEnvironmentVariable ("CEDITOR_WEBVIEW2_SHARED", {}).trim().toLowerCase();
+    return ! (value == "0" || value == "false" || value == "off" || value == "no");
 }
 
 juce::File profileFolderForNewWebView (const juce::String& appFolderName)

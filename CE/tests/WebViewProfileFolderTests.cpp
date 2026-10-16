@@ -112,21 +112,22 @@ static void sweep()
     base.deleteRecursively();
 }
 
-static void setShared (bool on)
+/** CEDITOR_WEBVIEW2_SHARED set to `value`, or not set at all for nullptr. */
+static void setSharedSwitch (const char* value)
 {
    #if JUCE_WINDOWS
-    _putenv_s ("CEDITOR_WEBVIEW2_SHARED", on ? "1" : "");
+    _putenv_s ("CEDITOR_WEBVIEW2_SHARED", value != nullptr ? value : "");   // "" removes it
    #else
-    if (on) setenv ("CEDITOR_WEBVIEW2_SHARED", "1", 1); else unsetenv ("CEDITOR_WEBVIEW2_SHARED");
+    if (value != nullptr) setenv ("CEDITOR_WEBVIEW2_SHARED", value, 1); else unsetenv ("CEDITOR_WEBVIEW2_SHARED");
    #endif
 }
 
 static void folderForNewWebView()
 {
     std::cout << "a folder for a new webview\n";
-    // The default, whatever the environment running the test says: docs/webview2-profiles.md
-    // has testers set the switch machine-wide.
-    setShared (false);
+    // A folder per webview, which is what the opt-out asks for, whatever the environment running
+    // the test says: docs/webview2-profiles.md has testers set the switch machine-wide.
+    setSharedSwitch ("0");
     const auto app = "CEditorWebViewProfileTest_" + juce::String (currentProcessId());
     const auto first = profileFolderForNewWebView (app);
     const auto second = profileFolderForNewWebView (app);
@@ -141,20 +142,24 @@ static void folderForNewWebView()
 
 static void sharedEngine()
 {
-    std::cout << "one engine per process, behind CEDITOR_WEBVIEW2_SHARED\n";
+    std::cout << "one engine per process, unless CEDITOR_WEBVIEW2_SHARED=0\n";
     const auto app = "CEditorWebViewProfileTest_" + juce::String (currentProcessId());
-    setShared (false);
-    check (! sharedEnginePerProcess(), "off unless the environment says so");
+    for (auto* off : { "0", "false", "OFF", " no " })
+    {
+        setSharedSwitch (off);
+        check (! sharedEnginePerProcess(), "off with CEDITOR_WEBVIEW2_SHARED=" + juce::String (off).trim());
+    }
     check (profileFolderForNewWebView (app) != profileFolderForNewWebView (app), "and then each webview has a folder of its own");
-    setShared (true);
-    check (sharedEnginePerProcess(), "on with CEDITOR_WEBVIEW2_SHARED=1");
+    setSharedSwitch ("1");
+    check (sharedEnginePerProcess(), "on with =1, as testers set it while it was off by default");
+    setSharedSwitch (nullptr);
+    check (sharedEnginePerProcess(), "on when the environment says nothing");
     const auto shared = profileFolderForNewWebView (app);
     check (shared == profileFolderForNewWebView (app), "every webview of this binary in this process then has the same one");
     const auto name = parseProfileFolderName (shared.getFileName());
     check (name && name->instance == "0" && name->pid == currentProcessId(), "instance 0, still named so the sweep knows whose it is");
     SweepContext context { currentProcessId(), currentProcessStart(), processIsRunning, juce::Time::getCurrentTime() };
     check (! isAbandoned (shared.getFileName(), juce::Time::getCurrentTime(), context), "and kept while the process runs");
-    setShared (false);
 }
 
 int main()

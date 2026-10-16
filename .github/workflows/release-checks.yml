@@ -10,10 +10,10 @@
 #                      run on Linux, this check is what found the C++ export failing there.
 #                      The same job then opens that plug-in the way a DAW does, in WebView2, with
 #                      CEditorWebViewEngineProbe: three copies in one process, windows closed and
-#                      reopened, a second process beside them, once with the shared-engine switch
-#                      (CEDITOR_WEBVIEW2_SHARED, docs/webview2-profiles.md) off and once on. Every
-#                      window has to show its panel, and the WebView2 engines it owns have to be one
-#                      per profile folder in use.
+#                      reopened, a second process beside them, once sharing one engine per process
+#                      as shipped and once opted out (CEDITOR_WEBVIEW2_SHARED=0,
+#                      docs/webview2-profiles.md). Every window has to show its panel, and the
+#                      WebView2 engines it owns have to be one per profile folder in use.
 #   installer          tools/scripts/package-installer.ps1 end to end: the app and the player
 #                      templates built as shipped, staged, and packed by Inno Setup. The installer
 #                      is uploaded as an artifact.
@@ -98,19 +98,19 @@ jobs:
       # Three copies in one process, every window opened, closed and reopened, and a second process
       # beside them (tests/WebViewEngineProbe.cpp). Each window logs its webview's profile folder and
       # "panel shown" to the same script log, which is kept below.
-      - name: Open several copies in one process, shared WebView2 engine off and on
+      - name: Open several copies in one process, one WebView2 engine shared and opted out
         timeout-minutes: 20   # a window that never closes hangs the probe; it should not cost the job
         run: |
           $probe = (Get-ChildItem -Recurse build/native -Filter CEditorWebViewEngineProbe.exe | Select-Object -First 1).FullName
           $plugin = (Resolve-Path "build/native/CEditorPlayerVST_artefacts/Release/VST3/NH Probe.vst3").Path
-          "--- switch off"
+          "--- shared, as shipped"
           & $probe $plugin --copies 3 --cycles 3
-          $off = $LASTEXITCODE
-          "--- switch on"
-          $env:CEDITOR_WEBVIEW2_SHARED = "1"
+          $shared = $LASTEXITCODE
+          "--- opted out (CEDITOR_WEBVIEW2_SHARED=0)"
+          $env:CEDITOR_WEBVIEW2_SHARED = "0"
           & $probe $plugin --copies 3 --cycles 3
-          $on = $LASTEXITCODE
-          if ($off -or $on) { exit 1 }
+          $optedOut = $LASTEXITCODE
+          if ($shared -or $optedOut) { exit 1 }
 
       - name: Keep the player's script log
         if: always()

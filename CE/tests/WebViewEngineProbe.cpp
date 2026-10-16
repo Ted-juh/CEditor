@@ -1,12 +1,12 @@
 // WebViewEngineProbe — a DAW, as far as the player's webview can tell.
 //
-// The shared-engine switch (CEDITOR_WEBVIEW2_SHARED, WebViewProfileFolders.h) gives every webview
-// one plug-in binary makes in one process the same WebView2 profile folder, so the copies of a panel
-// in a DAW share one engine instead of starting about 200 MB of browser each. It is off by default
-// because a shared folder is what once blanked a second panel, and what it waits on is somebody
-// opening several copies in a host and watching them draw. This is that somebody: it loads an
-// exported player plug-in several times in one process, opens every editor in a window of its own,
-// and checks each panel came up — then does the things a session does to them.
+// Every webview one plug-in binary makes in one process gets the same WebView2 profile folder
+// (WebViewProfileFolders.h), so the copies of a panel in a DAW share one engine instead of starting
+// a browser each; CEDITOR_WEBVIEW2_SHARED=0 opts out. It was off by default until this probe showed
+// it working, because a shared folder is what once blanked a second panel, and what it waited on was
+// somebody opening several copies in a host and watching them draw. This is that somebody: it loads
+// an exported player plug-in several times in one process, opens every editor in a window of its
+// own, and checks each panel came up — then does the things a session does to them.
 //
 //   1. open N copies, all windows at once;
 //   2. close one window and reopen it while the others stay open;
@@ -21,10 +21,10 @@
 // its webview's profile folder when it opens, then "page ready" when the page answers and "panel
 // shown" when the panel is in it. A webview that never started logs neither. On Windows it also
 // counts the WebView2 engines (browser processes) this process owns and their memory, and checks
-// the count is the number of profile folders in use: one with the switch, one per window without.
+// the count is the number of profile folders in use: one shared, one per window opted out.
 //
 // Not a ctest: it needs an exported plug-in and a desktop. Build it with
-// -DCEDITOR_WEBVIEW_ENGINE_PROBE=ON and run it twice, once with CEDITOR_WEBVIEW2_SHARED=1:
+// -DCEDITOR_WEBVIEW_ENGINE_PROBE=ON and run it twice, once with CEDITOR_WEBVIEW2_SHARED=0:
 //
 //   CEditorWebViewEngineProbe <player.vst3> [--copies 3] [--cycles 3] [--timeout 120]
 //

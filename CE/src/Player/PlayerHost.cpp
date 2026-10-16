@@ -134,10 +134,11 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         });
     });
 
-    // Unique WebView2 user-data folder PER INSTANCE. WebView2 cannot share a folder across
-    // processes/instances, so a fixed folder makes a second user (e.g. a plugin loaded while a
-    // standalone runs, or two plugin instances) fail to create its WebView -> blank panel. The
-    // folders processes that have gone left behind are swept (WebViewProfileFolders.h).
+    // Never a fixed WebView2 user-data folder: one a second process also used (a plug-in loaded
+    // while a standalone ran) failed to create its WebView -> blank panel. The folder is this
+    // process's and this binary's, shared by its copies so they share one engine, or one per
+    // window with CEDITOR_WEBVIEW2_SHARED=0; the folders processes that have gone left behind are
+    // swept (WebViewProfileFolders.h).
     auto userDataFolder = ceditor::webview::profileFolderForNewWebView ("CEditorPlayer_WebView2");
 
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()

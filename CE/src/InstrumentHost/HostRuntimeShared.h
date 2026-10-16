@@ -140,7 +140,8 @@ inline juce::WebBrowserComponent::Options
 makeHostWebViewOptions (const juce::String& userDataFolderName,
                         std::function<void (const juce::var& payload)> onCommand)
 {
-    // One per webview, as the player's; the folders gone processes left are swept (WebViewProfileFolders.h).
+    // As the player's: this process's and this binary's, shared by its webviews (one per webview with
+    // CEDITOR_WEBVIEW2_SHARED=0); the folders gone processes left are swept (WebViewProfileFolders.h).
     const auto userDataFolder = ceditor::webview::profileFolderForNewWebView (userDataFolderName);
 
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
