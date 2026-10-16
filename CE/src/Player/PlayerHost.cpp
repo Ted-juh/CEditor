@@ -8,6 +8,16 @@
 #include <cstring>
 #include <optional>
 
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
+
 namespace
 {
 juce::File getInstalledDistFolder()
@@ -190,6 +200,7 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     {
         if (onWebViewStage != nullptr) onWebViewStage ("panel shown");
         if (onResyncRequest != nullptr) onResyncRequest();
+        if (! hostWindowShown) sendHostWindow();   // a page loaded behind a minimised host
     });
 
     // A ce.storage write the page made (scriptStores, in PlayerHost.h).
@@ -237,7 +248,43 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
    #endif
 
+   #if JUCE_WINDOWS
+    startTimerHz (4);   // whether the host's window is showing ours (timerCallback)
+   #endif
+
     setSize (800, 480);
+}
+
+void PlayerHost::timerCallback()
+{
+   #if JUCE_WINDOWS
+    // In a plug-in this window is a child of the host's, and Windows tells a child nothing when the
+    // top-level window is minimised, nor when a host hides its plug-in window, so the page goes on
+    // drawing for nobody (release checks #17: sixty frames a second through 30 s minimised). The
+    // page is TOLD, and nothing is hidden: a hidden webview drops every event sent to it, and a
+    // hidden page gets no frames and runs its timers once a second, while with the window open it
+    // is what drives free-running modulators, scripts' timers and automation out to the hardware.
+    // Told, the page stops redrawing what cannot be seen and carries on with the rest
+    // (stores/hostWindow.js).
+    auto* peer = webView != nullptr ? getPeer() : nullptr;
+    if (peer == nullptr)
+        return;
+    const auto window = static_cast<HWND> (peer->getNativeHandle());
+    const auto top = GetAncestor (window, GA_ROOT);
+    const bool shown = IsWindowVisible (window) && ! (top != nullptr && IsIconic (top));
+    if (shown != hostWindowShown)
+    {
+        hostWindowShown = shown;
+        sendHostWindow();
+    }
+   #endif
+}
+
+void PlayerHost::sendHostWindow()
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("shown", hostWindowShown);
+    emitToWebView ("hostWindow", juce::var (obj));
 }
 
 PlayerHost::~PlayerHost()

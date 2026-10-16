@@ -9,6 +9,7 @@
   import { registerDocumentFonts } from './CE_Application/utils/documentFonts.js';
   import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
+  import { hostWindowShown } from './CE_Application/stores/hostWindow.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
   import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
@@ -610,6 +611,7 @@
     let deviceUnsub = null;
     let restoreToken = null;
     let sessionToken = null;
+    let hostWindowToken = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
       listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
@@ -641,6 +643,9 @@
       });
       // A host that restores state into an open window: from here on this is a saved project, and
       // a read that has not started yet must not run over it.
+      // Whether the host's window is showing ours (stores/hostWindow.js): a plug-in's page is not
+      // told by the browser, so PlayerHost looks and says.
+      hostWindowToken = backend.addEventListener('hostWindow', (payload) => hostWindowShown.set(payload?.shown !== false));
       sessionToken = backend.addEventListener('sessionRestored', () => {
         sessionRestored = true;
         if (synthSyncTimer) { clearTimeout(synthSyncTimer); synthSyncTimer = 0; startupReadPort = null; }
@@ -665,6 +670,8 @@
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
       if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
+      if (backend && hostWindowToken != null) backend.removeEventListener(hostWindowToken);
+      hostWindowShown.set(true);
       if (portsUnsub) portsUnsub();
       if (inputsUnsub) inputsUnsub();
       if (inMsgUnsub) inMsgUnsub();

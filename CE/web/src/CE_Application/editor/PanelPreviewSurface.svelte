@@ -4,6 +4,7 @@
   import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { sharedAnimationFrame } from '../utils/sharedAnimationFrame.js';
+  import { hostWindowShown } from '../stores/hostWindow.js';
   import { onDestroy, setContext, untrack } from 'svelte';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import { resolveControlFamily } from '../models/controlSetFamilies.js';
@@ -2344,7 +2345,20 @@
   let orbitClock = $state(0);
   // Every free-running control's ticker steps in one shared frame, and the clock moves once after
   // all of them; one loop each moved it once per ticker (utils/sharedAnimationFrame.js says why).
-  const orbitFrame = sharedAnimationFrame(() => { orbitClock = Date.now(); noteShownSteps(); });
+  //
+  // While the host's window is minimised or hides ours (stores/hostWindow.js), the clock and the
+  // steps shown stand still: they are what redraws the running controls, and nobody can see them.
+  // The tickers do not: what they send (values to bound targets, MIDI, notes, script events) is
+  // sent from the ticker loops themselves, every frame as before. Shown again, one move redraws
+  // every running control where it now is.
+  let hostShown = true;
+  const orbitFrame = sharedAnimationFrame(() => { if (hostShown) { orbitClock = Date.now(); noteShownSteps(); } });
+  const stopWatchingHostWindow = hostWindowShown.subscribe((shown) => {
+    const wasShown = hostShown;
+    hostShown = shown !== false;
+    if (hostShown && !wasShown) { orbitClock = Date.now(); noteShownSteps(); }
+  });
+  onDestroy(stopWatchingHostWindow);
   // WHAT A STEP SEQUENCE DRAWS MOVES WITH ITS STEP, NOT ITS CLOCK. Turing, Arp and Phrase are drawn
   // from the step they are on (their renderers' `head` and `playStep`), so they read their entry
   // here instead of orbitClock: it is worked out every frame, after the tickers, from what their
