@@ -119,6 +119,20 @@ and is collected about 12 s later, from 327 to 121 MB. What keeps a minimised We
 growing is not yet known: its growth does not follow its own CPU, which points at something reaching
 it from outside rather than its animation.
 
+To see inside the pages, release checks watch the first shared run with
+`tools/scripts/watch-webview-pages.mjs`. WebView2 is started with a debugging port of its own
+choosing (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0`, so a second process
+cannot collide with the first), and the watcher finds each browser's port in its profile folder
+and reports every page's visibility, the frames and timers it asked for, the events the plug-in
+pushed in and the page sent out, its heap, and what allocated, with the time, so its lines can be
+set beside the probe's. On a Windows machine, the same by hand:
+
+```
+set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0
+start "" build\native\Release\CEditorWebViewEngineProbe.exe "<plug-in>.vst3"
+node tools\scripts\watch-webview-pages.mjs --root "%TEMP%\CEditorPlayer_WebView2"
+```
+
 ### Checking it in a DAW
 
 On a Windows machine with an exported player plug-in installed:
