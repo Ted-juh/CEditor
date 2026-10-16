@@ -37,6 +37,10 @@
   let geom = $derived(orbitGeometry(width, height, PAD));
   let nodes = $derived(orbitNodes(control));
   let dragIndex = $derived(cfg.__drag !== undefined && cfg.__drag !== null ? n(cfg.__drag, -1) : -1);
+  // Moving: the preview's ticker is driving it (it injects __phase; the editor's canvas does not).
+  // While it moves it is a compositing layer of its own, so each frame re-rasters this drawing alone
+  // rather than the patch of panel beneath it as well.
+  let moving = $derived(cfg.running !== false && cfg.__phase !== undefined);
 
   let ringCss = $derived(css(cfg.ringColour, 'rgba(42,107,168,0.2)'));
   let centreCss = $derived(css(cfg.centreColour, 'rgba(58,58,68,1)'));
@@ -63,7 +67,7 @@
   }));
 </script>
 
-<svg class="orbit" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
+<svg class="orbit" class:moving width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <!-- Orbit rings -->
   {#if cfg.showRings !== false}
     {#each sats as sat (sat.i)}
@@ -75,37 +79,38 @@
 
   <!-- Centre hub -->
   <circle cx={geom.cx} cy={geom.cy} r="3.5" fill={centreCss} />
-  <circle cx={geom.cx} cy={geom.cy} r="7" fill="none" stroke={centreCss} stroke-width="1" opacity="0.5" />
+  <circle cx={geom.cx} cy={geom.cy} r="7" fill="none" stroke={centreCss} stroke-width="1" stroke-opacity="0.5" />
 
   {#each sats as sat (sat.i)}
     <!-- Spoke -->
     {#if cfg.showSpokes !== false && sat.s.enabled}
-      <line x1={geom.cx} y1={geom.cy} x2={sat.here.px} y2={sat.here.py} stroke={sat.colour} stroke-width="1" opacity="0.28" />
+      <line x1={geom.cx} y1={geom.cy} x2={sat.here.px} y2={sat.here.py} stroke={sat.colour} stroke-width="1" stroke-opacity="0.28" />
     {/if}
     <!-- Comet trail -->
     {#each sat.trail as t, k (k)}
-      <circle cx={t.px} cy={t.py} r={Math.max(1, sat.r * (0.35 + 0.4 * t.o))} fill={sat.colour} opacity={t.o} />
+      <circle cx={t.px} cy={t.py} r={Math.max(1, sat.r * (0.35 + 0.4 * t.o))} fill={sat.colour} fill-opacity={t.o} />
     {/each}
   {/each}
 
   {#each sats as sat (sat.i)}
     <!-- Satellite: glow halo + body + specular -->
     {#if sat.s.enabled}
-      <circle cx={sat.here.px} cy={sat.here.py} r={sat.r + 5} fill={sat.colour} opacity={0.16 + sat.out * 0.22} />
+      <circle cx={sat.here.px} cy={sat.here.py} r={sat.r + 5} fill={sat.colour} fill-opacity={0.16 + sat.out * 0.22} />
       <circle cx={sat.here.px} cy={sat.here.py} r={sat.r} fill={sat.colour}
               stroke={dragIndex === sat.i ? 'rgba(255,255,255,1)' : 'rgba(0,0,0,0.5)'} stroke-width={dragIndex === sat.i ? 2 : 1} />
       <circle cx={sat.here.px - sat.r * 0.3} cy={sat.here.py - sat.r * 0.3} r={Math.max(1, sat.r * 0.3)} fill="rgba(255,255,255,0.85)" />
     {:else}
-      <circle cx={sat.here.px} cy={sat.here.py} r="4" fill="none" stroke={sat.colour} stroke-width="1" opacity="0.4" stroke-dasharray="2 2" />
+      <circle cx={sat.here.px} cy={sat.here.py} r="4" fill="none" stroke={sat.colour} stroke-width="1" stroke-opacity="0.4" stroke-dasharray="2 2" />
     {/if}
     <!-- Optional value readout -->
     {#if cfg.showValues === true && sat.s.enabled}
       <text x={sat.here.px} y={sat.here.py - sat.r - 4} font-size={labelSize} fill={labelCss} text-anchor="middle"
-            style="font-variant-numeric:tabular-nums" opacity="0.9">{Math.round(sat.out * 100)}</text>
+            style="font-variant-numeric:tabular-nums" fill-opacity="0.9">{Math.round(sat.out * 100)}</text>
     {/if}
   {/each}
 </svg>
 
 <style>
   .orbit { position: absolute; inset: 0; display: block; pointer-events: none; overflow: visible; }
+  .orbit.moving { will-change: transform; }
 </style>
