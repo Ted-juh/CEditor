@@ -73,7 +73,14 @@ public:
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
     juce::var getMonitorEvents() const;
+    /** Send the UI the monitor events it has not been sent: midiMonitorEvents, { events, full: false }.
+        Coalesced to 20 a second, and what is new is worked out when it is sent, so nothing a
+        coalesced call held back is lost. Every caller goes through here; the payload of an
+        emitDeviceEvent ("midiMonitorEvents", ...) is not used. */
     void publishMonitorEvents();
+    /** The whole log, for a page that has just opened: { events, full: true }. What it holds is
+        not sent again by publishMonitorEvents. */
+    juce::var takeMonitorSnapshot();
     /** Forget the monitor log. The engine owns it, so clearing only the UI's copy does nothing. */
     void clearMonitorEvents();
     juce::var getDiagnostics() const;
@@ -247,6 +254,8 @@ private:
     std::map<juce::String, std::map<juce::String, juce::var>> runtimeState;
     juce::Array<juce::var> monitorEvents;
     juce::int64 monitorEventSequence = 0;
+    juce::int64 lastPublishedMonitorEventId = 0;   // the newest event the UI has been sent
+    juce::var takeNewMonitorEvents();
     double lastMonitorEmitMs = -1000.0;
     bool monitorEmitPending = false;
     double lastInboundHeavyEmitMs = 0.0;  // throttles per-incoming heavy bridge emits (CC streams)

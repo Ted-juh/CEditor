@@ -13,8 +13,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  MONITOR_EVENT_LIMIT,
   filterMonitorEvents,
   isMonitorFailure,
+  mergeMonitorEvents,
   monitorCounts,
   monitorEventLine,
   monitorFacets,
@@ -128,4 +130,35 @@ test('the counts say whether anything is happening at all', () => {
   assert.deepEqual(counts, { sent: 2, received: 1, failed: 1, total: 3 });
   assert.deepEqual(monitorCounts([]), { sent: 0, received: 0, failed: 0, total: 0 });
   assert.deepEqual(monitorCounts(undefined), { sent: 0, received: 0, failed: 0, total: 0 });
+});
+
+test('what is new is appended to the log, and the whole log replaces it', () => {
+  // C++ sends only the events the page has not had ({ full: false }); a page that has just opened,
+  // or a Clear, gets the whole log ({ full: true }). A bare array is a whole log too.
+  const ids = (log) => log.map((e) => e.eventId);
+  const held = [event({ eventId: 1 }), event({ eventId: 2 })];
+  assert.deepEqual(ids(mergeMonitorEvents(held, { events: [event({ eventId: 3 })], full: false })), [1, 2, 3]);
+  assert.deepEqual(ids(mergeMonitorEvents(held, { events: [event({ eventId: 7 })], full: true })), [7]);
+  assert.deepEqual(mergeMonitorEvents(held, { events: [], full: true }), [], 'a Clear empties it');
+  assert.deepEqual(ids(mergeMonitorEvents(held, [event({ eventId: 9 })])), [9]);
+  assert.deepEqual(ids(mergeMonitorEvents([], { events: [event({ eventId: 4 })], full: false })), [4]);
+});
+
+test('an event already held is not added twice, and nothing new keeps the same log', () => {
+  // A snapshot asked for while a delta was on its way can overlap it.
+  const held = [event({ eventId: 1 }), event({ eventId: 2 })];
+  const merged = mergeMonitorEvents(held, { events: [event({ eventId: 2 }), event({ eventId: 3 })], full: false });
+  assert.deepEqual(merged.map((e) => e.eventId), [1, 2, 3]);
+  assert.equal(mergeMonitorEvents(held, { events: [], full: false }), held, 'an empty delta changes nothing');
+  assert.equal(mergeMonitorEvents(held, { events: [event({ eventId: 1 })], full: false }), held);
+  assert.equal(mergeMonitorEvents(held, undefined), held);
+});
+
+test('the log keeps the last 500, as C++ does', () => {
+  const many = Array.from({ length: MONITOR_EVENT_LIMIT }, (_, i) => event({ eventId: i + 1 }));
+  const merged = mergeMonitorEvents(many, { events: [event({ eventId: 501 }), event({ eventId: 502 })], full: false });
+  assert.equal(merged.length, MONITOR_EVENT_LIMIT);
+  assert.equal(merged[0].eventId, 3);
+  assert.equal(merged.at(-1).eventId, 502);
+  assert.equal(mergeMonitorEvents([], { events: [...many, event({ eventId: 501 })], full: true }).length, MONITOR_EVENT_LIMIT);
 });

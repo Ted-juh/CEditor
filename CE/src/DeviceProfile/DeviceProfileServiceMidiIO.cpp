@@ -479,7 +479,7 @@ void DeviceProfileService::timerCallback()
 
     auto now = nowMs();
     if (monitorEmitPending && now - lastMonitorEmitMs >= 50.0)
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
     // Remove every due item before sending any of them. sendTransactionNow may queue the
     // remainder of a multi-message transaction; pushing onto a deque invalidates the iterator
     // used by the old single loop.

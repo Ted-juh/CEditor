@@ -131,6 +131,7 @@ import { DEFAULT_DEVICE_ROLE, DEFAULT_ECHO_WINDOW_MS } from './deviceConstants.j
 // this file as the inbound seam in its own header; the outbound half in bridge.js imports its
 // counterpart correctly. Dependency-free by design, so there is no cycle to avoid here.
 import { filterInboundMidi } from '../scripting/midiFilters.js';
+import { mergeMonitorEvents } from '../utils/midiMonitor.js';
 
 // Echo window per role: role mapping timingOverrides.echoWindowMs wins, then the profile
 // source's timing.echoWindowMs, then the conservative default. The parsed value is cached per
@@ -802,7 +803,7 @@ export function initDeviceProfileBridge() {
   });
 
   onMidiMonitorEvents((payload) => {
-    midiMonitorEvents.set(Array.isArray(payload) ? payload : []);
+    midiMonitorEvents.update((current) => mergeMonitorEvents(current, payload));
   });
 
   onDeviceDiagnostics((payload) => {
