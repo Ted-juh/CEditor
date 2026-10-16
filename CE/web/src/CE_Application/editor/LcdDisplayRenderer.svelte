@@ -19,6 +19,8 @@
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import { composeLayout, findLayout, resolveActiveLayoutId, infoFraction, WIDGET_ZONE_KINDS, regionStartOffset } from '../utils/lcdZones.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
+  import { hostWindowShown } from '../stores/hostWindow.js';
+  import { onDestroy } from 'svelte';
 
   let { control = null, allControls = [], width = 0, height = 0 } = $props();
 
@@ -75,6 +77,10 @@
   // frameTime is milliseconds since the animation (re)started, not page load,
   // so a finite repeat count can settle deterministically.
   let frameTime = $state(0);
+  // Unseen (stores/hostWindow.js), frameTime stands still and nothing redraws; the loop runs on,
+  // so shown again the display is where it would have been, and a finite scroll still ends.
+  let hostShown = true;
+  onDestroy(hostWindowShown.subscribe((shown) => { hostShown = shown !== false; }));
   let scrollDir = $derived(String(display?.scroll ?? 'off').trim().toLowerCase());
   let scrollSpeed = $derived(Math.max(0, numberOr(display?.scrollSpeed, 4)));
   let scrollMode = $derived(String(display?.scrollMode ?? 'loop').trim().toLowerCase());
@@ -137,7 +143,6 @@
     const loop = (t) => {
       if (origin < 0) origin = t;
       const elapsedMs = t - origin;
-      frameTime = elapsedMs;
 
       const elapsedChars = scrolling ? (elapsedMs / 1000) * scrollSpeed : 0;
       // scrollRepeat 0 = infinite; otherwise finish after N of the longest cycle.
@@ -146,6 +151,8 @@
         && (maxScrollPeriod === 0 || elapsedChars >= scrollRepeat * maxScrollPeriod);
       const scrollNeedsMore = scrolling && !finiteDone;
       const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore || zoneScrollActive || animActive || widgetMotion;
+      // The last frame is drawn even unseen, or a scroll that ended while minimised stays mid-way.
+      if (hostShown || !needMore) frameTime = elapsedMs;
       if (needMore) raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);

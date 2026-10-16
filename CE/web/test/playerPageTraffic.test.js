@@ -21,6 +21,8 @@ const HOST_H = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.h'), 'utf8');
 const HOST_CPP = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.cpp'), 'utf8');
 const PLAYER = readFileSync(join(REPO, 'CE/web/src/Player.svelte'), 'utf8');
 const PREVIEW = readFileSync(join(REPO, 'CE/web/src/CE_Application/editor/PanelPreviewSurface.svelte'), 'utf8');
+const LCD = readFileSync(join(REPO, 'CE/web/src/CE_Application/editor/LcdDisplayRenderer.svelte'), 'utf8');
+const PIXEL = readFileSync(join(REPO, 'CE/web/src/CE_Application/editor/PixelDisplayRenderer.svelte'), 'utf8');
 
 const body = (source, signature) => {
   const start = source.indexOf(signature);
@@ -81,4 +83,31 @@ test('unseen, the preview stops redrawing and its tickers carry on', () => {
     const loop = PREVIEW.slice(start, PREVIEW.indexOf('\n  }\n', start));
     assert.ok(!loop.includes('hostShown'), `${ticker} waits for the host window; what it sends must not`);
   }
+});
+
+test('unseen, the other redraw clocks stand still too, and what runs them runs on', () => {
+  // Every clock that only redraws, each with a loop of its own (a review found the first two
+  // running at sixty a second behind the shared frame's gate). Each loop keeps going and only stops
+  // moving its clock, so the peak still decays by the time and the sequencer still fires its steps.
+  const loopOf = (source, signature) => {
+    const start = source.indexOf(signature);
+    assert.ok(start > -1, `${signature} is gone`);
+    return source.slice(start, source.indexOf('\n  }\n', start));
+  };
+  const meter = loopOf(PREVIEW, 'function ensureMeterTicker()');
+  assert.match(meter, /if \(hostShown\) meterClock = Date\.now\(\);/);
+  assert.equal(meter.match(/meterClock = /g).length, 1, 'the meter clock moves unseen somewhere else');
+  const seq = loopOf(PREVIEW, 'function ensureSeqTicker()');
+  assert.match(seq, /if \(hostShown\) seqClock = now;/);
+  assert.equal(seq.match(/hostShown/g).length, 1, 'the sequencer loop looks at the host window for more than its clock');
+  assert.ok(seq.indexOf('if (hostShown)') > seq.lastIndexOf('seqStepOnce('), 'the sequencer waits for the host window before its steps');
+  // The displays: the LCD draws its last frame even unseen, so a scroll that ends then is not left mid-way.
+  for (const [name, source] of [['LcdDisplayRenderer', LCD], ['PixelDisplayRenderer', PIXEL]]) {
+    assert.ok(source.includes("import { hostWindowShown } from '../stores/hostWindow.js';"), `${name} does not watch the host window`);
+    assert.ok(source.includes('onDestroy(hostWindowShown.subscribe((shown) => { hostShown = shown !== false; }));'), `${name} keeps watching after it is gone`);
+  }
+  assert.match(LCD, /if \(hostShown \|\| !needMore\) frameTime = elapsedMs;\n\s*if \(needMore\) raf = requestAnimationFrame\(loop\);/);
+  assert.equal((LCD.match(/frameTime = elapsedMs/g) ?? []).length, 1, 'the LCD clock moves unseen');
+  assert.match(PIXEL, /if \(hostShown\) frameTime = t - origin;/);
+  assert.match(PIXEL, /setInterval\(\(\) => \{ if \(hostShown\) frameTime = Date\.now\(\) - origin; \}, 100\)/);
 });

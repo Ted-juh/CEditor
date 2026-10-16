@@ -1681,7 +1681,7 @@
       const anyPeak = flatControls(orderedControls ?? []).some((c) =>
         isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
-      meterClock = Date.now();
+      if (hostShown) meterClock = Date.now();   // the peak decays by the time, seen or not
       meterAnimationFrame = requestAnimationFrame(loop);
     };
     meterAnimationFrame = requestAnimationFrame(loop);
@@ -2348,9 +2348,10 @@
   //
   // While the host's window is minimised or hides ours (stores/hostWindow.js), the clock and the
   // steps shown stand still: they are what redraws the running controls, and nobody can see them.
-  // The tickers do not: what they send (values to bound targets, MIDI, notes, script events) is
-  // sent from the ticker loops themselves, every frame as before. Shown again, one move redraws
-  // every running control where it now is.
+  // So do the meter's and the step sequencer's clocks, and the displays' own (LcdDisplayRenderer,
+  // PixelDisplayRenderer). The tickers do not: what they send (values to bound targets, MIDI,
+  // notes, script events) is sent from the ticker loops themselves, every frame as before. Shown
+  // again, one move redraws every running control where it now is.
   let hostShown = true;
   const orbitFrame = sharedAnimationFrame(() => { if (hostShown) { orbitClock = Date.now(); noteShownSteps(); } });
   const stopWatchingHostWindow = hostWindowShown.subscribe((shown) => {
@@ -3857,7 +3858,7 @@
         }
         if (guard >= 16) seqAccMs[id] = 0;   // gave up catching up; resume from now
       }
-      seqClock = now;
+      if (hostShown) seqClock = now;   // the playhead drawn; the steps above fire regardless
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);

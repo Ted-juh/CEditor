@@ -135,13 +135,15 @@ watcher saw it (release checks #17):
 So the page is told, and nothing is hidden. On Windows `PlayerHost` looks four times a second at
 whether its window is visible and the top-level window above it is not minimised, and sends the
 page `hostWindow` when that changes, and again when a page loaded behind a minimised host asks for
-its panel. The preview's shared frame, which moves the clock and the steps shown and so redraws the
-running controls, waits while the window is unseen. The tickers (Orbit, Arp, Looper and the rest)
-send their values, notes, MIDI and script events from loops of their own, and carry on. In #20 the
-watcher saw a page's work fall from 2.2 s to 0.2 s in every 5 s when `hostWindow` arrived, with the
-MIDI it sent unchanged at 18 messages a second; it still asks for frames, being `visible` to
-Chromium, and they do nothing. `CE/web/test/playerPageTraffic.test.js` holds all of this in place.
-Off Windows the page is never told and draws as before.
+its panel. While the window is unseen, every clock that only redraws stands still: the preview's
+shared frame (the clock and the steps shown, which redraw the running controls), the meter's peak
+decay, the step sequencer's playhead and the LCD and pixel displays' own. Their loops run on, so
+shown again everything is where it would have been. The tickers (Orbit, Arp, Looper, the step
+sequencer and the rest) send their values, notes, MIDI and script events from those loops, and
+carry on. In #20 the watcher saw a page's work fall from 2.2 s to 0.2 s in every 5 s when
+`hostWindow` arrived, with the MIDI it sent unchanged at 18 messages a second; it still asks for
+frames, being `visible` to Chromium, and they do nothing. `CE/web/test/playerPageTraffic.test.js`
+holds all of this in place. Off Windows the page is never told and draws as before.
 
 Asking WebView2 for its low memory target while hidden (`MemoryUsageTargetLevel`, tried as part of
 JUCE patch 9) made no difference and came out.
