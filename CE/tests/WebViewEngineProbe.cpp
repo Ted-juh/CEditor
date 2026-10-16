@@ -13,7 +13,9 @@
 //   3. close every window and reopen them all straight away, `cycles` times — with the switch on,
 //      the new webviews ask for a folder whose engine may still be shutting down;
 //   4. start a second process (this program again, one copy) while the windows are open, as the
-//      standalone player beside a DAW would be.
+//      standalone player beside a DAW would be: once as a program started from Explorer is (no
+//      console, no standard handles), once as one started from a terminal is (its output attached).
+//      It says where it is before each step, so one that never finishes says where it stopped.
 //
 // "Came up" is read from the player's own log (%TEMP%\ceditor-player-scripts.log): the editor logs
 // its webview's profile folder when it opens, then "page ready" when the page answers and "panel
@@ -59,6 +61,14 @@ void say (const juce::String& line)
     std::cout << line << std::endl;
     if (reportFile != juce::File())
         reportFile.appendText (line + "\n");
+}
+
+/** "  .. 3.2 s  loading the plug-in": a line before each thing that can stop the process, so a
+    second process that never finishes says where it stopped. */
+void step (const juce::String& what)
+{
+    static const auto start = juce::Time::getMillisecondCounterHiRes();
+    say ("  .. " + juce::String ((juce::Time::getMillisecondCounterHiRes() - start) / 1000.0, 1) + " s  " + what);
 }
 
 void check (bool condition, const juce::String& label)
@@ -265,6 +275,7 @@ public:
     bool load()
     {
         juce::OwnedArray<juce::PluginDescription> types;
+        step ("reading the plug-in module");
         format.findAllTypesForFile (types, bundle.getFullPathName());
         if (types.isEmpty())
         {
@@ -274,12 +285,14 @@ public:
         for (size_t i = 0; i < copies.size(); ++i)
         {
             juce::String error;
+            step ("creating copy " + juce::String ((int) i + 1));
             copies[i].plugin = format.createInstanceFromDescription (*types[0], 44100.0, 512, error);
             if (copies[i].plugin == nullptr)
             {
                 check (false, "loaded copy " + juce::String ((int) i + 1) + ": " + error);
                 return false;
             }
+            step ("preparing copy " + juce::String ((int) i + 1));
             copies[i].plugin->prepareToPlay (44100.0, 512);
         }
         say ("loaded " + juce::String ((int) copies.size()) + " copies of " + types[0]->name);
@@ -288,6 +301,8 @@ public:
 
     void open (size_t i)
     {
+        if (copies.size() == 1)
+            step ("opening the window");
         auto* editor = copies[i].plugin->createEditorIfNeeded();
         copies[i].window = std::make_unique<EditorWindow> (copies[i].plugin->getName() + " " + juce::String ((int) i + 1), editor, (int) i);
     }
@@ -333,6 +348,7 @@ public:
     {
         shared = ceditor::webview::sharedEnginePerProcess();
         say (juce::String ("shared engine switch (CEDITOR_WEBVIEW2_SHARED): ") + (shared ? "on" : "off"));
+        step ("looking for a desktop");
         if (juce::Desktop::getInstance().getDisplays().getPrimaryDisplay() == nullptr)
         {
             check (false, "a desktop to open the windows on (on Linux, DISPLAY: Xvfb will do)");
@@ -370,15 +386,24 @@ public:
             expectEngines ("close all and reopen at once, cycle " + juce::String (c));
         }
 
-        // The standalone beside a DAW: another process with the same panel, while these are open.
-        // It reports through a file, not a pipe: on Linux the plug-in's webview forks, and the fork
-        // would hold a pipe open after the second process had gone.
+        // The standalone beside a DAW: another process with the same panel, while these are open,
+        // started both ways a standalone is: from Explorer or a shortcut (no console and no standard
+        // handles at all), and from a terminal (its output attached).
+        secondProcess (selfPath, "started like a program from Explorer", 0);
+        secondProcess (selfPath, "started like a program from a terminal", juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr);
+    }
+
+    /** Runs this program again with one copy, while this one's windows are open. It reports through a
+        file, not its output: on Linux the plug-in's webview forks, and the fork would hold a pipe open
+        after the second process had gone (the output, when attached, is never read for that reason). */
+    void secondProcess (const juce::String& selfPath, const juce::String& how, int streamFlags)
+    {
         const auto report = juce::File::createTempFile ("webview-engine-probe.txt");
         juce::ChildProcess second;
         const auto started = second.start (juce::StringArray { selfPath, bundle.getFullPathName(), "--child",
                                                                "--timeout", juce::String (timeout, 0),
-                                                               "--report", report.getFullPathName() }, 0);
-        check (started, "second process started");
+                                                               "--report", report.getFullPathName() }, streamFlags);
+        check (started, "second process " + how + ": started");
         if (started)
         {
             const auto reported = [&] { return report.loadFileAsString().contains ("webview engine probe: "); };
@@ -390,8 +415,8 @@ public:
                 if (line.isNotEmpty())
                     say ("    | " + line);
             check (report.loadFileAsString().contains ("webview engine probe: all stages passed"),
-                   "second process showed its panel beside these");
-            check (exited && second.getExitCode() == 0, "second process exited cleanly");
+                   "second process " + how + ": showed its panel beside these");
+            check (exited && second.getExitCode() == 0, "second process " + how + ": exited cleanly");
         }
         report.deleteFile();
     }
