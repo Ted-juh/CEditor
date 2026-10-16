@@ -324,6 +324,24 @@ double cpuSeconds (HANDLE process)
     return (double) (ticks (kernel) + ticks (user)) / 1.0e7;
 }
 
+/** CPU seconds WebView2's renderer processes in this process's tree have had: the pages' own work. */
+double webViewRendererCpu()
+{
+    double total = 0;
+    for (const auto& p : ownTree())
+    {
+        if (! isWebView2 (p))
+            continue;
+        if (const auto handle = OpenProcess (PROCESS_QUERY_LIMITED_INFORMATION, FALSE, p.pid))
+        {
+            if (webViewRole (handle) == "renderer")
+                total += cpuSeconds (handle);
+            CloseHandle (handle);
+        }
+    }
+    return total;
+}
+
 double privateMegabytes (HANDLE process)
 {
     PROCESS_MEMORY_COUNTERS_EX counters {};
@@ -602,28 +620,38 @@ public:
     void minimiseAndRestore()
     {
        #if JUCE_WINDOWS
-        const auto opened = webViewMemory();
+        // Memory at each point, and the CPU the renderers (the pages) had since the point before: a
+        // page that stops drawing when hidden has next to none while minimised.
+        auto cpu = webViewRendererCpu();
+        const auto sample = [&cpu]
+        {
+            const auto now = webViewRendererCpu();
+            const auto line = describeMemory (webViewMemory()) + ", renderers' CPU " + juce::String (now - cpu, 1) + " s";
+            cpu = now;
+            return line;
+        };
+        const auto opened = describeMemory (webViewMemory());
         waitFor ([] { return false; }, 10.0);
-        const auto shown = webViewMemory();
+        const auto shown = sample();
         for (auto& c : copies)
             if (c.window != nullptr)
                 c.window->setMinimised (true);
-        std::vector<std::map<juce::String, double>> minimised;
+        juce::StringArray minimised;
         for (int i = 0; i < 3; ++i)
         {
             waitFor ([] { return false; }, 10.0);
-            minimised.push_back (webViewMemory());
+            minimised.add (sample());
         }
         for (auto& c : copies)
             if (c.window != nullptr)
                 c.window->setMinimised (false);
         waitFor ([] { return false; }, 3.0);
         say ("        WebView2 processes' private memory:");
-        say ("          just opened           " + describeMemory (opened));
-        say ("          after 10 s shown      " + describeMemory (shown));
-        for (size_t i = 0; i < minimised.size(); ++i)
-            say ("          then " + juce::String ((int) i * 10 + 10) + " s minimised   " + describeMemory (minimised[i]));
-        say ("          3 s after restoring   " + describeMemory (webViewMemory()));
+        say ("          just opened           " + opened);
+        say ("          after 10 s shown      " + shown);
+        for (int i = 0; i < minimised.size(); ++i)
+            say ("          then " + juce::String (i * 10 + 10) + " s minimised   " + minimised[i]);
+        say ("          3 s after restoring   " + sample());
         const auto lines = log.sinceMark();
         check (PlayerLog::count (lines, "opened") == openWindows(), "minimise every window and restore them: no webview was made again");
         expectEngines ("minimise every window and restore them");
