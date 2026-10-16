@@ -121,16 +121,18 @@ it from outside rather than its animation.
 
 To see inside the pages, release checks watch the first shared run with
 `tools/scripts/watch-webview-pages.mjs`. WebView2 is started with a debugging port of its own
-choosing (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0`, so a second process
-cannot collide with the first), and the watcher finds each browser's port in its profile folder
-and reports every page's visibility, the frames and timers it asked for, the events the plug-in
-pushed in and the page sent out, its heap, and what allocated, with the time, so its lines can be
-set beside the probe's. On a Windows machine, the same by hand:
+choosing (`--remote-debugging-port=0`, so a second process cannot collide with the first), and the
+watcher finds each browser's port in its profile folder and reports every page's visibility, the
+frames and timers it asked for, the events the plug-in pushed in and the page sent out, its heap,
+and what allocated, with the time, so its lines can be set beside the probe's. The switch goes in
+through WebView2's per-user policy for the executable, which it reads where it ignored the
+`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` variable. On a Windows machine, the same by hand:
 
 ```
-set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0
+reg add HKCU\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments /v CEditorWebViewEngineProbe.exe /d --remote-debugging-port=0 /f
 start "" build\native\Release\CEditorWebViewEngineProbe.exe "<plug-in>.vst3"
 node tools\scripts\watch-webview-pages.mjs --root "%TEMP%\CEditorPlayer_WebView2"
+reg delete HKCU\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments /v CEditorWebViewEngineProbe.exe /f
 ```
 
 ### Checking it in a DAW
