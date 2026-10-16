@@ -248,10 +248,31 @@ int webViewEngines()
     return engines;
 }
 
-/** Private memory of every WebView2 process in this process's tree, in MB. */
-double webViewMegabytes()
+/** A WebView2 process's role, from its command line: "renderer", "gpu-process", "utility" and so on,
+    or "browser" for the engine itself, the one started without a --type. */
+juce::String webViewRole (HANDLE process)
 {
-    SIZE_T total = 0;
+    // ProcessCommandLineInformation (60) needs no more than PROCESS_QUERY_LIMITED_INFORMATION and
+    // answers with a UNICODE_STRING followed by the text it points at.
+    struct CommandLine { USHORT length; USHORT maximumLength; PWSTR buffer; };
+    using Query = LONG (WINAPI*) (HANDLE, ULONG, PVOID, ULONG, PULONG);
+    static const auto query = reinterpret_cast<Query> (reinterpret_cast<void*> (GetProcAddress (GetModuleHandleW (L"ntdll.dll"), "NtQueryInformationProcess")));
+    ULONG size = 0;
+    if (query == nullptr || (query (process, 60, nullptr, 0, &size), size < sizeof (CommandLine)))
+        return "unknown";
+    std::vector<ULONG_PTR> buffer ((size + sizeof (ULONG_PTR) - 1) / sizeof (ULONG_PTR));
+    if (query (process, 60, buffer.data(), (ULONG) (buffer.size() * sizeof (ULONG_PTR)), &size) < 0)
+        return "unknown";
+    const auto* line = reinterpret_cast<const CommandLine*> (buffer.data());
+    const juce::String text (line->buffer, (size_t) line->length / sizeof (WCHAR));
+    const auto type = text.fromFirstOccurrenceOf ("--type=", false, false).upToFirstOccurrenceOf (" ", false, false).unquoted();
+    return type.isEmpty() ? juce::String ("browser") : type;
+}
+
+/** Private memory of every WebView2 process in this process's tree, in MB, by role. */
+std::map<juce::String, double> webViewMemory()
+{
+    std::map<juce::String, double> out;
     for (const auto& p : ownTree())
     {
         if (! isWebView2 (p))
@@ -260,11 +281,32 @@ double webViewMegabytes()
         {
             PROCESS_MEMORY_COUNTERS_EX counters {};
             if (GetProcessMemoryInfo (handle, reinterpret_cast<PROCESS_MEMORY_COUNTERS*> (&counters), sizeof (counters)))
-                total += counters.PrivateUsage;
+                out[webViewRole (handle)] += (double) counters.PrivateUsage / (1024.0 * 1024.0);
             CloseHandle (handle);
         }
     }
-    return (double) total / (1024.0 * 1024.0);
+    return out;
+}
+
+double webViewMegabytes()
+{
+    double total = 0;
+    for (const auto& [role, megabytes] : webViewMemory())
+        total += megabytes;
+    return total;
+}
+
+/** "412 MB (browser 41, gpu-process 96, renderer 251, utility 24)" */
+juce::String describeMemory (const std::map<juce::String, double>& memory)
+{
+    double total = 0;
+    juce::StringArray parts;
+    for (const auto& [role, megabytes] : memory)
+    {
+        total += megabytes;
+        parts.add (role + " " + juce::String (megabytes, 0));
+    }
+    return juce::String (total, 0) + " MB (" + parts.joinIntoString (", ") + ")";
 }
 
 // --- Where a stalled process is (Windows) ---------------------------------------------------------
@@ -552,23 +594,30 @@ public:
             check (profiles.size() == 1, stage + ": one profile folder for every window (switch on)");
     }
 
-    /** Every window minimised, then restored: WebView2's private memory shown, after 10 s minimised,
-        and restored, and every panel still there afterwards. The numbers are reported, not judged. */
+    /** Every window left open for 10 s, then minimised for 10 s, then restored: WebView2's private
+        memory by process at each point, and every panel still there afterwards. The numbers are
+        reported, not judged; the 10 s shown is there to tell what minimising does from what time
+        does, since an animated panel's page makes garbage for as long as it draws. */
     void minimiseAndRestore()
     {
        #if JUCE_WINDOWS
-        const auto shown = webViewMegabytes();
+        const auto opened = webViewMemory();
+        waitFor ([] { return false; }, 10.0);
+        const auto shown = webViewMemory();
         for (auto& c : copies)
             if (c.window != nullptr)
                 c.window->setMinimised (true);
         waitFor ([] { return false; }, 10.0);
-        const auto minimised = webViewMegabytes();
+        const auto minimised = webViewMemory();
         for (auto& c : copies)
             if (c.window != nullptr)
                 c.window->setMinimised (false);
         waitFor ([] { return false; }, 3.0);
-        say ("        WebView2 processes' private memory: " + juce::String (shown, 0) + " MB shown, " + juce::String (minimised, 0)
-             + " MB minimised for 10 s, " + juce::String (webViewMegabytes(), 0) + " MB restored");
+        say ("        WebView2 processes' private memory:");
+        say ("          just opened           " + describeMemory (opened));
+        say ("          after 10 s shown      " + describeMemory (shown));
+        say ("          then 10 s minimised   " + describeMemory (minimised));
+        say ("          3 s after restoring   " + describeMemory (webViewMemory()));
         const auto lines = log.sinceMark();
         check (PlayerLog::count (lines, "opened") == openWindows(), "minimise every window and restore them: no webview was made again");
         expectEngines ("minimise every window and restore them");

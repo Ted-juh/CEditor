@@ -75,7 +75,8 @@ blank panel this section is about — and `opened, no webview` means the WebView
 
 `CEditorWebViewEngineProbe` (tests/WebViewEngineProbe.cpp) does what a tester would do in a DAW,
 in one process of its own: loads an exported player plug-in three times, opens every editor in a
-window, minimises them all and restores them (reporting WebView2's memory each way), closes one and reopens it, closes all three and reopens them at once (three times), and
+window, leaves them open for 10 s, minimises them all for 10 s and restores them (reporting WebView2's memory by
+process at each point, the 10 s shown being what tells minimising from time passing), closes one and reopens it, closes all three and reopens them at once (three times), and
 starts a second process with the same panel while the windows are open, once as a program started
 from Explorer is and once as one started from a terminal. Each window has to log `panel shown`. On Windows it also counts the WebView2 engines it owns, one per profile folder in use, and
 prints their memory. Build it beside a player plug-in and run it as it is and opted out:
