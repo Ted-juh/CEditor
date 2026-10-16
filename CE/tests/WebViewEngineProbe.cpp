@@ -594,10 +594,11 @@ public:
             check (profiles.size() == 1, stage + ": one profile folder for every window (switch on)");
     }
 
-    /** Every window left open for 10 s, then minimised for 10 s, then restored: WebView2's private
+    /** Every window left open for 10 s, then minimised for 30 s, then restored: WebView2's private
         memory by process at each point, and every panel still there afterwards. The numbers are
-        reported, not judged; the 10 s shown is there to tell what minimising does from what time
-        does, since an animated panel's page makes garbage for as long as it draws. */
+        reported, not judged. The 10 s shown is there to tell what minimising does from what time
+        does, since an animated panel's page makes garbage for as long as it draws; the 30 s
+        minimised, because a page that stops drawing is collected some 10 to 15 s later. */
     void minimiseAndRestore()
     {
        #if JUCE_WINDOWS
@@ -607,8 +608,12 @@ public:
         for (auto& c : copies)
             if (c.window != nullptr)
                 c.window->setMinimised (true);
-        waitFor ([] { return false; }, 10.0);
-        const auto minimised = webViewMemory();
+        std::vector<std::map<juce::String, double>> minimised;
+        for (int i = 0; i < 3; ++i)
+        {
+            waitFor ([] { return false; }, 10.0);
+            minimised.push_back (webViewMemory());
+        }
         for (auto& c : copies)
             if (c.window != nullptr)
                 c.window->setMinimised (false);
@@ -616,7 +621,8 @@ public:
         say ("        WebView2 processes' private memory:");
         say ("          just opened           " + describeMemory (opened));
         say ("          after 10 s shown      " + describeMemory (shown));
-        say ("          then 10 s minimised   " + describeMemory (minimised));
+        for (size_t i = 0; i < minimised.size(); ++i)
+            say ("          then " + juce::String ((int) i * 10 + 10) + " s minimised   " + describeMemory (minimised[i]));
         say ("          3 s after restoring   " + describeMemory (webViewMemory()));
         const auto lines = log.sinceMark();
         check (PlayerLog::count (lines, "opened") == openWindows(), "minimise every window and restore them: no webview was made again");

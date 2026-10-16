@@ -261,7 +261,7 @@ declares both.
   not a web form: there is nothing to fill them from, and no password for the browser to keep.
 
 JUCE 8.0.7 exposes neither. What the first saves is measured by `CEditorWebViewEngineProbe`, which
-leaves every window open for 10 s, minimises them all for 10 s and restores them, and reports
+leaves every window open for 10 s, minimises them all for 30 s and restores them, and reports
 WebView2's memory by process at each point (docs/webview2-profiles.md).
 
 **If you upgrade JUCE:** if `setControlVisible` and `setWebViewPreferences` are still there, re-apply
