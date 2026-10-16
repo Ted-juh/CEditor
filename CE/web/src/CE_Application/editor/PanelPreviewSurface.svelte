@@ -3,6 +3,7 @@
   import { parameterGroup, parameterAccent, parameterFeedback, parameterEntries, parameterBindingFor, splitParameterItemId } from '../utils/parameterStatus.js';
   import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
+  import { sharedAnimationFrame } from '../utils/sharedAnimationFrame.js';
   import { onDestroy, setContext, untrack } from 'svelte';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import { resolveControlFamily } from '../models/controlSetFamilies.js';
@@ -2341,6 +2342,9 @@
   const ORBIT_EMIT_MS = 25;
   const ORBIT_EMIT_EPS = 0.004;
   let orbitClock = $state(0);
+  // Every free-running control's ticker steps in one shared frame, and the clock moves once after
+  // all of them; one loop each moved it once per ticker (utils/sharedAnimationFrame.js says why).
+  const orbitFrame = sharedAnimationFrame(() => { orbitClock = Date.now(); });
   // The sequencer's own frame stamp, so `applyStepSequencerValueSource` re-runs as the playhead
   // walks. Separate from `orbitClock` because the two tickers self-stop independently.
   let seqClock = $state(0);
@@ -2387,10 +2391,9 @@
         }
         emitClockFanout(orbitControlWith(c, orbitPhaseState[id]), now, 'orbit');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Rate-capped, change-filtered fan-out for a free-running clock (Orbit,
   // Looper): send a bound port's value only when it moved ≥ epsilon AND that
@@ -2542,11 +2545,9 @@
         // Don't fight a recording in progress on this control's lane.
         if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');
       }
-      // touch a reactive dep so the resolve path re-runs
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   function looperGeomFor(control) {
     const t = control?._children?.Transform ?? {};
@@ -2893,10 +2894,9 @@
         }
         emitClockFanout(turingControlWith(c, phase, turingLiveSteps(c)), now, 'turing');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   function applyTuringValueSource(control, resolved) {
     if (!isTuringControl(control)) return resolved;
@@ -3014,10 +3014,9 @@
         }
         emitClockFanout(kineticControlWith(c, next, null, { __bounce: next.bounced }), now, 'kinetic');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   function applyKineticValueSource(control, resolved) {
     if (!isKineticControl(control)) return resolved;
@@ -3119,10 +3118,9 @@
         constPhaseState[id] = phase;
         emitClockFanout(constControlWith(c, wanderPos(phase)), now, 'constellation');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Inject the live probe (drag > wander > committed) + any star drag + marker.
   function applyConstellationValueSource(control, resolved) {
@@ -3650,10 +3648,9 @@
           }
         }
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Inject the live phase + linked notes so the renderer draws the real walk.
   function applyArpValueSource(control, resolved) {
@@ -4863,10 +4860,9 @@
         playRecorderWindow(c, prev, next, loopSecs);
         recorderPrevPhase[id] = next;
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Song mode for the recorder: the same chain engine, pointed at take slots
   // instead of patterns. A chain never runs while recording — swapping the take
@@ -5115,10 +5111,9 @@
         const index = Math.floor(next);
         if (index !== phraseIndexState[id]) phraseFireIndex(c, index, null);
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Song mode. A lap is one complete pass of the pattern, so the chain advances
   // on the pattern's own length rather than on a separate counter — a chain
