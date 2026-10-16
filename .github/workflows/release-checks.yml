@@ -8,12 +8,18 @@
 #                      (pluginval) and checked for every handler having run. ci.yml's verify-all
 #                      builds handler modules with the runner's clang, not the MinGW one users get;
 #                      run on Linux, this check is what found the C++ export failing there.
+#                      The same job then opens that plug-in the way a DAW does, in WebView2, with
+#                      CEditorWebViewEngineProbe: three copies in one process, windows closed and
+#                      reopened, a second process beside them, once with the shared-engine switch
+#                      (CEDITOR_WEBVIEW2_SHARED, docs/webview2-profiles.md) off and once on. Every
+#                      window has to show its panel, and the WebView2 engines it owns have to be one
+#                      per profile folder in use.
 #   installer          tools/scripts/package-installer.ps1 end to end: the app and the player
 #                      templates built as shipped, staged, and packed by Inno Setup. The installer
 #                      is uploaded as an artifact.
 #
 # Agreed with the repository owner in October 2026, as a workflow of its own so PR runs stay as
-# they are (CLAUDE.md: do not widen CI without asking).
+# they are (CLAUDE.md: do not widen CI without asking); the engine probe was agreed the same way.
 
 name: Release checks
 
@@ -67,9 +73,9 @@ jobs:
 
       - name: Build the probe plug-in with the handler loader (VST3)
         run: |
-          cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_NATIVE_HANDLERS=ON -DCEDITOR_DEV_MODE=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache "-DCE_VST_PANEL_PATH=$((Resolve-Path build/nh-probe/probe.cepanel).Path.Replace('\','/'))" "-DCE_VST_PRODUCT_NAME=NH Probe"
+          cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_NATIVE_HANDLERS=ON -DCEDITOR_DEV_MODE=OFF -DCEDITOR_WEBVIEW_ENGINE_PROBE=ON -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache "-DCE_VST_PANEL_PATH=$((Resolve-Path build/nh-probe/probe.cepanel).Path.Replace('\','/'))" "-DCE_VST_PRODUCT_NAME=NH Probe"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cmake --build --preset native-release --target CEditorPlayerVST_VST3
+          cmake --build --preset native-release --target CEditorPlayerVST_VST3 CEditorWebViewEngineProbe
 
       - name: Compile the handler modules into it, as an export does
         run: node tools/scripts/nativeHandlers/probe-panel.mjs modules build/nh-probe/probe.cepanel "build/native/CEditorPlayerVST_artefacts/Release/VST3/NH Probe.vst3/Contents/x86_64-win"
@@ -88,6 +94,23 @@ jobs:
           node tools/scripts/validate-plugins.mjs "build/native/CEditorPlayerVST_artefacts/Release/VST3/NH Probe.vst3" --require --skip-gui
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node tools/scripts/nativeHandlers/probe-panel.mjs check "$env:TEMP/ceditor-player-scripts.log"
+
+      # Three copies in one process, every window opened, closed and reopened, and a second process
+      # beside them (tests/WebViewEngineProbe.cpp). Each window logs its webview's profile folder and
+      # "panel shown" to the same script log, which is kept below.
+      - name: Open several copies in one process, shared WebView2 engine off and on
+        timeout-minutes: 20   # a window that never closes hangs the probe; it should not cost the job
+        run: |
+          $probe = (Get-ChildItem -Recurse build/native -Filter CEditorWebViewEngineProbe.exe | Select-Object -First 1).FullName
+          $plugin = (Resolve-Path "build/native/CEditorPlayerVST_artefacts/Release/VST3/NH Probe.vst3").Path
+          "--- switch off"
+          & $probe $plugin --copies 3 --cycles 3
+          $off = $LASTEXITCODE
+          "--- switch on"
+          $env:CEDITOR_WEBVIEW2_SHARED = "1"
+          & $probe $plugin --copies 3 --cycles 3
+          $on = $LASTEXITCODE
+          if ($off -or $on) { exit 1 }
 
       - name: Keep the player's script log
         if: always()

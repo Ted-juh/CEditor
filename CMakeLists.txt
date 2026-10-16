@@ -1787,6 +1787,34 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
     )
 endif()
 
+# A DAW, as far as the player's webview can tell: several copies of an exported player plug-in in
+# one process, every editor opened, closed and reopened, and a second process beside them, each
+# panel checked to have come up (tests/WebViewEngineProbe.cpp says how). It is what the shared
+# WebView2 engine switch (CEDITOR_WEBVIEW2_SHARED, docs/webview2-profiles.md) is tried with. Not a
+# ctest, for the reason the check above is not: it needs an exported plug-in, and a desktop.
+option(CEDITOR_WEBVIEW_ENGINE_PROBE "Build the webview engine probe (player copies in one process)" OFF)
+if (CEDITOR_WEBVIEW_ENGINE_PROBE)
+    add_executable(CEditorWebViewEngineProbe
+        "${CE_ROOT}/tests/WebViewEngineProbe.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
+    )
+    target_compile_features(CEditorWebViewEngineProbe PRIVATE cxx_std_23)
+    target_compile_definitions(CEditorWebViewEngineProbe PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+        # A console program turning the message loop itself, as the check above does.
+        JUCE_MODAL_LOOPS_PERMITTED=1
+    )
+    target_include_directories(CEditorWebViewEngineProbe PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorWebViewEngineProbe PRIVATE
+        juce::juce_audio_processors
+        juce::juce_gui_basics
+        $<$<PLATFORM_ID:Windows>:psapi>
+    )
+endif()
+
 # The worker. Deliberately OUTSIDE the CEDITOR_BUILD_APP block: it needs none of what that
 # block exists to gate (no WebView2, no juceaide, no BinaryData) — juce_audio_processors with
 # VST3 hosting is its whole dependency, and that compiles on Linux too, given the same X11/ALSA

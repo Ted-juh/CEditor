@@ -61,6 +61,29 @@ With the switch on, every copy in one DAW names the same folder, ending in `-0`;
 names its own. A window that logs `opened` and nothing after never got a working webview — the
 blank panel this section is about — and `opened, no webview` means the WebView2 runtime is missing.
 
+### The engine probe
+
+`CEditorWebViewEngineProbe` (tests/WebViewEngineProbe.cpp) does what a tester would do in a DAW,
+in one process of its own: loads an exported player plug-in three times, opens every editor in a
+window, closes one and reopens it, closes all three and reopens them at once (twice), and starts a
+second process with the same panel while the windows are open. Each window has to log `panel
+shown`. On Windows it also counts the WebView2 engines it owns, one per profile folder in use, and
+prints their memory. Build it beside a player plug-in and run it with the switch off and on:
+
+```
+cmake --preset native -DCEDITOR_WEBVIEW_ENGINE_PROBE=ON "-DCE_VST_PANEL_PATH=<export payload>"
+cmake --build --preset native-release --target CEditorWebViewEngineProbe CEditorPlayerVST_VST3
+build\native\Release\CEditorWebViewEngineProbe.exe "build\native\CEditorPlayerVST_artefacts\Release\VST3\<name>.vst3"
+set CEDITOR_WEBVIEW2_SHARED=1
+build\native\Release\CEditorWebViewEngineProbe.exe "build\native\CEditorPlayerVST_artefacts\Release\VST3\<name>.vst3"
+```
+
+`--copies`, `--cycles` and `--timeout` (seconds per stage) change the defaults of 3, 3 and 120. It
+runs on Linux too, where the webview is WebKitGTK and the switch only changes the folder's name; that
+proves the probe, not WebView2.
+
+It is not a DAW: a host's own threads and windows are still worth a look, which is what follows.
+
 ### Trying it
 
 On a Windows machine with an exported player plug-in installed:
