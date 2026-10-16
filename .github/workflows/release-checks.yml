@@ -130,19 +130,29 @@ jobs:
             # WebView2 opens a debugging port of its own choosing (0: no two browsers collide), and the
             # watcher reports each page's visibility, frames, timers, the events the plug-in pushed in and
             # the page sent out, its heap, and what allocated, with the time. It is printed after the run.
-            # The switch goes in through WebView2's per-user policy for the probe's executable: it ignored
-            # WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS (run #15, the browser's command line had no port).
-            $policy = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+            # The switch goes in every way WebView2 documents: the environment variable, and its policy for
+            # extra browser arguments, per user and per machine, for the probe's executable and for any.
+            # Runs #15 and #16 found neither the variable nor the per-user policy on the browser's command
+            # line; the watcher says what reached it.
+            $policies = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments',
+                        'HKLM:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+            $names = (Split-Path $probe -Leaf), '*'
             if ($round -eq 1) {
-              New-Item -Path $policy -Force | Out-Null
-              New-ItemProperty -Path $policy -Name (Split-Path $probe -Leaf) -Value '--remote-debugging-port=0' -PropertyType String -Force | Out-Null
+              $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=0'
+              foreach ($policy in $policies) {
+                New-Item -Path $policy -Force -ErrorAction SilentlyContinue | Out-Null
+                foreach ($name in $names) { New-ItemProperty -Path $policy -Name $name -Value '--remote-debugging-port=0' -PropertyType String -Force -ErrorAction SilentlyContinue | Out-Null }
+                $values = (Get-ItemProperty -Path $policy -ErrorAction SilentlyContinue).PSObject.Properties | Where-Object { $_.Name -notlike 'PS*' } | ForEach-Object { "$($_.Name)=$($_.Value)" }
+                "  $policy :: $($values -join '; ')"
+              }
               $watcher = (Resolve-Path tools/scripts/watch-webview-pages.mjs).Path
               $watch = Start-ThreadJob { node $using:watcher --seconds 300 --root "$env:TEMP/CEditorPlayer_WebView2" 2>&1 }
             }
             & $probe $plugin --copies 3 --cycles 3
             if ($LASTEXITCODE) { $failed++ }
             if ($round -eq 1) {
-              Remove-ItemProperty -Path $policy -Name (Split-Path $probe -Leaf) -ErrorAction SilentlyContinue
+              Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS -ErrorAction SilentlyContinue
+              foreach ($policy in $policies) { foreach ($name in $names) { Remove-ItemProperty -Path $policy -Name $name -ErrorAction SilentlyContinue } }
               "--- inside the pages of that run"
               Wait-Job $watch -Timeout 60 | Out-Null
               Stop-Job $watch
