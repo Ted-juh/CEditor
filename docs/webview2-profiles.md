@@ -46,6 +46,44 @@ so does every other process — the standalone, or a DAW that runs each plug-in 
 
 It stays off until it has been tried in DAWs, because a shared folder is what blanked panels before.
 
+### What the log says
+
+Every player window writes three lines about its webview to `%TEMP%\ceditor-player-scripts.log`,
+under the instance's tag:
+
+```
+[GAIA SH-01 3f2a]  [webview] opened, profile p4120-1d9a3f-7c01b2e4-0
+[GAIA SH-01 3f2a]  [webview] page ready, profile p4120-1d9a3f-7c01b2e4-0, 2890 ms after opening
+[GAIA SH-01 3f2a]  [webview] panel shown, profile p4120-1d9a3f-7c01b2e4-0, 3410 ms after opening
+```
+
+With the switch on, every copy in one DAW names the same folder, ending in `-0`; without it each
+names its own. A window that logs `opened` and nothing after never got a working webview — the
+blank panel this section is about — and `opened, no webview` means the WebView2 runtime is missing.
+
+### The engine probe
+
+`CEditorWebViewEngineProbe` (tests/WebViewEngineProbe.cpp) does what a tester would do in a DAW,
+in one process of its own: loads an exported player plug-in three times, opens every editor in a
+window, closes one and reopens it, closes all three and reopens them at once (three times), and
+starts a second process with the same panel while the windows are open, once as a program started
+from Explorer is and once as one started from a terminal. Each window has to log `panel shown`. On Windows it also counts the WebView2 engines it owns, one per profile folder in use, and
+prints their memory. Build it beside a player plug-in and run it with the switch off and on:
+
+```
+cmake --preset native -DCEDITOR_WEBVIEW_ENGINE_PROBE=ON "-DCE_VST_PANEL_PATH=<export payload>"
+cmake --build --preset native-release --target CEditorWebViewEngineProbe CEditorPlayerVST_VST3
+build\native\Release\CEditorWebViewEngineProbe.exe "build\native\CEditorPlayerVST_artefacts\Release\VST3\<name>.vst3"
+set CEDITOR_WEBVIEW2_SHARED=1
+build\native\Release\CEditorWebViewEngineProbe.exe "build\native\CEditorPlayerVST_artefacts\Release\VST3\<name>.vst3"
+```
+
+`--copies`, `--cycles` and `--timeout` (seconds per stage) change the defaults of 3, 3 and 120. It
+runs on Linux too, where the webview is WebKitGTK and the switch only changes the folder's name; that
+proves the probe, not WebView2.
+
+It is not a DAW: a host's own threads and windows are still worth a look, which is what follows.
+
 ### Trying it
 
 On a Windows machine with an exported player plug-in installed:
@@ -58,7 +96,9 @@ On a Windows machine with an exported player plug-in installed:
 5. In Task Manager, the DAW's `msedgewebview2.exe` processes: with the switch there should be one
    browser process (and its helpers) for the three windows, not three sets. The DAW's memory should
    be several hundred MB lower than without the switch.
-6. `setx CEDITOR_WEBVIEW2_SHARED ""` turns it off again.
+6. In `%TEMP%\ceditor-player-scripts.log`, every window should have logged `panel shown`, all with
+   the same `…-0` folder (see *What the log says*).
+7. `setx CEDITOR_WEBVIEW2_SHARED ""` turns it off again.
 
 A panel that stays blank or white with the switch on and draws without it is the failure this is
 waiting to rule out; note the DAW and its version.

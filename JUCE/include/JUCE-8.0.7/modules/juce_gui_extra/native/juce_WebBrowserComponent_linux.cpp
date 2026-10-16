@@ -1426,30 +1426,44 @@ private:
         {
             xembed = nullptr;
 
-            int status = 0, result = 0;
-
-            result = waitpid (childProcess, &status, WNOHANG);
-            for (int i = 0; i < 15 && (! WIFEXITED (status) || result != childProcess); ++i)
+            // CEditor patch (JUCE/VENDORED.md, 8). The child has been told to quit: give it the
+            // second and a half upstream gives it, then SIGTERM, then SIGKILL, and stop waiting the
+            // moment it has been reaped, however it ended. Upstream looped kill + a blocking waitpid
+            // until WIFEXITED, which a child that died of the SIGTERM never reports: the waitpid then
+            // failed at once (ECHILD) for good, the loop spun at full CPU re-sending SIGTERM to the
+            // pid, which can by then be another process's, and the window being closed never closed.
+            if (! childHasGone (1500))
             {
-                Thread::sleep (100);
-                result = waitpid (childProcess, &status, WNOHANG);
-            }
+                kill (childProcess, SIGTERM);
 
-            // clean-up any zombies
-            status = 0;
-            if (! WIFEXITED (status) || result != childProcess)
-            {
-                for (;;)
+                if (! childHasGone (1000))
                 {
-                    kill (childProcess, SIGTERM);
-                    waitpid (childProcess, &status, 0);
-
-                    if (WIFEXITED (status))
-                        break;
+                    kill (childProcess, SIGKILL);
+                    childHasGone (-1);
                 }
             }
 
             childProcess = 0;
+        }
+    }
+
+    // Whether the child has ended and been reaped within `milliseconds` (-1: however long it takes).
+    // A waitpid that fails for any reason but EINTR means there is no child left to wait for.
+    bool childHasGone (int milliseconds)
+    {
+        for (int waited = 0;; waited += 10)
+        {
+            int status = 0;
+            const auto result = waitpid (childProcess, &status, milliseconds < 0 ? 0 : WNOHANG);
+
+            if (result == childProcess || (result < 0 && errno != EINTR))
+                return true;
+
+            if (milliseconds >= 0 && waited >= milliseconds)
+                return false;
+
+            if (result == 0)
+                Thread::sleep (10);
         }
     }
 

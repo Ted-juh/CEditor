@@ -185,6 +185,20 @@ test('JUCE/VENDORED.md records the MIDI-CI patch', () => {
     'VENDORED.md must name the MIDI-CI file and the defect');
 });
 
+test('the Linux webview child is shut down without a loop that waits for an exit a signal never reports', () => {
+  // Patch 8: a child killed by the SIGTERM is WIFSIGNALED, not WIFEXITED, so upstream's loop spun on
+  // ECHILD at full CPU inside the closing window's destructor, re-sending SIGTERM to a reused pid.
+  const source = readFileSync(LINUX_BRIDGE, 'utf8');
+  const kill = source.slice(source.indexOf('void killChild()'));
+  const body = kill.slice(0, kill.indexOf('void launchChild()'));
+  assert.ok(!/WIFEXITED\s*\(/.test(body), `killChild waits for WIFEXITED again. ${REAPPLY}`);
+  assert.ok(!/for \(;;\)\s*\{\s*kill \(childProcess, SIGTERM\)/.test(body), `the kill-and-wait loop is back. ${REAPPLY}`);
+  for (const piece of ['CEditor patch (JUCE/VENDORED.md, 8)', 'childHasGone (1500)', 'kill (childProcess, SIGTERM)',
+    'kill (childProcess, SIGKILL)', 'childHasGone (-1)', "result == childProcess || (result < 0 && errno != EINTR)"])
+    assert.ok(body.includes(piece), `Missing ${piece} in killChild. ${REAPPLY}`);
+  assert.match(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8'), /### 8\. Linux webview: a closing window could spin the host forever/);
+});
+
 test('QuickJS still asks a proxy in the global prototype chain before reading a global through it', () => {
   // Without it, a read of an undefined name in a plug-in script is undefined instead of an error:
   // the per-script scope for undeclared names (JsScriptEngine.cpp) sits behind the global as a proxy.

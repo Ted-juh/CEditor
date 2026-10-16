@@ -79,6 +79,14 @@ public:
     std::function<juce::var()> scriptStores;
     std::function<void (const juce::var& change)> onScriptSetting;
 
+    // --- Whether the webview came up ------------------------------------------------------------
+    /** The name of the WebView2 profile folder this window's webview was given; empty when there
+        is no webview (the runtime is missing). Off Windows the folder is made and goes unused. */
+    juce::String webViewProfile() const { return webViewProfileName; }
+
+    /** "page ready" when the page first answers, "panel shown" when it has the panel loaded. */
+    std::function<void (const juce::String& stage)> onWebViewStage;
+
 private:
     void showStatusMessage (const juce::String& title, const juce::String& message);
     void loadPanelIntoWebView();
@@ -90,4 +98,5 @@ private:
     ceditor::device::DeviceProfileService& service;                      // owned or the processor's
     std::unique_ptr<juce::WebBrowserComponent> webView;
     std::unique_ptr<juce::Label> statusLabel;
+    juce::String webViewProfileName;
 };
