@@ -260,6 +260,14 @@ void PlayerHost::notifySessionRestored()
 
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)
 {
+    // The player shows no MIDI monitor, and the device service's snapshot of it is the whole log, up
+    // to 500 events, about 120 KB of JSON once full, sent with every MIDI message either way at up to
+    // 20 a second. A panel whose controls send MIDI as they move (QA-08's free-running ones send 17
+    // messages a second) had each window compile and parse 2 MB a second of a log nothing on the
+    // page reads, and keep it until a collection that did not come: release checks #17 watched it
+    // from inside the page, and it was most of what grew.
+    if (eventName == "midiMonitorEvents")
+        return;
     if (webView != nullptr)
         webView->emitEventIfBrowserIsVisible (eventName, payload);
 }

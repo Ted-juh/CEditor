@@ -97,27 +97,62 @@ It is not a DAW: a host's own threads and windows are still worth a look, which 
 
 ### What minimising gives back
 
-Nothing, so far. The probe's minimise stage, release checks #12 and #13 (QA-08, three windows, the
-shared engine; the renderers are the pages, and the GPU, browser and utility processes stay flat):
+Not much, and it no longer grows. The probe's minimise stage (QA-08, three windows, the shared
+engine; the renderers are the pages, and the GPU, browser and utility processes stay flat):
 
-| | renderers' memory | renderers' CPU in the interval |
-| --- | --- | --- |
-| just opened | 190 MB | |
-| after 10 s shown | 730-760 MB | 5.4 s |
-| then 10 s minimised | 820-907 MB | 1.3 s |
-| 20 s minimised | 941-1031 MB | 1.9 s |
-| 30 s minimised | 1120-1217 MB | 1.7 s |
-| 3 s after restoring | 1183-1283 MB | 0.2 s |
+| | renderers before (#14) | CPU | renderers now (#19) | CPU |
+| --- | --- | --- | --- | --- |
+| just opened | 193 MB | | 190 MB | |
+| after 10 s shown | 743 MB | 7.0 s | 749 MB | 6.0 s |
+| then 10 s minimised | 865 MB | 2.2 s | 812 MB | 1.3 s |
+| 20 s minimised | 992 MB | 1.9 s | 790 MB | 1.1 s |
+| 30 s minimised | 1149 MB | 2.9 s | 866 MB | 1.2 s |
+| 3 s after restoring | 1205 MB | | 902 MB | |
 
-Opted out, the same within 10%. A minimised page does slow down, to about a third of its CPU, but
-its memory keeps growing at 12 to 18 MB a second, and did not fall within the 43 s measured; only
-closing the windows gives it back. Asking WebView2 for its low memory target while hidden
-(`MemoryUsageTargetLevel`, tried as part of JUCE patch 9) made no difference and came out.
+Opted out, 779 to 896 MB and back. Inside each page (the page watcher below) the JS heap now stays
+at 43 to 53 MB used where it climbed past 120. What the pages were doing, as the watcher saw it
+(release checks #17):
 
-The same page in Chromium here, hidden as a background tab, goes quiet (one frame request a second)
-and is collected about 12 s later, from 327 to 121 MB. What keeps a minimised WebView2 page busy and
-growing is not yet known: its growth does not follow its own CPU, which points at something reaching
-it from outside rather than its animation.
+- **They were sent the MIDI monitor log.** The device service pushes the whole log, up to 500
+  events, with every MIDI message, at up to 20 a second, and QA-08's free-running controls send 17
+  a second: each window was pushed 2 to 9 MB of it every 5 s, to compile and parse, for a page that
+  shows no monitor. `PlayerHost::emitToWebView` drops it. This was the growth.
+- **They are never minimised.** A plug-in's window is a child of the host's, and Windows tells a
+  child nothing when the top-level window is minimised, nor when a host hides its plug-in window.
+  JUCE never learns the webview is not showing, so the pages stay `visible` and draw at sixty
+  frames a second throughout. This is still so. Hiding the webview while the host's window is
+  minimised was tried (release checks #18: 349 MB after 30 s minimised, on 0.2 s of CPU) and taken
+  out: a hidden component drops every event sent to it, and a hidden page gets no frames and runs
+  its timers once a second, while the window-open page is what drives free-running modulators,
+  panel scripts' timers and automation out to the hardware. The processor takes those over only
+  when the editor is closed; a page that rests while minimised needs them handed over first.
+
+Asking WebView2 for its low memory target while hidden (`MemoryUsageTargetLevel`, tried as part of
+JUCE patch 9) made no difference and came out.
+
+To see inside the pages, release checks watch the first shared run with
+`tools/scripts/watch-webview-pages.mjs`. WebView2 is started with a debugging port of its own
+choosing (`--remote-debugging-port=0`, so a second process cannot collide with the first), and the
+watcher finds each browser's port in its profile folder and reports every page's visibility, the
+frames and timers it asked for, the events the plug-in pushed in and the page sent out, its heap,
+and what allocated, with the time, so its lines can be set beside the probe's. The switch goes in
+through WebView2's policy for extra browser arguments, per machine: the runtime on the runner ignored
+the `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` variable (#15) and the per-user policy (#16), and took the
+per-machine one with values for the executable and for any (#17). On a Windows machine, the same by
+hand, from an elevated prompt:
+
+```
+set KEY=HKLM\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments
+reg add %KEY% /v CEditorWebViewEngineProbe.exe /d --remote-debugging-port=0 /f
+reg add %KEY% /v * /d --remote-debugging-port=0 /f
+start "" build\native\Release\CEditorWebViewEngineProbe.exe "<plug-in>.vst3"
+node tools\scripts\watch-webview-pages.mjs --root "%TEMP%\CEditorPlayer_WebView2"
+reg delete %KEY% /v CEditorWebViewEngineProbe.exe /f
+reg delete %KEY% /v * /f
+```
+
+The `*` value opens a debugging port in every WebView2 on the machine while it is there, which is
+why it goes again straight after.
 
 ### Checking it in a DAW
 
