@@ -9,14 +9,25 @@
 # comment used to claim it was present while configure failed on every run. .gitignore now has
 # an explicit exception for JUCE/bin, CMakeLists checks for the files before find_package, and
 # CE/web/test/vendoredJuceHelpers.test.js fails if the ignore rule creeps back.
-# The web bundle must be built BEFORE CMake configure: CMakeLists globs CE/web/dist into
-# PlayerWebData (the embedded player UI).
+# The web bundle must be built BEFORE CMake configure: CMakeLists globs CE/web/dist-embed, which the
+# build writes, into PlayerWebData (the embedded player UI).
 #
 # The player plug-in is built with the GAIA panel in it and put through the hosts' conformance
 # suites: pluginval for the VST3 and the LV2, clap-validator for the CLAP. docs/plugin-validation.md
-# has what the first runs found. Not covered yet: the installer packaging scripts.
+# has what the first runs found. The installer is packaged by hand, in release-checks.yml.
 #
-# The browser checks (CE/web/browser-checks) run too, after the web tests.
+# THREE JOBS, SIDE BY SIDE. Until October 2026 all of this was one job, and a run took thirty minutes:
+# the web tests (9.5 min) and the browser checks (8 min) ran one after the other before the C++ build
+# started, though neither uses anything the build makes, nor the build anything of theirs. Each now
+# has a runner of its own (standard runners cost nothing on a public repository; CLAUDE.md), and a
+# run takes as long as the longest of the three, about eleven minutes with a warm compiler cache:
+#   web-tests       the node suite and the script-export validation
+#   browser-checks  the web bundle, and Playwright over it
+#   windows         the web bundle again (CMake embeds it), the C++ build with every engine on,
+#                   CTest, the native handlers end to end, and the plug-in through the validators
+# All three run on Windows, as the one job did, so nothing that was checked there moved off it. The
+# bundle is built by both jobs that use it rather than handed from one to the other: under a minute
+# each, in parallel, where an artifact would make one job wait on the other.
 #
 # The optional script engines are on too: embedded CPython (CEDITOR_PYTHON) and the loader for
 # compiled-at-export C++/C#/Java handlers (CEDITOR_NATIVE_HANDLERS). Both are what an export with
@@ -36,6 +47,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  web-tests:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: CE/web/package-lock.json
+
+      # The script-export validation runs each language's export through its own toolchain where it
+      # finds one and skips it where it does not, so this job sets up the same ones the build job
+      # does: Python 3.13, JDK 21 and .NET 10 (see there). Without them it would pass on skips.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install web dependencies
+        working-directory: CE/web
+        run: npm ci
+
+      # The spec reporter, not the TAP one a non-terminal gets by default: it ends with a list of the
+      # failing tests and their errors. With TAP a failure sits wherever it ran, among some 34,000
+      # lines of "ok", and the log's tail says only "fail 1" (run 291).
+      - name: Web tests (node --test + script-export validation)
+        working-directory: CE/web
+        run: |
+          npm test -- --test-reporter=spec
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }   # a native failure does not stop a pwsh script
+          npm run test:script-exports
+
+  browser-checks:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: CE/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: CE/web
+        run: npm ci
+
+      - name: Build web bundle
+        working-directory: CE/web
+        run: npm run build
+
+      # The browser checks: Playwright driving the built pages, and Vite dev servers for the editor's
+      # docks and the host. The image has Chrome (Edge failing that); CHROMIUM_PATH points every check
+      # at it. browser-checks/runAll.mjs runs them all and names every failure, not just the first.
+      - name: Browser checks (Playwright)
+        working-directory: CE/web
+        run: |
+          $browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $browser) { throw "Neither Chrome nor Edge is installed on this runner." }
+          "Browser checks run in $browser"
+          $env:CHROMIUM_PATH = $browser
+          npm run test:browser
+
   windows:
     runs-on: windows-latest
     # 120, not 90: a cold build (empty compiler cache) takes about an hour, and plug-in validation
@@ -47,8 +132,13 @@ jobs:
     # their debug info inline (/Z7, see ce_enable_private_release_symbols in CMakeLists.txt); /Zi
     # would write a shared PDB that sccache cannot cache. `sccache --show-stats` at the end says how
     # many hits a run got.
+    #
+    # The validators are pinned here, and the cache that keeps them between runs is keyed on these,
+    # so a new version is fetched once and then kept.
     env:
       SCCACHE_GHA_ENABLED: "true"
+      PLUGINVAL_VERSION: v1.0.4
+      CLAP_VALIDATOR_REV: b2f1d9b79b1d264a5747f46707d72b1aa40a02ef
 
     steps:
       - uses: actions/checkout@v7
@@ -82,31 +172,9 @@ jobs:
         working-directory: CE/web
         run: npm ci
 
-      # The spec reporter, not the TAP one a non-terminal gets by default: it ends with a list of the
-      # failing tests and their errors. With TAP a failure sits wherever it ran, among some 34,000
-      # lines of "ok", and the log's tail says only "fail 1" (run 291).
-      - name: Web tests (node --test + script-export validation)
-        working-directory: CE/web
-        run: |
-          npm test -- --test-reporter=spec
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }   # a native failure does not stop a pwsh script
-          npm run test:script-exports
-
       - name: Build web bundle (required by CMake PlayerWebData glob)
         working-directory: CE/web
         run: npm run build
-
-      # The browser checks: Playwright driving the built pages, and Vite dev servers for the editor's
-      # docks and the host. The image has Chrome (Edge failing that); CHROMIUM_PATH points every check
-      # at it. browser-checks/runAll.mjs runs them all and names every failure, not just the first.
-      - name: Browser checks (Playwright)
-        working-directory: CE/web
-        run: |
-          $browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $browser) { throw "Neither Chrome nor Edge is installed on this runner." }
-          "Browser checks run in $browser"
-          $env:CHROMIUM_PATH = $browser
-          npm run test:browser
 
       # The one action still declared for Node 20, so GitHub runs it on Node 24 and says so in every
       # log. It has had no release since v1.13.0 (March 2024) and none for Node 24; it runs green on
@@ -150,17 +218,35 @@ jobs:
       - name: Native handlers (C++, Java, C#) end to end
         run: node tools/scripts/nativeHandlers/verify-all.mjs --require
 
+      # Fetching them was a minute and a half of every run, most of it building clap-validator, for
+      # two binaries that change only when the pins above do. They are kept in the Actions cache under
+      # those pins, and saved as soon as they are fetched, so a run whose validation fails keeps them.
+      - name: Restore plug-in validators
+        id: validators
+        uses: actions/cache/restore@v6
+        with:
+          path: tools/validators
+          key: plugin-validators-${{ runner.os }}-pluginval-${{ env.PLUGINVAL_VERSION }}-clap-validator-${{ env.CLAP_VALIDATOR_REV }}
+
       # Pinned, so a new validator release cannot turn this red on its own. pluginval is its
       # release binary; clap-validator is built from the commit of its 0.4.1 release, which needs
       # Rust 1.95 or later, hence the update.
       - name: Fetch plug-in validators
+        if: steps.validators.outputs.cache-hit != 'true'
         run: |
           New-Item -ItemType Directory -Force tools/validators | Out-Null
-          Invoke-WebRequest https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip -OutFile $env:RUNNER_TEMP/pluginval.zip
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/download/$env:PLUGINVAL_VERSION/pluginval_Windows.zip" -OutFile $env:RUNNER_TEMP/pluginval.zip
           Expand-Archive $env:RUNNER_TEMP/pluginval.zip -DestinationPath tools/validators -Force
           rustup update stable --no-self-update
-          cargo +stable install --git https://github.com/free-audio/clap-validator --rev b2f1d9b79b1d264a5747f46707d72b1aa40a02ef --locked --root $env:RUNNER_TEMP/clap-validator
+          cargo +stable install --git https://github.com/free-audio/clap-validator --rev $env:CLAP_VALIDATOR_REV --locked --root $env:RUNNER_TEMP/clap-validator
           Copy-Item $env:RUNNER_TEMP/clap-validator/bin/clap-validator.exe tools/validators/
+
+      - name: Keep plug-in validators for later runs
+        if: steps.validators.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: tools/validators
+          key: ${{ steps.validators.outputs.cache-primary-key }}
 
       # --require: a validator that did not run fails the step rather than passing it. GUI tests are
       # skipped; they open the WebView editor, which is not what this step checks.
