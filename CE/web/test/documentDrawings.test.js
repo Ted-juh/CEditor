@@ -127,8 +127,9 @@ test('a document without drawings is handed back as it was', () => {
 });
 
 test('the format number moves, so an older CEditor says a newer one wrote the file', () => {
-  assert.equal(PANEL_FORMAT_VERSION, 3);
-  assert.equal(JSON.parse(serializePanel(open('CE/qa/QA-08-export.cepanel'))).formatVersion, 3);
+  // 3 brought the table; 4 (documentEntries.js) is later still, and a reader of either needs it.
+  assert.ok(PANEL_FORMAT_VERSION >= 3);
+  assert.equal(JSON.parse(serializePanel(open('CE/qa/QA-08-export.cepanel'))).formatVersion, PANEL_FORMAT_VERSION);
 });
 
 test('a document from a newer CEditor keeps its drawings table: what this build did not put back is written back', () => {

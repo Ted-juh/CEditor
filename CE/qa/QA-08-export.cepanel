@@ -1,5 +1,5 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "panelGuid": "55b8368f-5140-42bb-a4f8-4434614e9b51",
   "exportSettings": {
     "pluginName": "",
@@ -2384,7 +2384,7 @@
       "_children": {
         "Core": {"name":"Waveform","id":"qa08_enum_index","controlType":"Combobox"},
         "Transform": {"x":522,"y":3844},
-        "Value": {"rows":[{"id":"saw","displayText":"Saw","internalValue":"saw","sendValue":0,"selectedByDefault":false,"enabled":true,"isHeader":false},{"id":"square","displayText":"Square","internalValue":"square","sendValue":1,"selectedByDefault":false,"enabled":true,"isHeader":false},{"id":"triangle","displayText":"Triangle","internalValue":"triangle","sendValue":2,"selectedByDefault":true,"enabled":true,"isHeader":false},{"id":"sine","displayText":"Sine","internalValue":"sine","sendValue":3,"selectedByDefault":false,"enabled":true,"isHeader":false},{"id":"noise","displayText":"Noise","internalValue":"noise","sendValue":4,"selectedByDefault":false,"enabled":true,"isHeader":false}]}
+        "Value": {"rows":[{"id":"saw","displayText":"Saw","internalValue":"saw","sendValue":0,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"square","displayText":"Square","internalValue":"square","sendValue":1,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"triangle","displayText":"Triangle","internalValue":"triangle","sendValue":2,"selectedByDefault":true,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"sine","displayText":"Sine","internalValue":"sine","sendValue":3,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"noise","displayText":"Noise","internalValue":"noise","sendValue":4,"isHeader":false,"_removed":["receiveValue","visualOverrides"]}]}
       },
       "_type": "Control"
     },
@@ -2422,7 +2422,7 @@
       "_children": {
         "Core": {"name":"Bank","id":"qa08_enum_value","controlType":"Combobox"},
         "Transform": {"x":1200,"y":3844},
-        "Value": {"rows":[{"id":"bank_a","displayText":"Bank A","internalValue":"bank_a","sendValue":0,"selectedByDefault":false,"enabled":true,"isHeader":false},{"id":"bank_b","displayText":"Bank B","internalValue":"bank_b","sendValue":1,"selectedByDefault":true,"enabled":true,"isHeader":false},{"id":"bank_c","displayText":"Bank C","internalValue":"bank_c","sendValue":2,"selectedByDefault":false,"enabled":true,"isHeader":false}],"storeByValue":true}
+        "Value": {"rows":[{"id":"bank_a","displayText":"Bank A","internalValue":"bank_a","sendValue":0,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"bank_b","displayText":"Bank B","internalValue":"bank_b","sendValue":1,"selectedByDefault":true,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"bank_c","displayText":"Bank C","internalValue":"bank_c","sendValue":2,"isHeader":false,"_removed":["receiveValue","visualOverrides"]}],"storeByValue":true}
       },
       "_type": "Control"
     },
@@ -2460,7 +2460,7 @@
       "_children": {
         "Core": {"name":"Category","id":"qa08_enum_header","controlType":"Combobox"},
         "Transform": {"x":522,"y":4051},
-        "Value": {"rows":[{"id":"hdr","displayText":"— Strings —","internalValue":"hdr","isHeader":true,"enabled":true},{"id":"violin","displayText":"Violin","internalValue":"violin","sendValue":0,"selectedByDefault":true,"enabled":true,"isHeader":false},{"id":"cello","displayText":"Cello","internalValue":"cello","sendValue":1,"selectedByDefault":false,"enabled":true,"isHeader":false},{"id":"bass","displayText":"Bass","internalValue":"bass","sendValue":2,"selectedByDefault":false,"enabled":true,"isHeader":false}]}
+        "Value": {"rows":[{"id":"hdr","displayText":"— Strings —","internalValue":"hdr","isHeader":true,"_removed":["sendValue","receiveValue","selectedByDefault","visualOverrides"]},{"id":"violin","displayText":"Violin","internalValue":"violin","sendValue":0,"selectedByDefault":true,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"cello","displayText":"Cello","internalValue":"cello","sendValue":1,"isHeader":false,"_removed":["receiveValue","visualOverrides"]},{"id":"bass","displayText":"Bass","internalValue":"bass","sendValue":2,"isHeader":false,"_removed":["receiveValue","visualOverrides"]}]}
       },
       "_type": "Control"
     },
@@ -2536,7 +2536,7 @@
         "Core": {"name":"Resonance","id":"qa08_device_param","controlType":"Slider"},
         "Transform": {"x":522,"y":4245},
         "Behavior": {"max":127,"defaultCurrentValue":0},
-        "DeviceBindings": {"bindings":[{"kind":"deviceParameter","parameterId":"osc1.resonance","deviceRole":"primary"}]}
+        "DeviceBindings": {"bindings":[{"deviceRole":"primary","parameterId":"osc1.resonance","_removed":["port","parameterType","adoptMetadata","dryRun","feedback"]}]}
       },
       "_type": "Control"
     },
@@ -2575,7 +2575,7 @@
         "Core": {"name":"Expression","id":"qa08_raw_cc","controlType":"Slider"},
         "Transform": {"x":1260,"y":4245},
         "Behavior": {"max":127,"defaultCurrentValue":64},
-        "DeviceBindings": {"bindings":[{"kind":"midiControl","message":"cc","controller":11,"channel":1}]}
+        "DeviceBindings": {"bindings":[{"kind":"midiControl","message":"cc","controller":11,"channel":1,"_removed":["port","deviceRole","parameterId","parameterType","adoptMetadata","dryRun","feedback"]}]}
       },
       "_type": "Control"
     },
@@ -2614,7 +2614,7 @@
         "Core": {"name":"Filter Track","id":"qa08_raw_nrpn","controlType":"Knob"},
         "Transform": {"x":522,"y":4439},
         "Behavior": {"max":16383,"defaultCurrentValue":8192},
-        "DeviceBindings": {"bindings":[{"kind":"midiControl","message":"nrpn","parameterMsb":1,"parameterLsb":24,"channel":1,"valueResolution":14}]}
+        "DeviceBindings": {"bindings":[{"kind":"midiControl","message":"nrpn","parameterMsb":1,"parameterLsb":24,"channel":1,"valueResolution":14,"_removed":["port","deviceRole","parameterId","parameterType","adoptMetadata","dryRun","feedback"]}]}
       },
       "_type": "Control"
     },
@@ -2653,7 +2653,7 @@
         "Core": {"name":"Velocity Depth","id":"qa08_inbound_only","controlType":"Knob"},
         "Transform": {"x":1172,"y":4439},
         "Behavior": {"max":127,"defaultCurrentValue":100},
-        "DeviceBindings": {"bindings":[{"kind":"midiControl","message":"velocity","channel":1}]}
+        "DeviceBindings": {"bindings":[{"kind":"midiControl","message":"velocity","channel":1,"_removed":["port","deviceRole","parameterId","parameterType","adoptMetadata","dryRun","feedback"]}]}
       },
       "_type": "Control"
     },
@@ -2692,7 +2692,7 @@
         "Core": {"name":"Muted Send","id":"qa08_bindings_off","controlType":"Slider"},
         "Transform": {"x":522,"y":4633},
         "Behavior": {"max":127,"defaultCurrentValue":0},
-        "DeviceBindings": {"enabled":false,"bindings":[{"kind":"deviceParameter","parameterId":"osc1.level","deviceRole":"primary"}]}
+        "DeviceBindings": {"enabled":false,"bindings":[{"deviceRole":"primary","parameterId":"osc1.level","_removed":["port","parameterType","adoptMetadata","dryRun","feedback"]}]}
       },
       "_type": "Control"
     },
@@ -2730,7 +2730,7 @@
       "_children": {
         "Core": {"name":"Ring","id":"qa08_channels_single","controlType":"CustomComponent"},
         "Transform": {"x":1260,"y":4633,"width":150,"height":100},
-        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","publicInput":true,"publicOutput":true,"min":0,"max":1,"defaultValue":0.25,"label":"value"},"_removed":["mainValue","mode"]}}
+        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","label":"value","defaultValue":0.25,"_removed":["name","type","step","currentValue","deviceBindable","format","snap","curve","constraints"]},"_removed":["mainValue","mode"]}}
       },
       "_type": "Control"
     },
@@ -2768,7 +2768,7 @@
       "_children": {
         "Core": {"name":"XY Pad","id":"qa08_channels_multi","controlType":"CustomComponent"},
         "Transform": {"x":522,"y":4827,"width":150,"height":100},
-        "ValueChannels": {"_children":{"x":{"_type":"ValueChannel","publicInput":true,"publicOutput":true,"min":0,"max":127,"defaultValue":64,"label":"X"},"y":{"_type":"ValueChannel","publicInput":true,"publicOutput":true,"min":0,"max":127,"defaultValue":64,"label":"Y"},"scratch":{"_type":"ValueChannel","publicInput":false,"publicOutput":false,"min":0,"max":1,"defaultValue":0,"label":"scratch"},"_removed":["mainValue","mode"]}}
+        "ValueChannels": {"_children":{"x":{"_type":"ValueChannel","label":"X","max":127,"defaultValue":64,"_removed":["name","type","step","currentValue","deviceBindable","format","snap","curve","constraints"]},"y":{"_type":"ValueChannel","label":"Y","max":127,"defaultValue":64,"_removed":["name","type","step","currentValue","deviceBindable","format","snap","curve","constraints"]},"scratch":{"_type":"ValueChannel","label":"scratch","publicInput":false,"publicOutput":false,"_removed":["name","type","step","currentValue","deviceBindable","format","snap","curve","constraints"]},"_removed":["mainValue","mode"]}}
       },
       "_type": "Control"
     },

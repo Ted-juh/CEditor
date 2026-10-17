@@ -6,12 +6,13 @@ import { expandControl, expandControls, shrinkControl } from '../src/CE_Applicat
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
 import { repairGaiaNoteChoices } from '../src/CE_Application/utils/gaiaNoteChoiceMigration.js';
-import { resolveDrawings } from '../src/CE_Application/stores/documentDrawings.js';
+import { readPanelDocument } from '../src/CE_Application/utils/panelFormat.js';
 
 test('opening a legacy GAIA panel repairs all six note tables and preserves the rest of every control', () => {
   const source = readFileSync(new URL('../../panels/Roland GAIA SH-01.cepanel', import.meta.url), 'utf8');
-  // Read raw, so the drawings the file writes once go back into their controls first, as opening does.
-  const before = flatControls(resolveDrawings(JSON.parse(source)).doc.controls.map(expandControl));
+  // Read as opening reads it (the drawings the file writes once and the defaults its list entries
+  // leave out go back in first), but without the repair deserializePanel makes after.
+  const before = flatControls(readPanelDocument(source).doc.controls.map(expandControl));
   const panel = deserializePanel(source, 'gaia.cepanel', 'gaia');
   const after = flatControls(panel.controls);
   assert.equal(after.length, before.length);

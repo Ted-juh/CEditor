@@ -1,5 +1,5 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "panelGuid": "31f3605a-9e56-49da-a505-a26800c78aae6",
   "exportSettings": {
     "pluginName": "",
@@ -408,7 +408,7 @@
         "Transform": {"x":184,"y":256,"width":190},
         "Text": {"content":"Super Saw"},
         "Behavior": {"defaultValue":"supersaw","keyboardEnabled":false,"focusable":false},
-        "Value": {"rows":[{"id":"saw","displayText":"Saw","internalValue":"saw","sendValue":0,"receiveValue":0,"selectedByDefault":false,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"","badge":"","swatch":"FF44AAFF","isHeader":false,"parentValue":""},{"id":"supersaw","displayText":"Super Saw","internalValue":"supersaw","sendValue":6,"receiveValue":6,"selectedByDefault":true,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"7 detuned saws","badge":"GAIA","swatch":"FFFFD166","isHeader":false,"parentValue":""},{"id":"noise","displayText":"Noise","internalValue":"noise","sendValue":5,"receiveValue":5,"selectedByDefault":false,"enabled":false,"visualOverrides":{},"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+        "Value": {"rows":[{"id":"saw","displayText":"Saw","internalValue":"saw","sendValue":0,"receiveValue":0,"icon":"","subtitle":"","badge":"","swatch":"FF44AAFF","isHeader":false,"parentValue":""},{"id":"supersaw","displayText":"Super Saw","internalValue":"supersaw","sendValue":6,"receiveValue":6,"selectedByDefault":true,"icon":"","subtitle":"7 detuned saws","badge":"GAIA","swatch":"FFFFD166","isHeader":false,"parentValue":""},{"id":"noise","displayText":"Noise","internalValue":"noise","sendValue":5,"receiveValue":5,"enabled":false,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
       },
       "_type": "Control"
     },
@@ -426,7 +426,7 @@
       "_children": {
         "Core": {"name":"qa02_listbox","id":"qa02_listbox","controlType":"Listbox"},
         "Transform": {"x":398,"y":256,"width":210,"height":168},
-        "Value": {"rows":[{"id":"hdr","displayText":"USER BANK A","internalValue":"","sendValue":"","receiveValue":"","selectedByDefault":false,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"","badge":"","swatch":"","isHeader":true,"parentValue":""},{"id":"a1","displayText":"Init Patch","internalValue":"a1","sendValue":0,"receiveValue":0,"selectedByDefault":true,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"A-1","badge":"FAV","swatch":"FF66DDAA","isHeader":false,"parentValue":""},{"id":"a2","displayText":"Hoover Lead","internalValue":"a2","sendValue":1,"receiveValue":1,"selectedByDefault":false,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"A-2","badge":"","swatch":"FFFF6B6B","isHeader":false,"parentValue":""},{"id":"a3","displayText":"(empty)","internalValue":"a3","sendValue":2,"receiveValue":2,"selectedByDefault":false,"enabled":false,"visualOverrides":{},"icon":"","subtitle":"A-3","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
+        "Value": {"rows":[{"id":"hdr","displayText":"USER BANK A","icon":"","subtitle":"","badge":"","swatch":"","isHeader":true,"parentValue":""},{"id":"a1","displayText":"Init Patch","internalValue":"a1","sendValue":0,"receiveValue":0,"selectedByDefault":true,"icon":"","subtitle":"A-1","badge":"FAV","swatch":"FF66DDAA","isHeader":false,"parentValue":""},{"id":"a2","displayText":"Hoover Lead","internalValue":"a2","sendValue":1,"receiveValue":1,"icon":"","subtitle":"A-2","badge":"","swatch":"FFFF6B6B","isHeader":false,"parentValue":""},{"id":"a3","displayText":"(empty)","internalValue":"a3","sendValue":2,"receiveValue":2,"enabled":false,"icon":"","subtitle":"A-3","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
       },
       "_type": "Control"
     },
@@ -500,7 +500,7 @@
       "_children": {
         "Core": {"name":"qa02_devicebindings","id":"qa02_devicebindings","controlType":"Knob"},
         "Transform": {"x":1214,"y":256,"width":90,"height":90},
-        "DeviceBindings": {"bindings":[{"kind":"deviceParameter","port":"value","deviceRole":"primary","parameterId":"filter.cutoff","parameterType":"integer","adoptMetadata":true,"dryRun":true,"feedback":{"receiveUpdates":true,"ignoreOwnEchoes":true,"echoWindowMs":250}}]}
+        "DeviceBindings": {"bindings":[{"deviceRole":"primary","parameterId":"filter.cutoff","parameterType":"integer","dryRun":true}]}
       },
       "_type": "Control"
     },
