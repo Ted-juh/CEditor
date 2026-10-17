@@ -6,12 +6,21 @@
   // highlight, smart Tab/auto-indent, bracket & quote auto-closing, comment toggle,
   // find & replace, and font zoom. Native textarea undo/redo and copy/paste are kept
   // intact by routing every programmatic edit through document.execCommand('insertText').
+  //
+  // A long JSON text (the panel file view's "every field" reference: up to 11,000 lines for one of
+  // GAIA's controls) is drawn only where it is on screen. The textarea still holds all of it, so
+  // selecting, copying, the caret and find are the browser's own over the whole text; the highlight
+  // layer and the gutter draw the visible lines and a margin, and move with the scroll. JSON can be
+  // drawn a window at a time because each of its tokens ends on the line it began on; a script's
+  // block comment or template string does not, so scripts are drawn whole, as before. Positions are
+  // found through an index of where each line starts (utils/lineIndex.js), not by counting newlines.
   import { onDestroy, tick } from 'svelte';
-  import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
+  import { highlight, lineCommentToken, matchingBracket, identifierOccurrences, languageKey } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
   import { projectFolds, pruneFolds } from './foldModel.js';
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
+  import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
 
   let {
     value = '',
@@ -129,16 +138,40 @@
   let lineHeight = $derived(Math.round(fontSize * 1.6));
   let lines = $derived(displayText.split('\n'));
   let lineCount = $derived(lines.length);
+  // Where each line starts, as character offsets: of the full source, and of what is displayed.
+  let valueStarts = $derived(lineStartsOf(value));
+  let displayStarts = $derived(projection ? lineStartsOf(displayText) : valueStarts);
   // Gutter shows full-source line numbers, so size it to the full line count (not the
   // possibly-fewer displayed rows when folded).
-  let gutterDigits = $derived(String(value.split('\n').length).length);
+  let gutterDigits = $derived(String(valueStarts.length).length);
+
+  // ----- drawing only what is on screen (long JSON) -----
+  const VIRTUAL_MIN_LINES = 1000;
+  const WINDOW_STEP = 40;    // the drawn window moves in steps of this many lines…
+  const WINDOW_MARGIN = 60;  // …and reaches this far past the screen on each side
+  let virtual = $derived(languageKey(language) === 'json' && lineCount > VIRTUAL_MIN_LINES);
+  let firstRow = $derived.by(() => {
+    if (!virtual) return 0;
+    const top = Math.max(0, Math.floor((scrollTop - PAD_TOP) / lineHeight));
+    return Math.max(0, Math.floor(top / WINDOW_STEP) * WINDOW_STEP - WINDOW_MARGIN);
+  });
+  let lastRow = $derived(virtual
+    ? Math.min(lineCount, firstRow + Math.ceil((taClientH || 800) / lineHeight) + WINDOW_STEP + 2 * WINDOW_MARGIN)
+    : lineCount);
+  let windowStart = $derived(virtual ? displayStarts[firstRow] : 0);
+  let windowText = $derived(virtual
+    ? displayText.slice(windowStart, lastRow < lineCount ? displayStarts[lastRow] - 1 : displayText.length)
+    : displayText);
+  let gutterRows = $derived(Array.from({ length: lastRow - firstRow }, (_, i) => firstRow + i));
+
   // Highlight a matched bracket pair only when there's no active text selection (and not folded).
+  // Offsets are into the drawn text, which a long text starts at windowStart.
   let matchMarks = $derived.by(() => {
     if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return undefined;
     const pair = matchingBracket(displayText, caretPos);
-    return pair ? new Set(pair) : undefined;
+    return pair ? new Set(pair.map((at) => at - windowStart)) : undefined;
   });
-  let highlighted = $derived(highlight(displayText, language, matchMarks));
+  let highlighted = $derived(highlight(windowText, language, matchMarks));
 
   // Highlight every occurrence of the identifier under the caret (or the selected word).
   const IDENT_RE = /^[A-Za-z_$][\w$]*$/;
@@ -152,11 +185,13 @@
   });
   let occurrences = $derived.by(() => {
     if (isFolded || !targetWord) return [];
-    const occ = identifierOccurrences(displayText, language, targetWord);
-    return occ.length >= 2 ? occ.slice(0, 200) : [];
+    // A long text marks the occurrences in what is drawn, which is all that would show.
+    const occ = identifierOccurrences(windowText, language, targetWord);
+    const found = occ.length >= 2 ? occ.slice(0, 200) : [];
+    return windowStart ? found.map((o) => ({ start: o.start + windowStart, end: o.end + windowStart })) : found;
   });
   // A trailing newline collapses in <pre>; pad so the highlight layer matches the textarea height.
-  let highlightedSafe = $derived(highlighted + (displayText.endsWith('\n') ? '\n' : ''));
+  let highlightedSafe = $derived(highlighted + (windowText.endsWith('\n') ? '\n' : ''));
 
   const CLOSERS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' };
   const OPENERS = new Set(Object.keys(CLOSERS));
@@ -189,13 +224,17 @@
     ctx.clearRect(0, 0, W, H);
     const n = lines.length;
     const cellH = Math.max(1, Math.min(4, H / Math.max(n, 1)));
+    // A text taller than the map is sampled, one line per row, so the map is the whole text and the
+    // viewport box (a share of the whole) sits over the part it says.
+    const stride = Math.max(1, (n * cellH) / H);
     const cellW = Math.max(0.8, Math.min(1.6, (W - 6) / 90));
     const fg = theme === 'light' ? 'rgba(31,36,48,0.5)' : 'rgba(207,227,216,0.45)';
     const com = theme === 'light' ? 'rgba(138,148,140,0.6)' : 'rgba(91,107,95,0.75)';
     const tok = lineCommentToken(language);
-    for (let i = 0; i < n; i++) {
-      const y = i * cellH;
-      if (y > H) break;
+    for (let row = 0; ; row++) {
+      const y = row * cellH;
+      const i = Math.floor(row * stride);
+      if (y > H || i >= n) break;
       const line = lines[i];
       ctx.fillStyle = tok && line.trimStart().startsWith(tok) ? com : fg;
       let run = -1;
@@ -245,9 +284,12 @@
     if (!taEl) return;
     const pos = taEl.selectionStart;
     caretPos = pos;
-    const before = taEl.value.slice(0, pos);
-    caretLine = countLines(before);
-    caretCol = pos - (before.lastIndexOf('\n') + 1);
+    // The index is of what is displayed; between a keystroke and the parent passing the new text
+    // back, the textarea is ahead of it, and is indexed itself.
+    const text = taEl.value;
+    const starts = text === displayText ? displayStarts : lineStartsOf(text);
+    caretLine = lineAt(starts, pos);
+    caretCol = pos - starts[caretLine];
     oncaret?.(fullLineOf(caretLine), caretCol + 1);
   }
 
@@ -263,9 +305,8 @@
 
   // line/column (0-based) of a character offset.
   function posOf(index) {
-    const before = value.slice(0, index);
-    const nl = before.lastIndexOf('\n');
-    return { line: countLines(before), col: index - (nl + 1) };
+    const line = lineAt(valueStarts, Math.min(index, value.length));
+    return { line, col: index - valueStarts[line] };
   }
   // Content-space pixel (pre-scroll) for a line/col.
   function xyOf(line, col) {
@@ -279,11 +320,10 @@
     const ly = clientY - r.top + taEl.scrollTop - PAD_TOP;
     const line = Math.max(0, Math.floor(ly / lineHeight));
     const col = Math.max(0, Math.round(lx / charWidth));
-    const lines = value.split('\n');
-    if (line >= lines.length) return value.length;
-    let base = 0;
-    for (let i = 0; i < line; i++) base += lines[i].length + 1;
-    return base + Math.min(col, lines[line].length);
+    if (line >= valueStarts.length) return value.length;
+    const base = valueStarts[line];
+    const end = line + 1 < valueStarts.length ? valueStarts[line + 1] - 1 : value.length;
+    return base + Math.min(col, end - base);
   }
 
   // ----- autocomplete -----
@@ -796,8 +836,7 @@
     taEl.focus();
     taEl.setSelectionRange(m[0], m[1]);
     // Scroll the match's line into view.
-    const ln = countLines(taEl.value.slice(0, m[0]));
-    const top = ln * lineHeight;
+    const top = posOf(m[0]).line * lineHeight;
     if (top < taEl.scrollTop || top > taEl.scrollTop + taEl.clientHeight - lineHeight * 2) {
       taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 2);
     }
@@ -838,14 +877,14 @@
   export async function revealLine(line, col = 1) {
     if (!taEl) return;
     if (isFolded) { unfoldAll(); await tick(); }
-    const lines = taEl.value.split('\n');
-    const at = Math.max(1, Math.min(lines.length, Math.floor(line) || 1));
-    let offset = 0;
-    for (let i = 0; i < at - 1; i++) offset += lines[i].length + 1;
-    offset += Math.max(0, Math.min(lines[at - 1].length, (Math.floor(col) || 1) - 1));
+    const at = Math.max(1, Math.min(valueStarts.length, Math.floor(line) || 1));
+    const start = valueStarts[at - 1];
+    const end = at < valueStarts.length ? valueStarts[at] - 1 : value.length;
+    const offset = start + Math.max(0, Math.min(end - start, (Math.floor(col) || 1) - 1));
     taEl.focus();
     taEl.setSelectionRange(offset, offset);
     taEl.scrollTop = Math.max(0, (at - 1) * lineHeight - taEl.clientHeight / 2);
+    onScroll();
     syncCaret();
   }
 
@@ -865,8 +904,8 @@
 
 <div class={['ce', theme === 'light' && 'light']} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
   <div class="ce-gutter">
-    <div class="ce-gutter-inner" style="transform:translateY({-scrollTop}px)">
-      {#each lines as _, i (i)}
+    <div class="ce-gutter-inner" style="transform:translateY({firstRow * lineHeight - scrollTop}px)">
+      {#each gutterRows as i (i)}
         {@const fl = fullLineOf(i)}
         <div class={['ce-gln', i === caretLine && 'active', errorLines.has(fl) && 'err', bpSet.has(fl) && 'bp']}
           role="button" tabindex="-1" title="Toggle breakpoint"
@@ -896,7 +935,7 @@
       <div class="ce-mcaret"
         style="left:{PAD_L + column.col * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {/each}
-    <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {-scrollTop}px)">{@html highlightedSafe}</pre>
+    <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {firstRow * lineHeight - scrollTop}px)">{@html highlightedSafe}</pre>
     <textarea
       class="ce-ta"
       bind:this={taEl}

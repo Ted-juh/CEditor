@@ -16,41 +16,94 @@ const isPlainObject = (value) => value !== null && typeof value === 'object' && 
 
 /** `value` as JSON (JSON's own rules for what is kept), laid out to fit `width` columns. */
 export function formatJson(value, { width = 80 } = {}) {
+  return formatJsonLines(value, { width }).join('\n');
+}
+
+/**
+ * formatJson's text as its lines, and where each object and list in it is: `onNode(value, start,
+ * end, depth, key)` is called once per object or list (lines from 1, inclusive; `key` is its
+ * property name or index in its parent). The panel file view's whole file uses it to know which
+ * lines are which control.
+ *
+ * One pass: whether an object fits on its line is measured only as far as the line is wide, so a
+ * 70,000-line file is laid out in a fraction of the time that measuring every subtree in full, once
+ * for each level above it, took.
+ */
+export function formatJsonLines(value, { width = 80, onNode = null } = {}) {
   const json = JSON.stringify(value);
-  if (json === undefined) return '';
-  return render(JSON.parse(json), 0, 0, width);
+  if (json === undefined) return [];
+  const lines = [];
+
+  // `prefix` is what the line holds before the value (its indent and key), `suffix` what follows
+  // its last line (the comma before the next entry).
+  const emit = (node, depth, prefix, suffix, key) => {
+    const isList = Array.isArray(node);
+    if (!isList && !isPlainObject(node)) {
+      lines.push(prefix + JSON.stringify(node) + suffix);
+      return;
+    }
+    const start = lines.length + 1;
+    // The outermost value always opens up: a control written on one line is no easier to read than
+    // the file was.
+    const flat = depth > 0 ? inlineWithin(node, width - prefix.length) : null;
+    if (flat !== null) {
+      lines.push(prefix + flat + suffix);
+    } else if (isList) {
+      if (!node.length) lines.push(`${prefix}[]${suffix}`);
+      else {
+        const pad = '  '.repeat(depth + 1);
+        lines.push(`${prefix}[`);
+        node.forEach((item, index) => emit(item, depth + 1, pad, index < node.length - 1 ? ',' : '', index));
+        lines.push(`${'  '.repeat(depth)}]${suffix}`);
+      }
+    } else {
+      const entries = Object.entries(node);
+      if (!entries.length) lines.push(`${prefix}{}${suffix}`);
+      else {
+        const pad = '  '.repeat(depth + 1);
+        lines.push(`${prefix}{`);
+        entries.forEach(([name, item], index) => emit(item, depth + 1, `${pad}${JSON.stringify(name)}: `, index < entries.length - 1 ? ',' : '', name));
+        lines.push(`${'  '.repeat(depth)}}${suffix}`);
+      }
+    }
+    onNode?.(node, start, lines.length, depth, key);
+  };
+  emit(JSON.parse(json), 0, '', '', null);
+  return lines;
 }
 
-function inline(value) {
-  if (Array.isArray(value)) return value.length ? `[${value.map(inline).join(', ')}]` : '[]';
-  if (isPlainObject(value)) {
-    const entries = Object.entries(value);
-    return entries.length ? `{ ${entries.map(([k, v]) => `${JSON.stringify(k)}: ${inline(v)}`).join(', ')} }` : '{}';
-  }
-  return JSON.stringify(value);
-}
-
-// `used` is how many columns the line has before the value: its indent and its key.
-function render(value, depth, used, width) {
-  if (!Array.isArray(value) && !isPlainObject(value)) return JSON.stringify(value);
-  const flat = inline(value);
-  // The outermost value always opens up: a control written on one line is no easier to read than
-  // the file was.
-  if (depth > 0 && used + flat.length <= width) return flat;
-  const pad = '  '.repeat(depth + 1);
-  const close = '  '.repeat(depth);
-  if (Array.isArray(value)) {
-    if (!value.length) return '[]';
-    const items = value.map((item) => pad + render(item, depth + 1, pad.length, width));
-    return `[\n${items.join(',\n')}\n${close}]`;
-  }
-  const entries = Object.entries(value);
-  if (!entries.length) return '{}';
-  const lines = entries.map(([key, item]) => {
-    const head = `${pad}${JSON.stringify(key)}: `;
-    return head + render(item, depth + 1, head.length, width);
-  });
-  return `{\n${lines.join(',\n')}\n${close}}`;
+// `value` on one line, or null when that is longer than `budget`: measured only up to the budget.
+function inlineWithin(value, budget) {
+  let out = '';
+  let over = false;
+  const add = (text) => {
+    if (over) return;
+    if (out.length + text.length > budget) over = true;
+    else out += text;
+  };
+  const walk = (node) => {
+    if (over) return;
+    if (Array.isArray(node)) {
+      if (!node.length) { add('[]'); return; }
+      add('[');
+      for (let i = 0; i < node.length && !over; i++) { if (i) add(', '); walk(node[i]); }
+      add(']');
+    } else if (isPlainObject(node)) {
+      const keys = Object.keys(node);
+      if (!keys.length) { add('{}'); return; }
+      add('{ ');
+      for (let i = 0; i < keys.length && !over; i++) {
+        if (i) add(', ');
+        add(`${JSON.stringify(keys[i])}: `);
+        walk(node[keys[i]]);
+      }
+      add(' }');
+    } else {
+      add(JSON.stringify(node));
+    }
+  };
+  walk(value);
+  return over ? null : out;
 }
 
 /**

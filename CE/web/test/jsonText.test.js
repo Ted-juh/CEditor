@@ -2,12 +2,13 @@
 //
 // formatJson has to give back exactly the value it was made from, whatever it lays on one line;
 // jsonSyntaxError has to find the line on every platform, since JavaScriptCore's JSON.parse message
-// carries none; jsonFoldRegions feeds the editor's gutter.
+// carries none; jsonFoldRegions feeds the editor's gutter. formatJsonLines is the same text as lines,
+// with where each object and list sits in it, which the panel file view's whole file navigates by.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatJson, jsonFoldRegions, jsonSyntaxError } from '../src/CE_Application/utils/jsonText.js';
+import { formatJson, formatJsonLines, jsonFoldRegions, jsonSyntaxError } from '../src/CE_Application/utils/jsonText.js';
 
 test('a value comes back from its text exactly, key order included', () => {
   const value = {
@@ -60,4 +61,28 @@ test('every object and list over several lines folds, brackets in strings aside'
     { startLine: 2, endLine: 7 },
     { startLine: 4, endLine: 6 },
   ]);
+});
+
+test('the lines are formatJson\'s text, and each object and list is reported with the lines it spans', () => {
+  const value = {
+    controls: [
+      { _type: 'Control', _children: { Core: { id: 'a', name: 'cutoff' }, Transform: { x: 1, y: 2 } } },
+      { _type: 'Control', _children: { Core: { id: 'b' }, Value: { steps: Array.from({ length: 30 }, (_, i) => i) } } },
+    ],
+    width: 600,
+  };
+  const spans = [];
+  const lines = formatJsonLines(value, { width: 60, onNode: (node, start, end, depth, key) => spans.push({ node, start, end, depth, key }) });
+  assert.equal(lines.join('\n'), formatJson(value, { width: 60 }));
+  // Each reported object or list is exactly the text on its lines: cut them out and they parse back to it.
+  for (const { node, start, end, key } of spans) {
+    const piece = lines.slice(start - 1, end).join('\n').trim().replace(/,$/, '').replace(/^"[^"]*": /, '');
+    assert.deepEqual(JSON.parse(piece), node, `${key}: lines ${start}-${end}`);
+  }
+  const at = (key) => spans.find((s) => s.key === key);
+  assert.deepEqual([at(null).start, at(null).end, at(null).depth], [1, lines.length, 0], 'the outermost value is every line');
+  assert.equal(at('controls').depth, 1);
+  assert.equal(at('Transform').start, at('Transform').end, 'what fits on its line spans one line');
+  assert.equal(spans.filter((s) => s.node?._type === 'Control').length, 2);
+  assert.deepEqual(formatJsonLines(undefined), [], 'nothing to write is no lines');
 });

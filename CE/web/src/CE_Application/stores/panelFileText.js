@@ -6,9 +6,9 @@
 // control of that type (documentShape.js, documentEntries.js), or from a new panel. Deleting a line
 // therefore puts that property back to its default.
 //
-// One item, not the file: a readable GAIA is 90,000 lines (1.7 million with its defaults), more than
-// the script editor, which draws its whole text on every keystroke, is made to hold. One control is
-// a median 55 lines, and the largest on the committed panels 1,500.
+// One item to edit, not the file: a readable GAIA is 71,000 lines, and an edit is checked and applied
+// one control at a time. One control is a median 55 lines, and the largest on the committed panels
+// 1,500. The whole file can be read (wholeFileText, below), as Save writes it, but not edited.
 //
 // HELD BACK: what an item's text does not show, and an edit therefore cannot change.
 //   - A container's child controls, which are items of their own.
@@ -33,7 +33,7 @@
 // What the edit did not change stays the very object it was, so an untouched section keeps sharing
 // its defaults and its drawing, and a text applied unchanged changes nothing.
 
-import { formatJson, jsonSyntaxError } from '../utils/jsonText.js';
+import { formatJson, formatJsonLines, jsonSyntaxError } from '../utils/jsonText.js';
 import { jsonEqual } from '../utils/jsonEqual.js';
 import { collectControlNames } from '../utils/containment.js';
 import { PANEL_FORMAT_VERSION, validatePanelDocument } from '../utils/panelFormat.js';
@@ -80,16 +80,17 @@ function childControls(control) {
 
 const DATA_INLINE_LIMIT = 160;
 const KEPT_MARK = ' — kept as it is';
+const SHORTENED_MARK = ' — shortened here';
 
 // `value` with every long data: string replaced by a placeholder; `kept` maps each placeholder back.
-function holdBackData(value) {
+function holdBackData(value, mark = KEPT_MARK) {
   const kept = new Map();
   const walk = (node) => {
     if (typeof node === 'string') {
       if (!node.startsWith('data:') || node.length <= DATA_INLINE_LIMIT) return node;
       const end = node.search(/[;,]/);
       const type = end > 5 ? node.slice(5, end) : 'data';
-      const token = `‹${type}, ${Math.max(1, Math.round(node.length / 1024))} KB${KEPT_MARK} #${kept.size + 1}›`;
+      const token = `‹${type}, ${Math.max(1, Math.round(node.length / 1024))} KB${mark} #${kept.size + 1}›`;
       kept.set(token, node);
       return token;
     }
@@ -433,4 +434,73 @@ export function applyPanelSettingsFileText(text, panel) {
   result.updates = updates;
   result.changed = Object.keys(updates).length > 0;
   return result;
+}
+
+// ---- the whole file, to read ----------------------------------------------------------------------
+
+/** What the file's sections are called in the outline, where the key alone would not say. */
+const SECTION_NAMES = {
+  controls: 'Controls',
+  scripts: 'Scripts',
+  drawings: 'Shared drawings',
+  exportParameters: 'Host parameters',
+  notepad: 'Notes',
+  layers: 'Layers',
+  snapshots: 'Snapshots',
+  deviceSession: 'Device session',
+  captureSession: 'Capture in progress',
+  cardPresets: 'Card presets',
+  controlSets: 'Control sets',
+  requiredProfiles: 'Required profiles',
+};
+
+/**
+ * The whole file, laid out to read. `saved` is the document as Save writes it (stores/panels.js
+ * serializePanelDocument: the string, or the object). Returns
+ *   { text, lineCount, controls, sections, shortened }
+ * where `controls` maps each control's id to the lines it spans ({ start, end }, from 1), wherever it
+ * sits in the tree, `sections` lists the file's top-level objects and lists in order
+ * ({ key, name, count, start, end }; `count` is how many entries a list or a map of objects has, else
+ * null), and `shortened` is how many embedded values (images) show as a
+ * placeholder: a 120 KB data: string is one line nobody can read, and longer than the rest of a
+ * control put together.
+ *
+ * For reading only. An edit is made one item at a time, where it is checked (applyControlFileText);
+ * the panel file view's "Edit this item" goes from here to there.
+ */
+export function wholeFileText(saved) {
+  const doc = typeof saved === 'string' ? JSON.parse(saved) : saved;
+  const { value, kept } = holdBackData(doc, SHORTENED_MARK);
+  const controls = new Map();
+  const sections = [];
+  const lines = formatJsonLines(value, {
+    width: TEXT_WIDTH,
+    onNode(node, start, end, depth, key) {
+      if (depth === 1) sections.push({ key, name: SECTION_NAMES[key] ?? key, count: entryCount(node), start, end });
+      const id = node?._children?.Core?.id;
+      if (node?._type === 'Control' && typeof id === 'string' && !controls.has(id)) controls.set(id, { start, end });
+    },
+  });
+  return { text: lines.join('\n'), lineCount: lines.length, controls, sections, shortened: kept.size };
+}
+
+const entryCount = (node) => (Array.isArray(node) ? node.length
+  : Object.values(node).every(isPlainObject) ? Object.keys(node).length : null);
+
+/**
+ * Which item of the whole file the given line (from 1) is in: the innermost control whose lines hold
+ * it, else the file section, else the panel's own settings. `{ kind: 'control', id }`,
+ * `{ kind: 'section', key, name }` or `{ kind: 'panel' }`.
+ */
+export function wholeFileItemAt(whole, line) {
+  let best = null;
+  for (const [id, span] of whole.controls) {
+    if (span.start <= line && line <= span.end && (!best || span.start >= best.span.start)) best = { id, span };
+  }
+  if (best) return { kind: 'control', id: best.id };
+  // What the panel settings text holds back (the controls list itself, scripts, shared drawings…)
+  // is no item of its own; everything else at the top of the file is a panel setting.
+  const section = whole.sections.find((s) => s.start <= line && line <= s.end);
+  if (section && PANEL_HELD_BACK.has(section.key)) return { kind: 'section', key: section.key, name: section.name };
+  return { kind: 'panel' };
 }

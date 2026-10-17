@@ -200,7 +200,8 @@ function panelWithBoundScripts(panel) {
   return panel;
 }
 
-function serializePanelDocument(panel) {
+/** The document Save writes for `panel`: its scripts as the script editor has them, its device session. */
+export function serializePanelDocument(panel) {
   return serializePanel(panelWithBoundScripts(panel), {
     deviceSession: getProjectDeviceSessionSnapshot(),
   });
