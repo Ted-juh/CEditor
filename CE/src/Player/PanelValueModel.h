@@ -28,9 +28,9 @@ namespace ceditor
  * findControlByName answers from an index of names and ids built on first use; nameIndex below
  * says why, and what keeps it true.
  *
- * An export payload's controls arrive as a diff against their types, carrying the defaults it is
- * against and the drawings several controls share, and share() rebuilds them sharing both;
- * rebuildFromDefaults says how.
+ * An export payload's controls arrive as a diff against their types, and the entries of their
+ * lists as a diff against baselines, carrying the defaults both are against and the drawings several
+ * controls share, and share() rebuilds them sharing all of it; rebuildFromDefaults says how.
  *
  * The rebuilt document is shared by every model of that panel in the process (SharedPanelDocument):
  * two copies of a panel in a DAW hold it once. Each model owns only what it has written; ownership
@@ -614,6 +614,12 @@ private:
     // A document without `controlDefaults` (a complete one, from before the export form) is used
     // as it is.
     //
+    // The diff stops at the entries of a control's lists, which a pristine control has nothing
+    // under: a binding, a grab area, a value channel, a behaviour, a device binding, a choice. Each
+    // of those is written as a diff against a baseline for its list, which the payload carries too,
+    // in `controlDefaults.entries` (documentEntries.js). They are put back first, as readPanelDocument
+    // puts them back in the WebView before anything else sees the controls; restoreEntries says which.
+    //
     // A payload also writes a drawing (a custom component's Parts section) that several controls use
     // once, in `drawings`, and those controls refer to it by name (documentDrawings.js). It goes back
     // into each of them first, as readPanelDocument does in the WebView, shared like the defaults.
@@ -645,9 +651,67 @@ private:
         carriedDefaults = obj->getProperty ("controlDefaults");
         obj->removeProperty ("controlDefaults");
         markShared (carriedDefaults);
+        const auto entryBaselines = carriedDefaults.getProperty ("entries", {});
         if (controls != nullptr)
             for (auto& control : *controls)
+            {
+                if (entryBaselines.isObject()) restoreEntries (control, entryBaselines);
                 control = rebuildControl (control);
+            }
+    }
+
+    // restoreEntries in documentEntries.js: each entry of a list the payload has a baseline for, put
+    // back over it, in the control as it came and in its children's, whatever their type. A map's
+    // entry (Bindings, HitZones, ValueChannels, Behaviors: section._children.<name>) only when it
+    // carries the baseline's `_type`, which marks it whole: one without is a diff against the entry
+    // of that name in its type's pristine control, and rebuildControl puts that back. An array's
+    // (DeviceBindings.bindings, Value.rows) always: an array is written whole when it differs from its
+    // type's, so all its entries are written over the baseline. As merge does everywhere else here,
+    // what an entry leaves at the baseline is the baseline's own node, shared.
+    //
+    // A payload written before payloads carried baselines has its entries whole, and has none to
+    // restore them from; one that carries them carries those its entries were written against, and
+    // a list it has no baseline for is left as it came.
+    static void restoreEntries (const juce::var& control, const juce::var& baselines)
+    {
+        auto* sections = control.getProperty ("_children", {}).getDynamicObject();
+        if (sections == nullptr) return;
+        for (const auto& p : sections->getProperties())
+        {
+            const auto name = p.name.toString();
+            if (name == "Children")
+            {
+                if (auto* kids = p.value.getProperty ("_children", {}).getDynamicObject())
+                    for (const auto& kid : kids->getProperties())
+                        if (kid.value.getDynamicObject() != nullptr) restoreEntries (kid.value, baselines);
+                continue;
+            }
+            auto* section = p.value.getDynamicObject();
+            const auto base = baselines.getProperty (p.name, {});
+            if (section == nullptr || base.getDynamicObject() == nullptr) continue;
+            if (name == "DeviceBindings" || name == "Value")
+            {
+                if (auto* list = section->getProperty (name == "Value" ? "rows" : "bindings").getArray())
+                    for (auto& entry : *list)
+                        if (entry.getDynamicObject() != nullptr) entry = merge (entry, base);
+            }
+            else if (name == "Bindings" || name == "HitZones" || name == "ValueChannels" || name == "Behaviors")
+            {
+                const auto type = base.getProperty ("_type", {});
+                auto* entries = section->getProperty ("_children").getDynamicObject();
+                if (entries == nullptr || ! type.isString()) continue;
+                // `_removed` is in this map too, as a list of names. Replaced by name: setProperty on a
+                // name already there keeps its place.
+                for (const auto& key : namesOf (*entries))
+                {
+                    if (key.toString() == "_removed") continue;
+                    const auto entry = entries->getProperty (key);
+                    const auto entryType = entry.getProperty ("_type", {});
+                    if (entry.getDynamicObject() != nullptr && entryType.isString() && entryType.toString() == type.toString())
+                        entries->setProperty (key, merge (entry, base));
+                }
+            }
+        }
     }
 
     // resolveDrawings in documentDrawings.js: each control's reference, its children's included,

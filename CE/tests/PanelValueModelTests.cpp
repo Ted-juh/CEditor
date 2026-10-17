@@ -167,6 +167,59 @@ const char* kDrawingsPanel = R"JSON({
     }
   }
 })JSON";
+
+// An export payload whose list entries are written as a diff against baselines it carries in
+// controlDefaults.entries (documentEntries.js). One entry of each kind; a channel that removes
+// fields; one that is a diff against its type's own entry, not the baseline; a list the payload has
+// no baseline for; and a container's child whose channel removes one, which must stay removed.
+const char* kEntriesPanel = R"JSON({
+  "name": "Entries",
+  "documentForm": "export",
+  "controls": [
+    { "_type": "Control", "_children": {
+        "Core": { "id": "s1", "name": "seq", "controlType": "Custom" },
+        "ValueChannels": { "_children": {
+          "level": { "_type": "ValueChannel", "name": "level", "max": 127 },
+          "pattern": { "_type": "ValueChannel", "name": "pattern", "type": "array", "items": [], "_removed": ["currentValue", "snap"] },
+          "mainValue": { "currentValue": 0.25 },
+          "_removed": ["mode"] } },
+        "HitZones": { "_children": {
+          "grab": { "_type": "HitZone", "name": "grab", "bounds": { "width": 50 } },
+          "other": { "_type": "HitZone", "name": "other", "cursor": "move" } } },
+        "Value": { "rows": [ { "id": "a", "displayText": "A" }, { "id": "b", "enabled": false, "_removed": ["visualOverrides"] } ] },
+        "DeviceBindings": { "bindings": [ { "parameterId": "cutoff" } ] },
+        "Bindings": { "_children": { "led": { "_type": "Binding", "name": "led", "target": "x" } } } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "box", "name": "box", "controlType": "Custom" },
+        "Children": { "_children": {
+          "inner": { "_type": "Control", "_children": {
+            "Core": { "id": "inner", "name": "inner", "controlType": "Custom" },
+            "ValueChannels": { "_children": {
+              "steps": { "_type": "ValueChannel", "name": "steps", "_removed": ["currentValue"] } } } } } } } } }
+  ],
+  "controlDefaults": {
+    "types": {
+      "Custom": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "Custom" },
+        "ValueChannels": { "_type": "ValueChannels", "_children": {
+          "mainValue": { "_type": "ValueChannel", "name": "mainValue", "min": 0, "max": 1, "currentValue": 0.5 },
+          "mode": { "_type": "ValueChannel", "name": "mode", "currentValue": "A" } } },
+        "HitZones": { "_type": "HitZones", "_children": {} },
+        "Bindings": { "_type": "Bindings", "_children": {} },
+        "Value": { "_type": "Value", "value": 0, "rows": [] },
+        "DeviceBindings": { "_type": "DeviceBindings", "bindings": [] },
+        "Children": { "_type": "Children", "_children": {} } } }
+    },
+    "entries": {
+      "HitZones": { "_type": "HitZone", "name": "", "shape": "rectangle", "cursor": "pointer",
+                    "bounds": { "x": 0, "y": 0, "width": 100, "height": 100 }, "meta": {} },
+      "ValueChannels": { "_type": "ValueChannel", "name": "", "type": "float", "min": 0, "max": 1, "currentValue": 0,
+                         "snap": { "enabled": true } },
+      "Value": { "id": "", "displayText": "", "enabled": true, "visualOverrides": {} },
+      "DeviceBindings": { "kind": "deviceParameter", "parameterId": "", "feedback": { "receiveUpdates": true } }
+    }
+  }
+})JSON";
 }
 
 int main()
@@ -322,6 +375,73 @@ int main()
                    && again.getValue ("twinA.Parts.cap.Background.Fill.colour").toString() == "FFFFFFFF"
                    && (int) again.getValue ("twinB.Parts.cap.Layout.x") == 4,
                "drawings: a second model of the same payload starts from the drawing, not from the first one's writes");
+    }
+
+    // --- an export payload's list entries, put back over the baselines it carries ----------------
+    // Read as the complete form had them; written to without reaching another entry that shares a
+    // baseline's node, or another model; and a payload from before payloads carried baselines read
+    // as it came, its entries whole.
+    {
+        const auto keysOf = [] (const juce::var& v)
+        {
+            juce::StringArray names;
+            if (auto* o = v.getDynamicObject())
+                for (const auto& p : o->getProperties()) names.add (p.name.toString());
+            return names.joinIntoString (",");
+        };
+        const auto shared = ceditor::PanelValueModel::share (juce::JSON::parse (kEntriesPanel));
+        ceditor::PanelValueModel m, other;
+        m.load (shared);
+        other.load (shared);
+
+        check ((int) m.getValue ("seq.ValueChannels.level.max") == 127 && m.getValue ("seq.ValueChannels.level.type").toString() == "float"
+                   && (bool) m.getValue ("seq.ValueChannels.level.snap.enabled"),
+               "entries: a channel is its diff over the baseline");
+        check (! m.getValue ("seq.level").isVoid() && (int) m.getValue ("seq.level") == 0,
+               "entries: a script reads a channel by its name, the baseline's currentValue");
+        check (m.getValue ("seq.ValueChannels.pattern.currentValue").isVoid() && m.getValue ("seq.ValueChannels.pattern.snap").isVoid()
+                   && m.getValue ("seq.ValueChannels.pattern.type").toString() == "array",
+               "entries: what an entry removed from the baseline stays removed");
+        check ((double) m.getValue ("seq.ValueChannels.mainValue.currentValue") == 0.25 && (int) m.getValue ("seq.ValueChannels.mainValue.max") == 1
+                   && m.getValue ("seq.ValueChannels.mainValue.snap").isVoid(),
+               "entries: one that is a diff against its type's own entry is rebuilt over that, not the baseline");
+        check (m.getValue ("seq.ValueChannels.mode").isVoid(), "entries: an entry of the type's the author deleted stays deleted");
+        check ((int) m.getValue ("seq.HitZones.grab.bounds.width") == 50 && (int) m.getValue ("seq.HitZones.grab.bounds.height") == 100
+                   && m.getValue ("seq.HitZones.grab.cursor").toString() == "pointer",
+               "entries: a grab area, nested defaults included");
+        check (keysOf (m.getValue ("seq.HitZones.grab")) == "_type,name,shape,cursor,bounds,meta"
+                   && keysOf (m.getValue ("seq.HitZones.grab.bounds")) == "x,y,width,height",
+               "entries: keys in the baseline's order, as the WebView has them");
+        check ((bool) m.getValue ("seq.Value.rows.0.enabled") && m.getValue ("seq.Value.rows.0.visualOverrides").isObject()
+                   && ! (bool) m.getValue ("seq.Value.rows.1.enabled") && m.getValue ("seq.Value.rows.1.visualOverrides").isVoid()
+                   && m.getValue ("seq.Value.rows.1.displayText").toString().isEmpty(),
+               "entries: each choice of a list, with what it removed left out");
+        check (m.getValue ("seq.DeviceBindings.bindings.0.kind").toString() == "deviceParameter"
+                   && m.getValue ("seq.DeviceBindings.bindings.0.parameterId").toString() == "cutoff"
+                   && (bool) m.getValue ("seq.DeviceBindings.bindings.0.feedback.receiveUpdates"),
+               "entries: a device binding");
+        check (m.getValue ("seq.Bindings.led.target").toString() == "x" && m.getValue ("seq.Bindings.led.enabled").isVoid(),
+               "entries: a list the payload has no baseline for is left as it came");
+        check (m.getValue ("inner.ValueChannels.steps.currentValue").isVoid() && (int) m.getValue ("inner.ValueChannels.steps.max") == 1,
+               "entries: a container's child is put back once (twice would bring back what it removed)");
+        check (m.getValue ("panel.controlDefaults").isVoid(), "entries: the baselines are not part of the panel a script sees");
+
+        check (m.setValue ("seq.HitZones.grab.bounds.height", juce::var (40)) && (int) m.getValue ("seq.HitZones.grab.bounds.height") == 40,
+               "entries: a write into a default an entry shares with its baseline lands");
+        check ((int) m.getValue ("seq.HitZones.other.bounds.height") == 100 && (int) other.getValue ("seq.HitZones.grab.bounds.height") == 100,
+               "  and reaches neither the other entry sharing that node nor another model");
+        check (m.setValue ("seq.DeviceBindings.bindings.0.feedback.receiveUpdates", juce::var (false))
+                   && ! (bool) m.getValue ("seq.DeviceBindings.bindings.0.feedback.receiveUpdates")
+                   && (bool) other.getValue ("seq.DeviceBindings.bindings.0.feedback.receiveUpdates"),
+               "entries: so does one through an array's entry");
+        check (m.setValue ("seq.level", juce::var (64)) && (int) m.getValue ("seq.level") == 64 && (int) other.getValue ("seq.level") == 0,
+               "entries: and a channel's value written by its name");
+
+        ceditor::PanelValueModel before;
+        check (before.loadFromJson (juce::String (kEntriesPanel).replace ("\"entries\"", "\"unrelated\"")), "entries: parsed a payload without baselines");
+        check (before.getValue ("seq.HitZones.grab.cursor").isVoid() && (int) before.getValue ("seq.HitZones.grab.bounds.width") == 50
+                   && before.getValue ("seq.HitZones.grab.bounds.height").isVoid(),
+               "  its entries are read as they came, as a payload written before baselines travelled has them whole");
     }
 
     // --- one document, two models: two instances of a panel in one DAW --------------------------

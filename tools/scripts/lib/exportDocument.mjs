@@ -3,7 +3,8 @@
 // The payload is the export form (exportFormDocument in CE/web/src/CE_Application/stores/
 // panelModel.js): controls written as a diff against their types, as a saved document's are, with
 // colour-set tokens resolved to literals, the export parameters derived from full controls, and the
-// defaults the diff is against carried alongside (`controlDefaults`), from which the plug-in's C++
+// defaults the diff is against carried alongside (`controlDefaults`, the baselines of the entries
+// of the controls' lists included, documentEntries.js), from which the plug-in's C++
 // (Player/PanelValueModel.h) rebuilds each control, and each drawing several controls share written
 // once (`drawings`, stores/documentDrawings.js). The editor makes it at the end of its own export
 // preparation (preparePanelForExport). Anything that bakes a saved file directly did not, and twice

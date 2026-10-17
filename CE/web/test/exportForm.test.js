@@ -1,10 +1,12 @@
 // exportForm.test.js — the export payload: controls as a diff, carrying the defaults they are against.
 //
 // The plug-in's C++ rebuilds each control from `controlDefaults` as it loads (Player/
-// PanelValueModel.h). It cannot run createControl, so the table has to be enough on its own, and
-// the rebuild has to give back exactly the controls the payload used to carry whole. rebuild() below
-// is that algorithm written in JavaScript, from the table alone: the C++ is the same steps, and its
-// own tests check it against hand-made documents; this checks the table against real panels.
+// PanelValueModel.h): the entries of its lists from the baselines in `entries`, then the control
+// from its type's pristine in `types`. It cannot run createControl, so the table has to be enough on
+// its own, and the rebuild has to give back exactly the controls the payload used to carry whole.
+// rebuild() below is that algorithm written in JavaScript, from the table alone: the C++ is the same
+// steps, and its own tests check it against hand-made documents; this checks the table against real
+// panels.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +18,7 @@ import { deserializePanel, exportFormDocument, serializePanel } from '../src/CE_
 import { serializePanelForExport } from '../src/CE_Application/stores/panels.js';
 import { controlSetForPanel } from '../src/CE_Application/models/controlSets.js';
 import { expandControl, shrinkAuthoredParts } from '../src/CE_Application/stores/documentShape.js';
-import { restoreEntries } from '../src/CE_Application/stores/documentEntries.js';
+import { ENTRY_BASELINES, restoreEntries } from '../src/CE_Application/stores/documentEntries.js';
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -69,6 +71,32 @@ function resolve(sparse, drawings) {
   return out;
 }
 
+/** The entries of a control's lists put back over the baselines the payload carries (restoreEntries
+    in PanelValueModel.h): a map's when it has the baseline's `_type`, an array's always, children's
+    whatever their type. */
+function restoreFromTable(sparse, entries) {
+  const sections = sparse?._children;
+  if (!isObject(sections) || !isObject(entries)) return sparse;
+  const out = { ...sparse, _children: { ...sections } };
+  for (const [name, section] of Object.entries(sections)) {
+    if (name === 'Children' && isObject(section?._children)) {
+      out._children.Children = { ...section, _children: Object.fromEntries(Object.entries(section._children)
+        .map(([key, child]) => [key, isObject(child) ? restoreFromTable(child, entries) : child])) };
+      continue;
+    }
+    const base = entries[name];
+    if (!isObject(section) || !isObject(base)) continue;
+    const listKey = { DeviceBindings: 'bindings', Value: 'rows' }[name];
+    if (listKey && Array.isArray(section[listKey])) {
+      out._children[name] = { ...section, [listKey]: section[listKey].map((entry) => (isObject(entry) ? merge(entry, copy(base)) : entry)) };
+    } else if (['Bindings', 'HitZones', 'ValueChannels', 'Behaviors'].includes(name) && isObject(section._children)) {
+      out._children[name] = { ...section, _children: Object.fromEntries(Object.entries(section._children).map(([key, entry]) =>
+        [key, key !== '_removed' && isObject(entry) && typeof base._type === 'string' && entry._type === base._type ? merge(entry, copy(base)) : entry])) };
+    }
+  }
+  return out;
+}
+
 function rebuild(sparse, defaults) {
   const pristine = defaults.types[sparse?._children?.Core?.controlType];
   const typeParts = new Set(Object.keys(pristine?._children?.Parts?._children ?? {}));
@@ -82,6 +110,14 @@ function rebuild(sparse, defaults) {
     for (const [key, child] of Object.entries(kids)) kids[key] = rebuild(child, defaults);
   }
   return control;
+}
+
+/** A payload's control as the C++ loads it: its drawing put back, then its entries, children's
+    included, once — a second pass would put back what an entry's `_removed` took out — then the
+    control rebuilt over its type. */
+function load(control, payload) {
+  const defaults = payload.controlDefaults;
+  return rebuild(restoreFromTable(resolve(control, payload.drawings), defaults.entries), defaults);
 }
 
 /** Where two values first differ, as a path, or null. assert.deepEqual on a whole panel builds a
@@ -121,7 +157,7 @@ test('rebuilt from the table it carries, every control is the one the complete f
     assert.equal(payload.documentForm, 'export');
     assert.equal(payload.controls.length, whole.controls.length);
     payload.controls.forEach((control, i) => {
-      const rebuilt = rebuild(resolve(control, payload.drawings), payload.controlDefaults);
+      const rebuilt = load(control, payload);
       // The complete form's authored parts travel sparse; compare in that form. Byte for byte, key
       // order included: the C++ finds a property named without its section by taking the first
       // section that has it, so a rebuilt control in another order could answer differently.
@@ -129,8 +165,8 @@ test('rebuilt from the table it carries, every control is the one the complete f
         same(shrinkAuthoredParts(rebuilt), whole.controls[i], `${rel}: control ${i} rebuilds differently`);
         assert.fail(`${rel}: control ${i} rebuilds with its keys in another order`);
       }
-      // …and the table agrees with the editor's own defaults, part by part included.
-      same(rebuilt, expandControl(resolve(control, payload.drawings)), `${rel}: control ${i}, the table and expandControl disagree`);
+      // …and the table agrees with the editor's own defaults, part by part and entry by entry included.
+      same(rebuilt, expandControl(restoreEntries(resolve(control, payload.drawings))), `${rel}: control ${i}, the table and expandControl disagree`);
     });
   }
 });
@@ -138,13 +174,12 @@ test('rebuilt from the table it carries, every control is the one the complete f
 test('made from the complete form, the diff is the one the panel itself gives', () => {
   // The complete form cannot say what an author deleted from a type's defaults (absent is absent),
   // but its controls still lack it, which is what a diff records. So converting the complete form
-  // must give the same diff as shrinking the panel's own controls. A saved document also writes the
-  // entries of its lists as diffs (documentEntries.js), which the payload does not, because the C++
-  // has no baselines for them; with those put back, the rest is the same diff.
+  // must give the same diff as shrinking the panel's own controls, the entries of its lists written
+  // as diffs too (documentEntries.js), as a saved document writes them.
   for (const rel of PANELS) {
     const panel = open(rel);
     const direct = JSON.parse(serializePanel(panel, { bakeControlSet: controlSetForPanel(panel), elide: true, captureSession: null }));
-    same(exportFormDocument(complete(panel)).controls, direct.controls.map(restoreEntries), `${rel}: the converted diff differs`);
+    same(exportFormDocument(complete(panel)).controls, direct.controls, `${rel}: the converted diff differs`);
   }
 });
 
@@ -159,7 +194,7 @@ test('an item the author deleted stays deleted through the payload', () => {
   const payload = exportFormDocument(complete(panel));
   const sparse = [...everyControl(payload.controls)].find((c) => c._children.Core.id === target._children.Core.id);
   assert.ok(sparse._children.States._children._removed?.includes(gone), `the deletion of ${gone} is written down`);
-  assert.equal(rebuild(resolve(sparse, payload.drawings), payload.controlDefaults)._children.States._children[gone], undefined, 'and the rebuild leaves it out');
+  assert.equal(load(sparse, payload)._children.States._children[gone], undefined, 'and the rebuild leaves it out');
 });
 
 test('the payload is the saved size, not the complete one', () => {
@@ -175,6 +210,24 @@ test('the payload is the saved size, not the complete one', () => {
   // travel once (documentDrawings.js).
   const drawings = Object.keys(doc.drawings ?? {}).length;
   assert.ok(drawings >= 10 && drawings < 40, `the drawings its controls share go once: ${drawings} of them`);
+  // And the entries of its lists travel as what they change: with them whole, as the payload carried
+  // them before, it would be over a tenth larger (GAIA 1.72 MB against 1.49; AN1x 1.93 against 1.44).
+  const { entries, ...rest } = doc.controlDefaults;
+  const wholeEntries = { ...doc, controls: doc.controls.map((c) => restoreEntries(c, entries)), controlDefaults: rest };
+  assert.ok(payload < JSON.stringify(wholeEntries).length * 0.9, `${payload} bytes against ${JSON.stringify(wholeEntries).length} with its entries whole`);
+});
+
+test('the player page reads the payload\'s entries as it reads them whole, and a payload from before', () => {
+  // A payload written before payloads carried baselines has its entries whole and no `entries`; the
+  // page (and the C++) read both to the same panel.
+  for (const rel of ['CE/panels/Yamaha AN1x.cepanel', 'CE/qa/QA-08-export.cepanel']) {
+    const payload = exportFormDocument(complete(open(rel)));
+    const { entries, ...rest } = payload.controlDefaults;
+    const before = { ...payload, controls: payload.controls.map((c) => restoreEntries(c, entries)), controlDefaults: rest };
+    const page = (doc) => deserializePanel(JSON.stringify(doc), rel, null).controls;
+    same(JSON.parse(JSON.stringify(page(payload))), JSON.parse(JSON.stringify(page(before))), `${rel}: the page reads the two differently`);
+    assert.ok(Object.keys(entries).length > 0 && Object.keys(entries).every((section) => section in ENTRY_BASELINES), `${rel}: ${Object.keys(entries)}`);
+  }
 });
 
 test('the player page loads the payload as the editor has the panel, deleted items included', () => {

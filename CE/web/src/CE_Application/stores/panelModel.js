@@ -6,7 +6,7 @@ import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandAuthoredParts, expandControls, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
 import { panelDocumentText } from './documentLayout.js';
 import { shareDrawings } from './documentDrawings.js';
-import { shrinkEntries } from './documentEntries.js';
+import { ENTRY_BASELINES, shrinkEntries } from './documentEntries.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
@@ -267,24 +267,28 @@ function stripGeneratedControls(controls) {
  * same type, and the entries of its lists, which the pristine has nothing under, a diff against
  * their own baselines. See documentShape.js and documentEntries.js — this is one line here because
  * the interesting half is the inverse, and the two have to stay exact inverses. The export payload
- * takes the first of the two only (exportFormDocument): the plug-in's C++ rebuilds controls from
- * their types and has no baselines for entries.
+ * is this form too (exportFormDocument), and carries what both halves are against.
  */
-function toDocumentForm(control) {
-  return shrinkEntries(shrinkControl(control));
+function toDocumentForm(control, usedBaselines = null) {
+  return shrinkEntries(shrinkControl(control), usedBaselines);
 }
 
 /**
  * The export payload in the form a plug-in is built from: its controls as a diff against their
- * types, like a saved document's, carrying the defaults that diff is against (`controlDefaults`),
- * marked `documentForm: 'export'`.
+ * types and the entries of their lists as a diff against their baselines, like a saved document's,
+ * carrying the defaults both are against (`controlDefaults`), marked `documentForm: 'export'`.
  *
  * The payload used to be complete, every field of every control written out, because the plug-in's
  * C++ reads controls raw and could not rebuild a default it never saw. GAIA's came to 12.2 MB, the
  * same panel saved is 3.0 MB, and the difference was the same defaults again for each of its 818
  * controls. Now the payload brings them once, per type, and the C++ rebuilds each control from them
  * as it loads (Player/PanelValueModel.h), sharing them rather than copying. A drawing several
- * controls share goes once too, as in a saved document (documentDrawings.js): 1.8 MB for GAIA.
+ * controls share goes once too, as in a saved document (documentDrawings.js): 1.8 MB for GAIA. And
+ * an entry of a control's lists (a binding, a grab area, a value channel, a choice) is written as
+ * what it changes from its baseline, and the baselines its entries were written against travel as
+ * `controlDefaults.entries`, from which the C++ and the player page put them back (documentEntries.js):
+ * GAIA's payload went from 1.72 MB to 1.49, AN1x's from 1.93 to 1.44. `entries` is there, if empty,
+ * in every payload written this way; a payload without it has its entries whole.
  *
  * It takes the COMPLETE document serializePanelForExport writes, and it is the last thing done to
  * one: everything before it in an export reads whole controls (the host parameter list, the fonts a
@@ -299,8 +303,11 @@ export function exportFormDocument(doc) {
   }
   const whole = (doc.controls ?? []).map(expandAuthoredParts);
   // A drawing more than one control uses goes once, as in a saved document (documentDrawings.js).
-  const { controls, drawings } = shareDrawings(whole.map(shrinkControl));
-  return { ...doc, documentForm: 'export', controls, ...(drawings ? { drawings } : {}), controlDefaults: exportDefaultsFor(whole) };
+  const used = new Set();
+  const { controls, drawings } = shareDrawings(whole.map((control) => toDocumentForm(control, used)));
+  const entries = Object.fromEntries(Object.entries(ENTRY_BASELINES).filter(([section]) => used.has(section)));
+  const controlDefaults = { ...exportDefaultsFor(whole), entries };
+  return { ...doc, documentForm: 'export', controls, ...(drawings ? { drawings } : {}), controlDefaults };
 }
 
 /**
@@ -357,7 +364,7 @@ export function serializePanel(panel, options = {}) {
   const baked = options.bakeControlSet
     ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
     : controls;
-  data.controls = elide ? baked.map(toDocumentForm) : baked.map(shrinkAuthoredParts);
+  data.controls = elide ? baked.map((control) => toDocumentForm(control)) : baked.map(shrinkAuthoredParts);
   // A saved document writes each drawing more than one control uses once, beside the controls
   // (documentDrawings.js). The complete form keeps every control's own: it is the step before the
   // export form, which does the same to its controls once they are a diff again.
