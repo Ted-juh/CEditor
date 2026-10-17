@@ -149,6 +149,9 @@ function sameValue(left, right) {
  */
 function shrink(value, pristine) {
   if (pristine === undefined) return value;
+  // A section a loaded control never changed is the shared default itself (expand), and so is the
+  // pristine shrinkControl now compares it against: the same object, nothing to walk.
+  if (value === pristine) return OMIT;
   if (!isPlainObject(value) || !isPlainObject(pristine)) {
     return sameValue(value, pristine) ? OMIT : value;
   }
@@ -415,20 +418,21 @@ function partSectionBaseline(sectionType) {
   return baseline;
 }
 
-/** The baseline for one part: its shell, plus SECTION_DEFAULTS for each section it actually owns. */
-function pristinePart(part) {
-  const shell = pristinePartShell();
-  for (const [key, section] of Object.entries(part?._children ?? {})) {
-    if (key === 'Layout' || !SECTION_DEFAULTS[section?._type]) continue;
-    shell._children[key] = partSectionBaseline(section._type);
-  }
-  return shell;
-}
+/**
+ * A part's document form, by the part, for parts that cannot change: a part two loaded controls
+ * hold is one frozen object (expandControls), and every control drawn with that drawing holds it,
+ * so it is diffed once a save rather than once per control. The form is frozen too, as it is shared.
+ */
+const shrunkParts = new WeakMap();
 
 function shrinkPart(part) {
   if (!isPlainObject(part) || !isPlainObject(part._children)) return part;
+  const frozen = Object.isFrozen(part);
+  if (frozen && shrunkParts.has(part)) return shrunkParts.get(part);
 
-  const sparse = shrink(part, pristinePart(part));
+  // The shared baseline, as expandPart uses: shrink only reads it. Building a new one for every part
+  // was a sixth of the time a save of GAIA took (below, at shrinkControl).
+  const sparse = shrink(part, sharedPristinePart(part));
   const out = sparse === OMIT ? {} : sparse;
 
   // Identity, always: `name` is how a binding target like `Parts.cap.Layout.y` finds it, and
@@ -442,13 +446,15 @@ function shrinkPart(part) {
     if (key === 'Layout' || !SECTION_DEFAULTS[section?._type]) continue;
     out._children[key] = { ...(out._children[key] ?? {}), _type: section._type };
   }
+  if (frozen) shrunkParts.set(part, deepFreeze(out));
   return out;
 }
 
 /**
- * pristinePart, built from shared, frozen pieces: the shell and one baseline per section type. One
- * per list of sections, so two parts with the same sections have the same default — which is what
- * lets expandControls see that two parts are equal.
+ * The baseline for one part — its shell, plus SECTION_DEFAULTS for each section it actually owns —
+ * built from shared, frozen pieces: the shell and one baseline per section type. One per list of
+ * sections, so two parts with the same sections have the same default — which is what lets
+ * expandControls see that two parts are equal.
  */
 let sharedShell = null;
 const sharedSectionBaselines = new Map();
@@ -529,7 +535,11 @@ function withChildMap(control, mapped) {
  */
 export function shrinkControl(control) {
   const controlType = control?._children?.Core?.controlType;
-  const pristine = pristineFor(controlType);
+  // The shared pristine: nothing here writes into it. A fresh copy per control, which is what
+  // pristineFor gives, was most of the time a save took — a pristine parsed from JSON for each of
+  // GAIA's 818 controls and a part baseline rebuilt for each of its parts' sections, 775 ms a save,
+  // and autosave runs one five seconds after an edit.
+  const pristine = sharedPristineFor(controlType);
   // A type with no pristine — held back, or from a newer build — still gets its parts elided,
   // since a part's baseline is SECTION_DEFAULTS and does not depend on the control's type at all.
   if (!pristine) return mapAuthoredParts(control, new Set(), shrinkPart);
@@ -611,7 +621,7 @@ function expandControlWith(sparse, sharing) {
  * offers for reaching inside a component.
  */
 export function shrinkAuthoredParts(control) {
-  const pristine = pristineFor(control?._children?.Core?.controlType);
+  const pristine = sharedPristineFor(control?._children?.Core?.controlType);
   const kids = childMapOf(control);
   const working = kids && Object.keys(kids).length
     ? withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, shrinkAuthoredParts(child)])))

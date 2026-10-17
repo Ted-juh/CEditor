@@ -210,3 +210,27 @@ test('saving straight after loading writes what it always did', () => {
   const once = serializePanel(deserializePanel(text, GAIA, null));
   assert.equal(serializePanel(deserializePanel(once, GAIA, null)), once);
 });
+
+test('a save compares a loaded panel against the very defaults it shares, and a shared drawing once', () => {
+  // Saving GAIA took most of a second, autosave included, because every control was compared with
+  // a pristine parsed afresh for it and every part with section baselines rebuilt for it. A loaded
+  // control's untouched sections ARE the shared defaults, and the parts of one drawing are one
+  // frozen object between the controls drawn with it, so neither needs walking twice.
+  const panel = open(GAIA);
+  const drawn = flatControls(panel.controls).filter((control) => control._children.Core.controlType === 'CustomComponent');
+  const byPart = new Map();
+  for (const control of drawn) {
+    for (const part of Object.values(control._children.Parts?._children ?? {})) {
+      if (Object.isFrozen(part)) byPart.set(part, [...(byPart.get(part) ?? []), control]);
+    }
+  }
+  const [sharedPart, holders] = [...byPart].find(([, list]) => list.length > 1) ?? [];
+  assert.ok(sharedPart, 'no part is shared between two loaded GAIA controls');
+  const formOf = (control) => Object.values(shrinkControl(control)._children.Parts?._children ?? {})
+    .find((part) => part?.name === sharedPart.name);
+  const first = formOf(holders[0]);
+  assert.equal(formOf(holders[1]), first, 'the shared part was diffed again for the second control');
+  assert.ok(Object.isFrozen(first), 'a part form two controls are given is not frozen');
+  // And the forms read back as what was saved.
+  assert.deepEqual(expandControl(shrinkControl(holders[0])), holders[0]);
+});

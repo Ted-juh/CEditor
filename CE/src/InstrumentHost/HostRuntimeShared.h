@@ -9,7 +9,7 @@
 #include "PngResourceValidation.h"
 #include "HostageManifest.h"
 #include "InstrumentHostService.h"
-#include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
+#include "EmbeddedWebBundle.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
 #include "../WebViewProfileFolders.h"
 
 // HostRuntimeShared — the glue both generated Hostage targets share.
@@ -110,15 +110,8 @@ provideHostRuntimeResource (const juce::String& rawPath)
         return juce::WebBrowserComponent::Resource { std::move (bytes), std::move (mime) };
     };
 
-    for (int i = 0; i < PlayerWebData::namedResourceListSize; ++i)
-    {
-        if (juce::String (PlayerWebData::originalFilenames[i]) == basename)
-        {
-            int size = 0;
-            if (auto* data = PlayerWebData::getNamedResource (PlayerWebData::namedResourceList[i], size))
-                return makeResource (data, (size_t) size, hostRuntimeMimeFor (mimeName));
-        }
-    }
+    if (auto bytes = ceditor::embeddedWebFile (basename))
+        return juce::WebBrowserComponent::Resource { std::move (*bytes), hostRuntimeMimeFor (mimeName) };
 
     // Fallback: filesystem dist (dev / build tree) if the bundle wasn't embedded.
     auto file = hostRuntimeDistFolder().getChildFile (basename);
