@@ -20,11 +20,13 @@
 # the web tests (9.5 min) and the browser checks (8 min) ran one after the other before the C++ build
 # started, though neither uses anything the build makes, nor the build anything of theirs. Each now
 # has a runner of its own (standard runners cost nothing on a public repository; CLAUDE.md), and a
-# run takes as long as the longest of the three, about eleven minutes with a warm compiler cache:
-#   web-tests       the node suite and the script-export validation
-#   browser-checks  the web bundle, and Playwright over it
-#   windows         the web bundle again (CMake embeds it), the C++ build with every engine on,
-#                   CTest, the native handlers end to end, and the plug-in through the validators
+# run takes as long as the longest of the three. Measured on the first run (39043706780), with a warm
+# compiler cache, against 30 min before:
+#   web-tests       10.5 min  the node suite and the script-export validation
+#   browser-checks   7 min    the web bundle, and Playwright over it
+#   windows         12 min    the web bundle again (CMake embeds it), the C++ build with every engine
+#                             on, CTest, the native handlers end to end, and the plug-in through the
+#                             validators; 1.3 min of it fetching those, which later runs restore
 # All three run on Windows, as the one job did, so nothing that was checked there moved off it. The
 # bundle is built by both jobs that use it rather than handed from one to the other: under a minute
 # each, in parallel, where an artifact would make one job wait on the other.
