@@ -385,7 +385,8 @@
                   title="Switch to the panel with this control selected">Show on the panel</button>
               {/if}
               <button class="btn primary" onclick={() => setMode('item')} disabled={wholeAt?.kind === 'section'}
-                title="Open what you are reading as an item, to edit">Edit this item</button>
+                title={wholeAt?.kind === 'section' ? `${wholeAt.name}: no item to edit here (${SECTION_REASONS[wholeAt.key] ?? 'it has no item of its own'})`
+                  : 'Open what you are reading as an item, to edit'}>Edit this item</button>
             </span>
           </div>
           <p class="pf-hint">The file as Save would write it now, laid out to read. It is for reading: to change something, click in it and press Edit this item.</p>
@@ -496,6 +497,8 @@
   .pf-editor :global(.ce) { flex: 1; }
   .pf-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .pf-actions { display: flex; gap: 6px; align-items: center; }
+  /* The script editor dims a disabled button only in its footer; here one has to look disabled too. */
+  .pf-actions .btn:disabled { opacity: 0.45; cursor: default; }
   .pf-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--txt-dim); margin-right: 6px; }
   .pf-hint { margin: 0; font-size: 12px; color: var(--txt-dim); }
   .pf-stale { align-items: center; }
