@@ -126,6 +126,9 @@ if (compileNative || embedPython) {
 function webBundleFresh(webDir, dist) {
   const indexHtml = path.join(dist, 'index.html');
   if (!existsSync(indexHtml)) return false;
+  // What the plug-in embeds is dist-embed/, written by `npm run build` after the Vite build
+  // (scripts/embed-web.mjs); a dist/ from a bare `vite build`, or from before it, has none.
+  if (!existsSync(path.join(webDir, 'dist-embed', 'player.html.gz'))) return false;
   const newest = (p, skip) => {
     let m = 0;
     const walk = (d) => {

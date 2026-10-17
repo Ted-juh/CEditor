@@ -2,7 +2,7 @@
 #include "WebViewProfileFolders.h"
 #include "TrustedWebBrowser.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
-#include "BinaryData.h" // PlayerWebData — the embedded web bundle (player.html + assets)
+#include "EmbeddedWebBundle.h" // PlayerWebData — the embedded web bundle (player.html + assets)
 
 #include <atomic>
 #include <cstring>
@@ -89,15 +89,8 @@ std::optional<juce::WebBrowserComponent::Resource> providePlayerResource (const 
 
     // Primary: the embedded web bundle. Vite emits unique asset basenames, so a basename
     // lookup is unambiguous. This is host-path-independent — it paints inside any DAW.
-    for (int i = 0; i < PlayerWebData::namedResourceListSize; ++i)
-    {
-        if (juce::String (PlayerWebData::originalFilenames[i]) == basename)
-        {
-            int size = 0;
-            if (auto* data = PlayerWebData::getNamedResource (PlayerWebData::namedResourceList[i], size))
-                return makeResource (data, (size_t) size, mimeFor (mimeFile));
-        }
-    }
+    if (auto bytes = ceditor::embeddedWebFile (basename))
+        return juce::WebBrowserComponent::Resource { std::move (*bytes), mimeFor (mimeFile) };
 
     // Fallback: filesystem dist (dev / build tree) if the bundle wasn't embedded.
     auto file = getDistFolder().getChildFile (basename);

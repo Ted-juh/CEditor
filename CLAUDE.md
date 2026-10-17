@@ -129,7 +129,8 @@ Linux container, and the notes about what breaks there are from that run, not fr
 cd CE/web
 npm ci
 npm run test:all     # node --test suite + script-export validation
-npm run build        # the bundle CMakeLists globs into PlayerWebData
+npm run build        # the bundle, and dist-embed/: what the player and host pages reach, gzipped,
+                     # which CMakeLists embeds as PlayerWebData
 ```
 
 The node suite takes about three and a half minutes here. `validate-script-exports` reports

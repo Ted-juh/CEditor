@@ -131,6 +131,9 @@ export default defineConfig(({ command }) => ({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // dist/.vite/manifest.json: the chunk graph, which scripts/embed-web.mjs follows (with the file
+    // names the built files carry) to pick what the player and Hostage embed. Not served, not embedded.
+    manifest: true,
     // Rollup's default 500 kB (and the 1400 that replaced it) is a DOWNLOAD budget: it exists to
     // stop a web app shipping megabytes over a network. This app never does. WebViewHost serves
     // dist/ off local disk through a resource provider, so a large chunk costs a disk read and a
@@ -166,8 +169,8 @@ export default defineConfig(({ command }) => ({
       // is why test/bundleHygiene.test.js guards the rule rather than a reviewer's memory.
       treeshake: false,
       // Three entries: the editor (index.html), the standalone player (player.html), and the
-      // generated instrument-host product's interface (host.html) — served from the same embedded
-      // bundle (PlayerWebData globs all of dist/), so it ships without any packaging change.
+      // generated instrument-host product's interface (host.html) — the last two served from the
+      // embedded bundle (PlayerWebData: what they reach, compressed, by scripts/embed-web.mjs).
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         player: fileURLToPath(new URL('./player.html', import.meta.url)),

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/embed-web.mjs",
     "check": "svelte-check --config ./svelte.config.js --tsconfig ./jsconfig.json",
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",

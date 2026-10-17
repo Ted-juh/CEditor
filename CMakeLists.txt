@@ -241,7 +241,18 @@ if(CEDITOR_BUILD_APP)
     # --- Player web bundle embedded into the player/plugin (self-contained, host-path-independent) ---
     # The player and the VST3 serve player.html + assets from this BinaryData, so the WebView paints
     # regardless of where the host loads the binary from (fixes blank UI in a DAW).
-    file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist/*")
+    #
+    # Not dist/ itself: dist-embed/, which `npm run build` writes after the Vite build
+    # (CE/web/scripts/embed-web.mjs) — the files player.html and host.html can reach, the only two
+    # pages served from here, each gzip-compressed and inflated as the page asks for it
+    # (PlayerHost.cpp, HostRuntimeShared.h). Globbing dist/ embedded the editor too: 21.6 MB of
+    # every 37 MB plug-in, where these come to 6.3. A bare `vite build` writes no dist-embed/, and a
+    # player built without it would be blank wherever its dist/ is not on disk, so that stops here.
+    file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist-embed/*")
+    if (NOT PLAYER_WEB_DIST)
+        message(FATAL_ERROR "CE/web/dist-embed is empty: run `npm run build` in CE/web first. It writes "
+                            "dist-embed/ after the Vite build, and the player, the plug-in and Hostage embed it.")
+    endif()
     juce_add_binary_data(PlayerWebData
         NAMESPACE PlayerWebData
         HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/PlayerWebData"
@@ -615,8 +626,8 @@ if(CEDITOR_BUILD_APP)
     # Two wrappers around the same InstrumentHostService the editor's preview uses: a standalone
     # (CEHostStandalone — owns the audio device, persists its session per user) and an outer VST3
     # (CEHostVST3 — the DAW owns audio and session; the rack rides in the project chunk). Both
-    # serve host.html out of PlayerWebData — the bundle glob above already embeds every dist/
-    # entry, so the runtime page ships without any packaging change.
+    # serve host.html out of PlayerWebData — the bundle above embeds what player.html and host.html
+    # reach (CE/web/scripts/embed-web.mjs), so the runtime page ships without any packaging change.
     #
     # Identity is stamped from cache variables because the Host Project build reuses these targets
     # per product: same shape, whatever name/code the project chose (the CEditorPlayerVST
