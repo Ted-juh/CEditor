@@ -6,6 +6,7 @@
   import { onDestroy, onMount, untrack } from 'svelte';
   import ScriptPicker from './ScriptPicker.svelte';
   import CodeEditor from './CodeEditor.svelte';
+  import PanelFileView from './PanelFileView.svelte';
   import ScriptConsole from './ScriptConsole.svelte';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
@@ -105,7 +106,7 @@
   // Seed once from the props/initial state; these are deliberately initial-only.
   let scripts = $state(untrack(() => (initialScripts ?? []).map((s) => normalizeSourceScript(s))));
 
-  let mainView = $state('editor');   // what fills the stage: 'editor' | 'test'
+  let mainView = $state('editor');   // what fills the stage: 'editor' | 'test' | 'file'
   let expanded = $state(new Set(['startup', 'ready', 'runtime', 'shutdown', 'dawstate'])); // expanded tree groups
   function toggleExpand(id) { const n = new Set(expanded); n.has(id) ? n.delete(id) : n.add(id); expanded = n; }
   function expand(id) { if (!expanded.has(id)) { const n = new Set(expanded); n.add(id); expanded = n; } }
@@ -954,6 +955,12 @@
             onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (mainView = 'test')}>
             <span class="ti">◉</span> Test / Trace
           </div>
+          <div class={['tnode', mainView === 'file' && 'active']} role="button" tabindex="0"
+            title="The panel's file, one item at a time, as text to read and edit"
+            onclick={() => mainView = 'file'}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (mainView = 'file')}>
+            <span class="ti">{'{ }'}</span> Panel file
+          </div>
         </div>
       {/if}
     </div>
@@ -962,6 +969,8 @@
       <div class="stagemain">
         {#if mainView === 'test'}
           {@render testView()}
+        {:else if mainView === 'file'}
+          <PanelFileView {panelId} />
         {:else}
           {@render detailPanel()}
         {/if}
@@ -969,7 +978,7 @@
 
       <!-- Right dock: Insert / Library / History tabs. Docked column by default; floats over
            the editor on narrow viewports so it never squeezes the code. -->
-      {#if showDock && selected && mainView !== 'test'}
+      {#if showDock && selected && mainView === 'editor'}
         <aside class={['dock', narrow && 'float']}>
           <div class="pickerpane">
             <div class="pickerhead docktabs">
@@ -995,7 +1004,7 @@
   <div class="stagefoot">
     <span>{scripts.length} scripts</span>
     <span class="ok">● {enabledCount} enabled</span>
-    {#if selected && mainView !== 'test'}
+    {#if selected && mainView === 'editor'}
       <span class="caretpos" title="Cursor position">Ln {caret.line}, Col {caret.col}</span>
     {/if}
     <span class="spacer" style="flex:1"></span>

@@ -487,6 +487,39 @@ export function panelOpenReport() {
 }
 
 /**
+ * A document's panel-level fields, normalised as opening the document normalises them: the ones
+ * the editor does not take as written. Everything else is taken as it is. `controls` are the panel's
+ * expanded controls, which the layer list is checked against. Opening a file uses it, and so does
+ * the panel file view when its panel settings are applied (stores/panelFileText.js), so a setting
+ * typed there is read exactly as the same setting in a file would be.
+ *
+ * `captureSession` is present when the document has one, and undefined when that one makes no sense:
+ * the caller drops it then.
+ */
+export function panelFieldsFromDocument(data, controls) {
+  const fields = {
+    // A document written before presets travelled has no `cardPresets` key, and one written by
+    // hand can have anything at all in it. Normalising here means every reader downstream can
+    // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
+    // itself against a string or a null.
+    cardPresets: normalizeCardPresets(data.cardPresets),
+    controlSet: normalizeControlSet(data.controlSet),
+    controlSets: normalizeControlSetList(data.controlSets),
+    snapshots: dedupeSnapshotIds(data.snapshots),
+    // Migration lives here rather than in a version bump: a document with no `layers` gets one
+    // built from first-appearance order, which is exactly what rendering used to infer, so it
+    // looks identical on the first load and stops restacking on every load after it.
+    layers: normalizePanelLayers(data.layers, controls),
+  };
+  if (data.deviceSession) fields.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
+  // Coerced rather than trusted: everything downstream indexes into `baselines` as arrays of byte
+  // arrays, and a document can be hand-edited. `normalizeCaptureSession` returns null for anything
+  // it cannot make sense of, and for an empty session, which then reads as no session at all.
+  if (data.captureSession) fields.captureSession = normalizeCaptureSession(data.captureSession) ?? undefined;
+  return fields;
+}
+
+/**
  * Returns the panel object, or null if the document is corrupted / not a valid panel; then
  * panelOpenReport().error says why. The document is checked against utils/panelDocumentSchema.js
  * and upgraded to the current format version on the way in (utils/panelFormat.js).
@@ -505,17 +538,6 @@ export function deserializePanel(json, filePath, name) {
   // rather than kept in the panel and written into a document that has no use for them.
   delete data.controlDefaults;
   const id = nextId++;
-  if (data.deviceSession) {
-    data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
-  }
-  // Coerced rather than trusted: everything downstream indexes into `baselines` as arrays of byte
-  // arrays, and a document can be hand-edited. `normalizeCaptureSession` returns null for anything
-  // it cannot make sense of, and for an empty session, which then reads as no session at all.
-  if (data.captureSession) {
-    const session = normalizeCaptureSession(data.captureSession);
-    if (session) data.captureSession = session;
-    else delete data.captureSession;
-  }
 
   // The document stores each control as a diff against its type's defaults; the editor's model
   // is always the full control, because everything that reads one reads deep paths off it. Done
@@ -523,29 +545,20 @@ export function deserializePanel(json, filePath, name) {
   // to spend a hundred milliseconds. Equal sections are one object between the controls, as their
   // defaults are (expandControls).
   const controls = repairGaiaNoteChoices(expandControls(data.controls ?? []));
+  const fields = panelFieldsFromDocument(data, controls);
 
   const panel = {
     ...createPanel(),
     ...data,
     controls,
-    // A document written before presets travelled has no `cardPresets` key, and one written by
-    // hand can have anything at all in it. Normalising here means every reader downstream can
-    // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
-    // itself against a string or a null.
-    cardPresets: normalizeCardPresets(data.cardPresets),
-    controlSet: normalizeControlSet(data.controlSet),
-    controlSets: normalizeControlSetList(data.controlSets),
-    snapshots: dedupeSnapshotIds(data.snapshots),
-    // Migration lives here rather than in a version bump: a document with no `layers` gets one
-    // built from first-appearance order, which is exactly what rendering used to infer, so it
-    // looks identical on the first load and stops restacking on every load after it.
-    layers: normalizePanelLayers(data.layers, controls),
+    ...fields,
     formatVersion: read.migration.toVersion,
     id,
     filePath,
     name: name || data.name || `Untitled ${id}`,
     modified: false,
   };
+  if (Object.hasOwn(fields, 'captureSession') && !fields.captureSession) delete panel.captureSession;
   // A document an older format was converted from is marked modified: what is open is no longer
   // what is on disk, and saving it should be offered.
   if (read.migration.changed) {

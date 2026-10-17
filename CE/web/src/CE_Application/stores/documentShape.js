@@ -35,6 +35,7 @@
 import { COMPONENT_TYPES, createControl } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { createPartNode } from '../utils/customComponentFactory.js';
+import { ENTRY_BASELINES } from './documentEntries.js';
 
 /** Reserved key: the names present in the pristine control that this document deleted. */
 const REMOVED = '_removed';
@@ -671,6 +672,96 @@ export function exportDefaultsFor(controls) {
   };
   (controls ?? []).forEach(visit);
   return { types, part: pristinePartShell(), partSections };
+}
+
+/**
+ * The properties a control's document form names that its defaults do not have. Each comes as
+ * `{ path, pattern }`: the path as a person reads it, sections joined by dots without the
+ * `_children` between them (`Transform.widht`, `Parts.cap.Layout.wdith`, `HitZones.grab.cursro`),
+ * and the same with every free name and list index replaced (`Parts.*.Layout.wdith`,
+ * `Value.rows.#.isHeader`), so a key can be looked for in other controls whatever their parts and
+ * entries are called.
+ *
+ * "Not in the defaults" is not "wrong". The defaults are what a new control starts with, and plenty
+ * of real properties are optional and absent until something sets them: on the committed panels
+ * this finds thousands (a label's `Text.Font.bold`, a control's `Core.description`, a component's
+ * `Designer` section, a MIDI CC binding's `channel`). The format keeps every key, so a newer
+ * CEditor's additions survive an older one. So this decides nothing; the panel file view warns only
+ * about a key an edit ADDS that is here and that no other control in the panel uses either, which
+ * is what a misspelling looks like (stores/panelFileText.js).
+ *
+ * What a key is held against:
+ *   - a section or property of the control's type: the type's pristine control;
+ *   - a section added to the control, written whole with its `_type`: SECTION_DEFAULTS for it;
+ *   - an authored part: the part shell, and SECTION_DEFAULTS for each section it owns (in full: the
+ *     part diff withholds Corners.linked so as always to write it, and it is not unknown for that);
+ *   - a binding, grab area, value channel or behaviour written whole, a device binding, a choice:
+ *     its baseline in documentEntries.js.
+ * An entry of a list of named things with none of those (a custom state, an animation) is not
+ * judged: any name is allowed there, and there is nothing to hold its keys against. A name in a map
+ * of fixed names (the sections, a Background's Fill, Border and Corners) is.
+ */
+export function unknownKeys(sparse) {
+  const pristine = sharedPristineFor(sparse?._children?.Core?.controlType);
+  if (!pristine || !isPlainObject(sparse)) return [];
+  const found = [];
+  walkKnown(sparse, pristine, [], [], found);
+  return found;
+}
+
+const ARRAY_ENTRY_BASELINES = { 'DeviceBindings.bindings': ENTRY_BASELINES.DeviceBindings, 'Value.rows': ENTRY_BASELINES.Value };
+
+function partVocabulary(part) {
+  sharedShell ??= deepFreeze(pristinePartShell());
+  const children = { ...sharedShell._children };
+  for (const [key, section] of Object.entries(part?._children ?? {})) {
+    if (key !== 'Layout' && SECTION_DEFAULTS[section?._type]) children[key] = SECTION_DEFAULTS[section._type];
+  }
+  return { ...sharedShell, _children: children };
+}
+
+function walkKnown(node, base, path, pattern, found) {
+  const note = (key) => found.push({ path: [...path, key].join('.'), pattern: [...pattern, key].join('.') });
+  for (const [key, value] of Object.entries(node)) {
+    if (key === REMOVED) continue;
+    if (key === '_children') {
+      if (isPlainObject(value)) walkKnownChildren(value, base?._children, path, pattern, found);
+      continue;
+    }
+    if (!isPlainObject(base) || !Object.hasOwn(base, key)) {
+      note(key);
+      continue;
+    }
+    const entryBase = path.length === 1 ? ARRAY_ENTRY_BASELINES[`${path[0]}.${key}`] : undefined;
+    if (entryBase && Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (isPlainObject(item)) walkKnown(item, entryBase, [...path, key, String(index)], [...pattern, key, '#'], found);
+      });
+    } else if (isPlainObject(value) && isPlainObject(base[key])) {
+      walkKnown(value, base[key], [...path, key], [...pattern, key], found);
+    }
+  }
+}
+
+function walkKnownChildren(children, baseChildren, path, pattern, found) {
+  const owner = path.length === 1 ? path[0] : null;
+  for (const [name, child] of Object.entries(children)) {
+    if (name === REMOVED || !isPlainObject(child)) continue;
+    const own = isPlainObject(baseChildren) ? baseChildren[name] : undefined;
+    if (isPlainObject(own)) {
+      walkKnown(child, own, [...path, name], [...pattern, name], found);
+    } else if (Object.hasOwn(child, 'name')) {
+      // A named entry: any name is allowed, so the pattern does not keep it.
+      const listBase = owner && ENTRY_BASELINES[owner];
+      const baseline = owner === 'Parts' ? partVocabulary(child)
+        : listBase && child._type === listBase._type ? listBase : null;
+      if (baseline) walkKnown(child, baseline, [...path, name], [...pattern, '*'], found);
+    } else if (SECTION_DEFAULTS[child._type]) {
+      walkKnown(child, SECTION_DEFAULTS[child._type], [...path, name], [...pattern, name], found);
+    } else {
+      found.push({ path: [...path, name].join('.'), pattern: [...pattern, name].join('.') });
+    }
+  }
 }
 
 /** Exposed so tests can assert the reserved key never collides with a real model key. */

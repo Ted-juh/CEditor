@@ -1,7 +1,8 @@
 // codeHighlight.js — tiny, dependency-free tokenizer used by CodeEditor.svelte.
 // Produces an HTML string of <span class="tok-…"> for the highlight overlay that sits
 // behind the editable <textarea>. Deliberately lightweight: regex token scanning, no AST.
-// Two languages mirror the script engines the panel runs (JavaScript + Lua 5.4 via wasmoon).
+// The languages mirror the script engines the panel runs, plus JSON for the panel file view
+// (PanelFileView.svelte), where a property name and a string value are told apart.
 
 const JS_KEYWORDS = new Set([
   'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'do',
@@ -57,6 +58,13 @@ const LANGS = {
     re: /((?:--\[\[[\s\S]*?\]\])|(?:--[^\n]*))|(\[\[[\s\S]*?\]\])|("(?:\\[\s\S]|[^"\\\n])*"?)|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_][\w]*)/g,
     keywords: LUA_KEYWORDS, literals: LUA_LITERALS, builtins: LUA_BUILTINS,
   },
+  // No comments and no single quotes in JSON: those groups are `(?!)`, which never takes part, so
+  // the scan loop sees them as absent rather than as an empty match. A number may be negative.
+  json: {
+    re: /((?!))|((?!))|("(?:\\[\s\S]|[^"\\\n])*"?)|((?!))|(-?\b\d[\w.+-]*)|([A-Za-z_$][\w$]*)/g,
+    keywords: new Set(), literals: new Set(['true', 'false', 'null']), builtins: new Set(),
+    propertyNames: true,
+  },
   cpp: {
     re: /((?:\/\/[^\n]*)|(?:\/\*[\s\S]*?\*\/))|()|("(?:\\[\s\S]|[^"\\\n])*"?)|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_]\w*)/g,
     keywords: CPP_KEYWORDS, literals: CPP_LITERALS, builtins: CPP_BUILTINS,
@@ -92,6 +100,7 @@ const LANGS = {
 
 export function languageKey(id) {
   if (id === 'javascript') return 'javascript';
+  if (id === 'json') return 'json';
   if (id === 'typescript' || id === 'ts') return 'typescript';
   if (id === 'cpp' || id === 'c++') return 'cpp';
   if (id === 'csharp' || id === 'cs') return 'csharp';
@@ -137,7 +146,7 @@ export function highlight(source, langId, marks) {
     const [whole, comment, mlString, dqString, sqString, num, word] = m;
     if (comment != null) out += span('tok-com', comment);
     else if (mlString != null) out += span('tok-str', mlString);
-    else if (dqString != null) out += span('tok-str', dqString);
+    else if (dqString != null) out += span(lang.propertyNames && isPropertyName(source, m.index + whole.length) ? 'tok-key' : 'tok-str', dqString);
     else if (sqString != null) out += span('tok-str', sqString);
     else if (num != null) out += span('tok-num', num);
     else if (word != null) {
@@ -153,6 +162,13 @@ export function highlight(source, langId, marks) {
   }
   if (last < source.length) out += escWithMarks(source.slice(last), last, marks);
   return out;
+}
+
+// Is the string that ended at `end` a property name: is the next thing after it, past spaces, a colon?
+function isPropertyName(source, end) {
+  let i = end;
+  while (i < source.length && (source[i] === ' ' || source[i] === '\t')) i++;
+  return source[i] === ':';
 }
 
 const BRACKET_OPEN = { '(': ')', '[': ']', '{': '}' };
@@ -197,9 +213,11 @@ export function matchingBracket(text, caret) {
   return null;
 }
 
-// Language-aware single-line comment prefix, used by the comment-toggle command.
+// Language-aware single-line comment prefix, used by the comment-toggle command. JSON has no
+// comments: '' says so, and the editor leaves the text alone.
 export function lineCommentToken(langId) {
   const k = languageKey(langId);
+  if (k === 'json') return '';
   return k === 'javascript' || k === 'cpp' || k === 'typescript' || k === 'csharp' || k === 'java' ? '//' : '--';
 }
 

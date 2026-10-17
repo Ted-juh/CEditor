@@ -206,3 +206,18 @@ test('a document symbol is never narrowed away, whatever the control is', () => 
   const { options } = getCompletions(src, 'lua', src.length, { controlType: 'Slider' });
   assert.ok(options.some((o) => o.label === 'arpRateOfMine'), "the user's own name always completes");
 });
+
+/* --------------------------------------------------------------------- JSON */
+
+test('JSON (the panel file view): the first mistake with its line, folds, and nothing to complete', async () => {
+  const { getFoldRegions } = await import('../src/CE_Application/scripting/languageService.js');
+  assert.deepEqual(analyze('{\n  "a": 1\n}', 'json').diagnostics, []);
+  const [d] = analyze('{\n  "a": 1,\n  "b": [1,]\n}', 'json').diagnostics;
+  assert.equal(d.severity, 'error');
+  assert.equal(d.line, 3);
+  assert.match(d.message, /comma before "]"/);
+  assert.deepEqual(getFoldRegions('{\n  "a": {\n    "b": 1\n  }\n}', 'json'), [{ startLine: 1, endLine: 5 }, { startLine: 2, endLine: 4 }]);
+  assert.deepEqual(getCompletions('{ "va', 'json', 5).options, [], 'the script API is nothing to type in a data file');
+  assert.equal(getHover('{ "value": 1 }', 'json', 4), null);
+  assert.equal(getSignatureHelp('{ "a": [1, ', 'json', 11), null);
+});

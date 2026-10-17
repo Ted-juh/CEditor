@@ -18,7 +18,7 @@ export const CHECKS = [
   'designerTab', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'panelShot',
   'releaseWorkflow', 'numberCellSelection', 'displayGapReview', 'ctrl49Screen', 'noteModules',
   'hostWorkspace', 'performanceTools', 'soundsPage', 'stageScreen', 'pluginPresets', 'songsPage',
-  'templateLabels', 'macroSetKnob', 'setSwatches', 'anatomyForms',
+  'templateLabels', 'macroSetKnob', 'setSwatches', 'anatomyForms', 'panelFile',
 ];
 
 // A check that hangs (a browser that never answers) fails rather than holding the run forever.

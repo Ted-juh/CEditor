@@ -766,6 +766,48 @@ export function commitHistoryTransaction(transaction) {
   return true;
 }
 
+/**
+ * Make one edit to a document that need not be the active one, and record it as exactly one undo
+ * step in THAT document's history, named `label`.
+ *
+ * For a panel edited from somewhere else: its controls, typed in the panel file view on a script
+ * tab (stores/panelFileActions.js). On a script tab no panel is active (resolvedActivePanelId is
+ * null there, on purpose), so the store write would go unrecorded, and switching back to the panel
+ * re-baselines past it: the edit could not be undone at all. Recorded here, it is the panel's next
+ * undo step, taken back the next time that panel is active and someone presses Undo.
+ *
+ * `apply` makes the edit (synchronously, through the document's store). Returns whether a step was
+ * recorded; an edit that changed nothing records nothing.
+ */
+export function recordEdit(target, apply, { label = '' } = {}) {
+  const context = normaliseContext(target);
+  if (!context || isRestoring || suppressed) {
+    apply();
+    return false;
+  }
+  flushPendingSnapshot();
+  const key = contextKey(context);
+  const before = snapshotOf(context);
+  const selection = selectionOf(context);
+  apply();
+  const after = snapshotOf(context);
+  // If this document is the active one, its store write scheduled an ordinary snapshot too; this
+  // step owns that write.
+  if (pendingContext && contextKey(pendingContext) === key) clearPending();
+  if (before == null || after == null || sameSnapshot(before, after, context)) return false;
+
+  const history = getHistory(key);
+  history.undoStack.push({ snapshot: before, selection, label: typeof label === 'string' && label ? label : undefined });
+  if (history.undoStack.length > MAX_HISTORY) history.undoStack.shift();
+  history.redoStack.length = 0;
+  if (baselineKey === key) {
+    lastSnapshot = after;
+    lastSelection = selectionOf(context);
+  }
+  updateAvailability();
+  return true;
+}
+
 /** Flush a snapshot that is still waiting on the debounce timer. */
 function flushPendingSnapshot() {
   if (!debounceTimer) return;

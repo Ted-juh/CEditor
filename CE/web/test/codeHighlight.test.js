@@ -94,3 +94,14 @@ test('matchingBracket respects nesting and returns null when unbalanced or away'
   assert.equal(matchingBracket('(unclosed', 1), null);
   assert.equal(matchingBracket('', 0), null);
 });
+
+test('JSON: a property name is told from a string value, and there are no comments to toggle', () => {
+  assert.equal(languageKey('json'), 'json');
+  const html = highlight('{ "name": "cut", "x": -1.5e3, "on": true, "none": null }', 'json');
+  assert.ok(html.includes('<span class="tok-key">"name"</span>'), html);
+  assert.ok(html.includes('<span class="tok-str">"cut"</span>'), 'a value is a string');
+  assert.ok(html.includes('<span class="tok-num">-1.5e3</span>'), 'a negative number with an exponent');
+  assert.ok(html.includes('<span class="tok-lit">true</span>') && html.includes('<span class="tok-lit">null</span>'));
+  assert.ok(highlight('{ "k" : 1 }', 'json').includes('tok-key'), 'a space before the colon');
+  assert.equal(lineCommentToken('json'), '');
+});
