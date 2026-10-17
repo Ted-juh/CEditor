@@ -22,7 +22,8 @@
 //     reading cannot find and nothing could load; it goes in all the same.
 // A file in public/ is copied to dist/ under its own name and is included whatever names it.
 //
-// Run by `npm run build` after `vite build`; also `node scripts/embed-web.mjs` on a built dist/.
+// Run by every Vite build of dist/ (embedPlayerBundle in vite.config.js), which removes dist-embed/
+// as it starts and writes it once dist/ is complete; also `node scripts/embed-web.mjs` on a built dist/.
 
 import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';

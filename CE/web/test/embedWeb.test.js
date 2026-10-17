@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EMBEDDED_PAGES, reachableFiles, writeEmbeddedBundle } from '../scripts/embed-web.mjs';
+import { embedPlayerBundle } from '../vite.config.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
@@ -102,9 +103,42 @@ test('a build without its page, or with two files of one name, is refused', () =
   } finally { twice.cleanup(); }
 });
 
-test('what is built is what is embedded: npm run build writes it, CMake takes it, the C++ inflates it', () => {
+test('a build of dist/ writes dist-embed/ to match it, and a failed one leaves none', () => {
+  // A step after the build could be left behind by a bare `vite build`, or by its own failure, and
+  // CMake would embed the old pages without a word (found in review). The build does it instead.
+  const fake = fakeDist();
+  const embedded = () => { try { return readdirSync(fake.out).sort(); } catch { return null; } };
+  const run = (outDir, { fail = null, renderFail = false } = {}) => {
+    const plugin = embedPlayerBundle({ web: fake.root });
+    plugin.configResolved({ root: fake.root, build: { outDir } });
+    plugin.buildStart();
+    plugin.buildEnd(fail ?? undefined);
+    if (renderFail) plugin.renderError(new Error('render'));
+    plugin.closeBundle.call({ info() {} });
+  };
+  try {
+    mkdirSync(fake.out);
+    writeFileSync(path.join(fake.out, 'old-page.js.gz'), 'from a build before');
+    run('dist');
+    assert.ok(embedded().includes('player.html.gz'));
+    assert.ok(!embedded().includes('old-page.js.gz'), 'a file of an earlier build survived');
+    run('dist', { fail: new Error('bundle') });
+    assert.equal(embedded(), null, 'a failed build left a dist-embed/ behind');
+    run('dist');
+    run('dist', { renderFail: true });
+    assert.equal(embedded(), null, 'a build that failed writing left a dist-embed/ behind');
+    // A build into some other folder is not the one CMake reads beside: it touches nothing.
+    run('dist');
+    const before = embedded();
+    run('elsewhere');
+    assert.deepEqual(embedded(), before);
+  } finally { fake.cleanup(); }
+});
+
+test('what is built is what is embedded: the build writes it, CMake takes it, the C++ inflates it', () => {
   const pkg = JSON.parse(read('CE/web/package.json'));
-  assert.match(pkg.scripts.build, /^vite build && node scripts\/embed-web\.mjs$/);
+  assert.equal(pkg.scripts.build, 'vite build', 'a step after the build can be left behind; the build writes dist-embed/');
+  assert.match(read('CE/web/vite.config.js'), /plugins: \[[^\]]*embedPlayerBundle\(\)\]/);
   assert.match(read('CE/web/vite.config.js'), /manifest: true,/);
   const cmake = read('CMakeLists.txt');
   assert.match(cmake, /file\(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "\$\{CE_ROOT\}\/web\/dist-embed\/\*"\)/);

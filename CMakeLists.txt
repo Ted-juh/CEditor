@@ -242,16 +242,16 @@ if(CEDITOR_BUILD_APP)
     # The player and the VST3 serve player.html + assets from this BinaryData, so the WebView paints
     # regardless of where the host loads the binary from (fixes blank UI in a DAW).
     #
-    # Not dist/ itself: dist-embed/, which `npm run build` writes after the Vite build
-    # (CE/web/scripts/embed-web.mjs) — the files player.html and host.html can reach, the only two
+    # Not dist/ itself: dist-embed/, which the Vite build writes with dist/ (embedPlayerBundle in
+    # CE/web/vite.config.js, scripts/embed-web.mjs) — the files player.html and host.html can reach, the only two
     # pages served from here, each gzip-compressed and inflated as the page asks for it
     # (PlayerHost.cpp, HostRuntimeShared.h). Globbing dist/ embedded the editor too: 21.6 MB of
-    # every 37 MB plug-in, where these come to 6.3. A bare `vite build` writes no dist-embed/, and a
+    # every 37 MB plug-in, where these come to 6.3. A build that failed leaves no dist-embed/, and a
     # player built without it would be blank wherever its dist/ is not on disk, so that stops here.
     file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist-embed/*")
     if (NOT PLAYER_WEB_DIST)
-        message(FATAL_ERROR "CE/web/dist-embed is empty: run `npm run build` in CE/web first. It writes "
-                            "dist-embed/ after the Vite build, and the player, the plug-in and Hostage embed it.")
+        message(FATAL_ERROR "CE/web/dist-embed is empty: run `npm run build` in CE/web first. The build writes "
+                            "dist-embed/ with dist/, and the player, the plug-in and Hostage embed it.")
     endif()
     juce_add_binary_data(PlayerWebData
         NAMESPACE PlayerWebData

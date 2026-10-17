@@ -1,8 +1,10 @@
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
+import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { writeEmbeddedBundle } from './scripts/embed-web.mjs';
 
 // Stamp the build with the git commit + time so the running app can show
 // exactly which version it is — no more guessing whether an installer is current.
@@ -86,8 +88,44 @@ export function oneByteChunks() {
   };
 }
 
+// What the player, the plug-in and Hostage embed (scripts/embed-web.mjs says what and why), written
+// by the build itself, so that whatever writes dist/ writes dist-embed/ to match. As a step after
+// `vite build` in package.json it could be left behind: a bare `vite build`, or one whose next step
+// failed, refreshed dist/ and kept an older dist-embed/, and CMake embedded the old pages without a
+// word. So a build of dist/ removes dist-embed/ as it starts and writes it once dist/ is complete;
+// a build that fails leaves none, and CMake stops on that with an explanation. A build into any
+// other folder leaves both alone.
+export function embedPlayerBundle({ web = fileURLToPath(new URL('.', import.meta.url)) } = {}) {
+  const dist = path.join(web, 'dist');
+  const embed = path.join(web, 'dist-embed');
+  let outDir = null;
+  let failed = false;
+  return {
+    name: 'ce-embed-player-bundle',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    buildStart() {
+      failed = false;
+      if (outDir === dist) rmSync(embed, { recursive: true, force: true });
+    },
+    buildEnd(error) {
+      if (error) failed = true;
+    },
+    renderError() {
+      failed = true;
+    },
+    closeBundle() {
+      if (outDir !== dist || failed) return;
+      const { files, compressed } = writeEmbeddedBundle(dist, embed, { publicDir: path.join(web, 'public') });
+      this.info?.(`dist-embed: ${files.length} files for the player and host pages, ${(compressed / 1048576).toFixed(1)} MB compressed`);
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
-  plugins: [stubNodeModuleBuiltin(), svelte(), oneByteChunks()],
+  plugins: [stubNodeModuleBuiltin(), svelte(), oneByteChunks(), embedPlayerBundle()],
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp()),
   },
