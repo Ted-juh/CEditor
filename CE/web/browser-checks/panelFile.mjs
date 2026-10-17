@@ -21,6 +21,7 @@
  *             the time a textarea takes to lay that text out
  *   window    only the lines on screen are drawn, and they line up with the gutter to the last line
  *   outline   a row goes to its lines, and what is being read is named; find goes to the next match
+ *   session   a device mapping changed while it is open shows in it, as it would in what Save writes
  *   edit      "Edit this item" opens what is being read as an item
  *   reference the "every field" reference of GAIA's longest control (11,000 lines) draws only the
  *             screen too, and its colours line up with the text under them
@@ -264,6 +265,20 @@ try {
     { counted: true, there: true },
     { counted: /^\d+\/\d+/.test(await kit.page.locator('.fv-find-count').textContent()), there: found.here.includes('tone3_filter_cutoff') && found.active > expected.label });
   await kit.page.keyboard.press('Escape');
+  // Save's document holds the project's device session too, which is no part of the panel object:
+  // a mapping that changes while the file is open has to show in it.
+  await store(async () => {
+    (await import('/src/CE_Application/stores/projectDeviceSession.js')).mergeProjectDeviceRoleMapping({ role: 'Probe role', profileId: 'probe-profile-7f3a' });
+  });
+  await kit.settle(1000);
+  await kit.page.locator('.fv-scroll').focus();
+  await kit.page.keyboard.press('Control+f');
+  await kit.page.keyboard.type('probe-profile-7f3a');
+  await kit.settle(300);
+  const sessionCount = (await kit.page.locator('.fv-find-count').textContent()).trim();
+  await kit.page.keyboard.press('Escape');
+  led.check(S, 'it follows the device session', 'a device mapping changed while the whole file is open is in it a moment later, as it is in what Save writes',
+    '1/1', sessionCount);
   await kit.page.locator('.pf .pf-row', { hasText: 'tone1_filter_cutoff_label' }).click();
   await kit.settle(300);
   await kit.page.locator('.pf button', { hasText: 'Edit this item' }).click();

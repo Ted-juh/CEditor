@@ -16,7 +16,8 @@
   // is then its table of contents: a row goes to its lines, and the row of the line being read (the
   // line clicked, or the top line once scrolled) is marked. "Edit this item" (or "One item") opens
   // that item to edit; "Whole file" from an item goes to its lines. The text is written when the mode
-  // is chosen, and again once the panel has stopped changing for a moment.
+  // is chosen, and again once the panel (or its device session, or its scripts) has stopped changing
+  // for a moment.
   import { onMount, tick, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import CodeEditor from './CodeEditor.svelte';
@@ -27,6 +28,8 @@
     wholeFileText, wholeFileItemAt,
   } from '../stores/panelFileText.js';
   import { applyControlFileEdit, applyPanelSettingsFileEdit } from '../stores/panelFileActions.js';
+  import { projectDeviceSession } from '../stores/projectDeviceSession.js';
+  import { scriptDocuments } from '../stores/scriptWorkspace.js';
   import { findControlById } from '../utils/containment.js';
 
   let { panelId = null } = $props();
@@ -46,11 +49,21 @@
 
   let mode = $state('item');          // 'item' | 'whole'
   let whole = $state.raw(null);       // wholeFileText(): the whole file and where each control is in it
-  let wholeOf = null;                 // the panel object it was written from
+  let wholeOf = null;                 // the wholeSource it was written from
   let wholeLine = $state(1);          // the line being read in it
   let wholeNote = $state('');
   let revealAfterWrite = null;        // the outline key to go to once the text is there
   let wholeAt = $derived(whole ? wholeFileItemAt(whole, wholeLine) : null);
+  // What Save's document is made of (serializePanelDocument): the panel, the project's device
+  // session, and the scripts of the panel's script document. The last two are no part of the panel
+  // object, so a mapping or a script changed while the file is open must rewrite it too.
+  let wholeSource = $derived.by(() => {
+    if (!panel) return null;
+    const doc = $scriptDocuments.find((entry) => String(entry.panelId) === String(panel.id));
+    return { panel, session: $projectDeviceSession, scripts: doc?.scripts, scriptsModified: doc?.modified };
+  });
+  const sameSource = (a, b) => Boolean(a && b) && a.panel === b.panel && a.session === b.session
+    && a.scripts === b.scripts && a.scriptsModified === b.scriptsModified;
   let hereKey = $derived(!wholeAt ? null
     : wholeAt.kind === 'control' ? wholeAt.id
       : wholeAt.kind === 'panel' ? PANEL_SETTINGS_ITEM : `section:${wholeAt.key}`);
@@ -90,15 +103,15 @@
     });
   });
 
-  // The whole file, written when it is shown and again (a moment later) when the panel changes.
+  // The whole file, written when it is shown and again (a moment later) when what it is made of changes.
   $effect(() => {
-    if (mode !== 'whole' || !panel) return;
-    const source = panel;
-    if (source === wholeOf) return;
+    const source = wholeSource;
+    if (mode !== 'whole' || !source) return;
+    if (sameSource(source, wholeOf)) return;
     const first = untrack(() => whole) === null;
     const timer = setTimeout(async () => {
       const line = untrack(() => wholeLine);
-      whole = wholeFileText(serializePanelDocument(source));
+      whole = wholeFileText(serializePanelDocument(source.panel));
       wholeOf = source;
       await tick();
       const to = revealAfterWrite != null ? lineOf(revealAfterWrite) : first ? null : line;
@@ -114,7 +127,7 @@
       wholeNote = '';
       mode = 'whole';
       // A text written before the panel last changed is not shown even for a moment.
-      if (whole && wholeOf === panel) {
+      if (whole && sameSource(wholeSource, wholeOf)) {
         const line = lineOf(selectedKey);
         tick().then(() => line && viewer?.revealLine(line));
       } else {
