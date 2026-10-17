@@ -741,6 +741,39 @@ icons go along.
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
 
+### Reading and editing the file as text
+
+The script editor can show the panel's file as text, one item at a time, and you can edit it there.
+Open the **Script Editor**, then **Tools → Panel file**. On the left is an outline: **Panel settings**,
+then every control, with a container's controls under it. **Find a control...** searches them by name,
+type or id. The screen opens on the control that was selected when you opened the Script Editor.
+
+Each item is written the way the file writes it: only what differs from a new control of that type,
+or from a new panel. So a short text means a control close to its defaults, and **deleting a line
+puts that property back to its default**. Tick **Every field** to see all of the control's
+properties with their defaults, to look up a property's name; that view is for reading only.
+
+Change the text and press **Apply** (or Ctrl+Enter). **Revert** throws your changes away. An edit you
+have not applied stays when you look at another item; the outline marks it with a dot. Before
+anything is applied, CEditor checks:
+
+- **The text has to be valid JSON.** A mistake is shown with its line; click it to jump there.
+- **A control's type and id stay as they are.** Turning a knob into a slider is not an edit. The id
+  is what ties the control's scripts, layers and snapshots to it. The panel's `panelGuid` stays too:
+  it is the panel's identity to every plug-in exported from it.
+- **A name another control already has** is given `_2`, as a rename in the properties panel is.
+- **A property that no control in the panel uses** is kept as you wrote it, with a warning to check
+  the spelling, because it does nothing.
+
+Some things are not in the text and cannot be changed there, so no edit can lose them: a
+container's controls (they are items of their own), scripts (the script screens), the notes (the
+notepad), the panel's name (it is the file's name), the host parameter list (made from the controls
+on every save), and an embedded image, which shows as a short placeholder and is kept as it is.
+
+An applied edit is one step in the panel's undo history, named after what you edited, such as
+"Edit cutoff as text". Go back to the panel and press **Undo** to take it back. **Show on the
+panel** goes there with the control selected.
+
 ### Autosave and recovery
 
 CEditor's autosave does **not** save your file. It keeps a recovery copy of panels with unsaved

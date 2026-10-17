@@ -975,6 +975,14 @@ export function closePanel(id) {
   return true;
 }
 
+/**
+ * The control that was selected on a panel when a script tab took over from it: `{ panelId, id }`,
+ * or null. Every tab switch clears the selection (setActiveEditorTab), so without this the script
+ * editor's Panel file screen (editor/PanelFileView.svelte) could not open on the control someone had
+ * just been looking at, which is how they get there: select it, then Script Editor in the Look bar.
+ */
+export const selectionBeforeScriptTab = writable(null);
+
 /** Switch to a panel by id */
 export function setActivePanel(id) {
   const nextTab = { type: 'panel', id };
@@ -1014,6 +1022,12 @@ export function setActiveEditorTab(tab) {
   }
 
   if (tab.tabType === 'script' || tab.type === 'script') {
+    // Read before the tab changes: on a script tab there is no active panel to ask.
+    const fromPanelId = get(resolvedActivePanelId);
+    if (fromPanelId != null) {
+      const [selectedId] = get(selectedComponentIds);
+      selectionBeforeScriptTab.set(selectedId != null ? { panelId: fromPanelId, id: selectedId } : null);
+    }
     const nextTab = { type: 'script', id: tab.id };
     activeEditorTab.set(nextTab);
     setActiveScriptDocument(tab.id);

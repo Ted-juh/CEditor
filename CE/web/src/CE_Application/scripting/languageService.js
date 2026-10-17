@@ -23,6 +23,7 @@ import {
   COMMANDS, HELPERS, PANEL_COMMANDS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
 import { memberAppliesToType } from './componentSchema.js';
+import { jsonFoldRegions, jsonSyntaxError } from '../utils/jsonText.js';
 
 /* ----------------------------------------------------------- static API data */
 
@@ -177,10 +178,25 @@ function collectLuaSymbols(ast) {
 // source is mid-edit and doesn't parse.
 const lastGoodSymbols = { javascript: [], lua: [] };
 
+// JSON (the panel file view): the first mistake, where it is. JSON.parse first, because it is fast
+// and almost always right; the scanner only for the location, which JavaScriptCore's message lacks.
+function analyzeJson(src) {
+  try {
+    JSON.parse(src);
+    return { diagnostics: [], symbols: [] };
+  } catch {
+    const err = jsonSyntaxError(src);
+    if (!err) return { diagnostics: [], symbols: [] };
+    // Columns from 0, as acorn gives them for JavaScript.
+    return { diagnostics: [{ severity: 'error', message: err.message, line: err.line, col: err.col - 1, index: err.index }], symbols: [] };
+  }
+}
+
 /** Parse + analyze: returns { diagnostics, symbols }. Never throws. */
 export function analyze(source, languageId) {
   const src = String(source ?? '');
   if (!src.trim()) return { diagnostics: [], symbols: [] };
+  if (languageId === 'json') return analyzeJson(src);
   // C++ has its own interpreter front-end (cppPreview); Python uses a lightweight scanner.
   if (languageId === 'cpp' || languageId === 'c++') return analyzeCpp(src);
   if (languageId === 'python') return analyzePython(src);
@@ -278,6 +294,8 @@ export function getCompletions(source, languageId, caretIndex, options = {}) {
   const src = String(source ?? '');
   const controlType = String(options?.controlType ?? '');
   const { prefix, start } = prefixBefore(src, caretIndex);
+  // A panel file is data: the script API's functions and keywords are nothing to type there.
+  if (languageId === 'json') return { from: start, to: caretIndex, options: [] };
 
   // Member access: the char before the word is a dot.
   if (src[start - 1] === '.') {
@@ -332,6 +350,7 @@ function filterRank(items, prefix) {
 
 /** Hover info for the identifier at `index` → { title, doc } or null. */
 export function getHover(source, languageId, index) {
+  if (languageId === 'json') return null;
   const w = wordAt(source, index);
   if (!w) return null;
   const name = w.word;
@@ -360,6 +379,7 @@ export function getHover(source, languageId, index) {
  * document's own functions. (Heuristic: doesn't skip commas inside strings.)
  */
 export function getSignatureHelp(source, languageId, caret) {
+  if (languageId === 'json') return null;
   const src = String(source ?? '');
   const pre = src.slice(0, caret);
   let depth = 0, commas = 0, i = pre.length - 1;
@@ -417,6 +437,7 @@ const LUA_FOLD = new Set(['FunctionDeclaration', 'IfStatement', 'ForNumericState
  */
 export function getFoldRegions(source, languageId) {
   const src = String(source ?? '');
+  if (languageId === 'json') return jsonFoldRegions(src);
   if (languageId === 'cpp' || languageId === 'c++') return foldCpp(src);
   if (languageId === 'python') return foldPython(src);
   if (languageId === 'typescript' || languageId === 'ts') return foldTs(src);

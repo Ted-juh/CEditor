@@ -27,6 +27,8 @@
     // The component type this script is attached to, if it is attached to one. Completion uses it
     // to leave out the verbs the control has no section for.
     controlType = '',
+    // Shown to read, not to edit: the panel file view's "every field" reference.
+    readOnly = false,
   } = $props();
 
   let bpSet = $derived(new Set(breakpoints)); // 1-based line numbers
@@ -195,7 +197,7 @@
       const y = i * cellH;
       if (y > H) break;
       const line = lines[i];
-      ctx.fillStyle = line.trimStart().startsWith(tok) ? com : fg;
+      ctx.fillStyle = tok && line.trimStart().startsWith(tok) ? com : fg;
       let run = -1;
       for (let c = 0; c <= line.length; c++) {
         const ch = line[c];
@@ -519,6 +521,10 @@
   // reselect [selStart,selEnd]. Fires the textarea input path so the parent stays in sync.
   function applyEdit(start, end, text, selStart, selEnd) {
     if (isFolded) return; // never edit the projected (folded) text — the full source is the truth
+    // readonly stops typing, not this: a read-only textarea refuses insertText, and the fallback
+    // below would write it anyway, past an oninput that ignores it. Every edit of the editor's own
+    // (indent, Enter, closing brackets, column typing, replace, rename, insert) comes through here.
+    if (readOnly) return;
     const ta = taEl;
     ta.focus();
     ta.setSelectionRange(start, end);
@@ -691,6 +697,7 @@
   function toggleComment() {
     const ta = taEl, v = ta.value;
     const token = lineCommentToken(language);
+    if (!token) return; // a language without comments (JSON)
     const selStart = ta.selectionStart, selEnd = ta.selectionEnd;
     const from = lineStartOf(v, selStart);
     // Operate on whole lines: extend to the end of the line containing the selection end.
@@ -826,6 +833,21 @@
     taEl.focus();
   }
   export function focus() { taEl?.focus(); }
+  // Put the caret at a line and column (both from 1) and scroll it into the middle of the view: the
+  // panel file view takes a reader to the mistake it reported.
+  export async function revealLine(line, col = 1) {
+    if (!taEl) return;
+    if (isFolded) { unfoldAll(); await tick(); }
+    const lines = taEl.value.split('\n');
+    const at = Math.max(1, Math.min(lines.length, Math.floor(line) || 1));
+    let offset = 0;
+    for (let i = 0; i < at - 1; i++) offset += lines[i].length + 1;
+    offset += Math.max(0, Math.min(lines[at - 1].length, (Math.floor(col) || 1) - 1));
+    taEl.focus();
+    taEl.setSelectionRange(offset, offset);
+    taEl.scrollTop = Math.max(0, (at - 1) * lineHeight - taEl.clientHeight / 2);
+    syncCaret();
+  }
 
   onDestroy(() => {
     cancelMinimapDrag?.();
@@ -879,14 +901,14 @@
       class="ce-ta"
       bind:this={taEl}
       value={displayText}
-      readonly={isFolded}
+      readonly={isFolded || readOnly}
       {placeholder}
       spellcheck="false"
       autocomplete="off"
       autocapitalize="off"
       autocorrect="off"
       wrap="off"
-      oninput={() => { if (isFolded) return; emit(); syncCaret(); if (!column) refreshCompletion(false); }}
+      oninput={() => { if (isFolded || readOnly) return; emit(); syncCaret(); if (!column) refreshCompletion(false); }}
       onscroll={onScroll}
       onkeydown={onKeydown}
       onkeyup={syncCaret}
@@ -1181,6 +1203,7 @@
   .ce-hl :global(.tok-kw)  { color: var(--ce-kw); }
   .ce-hl :global(.tok-lit) { color: var(--ce-litc); }
   .ce-hl :global(.tok-bi)  { color: var(--ce-bic); }
+  .ce-hl :global(.tok-key) { color: var(--ce-kw); }
   .ce-hl :global(.tok-match) {
     background: var(--ce-match-bg);
     border-radius: 2px;

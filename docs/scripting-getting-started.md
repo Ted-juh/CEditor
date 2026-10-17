@@ -24,7 +24,9 @@ The navigation rail groups scripts by *when they run*:
 | **DAW state** | `onDawSaveState` / `onDawRestoreState` | project save and restore (exported plugin in a DAW) |
 | **Shutdown** | `onPanelClose` — the window closes, scripts keep running; `onPanelDestroy` — the scripts stop | close: tidy what is on screen; destroy: send a final dump, all notes off |
 
-There is also a **Test / Trace** screen. Step 4 explains it.
+There is also a **Test / Trace** screen. Step 4 explains it. Beside it, **Panel file** shows the
+panel's file as text, one control at a time, and lets you edit it: see
+[Reading and editing the file as text](editor-manual.md#reading-and-editing-the-file-as-text).
 
 ## 2. Add a script
 
