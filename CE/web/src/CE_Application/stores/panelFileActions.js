@@ -10,7 +10,6 @@
 import { get } from 'svelte/store';
 import { panels } from './panels.js';
 import { recordEdit } from './history.js';
-import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { findControlById, mapControlsTree } from '../utils/containment.js';
 import { applyControlFileText, applyPanelSettingsFileText } from './panelFileText.js';
 
@@ -44,8 +43,11 @@ export function applyPanelSettingsFileEdit(panelId, text) {
 
   const result = applyPanelSettingsFileText(text, panel);
   if (!result.ok || !result.changed) return result;
+  // Written as they are, not through applyPanelUpdates: that keeps a locked aspect ratio when one
+  // side is dragged in the properties panel, and the text gives both sides (or leaves one at its
+  // default), so a width typed there is read as the same width in a file would be.
   recordEdit({ kind: 'panel', id: panelId }, () => {
-    panels.update((list) => list.map((p) => (p.id === panelId ? applyPanelUpdates(p, result.updates) : p)));
+    panels.update((list) => list.map((p) => (p.id === panelId ? { ...p, ...result.updates, modified: true } : p)));
   }, { label: 'Edit panel settings as text' });
   return result;
 }

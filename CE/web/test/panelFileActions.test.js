@@ -72,6 +72,18 @@ test('an unchanged text records nothing; the panel settings are a step of their 
   assert.equal(panelOf(panelId).width, 600);
 });
 
+test('a width typed into the settings is the width, with the aspect ratio locked as well', () => {
+  // The properties panel keeps a locked panel's proportions when one side is dragged; the text says
+  // both sides (or leaves one at its default), so it is read as a file would be: 900 by 400.
+  const panelId = livePanel('aspect');
+  panels.update((list) => list.map((p) => (p.id === panelId ? { ...p, lockAspectRatio: true } : p)));
+  const settings = JSON.parse(panelSettingsFileText(panelOf(panelId)).text);
+  assert.equal(settings.lockAspectRatio, true);
+  const result = applyPanelSettingsFileEdit(panelId, JSON.stringify({ ...settings, width: 900 }));
+  assert.equal(result.ok && result.changed, true);
+  assert.deepEqual([panelOf(panelId).width, panelOf(panelId).height], [900, 400]);
+});
+
 test('applied while the panel is the active one, it is still exactly one step', async () => {
   const panelId = livePanel('active');
   const result = applyControlFileEdit(panelId, 'active_b', moved(controlFileText(control(panelId, 'active_b')).text, 5));

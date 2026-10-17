@@ -521,6 +521,10 @@
   // reselect [selStart,selEnd]. Fires the textarea input path so the parent stays in sync.
   function applyEdit(start, end, text, selStart, selEnd) {
     if (isFolded) return; // never edit the projected (folded) text — the full source is the truth
+    // readonly stops typing, not this: a read-only textarea refuses insertText, and the fallback
+    // below would write it anyway, past an oninput that ignores it. Every edit of the editor's own
+    // (indent, Enter, closing brackets, column typing, replace, rename, insert) comes through here.
+    if (readOnly) return;
     const ta = taEl;
     ta.focus();
     ta.setSelectionRange(start, end);

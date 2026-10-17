@@ -113,6 +113,21 @@ try {
   await kit.page.locator('.pf button', { hasText: 'Revert' }).click();
   await kit.settle(300);
 
+  // ---- every field -------------------------------------------------------------------------------
+  // The textarea's readonly attribute stops typing, not the editor's own edits: Tab indents, Enter
+  // indents the new line, a bracket closes itself, each through a path of its own.
+  await kit.page.locator('.pf label', { hasText: 'Every field' }).locator('input').check();
+  await kit.settle(500);
+  const reference = await editorText();
+  const area = kit.page.locator('.pf textarea.ce-ta');
+  await area.click();
+  for (const key of ['Tab', 'Enter', 'Shift+Tab', 'BracketLeft', 'x']) await kit.page.keyboard.press(key);
+  await kit.settle(300);
+  led.check(S, 'every field is for reading', 'with Every field ticked, the whole control is shown and no key changes it, the editor\'s own edits (indent, new line, a closing bracket) included',
+    { whole: true, unchanged: true }, { whole: reference.length > goodText.length, unchanged: (await editorText()) === reference });
+  await kit.page.locator('.pf label', { hasText: 'Every field' }).locator('input').uncheck();
+  await kit.settle(300);
+
   // ---- settings ----------------------------------------------------------------------------------
   await kit.page.locator('.pf .pf-row', { hasText: 'Panel settings' }).click();
   await kit.settle(500);
