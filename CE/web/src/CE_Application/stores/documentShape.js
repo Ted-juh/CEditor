@@ -142,6 +142,10 @@ function sameValue(left, right) {
  * The diff. Arrays are stored WHOLE when they differ at all: a row list, a layer order and a
  * gradient's stops are edited as units, and an element-wise patch of them would be both unreadable
  * in a git diff and wrong the moment something was inserted rather than changed.
+ *
+ * What the pristine has nothing under is written whole, which includes the entries of a control's
+ * lists. A saved document then writes six of those lists' entries against baselines of their own
+ * (documentEntries.js); the export payload, which takes this diff alone, does not.
  */
 function shrink(value, pristine) {
   if (pristine === undefined) return value;

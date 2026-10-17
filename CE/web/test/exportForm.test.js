@@ -16,6 +16,7 @@ import { deserializePanel, exportFormDocument, serializePanel } from '../src/CE_
 import { serializePanelForExport } from '../src/CE_Application/stores/panels.js';
 import { controlSetForPanel } from '../src/CE_Application/models/controlSets.js';
 import { expandControl, shrinkAuthoredParts } from '../src/CE_Application/stores/documentShape.js';
+import { restoreEntries } from '../src/CE_Application/stores/documentEntries.js';
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -137,11 +138,13 @@ test('rebuilt from the table it carries, every control is the one the complete f
 test('made from the complete form, the diff is the one the panel itself gives', () => {
   // The complete form cannot say what an author deleted from a type's defaults (absent is absent),
   // but its controls still lack it, which is what a diff records. So converting the complete form
-  // must give the same diff as shrinking the panel's own controls.
+  // must give the same diff as shrinking the panel's own controls. A saved document also writes the
+  // entries of its lists as diffs (documentEntries.js), which the payload does not, because the C++
+  // has no baselines for them; with those put back, the rest is the same diff.
   for (const rel of PANELS) {
     const panel = open(rel);
     const direct = JSON.parse(serializePanel(panel, { bakeControlSet: controlSetForPanel(panel), elide: true, captureSession: null }));
-    same(exportFormDocument(complete(panel)).controls, direct.controls, `${rel}: the converted diff differs`);
+    same(exportFormDocument(complete(panel)).controls, direct.controls.map(restoreEntries), `${rel}: the converted diff differs`);
   }
 });
 

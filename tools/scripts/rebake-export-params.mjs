@@ -5,7 +5,8 @@
 // type's defaults (see stores/documentShape.js), so `panel.controls` off a raw JSON.parse is
 // sparse — deriving export parameters from it would read a Behavior or Value that is only absent
 // because it was unchanged, and quietly bake a shorter parameter list than the panel actually has.
-// Before that, a drawing several controls share is put back into each (stores/documentDrawings.js).
+// Before that, a drawing several controls share is put back into each (stores/documentDrawings.js),
+// and the defaults the entries of a control's lists leave out go back in (stores/documentEntries.js).
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -21,12 +22,18 @@ const mod = await import(webSrc('utils/exportParameters.js'));
 const { expandControl } = await import(webSrc('stores/documentShape.js'));
 const { panelDocumentText } = await import(webSrc('stores/documentLayout.js'));
 const { resolveDrawings } = await import(webSrc('stores/documentDrawings.js'));
+const { restoreDocumentEntries } = await import(webSrc('stores/documentEntries.js'));
+const { panelFormatVersion } = await import(webSrc('utils/panelFormat.js'));
 
-const { doc: panel } = resolveDrawings(JSON.parse(readFileSync(panelPath, 'utf8')));
-panel.controls = (panel.controls ?? []).map(expandControl);
-panel.exportParameters = mod.deriveExportParameters(panel);  // force re-derive from controls
-writeFileSync(panelPath, panelDocumentText(panel));   // the layout serializePanel writes
+// Derived from the whole controls, written back into the document as it was: only the list changes.
+// This wrote the expanded controls back once, without the drawings table, into a file that still
+// said it was a saved one.
+const saved = JSON.parse(readFileSync(panelPath, 'utf8'));
+const panel = restoreDocumentEntries(resolveDrawings(saved).doc, panelFormatVersion(saved));
+const controls = (panel.controls ?? []).map(expandControl);
+saved.exportParameters = mod.deriveExportParameters({ ...panel, controls });  // force re-derive from controls
+writeFileSync(panelPath, panelDocumentText(saved));   // the layout serializePanel writes
 
-console.log(`re-baked ${panel.exportParameters.length} params into ${panelPath}`);
-for (const p of panel.exportParameters)
+console.log(`re-baked ${saved.exportParameters.length} params into ${panelPath}`);
+for (const p of saved.exportParameters)
   console.log(`  ${p.id}  [${p.min}..${p.max}]  role=${p.deviceRole || '-'}  dev=${p.deviceParameterId || '-'}`);

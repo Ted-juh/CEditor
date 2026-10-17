@@ -6,6 +6,7 @@ import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandAuthoredParts, expandControls, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
 import { panelDocumentText } from './documentLayout.js';
 import { shareDrawings } from './documentDrawings.js';
+import { shrinkEntries } from './documentEntries.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
@@ -263,11 +264,14 @@ function stripGeneratedControls(controls) {
 
 /**
  * Shrink a control to the form the document stores: a diff against the pristine control of the
- * same type. See documentShape.js — this is one line here because the interesting half is the
- * inverse, and the two have to stay exact inverses.
+ * same type, and the entries of its lists, which the pristine has nothing under, a diff against
+ * their own baselines. See documentShape.js and documentEntries.js — this is one line here because
+ * the interesting half is the inverse, and the two have to stay exact inverses. The export payload
+ * takes the first of the two only (exportFormDocument): the plug-in's C++ rebuilds controls from
+ * their types and has no baselines for entries.
  */
 function toDocumentForm(control) {
-  return shrinkControl(control);
+  return shrinkEntries(shrinkControl(control));
 }
 
 /**
