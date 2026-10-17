@@ -774,6 +774,19 @@ An applied edit is one step in the panel's undo history, named after what you ed
 "Edit cutoff as text". Go back to the panel and press **Undo** to take it back. **Show on the
 panel** goes there with the control selected.
 
+**Whole file**, at the top of the outline, shows the whole file instead, as **Save** would write it
+now, laid out to read. A large panel's file is long (the Roland GAIA's is about 71,000 lines), so the
+outline becomes its table of contents: click a control, or **Host parameters**, **Scripts**,
+**Shared drawings** or **Notes**, to go to its lines. As you scroll or click, the header says which
+line you are at and what it belongs to, and the outline marks that row. **Ctrl+F** finds text
+anywhere in the file, starting from where you are; **Enter** goes to the next match. You can select
+and copy what is on screen.
+
+The whole file is for reading. To change something, click in it and press **Edit this item** (or
+**One item**): it opens as an item, to edit as above. **Whole file** from an item takes you back to its
+lines. Embedded images are shortened to a placeholder here, and an edit you have not applied yet is
+not in it.
+
 ### Autosave and recovery
 
 CEditor's autosave does **not** save your file. It keeps a recovery copy of panels with unsaved

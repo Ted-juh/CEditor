@@ -16,10 +16,21 @@
  *   show      "Show on the panel" goes back to the panel with that control selected
  *   undo      back on the panel, one Undo takes the control edit back, named after the control
  *
+ * Then the whole file, on GAIA (71,000 lines), which is what it is for:
+ *   whole     "Whole file" shows the file as Save writes it, at the control selected, in well under
+ *             the time a textarea takes to lay that text out
+ *   window    only the lines on screen are drawn, and they line up with the gutter to the last line
+ *   outline   a row goes to its lines, and what is being read is named; find goes to the next match
+ *   session   a device mapping changed while it is open shows in it, as it would in what Save writes
+ *   edit      "Edit this item" opens what is being read as an item
+ *   reference the "every field" reference of GAIA's longest control (11,000 lines) draws only the
+ *             screen too, and its colours line up with the text under them
+ *
  * Text goes in with keyboard.insertText, not type: the CodeEditor closes brackets and quotes as they
  * are typed, which is right for a person and turns a typed JSON document into a different one.
  */
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { boot, Ledger } from './behaviourKit.mjs';
 
 const kit = await boot();
@@ -169,6 +180,128 @@ try {
     { namedControl: true, namedSettings: true, x: 70, width: 600 },
     { namedControl: undone.includes('Edit Cutoff as text'), namedSettings: undone.includes('Edit panel settings as text'),
       x: (await control(cutoff))._children.Transform.x, width: await panelField('width') });
+
+  // ---- whole file (GAIA) ---------------------------------------------------------------------------
+  const gaia = await readFile(new URL('../../panels/Roland GAIA SH-01.cepanel', import.meta.url), 'utf8');
+  await store(async (json) => {
+    const { deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
+    const { addPanel, setActivePanel, panels } = await import('/src/CE_Application/stores/panels.js');
+    addPanel(deserializePanel(json, 'Roland GAIA SH-01.cepanel', 'Roland GAIA SH-01'));
+    let list; panels.subscribe((v) => { list = v; })();
+    setActivePanel(list[list.length - 1].id);
+  }, gaia);
+  await kit.settle(2500);
+  // GAIA's scripts wait for approval, and the notice saying so covers the foot of the screen.
+  const trust = kit.page.locator('button', { hasText: 'Enable scripts for this session' });
+  if (await trust.isVisible().catch(() => false)) { await trust.click(); await kit.settle(1000); }
+  await store(async () => { (await import('/src/CE_Application/stores/panels.js')).selectComponent('gaia_tone1_filter_cutoff_342'); });
+  await kit.settle(400);
+  await kit.page.locator('button.s-jump').click();
+  await kit.settle(2000);
+  await kit.page.locator('.bd-app .tnode', { hasText: 'Panel file' }).click();
+  await kit.settle(800);
+  // What the whole file should be, written here the way the view writes it.
+  const expected = await store(async () => {
+    const { panels, activePanelId, serializePanelDocument } = await import('/src/CE_Application/stores/panels.js');
+    const { wholeFileText } = await import('/src/CE_Application/stores/panelFileText.js');
+    const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+    const panel = get(panels).find((p) => p.id === get(activePanelId)) ?? get(panels).at(-1);
+    const whole = wholeFileText(serializePanelDocument(panel));
+    window.__wholeLines = whole.text.split('\n');
+    return { lines: whole.lineCount, cutoff: whole.controls.get('gaia_tone1_filter_cutoff_342').start, label: whole.controls.get('gaia_lbl_343').start };
+  });
+  const viewer = () => kit.page.evaluate(() => {
+    const v = document.querySelector('[data-testid="file-viewer"]');
+    const pre = v.querySelector('.fv-lines');
+    const rows = [...v.querySelectorAll('.fv-gln')];
+    const first = Number(rows[0].textContent);
+    const drawn = pre.textContent.split('\n');
+    return {
+      rows: rows.length, first, last: Number(rows.at(-1).textContent), nodes: v.querySelectorAll('*').length,
+      aligned: drawn.every((line, i) => line === window.__wholeLines[first - 1 + i]),
+      level: Math.abs(rows[0].getBoundingClientRect().top - pre.getBoundingClientRect().top) < 0.5,
+      active: Number(v.querySelector('.fv-gln.active')?.textContent ?? 0),
+      top: Math.floor((v.querySelector('.fv-scroll').scrollTop - 10) / 21) + 1,   // the line at the top edge
+      here: document.querySelector('[data-testid="panel-file-here"]')?.textContent ?? '',
+    };
+  });
+  const started = Date.now();
+  await kit.page.locator('.pf-mode-btn', { hasText: 'Whole file' }).click();
+  await kit.page.waitForSelector('[data-testid="file-viewer"] .fv-gln');
+  await kit.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const openedMs = Date.now() - started;
+  await kit.settle(400);
+  const first = await viewer();
+  led.check(S, 'the whole file opens', `"Whole file" shows the file as Save writes it, ${expected.lines} lines, at the control that was selected, in under three seconds (${openedMs} ms here)`,
+    { header: true, atCutoff: true, quick: true },
+    { header: (await kit.page.locator('.pf .pf-head .lang').textContent()).includes(expected.lines.toLocaleString('en')),
+      atCutoff: first.active === expected.cutoff && first.here.includes('tone1_filter_cutoff'), quick: openedMs < 3000 });
+  led.check(S, 'only the screen is drawn', 'of the whole file, only the lines on screen and a margin are drawn: a few hundred gutter rows, not tens of thousands',
+    { fewRows: true, fewNodes: true }, { fewRows: first.rows < 400 && expected.lines > 50000, fewNodes: first.nodes < 2000 });
+
+  await kit.page.evaluate(() => { const el = document.querySelector('.fv-scroll'); el.scrollTop = el.scrollHeight; });
+  await kit.settle(400);
+  const end = await viewer();
+  led.check(S, 'it lines up to the last line', 'scrolled to the end, the drawn lines are the file\'s last lines, level with their numbers',
+    { last: expected.lines, aligned: true, level: true }, { last: end.last, aligned: end.aligned, level: end.level });
+
+  // ---- outline and find --------------------------------------------------------------------------
+  await kit.page.locator('.pf .pf-row', { hasText: 'Scripts' }).first().click();
+  await kit.settle(300);
+  const scripts = await viewer();
+  await kit.page.locator('.pf .pf-row', { hasText: 'tone1_filter_cutoff_label' }).click();
+  await kit.settle(400);
+  const atLabel = await viewer();
+  led.check(S, 'the outline goes there', 'a row brings its lines to the top and what is being read is named: the scripts section, then the label',
+    { scripts: true, label: true, top: true },
+    { scripts: scripts.here.includes('Scripts'), label: atLabel.active === expected.label && atLabel.here.includes('tone1_filter_cutoff_label'),
+      top: atLabel.top === expected.label });
+  await kit.page.keyboard.press('Control+f');
+  await kit.settle(200);
+  await kit.page.keyboard.type('tone3_filter_cutoff');
+  await kit.settle(400);
+  const found = await viewer();
+  led.check(S, 'find goes to the next match', 'Ctrl+F searches the whole file from where the reader is, and shows the first match after it',
+    { counted: true, there: true },
+    { counted: /^\d+\/\d+/.test(await kit.page.locator('.fv-find-count').textContent()), there: found.here.includes('tone3_filter_cutoff') && found.active > expected.label });
+  await kit.page.keyboard.press('Escape');
+  // Save's document holds the project's device session too, which is no part of the panel object:
+  // a mapping that changes while the file is open has to show in it.
+  await store(async () => {
+    (await import('/src/CE_Application/stores/projectDeviceSession.js')).mergeProjectDeviceRoleMapping({ role: 'Probe role', profileId: 'probe-profile-7f3a' });
+  });
+  await kit.settle(1000);
+  await kit.page.locator('.fv-scroll').focus();
+  await kit.page.keyboard.press('Control+f');
+  await kit.page.keyboard.type('probe-profile-7f3a');
+  await kit.settle(300);
+  const sessionCount = (await kit.page.locator('.fv-find-count').textContent()).trim();
+  await kit.page.keyboard.press('Escape');
+  led.check(S, 'it follows the device session', 'a device mapping changed while the whole file is open is in it a moment later, as it is in what Save writes',
+    '1/1', sessionCount);
+  await kit.page.locator('.pf .pf-row', { hasText: 'tone1_filter_cutoff_label' }).click();
+  await kit.settle(300);
+  await kit.page.locator('.pf button', { hasText: 'Edit this item' }).click();
+  await kit.settle(600);
+  led.check(S, 'Edit this item', 'the button opens what is being read as an item, to edit', 'tone1_filter_cutoff_label · Label',
+    (await kit.page.locator('.pf .pf-head .lang').textContent()).trim());
+
+  // ---- the every-field reference of a long control ------------------------------------------------
+  await store(async () => { (await import('/src/CE_Application/stores/panels.js')).selectComponent('gaia_tone1_osc_wave_317'); });
+  await kit.settle(500);
+  await kit.page.locator('.pf label', { hasText: 'Every field' }).locator('input').check();
+  await kit.settle(800);
+  await kit.page.evaluate(() => { const ta = document.querySelector('.pf textarea.ce-ta'); ta.scrollTop = ta.scrollHeight * 0.6; ta.dispatchEvent(new Event('scroll')); });
+  await kit.settle(400);
+  const longReference = await kit.page.evaluate(() => {
+    const ta = document.querySelector('.pf textarea.ce-ta');
+    const lines = ta.value.split('\n');
+    const rows = [...document.querySelectorAll('.pf .ce-gln .ce-lnnum')].map((n) => Number(n.textContent));
+    const drawn = document.querySelector('.pf .ce-hl').textContent.split('\n');
+    return { lines: lines.length, rows: rows.length, aligned: drawn.slice(0, 60).every((line, i) => line === lines[rows[0] - 1 + i]) };
+  });
+  led.check(S, 'a long reference draws only the screen', 'the every-field reference of GAIA\'s longest control draws a window of its lines, and the colours are the text under them',
+    { long: true, fewRows: true, aligned: true }, { long: longReference.lines > 10000, fewRows: longReference.rows < 400, aligned: longReference.aligned });
 
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');

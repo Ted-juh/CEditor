@@ -11,14 +11,25 @@
   // control selected when the script tab took over (selectionBeforeScriptTab); "Show on the panel"
   // goes back to the panel with the control selected; and while the panel is visible beside this
   // tab (a split), picking a control in either selects it in both.
-  import { onMount, untrack } from 'svelte';
+  //
+  // WHOLE FILE: the same screen shows the whole file, as Save would write it now, to read. The outline
+  // is then its table of contents: a row goes to its lines, and the row of the line being read (the
+  // line clicked, or the top line once scrolled) is marked. "Edit this item" (or "One item") opens
+  // that item to edit; "Whole file" from an item goes to its lines. The text is written when the mode
+  // is chosen, and again once the panel (or its device session, or its scripts) has stopped changing
+  // for a moment.
+  import { onMount, tick, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import CodeEditor from './CodeEditor.svelte';
-  import { panels, selectedComponentId, selectComponent, selectionBeforeScriptTab, setActivePanel } from '../stores/panels.js';
+  import FileViewer from './FileViewer.svelte';
+  import { panels, selectedComponentId, selectComponent, selectionBeforeScriptTab, serializePanelDocument, setActivePanel } from '../stores/panels.js';
   import {
     PANEL_SETTINGS_ITEM, panelFileOutline, controlFileText, controlFullText, panelSettingsFileText, panelSettingsFullText,
+    wholeFileText, wholeFileItemAt,
   } from '../stores/panelFileText.js';
   import { applyControlFileEdit, applyPanelSettingsFileEdit } from '../stores/panelFileActions.js';
+  import { projectDeviceSession } from '../stores/projectDeviceSession.js';
+  import { scriptDocuments } from '../stores/scriptWorkspace.js';
   import { findControlById } from '../utils/containment.js';
 
   let { panelId = null } = $props();
@@ -34,6 +45,31 @@
   let drafts = $state(new Map());     // key -> { text, base }: an unapplied edit, and the text it began from
   let messages = $state({ errors: [], warnings: [], note: '' });
   let editor = $state(null);
+  let viewer = $state(null);          // the whole file's FileViewer
+
+  let mode = $state('item');          // 'item' | 'whole'
+  let whole = $state.raw(null);       // wholeFileText(): the whole file and where each control is in it
+  let wholeOf = null;                 // the wholeSource it was written from
+  let wholeLine = $state(1);          // the line being read in it
+  let wholeNote = $state('');
+  let revealAfterWrite = null;        // the outline key to go to once the text is there
+  let wholeAt = $derived(whole ? wholeFileItemAt(whole, wholeLine) : null);
+  // What Save's document is made of (serializePanelDocument): the panel, the project's device
+  // session, and the scripts of the panel's script document. The last two are no part of the panel
+  // object, so a mapping or a script changed while the file is open must rewrite it too.
+  let wholeSource = $derived.by(() => {
+    if (!panel) return null;
+    const doc = $scriptDocuments.find((entry) => String(entry.panelId) === String(panel.id));
+    return { panel, session: $projectDeviceSession, scripts: doc?.scripts, scriptsModified: doc?.modified };
+  });
+  const sameSource = (a, b) => Boolean(a && b) && a.panel === b.panel && a.session === b.session
+    && a.scripts === b.scripts && a.scriptsModified === b.scriptsModified;
+  let hereKey = $derived(!wholeAt ? null
+    : wholeAt.kind === 'control' ? wholeAt.id
+      : wholeAt.kind === 'panel' ? PANEL_SETTINGS_ITEM : `section:${wholeAt.key}`);
+  let activeKey = $derived(mode === 'whole' ? hereKey : selectedKey);
+  // The file's own sections that are no item of the outline: places to go to.
+  let wholeSections = $derived(whole ? whole.sections.filter((section) => SECTION_PLACES.has(section.key)) : []);
 
   // The item, and its text as the panel has it now. Recomputed when the item's own object changes,
   // not on every write to the panel, so a busy panel does not re-lay a text nobody touched.
@@ -61,9 +97,84 @@
   $effect(() => {
     const id = $selectedComponentId;
     untrack(() => {
-      if (id != null && rowsByKey.has(id) && id !== selectedKey) openItem(id, { fromCanvas: true });
+      if (id == null || !rowsByKey.has(id)) return;
+      if (mode === 'whole') { if (hereKey !== id) goTo(id, { fromCanvas: true }); }
+      else if (id !== selectedKey) openItem(id, { fromCanvas: true });
     });
   });
+
+  // The whole file, written when it is shown and again (a moment later) when what it is made of changes.
+  $effect(() => {
+    const source = wholeSource;
+    if (mode !== 'whole' || !source) return;
+    if (sameSource(source, wholeOf)) return;
+    const first = untrack(() => whole) === null;
+    const timer = setTimeout(async () => {
+      const line = untrack(() => wholeLine);
+      whole = wholeFileText(serializePanelDocument(source.panel));
+      wholeOf = source;
+      await tick();
+      const to = revealAfterWrite != null ? lineOf(revealAfterWrite) : first ? null : line;
+      revealAfterWrite = null;
+      if (to) viewer?.revealLine(to);
+    }, first ? 20 : 400);
+    return () => clearTimeout(timer);
+  });
+
+  function setMode(next) {
+    if (next === mode) return;
+    if (next === 'whole') {
+      wholeNote = '';
+      mode = 'whole';
+      // A text written before the panel last changed is not shown even for a moment.
+      if (whole && sameSource(wholeSource, wholeOf)) {
+        const line = lineOf(selectedKey);
+        tick().then(() => line && viewer?.revealLine(line));
+      } else {
+        whole = null;
+        revealAfterWrite = selectedKey;
+      }
+      return;
+    }
+    // Back to one item: the one being read, when it is one.
+    mode = 'item';
+    if (wholeAt?.kind === 'control' && rowsByKey.has(wholeAt.id)) openItem(wholeAt.id);
+    else if (wholeAt?.kind === 'panel') openItem(PANEL_SETTINGS_ITEM);
+  }
+
+  // Where an outline row's item starts in the whole file (from 1), or null.
+  function lineOf(key) {
+    if (!whole && key !== PANEL_SETTINGS_ITEM) return null;
+    if (key === PANEL_SETTINGS_ITEM) return 1;
+    if (key?.startsWith('section:')) return whole.sections.find((s) => `section:${s.key}` === key)?.start ?? null;
+    return whole.controls.get(key)?.start ?? null;
+  }
+
+  // In the whole file: go to a row's lines, and select it on the panel as opening it would.
+  function goTo(key, { fromCanvas = false } = {}) {
+    if (!whole) return;
+    const line = lineOf(key);
+    if (line == null) {
+      wholeNote = 'This control is not in the file: the panel makes it again each time it opens.';
+      return;
+    }
+    wholeNote = '';
+    viewer?.revealLine(line);
+    if (!fromCanvas && rowsByKey.get(key)?.kind === 'control') selectComponent(key);
+  }
+
+  // Keep the row of what is being read open and in view.
+  $effect(() => {
+    const key = hereKey;
+    if (mode !== 'whole' || !key || key.startsWith('section:')) return;
+    untrack(() => {
+      const next = new Set(expanded);
+      for (let row = rowsByKey.get(key); row?.parentId != null; row = rowsByKey.get(row.parentId)) next.add(row.parentId);
+      if (next.size !== expanded.size) expanded = next;
+      tick().then(() => outlineEl?.querySelector(`[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' }));
+    });
+  });
+  let outlineEl = $state(null);
 
   function openItem(key, { fromCanvas = false } = {}) {
     selectedKey = key;
@@ -72,6 +183,12 @@
     for (let row = rowsByKey.get(key); row?.parentId != null; row = rowsByKey.get(row.parentId)) next.add(row.parentId);
     expanded = next;
     if (!fromCanvas && key !== PANEL_SETTINGS_ITEM) selectComponent(key);
+  }
+
+  // A row picked in the outline: opened as the item, or gone to in the whole file.
+  function pick(key) {
+    if (mode === 'whole') goTo(key);
+    else openItem(key);
   }
 
   function toggle(key) {
@@ -174,6 +291,25 @@
     return parts.length ? `Not in this text, and kept as it is: ${parts.join(' · ')}.` : '';
   }
 
+  const SECTION_PLACES = new Set(['exportParameters', 'scripts', 'drawings', 'notepad', 'captureSession']);
+  const SECTION_REASONS = {
+    controls: 'the list of controls; each is an item of its own',
+    scripts: 'edited in the script screens',
+    exportParameters: 'made from the controls on every save',
+    drawings: 'drawings more than one control uses; edited through those controls',
+    notepad: 'edited in the notepad',
+    captureSession: 'the capture tool\'s',
+  };
+
+  function wholeHere() {
+    if (!wholeAt) return '';
+    const at = `Line ${wholeLine.toLocaleString('en')}`;
+    if (wholeAt.kind === 'panel') return `${at} · in the panel settings`;
+    if (wholeAt.kind === 'section') return `${at} · in ${wholeAt.name}: ${SECTION_REASONS[wholeAt.key] ?? 'no item of its own'}`;
+    const row = rowsByKey.get(wholeAt.id);
+    return `${at} · in ${row?.name || wholeAt.id}${row?.type ? ` · ${row.type}` : ''}`;
+  }
+
   function hint() {
     if (showAll) return 'Every field, defaults included: a reference to read, not to edit.';
     if (item?.kind === 'panel') return 'Only what differs from a new panel. Delete a line to put that setting back to a new panel\'s value.';
@@ -187,7 +323,13 @@
   </div>
 {:else}
   <div class="pf" data-testid="panel-file-view">
-    <div class="pf-outline" role="navigation" aria-label="Panel file outline">
+    <div class="pf-outline" role="navigation" aria-label="Panel file outline" bind:this={outlineEl}>
+      <div class="pf-mode" role="tablist" aria-label="What the text shows">
+        <button role="tab" aria-selected={mode === 'item'} class={['pf-mode-btn', mode === 'item' && 'on']}
+          title="One item at a time, to edit" onclick={() => setMode('item')}>One item</button>
+        <button role="tab" aria-selected={mode === 'whole'} class={['pf-mode-btn', mode === 'whole' && 'on']}
+          title="The whole file as Save writes it, to read" onclick={() => setMode('whole')}>Whole file</button>
+      </div>
       <div class="treesearch pf-search">
         <span class="si">⌕</span>
         <input class="searchinput" placeholder="Find a control…" value={search}
@@ -197,23 +339,35 @@
       </div>
       <div class="pf-rows" role="tree">
         {#if !search.trim()}
-          <div class={['pf-row', 'pf-panel', selectedKey === PANEL_SETTINGS_ITEM && 'sel']} role="treeitem" tabindex="0"
-            aria-selected={selectedKey === PANEL_SETTINGS_ITEM}
-            onclick={() => openItem(PANEL_SETTINGS_ITEM)}
-            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openItem(PANEL_SETTINGS_ITEM)}>
+          <div class={['pf-row', 'pf-panel', activeKey === PANEL_SETTINGS_ITEM && 'sel']} role="treeitem" tabindex="0"
+            aria-selected={activeKey === PANEL_SETTINGS_ITEM}
+            onclick={() => pick(PANEL_SETTINGS_ITEM)}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && pick(PANEL_SETTINGS_ITEM)}>
             <span class="pf-twist"></span>
             <span class="pf-name">Panel settings</span>
             {#if drafts.has(PANEL_SETTINGS_ITEM)}<span class="pf-draft" title="An edit not applied yet">●</span>{/if}
           </div>
+          {#if mode === 'whole'}
+            {#each wholeSections as section (section.key)}
+              <div class={['pf-row', 'pf-section', activeKey === `section:${section.key}` && 'sel']} role="treeitem" tabindex="0"
+                aria-selected={activeKey === `section:${section.key}`} data-key={`section:${section.key}`}
+                onclick={() => goTo(`section:${section.key}`)}
+                onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && goTo(`section:${section.key}`)}>
+                <span class="pf-twist"></span>
+                <span class="pf-name">{section.name}</span>
+                {#if section.count != null}<span class="pf-type">{section.count}</span>{/if}
+              </div>
+            {/each}
+          {/if}
         {/if}
         {#each visibleRows as row (row.key)}
           {#if row.kind === 'control'}
-            <div class={['pf-row', selectedKey === row.key && 'sel']} role="treeitem" tabindex="0"
-              aria-selected={selectedKey === row.key}
+            <div class={['pf-row', activeKey === row.key && 'sel']} role="treeitem" tabindex="0"
+              aria-selected={activeKey === row.key}
               style="padding-left:{8 + (search.trim() ? 0 : row.depth * 14)}px"
               data-key={row.key}
-              onclick={() => openItem(row.key)}
-              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openItem(row.key)}>
+              onclick={() => pick(row.key)}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && pick(row.key)}>
               {#if row.childCount && !search.trim()}
                 <button class="pf-twist" aria-label={expanded.has(row.key) ? 'Close' : 'Open'}
                   onclick={(e) => { e.stopPropagation(); toggle(row.key); }}>{expanded.has(row.key) ? '▾' : '▸'}</button>
@@ -233,7 +387,38 @@
     </div>
 
     <section class="pf-main">
-      {#if item && current}
+      {#if mode === 'whole'}
+        {#if whole}
+          <div class="codehead pf-head">
+            <span class="lang">Whole file · {whole.lineCount.toLocaleString('en')} lines</span>
+            <span class="pf-here" data-testid="panel-file-here">{wholeHere()}</span>
+            <span class="pf-actions">
+              {#if wholeAt?.kind === 'control'}
+                <button class="btn ghost" onclick={() => { setActivePanel(panel.id); selectComponent(wholeAt.id); }}
+                  title="Switch to the panel with this control selected">Show on the panel</button>
+              {/if}
+              <button class="btn primary" onclick={() => setMode('item')} disabled={wholeAt?.kind === 'section'}
+                title={wholeAt?.kind === 'section' ? `${wholeAt.name}: no item to edit here (${SECTION_REASONS[wholeAt.key] ?? 'it has no item of its own'})`
+                  : 'Open what you are reading as an item, to edit'}>Edit this item</button>
+            </span>
+          </div>
+          <p class="pf-hint">The file as Save would write it now, laid out to read. It is for reading: to change something, click in it and press Edit this item.</p>
+          {#if whole.shortened || drafts.size}
+            <p class="pf-hint">
+              {#if whole.shortened}{whole.shortened === 1 ? 'An embedded image is' : `${whole.shortened} embedded images are`} shortened to a placeholder here.{/if}
+              {#if drafts.size}{drafts.size === 1 ? 'An edit' : `${drafts.size} edits`} you have not applied {drafts.size === 1 ? 'is' : 'are'} not in it.{/if}
+            </p>
+          {/if}
+          {#if wholeNote}<div class="problem warn"><span>!</span><span>{wholeNote}</span></div>{/if}
+        {:else}
+          <p class="sub">Writing out the file…</p>
+        {/if}
+        {#if whole}
+          <div class="pf-editor">
+            <FileViewer bind:this={viewer} text={whole.text} oncurrent={(line) => wholeLine = line} />
+          </div>
+        {/if}
+      {:else if item && current}
         <div class="codehead pf-head">
           <span class="lang">{title()}</span>
           <span class="pf-actions">
@@ -296,6 +481,14 @@
     border-right: 1px solid var(--line); padding-right: 10px;
   }
   .pf-search { flex: none; margin: 0; }
+  .pf-mode { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--panel); flex: none; }
+  .pf-mode-btn {
+    flex: 1; border: none; background: none; color: var(--txt-dim); font-size: 12px; padding: 4px 6px;
+    border-radius: 5px; cursor: pointer;
+  }
+  .pf-mode-btn.on { background: var(--panel-2); color: var(--txt); }
+  .pf-section { color: var(--txt-faint); }
+  .pf-here { flex: 1; min-width: 0; font-size: 12px; color: var(--txt-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pf-rows { overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1px; }
   .pf-row {
     display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 5px; cursor: pointer;
@@ -317,6 +510,8 @@
   .pf-editor :global(.ce) { flex: 1; }
   .pf-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .pf-actions { display: flex; gap: 6px; align-items: center; }
+  /* The script editor dims a disabled button only in its footer; here one has to look disabled too. */
+  .pf-actions .btn:disabled { opacity: 0.45; cursor: default; }
   .pf-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--txt-dim); margin-right: 6px; }
   .pf-hint { margin: 0; font-size: 12px; color: var(--txt-dim); }
   .pf-stale { align-items: center; }
