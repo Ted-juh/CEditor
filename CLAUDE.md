@@ -317,8 +317,9 @@ choices) as a difference from a baseline, and carries neither, so the plug-in ha
 rebuild them from and every default-valued property is missing. The first validation runs did
 exactly that, and the player log filled with 14,000 refused script writes that were an artefact of
 the setup, not of the panel. `prepare-export-panel.mjs` writes the export payload the app would:
-the control diff, baked, with the defaults it is against (`controlDefaults`) and the list entries
-whole, from which the plug-in rebuilds each control. The exporters do this themselves.
+the same two differences, baked, carrying what they are against (`controlDefaults`: the type
+defaults, and the baselines under `entries`), from which the plug-in rebuilds each control. The
+exporters do this themselves.
 
 Do this when you touch `CE/src/Player/`, the CLAP wrapper or the plug-in's CMake. Its first run
 found five defects that no other test here could see. Linux is also where the host-thread

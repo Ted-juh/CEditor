@@ -22,8 +22,15 @@
 //
 // It is an encoding of the saved file and nothing more, like the drawings table (documentDrawings.js):
 // readPanelDocument puts every default back before migrations or anything else see the document, so
-// the editor, the player page and every exporter see each entry as it was. The plug-in's payload and
-// the complete form the exporters are handed are not written this way, so the C++ never sees it.
+// the editor, the player page and every exporter see each entry as it was. The complete form the
+// exporters are handed is not written this way.
+//
+// THE PLUG-IN'S PAYLOAD is (exportFormDocument in panelModel.js), and carries the baselines it was
+// written against in `controlDefaults.entries`, beside the pristine controls its controls are a diff
+// against. Its two readers put them back from what it carries, not from their own: the player page
+// through readPanelDocument, as here, and the plug-in's C++ as it rebuilds the controls (Player/
+// PanelValueModel.h). A payload written before it carried them has its entries whole, and is read as
+// it is. GAIA's payload was 1.72 MB and is 1.49; AN1x's 1.93 and 1.44.
 //
 // WHICH ENTRIES. A map entry is written this way only when it is whole, which is when the type's own
 // pristine has no entry of that name: one it does have is a diff against that entry already, and is
@@ -161,15 +168,18 @@ const VALUE_ROW = {
   visualOverrides: {},
 };
 
-/** The lists, by section: a map of entries of one `_type`, or an array under one key. */
-const MAPS = { Bindings: BINDING, HitZones: HIT_ZONE, ValueChannels: VALUE_CHANNEL, Behaviors: BEHAVIOR_MODULE };
-const ARRAYS = { DeviceBindings: ['bindings', DEVICE_BINDING], Value: ['rows', VALUE_ROW] };
-
-/** Exposed, frozen, so a test can pin them: changing one changes what every format-4 file says. */
+/**
+ * The baselines by the section that holds the list. Exposed, frozen, so a test can pin them: changing
+ * one changes what every format-4 file says. The plug-in's payload carries the ones it uses.
+ */
 export const ENTRY_BASELINES = deepFreeze({
   Bindings: BINDING, HitZones: HIT_ZONE, ValueChannels: VALUE_CHANNEL, Behaviors: BEHAVIOR_MODULE,
   DeviceBindings: DEVICE_BINDING, Value: VALUE_ROW,
 });
+
+/** The lists, by section: a map of entries of one `_type` (its `_children`), or an array under one key. */
+const MAP_SECTIONS = new Set(['Bindings', 'HitZones', 'ValueChannels', 'Behaviors']);
+const ARRAY_KEYS = { DeviceBindings: 'bindings', Value: 'rows' };
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -219,8 +229,11 @@ function writeMapEntry(entry, base) {
   return { _type: base._type, ...diffFrom(entry, base) };
 }
 
-/** `control` with each listed section passed through `edit(sectionName, section)`, children too. */
-function mapSections(control, edit) {
+/**
+ * `control` with each listed section that `baselines` has a baseline for passed through
+ * `edit(sectionName, section, baseline)`, children too.
+ */
+function mapSections(control, baselines, edit) {
   if (!isPlainObject(control) || !isPlainObject(control._children)) return control;
   let children = null;
   for (const [name, section] of Object.entries(control._children)) {
@@ -229,12 +242,13 @@ function mapSections(control, edit) {
       let kids = null;
       for (const [key, child] of Object.entries(section._children)) {
         // `_removed` lives in this map too, as a list of names, and is not a control.
-        const mapped = isPlainObject(child) ? mapSections(child, edit) : child;
+        const mapped = isPlainObject(child) ? mapSections(child, baselines, edit) : child;
         if (mapped !== child) (kids ??= { ...section._children })[key] = mapped;
       }
       if (kids) next = { ...section, _children: kids };
-    } else if (isPlainObject(section) && (Object.hasOwn(MAPS, name) || Object.hasOwn(ARRAYS, name))) {
-      next = edit(name, section);
+    } else if (isPlainObject(section) && (MAP_SECTIONS.has(name) || Object.hasOwn(ARRAY_KEYS, name))
+      && isPlainObject(baselines[name])) {
+      next = edit(name, section, baselines[name]);
     }
     if (next !== section) (children ??= { ...control._children })[name] = next;
   }
@@ -242,51 +256,64 @@ function mapSections(control, edit) {
 }
 
 /** One listed section with every entry it holds whole passed through `entryFn(entry, base)`. */
-function mapEntries(name, section, entryFn, isWhole) {
-  if (Object.hasOwn(MAPS, name)) {
-    const base = MAPS[name];
+function mapEntries(name, section, base, entryFn) {
+  if (MAP_SECTIONS.has(name)) {
     const entries = section._children;
     if (!isPlainObject(entries)) return section;
     let out = null;
     for (const [key, entry] of Object.entries(entries)) {
-      if (key === REMOVED || !isWhole(entry, base)) continue;
+      if (key === REMOVED || !wholeMapEntry(entry, base)) continue;
       (out ??= { ...entries })[key] = entryFn(entry, base);
     }
     return out ? { ...section, _children: out } : section;
   }
-  const [key, base] = ARRAYS[name];
+  const key = ARRAY_KEYS[name];
   const list = section[key];
   if (!Array.isArray(list)) return section;
   return { ...section, [key]: list.map((entry) => (isPlainObject(entry) ? entryFn(entry, base) : entry)) };
 }
 
-const wholeMapEntry = (entry, base) => isPlainObject(entry) && entry._type === base._type;
+// A baseline without a `_type` would take every entry that has none for whole, and those are the
+// diffs against an entry of the type's own pristine (WHICH ENTRIES).
+const wholeMapEntry = (entry, base) => isPlainObject(entry) && typeof base._type === 'string' && entry._type === base._type;
 
 /**
  * A document-form control (shrinkControl's) with the entries of its lists written as diffs against
- * their baselines. Its children are done too, against the same baselines.
+ * their baselines. Its children are done too, against the same baselines. The section of each
+ * baseline an entry was written against goes into `used`, when there is one.
  */
-export function shrinkEntries(control) {
-  return mapSections(control, (name, section) => mapEntries(name, section,
-    (entry, base) => (Object.hasOwn(MAPS, name) ? writeMapEntry(entry, base) : (diffFrom(entry, base) ?? {})),
-    wholeMapEntry));
-}
-
-/** The inverse of shrinkEntries: every entry with its baseline's defaults put back. */
-export function restoreEntries(control) {
-  return mapSections(control, (name, section) => mapEntries(name, section, applyDiff, wholeMapEntry));
+export function shrinkEntries(control, used = null) {
+  return mapSections(control, ENTRY_BASELINES, (name, section, base) => mapEntries(name, section, base, (entry) => {
+    used?.add(name);
+    return MAP_SECTIONS.has(name) ? writeMapEntry(entry, base) : (diffFrom(entry, base) ?? {});
+  }));
 }
 
 /**
- * A saved document with the defaults put back into the entries of its lists, when it is a saved
- * document of a format that leaves them out (VERSIONS, above). Anything else is returned as it is:
- * an older document, and the complete and export forms, whose entries are written whole.
+ * The inverse of shrinkEntries: every entry with its baseline's defaults put back. `baselines` are
+ * the ones the entries were written against: this format's, or what a payload carries. A list with
+ * no baseline there is left as it is.
+ */
+export function restoreEntries(control, baselines = ENTRY_BASELINES) {
+  return mapSections(control, baselines, (name, section, base) => mapEntries(name, section, base, applyDiff));
+}
+
+/**
+ * A document with the defaults put back into the entries of its lists, when it is one that leaves
+ * them out: a saved document of format 4 or later (VERSIONS, above), against this format's
+ * baselines, or a plug-in payload that carries the baselines it was written against
+ * (`controlDefaults.entries`), against those. Anything else is returned as it is: an older document,
+ * the complete form, and a payload from before payloads carried them, whose entries are whole.
  */
 export function restoreDocumentEntries(doc, formatVersion) {
-  if (formatVersion < ENTRY_DIFF_FORMAT || doc?.documentForm !== undefined || !Array.isArray(doc?.controls)) return doc;
+  if (!Array.isArray(doc?.controls)) return doc;
+  let baselines = null;
+  if (doc.documentForm === undefined && formatVersion >= ENTRY_DIFF_FORMAT) baselines = ENTRY_BASELINES;
+  else if (doc.documentForm === 'export' && isPlainObject(doc.controlDefaults?.entries)) baselines = doc.controlDefaults.entries;
+  if (!baselines) return doc;
   let changed = false;
   const controls = doc.controls.map((control) => {
-    const restored = restoreEntries(control);
+    const restored = restoreEntries(control, baselines);
     changed ||= restored !== control;
     return restored;
   });

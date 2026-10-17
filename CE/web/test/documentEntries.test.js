@@ -3,7 +3,8 @@
 // documentEntries.js writes six lists' entries as diffs against fixed baselines in a saved document,
 // and readPanelDocument puts the defaults back. What has to hold: an entry reads back as it was,
 // whatever it held or lacked; only those entries are touched; only a saved document of format 4 or
-// later is read this way; the plug-in's payload is not written this way; and it is worth it.
+// later is read this way; the plug-in's payload is written this way too, carrying its baselines,
+// and read from what it carries; and it is worth it.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -168,20 +169,59 @@ test('every panel in the tree opens to the controls its entries written whole wo
   }
 });
 
-test('the plug-in\'s payload carries its entries whole: the C++ has no baselines', () => {
+test('the plug-in\'s payload writes its entries the same way, and carries the baselines it used', () => {
   const panel = deserializePanel(readText(path.join(REPO, 'CE/panels/Roland GAIA SH-01.cepanel')), 'gaia.cepanel', null);
   const payload = exportFormDocument(JSON.parse(serializePanelForExport(panel)));
+  // The very diff a saved document writes (exportForm.test.js compares the whole of it).
   let zones = 0;
   const visit = (control) => {
     for (const zone of Object.values(control?._children?.HitZones?._children ?? {})) {
       if (zone?._type !== 'HitZone') continue;
       zones += 1;
-      for (const key of ['shape', 'enabled', 'cursor', 'bounds', 'source']) assert.ok(Object.hasOwn(zone, key), `a payload grab area lacks ${key}`);
+      assert.ok(!Object.hasOwn(zone, 'enabled') || zone.enabled !== ENTRY_BASELINES.HitZones.enabled, 'a payload grab area carries a default');
     }
     for (const child of Object.values(control?._children?.Children?._children ?? {})) if (child?._children) visit(child);
   };
   payload.controls.forEach(visit);
   assert.ok(zones > 100, `only ${zones} grab areas found`);
+  // Only the baselines some entry was written against, each as it is here, in this order.
+  const carried = payload.controlDefaults.entries;
+  assert.deepEqual(Object.keys(carried), Object.keys(ENTRY_BASELINES).filter((section) => section in carried));
+  assert.ok('HitZones' in carried && 'ValueChannels' in carried, `GAIA uses grab areas and channels: ${Object.keys(carried)}`);
+  for (const [section, base] of Object.entries(carried)) assert.deepEqual(base, json(ENTRY_BASELINES[section]), section);
+  // A payload with no entries in any list still says how they would be written.
+  const bare = exportFormDocument({ documentForm: 'complete', controls: [] });
+  assert.deepEqual(bare.controlDefaults.entries, {});
+});
+
+test('a payload is read against the baselines it carries, and one that carries none as it is', () => {
+  // The C++ does the same (Player/PanelValueModel.h, restoreEntries): what a payload was written
+  // against travels with it, so a reader of another build reads it as it was written.
+  const row = { id: 'a', displayText: 'A' };
+  const payload = (controlDefaults) => ({ formatVersion: 4, documentForm: 'export', controlDefaults, controls: [listsControl('k', {
+    Value: { rows: [row] },
+    HitZones: { _children: { grab: { _type: 'HitZone', name: 'grab' }, inherited: { cursor: 'move' }, _removed: ['main'] } },
+  })] });
+  const rowOf = (d) => d.controls[0]._children.Value.rows[0];
+  const zonesOf = (d) => d.controls[0]._children.HitZones._children;
+
+  const carried = { Value: { ...json(ENTRY_BASELINES.Value), enabled: false }, HitZones: json(ENTRY_BASELINES.HitZones) };
+  const read = restoreDocumentEntries(payload({ entries: carried }), 4);
+  assert.equal(rowOf(read).enabled, false, 'the carried baseline, not this build\'s');
+  assert.deepEqual(Object.keys(rowOf(read)), Object.keys(ENTRY_BASELINES.Value), 'in the baseline\'s order');
+  assert.equal(zonesOf(read).grab.cursor, 'pointer', 'a whole grab area has its defaults back');
+  assert.deepEqual(zonesOf(read).inherited, { cursor: 'move' }, 'one without the baseline\'s _type is a diff against its type\'s own, and left to expandControl');
+  assert.deepEqual(zonesOf(read)._removed, ['main']);
+  assert.deepEqual(read.controls[0]._children.Bindings, payload({}).controls[0]._children.Bindings, 'a list the payload has no baseline for is left as it came');
+
+  const untyped = restoreDocumentEntries(payload({ entries: { HitZones: { ...carried.HitZones, _type: undefined } } }), 4);
+  assert.deepEqual(zonesOf(untyped).grab, { _type: 'HitZone', name: 'grab' }, 'a baseline without a _type marks no entry whole');
+
+  const old = payload({ types: {} });
+  assert.equal(restoreDocumentEntries(old, 4), old, 'a payload from before payloads carried baselines is whole already');
+  // And through the loader the player page uses.
+  assert.equal(rowOf(readPanelDocument(JSON.stringify(payload({ entries: carried }))).doc).enabled, false);
+  assert.deepEqual(rowOf(readPanelDocument(JSON.stringify(old)).doc), row);
 });
 
 test('the point of it: the saved GAIA and AN1x are a good deal smaller', () => {
