@@ -1290,6 +1290,225 @@ function checksum(kind, bytes, opts)
   return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32)
 end
 
+-- Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+-- (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
+-- and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
+-- count from 0 here too, as dump layouts do, though Lua's own lists start at 1. A list may be hex
+-- text; each byte is read modulo 256; a mistake answers nil and says why; every list returned is new.
+local __BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32"
+local __WRITE_START = "Writing can run past the end, but not start beyond it."
+local __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local function __whole(n) return type(n) == "number" and n == math.floor(n) and n > -math.huge and n < math.huge end
+-- A whole number prints as one ("9", not Lua's "9.0" for a float), as it does in the other runtimes.
+local function __num(n)
+  if type(n) == "number" and n == math.floor(n) and math.abs(n) < 2 ^ 53 then return string.format("%d", math.floor(n)) end
+  return tostring(n)
+end
+local function __plural(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
+local function __span(word, a, b)
+  if a == b then return word .. " " .. a .. " is past" end
+  return word .. "s " .. a .. " to " .. b .. " run past"
+end
+local function __refuse(verb, why, tail)
+  logError(verb .. ": " .. why .. ", so there is no answer." .. (tail and (" " .. tail) or ""))
+  return nil
+end
+local function __bytesIn(verb, input)
+  local list = {}
+  if type(input) == "string" then
+    list = __hexBytes(verb, input, "there is no answer")
+    if list == nil then return nil end
+  elseif type(input) == "table" then list = input end
+  local out = {}
+  for i = 1, #list do out[i] = math.floor(tonumber(list[i]) or 0) % 256 end
+  return out
+end
+local function __shape(verb, opts)
+  local bits, order = 7, "msb"
+  if type(opts) == "table" then
+    if opts.bits ~= nil then bits = opts.bits end
+    if opts.order ~= nil then order = opts.order end
+  end
+  if bits ~= 7 and bits ~= 8 then return __refuse(verb, "bits must be 7 or 8") end
+  if order ~= "msb" and order ~= "lsb" then return __refuse(verb, 'order must be "msb" or "lsb"') end
+  return { bits = math.floor(bits), order = order }
+end
+function getBits(value, start, count)
+  local verb = "ce.midi.getBits"
+  if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32 then return __refuse(verb, __BIT_RANGE) end
+  start = math.floor(start); count = math.floor(count)
+  if type(value) == "number" then
+    if start + count > 32 then
+      return __refuse(verb, __span("bit", start, start + count - 1) .. " the 32 bits a number holds here")
+    end
+    return (math.floor(value) >> start) & ((1 << count) - 1)
+  end
+  local bytes = __bytesIn(verb, value)
+  if bytes == nil then return nil end
+  if start + count > #bytes * 8 then
+    return __refuse(verb, __span("bit", start, start + count - 1) .. " the end of " .. __plural(#bytes, "byte"))
+  end
+  local out = 0
+  for k = 0, count - 1 do
+    local at = start + k
+    out = out | (((bytes[at // 8 + 1] >> (at % 8)) & 1) << k)
+  end
+  return out
+end
+function setBits(value, start, count, bits)
+  local verb = "ce.midi.setBits"
+  if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32 then return __refuse(verb, __BIT_RANGE) end
+  start = math.floor(start); count = math.floor(count)
+  if not __whole(bits) or bits < 0 or bits >= 2 ^ count then return __refuse(verb, __num(bits) .. " does not fit in " .. __plural(count, "bit")) end
+  bits = math.floor(bits)
+  if type(value) == "number" then
+    if start + count > 32 then
+      return __refuse(verb, __span("bit", start, start + count - 1) .. " the 32 bits a number holds here")
+    end
+    return (math.floor(value) & ~(((1 << count) - 1) << start)) | (bits << start)
+  end
+  local bytes = __bytesIn(verb, value)
+  if bytes == nil then return nil end
+  if start + count > #bytes * 8 then
+    return __refuse(verb, __span("bit", start, start + count - 1) .. " the end of " .. __plural(#bytes, "byte"))
+  end
+  for k = 0, count - 1 do
+    local at = start + k
+    local i, bit = at // 8 + 1, 1 << (at % 8)
+    if (bits >> k) & 1 == 1 then bytes[i] = bytes[i] | bit else bytes[i] = bytes[i] & ~bit end
+  end
+  return bytes
+end
+function bytesRead(bytes, offset, count, opts)
+  local verb = "ce.midi.read"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  if not __whole(count) or count < 1 or count > 4 then return __refuse(verb, "count must be a whole number from 1 to 4") end
+  offset = math.floor(offset); count = math.floor(count)
+  local shape = __shape(verb, opts)
+  if shape == nil then return nil end
+  if offset + count > #list then
+    return __refuse(verb, __span("byte", offset, offset + count - 1) .. " the end of " .. __plural(#list, "byte"))
+  end
+  local v, base = 0, 1 << shape.bits
+  for k = 0, count - 1 do
+    local i = (shape.order == "msb") and (offset + k + 1) or (offset + count - k)
+    v = v * base + (list[i] % base)
+  end
+  return v
+end
+function bytesWrite(bytes, offset, count, value, opts)
+  local verb = "ce.midi.write"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  if not __whole(count) or count < 1 or count > 4 then return __refuse(verb, "count must be a whole number from 1 to 4") end
+  offset = math.floor(offset); count = math.floor(count)
+  local shape = __shape(verb, opts)
+  if shape == nil then return nil end
+  if not __whole(value) or value < 0 or value >= 2 ^ (shape.bits * count) then
+    return __refuse(verb, __num(value) .. " does not fit in " .. __plural(count * shape.bits, "bit"))
+  end
+  if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte"), __WRITE_START) end
+  local v, base, digits = math.floor(value), 1 << shape.bits, {}
+  for k = 1, count do digits[k] = v % base; v = v // base end
+  for k = 1, count do list[offset + k] = (shape.order == "msb") and digits[count - k + 1] or digits[k] end
+  return list
+end
+function bytesSlice(bytes, offset, count)
+  local verb = "ce.midi.slice"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  offset = math.floor(offset)
+  local last
+  if count == nil then
+    if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte")) end
+    last = #list
+  else
+    if not __whole(count) or count < 0 then return __refuse(verb, "count must be a whole number from 0") end
+    count = math.floor(count)
+    if offset + count > #list then
+      if count == 0 then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte")) end
+      return __refuse(verb, __span("byte", offset, offset + count - 1) .. " the end of " .. __plural(#list, "byte"))
+    end
+    last = offset + count
+  end
+  local out = {}
+  for i = offset + 1, last do out[#out + 1] = list[i] end
+  return out
+end
+function bytesPut(bytes, offset, values)
+  local verb = "ce.midi.put"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  offset = math.floor(offset)
+  local part = __bytesIn(verb, values)
+  if part == nil then return nil end
+  if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte"), __WRITE_START) end
+  for k = 1, #part do list[offset + k] = part[k] end
+  return list
+end
+function bytesFind(bytes, pattern, from)
+  local verb = "ce.midi.find"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  local wanted = __bytesIn(verb, pattern)
+  if wanted == nil then return nil end
+  if #wanted == 0 then return __refuse(verb, "the pattern is empty") end
+  local first = (from == nil) and 0 or from
+  if not __whole(first) or first < 0 then return __refuse(verb, "from must be a whole number from 0") end
+  -- Not found is an answer, not a mistake: nil comes back and nothing is said.
+  for i = math.floor(first), #list - #wanted do
+    local j = 1
+    while j <= #wanted and list[i + j] == wanted[j] do j = j + 1 end
+    if j > #wanted then return i end
+  end
+  return nil
+end
+function bytesToHex(bytes)
+  local list = __bytesIn("ce.midi.toHex", bytes)
+  if list == nil then return nil end
+  local parts = {}
+  for i = 1, #list do parts[i] = string.format("%02X", list[i]) end
+  return table.concat(parts, " ")
+end
+function bytesFromHex(text) return __bytesIn("ce.midi.fromHex", text) end
+function bytesToBase64(bytes)
+  local list = __bytesIn("ce.midi.toBase64", bytes)
+  if list == nil then return nil end
+  local out = {}
+  for i = 1, #list, 3 do
+    local a, b, c = list[i], list[i + 1], list[i + 2]
+    local n = a * 65536 + (b or 0) * 256 + (c or 0)
+    local function ch(k) return __B64:sub(k + 1, k + 1) end
+    out[#out + 1] = ch((n >> 18) & 63) .. ch((n >> 12) & 63)
+      .. (b == nil and "=" or ch((n >> 6) & 63)) .. (c == nil and "=" or ch(n & 63))
+  end
+  return table.concat(out)
+end
+function bytesFromBase64(text)
+  local verb = "ce.midi.fromBase64"
+  local clean = (type(text) == "string") and (text:gsub("[ \t\r\n]", "")) or nil
+  if clean == nil or #clean % 4 ~= 0 or not clean:match("^[A-Za-z0-9+/]*=?=?$") then
+    return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.")
+  end
+  local out = {}
+  for i = 1, #clean, 4 do
+    local group, n, pad = clean:sub(i, i + 3), 0, 0
+    for j = 1, 4 do
+      local c = group:sub(j, j)
+      if c == "=" then pad = pad + 1; n = n * 64 else n = n * 64 + (__B64:find(c, 1, true) - 1) end
+    end
+    out[#out + 1] = (n >> 16) & 255
+    if pad < 2 then out[#out + 1] = (n >> 8) & 255 end
+    if pad < 1 then out[#out + 1] = n & 255 end
+  end
+  return out
+end
+
 -- panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 -- order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
 -- out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
@@ -2517,7 +2736,7 @@ end
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
-  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
+  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromHsl = "hslToHex", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },

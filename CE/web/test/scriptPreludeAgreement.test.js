@@ -151,6 +151,22 @@ const CASES = [
   ['checksum', ['crc32', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
   // An unknown algorithm must come back as nothing in every runtime, not as a Roland checksum.
   ['checksum', ['crc17', [0x01, 0x02, 0x03]]],
+  // Byte lists (docs/design/script-bytes.md). Numbers here, lists in STRUCT_CASES. Negative
+  // numbers and full 32-bit fields are where Lua's 64-bit integers, JavaScript's doubles and
+  // Python's unbounded integers would part company if the arithmetic were not the same.
+  ['getBits', [180, 4, 3]], ['getBits', [[0, 180], 12, 3]], ['getBits', ['00 B4', 12, 3]],
+  ['getBits', [-1, 0, 8]], ['getBits', [-17, 4, 8]], ['getBits', [0xFFFFFFFF, 0, 32]],
+  ['getBits', [[0x34, 0x12], 0, 16]], ['getBits', [[1, 2, 3, 4], 4, 20]], ['getBits', [180.0, 2, 1]],
+  ['setBits', [180, 4, 3, 5]], ['setBits', [-1, 0, 8, 0]], ['setBits', [0, 28, 4, 15]],
+  ['bytesRead', [[240, 1, 16, 247], 1, 2]], ['bytesRead', ['34 12', 0, 2, { bits: 8, order: 'lsb' }]],
+  ['bytesRead', [[0x7F, 0x7F, 0x7F, 0x7F], 0, 4]], ['bytesRead', [[255, 255, 255, 255], 0, 4, { bits: 8 }]],
+  ['bytesRead', [[0x81], 0, 1]], ['bytesRead', [[1, 2], 0, 2, { order: 'lsb' }]],
+  ['bytesFind', ['F0 41 10 42 12 F7', '42 12']], ['bytesFind', [[1, 2, 1, 2], [1, 2], 1]],
+  ['bytesFind', [[1, 2, 3], [4]]], ['bytesFind', [[1, 2], [1, 2, 3]]], ['bytesFind', [[1, 2], [2], 5]],
+  ['bytesToHex', [[240, 65, 16, 247]]], ['bytesToHex', [[]]], ['bytesToHex', [[300, -1, 10.7]]],
+  ['bytesToHex', ['f0,41 0x10']],
+  ['bytesToBase64', [[240, 65, 16, 66]]], ['bytesToBase64', [[1]]], ['bytesToBase64', [[1, 2]]],
+  ['bytesToBase64', [[]]], ['bytesToBase64', ['F0 41']], ['bytesToBase64', [[255, 254, 253, 0, 1]]],
   // Hex text, as the editor always took it and the preludes now do: spaced, with commas and 0x,
   // one-digit bytes, and the one-argument form.
   ['checksum', ['roland', '40 00 7F 00']], ['checksum', ['roland', '0x40,0x00 7f 0']],
@@ -213,6 +229,18 @@ const STRUCT_CASES = [
   ['cycleAt', [6, 0]], ['cycleAt', [6, 1000]], ['cycleAt', [-3, 2]],
   ['loopedBeats', [0, 4, 8]], ['loopedBeats', [4, 4, 8]], ['loopedBeats', [13, 4, 8]],
   ['loopedBeats', [20, 4, 8]], ['loopedBeats', [20, 4, 0]],
+  // Byte lists that come back as lists: a field written across a byte boundary, a write that grows
+  // the list, the empty slice, and base64 with and without padding and with whitespace in it.
+  ['setBits', [[0, 180], 12, 3, 5]], ['setBits', ['00 00', 7, 2, 3]], ['setBits', [[255], 0, 8, 0]],
+  ['bytesWrite', [[240, 0, 0, 247], 1, 2, 200]], ['bytesWrite', [[1, 2], 2, 2, 0x1234, { bits: 8, order: 'lsb' }]],
+  ['bytesWrite', [[], 0, 4, 268435455]], ['bytesWrite', [[9, 9, 9], 1, 1, 0]],
+  ['bytesSlice', [[240, 65, 16, 66, 247], 1, 3]], ['bytesSlice', ['F0 41 10', 1]], ['bytesSlice', [[1, 2, 3], 3]],
+  ['bytesSlice', [[1, 2, 3], 1, 0]],
+  ['bytesPut', [[1, 2, 3], 3, [4, 5]]], ['bytesPut', [[1, 2, 3], 1, 'FF']], ['bytesPut', [[1, 2, 3], 0, []]],
+  ['bytesPut', [[1, 2, 3], 2, [7, 8, 9]]],
+  ['bytesFromHex', ['F0 41 10 F7']], ['bytesFromHex', ['0xf0,0x41']], ['bytesFromHex', ['']],
+  ['bytesFromBase64', ['8EEQQg==']], ['bytesFromBase64', ['AQ==']], ['bytesFromBase64', ['AQI=']],
+  ['bytesFromBase64', ['8E EQ\nQg==']], ['bytesFromBase64', ['']], ['bytesFromBase64', ['//79AAE=']],
 ];
 
 const near = (a, b) => (typeof a === 'number' && typeof b === 'number'
@@ -386,7 +414,9 @@ test('panic expands to the same CC sequence in the Lua prelude as in the WebView
 /* --------------------------------------------------------------------------------- helpers */
 
 function luaLiteral(v) {
+  if (v === null || v === undefined) return 'nil';
   if (Array.isArray(v)) return `{${v.map(luaLiteral).join(', ')}}`;
+  if (typeof v === 'object') return `{${Object.entries(v).map(([k, x]) => `${k} = ${luaLiteral(x)}`).join(', ')}}`;
   if (typeof v === 'string') return JSON.stringify(v);
   return String(v);
 }
@@ -506,6 +536,22 @@ const REFUSAL_CASES = [
   ['sendNote', [1, null, 100]], ['sendNoteOff', [1, null]], ['sendAftertouch', [1, 90, null]],
   ['scaleNotes', [null, 'major']], ['quantizeNote', [61, null, 'major']], ['degreeChord', [null, 'major', 1]],
   ['inScale', [null, 60, 'major']],
+  // Byte lists: every way each helper can refuse, and two that must not.
+  ['getBits', [180, -1, 3]], ['getBits', [180, 0, 33]], ['getBits', [180, 30, 4]], ['getBits', [180, 31, 2]],
+  ['getBits', [[1], 4, 8]], ['getBits', [[1], 8, 1]], ['getBits', ['F041', 0, 8]], ['getBits', [180, 4, 3]],
+  ['setBits', [0, 0, 3, 9]], ['setBits', [0, 0, 3, 2.5]], ['setBits', [0, 0, 1, 2]], ['setBits', [[1], 4, 8, 1]],
+  ['bytesRead', [[1, 2], 1, 2]], ['bytesRead', [[1, 2], 2, 1]], ['bytesRead', [[1, 2], -1, 1]],
+  ['bytesRead', [[1, 2], 0, 5]], ['bytesRead', [[1, 2], 0, 1, { bits: 6 }]], ['bytesRead', [[1, 2], 0, 1, { order: 'big' }]],
+  ['bytesRead', [[1], 0, 2]],
+  ['bytesWrite', [[1, 2], 3, 1, 0]], ['bytesWrite', [[1, 2], 0, 1, 128]], ['bytesWrite', [[1, 2], 0, 2, 70000, { bits: 8 }]],
+  ['bytesWrite', [[1, 2], 0, 1, -1]],
+  ['bytesSlice', [[1, 2, 3], 2, 2]], ['bytesSlice', [[1, 2, 3], 4]], ['bytesSlice', [[1, 2, 3], 5, 0]],
+  ['bytesSlice', [[1, 2, 3], 0, -1]], ['bytesSlice', [[1], 1, 1]],
+  ['bytesPut', [[1, 2], 3, [1]]], ['bytesPut', [[1, 2], 0, 'F0411']],
+  ['bytesFind', [[1, 2], []]], ['bytesFind', [[1, 2], [1], -1]], ['bytesFind', [[1, 2, 3], [9]]],
+  ['bytesFromHex', ['F04110']], ['bytesToHex', ['zz']],
+  ['bytesFromBase64', ['8EEQQg=']], ['bytesFromBase64', ['8E=Q']], ['bytesFromBase64', [42]],
+  ['bytesToBase64', [[1, 2, 3]]],
 ];
 
 function webRefusals(fn, args) {
@@ -594,6 +640,44 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   REFUSAL_CASES.forEach(([fn, args], i) => {
     assert.deepEqual(got[i], want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
   });
+});
+
+/* ---------------------------------------------- each language's own byte type, as a list */
+
+// The byte-list helpers take a list or hex text everywhere, and also the byte type each language
+// already has: a typed array in JavaScript, bytes or a bytearray in Python. (The WebView half is in
+// scriptBytes.test.js.) A list always comes back, so what a script does next is the same in every
+// language.
+test('the byte helpers read each language\'s own byte type as a list', async (t) => {
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+  vm.createContext(sandbox);
+  vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+  assert.equal(vm.runInContext('bytesToHex(new Uint8Array([0xF0, 0x41]))', sandbox), 'F0 41');
+  assert.equal(vm.runInContext('getBits(new Uint8Array([0, 0xB4]), 12, 3)', sandbox), 3);
+  assert.deepEqual(plain(vm.runInContext('bytesPut(new Uint8Array([1, 2]), 2, new Uint8Array([3]))', sandbox)), [1, 2, 3]);
+
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: bytes and bytearray were not checked'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(sys.stdin.read(), "prelude", "exec"), g)
+out = [g["bytesToHex"](b"\\xf0\\x41"), g["getBits"](bytearray([0, 0xB4]), 12, 3),
+       g["bytesPut"](bytearray([1, 2]), 2, b"\\x03"), g["bytesToBase64"](bytes([240, 65, 16, 66]))]
+sys.stdout.write(json.dumps(out))
+`;
+  const ran = spawnSync(python, ['-c', driver], {
+    input: extractRawString('PythonScriptEngine.cpp', 'PY'), encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.deepEqual(JSON.parse(ran.stdout), ['F0 41', 3, [1, 2, 3], '8EEQQg==']);
 });
 
 /* -------------------------------------------------------------- the generated ce.* namespace */

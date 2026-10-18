@@ -2234,6 +2234,203 @@ def checksum(kind, bytes=None, opts=None):
     if cid == "crc16-modbus": return __ce_crc_ref(bytes, 0xa001, 0xffff, 0x0000, 16)
     return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32)
 
+# Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+# (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
+# and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
+# count from 0. A list may be hex text, bytes or a bytearray; each byte is read modulo 256; a mistake
+# answers None and says why; every list returned is new.
+__BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32"
+__WRITE_START = "Writing can run past the end, but not start beyond it."
+__B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+def __whole(n):
+    import math
+    return isinstance(n, (int, float)) and not isinstance(n, bool) and math.isfinite(n) and n == math.floor(n)
+# A whole number prints as one ("9", not Python's "9.0" for a float), as it does in the other runtimes.
+def __num(n):
+    if isinstance(n, float) and n.is_integer(): return str(int(n))
+    return str(n)
+def __plural(n, word): return str(n) + " " + word + ("" if n == 1 else "s")
+def __span(word, a, b):
+    if a == b: return word + " " + str(a) + " is past"
+    return word + "s " + str(a) + " to " + str(b) + " run past"
+def __refuse(verb, why, tail=None):
+    logError(verb + ": " + why + ", so there is no answer." + ((" " + tail) if tail else ""))
+    return None
+def __byteOf(x):
+    import math
+    try: v = float(x)
+    except (TypeError, ValueError): v = 0.0
+    if v != v or v in (float("inf"), float("-inf")): v = 0.0
+    return int(math.floor(v)) % 256
+def __bytesIn(verb, data):
+    if isinstance(data, str):
+        data = __hexBytes(verb, data, "there is no answer")
+        if data is None: return None
+    elif isinstance(data, (bytes, bytearray, list, tuple)):
+        data = list(data)
+    else:
+        data = []
+    return [__byteOf(x) for x in data]
+def __shape(verb, opts):
+    bits, order = 7, "msb"
+    if isinstance(opts, dict):
+        if opts.get("bits") is not None: bits = opts.get("bits")
+        if opts.get("order") is not None: order = opts.get("order")
+    if isinstance(bits, bool) or bits not in (7, 8): return __refuse(verb, "bits must be 7 or 8")
+    if order not in ("msb", "lsb"): return __refuse(verb, 'order must be "msb" or "lsb"')
+    return { "bits": int(bits), "order": order }
+def getBits(value, start, count):
+    verb = "ce.midi.getBits"
+    if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
+    start = int(start); count = int(count)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        import math
+        if start + count > 32:
+            return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here")
+        return (int(math.floor(value)) >> start) & ((1 << count) - 1)
+    data = __bytesIn(verb, value)
+    if data is None: return None
+    if start + count > len(data) * 8:
+        return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(len(data), "byte"))
+    out = 0
+    for k in range(count):
+        at = start + k
+        out |= ((data[at // 8] >> (at % 8)) & 1) << k
+    return out
+def setBits(value, start, count, bits):
+    verb = "ce.midi.setBits"
+    if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
+    start = int(start); count = int(count)
+    if not __whole(bits) or bits < 0 or bits >= 2 ** count: return __refuse(verb, __num(bits) + " does not fit in " + __plural(count, "bit"))
+    bits = int(bits)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        import math
+        if start + count > 32:
+            return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here")
+        return (int(math.floor(value)) & ~(((1 << count) - 1) << start)) | (bits << start)
+    data = __bytesIn(verb, value)
+    if data is None: return None
+    if start + count > len(data) * 8:
+        return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(len(data), "byte"))
+    for k in range(count):
+        at = start + k
+        i, bit = at // 8, 1 << (at % 8)
+        if (bits >> k) & 1: data[i] |= bit
+        else: data[i] &= ~bit
+    return data
+def bytesRead(data, offset, count, opts=None):
+    verb = "ce.midi.read"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    if not __whole(count) or count < 1 or count > 4: return __refuse(verb, "count must be a whole number from 1 to 4")
+    offset = int(offset); count = int(count)
+    shape = __shape(verb, opts)
+    if shape is None: return None
+    if offset + count > len(data):
+        return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(len(data), "byte"))
+    part = data[offset:offset + count]
+    if shape["order"] == "lsb": part.reverse()
+    base, v = 1 << shape["bits"], 0
+    for b in part: v = v * base + (b % base)
+    return v
+def bytesWrite(data, offset, count, value, opts=None):
+    verb = "ce.midi.write"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    if not __whole(count) or count < 1 or count > 4: return __refuse(verb, "count must be a whole number from 1 to 4")
+    offset = int(offset); count = int(count)
+    shape = __shape(verb, opts)
+    if shape is None: return None
+    if not __whole(value) or value < 0 or value >= 2 ** (shape["bits"] * count):
+        return __refuse(verb, __num(value) + " does not fit in " + __plural(count * shape["bits"], "bit"))
+    if offset > len(data):
+        return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"), __WRITE_START)
+    base, v, digits = 1 << shape["bits"], int(value), []
+    for _ in range(count):
+        digits.append(v % base); v //= base
+    if shape["order"] == "msb": digits.reverse()
+    for j, d in enumerate(digits):
+        if offset + j < len(data): data[offset + j] = d
+        else: data.append(d)
+    return data
+def bytesSlice(data, offset, count=None):
+    verb = "ce.midi.slice"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    offset = int(offset)
+    if count is None:
+        if offset > len(data): return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"))
+        return data[offset:]
+    if not __whole(count) or count < 0: return __refuse(verb, "count must be a whole number from 0")
+    count = int(count)
+    if offset + count > len(data):
+        if count == 0: return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"))
+        return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(len(data), "byte"))
+    return data[offset:offset + count]
+def bytesPut(data, offset, values):
+    verb = "ce.midi.put"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    offset = int(offset)
+    part = __bytesIn(verb, values)
+    if part is None: return None
+    if offset > len(data):
+        return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"), __WRITE_START)
+    for j, b in enumerate(part):
+        if offset + j < len(data): data[offset + j] = b
+        else: data.append(b)
+    return data
+def bytesFind(data, pattern, start=None):
+    verb = "ce.midi.find"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    wanted = __bytesIn(verb, pattern)
+    if wanted is None: return None
+    if not wanted: return __refuse(verb, "the pattern is empty")
+    first = 0 if start is None else start
+    if not __whole(first) or first < 0: return __refuse(verb, "from must be a whole number from 0")
+    # Not found is an answer, not a mistake: None comes back and nothing is said.
+    for i in range(int(first), len(data) - len(wanted) + 1):
+        if data[i:i + len(wanted)] == wanted: return i
+    return None
+def bytesToHex(data):
+    data = __bytesIn("ce.midi.toHex", data)
+    if data is None: return None
+    return " ".join("%02X" % b for b in data)
+def bytesFromHex(text): return __bytesIn("ce.midi.fromHex", text)
+def bytesToBase64(data):
+    data = __bytesIn("ce.midi.toBase64", data)
+    if data is None: return None
+    out = ""
+    for i in range(0, len(data), 3):
+        chunk = data[i:i + 3]
+        n = chunk[0] * 65536 + (chunk[1] if len(chunk) > 1 else 0) * 256 + (chunk[2] if len(chunk) > 2 else 0)
+        out += __B64[(n >> 18) & 63] + __B64[(n >> 12) & 63]
+        out += (__B64[(n >> 6) & 63] if len(chunk) > 1 else "=") + (__B64[n & 63] if len(chunk) > 2 else "=")
+    return out
+def bytesFromBase64(text):
+    import re
+    verb = "ce.midi.fromBase64"
+    clean = re.sub(r"[ \t\r\n]", "", text) if isinstance(text, str) else None
+    if clean is None or len(clean) % 4 != 0 or not re.fullmatch(r"[A-Za-z0-9+/]*={0,2}", clean):
+        return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.")
+    out = []
+    for i in range(0, len(clean), 4):
+        group, n, pad = clean[i:i + 4], 0, 0
+        for c in group:
+            if c == "=":
+                pad += 1; n = n * 64
+            else:
+                n = n * 64 + __B64.index(c)
+        out.append((n >> 16) & 255)
+        if pad < 2: out.append((n >> 8) & 255)
+        if pad < 1: out.append(n & 255)
+    return out
+
 # panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 # order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
 # out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
@@ -2997,7 +3194,7 @@ def decodeJson(text):
 import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
-    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },

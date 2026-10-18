@@ -3588,6 +3588,104 @@ export const HELPERS = [
   { id: 'fromOffset', category: 'MIDI encoding', signature: 'fromOffset(b, center)', summary: 'Decode an offset value by subtracting `center` — the reverse of toOffset.' },
   { id: 'toSigned', category: 'MIDI encoding', signature: 'toSigned(v, bits)', summary: 'Turn a negative number into the form a synth uses for a signed value of `bits` bits (two\'s complement). Positive numbers come back unchanged. Use fromSigned to read one back.' },
   { id: 'fromSigned', category: 'MIDI encoding', signature: 'fromSigned(b, bits)', summary: 'Read a signed value of `bits` bits (two\'s complement) back into an ordinary number, which may be negative. The reverse of toSigned.' },
+
+  // Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+  // (docs/design/script-bytes.md says why lists and not a block object). Shared rules, stated once
+  // in each summary that needs them: offsets and bit positions count from 0 in every language, Lua
+  // included, as dump layouts do; a list may be hex text; a mistake answers nothing and says why;
+  // every list that comes back is new.
+  {
+    id: 'getBits', category: 'MIDI encoding', signature: 'getBits(value, start, count) -> number',
+    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte, as JUCE\'s MemoryBlock counts them. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0.',
+    params: [
+      { name: 'value', type: 'value', required: true },
+      { name: 'start', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+    ],
+  },
+  {
+    id: 'setBits', category: 'MIDI encoding', signature: 'setBits(value, start, count, bits) -> number|list',
+    summary: 'Write `bits` into the `count` bits starting at bit `start`, and return the result: a number for a number, a new list for a list (the one passed in is not changed). The reverse of getBits: `setBits(0xB4, 4, 3, 5)` is 0xD4. A value that does not fit in `count` bits is refused with a message rather than cut down to fit.',
+    params: [
+      { name: 'value', type: 'value', required: true },
+      { name: 'start', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+      { name: 'bits', type: 'number', required: true },
+    ],
+  },
+  {
+    id: 'bytesRead', category: 'MIDI encoding', signature: 'bytesRead(bytes, offset, count [, opts]) -> number',
+    summary: 'Read the number stored in `count` bytes (1 to 4) starting at `offset`, which counts from 0 in every language, as dump layouts do. By default the bytes are SysEx\'s 7-bit bytes, most significant first, the way to7bit writes them; `opts` can say otherwise. Bytes past the end of the list are refused with a message.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: [
+        { name: 'bits', type: 'number', default: '7', values: [7, 8],
+          summary: 'How many bits of each byte carry the number: 7 for SysEx data, 8 for a whole byte.' },
+        { name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
+          summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").' },
+      ] },
+    ],
+  },
+  {
+    id: 'bytesWrite', category: 'MIDI encoding', signature: 'bytesWrite(bytes, offset, count, value [, opts]) -> list',
+    summary: 'Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` is the same as bytesRead\'s. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+      { name: 'value', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false },
+    ],
+  },
+  {
+    id: 'bytesSlice', category: 'MIDI encoding', signature: 'bytesSlice(bytes, offset [, count]) -> list',
+    summary: 'Copy `count` bytes starting at `offset` (counted from 0) into a new list, or every byte from `offset` to the end when `count` is left out. For a patch name, `fromAscii(bytesSlice(dump, 10, 12))`. Bytes past the end are refused with a message.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'count', type: 'number', required: false },
+    ],
+  },
+  {
+    id: 'bytesPut', category: 'MIDI encoding', signature: 'bytesPut(bytes, offset, values) -> list',
+    summary: 'Write the bytes in `values` into a copy of `bytes`, starting at `offset` (counted from 0), and return it. The write may run past the end and the list grows, but it cannot start past the end. For a patch name, `bytesPut(dump, 10, toAscii("Lead", 12))`.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'values', type: 'bytes', required: true },
+    ],
+  },
+  {
+    id: 'bytesFind', category: 'MIDI encoding', signature: 'bytesFind(bytes, pattern [, from]) -> number',
+    summary: 'Find where `pattern` (a list of bytes, or hex text) first occurs in `bytes`, at or after `from` (0 by default), and return its offset, counted from 0. Returns nothing when it does not occur, which is an answer rather than a mistake, so nothing is written to the console. Use it to find each patch\'s header inside a bulk dump.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'pattern', type: 'bytes', required: true },
+      { name: 'from', type: 'number', required: false },
+    ],
+  },
+  {
+    id: 'bytesToHex', category: 'MIDI encoding', signature: 'bytesToHex(bytes) -> string',
+    summary: 'Write bytes as hex text, two uppercase digits a byte with one space between, "F0 41 10 F7": the form the console shows MIDI in, and the form every send reads back.',
+    params: [{ name: 'bytes', type: 'bytes', required: true }],
+  },
+  {
+    id: 'bytesFromHex', category: 'MIDI encoding', signature: 'bytesFromHex(text) -> list',
+    summary: 'Read hex text into a list of bytes, by the rule every send uses: one or two digits a byte, with or without 0x, with spaces or commas between. Text with a longer run, such as "F04110", is refused with a message.',
+    params: [{ name: 'text', type: 'text', required: true }],
+  },
+  {
+    id: 'bytesToBase64', category: 'MIDI encoding', signature: 'bytesToBase64(bytes) -> string',
+    summary: 'Write bytes as base64 text, the standard alphabet with = padding: about a third shorter than hex, for keeping a dump in a setting or in state.',
+    params: [{ name: 'bytes', type: 'bytes', required: true }],
+  },
+  {
+    id: 'bytesFromBase64', category: 'MIDI encoding', signature: 'bytesFromBase64(text) -> list',
+    summary: 'Read base64 text back into a list of bytes. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message.',
+    params: [{ name: 'text', type: 'text', required: true }],
+  },
 ];
 
 /* ------------------------------------------------------------------- modules */
@@ -3806,11 +3904,16 @@ const MODULE_MEMBERS = {
     'sendAftertouch', 'sendClock', 'sendTransport',
     'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
     'denibblize', 'toAscii', 'fromAscii', 'toOffset', 'fromOffset', 'toSigned', 'fromSigned',
+    'getBits', 'setBits',
   ].reduce((acc, id) => { acc[id] = id; return acc; }, {
     // The namespaced names read well; the flat aliases have to stay distinct from ce.core.intercept,
     // which is a different thing entirely — one filters a model path, these filter the wire.
     interceptIn: 'interceptMidiIn', interceptOut: 'interceptMidiOut',
     feed: 'feedMidi', route: 'routeMidi',
+    // The byte-list helpers: short names in the namespace, and flat names that say "bytes", since
+    // a bare global read, write, slice, put or find is a word a script reaches for itself.
+    read: 'bytesRead', write: 'bytesWrite', slice: 'bytesSlice', put: 'bytesPut', find: 'bytesFind',
+    toHex: 'bytesToHex', fromHex: 'bytesFromHex', toBase64: 'bytesToBase64', fromBase64: 'bytesFromBase64',
   }),
   'ce.device': {
     requestDump: 'requestDump', applyDump: 'applyDump', sendDump: 'sendDump', buildDump: 'buildDump',

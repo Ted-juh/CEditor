@@ -668,6 +668,36 @@ int main()
                    juce::String (verb) + " names the note it refused" + engine);
     }
 
+    // 12b) ce.midi byte lists, through the real engines and their namespaced names. The helpers'
+    // arithmetic and messages are compared across engines in scriptPreludeAgreement.test.js; this
+    // proves the generated ce.midi table reaches them in the Lua and JS engines that ship.
+    {
+        juce::Array<juce::var> byteScripts;
+        byteScripts.add (makeScript ("byteslua", "lua", "panel", "onBytesLua", "*",
+            "function onBytesLua()\n"
+            "  local msg = ce.midi.write({ 0xF0, 0, 0, 0xF7 }, 1, 2, 200)\n"
+            "  log('lua ' .. ce.midi.toHex(msg) .. ' ' .. ce.midi.read(msg, 1, 2) .. ' ' .. ce.midi.getBits(0xB4, 4, 3)\n"
+            "      .. ' ' .. ce.midi.find('F0 41 10 42', '10 42') .. ' ' .. ce.midi.toBase64(ce.midi.fromHex('F0 41 10 42')))\n"
+            "  ce.midi.slice({ 1, 2 }, 1, 2)\n"
+            "end\n"));
+        byteScripts.add (makeScript ("bytesjs", "javascript", "panel", "onBytesJs", "*",
+            "function onBytesJs() {\n"
+            "  var msg = ce.midi.put([0xF0, 0xF7], 1, ce.midi.fromBase64('QRA='));\n"
+            "  log('js ' + ce.midi.toHex(msg) + ' ' + ce.midi.setBits(0xB4, 4, 3, 5) + ' ' + ce.midi.slice(msg, 1, 2).length);\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (byteScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onBytesLua", "panel", juce::var());
+        runtime.dispatchEvent ("onBytesJs", "panel", juce::var());
+        check (host.logs.contains ("lua F0 01 48 F7 200 3 2 8EEQQg=="), "ce.midi byte helpers answer in the Lua engine (got "
+                   + host.logs.joinIntoString (" | ") + ")");
+        // put overwrites, it does not insert: 41 10 written at offset 1 of F0 F7 replaces the F7.
+        check (host.logs.contains ("js F0 41 10 212 2"), "ce.midi byte helpers answer in the JS engine");
+        check (host.levelled.size() == 1 && host.levelled[0] == "error:ce.midi.slice: bytes 1 to 2 run past the end of 2 bytes, so there is no answer.",
+               "and refuse in the WebView runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
     // 13) ce.storage ------------------------------------------------------------------------------
     juce::Array<juce::var> storeScripts;
     storeScripts.add (makeScript ("store", "lua", "panel", "onStore", "*",

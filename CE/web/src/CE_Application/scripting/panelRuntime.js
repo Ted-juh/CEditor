@@ -2089,6 +2089,18 @@ const helpers = {
   fromOffset: (b, center) => b - center,
   toSigned: (v, bits) => { const m = 2 ** bits; return v < 0 ? v + m : v; },
   fromSigned: (b, bits) => { const m = 2 ** bits; return b >= m / 2 ? b - m : b; },
+  // Byte lists — see "byte lists" below, and docs/design/script-bytes.md for why lists.
+  getBits: (value, start, count) => bytesGetBits(value, start, count),
+  setBits: (value, start, count, bits) => bytesSetBits(value, start, count, bits),
+  bytesRead: (bytes, offset, count, opts) => bytesRead(bytes, offset, count, opts),
+  bytesWrite: (bytes, offset, count, value, opts) => bytesWrite(bytes, offset, count, value, opts),
+  bytesSlice: (bytes, offset, count) => bytesSlice(bytes, offset, count),
+  bytesPut: (bytes, offset, values) => bytesPut(bytes, offset, values),
+  bytesFind: (bytes, pattern, from) => bytesFind(bytes, pattern, from),
+  bytesToHex: (bytes) => bytesToHex(bytes),
+  bytesFromHex: (text) => bytesFromHex(text),
+  bytesToBase64: (bytes) => bytesToBase64(bytes),
+  bytesFromBase64: (text) => bytesFromBase64(text),
 };
 // The spelling this runtime shipped with before the contract was enforced. panelApi.js declares
 // it as an alias of to14bit, so panels written against it keep working.
@@ -2134,6 +2146,216 @@ function scriptBytes(verb, input, outcome = 'nothing was sent') {
 }
 function toHexMessage(bytes) {
   return bytes.map((v) => (midiInt(v, 0, 255) & 0xff).toString(16).padStart(2, '0').toUpperCase()).join(' ');
+}
+
+/* ------------------------------------------------------------------- byte lists */
+// What JUCE's MemoryBlock does, over the plain lists scripts already pass bytes in
+// (docs/design/script-bytes.md): bit fields and multi-byte values read and written at an offset, a
+// pattern found, a run cut out or written in, and a list turned into hex or base64 text and back.
+// Lists rather than a block object, because only plain data crosses between scripts and languages
+// (panel-api-spec Q3). The rules, the same in every prelude and pinned word for word by
+// scriptPreludeAgreement.test.js:
+//   - offsets and bit positions count from 0, in every language, as dump layouts do (Lua too);
+//   - a list may also be hex text, read by scriptBytes' rule, and each byte is read modulo 256;
+//   - nothing is answered for a mistake, and the error says what it was. Nothing is clamped,
+//     wrapped or padded into a plausible answer, except that a write may run past the end of a
+//     list and grow it, since that is how a message is built;
+//   - every list that comes back is new. The one passed in is never changed.
+const byteOf = (x) => ((Math.floor(Number(x) || 0) % 256) + 256) % 256;
+const isWholeNumber = (n) => typeof n === 'number' && Number.isInteger(n);
+function bytesRefuse(verb, why, tail = '') {
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer.${tail ? ` ${tail}` : ''}`);
+  return undefined;
+}
+function bytesIn(verb, input) {
+  const raw = scriptBytes(verb, input, 'there is no answer');
+  return raw ? raw.map(byteOf) : undefined;
+}
+const BIT_RANGE = 'start must be a whole number from 0, and count one from 1 to 32';
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// A single position IS past the end; a range RUNS past it, since its first part may be inside.
+const span = (word, a, b) => (a === b ? `${word} ${a} is past` : `${word}s ${a} to ${b} run past`);
+const WRITE_START = 'Writing can run past the end, but not start beyond it.';
+function bytesOpts(verb, opts) {
+  const bits = opts?.bits ?? 7;
+  const order = opts?.order ?? 'msb';
+  if (bits !== 7 && bits !== 8) return bytesRefuse(verb, 'bits must be 7 or 8');
+  if (order !== 'msb' && order !== 'lsb') return bytesRefuse(verb, 'order must be "msb" or "lsb"');
+  return { bits, order };
+}
+function bytesGetBits(value, start, count) {
+  const verb = 'ce.midi.getBits';
+  if (!isWholeNumber(start) || start < 0 || !isWholeNumber(count) || count < 1 || count > 32) {
+    return bytesRefuse(verb, BIT_RANGE);
+  }
+  if (typeof value === 'number') {
+    if (start + count > 32) return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the 32 bits a number holds here`);
+    const m = 2 ** count;
+    return ((Math.floor(Math.floor(value) / 2 ** start) % m) + m) % m;
+  }
+  const bytes = bytesIn(verb, value);
+  if (!bytes) return undefined;
+  if (start + count > bytes.length * 8) {
+    return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the end of ${plural(bytes.length, 'byte')}`);
+  }
+  let out = 0;
+  for (let k = 0; k < count; k += 1) {
+    const at = start + k;
+    out += (Math.floor(bytes[Math.floor(at / 8)] / 2 ** (at % 8)) % 2) * 2 ** k;
+  }
+  return out;
+}
+function bytesSetBits(value, start, count, bits) {
+  const verb = 'ce.midi.setBits';
+  if (!isWholeNumber(start) || start < 0 || !isWholeNumber(count) || count < 1 || count > 32) {
+    return bytesRefuse(verb, BIT_RANGE);
+  }
+  if (!isWholeNumber(bits) || bits < 0 || bits >= 2 ** count) return bytesRefuse(verb, `${bits} does not fit in ${plural(count, 'bit')}`);
+  if (typeof value === 'number') {
+    if (start + count > 32) return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the 32 bits a number holds here`);
+    const v = Math.floor(value);
+    const m = 2 ** count;
+    const old = ((Math.floor(v / 2 ** start) % m) + m) % m;
+    return v - old * 2 ** start + bits * 2 ** start;
+  }
+  const bytes = bytesIn(verb, value);
+  if (!bytes) return undefined;
+  if (start + count > bytes.length * 8) {
+    return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the end of ${plural(bytes.length, 'byte')}`);
+  }
+  const out = bytes.slice();
+  for (let k = 0; k < count; k += 1) {
+    const at = start + k;
+    const i = Math.floor(at / 8);
+    const mask = 2 ** (at % 8);
+    const now = Math.floor(out[i] / mask) % 2;
+    const want = Math.floor(bits / 2 ** k) % 2;
+    out[i] += (want - now) * mask;
+  }
+  return out;
+}
+function bytesRead(bytes, offset, count, opts) {
+  const verb = 'ce.midi.read';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  if (!isWholeNumber(count) || count < 1 || count > 4) return bytesRefuse(verb, 'count must be a whole number from 1 to 4');
+  const shape = bytesOpts(verb, opts);
+  if (!shape) return undefined;
+  if (offset + count > list.length) {
+    return bytesRefuse(verb, `${span('byte', offset, offset + count - 1)} the end of ${plural(list.length, 'byte')}`);
+  }
+  const part = list.slice(offset, offset + count);
+  if (shape.order === 'lsb') part.reverse();
+  let v = 0;
+  for (const b of part) v = v * 2 ** shape.bits + (b % 2 ** shape.bits);
+  return v;
+}
+function bytesWrite(bytes, offset, count, value, opts) {
+  const verb = 'ce.midi.write';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  if (!isWholeNumber(count) || count < 1 || count > 4) return bytesRefuse(verb, 'count must be a whole number from 1 to 4');
+  const shape = bytesOpts(verb, opts);
+  if (!shape) return undefined;
+  if (!isWholeNumber(value) || value < 0 || value >= 2 ** (shape.bits * count)) {
+    return bytesRefuse(verb, `${value} does not fit in ${plural(count * shape.bits, 'bit')}`);
+  }
+  if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`, WRITE_START);
+  const digits = [];
+  let v = value;
+  for (let i = 0; i < count; i += 1) { digits.push(v % 2 ** shape.bits); v = Math.floor(v / 2 ** shape.bits); }
+  if (shape.order === 'msb') digits.reverse();
+  const out = list.slice();
+  digits.forEach((d, i) => { out[offset + i] = d; });
+  return out;
+}
+function bytesSlice(bytes, offset, count) {
+  const verb = 'ce.midi.slice';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  if (count === undefined || count === null) {
+    if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`);
+    return list.slice(offset);
+  }
+  if (!isWholeNumber(count) || count < 0) return bytesRefuse(verb, 'count must be a whole number from 0');
+  if (offset + count > list.length) {
+    return bytesRefuse(verb, count === 0 ? `offset ${offset} is past the end of ${plural(list.length, 'byte')}`
+      : `${span('byte', offset, offset + count - 1)} the end of ${plural(list.length, 'byte')}`);
+  }
+  return list.slice(offset, offset + count);
+}
+function bytesPut(bytes, offset, values) {
+  const verb = 'ce.midi.put';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  const part = bytesIn(verb, values);
+  if (!part) return undefined;
+  if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`, WRITE_START);
+  const out = list.slice();
+  part.forEach((b, i) => { out[offset + i] = b; });
+  return out;
+}
+function bytesFind(bytes, pattern, from) {
+  const verb = 'ce.midi.find';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  const wanted = bytesIn(verb, pattern);
+  if (!wanted) return undefined;
+  if (!wanted.length) return bytesRefuse(verb, 'the pattern is empty');
+  const first = from === undefined || from === null ? 0 : from;
+  if (!isWholeNumber(first) || first < 0) return bytesRefuse(verb, 'from must be a whole number from 0');
+  // Not found is an answer, not a mistake: nothing comes back and nothing is said.
+  for (let i = first; i + wanted.length <= list.length; i += 1) {
+    let j = 0;
+    while (j < wanted.length && list[i + j] === wanted[j]) j += 1;
+    if (j === wanted.length) return i;
+  }
+  return undefined;
+}
+// Hex text out, the form the console prints messages in and every send reads back: two uppercase
+// digits a byte, one space between. Reading it back is scriptBytes' rule, so text that is not a
+// byte at a time is refused here as it is in a send.
+function bytesToHex(bytes) {
+  const list = bytesIn('ce.midi.toHex', bytes);
+  return list ? list.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ') : undefined;
+}
+function bytesFromHex(text) { return bytesIn('ce.midi.fromHex', text); }
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function bytesToBase64(bytes) {
+  const list = bytesIn('ce.midi.toBase64', bytes);
+  if (!list) return undefined;
+  let out = '';
+  for (let i = 0; i < list.length; i += 3) {
+    const a = list[i], b = list[i + 1], c = list[i + 2];
+    const n = a * 65536 + (b ?? 0) * 256 + (c ?? 0);
+    out += BASE64[Math.floor(n / 262144) % 64] + BASE64[Math.floor(n / 4096) % 64]
+      + (b === undefined ? '=' : BASE64[Math.floor(n / 64) % 64])
+      + (c === undefined ? '=' : BASE64[n % 64]);
+  }
+  return out;
+}
+function bytesFromBase64(text) {
+  const verb = 'ce.midi.fromBase64';
+  const clean = typeof text === 'string' ? text.replace(/[ \t\r\n]/g, '') : null;
+  if (clean === null || clean.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) {
+    return bytesRefuse(verb, 'that is not base64', 'Base64 is groups of four characters from A-Z, a-z, '
+      + '0-9, + and /, with = only as padding at the end.');
+  }
+  const out = [];
+  for (let i = 0; i < clean.length; i += 4) {
+    const group = clean.slice(i, i + 4);
+    const pad = (group.match(/=/g) ?? []).length;
+    let n = 0;
+    for (let j = 0; j < 4; j += 1) n = n * 64 + (group[j] === '=' ? 0 : BASE64.indexOf(group[j]));
+    out.push(Math.floor(n / 65536) % 256);
+    if (pad < 2) out.push(Math.floor(n / 256) % 256);
+    if (pad < 1) out.push(n % 256);
+  }
+  return out;
 }
 // checksum(kind, bytes). "roland"/"yamaha" are the same two's-complement 7-bit sum — Roland
 // documents it as (128 - sum) & 0x7F and Yamaha as (0 - sum) & 0x7F, which are the same number —

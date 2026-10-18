@@ -165,6 +165,21 @@ int main()
                    juce::String ("Notes: ") + verb + " names the note it refused");
     }
 
+    // ce.midi byte lists in the embedded interpreter, with Python's own bytes and bytearray read as
+    // lists (scriptPreludeAgreement.test.js compares the arithmetic across engines).
+    {
+        juce::Array<juce::var> byteScripts;
+        byteScripts.add (makeScript ("pyBytes", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    msg = ce.midi.write(bytearray([0xF0, 0, 0, 0xF7]), 1, 2, 200)\n"
+            "    log('py ' + ce.midi.toHex(msg) + ' ' + str(ce.midi.getBits(b'\\x00\\xb4', 12, 3)) + ' ' + ce.midi.toBase64(b'\\xf0\\x41\\x10\\x42'))\n"));
+        runtime.loadScripts (juce::var (byteScripts));
+        host.logs.clear();
+        runtime.onPanelReady (true);
+        check (host.logs.contains ("py F0 01 48 F7 3 8EEQQg=="), "Bytes: ce.midi byte helpers answer in Python, reading bytes and bytearray (got "
+                   + host.logs.joinIntoString (" | ") + ")");
+    }
+
     // ---- Two instances in one process ------------------------------------------------------------
     // What the user asked for: every instance of a panel is on its own, even two copies of the same
     // panel. Each runtime is one instance (one plug-in, one standalone window).

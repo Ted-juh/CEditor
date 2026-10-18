@@ -1375,6 +1375,204 @@ function checksum(kind, bytes, opts) {
   return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32);
 }
 
+// Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+// (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
+// and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
+// count from 0. A list may be hex text, or a typed array such as Uint8Array; each byte is read
+// modulo 256; a mistake answers undefined and says why; every list returned is new.
+var __BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32";
+var __WRITE_START = "Writing can run past the end, but not start beyond it.";
+var __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function __whole(n) { return typeof n === "number" && isFinite(n) && Math.floor(n) === n; }
+function __plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+function __span(word, a, b) { return a === b ? word + " " + a + " is past" : word + "s " + a + " to " + b + " run past"; }
+function __refuse(verb, why, tail) {
+  logError(verb + ": " + why + ", so there is no answer." + (tail ? " " + tail : ""));
+  return undefined;
+}
+function __bytesIn(verb, input) {
+  var list = [];
+  if (typeof input === "string") {
+    list = __hexBytes(verb, input, "there is no answer");
+    if (list === undefined) return undefined;
+  } else if (input && typeof input === "object" && typeof input.length === "number") {
+    list = Array.prototype.slice.call(input);
+  }
+  var out = [];
+  for (var i = 0; i < list.length; i++) out.push(((Math.floor(Number(list[i]) || 0) % 256) + 256) % 256);
+  return out;
+}
+function __shape(verb, opts) {
+  var bits = 7, order = "msb";
+  if (opts && typeof opts === "object") {
+    if (opts.bits !== undefined && opts.bits !== null) bits = opts.bits;
+    if (opts.order !== undefined && opts.order !== null) order = opts.order;
+  }
+  if (bits !== 7 && bits !== 8) return __refuse(verb, "bits must be 7 or 8");
+  if (order !== "msb" && order !== "lsb") return __refuse(verb, 'order must be "msb" or "lsb"');
+  return { bits: bits, order: order };
+}
+function getBits(value, start, count) {
+  var verb = "ce.midi.getBits";
+  if (!__whole(start) || start < 0 || !__whole(count) || count < 1 || count > 32) return __refuse(verb, __BIT_RANGE);
+  if (typeof value === "number") {
+    if (start + count > 32) return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here");
+    var m = Math.pow(2, count);
+    return ((Math.floor(Math.floor(value) / Math.pow(2, start)) % m) + m) % m;
+  }
+  var bytes = __bytesIn(verb, value);
+  if (bytes === undefined) return undefined;
+  if (start + count > bytes.length * 8) {
+    return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(bytes.length, "byte"));
+  }
+  var out = 0;
+  for (var k = 0; k < count; k++) {
+    var at = start + k;
+    out += (Math.floor(bytes[Math.floor(at / 8)] / Math.pow(2, at % 8)) % 2) * Math.pow(2, k);
+  }
+  return out;
+}
+function setBits(value, start, count, bits) {
+  var verb = "ce.midi.setBits";
+  if (!__whole(start) || start < 0 || !__whole(count) || count < 1 || count > 32) return __refuse(verb, __BIT_RANGE);
+  if (!__whole(bits) || bits < 0 || bits >= Math.pow(2, count)) return __refuse(verb, bits + " does not fit in " + __plural(count, "bit"));
+  if (typeof value === "number") {
+    if (start + count > 32) return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here");
+    var v = Math.floor(value), m = Math.pow(2, count);
+    var old = ((Math.floor(v / Math.pow(2, start)) % m) + m) % m;
+    return v - old * Math.pow(2, start) + bits * Math.pow(2, start);
+  }
+  var bytes = __bytesIn(verb, value);
+  if (bytes === undefined) return undefined;
+  if (start + count > bytes.length * 8) {
+    return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(bytes.length, "byte"));
+  }
+  for (var k = 0; k < count; k++) {
+    var at = start + k, i = Math.floor(at / 8), mask = Math.pow(2, at % 8);
+    var now = Math.floor(bytes[i] / mask) % 2, want = Math.floor(bits / Math.pow(2, k)) % 2;
+    bytes[i] += (want - now) * mask;
+  }
+  return bytes;
+}
+function bytesRead(bytes, offset, count, opts) {
+  var verb = "ce.midi.read";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  if (!__whole(count) || count < 1 || count > 4) return __refuse(verb, "count must be a whole number from 1 to 4");
+  var shape = __shape(verb, opts);
+  if (shape === undefined) return undefined;
+  if (offset + count > list.length) {
+    return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(list.length, "byte"));
+  }
+  var base = Math.pow(2, shape.bits), v = 0;
+  for (var k = 0; k < count; k++) {
+    var i = shape.order === "msb" ? offset + k : offset + count - 1 - k;
+    v = v * base + (list[i] % base);
+  }
+  return v;
+}
+function bytesWrite(bytes, offset, count, value, opts) {
+  var verb = "ce.midi.write";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  if (!__whole(count) || count < 1 || count > 4) return __refuse(verb, "count must be a whole number from 1 to 4");
+  var shape = __shape(verb, opts);
+  if (shape === undefined) return undefined;
+  if (!__whole(value) || value < 0 || value >= Math.pow(2, shape.bits * count)) {
+    return __refuse(verb, value + " does not fit in " + __plural(count * shape.bits, "bit"));
+  }
+  if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"), __WRITE_START);
+  var base = Math.pow(2, shape.bits), v = value, digits = [];
+  for (var k = 0; k < count; k++) { digits.push(v % base); v = Math.floor(v / base); }
+  if (shape.order === "msb") digits.reverse();
+  for (var j = 0; j < count; j++) list[offset + j] = digits[j];
+  return list;
+}
+function bytesSlice(bytes, offset, count) {
+  var verb = "ce.midi.slice";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  if (count === undefined || count === null) {
+    if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"));
+    return list.slice(offset);
+  }
+  if (!__whole(count) || count < 0) return __refuse(verb, "count must be a whole number from 0");
+  if (offset + count > list.length) {
+    return __refuse(verb, count === 0 ? "offset " + offset + " is past the end of " + __plural(list.length, "byte")
+      : __span("byte", offset, offset + count - 1) + " the end of " + __plural(list.length, "byte"));
+  }
+  return list.slice(offset, offset + count);
+}
+function bytesPut(bytes, offset, values) {
+  var verb = "ce.midi.put";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  var part = __bytesIn(verb, values);
+  if (part === undefined) return undefined;
+  if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"), __WRITE_START);
+  for (var k = 0; k < part.length; k++) list[offset + k] = part[k];
+  return list;
+}
+function bytesFind(bytes, pattern, from) {
+  var verb = "ce.midi.find";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  var wanted = __bytesIn(verb, pattern);
+  if (wanted === undefined) return undefined;
+  if (!wanted.length) return __refuse(verb, "the pattern is empty");
+  var first = (from === undefined || from === null) ? 0 : from;
+  if (!__whole(first) || first < 0) return __refuse(verb, "from must be a whole number from 0");
+  // Not found is an answer, not a mistake: undefined comes back and nothing is said.
+  for (var i = first; i + wanted.length <= list.length; i++) {
+    var j = 0;
+    while (j < wanted.length && list[i + j] === wanted[j]) j++;
+    if (j === wanted.length) return i;
+  }
+  return undefined;
+}
+function bytesToHex(bytes) {
+  var list = __bytesIn("ce.midi.toHex", bytes);
+  if (list === undefined) return undefined;
+  return list.map(function (b) { var h = b.toString(16).toUpperCase(); return h.length < 2 ? "0" + h : h; }).join(" ");
+}
+function bytesFromHex(text) { return __bytesIn("ce.midi.fromHex", text); }
+function bytesToBase64(bytes) {
+  var list = __bytesIn("ce.midi.toBase64", bytes);
+  if (list === undefined) return undefined;
+  var out = "";
+  for (var i = 0; i < list.length; i += 3) {
+    var a = list[i], b = list[i + 1], c = list[i + 2];
+    var n = a * 65536 + (b === undefined ? 0 : b) * 256 + (c === undefined ? 0 : c);
+    out += __B64.charAt(Math.floor(n / 262144) % 64) + __B64.charAt(Math.floor(n / 4096) % 64)
+      + (b === undefined ? "=" : __B64.charAt(Math.floor(n / 64) % 64))
+      + (c === undefined ? "=" : __B64.charAt(n % 64));
+  }
+  return out;
+}
+function bytesFromBase64(text) {
+  var verb = "ce.midi.fromBase64";
+  var clean = typeof text === "string" ? text.replace(/[ \t\r\n]/g, "") : null;
+  if (clean === null || clean.length % 4 !== 0 || !/^[A-Za-z0-9+\/]*={0,2}$/.test(clean)) {
+    return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.");
+  }
+  var out = [];
+  for (var i = 0; i < clean.length; i += 4) {
+    var n = 0, pad = 0;
+    for (var j = 0; j < 4; j++) {
+      var c = clean.charAt(i + j);
+      if (c === "=") { pad++; n = n * 64; } else n = n * 64 + __B64.indexOf(c);
+    }
+    out.push(Math.floor(n / 65536) % 256);
+    if (pad < 2) out.push(Math.floor(n / 256) % 256);
+    if (pad < 1) out.push(n % 256);
+  }
+  return out;
+}
+
 // panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 // order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
 // out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
@@ -2371,7 +2569,7 @@ function decodeJson(text) {
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
-  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
