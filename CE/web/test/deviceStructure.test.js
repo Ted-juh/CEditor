@@ -158,6 +158,22 @@ test('bind writes a real DeviceBindings entry, and the control then sends on set
   });
 });
 
+test('set()\'s transmit option reaches the write: transmit = false moves the control and sends nothing', () => {
+  // The binding handed setValue an empty form for an object, so { transmit = false } was accepted
+  // and dropped, in the editor only: a bound control sent its value whatever the script asked.
+  const knob = createControl('Knob', { name: 'cutoffKnob' });
+  withPanel(panelWith([knob]), (api) => {
+    api.deviceDefineParameter('cutoff', { min: 0, max: 127, cc: 74 });
+    api.deviceBind('cutoffKnob', 'cutoff');
+    clearScriptTrace();
+    api.set('cutoffKnob.value', 90, { transmit: false });
+    api.self.set('cutoffKnob.value', 91, { transmit: false });
+    assert.deepEqual(midiLines(), [], `nothing should have been sent:\n${traced()}`);
+    api.set('cutoffKnob.value', 100, { transmit: true });
+    assert.ok(midiLines().some((l) => l.includes('B0 4A 64')), `expected B0 4A 64 in:\n${traced()}`);
+  });
+});
+
 test('binding twice on one port replaces rather than stacking', () => {
   const knob = createControl('Knob', { name: 'k' });
   withPanel(panelWith([knob]), (api, panel) => {

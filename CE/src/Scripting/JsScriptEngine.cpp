@@ -1987,7 +1987,8 @@ var __MIDI_ARGS = {
 function __midiArg(verb, kind, v) {
   var a = __MIDI_ARGS[kind];
   if (v === undefined || v === null) { logError(verb + ": no " + a[0] + " given, so nothing was sent."); return undefined; }
-  var n = typeof v === "number" && isFinite(v) ? Math.floor(v + 0.5) : undefined;
+  var r = __realNumber(v);   // text that is a number ("64") is read as one, as it always was
+  var n = r === undefined ? undefined : Math.floor(r + 0.5);
   if (n === undefined || (a[4] && (n < a[2] || n > a[3]))) {
     logError(verb + ": " + __shownValue(v) + " is not " + a[1] + ", so nothing was sent. " + a[5]);
     return undefined;
@@ -2023,7 +2024,8 @@ function __badNote(verb, note) {
 // length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
 function __noteLength(verb, ms) {
   if (ms === undefined || ms === null) return null;
-  if (typeof ms === "number" && isFinite(ms) && ms > 0) return ms;
+  var length = __realNumber(ms);   // "500" is what sendNote has always read
+  if (length !== undefined && length > 0) return length;
   logError(verb + ": " + __shownValue(ms) + " is not a length in milliseconds, so nothing was sent. "
     + "Give a number above 0, or leave it out to send the note off yourself.");
   return undefined;

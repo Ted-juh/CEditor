@@ -602,6 +602,9 @@ const REFUSAL_CASES = [
   ['sendCC', [1, 200, 5]], ['sendCC', [1, 'cutoff', 5]], ['sendCC', [0, 7, 5]], ['sendCC', [17, 7, 5]],
   ['sendCC', [null, 7, 5]], ['sendCC', [1, 7, null]], ['sendCC', [1, 7, 'loud']], ['sendCC', [1, 7, NaN]],
   ['sendCC', [1, 7, 128]], ['sendCC', [1, 7.4, 64.5]], ['sendCC', [true, 7, 5]],
+  // Text that is a number is read as one, as it always was; text that is not, is not.
+  ['sendCC', ['1', ' 74 ', '64']], ['sendCC', [1, '0x10', 5]], ['sendNote', [1, 60, 100, '500']],
+  ['sendNote', [1, 60, '1e2']], ['sendPitchBend', [1, '8192']],
   ['sendNote', [1, 'C10', 100]], ['sendNote', [1, 'C-2', 100]], ['sendNote', [1, 128, 100]],
   ['sendNote', [1, -1, 100]], ['sendNote', [1, NaN, 100]], ['sendNote', [1, true, 100]],
   ['sendNote', [1, [60], 100]], ['sendNote', [1, 60]], ['sendNote', [1, 60, 100, '500ms']],

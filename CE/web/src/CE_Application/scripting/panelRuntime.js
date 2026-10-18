@@ -79,7 +79,7 @@ import {
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
-  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
+  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, memberPath,
 } from './panelApi.js';
 // Each section type's template: what get() checks a path against, and create's `<section>` keys.
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -2619,9 +2619,10 @@ function releaseTrackedScriptNotes(role, channel, note) {
 // Select), channel 0 or 17 as 1 or 16, a missing velocity as 0 (a note off). So an ADDRESS (channel,
 // controller, program, bank, parameter number) outside its range is refused, since clamping it picks
 // a different message; so is anything that is not a number, or is missing where there is no default.
-// A VALUE past the end of its range (a CC value of 128) is still clamped, as before. A number with a
-// fraction is rounded half up, the same in every runtime (the player floored it). The preludes'
-// __midiArg is the twin of this, word for word.
+// Text that is a number ("64", from a label say) is read as one, as it always was, by realNumber's
+// rule. A VALUE past the end of its range (a CC value of 128) is still clamped, as before. A number
+// with a fraction is rounded half up, the same in every runtime (the player floored it). The
+// preludes' __midiArg is the twin of this, word for word.
 const MIDI_ARGS = {
   channel: ['channel', 'a channel', 1, 16, true, 'A channel is a whole number from 1 to 16.'],
   controller: ['controller number', 'a controller number', 0, 127, true, 'A controller number is a whole number from 0 to 127.'],
@@ -2643,7 +2644,8 @@ function midiArg(verb, kind, v) {
     addScriptTrace('error', '', `${verb}: no ${noun} given, so nothing was sent.`);
     return undefined;
   }
-  const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v + 0.5) : undefined;
+  const r = realNumber(v);
+  const n = r === undefined ? undefined : Math.floor(r + 0.5);
   if (n === undefined || (address && (n < lo || n > hi))) {
     addScriptTrace('error', '', `${verb}: ${shownValue(v)} is not ${aNoun}, so nothing was sent. ${hint}`);
     return undefined;
@@ -2681,7 +2683,8 @@ function refuseNote(verb, note) {
 // "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
 function noteLength(verb, ms) {
   if (ms === undefined || ms === null) return null;
-  if (typeof ms === 'number' && Number.isFinite(ms) && ms > 0) return ms;
+  const length = realNumber(ms);   // "500" is what sendNote has always read
+  if (length !== undefined && length > 0) return length;
   addScriptTrace('error', '', `${verb}: ${shownValue(ms)} is not a length in milliseconds, so nothing was sent. `
     + 'Give a number above 0, or leave it out to send the note off yourself.');
   return undefined;
@@ -5719,8 +5722,9 @@ function controlSummary(control, controls) {
 const FIND_FILTERS = { name: 'string', type: 'string', generated: 'boolean', parent: 'string' };
 const FIND_TAKES = { string: 'text', boolean: 'true or false' };
 
-/** How a value reads in a message about a script's mistake. */
-function shownValue(v) {
+/** How a find query's value reads in its refusal. A panel verb, so it runs in this runtime only,
+ *  and can tell a table from a list where shownValue, held to the preludes' words, cannot. */
+function shownQueryValue(v) {
   if (typeof v === 'string') return `"${v}"`;
   if (v === undefined || v === null) return 'nothing';
   if (typeof v === 'object') return Array.isArray(v) ? 'a list' : 'a table';
@@ -5735,7 +5739,7 @@ function findQueryProblem(query) {
   const queryKeys = isOptionsTable(query) ? Object.keys(query) : [];
   const listQuery = queryKeys.length > 0 && queryKeys.every((key) => LIST_KEY.test(key));
   if (!isOptionsTable(query) || listQuery) {
-    return `the query is ${listQuery ? 'a list' : shownValue(query)}, not part of a name or a table of filters, so nothing was found. ${filters}`;
+    return `the query is ${listQuery ? 'a list' : shownQueryValue(query)}, not part of a name or a table of filters, so nothing was found. ${filters}`;
   }
   const unknown = Object.keys(query).filter((key) => !(key in FIND_FILTERS));
   if (unknown.length) {
@@ -5746,7 +5750,7 @@ function findQueryProblem(query) {
   for (const [key, type] of Object.entries(FIND_FILTERS)) {
     const v = query[key];
     if (v === undefined || v === null || typeof v === type) continue;
-    return `${key} takes ${FIND_TAKES[type]}, not ${shownValue(v)}, so nothing was found.`;
+    return `${key} takes ${FIND_TAKES[type]}, not ${shownQueryValue(v)}, so nothing was found.`;
   }
   return null;
 }
@@ -7720,17 +7724,146 @@ const LIST_KEY = /^\d+$/;
 const andList = (items) => (items.length < 2 ? items.join('')
   : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 
+/* ------------------------------------------------------------- option keys nothing reads
+ * An options table is the one argument where a mistake cannot show. `{ easing = "outBack" }` on
+ * ce.anim.to moved in a straight line, `{ time = 800 }` took 300 ms, `{ onDone = fn }` never ran,
+ * ce.draw.transform({ rotation = 45 }) turned nothing because the option is `rotate`, and a NRPN
+ * declared with `{ mbs = 1 }` sent MSB 0. Every one of those calls succeeded, and only ce.text.style
+ * and ce.image.set said anything about a key they did not know.
+ *
+ * So every call is checked against the fields panelApi.js lists for that member's options, here
+ * where the functions are handed to scripts rather than inside each one: one check, driven by the
+ * contract, so a field the contract gains is a field the check accepts. A key that is not listed is
+ * WARNED about and the call still runs, which is what it always did; whether it should refuse
+ * instead is the owner's decision. The message names the member by its namespaced path and lists
+ * the options it does have.
+ *
+ * What is not a mistake, and is not reported:
+ *  · a key that is a number. wasmoon hands a Lua list over as an object with keys "1", "2", …, and
+ *    a list is not an options table, whatever argument it arrived in.
+ *  · anything inside an option's value, unless the contract lists that option's own fields (a
+ *    NRPN's msb and lsb): a curve's four numbers, a SysEx template, a state's `when`.
+ *  · a member whose options list no fields. The contract does not say what it takes, so nothing
+ *    here can say what it does not.
+ */
+
+// These check their own option keys and REFUSE an unknown one, so a warning here would say it
+// twice, and would say "ignored" of a call that was refused whole. ce.storage refuses because a
+// misspelled scope key is how a private setting would land in the shared store (storageScopeOf).
+const REFUSES_UNKNOWN_OPTIONS = new Set([
+  'textStyle', 'imageSet', 'panelFind',
+  'saveSetting', 'loadSetting', 'listSettings', 'forgetSetting', 'allSettings', 'clearSettings',
+  'storageInfo',
+]);
+
+/** The section names a control can carry: what a `<section>` field accepts. */
+const SECTION_NAMES = new Set(Object.keys(SECTION_DEFAULTS));
+
+/** A field list as the check reads it: the names in contract order, and the nested lists. */
+function optionShape(fields) {
+  const names = [];
+  const nested = new Map();
+  let sections = false;
+  for (const field of fields) {
+    if (field.name === '<section>') { sections = true; continue; }
+    names.push(field.name);
+    if (Array.isArray(field.fields) && field.fields.length) nested.set(field.name, optionShape(field.fields));
+  }
+  return { names, known: new Set(names), nested, sections };
+}
+
+/** Member id -> { path, checks: [{ index, shape }] }, for every member whose options list fields. */
+const OPTION_CHECKS = (() => {
+  const out = new Map();
+  for (const member of Object.values(MEMBER_BY_ID)) {
+    if (member.kind === 'lifecycle' || REFUSES_UNKNOWN_OPTIONS.has(member.id)) continue;
+    const checks = [];
+    (member.params ?? []).forEach((param, index) => {
+      if (Array.isArray(param.fields) && param.fields.length) checks.push({ index, shape: optionShape(param.fields) });
+    });
+    if (checks.length) out.set(member.id, { path: memberPath(member.id), checks });
+  }
+  return out;
+})();
+
+/** The keys `opts` holds that `shape` does not list, grouped by the option they sit inside. */
+function unknownOptionKeys(opts, shape, parent = '', out = []) {
+  const unknown = [];
+  for (const key of Object.keys(opts)) {
+    if (LIST_KEY.test(key)) continue;
+    if (shape.known.has(key)) {
+      const inner = shape.nested.get(key);
+      if (inner && isOptionsTable(opts[key])) unknownOptionKeys(opts[key], inner, parent ? `${parent}.${key}` : key, out);
+      continue;
+    }
+    if (shape.sections && SECTION_NAMES.has(key)) continue;
+    unknown.push(key);
+  }
+  if (unknown.length) out.push({ parent, keys: unknown, shape });
+  return out;
+}
+
+/** `ce.anim.to: "easing" is not one of its options, so it was ignored. Its options are: …` */
+function unknownOptionsMessage(path, { parent, keys, shape }) {
+  const quoted = keys.map((key) => `"${parent ? `${parent}.` : ''}${key}"`);
+  const what = keys.length === 1
+    ? `${quoted[0]} is not one of its options, so it was ignored.`
+    : `${andList(quoted)} are not among its options, so they were ignored.`;
+  const names = shape.sections
+    ? [...shape.names, 'and the name of any section, such as Behavior']
+    : shape.names;
+  const listed = names.length === 1
+    ? `${parent ? `The only option of ${parent}` : 'Its only option'} is ${names[0]}.`
+    : `${parent ? `The options of ${parent}` : 'Its options'} are: ${names.join(', ')}.`;
+  return `${path}: ${what} ${listed}`;
+}
+
+// One wrapper per function, so a function every script shares (checksum, panic, encodeJson) stays
+// one function, as the approval guard needs it to be.
+const optionCheckers = new WeakMap();
+
+function withOptionCheck(fn, { path, checks }) {
+  let checked = optionCheckers.get(fn);
+  if (!checked) {
+    checked = function checkedOptions(...args) {
+      for (const { index, shape } of checks) {
+        if (!isOptionsTable(args[index])) continue;
+        for (const group of unknownOptionKeys(args[index], shape)) {
+          addScriptTrace('warn', '', unknownOptionsMessage(path, group));
+        }
+      }
+      return fn.apply(this, args);
+    };
+    optionCheckers.set(fn, checked);
+  }
+  return checked;
+}
+
+/** Put the check in front of every member whose options the contract lists. */
+function applyOptionChecks(flat) {
+  for (const [memberId, check] of OPTION_CHECKS) {
+    if (typeof flat[memberId] === 'function') flat[memberId] = withOptionCheck(flat[memberId], check);
+  }
+}
+
+/** For the tests: the members whose option keys are checked, by namespaced path. */
+export function optionCheckedMembersForTesting() {
+  return [...OPTION_CHECKS.values()].map((c) => c.path).sort();
+}
+
 // @module -
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const self = {
-    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
+    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
+      typeof form === 'string' || isOptionsTable(form) ? form : ''),
     get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form, true),
   };
   const api = {
-    // The third argument is the value form for the second-argument spelling. `set` also takes an
-    // opts object in that position in the contract; only a string is read as a form, so
-    // set(path, v, { transmit: false }) is unaffected.
-    set: (path, value, form) => setValue(path, value, typeof form === 'string' ? form : ''),
+    // The third argument is the value form for the second-argument spelling, or the contract's opts
+    // object: setValue reads a string as a form and an object as opts. This passed '' for an
+    // object, so set(path, v, { transmit = false }) was accepted and its `transmit` never reached
+    // the write, in the editor only: the player's host has always read it.
+    set: (path, value, form) => setValue(path, value, typeof form === 'string' || isOptionsTable(form) ? form : ''),
     get: (path, form) => getValue(path, form, true),
     log: (msg, val) => scriptPrint('log', scriptId, msg, val),
     // Levels the console already renders differently — the runtime uses the distinction constantly
@@ -7800,9 +7933,12 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     uiStatus: (message, opts) => uiStatusImpl(message, opts),
     uiState: () => uiStateImpl(),
     uiCopy: (text) => uiCopyImpl(scriptId, text),
-    uiDialog: (opts, onChoice) => uiDialogImpl(scriptId, opts, onChoice),
     // prompt and choose are dialog() with a different SHAPE of question — one modal at a time,
-    // one callback contract, one teardown, whatever is being asked.
+    // one callback contract, one teardown, whatever is being asked. Each names its own shape after
+    // the script's options, dialog included: `ask` is how these three tell the store apart, not an
+    // option of any of them, so a script's `ask` is reported as unknown and is not obeyed.
+    uiDialog: (opts, onChoice) => uiDialogImpl(scriptId,
+      isOptionsTable(opts) ? { ...opts, ask: 'choice' } : opts, onChoice),
     uiPrompt: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'text' }, onAnswer),
     uiChoose: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'list' }, onAnswer),
     // ce.draw — immediate-mode drawing on top of a control
@@ -8117,6 +8253,10 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     self,
     ...helpers,
   };
+
+  // Unknown option keys are reported for every member the contract lists options for, before the
+  // guard and the namespace see the functions, so every spelling of a member carries the check.
+  applyOptionChecks(api);
 
   // Installed third-party modules (ce.ext.*) contribute their members to the SAME flat surface a
   // built-in module does, before anything is gated — so they are gated, namespaced and discovered

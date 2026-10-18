@@ -118,8 +118,8 @@ export const WRITTEN = {
 
   /* ------------------------------------------------------------------ ce.device */
   requestDump: {
-    lua: `ce.device.requestDump("patch", function(bytes)\n  ce.device.applyDump(bytes)\nend, { timeoutMs = 2000 })`,
-    js: `ce.device.requestDump("patch", (bytes) => {\n  ce.device.applyDump(bytes);\n}, { timeoutMs: 2000 });`,
+    lua: `ce.device.requestDump("patch", function(values, info)\n  if info.ok then log("patch arrived") else log(info.error) end\nend, { timeout = 2000 })`,
+    js: `ce.device.requestDump("patch", (values, info) => {\n  if (info.ok) log("patch arrived"); else log(info.error);\n}, { timeout: 2000 });`,
   },
   applyDump: {
     lua: `-- from the device, or from an already-decoded map with no device at all\nce.device.applyDump(bytes)\nce.device.applyDump({ ["osc1.wave"] = 2, ["filter.cutoff"] = 96 })`,
@@ -292,12 +292,12 @@ export const WRITTEN = {
     js: `// the whole opts vocabulary, which the signature only calls "opts"\nce.anim.to("Cutoff.value", 0.9, {\n  duration: 600,       // ms; ignored when 'beats' is given\n  beats: 1,            // musical length instead of ms\n  sync: true,          // follow the transport, pausing when it stops\n  curve: "exp",        // a name ce.anim.to lists, or four numbers\n  from: 0.1,           // start here rather than from the current value\n  delay: 100,          // wait this long first\n  stagger: 40,         // with a list of paths, start each this much after the last\n  repeat: 2,           // run it twice more after the first\n  pingpong: true,      // ...alternating direction\n  done: (info) => {\n    if (info.completed) log("arrived");          // false when stopped or replaced\n  },\n});`,
   },
   animateSpring: {
-    lua: `ce.anim.spring("Fader.value", 0.8, {\n  stiffness = 180, damping = 12, mass = 1, velocity = 0,\n})`,
-    js: `ce.anim.spring("Fader.value", 0.8, {\n  stiffness: 180, damping: 12, mass: 1, velocity: 0,\n});`,
+    lua: `ce.anim.spring("Fader.value", 0.8, {\n  damping = 4, frequency = 18, duration = 800,   -- looser, faster wobble, for longer\n})`,
+    js: `ce.anim.spring("Fader.value", 0.8, {\n  damping: 4, frequency: 18, duration: 800,   // looser, faster wobble, for longer\n});`,
   },
   animateEnvelope: {
-    lua: `-- points are { at, value }; 'at' is 0..1 of the whole duration\nce.anim.envelope("Cutoff.value", {\n  { 0, 0 }, { 0.1, 1 }, { 0.4, 0.6 }, { 1, 0 },\n}, { duration = 1200, curve = "s" })`,
-    js: `// points are [at, value]; 'at' is 0..1 of the whole duration\nce.anim.envelope("Cutoff.value", [\n  [0, 0], [0.1, 1], [0.4, 0.6], [1, 0],\n], { duration: 1200, curve: "s" });`,
+    lua: `-- points are { at, value }; 'at' is 0..1 of the whole duration\nce.anim.envelope("Cutoff.value", {\n  { 0, 0 }, { 0.1, 1 }, { 0.4, 0.6 }, { 1, 0 },\n}, { duration = 1200, to = 1 })`,
+    js: `// points are [at, value]; 'at' is 0..1 of the whole duration\nce.anim.envelope("Cutoff.value", [\n  [0, 0], [0.1, 1], [0.4, 0.6], [1, 0],\n], { duration: 1200, to: 1 });`,
   },
   animateStop: { code: 'ce.anim.stop("Cutoff.value")   -- no argument stops every animation' },
   animateRunning: {
@@ -323,29 +323,29 @@ export const WRITTEN = {
 
   /* ------------------------------------------------------------------ ce.ui */
   uiNotify: {
-    lua: `ce.ui.notify("Patch sent", { kind = "success", ms = 2000 })`,
-    js: `ce.ui.notify("Patch sent", { kind: "success", ms: 2000 });`,
+    lua: `ce.ui.notify("Patch sent", { kind = "info", duration = 2000 })`,
+    js: `ce.ui.notify("Patch sent", { kind: "info", duration: 2000 });`,
   },
   uiStatus: {
     lua: `ce.ui.status("Waiting for dump…")\nce.ui.status()   -- no argument clears it`,
     js: `ce.ui.status("Waiting for dump…");\nce.ui.status();   // no argument clears it`,
   },
   uiDialog: {
-    lua: `ce.ui.dialog({\n  title = "Overwrite patch?",\n  message = "Slot 12 already has one.",\n  choices = { "Overwrite", "Cancel" },\n}, function(picked)\n  if picked == "Overwrite" then ce.device.sendDump("patch") end\nend)`,
-    js: `ce.ui.dialog({\n  title: "Overwrite patch?",\n  message: "Slot 12 already has one.",\n  choices: ["Overwrite", "Cancel"],\n}, (picked) => {\n  if (picked === "Overwrite") ce.device.sendDump("patch");\n});`,
+    lua: `ce.ui.dialog({\n  title = "Overwrite patch?",\n  message = "Slot 12 already has one.",\n  buttons = { "Overwrite", "Cancel" },\n}, function(picked)\n  if picked == "Overwrite" then ce.device.sendDump("patch") end\nend)`,
+    js: `ce.ui.dialog({\n  title: "Overwrite patch?",\n  message: "Slot 12 already has one.",\n  buttons: ["Overwrite", "Cancel"],\n}, (picked) => {\n  if (picked === "Overwrite") ce.device.sendDump("patch");\n});`,
   },
   uiPrompt: {
-    lua: `ce.ui.prompt({ title = "Patch name", value = "Bass 3", max = 16 },\n  function(answer)\n    if answer then set("Name.Text.content", answer) end\n  end)`,
-    js: `ce.ui.prompt({ title: "Patch name", value: "Bass 3", max: 16 },\n  (answer) => {\n    if (answer) set("Name.Text.content", answer);\n  });`,
+    lua: `ce.ui.prompt({ title = "Patch name", value = "Bass 3", placeholder = "up to 16 letters" },\n  function(answer)\n    if answer then set("Name.Text.content", answer) end\n  end)`,
+    js: `ce.ui.prompt({ title: "Patch name", value: "Bass 3", placeholder: "up to 16 letters" },\n  (answer) => {\n    if (answer) set("Name.Text.content", answer);\n  });`,
   },
   uiChoose: {
-    lua: `ce.ui.choose({ title = "Bank", options = { "A", "B", "C" } },\n  function(picked) log(picked) end)`,
-    js: `ce.ui.choose({ title: "Bank", options: ["A", "B", "C"] },\n  (picked) => log(picked));`,
+    lua: `ce.ui.choose({ title = "Bank", items = { "A", "B", "C" } },\n  function(picked) log(picked) end)`,
+    js: `ce.ui.choose({ title: "Bank", items: ["A", "B", "C"] },\n  (picked) => log(picked));`,
   },
   uiDismiss: { code: 'ce.ui.dismiss()   -- everything this script put up; pass an id for one' },
   uiUpdate: {
-    lua: `local id = ce.ui.notify("Sending 1/8…", { sticky = true })\nce.ui.update(id, "Sending 4/8…", { progress = 0.5 })`,
-    js: `const id = ce.ui.notify("Sending 1/8…", { sticky: true });\nce.ui.update(id, "Sending 4/8…", { progress: 0.5 });`,
+    lua: `local id = ce.ui.notify("Sending 1/8…", { duration = 0 })   -- 0: stays until dismissed\nce.ui.update(id, "Sending 4/8…")`,
+    js: `const id = ce.ui.notify("Sending 1/8…", { duration: 0 });   // 0: stays until dismissed\nce.ui.update(id, "Sending 4/8…");`,
   },
   uiState: {
     lua: `local s = ce.ui.state()\nif s.dialogOpen then return end   -- do not stack a second one`,
@@ -465,8 +465,8 @@ export const WRITTEN = {
     js: `ce.panel.grid(["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"],\n  { columns: 4, gapX: 6, gapY: 6 });`,
   },
   panelCircle: {
-    lua: `ce.panel.circle({ "P1", "P2", "P3", "P4" },\n  { cx = 100, cy = 100, radius = 60, from = 0, sweep = 360 })`,
-    js: `ce.panel.circle(["P1", "P2", "P3", "P4"],\n  { cx: 100, cy: 100, radius: 60, from: 0, sweep: 360 });`,
+    lua: `-- around the middle of the box they fill now; -90 puts the first at twelve o'clock\nce.panel.circle({ "P1", "P2", "P3", "P4" }, { radius = 60, startAngle = -90 })`,
+    js: `// around the middle of the box they fill now; -90 puts the first at twelve o'clock\nce.panel.circle(["P1", "P2", "P3", "P4"], { radius: 60, startAngle: -90 });`,
   },
   panelFlip: {
     lua: `ce.panel.flip({ "A", "B", "C" }, "horizontal")`,
@@ -491,8 +491,8 @@ export const WRITTEN = {
     js: `// a plain object, private to this script, gone when the panel closes\nce.storage.state.lastNote = 60;\nlog(ce.storage.state.lastNote);`,
   },
   saveSetting: {
-    lua: `ce.storage.saveSetting("favouriteBank", 2)                    -- shared with the panel\nce.storage.saveSetting("cursor", 4, { scope = "script" })     -- private to this script\nce.storage.saveSetting("port", "USB 1", { scope = "machine" }) -- this machine only`,
-    js: `ce.storage.saveSetting("favouriteBank", 2);                    // shared with the panel\nce.storage.saveSetting("cursor", 4, { scope: "script" });      // private to this script\nce.storage.saveSetting("port", "USB 1", { scope: "machine" }); // this machine only`,
+    lua: `ce.storage.saveSetting("favouriteBank", 2)                    -- shared with the panel\nce.storage.saveSetting("cursor", 4, { scope = "script" })     -- private to this script\nce.storage.saveSetting("port", "USB 1", { scope = "local" })   -- this machine only`,
+    js: `ce.storage.saveSetting("favouriteBank", 2);                    // shared with the panel\nce.storage.saveSetting("cursor", 4, { scope: "script" });      // private to this script\nce.storage.saveSetting("port", "USB 1", { scope: "local" });   // this machine only`,
   },
   loadSetting: {
     lua: `local bank = ce.storage.loadSetting("favouriteBank", 1)\nlocal cursor = ce.storage.loadSetting("cursor", 0, { scope = "script" })`,

@@ -1682,8 +1682,8 @@ local function __midiArg(verb, kind, v)
     logError(verb .. ": no " .. a[1] .. " given, so nothing was sent.")
     return nil
   end
-  local n = nil
-  if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then n = math.floor(v + 0.5) end
+  local r = __realNumber(v)   -- text that is a number ("64") is read as one, as it always was
+  local n = r ~= nil and math.floor(r + 0.5) or nil
   if n == nil or (a[5] and (n < a[3] or n > a[4])) then
     logError(verb .. ": " .. __shownValue(v) .. " is not " .. a[2] .. ", so nothing was sent. " .. a[6])
     return nil
@@ -1938,7 +1938,8 @@ end
 -- a length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
 local function __noteLength(verb, ms)
   if ms == nil then return false end
-  if type(ms) == "number" and ms == ms and ms ~= math.huge and ms > 0 then return ms end
+  local length = __realNumber(ms)   -- "500" is what sendNote has always read
+  if length ~= nil and length > 0 then return length end
   logError(verb .. ": " .. __shownValue(ms) .. " is not a length in milliseconds, so nothing was sent. "
     .. "Give a number above 0, or leave it out to send the note off yourself.")
   return nil

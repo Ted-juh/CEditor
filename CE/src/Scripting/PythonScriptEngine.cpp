@@ -2896,7 +2896,8 @@ def __midiArg(verb, kind, v):
     if v is None:
         logError(verb + ": no " + noun + " given, so nothing was sent.")
         return None
-    n = int(math.floor(v + 0.5)) if __finite(v) else None
+    r = __realNumber(v)   # text that is a number ("64") is read as one, as it always was
+    n = int(math.floor(r + 0.5)) if r is not None else None
     if n is None or (address and (n < lo or n > hi)):
         logError(verb + ": " + __shownValue(v) + " is not " + a_noun + ", so nothing was sent. " + hint)
         return None
@@ -2928,7 +2929,8 @@ def __badNote(verb, note):
 # a length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
 def __noteLength(verb, ms):
     if ms is None: return False
-    if __finite(ms) and ms > 0: return ms
+    length = __realNumber(ms)   # "500" is what sendNote has always read
+    if length is not None and length > 0: return length
     logError(verb + ": " + __shownValue(ms) + " is not a length in milliseconds, so nothing was sent. "
              + "Give a number above 0, or leave it out to send the note off yourself.")
     return None

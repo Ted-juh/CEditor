@@ -72,6 +72,28 @@ inline juce::String shownScriptValue (const juce::var& v)
     return "a list";
 }
 
+/** Text that is a decimal number, as the WebView runtime's realNumber reads it ("64", " -1.5 ",
+ *  "2e3"), into `out`; false for anything else, hex and "inf" included. */
+inline bool decimalTextValue (const juce::String& text, double& out)
+{
+    const auto t = text.trim();
+    int i = 0, digits = 0;
+    if (t[i] == '+' || t[i] == '-') ++i;
+    while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; }
+    if (t[i] == '.') { ++i; while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; } }
+    if (digits == 0) return false;
+    if (t[i] == 'e' || t[i] == 'E')
+    {
+        ++i;
+        if (t[i] == '+' || t[i] == '-') ++i;
+        if (! juce::CharacterFunctions::isDigit (t[i])) return false;
+        while (juce::CharacterFunctions::isDigit (t[i])) ++i;
+    }
+    if (i != t.length()) return false;
+    out = t.getDoubleValue();
+    return std::isfinite (out);
+}
+
 /** One item of a script's list of bytes: a whole number from 0 to 255, or text that is one hex
  *  byte. -1 when it is neither. */
 inline int scriptListByte (const juce::var& v)
@@ -596,13 +618,15 @@ private:
             logAt ("error", verb + ": no value given, so nothing was sent.", juce::var());
             return false;
         }
-        const bool number = (v.isInt() || v.isInt64() || v.isDouble()) && std::isfinite (static_cast<double> (v));
+        double d = 0.0;   // text that is a number ("64") is read as one, as the preludes read it
+        const bool number = (v.isInt() || v.isInt64() || v.isDouble()) ? std::isfinite (d = static_cast<double> (v))
+                                                                       : v.isString() && decimalTextValue (v.toString(), d);
         if (! number)
         {
             logAt ("error", verb + ": " + shownScriptValue (v) + " is not a value, so nothing was sent. " + hint, juce::var());
             return false;
         }
-        out = juce::jlimit (0, hi, static_cast<int> (std::floor (static_cast<double> (v) + 0.5)));
+        out = juce::jlimit (0, hi, static_cast<int> (std::floor (d + 0.5)));
         return true;
     }
 

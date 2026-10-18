@@ -334,6 +334,36 @@ const SHARED_OPTION_FIELDS = {
     summary: 'Start from this value instead of wherever the control is now.',
   },
 
+  /* --- a control's props (ce.panel.create / .clone) ---------------------- */
+  // Shared because clone's `props` "works as in create", and listed nothing while it did: the two
+  // read the same keys through applyControlProps.
+  controlName: {
+    name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
+    summary: 'The control\'s name. Every other command addresses the control by this name.',
+  },
+  controlX: {
+    name: 'x', type: 'number', default: '0', unit: 'pixels',
+    summary: 'Distance from the left edge of whatever contains it.',
+  },
+  controlY: { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Distance from the top edge.' },
+  controlWidth: {
+    name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
+    summary: 'How wide to make it.',
+  },
+  controlHeight: {
+    name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
+    summary: 'How tall to make it.',
+  },
+  controlParent: {
+    name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"',
+    summary: 'The name of a container to put it inside.',
+  },
+  controlSection: {
+    name: '<section>', type: 'object', group: 'any section',
+    summary: 'Any section of the control, to set up as you make it — for example '
+      + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses.',
+  },
+
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
   uiKind: {
     name: 'kind', type: 'text', default: '"info"', values: ['info', 'warn', 'error'],
@@ -1054,7 +1084,7 @@ export const COMMANDS = [
             summary: 'The value that y = 0 in the shape means.' },
           { name: 'to', type: 'number', default: '1',
             summary: 'The value that y = 1 in the shape means.' },
-          'duration', 'beats', 'sync', 'delay', 'repeat', 'pingpong', 'done',
+          'duration', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],
     scopes: 'any',
@@ -1189,6 +1219,11 @@ export const COMMANDS = [
           { name: 'placeholder', type: 'text', sample: '"Patch name"',
             summary: 'Grey hint text shown while the field is empty.' },
           'uiAccept', 'uiCancel', 'uiKind',
+          // Read by the dialog store for every shape, and listed so the check of option keys
+          // (panelRuntime.js) does not call a key that works unknown.
+          { name: 'default', type: 'text', default: 'the accept label', sample: '"Cancel"',
+            summary: 'Which of the two buttons is drawn as the default one: the accept label or the '
+              + 'cancel label. Pressing Enter in the field accepts either way.' },
         ]) },
       { name: 'onAnswer', type: 'function', required: false },
     ],
@@ -1924,21 +1959,8 @@ export const COMMANDS = [
     params: [
       { name: 'type', type: 'string', required: true },
       { name: 'props', type: 'object', required: false, fields: optionFields([
-        { name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-          summary: 'The control\'s name. Every other command addresses the control by this name.' },
-        { name: 'x', type: 'number', default: '0', unit: 'pixels',
-          summary: 'Distance from the left edge of whatever contains it.' },
-        { name: 'y', type: 'number', default: '0', unit: 'pixels',
-          summary: 'Distance from the top edge.' },
-        { name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-          summary: 'How wide to make it.' },
-        { name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-          summary: 'How tall to make it.' },
-        { name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"',
-          summary: 'The name of a container to put it inside.' },
-        { name: '<section>', type: 'object', group: 'any section',
-          summary: 'Any section of the control, to set up as you create it — for example '
-            + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses.' },
+        'controlName', 'controlX', 'controlY', 'controlWidth', 'controlHeight', 'controlParent',
+        'controlSection',
       ]) },
     ],
     scopes: 'any',
@@ -1953,7 +1975,12 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'name', type: 'string', required: true },
-      { name: 'props', type: 'object', required: false },
+      { name: 'props', type: 'object', required: false, fields: optionFields([
+        { like: 'controlName', default: 'the original\'s name with _copy added' },
+        'controlX', 'controlY', 'controlWidth', 'controlHeight',
+        { like: 'controlParent', default: 'the original\'s container' },
+        'controlSection',
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -2311,7 +2338,12 @@ export const COMMANDS = [
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'beats', type: 'number or division', required: true },
-      { name: 'opts', type: 'table', required: false },
+      // Typed 'table' with no fields, so the one option the summary describes was unchecked.
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'follow', type: 'true or false', default: 'true',
+          summary: 'Change the interval when the tempo changes. false keeps the interval the tempo '
+            + 'gave it when it started.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'syncTimer("${1:step}", 0.25)$0', javascript: 'syncTimer("${1:step}", 0.25);$0' },
@@ -2590,8 +2622,14 @@ export const COMMANDS = [
           summary: 'What a boolean sends when it is off.' },
         { name: 'cc', type: 'number', sample: '74', group: 'how it reaches the synth — pick one',
           summary: 'Send it as this CC number, 0 to 127. The simplest of the three wire formats.' },
+        // `fields` here are msb and lsb, which the check of option keys (panelRuntime.js) reads one
+        // level down: { mbs = 1 } was accepted and sent MSB 0.
         { name: 'nrpn', type: 'object', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as an NRPN, as { msb, lsb } or the two numbers as a list.' },
+          summary: 'Send it as an NRPN, as { msb, lsb } or the two numbers as a list.',
+          fields: [
+            { name: 'msb', type: 'number', summary: 'The parameter number\'s high byte (CC 99).' },
+            { name: 'lsb', type: 'number', summary: 'The parameter number\'s low byte (CC 98).' },
+          ] },
         { name: 'sysex', type: 'text or list', group: 'how it reaches the synth — pick one',
           summary: 'Send it as a SysEx message built from this template, a list or text such as '
             + '"F0 41 10 $value F7". Each entry is one byte, a number from 0 to 255 or one or two hex '
@@ -2618,6 +2656,13 @@ export const COMMANDS = [
         { name: 'variables', type: 'object',
           summary: 'Extra named bytes your SysEx template can refer to as $name, such as an address '
             + 'or a part number. Each is a number from 0 to 255, or one or two hex digits as text.' },
+        // Read by both runtimes (deviceDefinitions.js, ScriptRuntime::defineDeviceParameter) and
+        // listed nowhere, so the check of option keys would have called them unknown.
+        { name: 'length', type: 'number', default: '0',
+          summary: 'For a text parameter, how many characters it holds.' },
+        { name: 'pad', type: 'number', default: '32',
+          summary: 'For a text parameter, the character code that fills it out to `length` (32 is '
+            + 'a space).' },
       ]) },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2642,7 +2687,16 @@ export const COMMANDS = [
         { name: 'match', type: 'object', required: true,
           summary: 'How to recognise the reply, as { prefix, suffix } — the bytes a matching '
             + 'message starts and ends with, which may include $deviceId (16) and $channel (1). A '
-            + 'layout with no prefix is refused, because it would match every SysEx that arrives.' },
+            + 'layout with no prefix is refused, because it would match every SysEx that arrives.',
+          fields: [
+            { name: 'prefix', type: 'text or list', summary: 'The bytes a matching message starts with.' },
+            { name: 'suffix', type: 'text or list', summary: 'The bytes a matching message ends with.' },
+          ] },
+        // Both runtimes read these at the top level when `match` does not give them.
+        { name: 'prefix', type: 'text or list',
+          summary: 'The same as `match.prefix`, used when `match` does not give one.' },
+        { name: 'suffix', type: 'text or list',
+          summary: 'The same as `match.suffix`, used when `match` does not give one.' },
         { name: 'offset', type: 'number', default: '0',
           summary: 'How many bytes in from the start of the message the values begin.' },
         { name: 'size', type: 'number', default: 'whatever is left', sample: '256',

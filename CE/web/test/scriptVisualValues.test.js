@@ -211,24 +211,27 @@ test('a property that is not a colour is left alone, whatever it is called', () 
 /* ========================================================================== ce.panel.patch */
 
 test('ce.panel.patch refuses an unreadable colour as set() does, and the whole patch with it', () => {
+  // On the Button, which has a Background to patch (a Knob draws through its parts and has none,
+  // so a patch of its Background leads nowhere, which ce.panel.patch reports on its own).
   withControls((api) => {
-    api.panelDefine('K', 'States', 'Hot', {});
+    api.panelDefine('B', 'States', 'Hot', {});
     clearScriptTrace();
-    api.panelPatch('K', 'Hot', { 'Background.Fill.colour': '#000', 'Transform.opacity': 60 });
-    assert.deepEqual(errors(), ['ce.panel.patch("K", "Hot"): at "Background.Fill.colour", "#000" is not a '
+    api.panelPatch('B', 'Hot', { 'Background.Fill.colour': '#000', 'Transform.opacity': 60 });
+    assert.deepEqual(errors(), ['ce.panel.patch("B", "Hot"): at "Background.Fill.colour", "#000" is not a '
       + `colour the panel can read, so nothing was patched. ${FORMS} Write "#000000".`]);
-    assert.deepEqual(api.panelEntry('K', 'States', 'Hot').patches?.component ?? {}, {},
+    assert.deepEqual(api.panelEntry('B', 'States', 'Hot').patches?.component ?? {}, {},
       'the state is as it was: nothing from the refused patch landed');
     // A part's patch is typed by the part's sections, or by the templates when it has none.
+    api.panelDefine('K', 'States', 'Hot', {});
     clearScriptTrace();
     api.panelPatch('K', 'Hot', { 'Background.Fill.colour': 'red' }, 'cap');
     assert.equal(errors().length, 1);
     assert.match(errors()[0], /^ce\.panel\.patch\("K", "Hot"\): at "Background\.Fill\.colour", "red" is not/);
     // What the panel reads goes in as written.
     clearScriptTrace();
-    api.panelPatch('K', 'Hot', { 'Background.Fill.colour': '#000000' });
+    api.panelPatch('B', 'Hot', { 'Background.Fill.colour': '#000000' });
     assert.deepEqual(errors(), []);
-    assert.equal(api.panelEntry('K', 'States', 'Hot').patches.component['Background.Fill.colour'], '#000000');
+    assert.equal(api.panelEntry('B', 'States', 'Hot').patches.component['Background.Fill.colour'], '#000000');
   });
 });
 

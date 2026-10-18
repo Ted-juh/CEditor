@@ -725,7 +725,8 @@ int main()
         ruleHost.sendCC (1, 200, juce::var (5));
         ruleHost.sendCC (2, 7, juce::var ("loud"));
         ruleHost.sendCC (2, 7, juce::var (64.5));
-        check (out.joinIntoString (" | ") == "cc 2 7 65", "the host passes a valid CC on, rounded (got " + out.joinIntoString (" | ") + ")");
+        ruleHost.sendCC (2, 7, juce::var (" 64 "));   // text that is a number, as a script may pass
+        check (out.joinIntoString (" | ") == "cc 2 7 65 | cc 2 7 64", "the host passes a valid CC on, rounded (got " + out.joinIntoString (" | ") + ")");
         check (logs.joinIntoString (" | ") ==
                    "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
                    "sendCC: \"loud\" is not a value, so nothing was sent. A value is a number from 0 to 127.",
