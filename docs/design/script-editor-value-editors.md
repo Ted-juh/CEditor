@@ -5,8 +5,9 @@ Status: **proposal, nothing built.** 2026-10-18.
 It started as a question about colour. A script's colours are typed out as hex, so why is there no
 swatch beside them that opens the display panel's colour and gradient editors? Colour turned out to
 be one case of something more general, and the decisions are in the general part. So this record
-takes the general shape first, then works colour and gradient through as the example, then lists
-the other kinds of value with what each would need.
+takes the general shape first, with the kinds at a glance and what looking into them showed. It
+then works colour and gradient through as the example, lists the other kinds of value with what
+each would need, and ends with fifteen examples in script form.
 
 Where this names a file or a line, it was read in the tree on that date. Anything not built yet is
 described as a proposal.
@@ -26,6 +27,85 @@ is that the editor recognises such a value and then:
 
 The script stays the truth. The editor only ever changes characters in it, through the same edit
 path as typing.
+
+## The kinds at a glance
+
+Grouped by how you would change each one. [The other kinds](#the-other-kinds) has the detail, and
+[Examples](#examples) shows each one in a script.
+
+**Values that need a picture to choose, so they open a tab in the display panel**
+
+- **Colours** open the Colors tab.
+- **Gradients** (`ce.draw.gradient`) open the Gradient tab.
+- **Easing curves** (`curve = "outBack"`, or four numbers) open the Animation tab's curve editor.
+  Its curve picture and editor already work on their own, and the API documentation already says
+  the script and the tab use the same four numbers.
+- **Font families** (`ce.text.style`, `ce.draw.measure`, `ce.text.font`) open the Text tab's family
+  list, where each row is set in its own face.
+- **Images and icons** (`ce.image.asset`) get a thumbnail and open the Assets tab.
+
+**Values chosen from a fixed list, so they use the editor's own completion list**
+
+- Note divisions, scales, chords, event names and a control's animation names.
+- The 16 parameters whose allowed values the API already lists, such as blend modes, line caps and
+  image fit.
+- Control names and property paths.
+
+The completion list (Ctrl+Space) reopens over a value that is already there and offers the
+alternatives. That adds no pop-up, which keeps the recorded rule that colour editing happens only in
+the display panel.
+
+**Numbers with a known unit and range, so you drag them**
+
+- Angles, milliseconds and opacity, by Alt-drag in place, with the drag code the app already has.
+
+**Values worth reading and checking but not editing**
+
+- **SysEx**: the bytes that will actually be sent, and the checksum where it can be known.
+- **Note numbers**: `60` reads as C4, and `"C4"` as 60.
+- **Device parameters**: the range and the CC number.
+
+**Not worth doing:** true/false values, free text such as labels and log messages, and numbers with
+no unit or range.
+
+## What looking into it showed
+
+1. **The checks may matter more than the editors.** Several mistakes in a script fail with no
+   error at all. Each of these was traced through the WebView runtime (`panelRuntime.js`) on this
+   date:
+   - `ce.midi.sendNote(1, "c4", 100)` plays note 0, C-1. The name parser wants a capital letter
+     (`noteNumber`, `panelRuntime.js:1775`), and `sendNote` turns a name it cannot read into 0
+     (`midiNote`, `panelRuntime.js:2133`).
+   - `ce.midi.sendSysex("F0411000")` sends `F0 FF F7`. Hex text is split on spaces and commas, so
+     the whole string is read as one number, clamped to 255, then framed (`toByteArray`,
+     `panelRuntime.js:2049`).
+   - `ce.time.step(beats, "1/8t")` returns nothing, because divisions are case-sensitive: the
+     table spells it `"1/8T"`.
+   - `ce.draw.image("knob-cap", …)` draws nothing, because it wants the image data and not an
+     asset's name.
+   - A Roland SysEx template with `$checksum` and no `$checksumStart` sums the header as well, and
+     *"a message the synth rejects silently"* is the result (`deviceDefinitions.js:224`).
+
+   Others do report themselves, but only when the script runs: `ce.draw.blend` with an unknown mode
+   and `ce.text.style` with a font that is not available. A check moves the same message to the
+   moment it is typed. The checks for lists of names are also the cheapest to build, which makes
+   them the best next step after colour. The silent ones could also be reported by the runtime
+   itself. The editor's check does not replace that.
+2. **A value is recognised by where it is, not by what it looks like.** `"F0411000"` is a colour
+   when it is set on a property and SysEx when it is passed to `sendSysex`. So the order is: what
+   the API says that argument is, then a property path or key name, and only then the text itself.
+   Only `#RRGGBB` is clear enough to recognise on its own.
+3. **The API description needs work first.** It calls most of these parameters `string`. One
+   parameter is typed `colour`. Scales and divisions have their own tables, and the parameters do
+   not point at them. Units are uneven too. `ce.draw.arc`'s angles are degrees in the summary and
+   carry no `unit`, and two neighbouring commands read `opacity` on different scales:
+   `ce.image.set` from 0 to 100 and `ce.image.icon` from 0 to 1. So for most kinds the first change
+   is giving parameters real types and units in `panelApi.js`. That also improves the scripting
+   manual, completion and checking, which all read the same description.
+4. **One set of editing rules covers every kind.** The script stays the truth, and only its text
+   changes. A drag writes once, when you let go, because with Live on every change resets the
+   script's running state and could fire handlers that send MIDI. Cancel puts the original text
+   back exactly. The Animation tab's curve editor already works this way.
 
 ## What there is to build on
 
@@ -246,6 +326,249 @@ One table, then notes on the kinds where there is something more to say.
   properties panel is the natural extra.
 - **SysEx is to read and check, not to edit.** A byte string with its checksum checked, and the
   algorithm named by the `checksum` call beside it, is worth more than any editor for it.
+
+## Examples
+
+Each example is a few lines of script as someone would write them today, followed by what the
+editor would mark, explain, check and write. The examples are in Lua unless the JavaScript differs
+in a way that matters. The hover and check wording is proposed. The behaviour it describes is the
+runtime's, traced on this date.
+
+### 1. One hex string, two readers
+
+```lua
+function onDraw(info)
+  ce.draw.clear()
+  ce.draw.fill("#5B9BD580")
+  ce.draw.rect(0, 0, info.width, info.height)
+end
+
+ce.core.set("Cutoff.Background.Fill.colour", "#5B9BD580")
+```
+
+- **Line 3** is tinted blue at half strength over a checker. `ce.draw` hands the string to CSS,
+  which reads the last pair, `80`, as alpha.
+- **Line 7** is tinted green, `#9BD580`, because a property reads the last six digits. Hover:
+  *"A panel colour reads the last six digits: 9BD580. A see-through property colour is AARRGGBB,
+  "805B9BD5", which ce.math.alpha("#5B9BD5", 0.5) builds."* The same text is a warning in the
+  diagnostics.
+- **Editing.** The gutter swatch opens the Colors tab. Line 3 is written back as `#RRGGBBAA`,
+  because CSS reads that alpha. Line 7 is written back as `AARRGGBB`. This is the one case where an
+  edit changes the form, because the original form could not say what it meant.
+
+### 2. The same characters, three meanings
+
+```lua
+ce.midi.sendSysex("F0411000")
+ce.core.set("Pad1.Background.Fill.colour", "F0411000")
+ce.core.log("F0411000")
+```
+
+- **Line 1 is SysEx**, because `sendSysex`'s parameter is typed `bytes`, and the schema is asked
+  first. Hover: *"Sent as F0 FF F7. Hex without spaces is read as one number. Separate the bytes:
+  "F0 41 10 00"."* That is an error-level check, because the message that goes out is not the one
+  written.
+- **Line 2 is a colour**, from the path's last segment. The tint is a very dark red at 94% opacity
+  (alpha `F0`, colour `411000`).
+- **Line 3 is nothing.** `log` takes free text, and no kind claims it.
+
+### 3. The panel file view
+
+```json
+"Fill": {
+  "colour": "FF5B9BD5",
+  "gradient": {
+    "type": "linear", "angle": 90,
+    "stops": [ { "color": "FFFFFF", "position": 0 }, { "color": "000000", "position": 100 } ]
+  }
+}
+```
+
+There is no API call here, only keys. `colour` and the stops' `color` match `colou?r|tint`, the
+pattern `documentColours.js` uses, so all three values are tinted and each opens the Colors tab.
+The `gradient` key gives the whole object a gutter strip, which opens the Gradient tab with every
+control it has, because this is a stored gradient and not a `ce.draw` one.
+
+### 4. A gradient with no angle
+
+```lua
+ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "#0A1830" }))
+```
+
+- **Mark.** A gutter strip running top to bottom, because the runtime's default angle is 180.
+- **Editing.** The Gradient tab opens at 180, not at its own default of 90, and with the radial
+  controls hidden. Turning it to 135 and adding a stop at 30% writes:
+
+  ```lua
+  ce.draw.fill(ce.draw.gradient({
+    { at = 0, colour = "#2A6BD4" }, { at = 0.3, colour = "#5B9BD5" }, { at = 1, colour = "#0A1830" },
+  }, 135))
+  ```
+
+  ```javascript
+  ce.draw.fill(ce.draw.gradient([
+    { at: 0, colour: "#2A6BD4" }, { at: 0.3, colour: "#5B9BD5" }, { at: 1, colour: "#0A1830" },
+  ], 135));
+  ```
+
+- **Form.** Once the stops are evenly spaced again, they are written back as bare colours. A stop
+  that had `opacity = 0.5` keeps it, because the tab has no such field to change it with.
+
+### 5. A computed value gets no editor
+
+```lua
+local base = "#2A6BD4"
+ce.draw.fill(ce.draw.gradient({ base, ce.math.darken(base) }, 180))
+```
+
+- **Line 1** gets a swatch. That is where `base` is edited, and both stops follow when the script
+  runs.
+- **Line 2** gets no strip, because its second colour only exists at run time. An editor here would
+  have to choose between overwriting the expression and editing nothing.
+
+### 6. An easing curve, and a duration in milliseconds
+
+```lua
+ce.anim.to("cutoff", 127, { duration = 500, curve = "outBack" })
+```
+
+- **`"outBack"`** gets a gutter curve (`EasingCurve`), overshoot included. Ctrl/Cmd-click opens
+  the Animation tab's `BezierEditor` at outBack's numbers, `0.175, 0.885, 0.32, 1.275`
+  (`utils/easing.js:38`). Dragging a handle writes four numbers, `curve = { 0.2, 0.9, 0.3, 1.4 }` in
+  Lua and `curve: [0.2, 0.9, 0.3, 1.4]` in JavaScript, and writes a name back if the numbers land on
+  a named curve. Through the completion list, the value can also be swapped for any other name in
+  `ANIM_CURVE_NAMES`.
+- **Typing `"outBak"`** gets a warning: *"Not a curve name. The move would run in a straight
+  line."* The runtime reports the same thing, but only when the move starts.
+- **`500`** is a number in milliseconds (`duration` carries `unit: 'milliseconds'`). Hover: *"500 ms,
+  1 beat at the current 120 BPM"*, using `ce.time.msToBeats`. Alt-drag changes it in steps of 10 ms.
+
+### 7. Note names: the silent C-1
+
+```lua
+ce.midi.sendNote(1, "c4", 100, 250)
+local triad = ce.music.chord("C4", "major")
+```
+
+- **`"c4"`** gets an error: *"Not a note name the runtime reads (the letter must be a capital).
+  This sends note 0, C-1."* Completion offers `"C4"`.
+- **`"C4"`** on line 2 has hover text: *"MIDI note 60, middle C"*. A number in the same place, `48`,
+  reads *"C3"*.
+- **No editor** for a single note. A `MiniKeys` keyboard to pick one from is possible, but typing a
+  name is as fast and is the thing being checked.
+
+### 8. Divisions and scales
+
+```lua
+local step = ce.time.step(beats, "1/8t")
+local notes = ce.music.scale("C3", "harmonicMinr")
+```
+
+- **`"1/8t"`** gets a warning: *"Not a division (they are case-sensitive). ce.time.step returns
+  nothing."* Completion lists the fourteen, each with its label from `DIVISION_LABELS`: *1/8T, 8th
+  T*.
+- **`"harmonicMinr"`** gets the same kind of check against `SCALE_NAMES`, and the same consequence:
+  `ce.music.scale` returns nothing for a scale it does not know.
+- **Hover on `"harmonicMinor"`**, once it is spelled right, lists the notes from C3: *C D E♭ F G A♭
+  B*.
+
+### 9. A fixed list
+
+```lua
+ce.draw.blend("multipy")
+```
+
+Today this is refused when the script runs, with a console message listing the twelve modes, and
+returns false. The check says the same thing as it is typed, and completion over the value offers
+the twelve. The list is held twice, in the schema (`panelApi.js:1573`) and in the runtime
+(`panelRuntime.js:6909`). The check reads the schema, so the two copies need a test that keeps them
+equal.
+
+### 10. A font family
+
+```lua
+ce.text.style("Title", { family = "Inter Tigt", size = 18 })
+```
+
+- **Mark.** A gutter "Aa", drawn in the family's own face, or in the fallback face with a warning
+  when no such font is available: *"Not an available font. ce.text.style will refuse it."*
+- **Editing.** The "Aa" opens the Text tab's family list. Picking a family writes
+  `family = "Inter Tight"`.
+- **`size = 18`** is in pixels (the option carries `unit: 'pixels'`) and can be Alt-dragged in
+  whole pixels.
+
+### 11. An image: a name or the data
+
+```lua
+ce.draw.image("knob-cap", 0, 0, 32, 32)
+local cap = ce.image.asset("knob-cap")
+```
+
+- **Line 1** gets a warning: *"An asset's name draws nothing here: ce.draw.image wants the image
+  data. Use ce.image.asset("knob-cap").dataUrl."*
+- **Line 2** gets a gutter thumbnail when the library or the panel has an image of that name, and a
+  warning when neither has. Clicking the thumbnail opens the Assets tab, and choosing another image
+  writes its name.
+
+### 12. Two scales for one word
+
+```lua
+ce.image.set("Logo", logoData, { opacity = 0.5 })
+ce.image.icon("Badge", "star", { opacity = 0.5 })
+```
+
+- **Line 1** is on the 0 to 100 scale. Hover: *"0.5 of 100: almost invisible. Did you mean 50?"*,
+  as a warning.
+- **Line 2** is on the 0 to 1 scale, so 0.5 is half.
+- **Alt-drag** reads each option's own `unit`, so the first moves in whole numbers up to 100 and the
+  second in hundredths up to 1. None of this works unless the unit is in the schema. Here it is.
+
+### 13. Angles the schema does not know are angles
+
+```lua
+ce.draw.arc(cx, cy, 40, -135, 135)
+```
+
+`from` and `to` are degrees, with 0 at twelve o'clock and increasing clockwise, but only the
+summary says so: the parameters carry no `unit`. Until they do, these are plain numbers and get no
+drag. Step zero for this kind is one line in `panelApi.js` per parameter. After that, Alt-drag
+moves them in whole degrees, and hover says where 0 is.
+
+### 14. Controls, paths and animation names
+
+```lua
+ce.panel.keep("Cuttoff.Background.Fill.colour")
+ce.anim.play("Cutoff", "Pluse")
+```
+
+- **`"Cuttoff…"`** gets a warning: *"No control named Cuttoff. Did you mean Cutoff?"* Completion
+  over a path works one segment at a time: control, then section, then property. Today the
+  console reports *control "Cuttoff" not found* when the script runs, and `ce.panel.keep` returns
+  false. The check gives the same message while typing.
+- **`"Cutoff"`** on line 2 is underlined, and Ctrl/Cmd-click selects that control on the canvas.
+- **`"Pluse"`** is checked against the keyframe animations `Cutoff` actually has, and completion
+  offers those names. Today, `ce.anim.play` returns false when the script runs.
+
+### 15. A SysEx template and where its checksum starts
+
+```lua
+ce.device.defineParameter("level", {
+  name = "Level", min = 0, max = 127,
+  sysex = { "F0", "41", "10", "42", "12", "$checksumStart", "40", "01", "33", "$value", "$checksum", "F7" },
+  checksum = "roland-7bit",
+})
+```
+
+- **Hover on the template** shows the message the synth would receive, built by the same encoder
+  the runtime uses (`encodeParameter`, `deviceDefinitions.js`): *"At 0, 64 and 127: … F0 41 10 42
+  12 40 01 33 40 4C F7 …"*. The checksum of address and data for 64 is `4C`.
+- **Remove `"$checksumStart"`** and the sum starts right after `F0`, header included, which gives
+  `27`. The check: *"A Roland checksum covers the address and data only. Without $checksumStart
+  this one includes the header, and the synth will ignore the message."* Here a check really does
+  matter more than an editor would.
+- **A bare literal**, such as `sendSysex("F0 41 10 42 12 40 00 7F 00 41 F7")` (the GS reset),
+  does not say where its checksum starts. So the editor shows the bytes as sent and leaves the
+  checksum alone. The template form is the one that says.
 
 ## Rules every edit session follows
 
