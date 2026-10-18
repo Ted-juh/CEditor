@@ -5713,8 +5713,51 @@ function controlSummary(control, controls) {
   };
 }
 
+// What ce.panel.find filters on, and what each takes. A key it did not know used to filter nothing,
+// so { Type = "Knob" }, { kind = "Knob" } and { generated = "true" } all answered with every control
+// on the panel, which a script then went on to change.
+const FIND_FILTERS = { name: 'string', type: 'string', generated: 'boolean', parent: 'string' };
+const FIND_TAKES = { string: 'text', boolean: 'true or false' };
+
+/** How a value reads in a message about a script's mistake. */
+function shownValue(v) {
+  if (typeof v === 'string') return `"${v}"`;
+  if (v === undefined || v === null) return 'nothing';
+  if (typeof v === 'object') return Array.isArray(v) ? 'a list' : 'a table';
+  return String(v);
+}
+
+/** Why a find query cannot be answered, or null. */
+function findQueryProblem(query) {
+  const filters = `Its filters are: ${Object.keys(FIND_FILTERS).join(', ')}.`;
+  if (query == null || typeof query === 'string') return null;
+  // A Lua list, { "Knob" }, arrives as { 1: "Knob" }: it is a list, not a filter called "1".
+  const queryKeys = isOptionsTable(query) ? Object.keys(query) : [];
+  const listQuery = queryKeys.length > 0 && queryKeys.every((key) => LIST_KEY.test(key));
+  if (!isOptionsTable(query) || listQuery) {
+    return `the query is ${listQuery ? 'a list' : shownValue(query)}, not part of a name or a table of filters, so nothing was found. ${filters}`;
+  }
+  const unknown = Object.keys(query).filter((key) => !(key in FIND_FILTERS));
+  if (unknown.length) {
+    const quoted = andList(unknown.map((key) => `"${key}"`));
+    return `${quoted} ${unknown.length === 1 ? 'is not one of its filters' : 'are not among its filters'}, `
+      + `so nothing was found. ${filters}`;
+  }
+  for (const [key, type] of Object.entries(FIND_FILTERS)) {
+    const v = query[key];
+    if (v === undefined || v === null || typeof v === type) continue;
+    return `${key} takes ${FIND_TAKES[type]}, not ${shownValue(v)}, so nothing was found.`;
+  }
+  return null;
+}
+
 function panelFindImpl(query) {
   const controls = activePanel()?.controls ?? [];
+  const problem = findQueryProblem(query);
+  if (problem) {
+    addScriptTrace('error', '', `ce.panel.find: ${problem}`);
+    return [];
+  }
   const q = typeof query === 'string' ? { name: query } : (query ?? {});
   return flatControls(controls)
     .map((c) => ({ control: c, info: controlSummary(c, controls) }))
@@ -5846,7 +5889,12 @@ function panelAlignImpl(names, edge, opts) {
   // which is what the canvas calls a key object.
   const keyName = opts?.to != null ? String(opts.to) : null;
   const key = keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null;
-  if (keyName && !key) addScriptTrace('error', '', `ce.panel.align: "${keyName}" is not one of the names given.`);
+  // Refused rather than lining up on the group instead: "line these up on that one" done against
+  // something else is a layout the script did not ask for, and it would have to undo it by hand.
+  if (keyName && !key) {
+    addScriptTrace('error', '', `ce.panel.align: "${keyName}" is not one of the names given, so nothing was moved.`);
+    return 0;
+  }
   const ref = key ? { x: key.x, y: key.y, width: key.width, height: key.height } : boundsOf(transforms);
   const patches = new Map();
   for (const t of transforms) {
@@ -5881,9 +5929,16 @@ function panelMatchImpl(names, what, opts) {
   }
   const transforms = panelTransforms(names, 'match');
   if (transforms.length < 2) return 0;
-  // The first name is the reference unless one is named, which is the canvas's rule too.
+  // The first name is the reference unless one is named, which is the canvas's rule too. A name that
+  // is not in the list used to fall back to the first, silently, and every other control took the
+  // wrong size; it is refused, in align's words.
   const keyName = opts?.to != null ? String(opts.to) : null;
-  const key = (keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null) ?? transforms[0];
+  const named = keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null;
+  if (keyName && !named) {
+    addScriptTrace('error', '', `ce.panel.match: "${keyName}" is not one of the names given, so nothing was resized.`);
+    return 0;
+  }
+  const key = named ?? transforms[0];
   const patches = new Map();
   for (const t of transforms) {
     if (t.id === key.id) continue;                       // the reference does not resize itself
@@ -6125,6 +6180,31 @@ const COLLECTION_TEMPLATES = {
     }),
 };
 
+// What a state carries: the template's fields and `rule`, the compound condition evaluateState reads
+// beside `when` (utils/interactionRuntime.js). A spec key outside these was stored as written and
+// read by nothing, so define("k", "States", "Warn", { wen = { hover = true } }) made a state with no
+// condition at all, which is a state that always applies. `patches` holds two maps, by name.
+const STATE_FIELDS = ['name', 'group', 'description', 'enabled', 'when', 'rule', 'patches'];
+const STATE_PATCH_MAPS = ['component', 'parts'];
+
+/** Why a States spec cannot be defined as given, or null. */
+function stateSpecProblem(spec) {
+  const unknown = Object.keys(spec).filter((key) => key !== '_type' && !STATE_FIELDS.includes(key));
+  const patches = isOptionsTable(spec.patches) ? spec.patches : null;
+  const unknownMaps = patches ? Object.keys(patches).filter((key) => !STATE_PATCH_MAPS.includes(key)) : [];
+  if (unknown.length) {
+    const quoted = andList(unknown.map((key) => `"${key}"`));
+    return `${quoted} ${unknown.length === 1 ? 'is not one of the fields a state has' : 'are not among the fields a state has'}, `
+      + `so nothing was defined. A state's fields are: ${STATE_FIELDS.join(', ')}.`;
+  }
+  if (unknownMaps.length) {
+    const quoted = andList(unknownMaps.map((key) => `"patches.${key}"`));
+    return `${quoted} ${unknownMaps.length === 1 ? 'is not one of the maps patches holds' : 'are not among the maps patches holds'}, `
+      + `so nothing was defined. patches holds: ${STATE_PATCH_MAPS.join(', ')}.`;
+  }
+  return null;
+}
+
 /** Resolve (control, section) with the section name matched case-insensitively, as paths are. */
 function collectionNode(controlName, section, verb) {
   const control = controlNamed(controlName);
@@ -6176,6 +6256,11 @@ function panelDefineImpl(controlName, section, name, spec) {
   }
 
   const given = spec && typeof spec === 'object' && !Array.isArray(spec) ? spec : {};
+  const problem = found.key === 'States' ? stateSpecProblem(given) : null;
+  if (problem) {
+    addScriptTrace('error', '', `ce.panel.define("${controlName}", "States", "${key}"): ${problem}`);
+    return false;
+  }
   const template = COLLECTION_TEMPLATES[found.key]?.(key, given) ?? { _type: found.key.replace(/s$/, '') };
   const entry = { ...template, ...given, name: given.name ?? key };
   // One level of merge for the nested shapes a template carries, so a spec that names only
@@ -6252,28 +6337,81 @@ function panelPatchImpl(controlName, stateName, patch, part) {
 
   const state = kids[key];
   const target = String(part ?? '');
+  // The keys are paths into the control, or into the part a part patch names. A part the control
+  // does not have was stored anyway, and the renderer skips a part it cannot find.
+  const partNames = Object.keys(found.control._children?.Parts?._children ?? {});
+  const partKey = target ? partNames.find((p) => p.toLowerCase() === target.toLowerCase()) : null;
+  if (target && partKey == null) {
+    addScriptTrace('error', '',
+      `ce.panel.patch: "${controlName}" has no part called "${target}", so nothing was applied. `
+      + (partNames.length ? `Its parts are ${partNames.join(', ')}.` : 'It has no parts.'));
+    return 0;
+  }
+  const node = partKey != null ? found.control._children.Parts._children[partKey] : found.control;
+  const owner = partKey != null ? `part "${partKey}"` : `"${controlName}"`;
+
+  // Each key is checked before anything is written, and only what lands is counted. A misspelled
+  // key or a nested table used to be stored as written and counted, so the call answered 1 for a
+  // change the panel never showed.
+  const applied = [];
+  const entriesList = Object.entries(entries);
+  for (const [path, value] of entriesList) {
+    const where = patchKeyPath(node, String(path), value, owner);
+    if (where.why) {
+      addScriptTrace('error', '', `ce.panel.patch("${controlName}", "${key}"): ${where.why}, so it was not applied.`);
+      continue;
+    }
+    applied.push([where.path, value]);
+  }
+  if (!applied.length) return 0;
+
   const base = state.patches ?? (state.patches = { component: {}, parts: {} });
   let map;
-  if (target) {
+  if (partKey != null) {
     base.parts ??= {};
-    base.parts[target] ??= {};
-    map = base.parts[target];
+    base.parts[partKey] ??= {};
+    map = base.parts[partKey];
   } else {
     base.component ??= {};
     map = base.component;
   }
-
-  let n = 0;
-  for (const [path, value] of Object.entries(entries)) {
-    map[String(path)] = value;
-    n += 1;
-  }
+  for (const [path, value] of applied) map[path] = value;
   // Written back through the same door every structure write uses, so the editor store and the
   // player host both see it — mutating the node in place would move the object and not the panel.
   writeControlProperty(found.control, `States.${key}.patches`, base);
+  const n = applied.length;
   addScriptTrace('log', '',
-    `ce.panel.patch ${controlName}.${key}${target ? `.parts.${target}` : ''}: ${n} key(s)`);
+    `ce.panel.patch ${controlName}.${key}${partKey != null ? `.parts.${partKey}` : ''}: `
+    + (n === entriesList.length ? plural(n, 'key') : `${n} of ${plural(entriesList.length, 'key')} applied`));
   return n;
+}
+
+/**
+ * Where one patch key leads on `node` (the control, or one of its parts): `{ path }`, the key with
+ * the node's own capitals, which is how the renderer looks it up (setTreeValueAtPath walks exact
+ * keys); or `{ why }` it leads nowhere. Matched without regard to capitals, as every path is.
+ *
+ * Refused: a path that reaches nothing, a section rather than one setting in it (which is what a
+ * nested table is: `{ Background = { Fill = … } }` is one key, "Background", and would have replaced
+ * the whole section in that state), and a property its section's type does not have. A path through
+ * a section nobody has edited yet (an effect's) is checked against its template.
+ */
+function patchKeyPath(node, path, value, owner) {
+  const segs = path.split('.');
+  const real = walkCaseInsensitive(node, segs);
+  if (real != null) {
+    const at = valueAtPath(node, real);
+    if (at && typeof at === 'object' && !Array.isArray(at) && (at._type !== undefined || at._children !== undefined)) {
+      return { why: `"${path}" is a section, not one setting in it. Name each setting by its whole path, such as "Background.Fill.colour"` };
+    }
+    return { path: real };
+  }
+  if (segs.length > 1) {
+    const probe = probeNestedWrite(node, path, value);
+    if (probe.writes && !(probe.fresh && probe.typed)) return { path };
+    if (probe.writes) return { why: `"${path}" is not a property of its section on ${owner}` };
+  }
+  return { why: `"${path}" does not lead anywhere on ${owner}` };
 }
 
 /**

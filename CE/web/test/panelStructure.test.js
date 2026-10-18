@@ -172,6 +172,37 @@ test('find narrows by name, type, parent and generated', () => {
   });
 });
 
+test('find refuses a filter it does not know, or a value of the wrong kind, rather than finding everything', () => {
+  // Each of these filtered nothing and answered with every control on the panel, which the script
+  // then went on to move, recolour or destroy.
+  const panel = panelWith([createControl('Knob', { name: 'k1' }), createControl('Label', { name: 'l1' })]);
+  withPanel(panel, (api) => {
+    const refused = (query, message) => {
+      clearScriptTrace();
+      assert.deepEqual(api.panelFind(query), [], `find(${JSON.stringify(query)}) found something`);
+      const errors = get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+      assert.deepEqual(errors, [message]);
+    };
+    const filters = 'Its filters are: name, type, generated, parent.';
+    refused({ Type: 'Knob' }, `ce.panel.find: "Type" is not one of its filters, so nothing was found. ${filters}`);
+    refused({ kind: 'Knob', parnt: 'row' },
+      `ce.panel.find: "kind" and "parnt" are not among its filters, so nothing was found. ${filters}`);
+    refused({ generated: 'true' }, 'ce.panel.find: generated takes true or false, not "true", so nothing was found.');
+    refused({ type: 5 }, 'ce.panel.find: type takes text, not 5, so nothing was found.');
+    refused(42, `ce.panel.find: the query is 42, not part of a name or a table of filters, so nothing was found. ${filters}`);
+    // A Lua list arrives as an object of numbered keys, and is called a list, not filter "1".
+    refused({ 1: 'Knob' }, `ce.panel.find: the query is a list, not part of a name or a table of filters, so nothing was found. ${filters}`);
+    refused(['Knob'], `ce.panel.find: the query is a list, not part of a name or a table of filters, so nothing was found. ${filters}`);
+
+    // What it understands still works, and an empty table is no filter at all.
+    clearScriptTrace();
+    assert.deepEqual(api.panelFind({ type: 'Knob' }), ['k1']);
+    assert.deepEqual(api.panelFind({}).sort(), ['k1', 'l1']);
+    assert.deepEqual(api.panelFind({ name: 'l' }), ['l1']);
+    assert.equal(get(scriptTrace).filter((t) => t.kind === 'error' || t.kind === 'warn').length, 0);
+  });
+});
+
 test('destroy removes a control and everything inside it', () => {
   const panel = panelWith();
   withPanel(panel, (api) => {

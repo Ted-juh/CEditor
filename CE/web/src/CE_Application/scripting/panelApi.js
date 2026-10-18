@@ -1982,14 +1982,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelFind', category: 'Panel structure', signature: 'panelFind([query])',
-    summary: 'List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control.',
+    summary: 'List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'query', type: 'object', required: false, fields: optionFields([
       { name: 'name', type: 'text', sample: '"osc"', summary: 'Match controls whose name contains this.' },
       { name: 'type', type: 'text', sample: '"Knob"', summary: 'Match one kind of control, such as "Knob". '
         + 'ce.panel.types() lists the spellings.' },
       { name: 'generated', type: 'true or false',
-        summary: 'Match only controls a script created, or only ones you placed by hand.' },
+        summary: '`true` matches only controls a script created, `false` only the ones you placed '
+          + 'by hand. The text "true" is refused.' },
       { name: 'parent', type: 'text', sample: '"row1"',
         summary: 'Match only what is inside the container of this name.' },
     ]) }],
@@ -2039,7 +2040,7 @@ export const COMMANDS = [
      back through it, exactly as the canvas does. */
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
-    summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead. Returns how many controls it moved. Names that are not controls are reported and skipped.',
+    summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2081,7 +2082,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelMatch', category: 'Panel structure', signature: 'panelMatch(names, what [, opts]) -> number',
-    summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. Needs at least two controls. Returns how many controls changed.',
+    summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2209,7 +2210,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. Returns true if the entry was written.',
+    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. For a state, a key other than name, group, description, enabled, when, rule and patches (whose maps are component and parts) is refused and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2240,7 +2241,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. A colour the panel cannot read is refused as `set()` refuses it, and then nothing in the patch is applied. This is the way to reach the settings inside a state, which `set()` cannot.',
+    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. A colour the panel cannot read is refused as `set()` refuses it, and then nothing is applied. This reaches the settings inside a state, which `set()` cannot.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
