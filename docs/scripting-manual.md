@@ -880,7 +880,7 @@ The commands nearly every script uses: reading and changing values, deciding whe
 
 #### `set(path, value [, opts])`
 
-Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; with the panel open, anything else is refused with a message and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.
+Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". With the panel open, "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), which `get()` returns; a number, "#" with four digits and anything else are refused with a message, and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.
 
 **`opts`** can contain:
 
@@ -2734,7 +2734,7 @@ ce.panel.undefine("knob", "States", "Disabled");
 
 #### `ce.panel.patch(control, state, patch [, part])`
 
-Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. A colour the panel cannot read is refused as `set()` refuses it, and then nothing is applied. This reaches the settings inside a state, which `set()` cannot.
+Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.
 
 *Short name: `panelPatch` · Panel window only.*
 
@@ -3362,7 +3362,7 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit. One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
 | `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens. One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
 | `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
-| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. Any other form is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
+| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
 | `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only. One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
 | `offsetX` | number (pixels) | 0 | Nudge the image sideways. |
@@ -3402,7 +3402,7 @@ Show an image from the icon library (or one the panel carries) in a control's Ic
 |---|---|---|---|
 | `size` | number (pixels) | 16 | How big the icon is drawn. |
 | `fit` | text | "contain" | How the icon fills its box, using the Icon section's own values. |
-| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. Any other form is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
+| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
 | `opacity` | number (0 to 1) | 1 | Image opacity. 0 is invisible, 1 is fully opaque. A value above 1, such as 50 written for ce.image.set's scale, draws fully opaque and writes a warning. |
 | `rotation` | number (degrees) | 0 | Turn the image clockwise, with 0 upright. |
 
