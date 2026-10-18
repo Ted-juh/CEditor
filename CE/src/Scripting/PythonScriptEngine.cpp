@@ -2387,18 +2387,24 @@ def __7(v):
     import math
     v = math.floor(v or 0)
     return 0 if v < 0 else (127 if v > 127 else v)
-# noteNumber is None for an unreadable name; a MIDI message still needs a BYTE, so it becomes 0
-# here rather than a None slipping into a message.
+# noteNumber is None for an unreadable name, and so is this. It used to become 0, which kept a None
+# out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded the bottom
+# of the keyboard with nothing to say why. A sender that gets None refuses the message with
+# __badNote, the way the WebView runtime's refuseNote does, in the same words.
 def __note(n):
     if isinstance(n, str):
-        return noteNumber(n) or 0
+        return noteNumber(n)
     return __7(n)
+def __badNote(verb, note):
+    logError(verb + ': "' + str(note) + '" is not a note name, so nothing was sent. A name is '
+             + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
 
 def sendNote(channel, note, velocity, ms=None):
     # A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
     # timer for it, and getting that wrong means a hung voice - the one MIDI mistake you hear rather
     # than read. A panel cannot play a note at all.
     n = __note(note)
+    if n is None: return __badNote("sendNote", note)
     sendMidi([0x90 | __ch(channel), n, __7(velocity)])
     if ms is not None and ms > 0:
         after(ms, lambda: sendMidi([0x80 | __ch(channel), n, 0]))
@@ -2450,7 +2456,9 @@ def sendSongPosition(beats):
     b = 0 if b < 0 else (16383 if b > 16383 else b)
     sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F])
 def sendNoteOff(channel, note, velocity=0):
-    sendMidi([0x80 | __ch(channel), __note(note), __7(velocity)])
+    n = __note(note)
+    if n is None: return __badNote("sendNoteOff", note)
+    sendMidi([0x80 | __ch(channel), n, __7(velocity)])
 def sendProgramChange(channel, program, bankMsb=None, bankLsb=None):
     # Bank select first: a device applies the bank that was in force when the program change lands.
     if bankMsb is not None: sendCC(channel, 0, __7(bankMsb))
@@ -2462,8 +2470,10 @@ def sendPitchBend(channel, value):
     v = 0 if v < 0 else (16383 if v > 16383 else v)
     sendMidi([0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128])
 def sendAftertouch(channel, pressure, note=None):
-    if note is not None: sendMidi([0xA0 | __ch(channel), __note(note), __7(pressure)])
-    else: sendMidi([0xD0 | __ch(channel), __7(pressure)])
+    if note is None: return sendMidi([0xD0 | __ch(channel), __7(pressure)])
+    n = __note(note)
+    if n is None: return __badNote("sendAftertouch", note)
+    sendMidi([0xA0 | __ch(channel), n, __7(pressure)])
 def sendClock(): sendMidi([0xF8])
 def sendTransport(action="start"):
     action = str(action).lower()

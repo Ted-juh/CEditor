@@ -1146,7 +1146,7 @@ ce.midi.sendMidi([0x90, 60, 100])
 
 #### `ce.midi.sendNote(channel, note, velocity [, ms])`
 
-Play a note. `note` is a MIDI note number or a name such as "C3". A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.
+Play a note. `note` is a MIDI note number or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too. A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.
 
 *Short name: `sendNote`.*
 

@@ -635,6 +635,39 @@ int main()
     check (host.rawSends[1] == "E0 00 00", "ce.midi.sendPitchBend agrees across engines");
     check (errors.isEmpty(), "no errors from the message verbs");
 
+    // A note name the senders cannot read is refused, not sent as note 0. "c4" (the letter must be
+    // a capital) used to become 0 and play C-1 with nothing to say why; the WebView runtime refuses
+    // it in the same words (scriptMusic.test.js).
+    juce::Array<juce::var> badNoteScripts;
+    badNoteScripts.add (makeScript ("badnotes", "lua", "panel", "onBadNotes", "*",
+        "function onBadNotes()\n"
+        "  sendNote(1, \"c4\", 100)\n"
+        "  sendNoteOff(1, \"c4\")\n"
+        "  sendAftertouch(1, 90, \"c4\")\n"
+        "  sendNote(1, \"C-1\", 100)\n"       // note 0 by NAME is still a real note
+        "end\n"));
+    badNoteScripts.add (makeScript ("badnotesjs", "javascript", "panel", "onBadNotesJs", "*",
+        "function onBadNotesJs() { ce.midi.sendNote(1, 'c4', 100); ce.midi.sendNoteOff(1, 'c4');"
+        " ce.midi.sendAftertouch(1, 90, 'c4'); }"));
+    runtime.loadScripts (juce::var (badNoteScripts));
+    for (const auto* event : { "onBadNotes", "onBadNotesJs" })
+    {
+        const bool lua = juce::String (event) == "onBadNotes";
+        host.rawSends.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent (event, "panel", juce::var());
+        const juce::String engine = lua ? " (Lua)" : " (JS)";
+        check (host.rawSends.size() == (lua ? 1 : 0),
+               "an unreadable note name sends nothing" + engine + " (got " + host.rawSends.joinIntoString (" | ") + ")");
+        if (lua) check (host.rawSends[0] == "90 00 64", "C-1 by name is note 0 and still plays");
+        check (host.levelled.size() == 3, "each refusal is an error line" + engine);
+        for (const auto* verb : { "sendNote", "sendNoteOff", "sendAftertouch" })
+            check (host.levelled.contains (juce::String ("error:") + verb + ": \"c4\" is not a note name, so nothing was sent. "
+                                           "A name is a capital letter, then # or b if it has one, then the octave: "
+                                           "\"C4\", \"Eb3\", \"F#-1\"."),
+                   juce::String (verb) + " names the note it refused" + engine);
+    }
+
     // 13) ce.storage ------------------------------------------------------------------------------
     juce::Array<juce::var> storeScripts;
     storeScripts.add (makeScript ("store", "lua", "panel", "onStore", "*",

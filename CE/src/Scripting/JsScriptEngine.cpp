@@ -1531,14 +1531,21 @@ function logError(message, value) { return __api.logAt("error", String(message),
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
 function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ? 16 : c)) - 1; }
 function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
-// noteNumber is undefined for an unreadable name; a MIDI message still needs a BYTE, so it becomes
-// 0 here rather than an undefined slipping into a message.
-function __note(n) { return typeof n === "string" ? (noteNumber(n) === undefined ? 0 : noteNumber(n)) : __7(n); }
+// noteNumber is undefined for an unreadable name, and so is this. It used to become 0, which kept an
+// undefined out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded
+// the bottom of the keyboard with nothing to say why. A sender that gets undefined refuses the
+// message with __badNote, the way the WebView runtime's refuseNote does, in the same words.
+function __note(n) { return typeof n === "string" ? noteNumber(n) : __7(n); }
+function __badNote(verb, note) {
+  logError(verb + ': "' + String(note) + '" is not a note name, so nothing was sent. A name is '
+    + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+}
 
 // A duration schedules the note off — otherwise every script that plays a note hand-rolls a timer,
 // and getting that wrong means a hung voice, the one MIDI mistake you hear rather than read.
 function sendNote(channel, note, velocity, ms) {
   var n = __note(note);
+  if (n === undefined) return __badNote("sendNote", note);
   sendMidi([0x90 | __ch(channel), n, __7(velocity)]);
   if (ms !== undefined && ms !== null && ms > 0)
     after(ms, function () { sendMidi([0x80 | __ch(channel), n, 0]); });
@@ -1576,7 +1583,11 @@ function sendSongPosition(beats) {
   var b = Math.floor(Number(beats) || 0); b = b < 0 ? 0 : (b > 16383 ? 16383 : b);
   sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F]);
 }
-function sendNoteOff(channel, note, velocity) { sendMidi([0x80 | __ch(channel), __note(note), __7(velocity || 0)]); }
+function sendNoteOff(channel, note, velocity) {
+  var n = __note(note);
+  if (n === undefined) return __badNote("sendNoteOff", note);
+  sendMidi([0x80 | __ch(channel), n, __7(velocity || 0)]);
+}
 function sendProgramChange(channel, program, bankMsb, bankLsb) {
   // Bank select first: a device applies the bank that was in force when the program change lands.
   if (bankMsb !== undefined && bankMsb !== null) sendCC(channel, 0, __7(bankMsb));
@@ -1589,8 +1600,10 @@ function sendPitchBend(channel, value) {
   sendMidi([0xE0 | __ch(channel), v % 128, Math.floor(v / 128) % 128]);
 }
 function sendAftertouch(channel, pressure, note) {
-  if (note !== undefined && note !== null) sendMidi([0xA0 | __ch(channel), __note(note), __7(pressure)]);
-  else sendMidi([0xD0 | __ch(channel), __7(pressure)]);
+  if (note === undefined || note === null) return sendMidi([0xD0 | __ch(channel), __7(pressure)]);
+  var n = __note(note);
+  if (n === undefined) return __badNote("sendAftertouch", note);
+  sendMidi([0xA0 | __ch(channel), n, __7(pressure)]);
 }
 function sendClock() { sendMidi([0xF8]); }
 function sendTransport(action) {

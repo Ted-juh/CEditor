@@ -1426,15 +1426,22 @@ end
 -- allowed to say so.
 local function __ch(c) c = math.floor(tonumber(c) or 1); if c < 1 then c = 1 elseif c > 16 then c = 16 end return c - 1 end
 local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 elseif v > 127 then v = 127 end return v end
--- noteNumber is nil for an unreadable name; a MIDI message still needs a BYTE, so it becomes 0
--- here rather than a nil slipping into a message.
-local function __note(n) if type(n) == "string" then return noteNumber(n) or 0 end return __7(n) end
+-- noteNumber is nil for an unreadable name, and so is this. It used to become 0, which kept a nil
+-- out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded the bottom
+-- of the keyboard with nothing to say why. A sender that gets nil refuses the message with
+-- __badNote, the way the WebView runtime's refuseNote does, in the same words.
+local function __note(n) if type(n) == "string" then return noteNumber(n) end return __7(n) end
+local function __badNote(verb, note)
+  logError(verb .. ': "' .. tostring(note) .. '" is not a note name, so nothing was sent. A name is '
+    .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+end
 
 -- A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
 -- timer for it, and getting that wrong means a hung voice — the one MIDI mistake you hear rather
 -- than read. A panel cannot play a note at all.
 function sendNote(channel, note, velocity, ms)
   local n = __note(note)
+  if n == nil then return __badNote("sendNote", note) end
   sendMidi({0x90 | __ch(channel), n, __7(velocity)})
   if ms ~= nil and ms > 0 then
     after(ms, function() sendMidi({0x80 | __ch(channel), n, 0}) end)
@@ -1452,7 +1459,11 @@ function sendSongPosition(beats)
   local b = math.floor(tonumber(beats) or 0); if b < 0 then b = 0 elseif b > 16383 then b = 16383 end
   sendMidi({0xF2, b & 0x7F, (b >> 7) & 0x7F})
 end
-function sendNoteOff(channel, note, velocity) sendMidi({0x80 | __ch(channel), __note(note), __7(velocity or 0)}) end
+function sendNoteOff(channel, note, velocity)
+  local n = __note(note)
+  if n == nil then return __badNote("sendNoteOff", note) end
+  sendMidi({0x80 | __ch(channel), n, __7(velocity or 0)})
+end
 function sendProgramChange(channel, program, bankMsb, bankLsb)
   -- Bank select first: a device applies the bank that was in force when the program change lands.
   if bankMsb ~= nil then sendCC(channel, 0, __7(bankMsb)) end
@@ -1465,8 +1476,10 @@ function sendPitchBend(channel, value)
   sendMidi({0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128})
 end
 function sendAftertouch(channel, pressure, note)
-  if note ~= nil then sendMidi({0xA0 | __ch(channel), __note(note), __7(pressure)})
-  else sendMidi({0xD0 | __ch(channel), __7(pressure)}) end
+  if note == nil then return sendMidi({0xD0 | __ch(channel), __7(pressure)}) end
+  local n = __note(note)
+  if n == nil then return __badNote("sendAftertouch", note) end
+  sendMidi({0xA0 | __ch(channel), n, __7(pressure)})
 end
 function sendClock() sendMidi({0xF8}) end
 function sendTransport(action)

@@ -2128,9 +2128,15 @@ function releaseTrackedScriptNotes(role, channel, note) {
 // is what makes them identical in every runtime and every exported language. `note` accepts a MIDI
 // number or a name ("C3"), because a script that reads musically should be allowed to say so.
 const midiCh = (c) => midiInt(c, 1, 16) - 1;
-// noteNumber returns nil for a name it cannot read; sendNote still has to put a BYTE on the wire,
-// so an unreadable name becomes 0 here rather than an undefined slipping into a MIDI message.
-const midiNote = (n) => (typeof n === 'string' ? (helpers.noteNumber(n) ?? 0) : midiInt(n, 0, 127));
+// noteNumber returns nil for a name it cannot read, and so does this. It used to become 0, which
+// kept an undefined out of the message and sent note 0 instead: "c4" (the letter must be a capital)
+// played C-1, the bottom of the keyboard, with nothing to say why. A sender that gets undefined
+// here refuses the message with refuseNote, the way an unknown blend mode or checksum is refused.
+const midiNote = (n) => (typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
+function refuseNote(verb, note) {
+  addScriptTrace('error', '', `${verb}: "${note}" is not a note name, so nothing was sent. A name is `
+    + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+}
 
 /* --- the wire filters: interceptIn / interceptOut / feed --------------------------------------
  * ce.core.intercept filters a MODEL PATH. These filter the WIRE, and they are a different thing:
@@ -2190,6 +2196,7 @@ const midiApi = {
   },
   sendNote: (ch, note, velocity, ms) => {
     const n = midiNote(note);
+    if (n === undefined) { refuseNote('sendNote', note); return; }
     const channel = midiCh(ch);
     const role = routedRole ?? DEFAULT_ROLE;
     sendRawMidi([0x90 | channel, n, midiInt(velocity, 0, 127)], `note_${n}`);
@@ -2211,6 +2218,7 @@ const midiApi = {
   sendNoteOff: (ch, note, velocity) => {
     const channel = midiCh(ch);
     const n = midiNote(note);
+    if (n === undefined) { refuseNote('sendNoteOff', note); return; }
     const role = routedRole ?? DEFAULT_ROLE;
     releaseTrackedScriptNotes(role, channel, n);
     sendRawMidi([0x80 | channel, n, midiInt(velocity ?? 0, 0, 127)], `noteoff_${n}`);
@@ -2226,9 +2234,15 @@ const midiApi = {
     const v = midiInt(value ?? 8192, 0, 16383);
     sendRawMidi([0xE0 | midiCh(ch), v % 128, Math.floor(v / 128) % 128], 'bend');
   },
-  sendAftertouch: (ch, pressure, note) => (note === undefined || note === null
-    ? sendRawMidi([0xD0 | midiCh(ch), midiInt(pressure, 0, 127)], 'aftertouch')
-    : sendRawMidi([0xA0 | midiCh(ch), midiNote(note), midiInt(pressure, 0, 127)], 'polyaftertouch')),
+  sendAftertouch: (ch, pressure, note) => {
+    if (note === undefined || note === null) {
+      sendRawMidi([0xD0 | midiCh(ch), midiInt(pressure, 0, 127)], 'aftertouch');
+      return;
+    }
+    const n = midiNote(note);
+    if (n === undefined) { refuseNote('sendAftertouch', note); return; }
+    sendRawMidi([0xA0 | midiCh(ch), n, midiInt(pressure, 0, 127)], 'polyaftertouch');
+  },
   // feed(bytes) — inject as if the hardware had sent it, so the panel's OWN bindings, note input
   // and transport all act on it. set() moves a control directly and bypasses every binding, which
   // is a different thing: this is how a script-built arpeggiator drives the panel rather than

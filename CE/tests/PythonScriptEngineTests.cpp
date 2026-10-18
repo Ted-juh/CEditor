@@ -42,6 +42,15 @@ public:
     juce::var runAction (const juce::String&, const juce::var&) override { return {}; }
     void emitEvent (const juce::String&, const juce::var&) override {}
     void log (const juce::String& message, const juce::var&) override { logs.add (message); }
+
+    juce::StringArray rawSends;   // sendMidi, as "90 3C 64"
+    void sendMidi (const juce::var& bytes) override
+    {
+        juce::StringArray hex;
+        if (auto* arr = bytes.getArray())
+            for (const auto& b : *arr) hex.add (juce::String::toHexString ((int) b).paddedLeft ('0', 2).toUpperCase());
+        rawSends.add (hex.joinIntoString (" "));
+    }
 };
 
 static int failures = 0;
@@ -131,6 +140,30 @@ int main()
     host.logs.clear();
     runtime.dispatchEvent ("onAfter", "panel", juce::var());
     check (host.logs.contains ("after ok"), "Guard: next dispatch runs clean after a watchdog trip");
+
+    // A note name the senders cannot read is refused, not sent as note 0 (C-1). The Lua and JS
+    // preludes and the WebView runtime refuse it in the same words.
+    {
+        juce::Array<juce::var> noteScripts;
+        noteScripts.add (makeScript ("pyNotes", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    sendNote(1, 'c4', 100)\n"
+            "    sendNoteOff(1, 'c4')\n"
+            "    sendAftertouch(1, 90, 'c4')\n"
+            "    sendNote(1, 'C-1', 100)\n"));
+        runtime.loadScripts (juce::var (noteScripts));
+        host.rawSends.clear();
+        host.logs.clear();
+        runtime.onPanelReady (true);
+        check (host.rawSends.size() == 1 && host.rawSends[0] == "90 00 64",
+               "Notes: an unreadable name sends nothing; C-1 by name still plays (got "
+                   + host.rawSends.joinIntoString (" | ") + ")");
+        for (const auto* verb : { "sendNote", "sendNoteOff", "sendAftertouch" })
+            check (host.logs.contains (juce::String (verb) + ": \"c4\" is not a note name, so nothing was sent. "
+                                       "A name is a capital letter, then # or b if it has one, then the octave: "
+                                       "\"C4\", \"Eb3\", \"F#-1\"."),
+                   juce::String ("Notes: ") + verb + " names the note it refused");
+    }
 
     // ---- Two instances in one process ------------------------------------------------------------
     // What the user asked for: every instance of a panel is on its own, even two copies of the same

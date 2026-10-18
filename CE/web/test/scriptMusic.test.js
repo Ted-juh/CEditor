@@ -245,14 +245,28 @@ test('a name it cannot read returns nothing, not note 0', () => {
   }
 });
 
-test('sendNote still puts a byte on the wire when the name is unreadable', () => {
-  // noteNumber is honest; the MIDI path cannot be — a message needs a NUMBER. This pins that the
-  // honesty did not leak out as an undefined byte in a MIDI message.
+test('a note name the senders cannot read is refused, not sent as note 0', () => {
+  // This used to pin "90 00 64": the unreadable name became note 0 so that no undefined byte could
+  // reach a message. That kept the message well formed and played C-1 instead, so "c4" (the letter
+  // must be a capital) sounded the bottom of the keyboard with nothing to say why. Nothing goes on
+  // the wire now, undefined or otherwise, and the error names the note.
+  for (const [verb, send] of [
+    ['sendNote', () => api.sendNote(1, 'c4', 100)],
+    ['sendNoteOff', () => api.sendNoteOff(1, 'c4')],
+    ['sendAftertouch', () => api.sendAftertouch(1, 90, 'c4')],
+  ]) {
+    clearScriptTrace();
+    send();
+    const trace = get(scriptTrace);
+    assert.equal(trace.find((e) => e.kind === 'midi'), undefined, `${verb} must send nothing`);
+    const error = trace.find((e) => e.kind === 'error');
+    assert.ok(error, `${verb} must say why nothing was sent`);
+    assert.match(error.message, new RegExp(`^${verb}: "c4" is not a note name`));
+  }
   clearScriptTrace();
-  api.sendNote(1, 'nonsense', 100);
-  const line = get(scriptTrace).find((e) => e.kind === 'midi');
-  assert.ok(line, 'sendNote should have traced a message');
-  assert.match(line.message, /90 00 64/, 'an unreadable name sends note 0, not an undefined byte');
+  api.sendNote(1, 'C4', 100);
+  assert.match(get(scriptTrace).find((e) => e.kind === 'midi')?.message ?? '', /90 3C 64/,
+    'a readable name still plays');
 });
 
 /* -------------------------------------------------------------------------- noteSpelling */

@@ -2814,7 +2814,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity [, ms])',
-    summary: 'Play a note. `note` is a MIDI note number or a name such as "C3". A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.',
+    summary: 'Play a note. `note` is a MIDI note number or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too. A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
