@@ -643,11 +643,14 @@ private:
         bool pingpong = false, paused = false;
         double heldProgress = 0.0;
         int groupId = 0;               // 0 = alone; otherwise one completion for the whole call
+        juce::String doneToken;        // the prelude's name for its done; empty = none to call
+        int scriptSet = 0;             // the loadScripts it was started under (animationScriptSet)
     };
     std::vector<Animation> animations;
-    struct AnimationGroup { int remaining = 0; bool completed = true; };
+    struct AnimationGroup { int remaining = 0; bool completed = true; juce::String token; };
     std::map<int, AnimationGroup> animationGroups;
     int animationGroupSeq = 0;
+    int animationScriptSet = 0;   // counts loadScripts: a done token is only good within one set
     /** Progress, value, and the completion emit — shared by the tick and by the four verbs that
         need to know where an animation is without advancing it. */
     double animationProgressOf (const Animation& a, double nowMs, double beats) const;

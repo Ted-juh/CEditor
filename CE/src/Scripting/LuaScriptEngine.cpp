@@ -2415,7 +2415,14 @@ end
 -- `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 -- this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
 -- a completion callback can be a plain argument in every language.
-local __animDone, __animGroup, __animGroupN = {}, {}, 0
+--
+-- Each move with a done gets a token of its own ("lua:3"), handed to the host as `__done` and
+-- emitted back with the result, and its function is stored under that. It was stored under the
+-- path, or for a list under a number the host counted separately, so replacing a move called the
+-- new move's done for the old one, and two lists from two scripts or engines crossed their dones
+-- (ScriptRuntime::fireAnimationDone says how). The prelude is shared by every Lua script, so one
+-- count keeps the tokens apart.
+local __animDone, __animSeq = {}, 0
 
 -- An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
 -- own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
@@ -2446,14 +2453,10 @@ local function __animStart(kind, path, target, opts)
   for k, v in pairs(opts) do o[k] = v end
   o.done = nil
   if type(opts.done) == "function" then
-    if list ~= nil then
-      __animGroupN = __animGroupN + 1
-      local gid = __animGroupN
-      __animGroup[gid] = opts.done
-      o.group = gid
-    else
-      __animDone[tostring(path)] = opts.done
-    end
+    __animSeq = __animSeq + 1
+    local token = "lua:" .. tostring(__animSeq)
+    __animDone[token] = opts.done
+    o.__done = token
   end
   __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o)
 end
@@ -2510,16 +2513,9 @@ function animateFinish(path) return __animateFinish(path == nil and "" or tostri
 -- table, { path, completed } or { paths, completed }, and a table is always true, so
 -- `if completed then` read a cancelled move as a finished one.
 on("*", "__animDone", function(info)
-  if info == nil then return end
-  if info.group ~= nil then
-    local fn = __animGroup[info.group]
-    __animGroup[info.group] = nil
-    if fn ~= nil then fn(info.completed == true) end
-    return
-  end
-  local key = tostring(info.path or "")
-  local fn = __animDone[key]
-  __animDone[key] = nil
+  if info == nil or info.token == nil then return end
+  local fn = __animDone[info.token]
+  __animDone[info.token] = nil
   if fn ~= nil then fn(info.completed == true) end
 end)
 

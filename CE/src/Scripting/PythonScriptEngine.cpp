@@ -1023,9 +1023,15 @@ def clockTempo(intervalsMs):
 # `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 # this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
 # a completion callback can be a plain argument in every language.
+#
+# Each move with a done gets a token of its own ("py:<script id>:3"), handed to the host as `__done`
+# and emitted back with the result, and its function is stored under that. It was stored under the
+# path, or for a list under a number the host counted separately, so replacing a move called the new
+# move's done for the old one, and two lists from two scripts or engines crossed their dones
+# (ScriptRuntime::fireAnimationDone says how). This prelude runs in each script's own namespace, so
+# the count is the script's and the token carries the script's id.
 __animDone = {}
-__animGroup = {}
-__animGroupN = [0]
+__animSeq = [0]
 
 # An envelope's shape is SAMPLED here, with map() - ce.math's, which is the Envelope component's own
 # envValueAt - and the host interpolates the samples. That is what lets the host engine run an
@@ -1051,12 +1057,10 @@ def __animStart(kind, path, target, opts):
     o.pop("done", None)
     fn = opts.get("done") if isinstance(opts, dict) else None
     if callable(fn):
-        if lst is not None:
-            __animGroupN[0] += 1
-            __animGroup[__animGroupN[0]] = fn
-            o["group"] = __animGroupN[0]
-        else:
-            __animDone[str(path)] = fn
+        __animSeq[0] += 1
+        token = "py:" + str(globals().get("__scriptId", "")) + ":" + str(__animSeq[0])
+        __animDone[token] = fn
+        o["__done"] = token
     __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o)
 
 # to and spring move to a number, and only a number. A target that is not one ("full", "100px",
@@ -1124,13 +1128,7 @@ def animateFinish(path=None):
 # true, so `if completed:` read a cancelled move as a finished one.
 def __animDoneTick(info):
     if not hasattr(info, "get"): return
-    gid = info.get("group")
-    if gid is not None:
-        fn = __animGroup.pop(gid, None)
-        if fn is not None: fn(info.get("completed") is True)
-        return
-    key = str(info.get("path") or "")
-    fn = __animDone.pop(key, None)
+    fn = __animDone.pop(info.get("token"), None)
     if fn is not None: fn(info.get("completed") is True)
 on("*", "__animDone", __animDoneTick)
 

@@ -291,13 +291,29 @@ double ScriptRuntime::animationValueOf (const Animation& a, double progress) con
 // prelude routes the emit to the function it stored. Exactly how after()'s one-shot already works,
 // and the reason `done` can be a plain function argument in every language.
 //
-// The emit carries what the prelude needs to FIND the function (`path`, or `group` for a list) and
-// `completed`; the prelude calls done(completed) with that boolean alone, as the contract says and
-// the WebView's fireAnimationDone does. It used to hand the script this table, { path, completed }
-// or { paths, completed }, and a table is always true, so `if completed then` read a cancelled move
-// as a finished one.
+// The emit is { token, completed }: the token the prelude gave the move when it stored its done
+// (`__done` in the options), and the prelude calls done(completed) with that boolean alone, as the
+// contract says and the WebView's fireAnimationDone does. It used to hand the script this table,
+// { path, completed } or { paths, completed }, and a table is always true, so `if completed then`
+// read a cancelled move as a finished one. A move started without a done has no token and emits
+// nothing.
+//
+// The token is the prelude's, and is never the same twice in one script set: each prelude counts
+// its own and names its engine ("lua:3", "js:3", and "py:<script id>:3", since every Python script
+// runs a prelude of its own). The emit used to carry the PATH, or for a list a group number counted
+// here, and each prelude looked the function up by that. A path is not one move: replacing a move
+// with one that had a done of its own stored the new function first, so the replaced move's emit
+// called the NEW one with false, and the replaced one's never ran; and a path animated from two
+// scripts found both functions. The group number was counted here and in each prelude separately,
+// so as soon as two scripts, or a Lua and a JavaScript one, started a list, they disagreed: a list's
+// done ran when another list ended, or never.
+//
+// A prelude counts from 1 again whenever the script set is loaded (loadScripts rebuilds it), and a
+// move can outlive the set that started it. Its done went with that set, so a move started before
+// the last load emits nothing, rather than calling whatever the new set stored under its token.
 void ScriptRuntime::fireAnimationDone (const Animation& a, bool completed)
 {
+    juce::String token = a.doneToken;
     if (a.groupId != 0)
     {
         const auto it = animationGroups.find (a.groupId);
@@ -305,15 +321,13 @@ void ScriptRuntime::fireAnimationDone (const Animation& a, bool completed)
         it->second.remaining -= 1;
         if (! completed) it->second.completed = false;
         if (it->second.remaining > 0) return;
-        auto* obj = new juce::DynamicObject();
-        obj->setProperty ("group", a.groupId);
-        obj->setProperty ("completed", it->second.completed);
+        token = it->second.token;
+        completed = it->second.completed;
         animationGroups.erase (it);
-        host.emitEvent ("__animDone", juce::var (obj));
-        return;
     }
+    if (token.isEmpty() || a.scriptSet != animationScriptSet) return;
     auto* obj = new juce::DynamicObject();
-    obj->setProperty ("path", a.path);
+    obj->setProperty ("token", token);
     obj->setProperty ("completed", completed);
     host.emitEvent ("__animDone", juce::var (obj));
 }
@@ -405,19 +419,20 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         const double stagger = number ("stagger", 0.0);
         const double baseDelay = number ("delay", 0.0);
         int groupId = 0;
-        if (o != nullptr && o->hasProperty ("group"))
+        if (const auto token = o != nullptr ? o->getProperty ("__done").toString() : juce::String(); token.isNotEmpty())
         {
             animationGroupSeq += 1;
             groupId = animationGroupSeq;
             AnimationGroup g;
             g.remaining = paths.size();
+            g.token = token;
             animationGroups[groupId] = g;
         }
         for (int i = 0; i < paths.size(); ++i)
         {
             auto* each = o != nullptr ? new juce::DynamicObject (*o) : new juce::DynamicObject();
             each->setProperty ("delay", baseDelay + stagger * (double) i);
-            each->removeProperty ("group");
+            each->removeProperty ("__done");   // the list's, not each path's
             each->setProperty ("__group", groupId);
             startAnimation (kind, juce::var (paths[i]), target, juce::var (each));
         }
@@ -431,6 +446,8 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     a.kind = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
     a.path = key;
     a.groupId = (o != nullptr && o->hasProperty ("__group")) ? (int) o->getProperty ("__group") : 0;
+    if (o != nullptr) a.doneToken = o->getProperty ("__done").toString();
+    a.scriptSet = animationScriptSet;
 
     const auto curveVar = o != nullptr ? o->getProperty ("curve") : juce::var();
     if (curveVar.isArray() || curveVar.isObject())
@@ -725,6 +742,9 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     // state to say goodbye with. This is what makes onPanelDestroy fire on a panel switch and on
     // a script-set reload, not only at shutdown, without every host having to remember to call it.
     onPanelDestroy();
+    // A move the outgoing set started may still be running, and its done is about to go with the
+    // set's preludes. See fireAnimationDone.
+    animationScriptSet += 1;
 
     scripts.clear();
     // Runtime device declarations belong to the script set that made them: a parameter declared by

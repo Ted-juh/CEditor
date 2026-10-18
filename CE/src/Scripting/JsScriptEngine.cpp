@@ -50,7 +50,7 @@ var __ceCur = {
   __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
   __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
   __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
-  __after: {}, __afterN: 0, __animDone: {}, __animGroup: {}, __animGroupN: 0, __dumpWaiters: [],
+  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [],
   __globals: {}
 };
 var __CE_OWN = Object.keys(__ceCur);
@@ -2418,8 +2418,16 @@ function clockTempo(intervalsMs) {
 //
 // `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 // this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
-// a completion callback can be a plain argument in every language. __animDone, __animGroup and
-// __animGroupN are the running script's own (__CE_OWN).
+// a completion callback can be a plain argument in every language. __animDone is the running
+// script's own (__CE_OWN).
+//
+// Each move with a done gets a token of its own ("js:3"), handed to the host as `__done` and emitted
+// back with the result, and its function is stored under that. It was stored under the path, or for
+// a list under a number the host counted separately, so replacing a move called the new move's done
+// for the old one, and two lists from two scripts or engines crossed their dones
+// (ScriptRuntime::fireAnimationDone says how). __animSeq is the engine's, not a script's, so no two
+// scripts hand out the same token.
+var __animSeq = 0;
 
 // An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
 // own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
@@ -2447,13 +2455,10 @@ function __animStart(kind, path, target, opts) {
   for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
   o.done = undefined;
   if (typeof opts.done === "function") {
-    if (list) {
-      __animGroupN += 1;
-      __animGroup[__animGroupN] = opts.done;
-      o.group = __animGroupN;
-    } else {
-      __animDone[String(path)] = opts.done;
-    }
+    __animSeq += 1;
+    var token = "js:" + __animSeq;
+    __animDone[token] = opts.done;
+    o.__done = token;
   }
   __api.animate(kind, list ? list : String(path), Number(target) || 0, o);
 }
@@ -2508,16 +2513,9 @@ function animateFinish(path) { return __api.animateFinish(path === undefined || 
 // object, { path, completed } or { paths, completed }, and an object is always truthy, so
 // `if (completed)` read a cancelled move as a finished one.
 on("*", "__animDone", function (info) {
-  if (!info) return;
-  if (info.group !== undefined && info.group !== null) {
-    var g = __animGroup[info.group];
-    delete __animGroup[info.group];
-    if (g) g(info.completed === true);
-    return;
-  }
-  var key = String(info.path === undefined ? "" : info.path);
-  var fn = __animDone[key];
-  delete __animDone[key];
+  if (!info || info.token === undefined || info.token === null) return;
+  var fn = __animDone[info.token];
+  delete __animDone[info.token];
   if (fn) fn(info.completed === true);
 });
 

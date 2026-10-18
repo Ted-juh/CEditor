@@ -3336,6 +3336,77 @@ int main()
                            + expected[i] + "\", got \"" + (i < got.size() ? got[i] : juce::String ("nothing")) + "\")");
     }
 
+    // 39c) Each move's done reaches its own function, whoever started it -----------------------------
+    // The preludes stored a done under its path, or for a list under a number they counted while
+    // the host counted its own. So a path replaced by a move with a done of its own called the NEW
+    // function for the old move, and the old one never ran; two scripts, or a Lua and a JavaScript
+    // one, that each started a list got each other's done, or none; and a reload, which starts every
+    // prelude counting again, left the host's numbers pointing at nothing. Each move with a done now
+    // has a token of its own, and a move that outlives the set that started it calls nothing.
+    {
+        TestHost mixHost;
+        ScriptRuntime mix (mixHost);
+        mixHost.runtime = &mix;
+        juce::StringArray mixErrors;
+        mix.setErrorLogger ([&mixErrors] (const juce::String& line)
+            { mixErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+        juce::Array<juce::var> set1;
+        set1.add (makeScript ("mixLua", "lua", "panel", "onGo", "*",
+            "function onGo()\n"
+            "  ce.anim.to({ 'p', 'q' }, 1, { duration = 100, from = 0, done = function(c) log('lua list ' .. tostring(c)) end })\n"
+            "  ce.anim.to('x', 1, { duration = 100, from = 0, done = function(c) log('lua x ' .. tostring(c)) end })\n"
+            "  ce.anim.to('z', 1, { duration = 1000, from = 0, done = function(c) log('lua z ' .. tostring(c)) end })\n"
+            "end\n"));
+        set1.add (makeScript ("mixJsA", "javascript", "panel", "onGo", "*",
+            "function onGo() {\n"
+            "  ce.anim.to(['r', 's'], 1, { duration: 100, from: 0, done: function (c) { log('jsA list ' + c); } });\n"
+            "  ce.anim.to('x', 2, { duration: 100, from: 0, done: function (c) { log('jsA x ' + c); } });\n"
+            "}\n"));
+        set1.add (makeScript ("mixJsB", "javascript", "panel", "onGo", "*",
+            "function onGo() {\n"
+            "  ce.anim.to(['t', 'u'], 1, { duration: 200, from: 0, done: function (c) { log('jsB list ' + c); } });\n"
+            "  ce.anim.to('y', 1, { duration: 100, from: 0, done: function (c) { log('jsB y1 ' + c); } });\n"
+            "  ce.anim.to('y', 2, { duration: 100, from: 0, done: function (c) { log('jsB y2 ' + c); } });\n"
+            "}\n"));
+        mix.loadScripts (juce::var (set1));
+        mix.tickAnimations (0.0);
+        mix.dispatchEvent ("onGo", "panel", juce::var());
+        const auto mixed = [&mixHost] { const auto line = mixHost.logs.joinIntoString (" | "); mixHost.logs.clear(); return line; };
+        const auto atStart = mixed();
+        check (atStart == "lua x false | jsB y1 false",
+               "a replaced move's own done gets false, from another script or the same one (got " + atStart + ")");
+        mix.tickAnimations (100.0);
+        const auto at100 = mixed();
+        check (at100 == "lua list true | jsA list true | jsA x true | jsB y2 true",
+               "each list's done, and each replacing move's, is its own (got " + at100 + ")");
+        mix.tickAnimations (200.0);
+        const auto at200 = mixed();
+        check (at200 == "jsB list true", "…and a second script's list is not ended by the first's (got " + at200 + ")");
+
+        // Reload while 'z' is still going. The new set's prelude counts from 1 again, so its third
+        // token, 'w''s, is the one 'z' carries; and the host's list count does not start again.
+        juce::Array<juce::var> set2;
+        set2.add (makeScript ("mixLua2", "lua", "panel", "onGo", "*",
+            "function onGo()\n"
+            "  ce.anim.to('a', 1, { duration = 100, from = 0, done = function(c) log('new a ' .. tostring(c)) end })\n"
+            "  ce.anim.to('b', 1, { duration = 100, from = 0, done = function(c) log('new b ' .. tostring(c)) end })\n"
+            "  ce.anim.to('w', 1, { duration = 2000, from = 0, done = function(c) log('new w ' .. tostring(c)) end })\n"
+            "  ce.anim.to({ 'c', 'd' }, 1, { duration = 100, from = 0, done = function(c) log('new list ' .. tostring(c)) end })\n"
+            "end\n"));
+        mix.loadScripts (juce::var (set2));
+        mix.dispatchEvent ("onGo", "panel", juce::var());
+        mix.tickAnimations (300.0);
+        mix.tickAnimations (1000.0);
+        const auto afterReload = mixed();
+        check (afterReload == "new a true | new b true | new list true",
+               "a move that outlives its script set calls nothing in the next one (got " + afterReload + ")");
+        check (! mix.animationRunning ("z") && mix.animationRunning ("w"), "…though it still ran to its end");
+        mix.tickAnimations (2200.0);
+        const auto atEnd = mixed();
+        check (atEnd == "new w true", "…and the new set's move gets its own done when it ends (got " + atEnd + ")");
+        check (mixErrors.isEmpty(), "and no script raised doing any of it");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

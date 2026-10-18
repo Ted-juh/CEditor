@@ -360,6 +360,32 @@ int main()
         const auto atStop = steps();
         check (atStop == "i 1 bool False", "ce.anim: ...and stopping it is done(False) (got " + atStop + ")");
         check (animErrors.isEmpty(), "ce.anim: no script raised doing any of it");
+
+        // Two Python scripts each run this prelude in a namespace of their own, so each counted its
+        // lists from 1 and the host counted its own: the first list's end called both dones, and the
+        // second's called none. And a path replaced by a move with its own done called the new one.
+        juce::Array<juce::var> twoScripts;
+        twoScripts.add (makeScript ("pyA", "onGo", "*",
+            "def onGo(value=None):\n"
+            "    ce.anim.to(['p', 'q'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('A list ' + str(c)) })\n"
+            "    ce.anim.to('x', 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('A x ' + str(c)) })\n"));
+        twoScripts.add (makeScript ("pyB", "onGo", "*",
+            "def onGo(value=None):\n"
+            "    ce.anim.to(['r', 's'], 1, { 'duration': 200, 'from': 0, 'done': lambda c: log('B list ' + str(c)) })\n"
+            "    ce.anim.to('x', 2, { 'duration': 100, 'from': 0, 'done': lambda c: log('B x ' + str(c)) })\n"));
+        anim.loadScripts (juce::var (twoScripts));
+        anim.tickAnimations (2000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onGo", "panel", juce::var());
+        const auto twoStart = steps();
+        check (twoStart == "A x False", "ce.anim: the replaced move's own done gets False (got " + twoStart + ")");
+        anim.tickAnimations (2100.0);
+        const auto two100 = steps();
+        check (two100 == "A list True | B x True", "ce.anim: one script's list ends its own done only (got " + two100 + ")");
+        anim.tickAnimations (2200.0);
+        const auto two200 = steps();
+        check (two200 == "B list True", "ce.anim: …and the other's ends its (got " + two200 + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised doing that either");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------
