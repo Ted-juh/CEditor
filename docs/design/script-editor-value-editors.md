@@ -248,6 +248,10 @@ seen from the script side.
 The swatch shows what the reader will paint. Writing `#RRGGBBAA` into a property gives a green
 swatch, which is the trap the `colourAlpha` documentation warns about, caught as it is typed.
 
+Both readers have since changed: `ce.draw` now paints the panel's own forms, and a property refuses
+what it cannot read. [Fixed since, and still open](#fixed-since-and-still-open) has the detail. The
+eight-digit trap itself remains, because each reader keeps its own meaning for `#` with eight digits.
+
 ### Claiming
 
 - `#RRGGBB` anywhere.
@@ -610,6 +614,23 @@ Two small gaps noticed on the way were then closed as well. A note left out alto
 refused like an unreadable name, everywhere but aftertouch, where no note means channel pressure.
 And the player now says "no bytes given" for an empty `sendMidi`, `sendSysex` or `feedMidi`, as the
 editor always did, instead of handing its callback nothing to send.
+
+The drawing and colour parts of the API were then gone through the same way, and six more were
+fixed on the same rule:
+
+| Was | Now | Where |
+|---|---|---|
+| a colour property took any string: `"#000"`, `"red"` and `"rgb(0,0,0)"` were stored and painted white, through `set()`, `ce.panel.patch` and both image tints; `"#000"` as an icon tint was stored as `"000"`, no tint at all | refused, with the six- or eight-digit form to write (`"#000000"`, and `"#FF0000"` for `"red"`). Which properties are colours comes from the section templates, not from names (`scriptColours.js`) | WebView runtime |
+| `ce.draw.fill("FF5B9BD5")`, the panel's own form and what `get()` returns, painted nothing, as did a bare `"5B9BD5"`, a number or an unknown name; gradient stops the same | the panel's forms are turned into CSS, with `rgba()` where there is alpha; what CSS reads is kept as written; anything else is refused and the style in force stays | WebView runtime (the verbs are panel-view only) |
+| a number on a 0..1 scale written out of 100 was clamped or used as it was: `ce.draw.opacity(50)` was solid and `("50%")` switched it off, `ce.math.alpha(c, 128)` was solid, `lighten(c, 40)` white, and a gradient stop's `at: 50` went to the end | refused, with the number out of 100 when that lands inside the scale. The icon-opacity warning no longer offers 1.5 for 150 | WebView runtime; `lighten`, `darken` and `alpha` in the three preludes |
+| the `ce.math` colour readers took the last six characters of anything, so `"x5B9BD5"`, `"#12#34#56"` and `0xFF0000` were colours | 6 or 8 hex digits, the 8 being AARRGGBB, with one `#` at most; anything else is refused | WebView runtime; the three preludes |
+| `ce.draw.text` drew `"center"`, `"centre"` and `"Right"` left-aligned | any case, and all three spellings of centre the app uses mean `"middle"`; another word is refused | WebView runtime |
+| `ce.anim.to(path, "full")` moved the value to 0 (the Python prelude raised), and a colour path had the number written into it | refused; text that is a number is still read as one; a colour property as the path is refused | WebView runtime; the three preludes (the colour path in the WebView only) |
+
+Two decisions are left with the owner. A property refuses `"#RGB"` and the CSS names, giving the
+long form to write; whether to accept them instead is open. And `#` with eight digits still means
+AARRGGBB in a property and in `ce.math`, and RRGGBBAA in a drawing, CSS's own meaning, which was
+kept. The swatch proposed above is where that difference would show.
 
 ## Rules every edit session follows
 
