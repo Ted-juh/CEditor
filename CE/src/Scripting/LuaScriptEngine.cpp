@@ -876,12 +876,17 @@ __CE_EASINGS["inOutBack"] = {0.68,-0.55,0.265,1.55}
 -- scaleNotes("c4") answered with the scale on C-1. Both now answer nil and say why, through
 -- __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
 -- helper checks its scale or chord first, then its notes in argument order, and stops at the first.
-local function __pitch(v) if type(v) == "string" then return noteNumber(v) end return math.floor(tonumber(v) or 0) end
+local function __pitch(v) if v == nil then return nil end if type(v) == "string" then return noteNumber(v) end return math.floor(tonumber(v) or 0) end
 local function __steps(tbl, name, fallback)
   local s = tbl[name == nil and fallback or tostring(name)]
   return s
 end
 local function __pitchOf(verb, v)
+  -- A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
+  if v == nil then
+    logError(verb .. ': no note was given, so there is no answer. A note is a MIDI number or a name, such as 60 or "C4".')
+    return nil
+  end
   local n = __pitch(v)
   if n == nil then
     logError(verb .. ': "' .. tostring(v) .. '" is not a note name, so there is no answer. A name is '
@@ -1498,8 +1503,13 @@ local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 else
 -- out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded the bottom
 -- of the keyboard with nothing to say why. A sender that gets nil refuses the message with
 -- __badNote, the way the WebView runtime's refuseNote does, in the same words.
-local function __note(n) if type(n) == "string" then return noteNumber(n) end return __7(n) end
+-- A note left out altogether is nil here too, not the 0 the numeric path made of it.
+local function __note(n) if n == nil then return nil end if type(n) == "string" then return noteNumber(n) end return __7(n) end
 local function __badNote(verb, note)
+  if note == nil then
+    logError(verb .. ': no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".')
+    return
+  end
   logError(verb .. ': "' .. tostring(note) .. '" is not a note name, so nothing was sent. A name is '
     .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
 end

@@ -109,6 +109,17 @@ test('a note name the music helpers cannot read is refused, not read as C-1', ()
   ]) {
     assert.deepEqual(errorsFrom(call), { value: undefined, errors: [unreadable(verb)] }, verb);
   }
+  // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
+  const missing = (verb) => `${verb}: no note was given, so there is no answer. A note is a MIDI `
+    + 'number or a name, such as 60 or "C4".';
+  for (const [verb, call] of [
+    ['ce.music.scale', () => api.scaleNotes(undefined, 'major')],
+    ['ce.music.chord', () => api.chordNotes(null, 'major')],
+    ['ce.music.quantize', () => api.quantizeNote(61, undefined, 'major')],
+    ['ce.music.degreeChord', () => api.degreeChord(undefined, 'major', 1)],
+  ]) {
+    assert.deepEqual(errorsFrom(call), { value: undefined, errors: [missing(verb)] }, `${verb}, nothing given`);
+  }
   // A right name, and note 0 spelled as a name, are still answers, and say nothing.
   assert.deepEqual(errorsFrom(() => api.scaleNotes('C-1', 'major')).errors, []);
   assert.deepEqual(errorsFrom(() => api.scaleNotes('C-1', 'major')).value, api.scaleNotes(0, 'major'));
@@ -318,6 +329,23 @@ test('a note name the senders cannot read is refused, not sent as note 0', () =>
   api.sendNote(1, 'C4', 100);
   assert.match(get(scriptTrace).find((e) => e.kind === 'midi')?.message ?? '', /90 3C 64/,
     'a readable name still plays');
+
+  // A note left out altogether is refused too: the numeric path made it 0, which played C-1.
+  for (const [verb, send] of [
+    ['sendNote', () => api.sendNote(1, undefined, 100)],
+    ['sendNoteOff', () => api.sendNoteOff(1)],
+  ]) {
+    clearScriptTrace();
+    send();
+    assert.equal(get(scriptTrace).find((e) => e.kind === 'midi'), undefined, `${verb} with no note sends nothing`);
+    assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message),
+      [`${verb}: no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".`]);
+  }
+  // …except aftertouch, where no note is how channel pressure is asked for.
+  clearScriptTrace();
+  api.sendAftertouch(1, 90);
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
+  assert.match(get(scriptTrace).find((e) => e.kind === 'midi')?.message ?? '', /D0 5A/);
 });
 
 /* -------------------------------------------------------------------------- noteSpelling */

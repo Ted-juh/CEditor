@@ -1025,9 +1025,18 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55];
 // so scaleNotes("c4") answered with the scale on C-1. Both now answer undefined and say why, through
 // __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
 // helper checks its scale or chord first, then its notes in argument order, and stops at the first.
-function __pitch(v) { if (typeof v !== "string") return Math.floor(Number(v) || 0); return noteNumber(v); }
+function __pitch(v) {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string") return Math.floor(Number(v) || 0);
+  return noteNumber(v);
+}
 function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
 function __pitchOf(verb, v) {
+  // A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
+  if (v === undefined || v === null) {
+    logError(verb + ': no note was given, so there is no answer. A note is a MIDI number or a name, such as 60 or "C4".');
+    return undefined;
+  }
   var n = __pitch(v);
   if (n === undefined) {
     logError(verb + ': "' + String(v) + '" is not a note name, so there is no answer. A name is '
@@ -1591,8 +1600,16 @@ function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 
 // undefined out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded
 // the bottom of the keyboard with nothing to say why. A sender that gets undefined refuses the
 // message with __badNote, the way the WebView runtime's refuseNote does, in the same words.
-function __note(n) { return typeof n === "string" ? noteNumber(n) : __7(n); }
+// A note left out altogether is undefined here too, not the 0 the numeric path made of it.
+function __note(n) {
+  if (n === undefined || n === null) return undefined;
+  return typeof n === "string" ? noteNumber(n) : __7(n);
+}
 function __badNote(verb, note) {
+  if (note === undefined || note === null) {
+    logError(verb + ': no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".');
+    return;
+  }
   logError(verb + ': "' + String(note) + '" is not a note name, so nothing was sent. A name is '
     + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
 }

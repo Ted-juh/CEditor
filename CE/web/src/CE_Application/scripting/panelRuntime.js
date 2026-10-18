@@ -920,6 +920,12 @@ const musicPitch = (v) => (typeof v === 'string'
   : Math.floor(Number(v) || 0));
 const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
 function musicPitchOf(verb, v) {
+  // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
+  if (v === undefined || v === null) {
+    addScriptTrace('error', '', `${verb}: no note was given, so there is no answer. A note is a MIDI `
+      + 'number or a name, such as 60 or "C4".');
+    return undefined;
+  }
   const n = musicPitch(v);
   if (n === undefined) {
     addScriptTrace('error', '', `${verb}: "${v}" is not a note name, so there is no answer. A name is `
@@ -2206,10 +2212,15 @@ const midiCh = (c) => midiInt(c, 1, 16) - 1;
 // kept an undefined out of the message and sent note 0 instead: "c4" (the letter must be a capital)
 // played C-1, the bottom of the keyboard, with nothing to say why. A sender that gets undefined
 // here refuses the message with refuseNote, the way an unknown blend mode or checksum is refused.
-const midiNote = (n) => (typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
+// A note that is missing altogether is refused the same way. It became 0 by the numeric path, so
+// sendNote(1) with the note left out played C-1 just as "c4" did.
+const midiNote = (n) => (n === undefined || n === null ? undefined
+  : typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
 function refuseNote(verb, note) {
-  addScriptTrace('error', '', `${verb}: "${note}" is not a note name, so nothing was sent. A name is `
-    + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  addScriptTrace('error', '', note === undefined || note === null
+    ? `${verb}: no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".`
+    : `${verb}: "${note}" is not a note name, so nothing was sent. A name is `
+      + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
 }
 
 /* --- the wire filters: interceptIn / interceptOut / feed --------------------------------------

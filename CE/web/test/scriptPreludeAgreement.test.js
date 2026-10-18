@@ -173,6 +173,7 @@ const STRUCT_CASES = [
   // An unreadable root is no answer in every runtime, not the scale on C-1.
   ['scaleNotes', ['c4', 'major']], ['chordNotes', ['c4', 'major']], ['quantizeNote', ['c4', 60, 'major']],
   ['degreeChord', ['c4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
+  ['scaleNotes', [null, 'major']], ['degreeChord', [null, 'major', 1]],
   ['chordNotes', ['C4', 'min7']], ['chordNotes', [60, 'bogus']],
   ['quantizeNote', [61, 60, 'major']], ['quantizeNote', [66, 60, 'major']], ['quantizeNote', [61, 60, 'bogus']],
   // degreeChord returns a whole record — name, roman numeral, spelling and notes — so every field
@@ -481,8 +482,8 @@ test('the Python engine prelude computes what the WebView runtime computes', asy
 // exported plugin tell the author two different things about one line. Each case runs in all four
 // engines, and the error lines it raises are compared with the WebView runtime's exactly. A case
 // that must raise nothing (a division in another case, say) is here too, so "accepted" is pinned
-// as firmly as "refused". Arguments are strings and numbers only: how each language prints a nil
-// is not a disagreement worth having.
+// as firmly as "refused". A null argument is a value left out (nil, undefined, None), and the
+// refusals for it print no value, because each language would print a different word.
 const REFUSAL_CASES = [
   // MIDI senders: an unreadable note name sends nothing.
   ['sendNote', [1, 'c4', 100]], ['sendNoteOff', [1, 'c4']], ['sendAftertouch', [1, 90, 'c4']],
@@ -500,6 +501,11 @@ const REFUSAL_CASES = [
   // checksum reads hex text a byte at a time, and names the algorithms it knows.
   ['checksum', ['roland', '40007F00']], ['checksum', ['roland', '40 00 zz 00']], ['checksum', ['40 0 7F 00']],
   ['checksum', ['crc17', [1, 2, 3]]],
+  // A note left out altogether, which the numeric path used to make 0. Channel pressure is the one
+  // place a missing note is meant, and it must stay silent.
+  ['sendNote', [1, null, 100]], ['sendNoteOff', [1, null]], ['sendAftertouch', [1, 90, null]],
+  ['scaleNotes', [null, 'major']], ['quantizeNote', [61, null, 'major']], ['degreeChord', [null, 'major', 1]],
+  ['inScale', [null, 60, 'major']],
 ];
 
 function webRefusals(fn, args) {

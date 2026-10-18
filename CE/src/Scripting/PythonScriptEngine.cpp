@@ -1867,12 +1867,18 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 # checks its scale or chord first, then its notes in argument order, and stops at the first.
 def __pitch(v):
     import math
+    if v is None:
+        return None
     if isinstance(v, str):
         return noteNumber(v)
     return math.floor(v or 0)
 def __steps(tbl, name, fallback):
     return tbl.get(fallback if name is None else str(name))
 def __pitchOf(verb, v):
+    # A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
+    if v is None:
+        logError(verb + ': no note was given, so there is no answer. A note is a MIDI number or a name, such as 60 or "C4".')
+        return None
     n = __pitch(v)
     if n is None:
         logError(verb + ': "' + str(v) + '" is not a note name, so there is no answer. A name is '
@@ -2455,11 +2461,17 @@ def __7(v):
 # out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded the bottom
 # of the keyboard with nothing to say why. A sender that gets None refuses the message with
 # __badNote, the way the WebView runtime's refuseNote does, in the same words.
+# A note left out altogether is None here too, not the 0 the numeric path made of it.
 def __note(n):
+    if n is None:
+        return None
     if isinstance(n, str):
         return noteNumber(n)
     return __7(n)
 def __badNote(verb, note):
+    if note is None:
+        logError(verb + ': no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".')
+        return
     logError(verb + ': "' + str(note) + '" is not a note name, so nothing was sent. A name is '
              + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
 
