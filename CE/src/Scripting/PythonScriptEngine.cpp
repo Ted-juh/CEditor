@@ -769,16 +769,18 @@ def msToBeats(ms, bpm=None):
 # that is permanently at the wrong rate.
 def syncTimer(id, beats, opts=None):
     key = "" if id is None else str(id)
-    ms = beatsToMs(beats)
+    length = __beatsOf('ce.time.syncTimer("' + key + '")', beats, True, "no timer was started")
+    if length is None: return
+    ms = beatsToMs(length)
     if ms is None:
         log("syncTimer(\"" + str(id) + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
         return
-    startTimer(key, ms)                                   # clears any previous follow...
+    __armTimer(key, ms)                                   # clears any previous follow...
     follow = True
     if isinstance(opts, dict) and opts.get("follow") is False:
         follow = False
     if follow:
-        __syncFollow[key] = float(beats or 0)             # ...and this puts it back on purpose
+        __syncFollow[key] = length                        # ...and this puts it back on purpose
 # Re-time every following sync timer. Armed from the prelude's own onTransport listener, so it
 # belongs to no script and survives every reload of them.
 def __reArmSyncTimers():
@@ -786,7 +788,7 @@ def __reArmSyncTimers():
         ms = beatsToMs(beats)
         # No tempo any more: leave it running at the last one rather than stopping the music.
         if ms is None: continue
-        startTimer(key, ms)
+        __armTimer(key, ms)
         __syncFollow[key] = beats
 __lastSyncBpm = [None]
 def __syncOnTransport(t):
@@ -808,10 +810,14 @@ def after(ms, fn):
     if not callable(fn):
         log("after(ms, fn) needs a function to run — nothing was scheduled")
         return None
+    if __timeRefused("ce.time.after", ms, "milliseconds", "delay", False, "nothing was scheduled"): return None
+    return __oneShot(ms, fn)
+# The one-shot itself, unchecked: sendNote's duration works out its own delay.
+def __oneShot(ms, fn):
     __afterN[0] += 1
     _id = "__after:" + str(__afterN[0])
     __after[_id] = fn
-    startTimer(_id, ms)
+    __armTimer(_id, ms)
     return _id
 # Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
 # A one-shot is NOT a timer the panel declared, so it is swallowed here rather than surfacing as
@@ -829,7 +835,9 @@ on("*", "onTimer", __afterTick)
 # had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 # fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 def afterBeats(beats, fn):
-    ms = beatsToMs(beats)
+    length = __beatsOf("ce.time.afterBeats", beats, False, "nothing was scheduled")
+    if length is None: return None
+    ms = beatsToMs(length)
     if ms is None:
         log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
         return None
@@ -1114,14 +1122,47 @@ def buildDump(kind):              return __api.buildDump(kind)
 # global round (ce.math) which shadows the builtin for this whole namespace.
 __timerIds = {}
 __syncFollow = {}
-def startTimer(id, ms=0):
-    key = "" if id is None else str(id)
-    if not key: return None
+# An interval or a delay a script got wrong is refused, in the WebView runtime's words (timeRefused
+# there). A repeating interval is a number above 0; a one-shot's delay a number from 0, where 0 is
+# "as soon as the handler has returned". Text is refused, "250" included, and so are True and
+# False, which Python would otherwise count as 1 and 0. Returns True when it refused.
+def __timeRefused(call, value, unit, what, positive, outcome):
+    import math as __m
+    why = None
+    if value is None: why = "no " + what + " was given"
+    elif isinstance(value, str): why = '"' + value + '" is not a number of ' + unit
+    elif isinstance(value, bool) or not isinstance(value, (int, float)): why = "the " + what + " is not a number of " + unit
+    elif isinstance(value, float) and (__m.isnan(value) or __m.isinf(value)):
+        why = "the " + what + " is not a finite number of " + unit
+    elif positive and value <= 0: why = __shown(value) + " is not more than 0 " + unit
+    elif not positive and value < 0: why = __shown(value) + " is less than 0 " + unit
+    if why is None: return False
+    logError(call + ": " + why + ", so " + outcome + ".")
+    return True
+# A number of beats, or a division's name ("1/16" is a quarter of a beat), any case. None when
+# refused. The WebView runtime's beatsOf.
+def __beatsOf(call, value, positive, outcome):
+    if isinstance(value, str):
+        wanted = value.lower()
+        for name in __CE_DIVISION_NAMES:
+            if name.lower() == wanted: return __CE_DIVISIONS[name]
+        logError(call + ': "' + value + '" is neither a number of beats nor a division, so ' + outcome
+                 + ". The divisions are " + ", ".join(__CE_DIVISION_NAMES) + ".")
+        return None
+    return None if __timeRefused(call, value, "beats", "number of beats", positive, outcome) else value
+# Start or re-time a timer whose interval the caller checked or worked out itself.
+def __armTimer(key, ms):
     # An explicit millisecond interval REPLACES a musical one: this is a script asking for
     # milliseconds, not beats.
     __syncFollow.pop(key, None)
     __timerIds[key] = True
     return __api.startTimer(key, int((ms or 0) + 0.5))
+def startTimer(id, ms=None):
+    key = "" if id is None else str(id)
+    if not key: return None
+    if __timeRefused('ce.time.startTimer("' + key + '")', ms, "milliseconds", "interval", True, "no timer was started"):
+        return None
+    return __armTimer(key, ms)
 def stopTimer(id):
     key = "" if id is None else str(id)
     __syncFollow.pop(key, None)
@@ -2880,7 +2921,7 @@ def sendNote(channel=None, note=None, velocity=None, ms=None):
     if length is None: return
     sendMidi([0x90 | (c - 1), n, v])
     if length is not False:
-        after(length, lambda: sendMidi([0x80 | (c - 1), n, 0]))
+        __oneShot(length, lambda: sendMidi([0x80 | (c - 1), n, 0]))
 
 # routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
 # ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
@@ -3177,19 +3218,32 @@ __CE_SCOPES = ("panel", "script", "local")
 # even called. All four runtimes spell the prefix this way.
 __CE_SCRIPT_PREFIX = "\u0001script:"
 
-def __storageScope(opts):
+def __storageScope(opts, verb):
     """The scope asked for, or None when it is not one this build knows.
 
     Refusing rather than falling back to "panel": storing a value in a scope the caller did not ask
     for is how a private setting quietly becomes a shared one, and a typo in a scope name would be
-    the way it happened."""
+    the way it happened. A typo in the KEY ({"scop": "script"}) is the same leak, so any key but
+    "scope" is refused as well, sorted so every runtime names them in one order. A key that is a
+    number is a list entry and is left alone. `verb` is the call's namespaced path; the WebView
+    runtime's storageScopeOf says the same words."""
+    if isinstance(opts, dict):
+        unknown = sorted(str(k) for k in opts
+                         if isinstance(k, str) and k != "scope" and not k.isdigit())
+        if unknown:
+            quoted = ['"' + k + '"' for k in unknown]
+            listed = quoted[0] if len(quoted) == 1 else ", ".join(quoted[:-1]) + " and " + quoted[-1]
+            logError(verb + ": " + listed
+                     + (" is not one of its options" if len(unknown) == 1 else " are not among its options")
+                     + ", so nothing was done. Its only option is scope.")
+            return None
     raw = opts if isinstance(opts, str) else (opts.get("scope") if isinstance(opts, dict) else None)
     if raw is None or raw == "":
         return "panel"
     scope = str(raw)
     if scope in __CE_SCOPES:
         return scope
-    logError('ce.storage: "%s" is not a scope. One of: panel, script, local.' % scope)
+    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % scope)
     return None
 
 # Which of the host's two real stores a scope lives in.
@@ -3211,7 +3265,7 @@ def __storageKeyFrom(scope, stored):
     return None if stored.startswith(__CE_SCRIPT_PREFIX) else stored
 
 def saveSetting(key, value, opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.saveSetting")
     if scope is None:
         return False
     store = __storageStore(scope)
@@ -3223,7 +3277,7 @@ def saveSetting(key, value, opts=None):
     return True
 
 def loadSetting(key, fallback=None, opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.loadSetting")
     if scope is None:
         return fallback
     v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
@@ -3231,7 +3285,7 @@ def loadSetting(key, fallback=None, opts=None):
 
 # settings() lists every saved key; forget() deletes one and says whether there was one.
 def listSettings(opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.settings")
     if scope is None:
         return []
     out = []
@@ -3242,7 +3296,7 @@ def listSettings(opts=None):
     return out
 
 def forgetSetting(key, opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.forget")
     if scope is None:
         return False
     return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) is True
@@ -3250,7 +3304,7 @@ def forgetSetting(key, opts=None):
 # Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 # one was the only way before.
 def allSettings(opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.all")
     if scope is None:
         return {}
     return { k: loadSetting(k, None, opts) for k in listSettings(opts) }
@@ -3258,12 +3312,15 @@ def allSettings(opts=None):
 # Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
 # keys alone: "clear my settings" must not mean "clear everybody's".
 def clearSettings(opts=None):
+    # Checked here first, so a refusal names clear rather than the settings() it calls.
+    if __storageScope(opts, "ce.storage.clear") is None:
+        return 0
     return sum(1 for k in listSettings(opts) if forgetSetting(k, opts))
 
 # Which store a scope is talking to, and what is in it. `available` is the honest field: false means
 # writes in this scope will not stick, which is worth saying once rather than per key.
 def storageInfo(opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.info")
     if scope is None:
         return None
     contents = allSettings(opts)

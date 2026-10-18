@@ -3362,6 +3362,51 @@ int main()
         check (impHost.logs.contains ("A later 107"), "…including in a callback that runs later, from a timer");
     }
 
+    // ---- Intervals and storage option keys a script got wrong, in the real engines --------------
+    // startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) reached the host as 0 ms (its
+    // 5 ms floor, a flood), after("1s", fn) ran at once, and saveSetting(k, v, { scop = "script" })
+    // saved into the shared panel store. Each is refused now, in the words the WebView runtime and
+    // the three preludes share (scriptPreludeAgreement.test.js), and nothing reaches the host. What
+    // is right still does: a 250 ms timer, after(0, fn), and a division as a sync timer's length.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        TestHost host;
+        ScriptRuntime runtime (host);
+        host.runtime = &runtime;
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("bad", lang, "panel", "onBad", "*", isLua
+            ? "function onBad()\n"
+              "  startTimer(\"t\", \"fast\")\n  startTimer(\"u\", -100)\n  startTimer(\"v\")\n"
+              "  after(\"1s\", function() end)\n  syncTimer(\"s\", 0)\n"
+              "  saveSetting(\"k\", 1, { scop = \"script\" })\n"
+              "  startTimer(\"ok\", 250)\n  after(0, function() end)\n"
+              "end\n"
+            : "function onBad() {\n"
+              "  startTimer(\"t\", \"fast\"); startTimer(\"u\", -100); startTimer(\"v\");\n"
+              "  after(\"1s\", function () {}); syncTimer(\"s\", 0);\n"
+              "  saveSetting(\"k\", 1, { scop: \"script\" });\n"
+              "  startTimer(\"ok\", 250); after(0, function () {});\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.timerOps.clear();
+        host.timerStarts.clear();
+        host.levelled.clear();
+        runtime.runAction ("onBad", juce::var());
+        const juce::String tag (lang);
+        check (host.timerStarts.size() == 2 && host.timerStarts[0] == "ok" && host.timerStarts[1].startsWith ("__after:"),
+               tag + ": only the 250 ms timer and the after(0) reach the host (got " + host.timerOps.joinIntoString (", ") + ")");
+        check (host.settings.empty(), tag + ": a misspelled scope key saves nothing, in no store");
+        for (const char* line : {
+                 "error:ce.time.startTimer(\"t\"): \"fast\" is not a number of milliseconds, so no timer was started.",
+                 "error:ce.time.startTimer(\"u\"): -100 is not more than 0 milliseconds, so no timer was started.",
+                 "error:ce.time.startTimer(\"v\"): no interval was given, so no timer was started.",
+                 "error:ce.time.after: \"1s\" is not a number of milliseconds, so nothing was scheduled.",
+                 "error:ce.time.syncTimer(\"s\"): 0 is not more than 0 beats, so no timer was started.",
+                 "error:ce.storage.saveSetting: \"scop\" is not one of its options, so nothing was done. Its only option is scope." })
+            check (host.levelled.contains (line), tag + ": " + juce::String (line).fromFirstOccurrenceOf (":", false, false));
+    }
+
     // ---- Two instances in one process ------------------------------------------------------------
     // Each ScriptRuntime is one plug-in instance (one standalone window). Two copies of one panel,
     // in one DAW, must keep their own variables in Lua and in JavaScript — a global JavaScript

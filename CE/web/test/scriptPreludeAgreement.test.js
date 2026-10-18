@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { get } from 'svelte/store';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { resetScriptStateForTesting, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import {
   JSON_CASES, JSON_DECODE_CASES, JSON_REJECTS, NATIVE_ENCODE_CASES,
@@ -449,6 +449,7 @@ test('panic expands to the same CC sequence in the Lua prelude as in the WebView
 /* --------------------------------------------------------------------------------- helpers */
 
 function luaLiteral(v) {
+  if (v === FN) return 'function() end';
   if (v === null || v === undefined) return 'nil';
   if (Array.isArray(v)) return `{${v.map(luaLiteral).join(', ')}}`;
   if (typeof v === 'object') return `{${Object.entries(v).map(([k, x]) => `${k} = ${luaLiteral(x)}`).join(', ')}}`;
@@ -555,7 +556,9 @@ test('the Python engine prelude computes what the WebView runtime computes', asy
 // engines, and the error lines it raises are compared with the WebView runtime's exactly. A case
 // that must raise nothing (a division in another case, say) is here too, so "accepted" is pinned
 // as firmly as "refused". A null argument is a value left out (nil, undefined, None), and the
-// refusals for it print no value, because each language would print a different word.
+// refusals for it print no value, because each language would print a different word. FN stands for
+// a function, which each engine is handed in its own language.
+const FN = { __function: true };
 const REFUSAL_CASES = [
   // MIDI senders: an unreadable note name sends nothing.
   ['sendNote', [1, 'c4', 100]], ['sendNoteOff', [1, 'c4']], ['sendAftertouch', [1, 90, 'c4']],
@@ -648,16 +651,38 @@ const REFUSAL_CASES = [
   ['animateTo', ['K.value', 'full']], ['animateSpring', ['K.value', '100px']],
   ['animateTo', ['K.value', '#FF0000']], ['animateTo', [['K.value', 'R.value'], null]],
   ['animateSpring', ['K.value', true]],
+  // Settings: an options table with any key but `scope` is refused, because a misspelled key used to
+  // mean the shared panel store. The keys are named sorted, whatever order the table keeps them in.
+  ['saveSetting', ['k', 1, { scop: 'script' }]], ['loadSetting', ['k', null, { scope: 'script', fallbak: 2 }]],
+  ['listSettings', [{ b: 1, a: 2 }]], ['allSettings', [{ scope: 'panel', z: 1, x: 2, y: 3 }]],
+  ['forgetSetting', ['k', { scop: 'local' }]], ['clearSettings', [{ scop: 'script' }]],
+  ['storageInfo', [{ scope: 'sript' }]], ['saveSetting', ['k', 1, { scope: 'bogus' }]],
+  // Timers: a repeating interval is a number above 0, a one-shot's delay a number from 0, and a
+  // musical length may be a division's name. Each used to become a 1 ms timer, or run at once.
+  ['startTimer', ['t', 'fast']], ['startTimer', ['t']], ['startTimer', ['t', -100]], ['startTimer', ['t', 0]],
+  ['startTimer', [5, -0.5]], ['startTimer', ['t', true]], ['startTimer', ['t', '250']],
+  ['startTimer', ['t', { ms: 5 }]], ['startTimer', ['t', 250]],
+  ['syncTimer', ['s', '1/6']], ['syncTimer', ['s', 0]], ['syncTimer', ['s', null]], ['syncTimer', ['s', -1]],
+  ['syncTimer', ['s', 'fast']], ['syncTimer', ['s', '1/16']], ['syncTimer', ['s', '1/8t']], ['syncTimer', ['s', 0.25]],
+  ['after', ['1s', FN]], ['after', [-5, FN]], ['after', [null, FN]], ['after', [false, FN]],
+  ['after', [0, FN]], ['after', [10, FN]],
+  ['afterBeats', ['1/6', FN]], ['afterBeats', [-1, FN]], ['afterBeats', [null, FN]], ['afterBeats', ['1/4', FN]],
+  ['afterBeats', [0, FN]],
 ];
+
+/** The case's arguments with FN made a function in this realm. */
+const withFunctions = (args) => args.map((a) => (a === FN ? () => {} : a));
 
 function webRefusals(fn, args) {
   clearScriptTrace();
-  web[fn](...args);
+  web[fn](...withFunctions(args));
   return get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
 }
 
 test('the engines refuse the same mistakes in the same words', async (t) => {
   const want = REFUSAL_CASES.map(([fn, args]) => webRefusals(fn, args));
+  // The cases that are accepted started real timers in this process.
+  resetScriptStateForTesting();
   assert.ok(want.some((lines) => lines.length), 'the cases must include some refusals');
 
   // JavaScript, under node:vm.
@@ -673,7 +698,7 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
     });
     REFUSAL_CASES.forEach(([fn, args], i) => {
       errors.length = 0;
-      sandbox[fn](...args);
+      sandbox[fn](...withFunctions(args));
       assert.deepEqual([...errors], want[i], `JS prelude ${fn}(${JSON.stringify(args)})`);
     });
   }
@@ -683,7 +708,9 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
     const { LuaFactory } = await import('wasmoon');
     const lua = await new LuaFactory().createEngine();
     try {
-      for (const name of ['log', 'logError', 'sendCC', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+      // __transportState answers nothing, as a host with no transport does, so a musical timer
+      // that is accepted stops at "no tempo" (a log line, not an error).
+      for (const name of ['log', 'logError', 'sendCC', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
         lua.global.set(name, () => {});
       }
       await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
@@ -727,7 +754,7 @@ def _dec(v):
 out = []
 for fn, args in payload["cases"]:
     del errors[:]
-    g[fn](*_dec(args))
+    g[fn](*[(lambda *a: None) if isinstance(x, dict) and x.get("__function") else x for x in _dec(args)])
     out.append(list(errors))
 sys.stdout.write(json.dumps(out, ensure_ascii=False))
 `;

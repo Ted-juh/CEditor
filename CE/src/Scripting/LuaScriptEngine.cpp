@@ -1971,7 +1971,7 @@ function sendNote(channel, note, velocity, ms)
   local length = __noteLength("sendNote", ms); if length == nil then return end
   sendMidi({0x90 | (c - 1), n, v})
   if length then
-    after(length, function() sendMidi({0x80 | (c - 1), n, 0}) end)
+    __oneShot(length, function() sendMidi({0x80 | (c - 1), n, 0}) end)
   end
 end
 function sendRPN(channel, msb, lsb, value)
@@ -2087,14 +2087,55 @@ end
 -- would call itself.
 local __hostStartTimer, __hostStopTimer = startTimer, stopTimer
 local __timerIds, __syncFollow = {}, {}
-function startTimer(id, ms)
-  local key = tostring(id == nil and "" or id)
-  if key == "" then return end
+-- An interval or a delay a script got wrong is refused, in the WebView runtime's words (timeRefused
+-- there). `tonumber(ms) or 0` made startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) a
+-- timer at the host's 5 ms floor, and after("1s", fn) ran at once. A repeating interval is a number
+-- above 0; a one-shot's delay a number from 0, where 0 is "as soon as the handler has returned".
+-- Text is refused, "250" included. Returns true when it refused.
+local function __timeRefused(call, value, unit, what, positive, outcome)
+  local why
+  if value == nil then why = "no " .. what .. " was given"
+  elseif type(value) == "string" then why = '"' .. value .. '" is not a number of ' .. unit
+  elseif type(value) ~= "number" then why = "the " .. what .. " is not a number of " .. unit
+  elseif value ~= value or value == math.huge or value == -math.huge then
+    why = "the " .. what .. " is not a finite number of " .. unit
+  elseif positive and value <= 0 then why = __shown(value) .. " is not more than 0 " .. unit
+  elseif not positive and value < 0 then why = __shown(value) .. " is less than 0 " .. unit end
+  if why == nil then return false end
+  logError(call .. ": " .. why .. ", so " .. outcome .. ".")
+  return true
+end
+-- A number of beats, or a division's name ("1/16" is a quarter of a beat), any case. nil when
+-- refused. The WebView runtime's beatsOf.
+local function __beatsOf(call, value, positive, outcome)
+  if type(value) == "string" then
+    local wanted = string.lower(value)
+    for i = 1, #__CE_DIVISION_NAMES do
+      local id = __CE_DIVISION_NAMES[i]
+      if string.lower(id) == wanted then return __CE_DIVISIONS[id] end
+    end
+    logError(call .. ': "' .. value .. '" is neither a number of beats nor a division, so ' .. outcome
+      .. ". The divisions are " .. table.concat(__CE_DIVISION_NAMES, ", ") .. ".")
+    return nil
+  end
+  if __timeRefused(call, value, "beats", "number of beats", positive, outcome) then return nil end
+  return value
+end
+-- Start or re-time a timer whose interval the caller checked or worked out itself.
+local function __armTimer(key, ms)
   -- An explicit millisecond interval REPLACES a musical one: this is a script asking for
   -- milliseconds, not beats.
   __syncFollow[key] = nil
   __timerIds[key] = true
   __hostStartTimer(key, math.floor((tonumber(ms) or 0) + 0.5))
+end
+function startTimer(id, ms)
+  local key = tostring(id == nil and "" or id)
+  if key == "" then return end
+  if __timeRefused('ce.time.startTimer("' .. key .. '")', ms, "milliseconds", "interval", true, "no timer was started") then
+    return
+  end
+  __armTimer(key, ms)
 end
 function stopTimer(id)
   local key = tostring(id == nil and "" or id)
@@ -2120,14 +2161,16 @@ end
 -- that is permanently at the wrong rate.
 function syncTimer(id, beats, opts)
   local key = tostring(id == nil and "" or id)
-  local ms = beatsToMs(beats)
+  local length = __beatsOf('ce.time.syncTimer("' .. key .. '")', beats, true, "no timer was started")
+  if length == nil then return end
+  local ms = beatsToMs(length)
   if ms == nil then
     log("syncTimer(\"" .. tostring(id) .. "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
     return
   end
-  startTimer(key, ms)                                     -- clears any previous follow…
+  __armTimer(key, ms)                                     -- clears any previous follow…
   if not (opts ~= nil and opts.follow == false) then
-    __syncFollow[key] = tonumber(beats) or 0              -- …and this puts it back on purpose
+    __syncFollow[key] = length                            -- …and this puts it back on purpose
   end
 end
 -- Re-time every following sync timer. Armed from the prelude's own onTransport listener below, so
@@ -2138,7 +2181,7 @@ local function __reArmSyncTimers()
   for key, beats in pairs(pending) do
     local ms = beatsToMs(beats)
     -- No tempo any more: leave it running at the last one rather than stopping the music.
-    if ms ~= nil then startTimer(key, ms) __syncFollow[key] = beats end
+    if ms ~= nil then __armTimer(key, ms) __syncFollow[key] = beats end
   end
 end
 local __lastSyncBpm = nil
@@ -2157,16 +2200,22 @@ end)
 -- removed and the timer stopped BEFORE fn runs, so a callback that throws cannot leave a one-shot
 -- repeating forever — which is precisely what the hand-rolled version does.
 local __after, __afterN = {}, 0
+-- The one-shot itself, unchecked: sendNote's duration works out its own delay. Global, because
+-- sendNote is written above this and a local declared here would not be visible to it.
+function __oneShot(ms, fn)
+  __afterN = __afterN + 1
+  local id = "__after:" .. tostring(__afterN)
+  __after[id] = fn
+  __armTimer(id, ms)
+  return id
+end
 function after(ms, fn)
   if type(fn) ~= "function" then
     log("after(ms, fn) needs a function to run — nothing was scheduled")
     return nil
   end
-  __afterN = __afterN + 1
-  local id = "__after:" .. tostring(__afterN)
-  __after[id] = fn
-  startTimer(id, ms)
-  return id
+  if __timeRefused("ce.time.after", ms, "milliseconds", "delay", false, "nothing was scheduled") then return nil end
+  return __oneShot(ms, fn)
 end
 -- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
 -- A one-shot is NOT a timer the panel declared, so it is swallowed here rather than surfacing as
@@ -2185,7 +2234,9 @@ end)
 -- had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 -- fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 function afterBeats(beats, fn)
-  local ms = beatsToMs(beats)
+  local length = __beatsOf("ce.time.afterBeats", beats, false, "nothing was scheduled")
+  if length == nil then return nil end
+  local ms = beatsToMs(length)
   if ms == nil then
     log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
     return nil
@@ -2635,15 +2686,37 @@ local __CE_SCRIPT_PREFIX = "\001script:"
 
 -- The scope asked for, or nothing when it is not one this build knows. Refusing rather than falling
 -- back to "panel": storing a value in a scope the caller did not ask for is how a private setting
--- quietly becomes a shared one, and a typo in a scope name would be the way it happened.
-function __storageScope(opts)
+-- quietly becomes a shared one, and a typo in a scope name would be the way it happened. A typo in
+-- the KEY ({ scop = "script" }) is the same leak, so any key but `scope` is refused as well, sorted
+-- because pairs() has no order and every runtime must name them in one. A key that is a number is
+-- a list entry and is left alone. `verb` is the call's namespaced path; the WebView runtime's
+-- storageScopeOf says the same words.
+function __storageScope(opts, verb)
   local raw
   if type(opts) == "string" then raw = opts
-  elseif type(opts) == "table" then raw = opts.scope end
+  elseif type(opts) == "table" then
+    local unknown = {}
+    for k in pairs(opts) do
+      if type(k) == "string" and k ~= "scope" and not k:match("^%d+$") then unknown[#unknown + 1] = k end
+    end
+    if #unknown > 0 then
+      table.sort(unknown)
+      local quoted = {}
+      for i, k in ipairs(unknown) do quoted[i] = '"' .. k .. '"' end
+      local listed = quoted[1]
+      if #quoted > 1 then
+        listed = table.concat(quoted, ", ", 1, #quoted - 1) .. " and " .. quoted[#quoted]
+      end
+      logError(verb .. ": " .. listed .. (#unknown == 1 and " is not one of its options" or " are not among its options")
+        .. ", so nothing was done. Its only option is scope.")
+      return nil
+    end
+    raw = opts.scope
+  end
   if raw == nil or raw == "" then return "panel" end
   local scope = tostring(raw)
   for _, known in ipairs(__CE_SCOPES) do if known == scope then return scope end end
-  logError('ce.storage: "' .. scope .. '" is not a scope. One of: panel, script, local.')
+  logError(verb .. ': "' .. scope .. '" is not a scope, so nothing was done. One of: panel, script, local.')
   return nil
 end
 
@@ -2670,7 +2743,7 @@ function __storageKeyFrom(scope, stored)
 end
 
 function saveSetting(key, value, opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.saveSetting")
   if scope == nil then return false end
   local store = __storageStore(scope)
   if __settingsAvailable(store) ~= true then
@@ -2683,7 +2756,7 @@ function saveSetting(key, value, opts)
 end
 
 function loadSetting(key, fallback, opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.loadSetting")
   if scope == nil then return fallback end
   local v = __loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
   if v == nil then return fallback end
@@ -2692,7 +2765,7 @@ end
 
 -- settings() lists every saved key; forget() deletes one and says whether there was one.
 function listSettings(opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.settings")
   if scope == nil then return {} end
   local raw = __listSettings(__storageStore(scope)) or {}
   local out = {}
@@ -2704,7 +2777,7 @@ function listSettings(opts)
 end
 
 function forgetSetting(key, opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.forget")
   if scope == nil then return false end
   return __forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) == true
 end
@@ -2712,7 +2785,7 @@ end
 -- Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 -- one was the only way before.
 function allSettings(opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.all")
   if scope == nil then return {} end
   local out = {}
   for _, k in ipairs(listSettings(opts)) do out[k] = loadSetting(k, nil, opts) end
@@ -2722,6 +2795,8 @@ end
 -- Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
 -- keys alone: "clear my settings" must not mean "clear everybody's".
 function clearSettings(opts)
+  -- Checked here first, so a refusal names clear rather than the settings() it calls.
+  if __storageScope(opts, "ce.storage.clear") == nil then return 0 end
   local gone = 0
   for _, k in ipairs(listSettings(opts)) do if forgetSetting(k, opts) then gone = gone + 1 end end
   return gone
@@ -2730,7 +2805,7 @@ end
 -- Which store a scope is talking to, and what is in it. `available` is the honest field: false means
 -- writes in this scope will not stick, which is worth saying once rather than per key.
 function storageInfo(opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.info")
   if scope == nil then return nil end
   local contents = allSettings(opts)
   local count = 0

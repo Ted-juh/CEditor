@@ -321,14 +321,51 @@ function buildDump(kind) { return __api.buildDump(kind); }
 // The prelude tracks which timers exist (runningTimers) and which follow the tempo (syncTimer), so
 // these are more than a pass-through to the host. Both tables, __timerIds and __syncFollow, are the
 // running script's own (__CE_OWN).
-function startTimer(id, ms) {
-  var key = String(id === undefined || id === null ? "" : id);
-  if (!key) return undefined;
+// An interval or a delay a script got wrong is refused, in the WebView runtime's words (timeRefused
+// there). `Number(ms) || 0` made startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) a
+// timer at the host's 5 ms floor, and after("1s", fn) ran at once. A repeating interval is a number
+// above 0; a one-shot's delay a number from 0, where 0 is "as soon as the handler has returned".
+// Text is refused, "250" included. Returns true when it refused.
+function __timeRefused(call, value, unit, what, positive, outcome) {
+  var why = null;
+  if (value === undefined || value === null) why = "no " + what + " was given";
+  else if (typeof value === "string") why = '"' + value + '" is not a number of ' + unit;
+  else if (typeof value !== "number") why = "the " + what + " is not a number of " + unit;
+  else if (!isFinite(value)) why = "the " + what + " is not a finite number of " + unit;
+  else if (positive && value <= 0) why = String(value) + " is not more than 0 " + unit;
+  else if (!positive && value < 0) why = String(value) + " is less than 0 " + unit;
+  if (why === null) return false;
+  logError(call + ": " + why + ", so " + outcome + ".");
+  return true;
+}
+// A number of beats, or a division's name ("1/16" is a quarter of a beat), any case. Nothing when
+// refused. The WebView runtime's beatsOf.
+function __beatsOf(call, value, positive, outcome) {
+  if (typeof value === "string") {
+    var wanted = value.toLowerCase();
+    for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
+      if (__CE_DIVISION_NAMES[i].toLowerCase() === wanted) return __CE_DIVISIONS[__CE_DIVISION_NAMES[i]];
+    }
+    logError(call + ': "' + value + '" is neither a number of beats nor a division, so ' + outcome
+      + ". The divisions are " + __CE_DIVISION_NAMES.join(", ") + ".");
+    return undefined;
+  }
+  return __timeRefused(call, value, "beats", "number of beats", positive, outcome) ? undefined : value;
+}
+// Start or re-time a timer whose interval the caller checked or worked out itself.
+function __armTimer(key, ms) {
   // An explicit millisecond interval REPLACES a musical one: this is a script asking for
   // milliseconds, not beats.
   delete __syncFollow[key];
   __timerIds[key] = true;
   return __api.startTimer(key, Math.round(Number(ms) || 0));
+}
+function startTimer(id, ms) {
+  var key = String(id === undefined || id === null ? "" : id);
+  if (!key) return undefined;
+  if (__timeRefused('ce.time.startTimer("' + key + '")', ms, "milliseconds", "interval", true, "no timer was started"))
+    return undefined;
+  return __armTimer(key, ms);
 }
 function stopTimer(id) {
   var key = String(id === undefined || id === null ? "" : id);
@@ -1988,7 +2025,7 @@ function sendNote(channel, note, velocity, ms) {
   var v = __midiArg("sendNote", "velocity", velocity); if (v === undefined) return;
   var length = __noteLength("sendNote", ms); if (length === undefined) return;
   sendMidi([0x90 | (c - 1), n, v]);
-  if (length !== null) after(length, function () { sendMidi([0x80 | (c - 1), n, 0]); });
+  if (length !== null) __oneShot(length, function () { sendMidi([0x80 | (c - 1), n, 0]); });
 }
 // routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
 // ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
@@ -2122,13 +2159,15 @@ function msToBeats(ms, bpm) {
 // that is permanently at the wrong rate.
 function syncTimer(id, beats, opts) {
   var key = String(id === undefined || id === null ? "" : id);
-  var ms = beatsToMs(beats);
+  var length = __beatsOf('ce.time.syncTimer("' + key + '")', beats, true, "no timer was started");
+  if (length === undefined) return;
+  var ms = beatsToMs(length);
   if (ms === null) {
     log("syncTimer(\"" + id + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.");
     return;
   }
-  startTimer(key, ms);                                    // clears any previous follow…
-  if (!(opts && opts.follow === false)) __syncFollow[key] = Number(beats) || 0;   // …put back on purpose
+  __armTimer(key, ms);                                    // clears any previous follow…
+  if (!(opts && opts.follow === false)) __syncFollow[key] = length;   // …put back on purpose
 }
 // Re-time every following sync timer. Armed from the prelude's own onTransport listener, so it
 // belongs to no script and survives every reload of them.
@@ -2140,7 +2179,7 @@ function __reArmSyncTimers() {
     var ms = beatsToMs(pending[k]);
     // No tempo any more: leave it running at the last one rather than stopping the music.
     if (ms === null) continue;
-    startTimer(k, ms);
+    __armTimer(k, ms);
     __syncFollow[k] = pending[k];
   }
 }
@@ -2165,10 +2204,15 @@ function after(ms, fn) {
     log("after(ms, fn) needs a function to run — nothing was scheduled");
     return undefined;
   }
+  if (__timeRefused("ce.time.after", ms, "milliseconds", "delay", false, "nothing was scheduled")) return undefined;
+  return __oneShot(ms, fn);
+}
+// The one-shot itself, unchecked: sendNote's duration works out its own delay.
+function __oneShot(ms, fn) {
   __afterN += 1;
   var id = "__after:" + __afterN;
   __after[id] = fn;
-  startTimer(id, ms);
+  __armTimer(id, ms);
   return id;
 }
 // Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
@@ -2188,7 +2232,9 @@ on("*", "onTimer", function (info) {
 // had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 // fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 function afterBeats(beats, fn) {
-  var ms = beatsToMs(beats);
+  var length = __beatsOf("ce.time.afterBeats", beats, false, "nothing was scheduled");
+  if (length === undefined) return undefined;
+  var ms = beatsToMs(length);
   if (ms === null) {
     log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.");
     return undefined;
@@ -2623,13 +2669,32 @@ var __CE_SCOPES = ["panel", "script", "local"];
 
 /* The scope asked for, or nothing when it is not one this build knows. Refusing rather than falling
  * back to "panel": storing a value in a scope the caller did not ask for is how a private setting
- * quietly becomes a shared one, and a typo in a scope name would be the way it happened. */
-function __storageScope(opts) {
+ * quietly becomes a shared one, and a typo in a scope name would be the way it happened. A typo in
+ * the KEY ({ scop: "script" }) is the same leak, so any key but `scope` is refused as well, sorted so
+ * every runtime names them in one order. A key that is a number is a list entry and is left alone.
+ * `verb` is the call's namespaced path. The WebView runtime's storageScopeOf says the same words. */
+function __storageScope(opts, verb) {
+  if (opts !== null && typeof opts === "object" && !Array.isArray(opts)) {
+    var unknown = [];
+    for (var key in opts) {
+      if (Object.prototype.hasOwnProperty.call(opts, key) && key !== "scope" && !/^\d+$/.test(key)) unknown.push(key);
+    }
+    if (unknown.length) {
+      unknown.sort();
+      var quoted = [];
+      for (var i = 0; i < unknown.length; i++) quoted.push('"' + unknown[i] + '"');
+      var listed = quoted.length < 2 ? quoted.join("")
+        : quoted.slice(0, -1).join(", ") + " and " + quoted[quoted.length - 1];
+      logError(verb + ": " + listed + (unknown.length === 1 ? " is not one of its options" : " are not among its options")
+               + ", so nothing was done. Its only option is scope.");
+      return undefined;
+    }
+  }
   var raw = (typeof opts === "string") ? opts : (opts ? opts.scope : undefined);
   if (raw === undefined || raw === null || raw === "") return "panel";
   var scope = String(raw);
   if (__CE_SCOPES.indexOf(scope) >= 0) return scope;
-  logError('ce.storage: "' + scope + '" is not a scope. One of: ' + __CE_SCOPES.join(", ") + ".");
+  logError(verb + ': "' + scope + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
   return undefined;
 }
 // Which of the host's two real stores a scope lives in.
@@ -2651,7 +2716,7 @@ function __storageKeyFrom(scope, stored) {
 }
 
 function saveSetting(key, value, opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.saveSetting");
   if (!scope) return false;
   var store = __storageStore(scope);
   if (__api.settingsAvailable(store) !== true) {
@@ -2663,14 +2728,14 @@ function saveSetting(key, value, opts) {
   return true;
 }
 function loadSetting(key, fallback, opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.loadSetting");
   if (!scope) return fallback;
   var v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope));
   return (v === undefined || v === null) ? fallback : v;
 }
 // settings() lists every saved key; forget() deletes one and says whether there was one.
 function listSettings(opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.settings");
   if (!scope) return [];
   var raw = __api.listSettings(__storageStore(scope)) || [];
   var out = [];
@@ -2681,14 +2746,14 @@ function listSettings(opts) {
   return out;
 }
 function forgetSetting(key, opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.forget");
   if (!scope) return false;
   return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) === true;
 }
 // Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 // one was the only way before.
 function allSettings(opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.all");
   if (!scope) return {};
   var keys = listSettings(opts), out = {};
   for (var i = 0; i < keys.length; i++) out[keys[i]] = loadSetting(keys[i], undefined, opts);
@@ -2697,6 +2762,8 @@ function allSettings(opts) {
 // Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
 // keys alone: "clear my settings" must not mean "clear everybody's".
 function clearSettings(opts) {
+  // Checked here first, so a refusal names clear rather than the settings() it calls.
+  if (!__storageScope(opts, "ce.storage.clear")) return 0;
   var keys = listSettings(opts), gone = 0;
   for (var i = 0; i < keys.length; i++) if (forgetSetting(keys[i], opts)) gone++;
   return gone;
@@ -2704,7 +2771,7 @@ function clearSettings(opts) {
 // Which store a scope is talking to, and what is in it. `available` is the honest field: false means
 // writes in this scope will not stick, which is worth saying once rather than per key.
 function storageInfo(opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.info");
   if (!scope) return undefined;
   var store = __storageStore(scope);
   var contents = allSettings(opts);

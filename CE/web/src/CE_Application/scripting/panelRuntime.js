@@ -6304,9 +6304,57 @@ function clearTimerHandle(key) {
   timers.delete(key);
 }
 
+/* An interval or a delay a script got wrong is refused, in the words every prelude uses.
+ *
+ * startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) all became `Number(ms) || 0`, a
+ * timer firing every millisecond here and every 5 in the player, which is a script flooding the
+ * panel because of a typo. after("1s", fn) ran at once. A repeating interval has to be a number
+ * above 0; a one-shot's delay a number from 0, where 0 is "as soon as the handler has returned",
+ * the way setTimeout(fn, 0) is read. A number is a number: "250" is text, and is refused like any
+ * text, because two of the four runtimes could not read it and the other two read "" as 0.
+ *
+ * `call` names the call, `unit` is "milliseconds" or "beats", and `outcome` is what did not happen.
+ * Returns true when it refused. */
+function timeRefused(call, value, { unit, what, positive, outcome }) {
+  let why = null;
+  if (value === undefined || value === null) why = `no ${what} was given`;
+  else if (typeof value === 'string') why = `"${value}" is not a number of ${unit}`;
+  else if (typeof value !== 'number') why = `the ${what} is not a number of ${unit}`;
+  else if (!Number.isFinite(value)) why = `the ${what} is not a finite number of ${unit}`;
+  else if (positive && value <= 0) why = `${value} is not more than 0 ${unit}`;
+  else if (!positive && value < 0) why = `${value} is less than 0 ${unit}`;
+  if (why === null) return false;
+  addScriptTrace('error', '', `${call}: ${why}, so ${outcome}.`);
+  return true;
+}
+
+/* A number of beats, or a division's name, which is the other way a musical length is written
+ * ("1/16" is a quarter of a beat): syncTimer("step", "1/16") was 1 ms and afterBeats("1/4", fn) ran
+ * at once, and the name has one meaning, so it is read. Any case, as divisionId reads it. Anything
+ * else is refused by timeRefused. */
+function beatsOf(call, value, { positive, outcome }) {
+  if (typeof value === 'string') {
+    const id = DIVISION_NAMES.find((d) => d.toLowerCase() === value.toLowerCase());
+    if (id !== undefined) return DIVISIONS[id];
+    addScriptTrace('error', '', `${call}: "${value}" is neither a number of beats nor a division, `
+      + `so ${outcome}. The divisions are ${DIVISION_NAMES.join(', ')}.`);
+    return undefined;
+  }
+  return timeRefused(call, value, { unit: 'beats', what: 'number of beats', positive, outcome })
+    ? undefined : value;
+}
+
+/** startTimer as a script calls it: the interval checked, then armed. */
 function startTimer(id, ms) {
   const key = String(id ?? '');
   if (!key) return;
+  if (timeRefused(`ce.time.startTimer("${key}")`, ms,
+    { unit: 'milliseconds', what: 'interval', positive: true, outcome: 'no timer was started' })) return;
+  armTimer(key, ms);
+}
+
+/** Start or re-time a timer whose interval the caller has already checked or worked out. */
+function armTimer(key, ms) {
   const period = Math.max(1, Math.round(Number(ms) || 0));
   clearTimerHandle(key);
   // An explicit millisecond interval REPLACES a musical one — startTimer over a sync timer is a
@@ -6350,8 +6398,17 @@ function afterFor(scriptId, ms, fn) {
   // The owner is stored with the callback so a throw inside it is reported against the script that
   // scheduled it. By the time it fires there is no dispatch in progress to infer that from.
   afterCallbacks.set(id, { fn, scriptId: scriptId ?? '' });
-  startTimer(id, ms);
+  armTimer(id, ms);
   return id;
+}
+
+/** after as a script calls it. afterFor itself stays unchecked: sendNote's duration and
+    requestDump's timeout work out their own delays. */
+function afterRead(scriptId, ms, fn) {
+  if (typeof fn !== 'function') return afterFor(scriptId, ms, fn);   // its own message
+  if (timeRefused('ce.time.after', ms,
+    { unit: 'milliseconds', what: 'delay', positive: false, outcome: 'nothing was scheduled' })) return undefined;
+  return afterFor(scriptId, ms, fn);
 }
 
 /** Schedule a one-shot the runtime owns, rather than one a script asked for. Used by sendNote's
@@ -6444,17 +6501,19 @@ function msToBeatsRead(ms, bpm) {
  */
 function syncTimerRead(id, beats, opts) {
   const key = String(id ?? '');
-  const ms = beatsToMsRead(beats);
+  const length = beatsOf(`ce.time.syncTimer("${key}")`, beats, { positive: true, outcome: 'no timer was started' });
+  if (length === undefined) return;
+  const ms = beatsToMsRead(length);
   if (ms == null) {
     addScriptTrace('log', '',
       `syncTimer("${id}"): no tempo is being reported, so there is no interval to compute. `
       + 'Use startTimer with a millisecond interval, or wait for onTransport.');
     return;
   }
-  startTimer(key, Math.round(ms));            // clears any previous follow…
+  armTimer(key, Math.round(ms));              // clears any previous follow…
   const follow = !(opts && opts.follow === false);
   if (!follow) return;
-  syncFollowers.set(key, Number(beats) || 0);  // …and this puts it back on purpose
+  syncFollowers.set(key, length);             // …and this puts it back on purpose
   watchTempoForSyncTimers();
 }
 
@@ -6473,7 +6532,7 @@ function reArmSyncTimers() {
   for (const [key, beats] of [...syncFollowers]) {
     const ms = beatsToMsRead(beats);
     if (ms == null) continue;                 // no tempo any more: leave it running at the last one
-    startTimer(key, Math.round(ms));
+    armTimer(key, Math.round(ms));
     syncFollowers.set(key, beats);
   }
 }
@@ -6499,7 +6558,9 @@ function watchTempoForSyncTimers() {
  * says so rather than firing immediately.
  */
 function afterBeatsFor(scriptId, beats, fn) {
-  const ms = beatsToMsRead(beats);
+  const length = beatsOf('ce.time.afterBeats', beats, { positive: false, outcome: 'nothing was scheduled' });
+  if (length === undefined) return undefined;
+  const ms = beatsToMsRead(length);
   if (ms == null) {
     addScriptTrace('log', scriptId ?? '',
       'afterBeats(): no tempo is being reported, so there is no delay to compute. '
@@ -7178,14 +7239,33 @@ const LOCAL_STORAGE_PREFIX = 'ce.storage:';
  *  Refusing rather than falling back to "panel": storing a value in a scope the caller did not ask
  *  for is how a private setting quietly becomes a shared one, and a typo in a scope name would be
  *  the way it happened. Every verb below bails on nothing.
+ *
+ *  A typo in the KEY is the same leak by another door, and it used to walk straight through:
+ *  `saveSetting(k, v, { scop = "script" })` has no `scope`, so it was "panel", and another script
+ *  read the value. So an options table with any key but `scope` is refused too, where the other
+ *  verbs only warn (applyOptionChecks): here the fallback is not harmless. The keys are sorted, so
+ *  the four runtimes, whose tables keep different orders, say the same words. A key that is a
+ *  number is a list entry, as everywhere else, and is left alone.
+ *
+ *  `verb` is the call's namespaced path, ce.storage.saveSetting and so on.
  */
-function storageScopeOf(opts, scriptId) {
+function storageScopeOf(opts, scriptId, verb) {
+  if (isOptionsTable(opts)) {
+    const unknown = Object.keys(opts).filter((key) => key !== 'scope' && !LIST_KEY.test(key)).sort();
+    if (unknown.length) {
+      const quoted = andList(unknown.map((key) => `"${key}"`));
+      addScriptTrace('error', scriptId ?? '', unknown.length === 1
+        ? `${verb}: ${quoted} is not one of its options, so nothing was done. Its only option is scope.`
+        : `${verb}: ${quoted} are not among its options, so nothing was done. Its only option is scope.`);
+      return undefined;
+    }
+  }
   const raw = typeof opts === 'string' ? opts : opts?.scope;
   if (raw == null || raw === '') return 'panel';
   const scope = String(raw);
   if (STORAGE_SCOPES.includes(scope)) return scope;
   addScriptTrace('error', scriptId ?? '',
-    `ce.storage: "${scope}" is not a scope. One of: ${STORAGE_SCOPES.join(', ')}.`);
+    `${verb}: "${scope}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
   return undefined;
 }
 
@@ -7247,7 +7327,7 @@ function localWrite(map) {
 }
 
 function saveSetting(key, value, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.saveSetting');
   if (!scope) return false;
   const stored = storageKeyFor(scope, key, scriptId);
   // In the player, both scopes are the instance's, and every write goes back to it.
@@ -7275,7 +7355,7 @@ function saveSetting(key, value, opts, scriptId) {
 }
 
 function loadSetting(key, fallback, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.loadSetting');
   if (!scope) return fallback;
   const stored = storageKeyFor(scope, key, scriptId);
   const source = scope === 'local' ? localRead() : settingsStore();
@@ -7286,7 +7366,7 @@ function loadSetting(key, fallback, opts, scriptId) {
 /** Every key this panel has saved IN THIS SCOPE. Empty means nothing written — not "settings
  *  unavailable", which is what info() is for. */
 function listSettings(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.settings');
   if (!scope) return [];
   const source = (scope === 'local' ? localRead() : settingsStore()) ?? {};
   return Object.keys(source)
@@ -7297,7 +7377,7 @@ function listSettings(opts, scriptId) {
 /** Every setting as a table — the read every other module got, instead of listing keys and looping
  *  to fetch each one. */
 function allSettings(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.all');
   if (!scope) return {};
   const source = (scope === 'local' ? localRead() : settingsStore()) ?? {};
   const out = {};
@@ -7311,7 +7391,7 @@ function allSettings(opts, scriptId) {
 /** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing
  *  there" — the distinction the whole module keeps. */
 function forgetSetting(key, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.forget');
   if (!scope) return false;
   const stored = storageKeyFor(scope, key, scriptId);
   if (host?.storage) return host.storage.forget(scope === 'local' ? 'local' : 'panel', stored);
@@ -7330,7 +7410,7 @@ function forgetSetting(key, opts, scriptId) {
 /** Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
  *  keys alone: "clear my settings" must not mean "clear everybody's". */
 function clearSettings(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.clear');
   if (!scope) return 0;
   const keys = listSettings(opts, scriptId);
   let gone = 0;
@@ -7347,7 +7427,7 @@ function clearSettings(opts, scriptId) {
  * scope will not stick, which is a thing to say once rather than discover per key.
  */
 function storageInfo(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.info');
   if (!scope) return undefined;
   const source = scope === 'local' ? localRead() : settingsStore();
   const contents = allSettings(opts, scriptId);
@@ -7426,6 +7506,21 @@ function decodeJson(text) {
   } catch { return undefined; }
 }
 
+/* --------------------------------------------------------- reading what a script passed */
+
+/** An options table, rather than a list, a typed array, text or nothing. */
+function isOptionsTable(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && !ArrayBuffer.isView(value);
+}
+
+// A key that is a number is a list entry: wasmoon hands a Lua list over as an object with keys
+// "1", "2", …, and a list is not a table of options or filters, whatever argument it arrived in.
+const LIST_KEY = /^\d+$/;
+
+/** "a", "a and b", "a, b and c": several things named in one sentence. */
+const andList = (items) => (items.length < 2 ? items.join('')
+  : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+
 // @module -
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const self = {
@@ -7485,7 +7580,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     defineAction: (name, fn) => defineActionImpl(scriptId, name, fn),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
-    after: (ms, fn) => afterFor(scriptId, ms, fn),
+    after: (ms, fn) => afterRead(scriptId, ms, fn),
     // ce.anim — values that move over time
     animateTo: (path, target, opts) => startAnimationImpl(scriptId, 'to', path, target, opts ?? {}),
     animateSpring: (path, target, opts) => startAnimationImpl(scriptId, 'spring', path, target, opts ?? {}),

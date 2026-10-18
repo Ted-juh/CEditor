@@ -276,7 +276,9 @@ const SHARED_OPTION_FIELDS = {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
     summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
       + 'it; "script" is private to this one; "local" stays on this machine and is never written '
-      + 'into the panel document.',
+      + 'into the panel document. A scope that is not one of these is refused, and so is an options '
+      + 'table with any other key, such as a misspelled `scop`: nothing is saved or read, and a '
+      + 'message says why, because falling back to "panel" would share a private setting.',
   },
 
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
@@ -777,7 +779,7 @@ export const COMMANDS = [
   // yours — start with the same id twice and the second call re-times the existing timer.
   {
     id: 'startTimer', category: 'Events & Flow', signature: 'startTimer(id, ms)',
-    summary: 'Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one.',
+    summary: 'Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'ms', type: 'number', required: true },
@@ -787,7 +789,7 @@ export const COMMANDS = [
   },
   {
     id: 'after', category: 'Events & Flow', signature: 'after(ms, fn) -> id',
-    summary: 'Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs.',
+    summary: 'Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs. 0 runs it as soon as the handler that asked has returned. A missing delay, text (even "1000") or a negative number schedules nothing and writes a message.',
     params: [
       { name: 'ms', type: 'number', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -2304,10 +2306,10 @@ export const COMMANDS = [
   },
   {
     id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
-    summary: 'Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. If there is no tempo to work from, no timer starts and a note is written to the script console.',
+    summary: 'Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division\'s name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.',
     params: [
       { name: 'id', type: 'string', required: true },
-      { name: 'beats', type: 'number', required: true },
+      { name: 'beats', type: 'number or division', required: true },
       { name: 'opts', type: 'table', required: false },
     ],
     scopes: 'any',
@@ -2315,7 +2317,7 @@ export const COMMANDS = [
   },
   {
     id: 'afterBeats', category: 'Time', signature: 'afterBeats(beats, fn) -> id',
-    summary: 'Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.',
+    summary: 'Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. `beats` may also be a division\'s name, such as "1/4", read as `ce.time.division()` reads it; 0 runs `fn` as soon as the handler has returned. A negative number, a name that is not a division, or no delay at all schedules nothing and writes a message. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'fn', type: 'function', required: true },
