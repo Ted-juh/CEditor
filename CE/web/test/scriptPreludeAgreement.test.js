@@ -449,8 +449,15 @@ function luaLiteral(v) {
   if (Array.isArray(v)) return `{${v.map(luaLiteral).join(', ')}}`;
   if (typeof v === 'object') return `{${Object.entries(v).map(([k, x]) => `${k} = ${luaLiteral(x)}`).join(', ')}}`;
   if (typeof v === 'string') return JSON.stringify(v);
+  if (typeof v === 'number' && !Number.isFinite(v)) {
+    return Number.isNaN(v) ? '(0/0)' : v > 0 ? 'math.huge' : '(-math.huge)';
+  }
   return String(v);
 }
+// JSON for the Python driver, which cannot write NaN or Infinity: they go as marked strings that the
+// driver's _dec turns back into floats, so a case can pass them to every engine alike.
+const pyJson = (v) => JSON.stringify(v, (_k, x) => (typeof x === 'number' && !Number.isFinite(x)
+  ? `\u0000${Number.isNaN(x) ? 'nan' : x > 0 ? 'inf' : '-inf'}` : x));
 
 // The JS half of the serialiser above: same key ordering, same number formatting (Lua's "%.10g"
 // keeps ten significant digits, so scale()'s 503.937007874… must be cut the same way on both
@@ -583,6 +590,41 @@ const REFUSAL_CASES = [
   ['bytesFromHex', ['F04110']], ['bytesToHex', ['zz']],
   ['bytesFromBase64', ['8EEQQg=']], ['bytesFromBase64', ['8E=Q']], ['bytesFromBase64', [42]],
   ['bytesToBase64', [[1, 2, 3]]],
+  // Channel messages: an address outside its range, anything that is not a number, and a value left
+  // out are refused; a value past the end of its range is still clamped, so those must stay silent.
+  ['sendCC', [1, 200, 5]], ['sendCC', [1, 'cutoff', 5]], ['sendCC', [0, 7, 5]], ['sendCC', [17, 7, 5]],
+  ['sendCC', [null, 7, 5]], ['sendCC', [1, 7, null]], ['sendCC', [1, 7, 'loud']], ['sendCC', [1, 7, NaN]],
+  ['sendCC', [1, 7, 128]], ['sendCC', [1, 7.4, 64.5]], ['sendCC', [true, 7, 5]],
+  ['sendNote', [1, 'C10', 100]], ['sendNote', [1, 'C-2', 100]], ['sendNote', [1, 128, 100]],
+  ['sendNote', [1, -1, 100]], ['sendNote', [1, NaN, 100]], ['sendNote', [1, true, 100]],
+  ['sendNote', [1, [60], 100]], ['sendNote', [1, 60]], ['sendNote', [1, 60, 100, '500ms']],
+  ['sendNote', [1, 60, 100, -5]], ['sendNote', [1, 60, 100, 0]], ['sendNote', [1, 'G9', 100]],
+  ['sendNote', [1, 127.6, 100]], ['sendNote', [1, 60, 100, 250]],
+  ['sendNoteOff', [1, 'G#9']], ['sendNoteOff', [1, 60]], ['sendAftertouch', [1, null]], ['sendAftertouch', [1, 90, 200]],
+  ['sendProgramChange', [1, 128]], ['sendProgramChange', [1, 5, 200]], ['sendProgramChange', [1, null]],
+  ['sendPitchBend', [1, 'center']], ['sendPitchBend', [1, NaN]], ['sendPitchBend', [1]], ['sendPitchBend', [1, -1]],
+  ['sendNRPN', [1, 128, 0, 5]], ['sendNRPN', [1, 0, 0, null]], ['sendRPN', [1, 0, 'x', 5]], ['sendRPN', [1, 0, 0, 20000]],
+  ['sendSongPosition', [null]], ['sendSongPosition', ['start']],
+  ['sendTransport', ['pause']], ['sendTransport', [null]], ['sendTransport', ['STOP']], ['sendTransport', [3]],
+  ['panic', [{ channel: 'all' }]], ['panic', [{ channel: 17 }]], ['panic', [{ channel: 2 }]],
+  // The music helpers' numbers: NaN or true is not a note, where it used to root the answer at C-1.
+  ['scaleNotes', [NaN, 'major']], ['scaleNotes', [true, 'major']], ['quantizeNote', [NaN, 60, 'major']],
+  ['inScale', [Infinity, 60, 'major']], ['scaleDegree', [60, [60], 'major']], ['chordNotes', [127, 'major']],
+  // One byte rule: an item is a whole number from 0 to 255 or one hex byte, a list is a list, and the
+  // separators are the same everywhere (a form feed is one, a no-break space is not).
+  ['bytesToHex', [[300]]], ['bytesToHex', [['41', '0xF7']]], ['bytesToHex', [[1.5]]], ['bytesToHex', [[-1]]],
+  ['bytesToHex', [[true]]], ['bytesToHex', [[[1]]]], ['bytesToHex', [42]], ['bytesToHex', [null]],
+  ['bytesToHex', [[NaN]]], ['bytesToHex', [[1, Infinity]]], ['bytesToHex', [['G0']]],
+  ['bytesToHex', ['F0\f41']], ['bytesToHex', ['F0\u00A041']],
+  ['bytesPut', [[1, 2, 3], 1, 0x7F]], ['bytesFind', [[1, 2], 0xF7]], ['bytesFromHex', [42]],
+  ['bytesFromHex', [null]], ['bytesFromHex', [[1, 2]]], ['bytesFromBase64', [null]],
+  ['checksum', ['roland']], ['checksum', [null]], ['checksum', ['roland', [300]]], ['checksum', ['xor', ['41', 16]]],
+  // A value left out, or not a number, is named rather than printed as each language prints it.
+  ['setBits', [0, 0, 3]], ['bytesWrite', [[1], 0, 1]], ['bytesWrite', [[1], 0, 1, '5']],
+  ['getBits', [NaN, 0, 3]], ['setBits', [Infinity, 0, 3, 1]], ['getBits', [true, 0, 1]],
+  ['getBits', [5]], ['bytesPut', [[1], 1]],
+  ['beatsPerDivision', [null]], ['stepAt', [2.5]], ['stepAt', [2.5, 8]], ['swingOffset', [1, 0.5]],
+  ['checksum', [null, [1, 2]]], ['checksum', [true, [1, 2]]], ['checksum', ['constructor', [1, 2]]],
 ];
 
 function webRefusals(fn, args) {
@@ -654,15 +696,20 @@ for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendC
 exec(compile(payload["prelude"], "prelude", "exec"), g)
 errors = []
 g["logError"] = lambda m, *rest: errors.append(str(m))
+def _dec(v):
+    if isinstance(v, str) and v.startswith("\\u0000"): return float(v[1:])
+    if isinstance(v, list): return [_dec(x) for x in v]
+    if isinstance(v, dict): return {k: _dec(x) for k, x in v.items()}
+    return v
 out = []
 for fn, args in payload["cases"]:
     del errors[:]
-    g[fn](*args)
+    g[fn](*_dec(args))
     out.append(list(errors))
 sys.stdout.write(json.dumps(out, ensure_ascii=False))
 `;
   const run = spawnSync(python, ['-c', driver], {
-    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: REFUSAL_CASES }),
+    input: pyJson({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: REFUSAL_CASES }),
     encoding: 'utf8',
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
   });

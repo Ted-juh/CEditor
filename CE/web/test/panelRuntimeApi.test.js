@@ -284,7 +284,7 @@ test('hex text is read a byte at a time, and a token that is not one byte is ref
   // The other calls that read hex text read it the same way.
   clearScriptTrace();
   assert.equal(api.checksum('roland', '40007F00'), undefined);
-  assert.match(errors()[0], /^checksum: "40007F00" is not one byte, so there is no checksum\./);
+  assert.match(errors()[0], /^ce\.midi\.checksum: "40007F00" is not one byte, so there is no checksum\./);
   assert.equal(api.checksum('roland', '40 00 7F 00'), 0x41, 'the GS reset checksum, from spaced text');
   clearScriptTrace();
   api.sendMidi('903C64');
@@ -314,19 +314,54 @@ test('middle C is C4, and the docs now say so', () => {
 });
 
 test('the note verbs build the bytes the MIDI spec calls for', () => {
-  // Asserted against the runtime source rather than a captured send, since without a JUCE host the
-  // bytes only reach the trace console. The C++ suite asserts the actual wire bytes.
-  // `n` is midiNote(note), resolved once — sendNote now also schedules the note off when given a
-  // duration, and re-resolving the name for that would let a note start on one pitch and end on
-  // another if noteName ever changed under it.
-  assert.match(runtimeSource, /0x90 \| channel, n,/, 'note on is 0x90');
-  assert.match(runtimeSource, /0x80 \| channel, n, 0/, 'the scheduled note off is 0x80');
-  assert.match(runtimeSource, /0x80 \| channel, n, midiInt\(velocity/, 'and explicit sendNoteOff is 0x80');
-  assert.match(runtimeSource, /0xC0 \| midiCh\(ch\)/, 'program change is 0xC0');
-  assert.match(runtimeSource, /0xE0 \| midiCh\(ch\), v % 128, Math\.floor\(v \/ 128\)/, 'pitch bend is lsb then msb');
-  assert.match(runtimeSource, /0xD0 \| midiCh\(ch\)/, 'channel pressure is 0xD0');
-  assert.match(runtimeSource, /0xA0 \| midiCh\(ch\)/, 'poly pressure is 0xA0');
-  assert.match(runtimeSource, /\[0xF8\]/, 'clock is 0xF8');
+  // Without a JUCE host the bytes reach the trace console, so this asserts what would go out. It
+  // used to match the runtime's source text, which pinned how the bytes were written rather than
+  // what they were. The C++ suite asserts the player's wire bytes.
+  const sent = (call) => {
+    clearScriptTrace();
+    call();
+    return get(scriptTrace).filter((e) => e.kind === 'midi')
+      .map((e) => e.message.replace(/^→ \S+: /, '').replace(/ {2}\(no JUCE host — not sent\)$/, ''));
+  };
+  assert.deepEqual(sent(() => api.sendNote(2, 60, 100)), ['91 3C 64'], 'note on is 0x90');
+  assert.deepEqual(sent(() => api.sendNoteOff(2, 60, 10)), ['81 3C 0A'], 'note off is 0x80');
+  assert.deepEqual(sent(() => api.sendProgramChange(2, 7)), ['C1 07'], 'program change is 0xC0');
+  assert.deepEqual(sent(() => api.sendPitchBend(2, 8193)), ['E1 01 40'], 'pitch bend is lsb then msb');
+  assert.deepEqual(sent(() => api.sendAftertouch(2, 90)), ['D1 5A'], 'channel pressure is 0xD0');
+  assert.deepEqual(sent(() => api.sendAftertouch(2, 90, 64)), ['A1 40 5A'], 'poly pressure is 0xA0');
+  assert.deepEqual(sent(() => api.sendClock()), ['F8'], 'clock is 0xF8');
+});
+
+test('a channel message that would go out wrong is refused, and nothing goes out', () => {
+  // Each of these used to send something: CC 127 (Poly Mode On) for 200, CC 0 (Bank Select) for
+  // "cutoff", 90 84 64 for "C10" (a status byte in the data slot), a note off for a missing velocity,
+  // a note on and never its note off for "500ms", Start for "pause", channel 1 for "all".
+  const midi = () => get(scriptTrace).filter((e) => e.kind === 'midi').map((e) => e.message);
+  const errors = () => get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+  for (const [call, said] of [
+    [() => api.sendCC(1, 200, 5), 'sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127.'],
+    [() => api.sendCC(1, 'cutoff', 5), 'sendCC: "cutoff" is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127.'],
+    [() => api.sendCC(17, 7, 5), 'sendCC: 17 is not a channel, so nothing was sent. A channel is a whole number from 1 to 16.'],
+    [() => api.sendNote(1, 'C10', 100), 'sendNote: "C10" is outside the MIDI notes, so nothing was sent. MIDI notes run from 0 to 127, which is C-1 to G9.'],
+    [() => api.sendNote(1, Number.NaN, 100), 'sendNote: NaN is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'],
+    [() => api.sendNote(1, 60), 'sendNote: no velocity given, so nothing was sent.'],
+    [() => api.sendNote(1, 60, 100, '500ms'), 'sendNote: "500ms" is not a length in milliseconds, so nothing was sent. Give a number above 0, or leave it out to send the note off yourself.'],
+    [() => api.sendTransport('pause'), 'sendTransport: "pause" is not a transport action, so nothing was sent. The actions are "start", "continue" and "stop".'],
+    [() => api.panic({ channel: 'all' }), 'panic: "all" is not a channel, so nothing was sent. A channel is a whole number from 1 to 16.'],
+    [() => api.sendSysex([0x41, 0x10, 300]), 'sendSysex: 300 at position 2 is not a byte, so nothing was sent. A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".'],
+    [() => api.sendMidi(42), 'sendMidi: 42 is not a list of bytes, so nothing was sent.'],
+  ]) {
+    clearScriptTrace();
+    call();
+    assert.deepEqual({ midi: midi(), errors: errors() }, { midi: [], errors: [said] });
+  }
+  // A value past the end of its range is still sent as the nearest end, and text items are bytes.
+  clearScriptTrace();
+  api.sendCC(1, 7, 128);
+  api.sendSysex(['F0', '41', 'F7']);
+  api.sendTransport('STOP');
+  assert.deepEqual(midi().map((m) => m.replace(/^→ \S+: /, '').replace(/ {2}\(no JUCE host — not sent\)$/, '')),
+    ['B0 07 7F', 'F0 41 F7', 'FC']);
 });
 
 test('tearing down a script sends pending duration note-offs before cancelling timers', () => {

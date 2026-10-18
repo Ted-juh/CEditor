@@ -484,7 +484,8 @@ namespace Ce
         public void sendNRPN(int channel, int msb, int lsb, double v) => sendNRPN(channel, msb, lsb, new Var(v));
 
         /// <summary>sendSysex(bytes) or sendSysex("F0 41 10 …"). The list or the string goes to the host
-        /// as it is — the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS.</summary>
+        /// as it is — the host reads it as it does for Lua and JS (each byte 0 to 255, each hex token one
+        /// byte, anything else refused with a message) and adds F0/F7.</summary>
         public void sendSysex(IEnumerable<int> bytes)
         {
             var list = new List<int>(bytes ?? Array.Empty<int>());

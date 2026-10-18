@@ -2762,7 +2762,7 @@ export const COMMANDS = [
   /* --- Device / MIDI: raw (Q9) --- */
   {
     id: 'sendCC', category: 'Device / MIDI', signature: 'sendCC(channel, cc, value)',
-    summary: 'Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.',
+    summary: 'Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127. A channel or controller number outside its range, or anything that is not a number, is refused with a message and nothing is sent, in every send command; a value past the end of its range is sent as the nearest end. A number with a fraction is rounded.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'cc', type: 'number', required: true },
@@ -2811,14 +2811,14 @@ export const COMMANDS = [
   // sendCC. That is what makes them portable to every runtime and every exported language.
   {
     id: 'sendMidi', category: 'Device / MIDI', signature: 'sendMidi(bytes)',
-    summary: 'Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run is refused with a message.',
+    summary: 'Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendMidi({0x90, 60, 100})$0', javascript: 'sendMidi([0x90, 60, 100])$0' },
   },
   {
     id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity [, ms])',
-    summary: 'Play a note. `note` is a MIDI note number or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note left out, is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too (where leaving the note out of aftertouch means channel pressure, as it always has). A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.',
+    summary: 'Play a note. `note` is a MIDI note number from 0 to 127 or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, a note outside 0 to 127 ("C10"), or a note left out is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too. The velocity must be given; 0 means note off. Give `ms`, a number above 0, and the matching note off is sent for you after that many milliseconds.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
@@ -2830,7 +2830,7 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiIn', category: 'Device / MIDI', signature: 'interceptMidiIn(fn)',
-    summary: 'See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged.',
+    summary: 'See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2840,7 +2840,7 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiOut', category: 'Device / MIDI', signature: 'interceptMidiOut(fn)',
-    summary: 'See every MIDI message the panel sends — from a script or from a control\'s own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged.',
+    summary: 'See every MIDI message the panel sends — from a script or from a control\'s own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2850,7 +2850,7 @@ export const COMMANDS = [
   },
   {
     id: 'feedMidi', category: 'Device / MIDI', signature: 'feedMidi(bytes)',
-    summary: 'Pretend a MIDI message arrived from the synth. The panel\'s controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run is refused with a message.',
+    summary: 'Pretend a MIDI message arrived from the synth. The panel\'s controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.',
     params: [{ name: 'bytes', type: 'value', required: true }],
     scopes: 'any',
     snippet: { lua: 'feedMidi(${1:{0x90, 60, 100\}})$0', javascript: 'feedMidi([${1:0x90, 60, 100}])$0' },
@@ -2893,7 +2893,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendPitchBend', category: 'Device / MIDI', signature: 'sendPitchBend(channel, value)',
-    summary: 'Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). How many semitones the full range covers is set on the synth.',
+    summary: 'Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). Left out, the bend centres; anything that is not a number is refused with a message. How many semitones the full range covers is set on the synth.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'value', type: 'number', required: true },
@@ -2903,7 +2903,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendAftertouch', category: 'Device / MIDI', signature: 'sendAftertouch(channel, pressure [, note])',
-    summary: 'Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch).',
+    summary: 'Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch). Leaving the note out means channel pressure; the pressure itself must be given.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'pressure', type: 'number', required: true },
@@ -2921,21 +2921,21 @@ export const COMMANDS = [
   },
   {
     id: 'sendTransport', category: 'Device / MIDI', signature: 'sendTransport(action)',
-    summary: 'Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`).',
+    summary: 'Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`), in any case. Any other action, or none, is refused with a message and nothing is sent.',
     params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'] }],
     scopes: 'any',
     snippet: { lua: 'sendTransport("${1:start}")$0', javascript: 'sendTransport("${1:start}")$0' },
   },
   {
     id: 'sendSysex', category: 'Device / MIDI', signature: 'sendSysex(bytes)',
-    summary: 'Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7". In hex text each byte is one or two digits, with spaces or commas between the bytes; text with a longer run, such as "F04110", is refused with a message and nothing is sent.',
+    summary: 'Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7". In hex text each byte is one or two digits, with spaces or commas between the bytes; text with a longer run, such as "F04110", is refused with a message and nothing is sent. In a list each byte is a whole number from 0 to 255, or text that is one hex byte ("F7"); anything else, such as 300, is refused the same way.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendSysex(${1:bytes})$0', javascript: 'sendSysex(${1:bytes})$0' },
   },
   {
     id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes [, opts]) -> number',
-    summary: 'Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name returns nothing and prints the names it accepts. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.',
+    summary: 'Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts, and so do bytes that are not bytes. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.',
     params: [
       { name: 'type', type: 'string', required: true,
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
@@ -2952,7 +2952,7 @@ export const COMMANDS = [
   },
   {
     id: 'panic', category: 'Device / MIDI', signature: 'panic([opts])',
-    summary: 'Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`; set `opts.resetControllers` to false to leave controllers alone.',
+    summary: 'Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`, a number from 1 to 16 (anything else, such as "all", is refused and nothing is sent); set `opts.resetControllers` to false to leave controllers alone.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'channel', type: 'number', default: 'all sixteen channels', sample: '1',
         summary: 'Silence one channel instead of every one.' },
@@ -3596,7 +3596,7 @@ export const HELPERS = [
   // every list that comes back is new.
   {
     id: 'getBits', category: 'MIDI encoding', signature: 'getBits(value, start, count) -> number',
-    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0.',
+    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0, and so is a list item that is not a byte from 0 to 255.',
     params: [
       { name: 'value', type: 'value', required: true },
       { name: 'start', type: 'number', required: true },
@@ -3673,7 +3673,7 @@ export const HELPERS = [
   },
   {
     id: 'bytesFromHex', category: 'MIDI encoding', signature: 'bytesFromHex(text) -> list',
-    summary: 'Read hex text into a list of bytes, by the rule every send uses: one or two digits a byte, with or without 0x, with spaces or commas between. Text with a longer run, such as "F04110", is refused with a message.',
+    summary: 'Read hex text into a list of bytes, by the rule every send uses: one or two digits a byte, with or without 0x, with spaces or commas between. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text.',
     params: [{ name: 'text', type: 'text', required: true }],
   },
   {

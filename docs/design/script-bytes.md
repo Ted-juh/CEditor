@@ -92,12 +92,20 @@ The same in the WebView runtime and the Lua, JavaScript and Python preludes:
 - **A list may also be hex text**, read by the rule every send uses, or a typed array in
   JavaScript, or `bytes` or a `bytearray` in Python. A list always comes back, so what a script does
   next is the same everywhere.
-- **Each byte is read modulo 256**, so `toHex([300])` is `"2C"`.
+- **A byte is a byte by one rule, the one every send uses**: in a list, a whole number from 0 to
+  255, or text that is one hex byte (`{"F0", "41"}` is F0 41); in hex text, one or two hex digits
+  a token, with spaces, tabs, line breaks or commas between. Anything else is refused and says what
+  it was and where: `toHex([300])` answers nothing, with "300 at position 0 is not a byte". A number
+  where a list belongs is refused too (`put(msg, 1, 0x7F)` is "127 is not a list of bytes"), and
+  nothing at all is "no bytes given". Until 2026-10-18 these helpers read an item modulo 256 (300
+  was 2C) while every send clamped it (300 was FF, a System Reset inside a SysEx): two rules for one
+  thing, and neither said anything.
 - **Every list that comes back is new.** The one passed in is never changed, so a dump a script was
   handed cannot be edited by accident.
 - **A mistake answers nothing and says what it was**: bits or bytes past the end, a value that does
   not fit, an offset or count that is not a whole number in range, text that is not hex or not
-  base64. Nothing is cut down, wrapped or padded into a plausible answer, because a plausible wrong
+  base64, an item that is not a byte. A value left out is named ("the value to write is missing")
+  rather than printed, since each language would print it as a different word. Nothing is cut down, wrapped or padded into a plausible answer, because a plausible wrong
   byte sent to a synth is the failure every fix on 2026-10-18 was about.
 - **One exception: a write may run past the end and grow the list**, since that is how a message is
   built. It cannot start beyond the end, which would leave a gap.
@@ -119,9 +127,12 @@ The same in the WebView runtime and the Lua, JavaScript and Python preludes:
 
 - `scriptPreludeAgreement.test.js` runs every helper in all four engines and requires the same
   values. That includes negative numbers and full 32-bit fields, where the languages' integers
-  would part company if the arithmetic differed. It also requires the same words for 36 refusals
-  and silence in three cases that must not refuse. A separate test there checks each language's own
-  byte type.
+  would part company if the arithmetic differed. It also requires the same words for every refusal,
+  NaN and Infinity included (the cases carry them to Python and Lua as themselves), and silence where
+  a case must not refuse. A separate test there checks each language's own byte type.
+- The player reads a send's bytes in one place, `BridgeScriptHost::bytesFromScript`, by the same
+  rule and in the same words; `PlayerScriptIntegrationTests` drives it from real Lua and JavaScript,
+  a `Uint8Array` included.
 - `scriptBytes.test.js` pins the behaviour itself: MemoryBlock's bit order, inputs left unchanged,
   growth, and base64 against node's own encoder.
 - `ScriptRuntimeTests` and `PythonScriptEngineTests` call the helpers through their namespaced names

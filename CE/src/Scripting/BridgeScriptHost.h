@@ -13,6 +13,7 @@
 // THREADING: all calls happen on the message thread, inside a dispatch.
 
 #include "ScriptRuntime.h"
+#include <cmath>
 #include <map>
 
 namespace ceditor::scripting
@@ -22,12 +23,22 @@ namespace ceditor::scripting
 // without 0x. A longer token was read as ONE number and the low byte kept, so "F0411000" went out
 // as F0 00 F7 (the WebView runtime clamped it and sent F0 FF F7), and neither said anything. These
 // find the token that is not one byte and say so, in the same words as scriptBytes in the WebView
-// runtime (panelRuntime.js). Splits on the same separators: whitespace and commas.
+// runtime (panelRuntime.js). Splits on the same separators in every runtime: space, tab, the line
+// breaks, form feed, vertical tab and the comma (Lua's %s, and not JavaScript's \s, which would also
+// take a no-break space).
 inline juce::StringArray hexTextTokens (const juce::String& text)
 {
-    auto tokens = juce::StringArray::fromTokens (text, " ,\t\r\n", "");
+    auto tokens = juce::StringArray::fromTokens (text, " ,\t\r\n\f\v", "");
     tokens.removeEmptyStrings();
     return tokens;
+}
+
+/** One hex byte's value, or -1 when the text is not one byte. */
+inline int hexTextByte (const juce::String& token)
+{
+    const auto digits = token.startsWithIgnoreCase ("0x") ? token.substring (2) : token;
+    if (digits.isEmpty() || digits.length() > 2 || ! digits.containsOnly ("0123456789abcdefABCDEF")) return -1;
+    return digits.getHexValue32();
 }
 
 /** The first token of `bytes`' hex text that is not one byte, or empty when it is all bytes (or not
@@ -36,12 +47,46 @@ inline juce::String firstTokenNotOneByte (const juce::var& bytes)
 {
     if (! bytes.isString()) return {};
     for (const auto& token : hexTextTokens (bytes.toString()))
-    {
-        const auto digits = token.startsWithIgnoreCase ("0x") ? token.substring (2) : token;
-        if (digits.isEmpty() || digits.length() > 2 || ! digits.containsOnly ("0123456789abcdefABCDEF"))
-            return token;
-    }
+        if (hexTextByte (token) < 0) return token;
     return {};
+}
+
+/** How a refusal shows a value a script passed, in the same words as the WebView runtime's
+ *  shownValue and the preludes' __shownValue, whichever engine it came from: "nothing", NaN and
+ *  Infinity as JavaScript writes them, a whole number without ".0", text in quotes, "a list". */
+inline juce::String shownScriptValue (const juce::var& v)
+{
+    if (v.isVoid() || v.isUndefined()) return "nothing";
+    if (v.isBool()) return static_cast<bool> (v) ? "true" : "false";
+    if (v.isInt() || v.isInt64()) return juce::String (static_cast<juce::int64> (v));
+    if (v.isDouble())
+    {
+        const double d = v;
+        if (std::isnan (d)) return "NaN";
+        if (std::isinf (d)) return d > 0 ? "Infinity" : "-Infinity";
+        if (d == std::floor (d) && std::abs (d) < 9007199254740992.0) return juce::String (static_cast<juce::int64> (d));
+        return juce::String (d);
+    }
+    if (v.isString()) return "\"" + v.toString() + "\"";
+    if (v.isMethod()) return "a function";
+    return "a list";
+}
+
+/** One item of a script's list of bytes: a whole number from 0 to 255, or text that is one hex
+ *  byte. -1 when it is neither. */
+inline int scriptListByte (const juce::var& v)
+{
+    if (v.isInt() || v.isInt64())
+    {
+        const auto n = static_cast<juce::int64> (v);
+        return n >= 0 && n <= 255 ? static_cast<int> (n) : -1;
+    }
+    if (v.isDouble())
+    {
+        const double d = v;
+        return d >= 0.0 && d <= 255.0 && d == std::floor (d) ? static_cast<int> (d) : -1;
+    }
+    return v.isString() ? hexTextByte (v.toString()) : -1;
 }
 
 /** "sendSysex: "F0411000" is not one byte, so nothing was sent. Put a space between …" */
@@ -215,8 +260,29 @@ public:
         if (callbacks.setValue) callbacks.setValue (addressed.first, value, transmit, addressed.second);
     }
 
-    void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
-    void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
+    // The Lua, JavaScript and Python preludes check a CC's numbers before they get here (__midiArg);
+    // a native handler's sendCC does not pass through a prelude, so the same check is made here, in
+    // the same words: an address outside its range, or a value that is not a number, is refused,
+    // and a value is rounded half up and clamped. A script's call arrives already checked.
+    void sendCC (int ch, int cc, const juce::var& v) override
+    {
+        juce::var value;
+        if (! midiAddress ("sendCC", ch, 1, 16, "a channel", "A channel is a whole number from 1 to 16.")
+            || ! midiAddress ("sendCC", cc, 0, 127, "a controller number", "A controller number is a whole number from 0 to 127.")
+            || ! midiValue ("sendCC", v, 127, "A value is a number from 0 to 127.", value))
+            return;
+        if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, value);
+    }
+    void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override
+    {
+        juce::var value;
+        if (! midiAddress ("sendNRPN", ch, 1, 16, "a channel", "A channel is a whole number from 1 to 16.")
+            || ! midiAddress ("sendNRPN", msb, 0, 127, "an MSB", "An MSB is a whole number from 0 to 127.")
+            || ! midiAddress ("sendNRPN", lsb, 0, 127, "an LSB", "An LSB is a whole number from 0 to 127.")
+            || ! midiValue ("sendNRPN", v, 16383, "A value is a number from 0 to 16383.", value))
+            return;
+        if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, value);
+    }
     void sendSysex (const juce::var& bytes) override
     {
         auto message = bytes;
@@ -272,7 +338,9 @@ public:
     void applyDump (const juce::var& bytes) override
     {
         auto dump = bytes;
-        if (! bytesFromScript ("applyDump", "nothing was decoded", dump)) return;
+        // A decoded { parameter: value } map is not bytes, and goes to the callback as it is.
+        const bool decodedMap = dump.getDynamicObject() != nullptr && ! dump.isArray();
+        if (! decodedMap && ! bytesFromScript ("applyDump", "nothing was decoded", dump)) return;
         if (callbacks.applyDump) callbacks.applyDump (dump);
     }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
@@ -447,19 +515,76 @@ private:
     // runtime's words, and otherwise turned into the list of numbers the callback is handed. The
     // app's callbacks never parse text of their own, so they cannot split it differently. Text was
     // the editor's alone until now for every verb but sendSysex: the player's sendMidi took a list
-    // and dropped text without a word. Anything that is not text passes through untouched.
+    // and dropped text without a word.
+    //
+    // A list is read here too, by the same rule as the WebView runtime's scriptBytes: each item a
+    // whole number from 0 to 255, or text that is one hex byte. The callbacks clamped what they were
+    // handed, so 300 went out as FF, a System Reset in the middle of a SysEx, and "41" was read as
+    // decimal. An object is read as its values, the way the editor reads a Lua table, which is also
+    // what QuickJS makes of a Uint8Array; it used to be "no bytes given". Nothing given becomes the
+    // empty list, for hasBytes to report.
     bool bytesFromScript (const juce::String& verb, const juce::String& outcome, juce::var& bytes)
     {
-        if (! bytes.isString()) return true;
-        if (const auto token = firstTokenNotOneByte (bytes); token.isNotEmpty())
+        juce::Array<juce::var> list;
+        if (bytes.isVoid() || bytes.isUndefined()) { bytes = juce::var (list); return true; }
+        if (bytes.isString())
         {
-            logAt ("error", notOneByteMessage (verb, token, outcome), juce::var());
+            if (const auto token = firstTokenNotOneByte (bytes); token.isNotEmpty())
+            {
+                logAt ("error", notOneByteMessage (verb, token, outcome), juce::var());
+                return false;
+            }
+            for (const auto& token : hexTextTokens (bytes.toString()))
+                list.add (hexTextByte (token));
+            bytes = juce::var (list);
+            return true;
+        }
+        juce::Array<juce::var> items;
+        if (auto* array = bytes.getArray()) items = *array;
+        else if (auto* object = bytes.getDynamicObject())
+            for (const auto& property : object->getProperties()) items.add (property.value);
+        else
+        {
+            logAt ("error", verb + ": " + shownScriptValue (bytes) + " is not a list of bytes, so " + outcome + ".", juce::var());
             return false;
         }
-        juce::Array<juce::var> list;
-        for (const auto& token : hexTextTokens (bytes.toString()))
-            list.add ((token.startsWithIgnoreCase ("0x") ? token.substring (2) : token).getHexValue32());
+        for (int i = 0; i < items.size(); ++i)
+        {
+            const int b = scriptListByte (items.getReference (i));
+            if (b < 0)
+            {
+                logAt ("error", verb + ": " + shownScriptValue (items.getReference (i)) + " at position " + juce::String (i)
+                                    + " is not a byte, so " + outcome
+                                    + ". A byte is a whole number from 0 to 255, or one or two hex digits such as \"F7\".",
+                       juce::var());
+                return false;
+            }
+            list.add (b);
+        }
         bytes = juce::var (list);
+        return true;
+    }
+
+    bool midiAddress (const juce::String& verb, int v, int lo, int hi, const char* aNoun, const char* hint)
+    {
+        if (v >= lo && v <= hi) return true;
+        logAt ("error", verb + ": " + juce::String (v) + " is not " + aNoun + ", so nothing was sent. " + hint, juce::var());
+        return false;
+    }
+    bool midiValue (const juce::String& verb, const juce::var& v, int hi, const char* hint, juce::var& out)
+    {
+        if (v.isVoid() || v.isUndefined())
+        {
+            logAt ("error", verb + ": no value given, so nothing was sent.", juce::var());
+            return false;
+        }
+        const bool number = (v.isInt() || v.isInt64() || v.isDouble()) && std::isfinite (static_cast<double> (v));
+        if (! number)
+        {
+            logAt ("error", verb + ": " + shownScriptValue (v) + " is not a value, so nothing was sent. " + hint, juce::var());
+            return false;
+        }
+        out = juce::jlimit (0, hi, static_cast<int> (std::floor (static_cast<double> (v) + 0.5)));
         return true;
     }
 

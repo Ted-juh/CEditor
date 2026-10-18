@@ -32,7 +32,8 @@ public:
     { auto it = values.find (path); return it != values.end() ? it->second : juce::var(); }
     void setValue (const juce::String& path, const juce::var& value, const juce::var&) override
     { values[path] = value; if (onSet) onSet (path); }
-    void sendCC (int, int, const juce::var&) override {}
+    juce::StringArray ccSends;    // sendCC, as "1 7 65"
+    void sendCC (int ch, int cc, const juce::var& v) override { ccSends.add (juce::String (ch) + " " + juce::String (cc) + " " + v.toString()); }
     void sendNRPN (int, int, int, const juce::var&) override {}
     void sendSysex (const juce::var&) override {}
     void requestDump (const juce::String&) override {}
@@ -177,6 +178,41 @@ int main()
         host.logs.clear();
         runtime.onPanelReady (true);
         check (host.logs.contains ("py F0 01 48 F7 3 8EEQQg=="), "Bytes: ce.midi byte helpers answer in Python, reading bytes and bytearray (got "
+                   + host.logs.joinIntoString (" | ") + ")");
+    }
+
+    // Channel messages are checked in the prelude before they reach the host: an address outside its
+    // range is refused (CC 200 used to be CC 127), a fraction rounds half up as in the editor (this
+    // floored it), and a left-out argument is refused where Python raised a TypeError.
+    {
+        juce::Array<juce::var> sendScripts;
+        sendScripts.add (makeScript ("pySends", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    sendCC(1, 200, 5)\n"
+            "    sendCC(1, 7, 64.5)\n"
+            "    sendNote(1, 60)\n"
+            "    sendNote(1)\n"
+            "    sendTransport('pause')\n"
+            "    ce.midi.put([1, 2], 1)\n"
+            "    log('py ' + str(ce.midi.toHex([300])))\n"));
+        runtime.loadScripts (juce::var (sendScripts));
+        host.logs.clear();
+        host.ccSends.clear();
+        host.rawSends.clear();
+        runtime.onPanelReady (true);
+        check (host.ccSends.joinIntoString (" | ") == "1 7 65" && host.rawSends.isEmpty(),
+               "Sends: only the valid CC reaches the host, rounded half up (got " + host.ccSends.joinIntoString (" | ")
+                   + " / " + host.rawSends.joinIntoString (" | ") + ")");
+        check (host.logs.joinIntoString (" | ") ==
+                   "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
+                   "sendNote: no velocity given, so nothing was sent. | "
+                   "sendNote: no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or \"C4\". | "
+                   "sendTransport: \"pause\" is not a transport action, so nothing was sent. The actions are \"start\", \"continue\" and \"stop\". | "
+                   "ce.midi.put: no bytes given, so there is no answer. | "
+                   "ce.midi.toHex: 300 at position 0 is not a byte, so there is no answer. A byte is a whole number from 0 to 255, "
+                   "or one or two hex digits such as \"F7\". | "
+                   "py None",
+               "Sends: the rest are refused in the WebView runtime's words, a left-out argument included (got "
                    + host.logs.joinIntoString (" | ") + ")");
     }
 

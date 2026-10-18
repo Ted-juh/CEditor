@@ -915,9 +915,11 @@ const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 // An unknown scale or chord name already answered nothing, just as silently; musicSetOf says so.
 // Both are in the words of each prelude's __pitchOf and __setOf. Each helper checks its scale or
 // chord first, then its notes in argument order, and stops at the first that cannot be read.
-const musicPitch = (v) => (typeof v === 'string'
-  ? helpers.noteNumber(v)
-  : Math.floor(Number(v) || 0));
+// A number has to be a finite one: NaN, true or a table went through Number(v) || 0 and rooted the
+// answer at C-1 or C#-1 just as an unreadable name had. The answer itself may pass 127 (a chord on
+// G9 does), since these compute pitches; a sender refuses one that is not a MIDI note.
+const musicPitch = (v) => (typeof v === 'string' ? helpers.noteNumber(v)
+  : typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined);
 const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
 function musicPitchOf(verb, v) {
   // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
@@ -928,8 +930,11 @@ function musicPitchOf(verb, v) {
   }
   const n = musicPitch(v);
   if (n === undefined) {
-    addScriptTrace('error', '', `${verb}: "${v}" is not a note name, so there is no answer. A name is `
-      + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+    addScriptTrace('error', '', typeof v === 'string'
+      ? `${verb}: "${v}" is not a note name, so there is no answer. A name is `
+        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+      : `${verb}: ${shownValue(v)} is not a note, so there is no answer. A note is a MIDI `
+        + 'number or a name, such as 60 or "C4".');
   }
   return n;
 }
@@ -1020,11 +1025,13 @@ const nowMsRead = () => (NOW_EPOCH === null ? performance.now() : Date.now() - N
 // read: "1/8t" is "1/8T", because the names differ only by D and T and nothing is ambiguous. The
 // table's own id comes back, because the transport's functions look the name up again.
 function divisionId(verb, name) {
-  const wanted = String(name).toLowerCase();
+  const wanted = typeof name === 'string' ? name.toLowerCase() : null;
   const id = DIVISION_NAMES.find((d) => d.toLowerCase() === wanted);
   if (id === undefined) {
-    addScriptTrace('error', '', `${verb}: "${name}" is not a division, so there is no answer. `
-      + `The divisions are ${DIVISION_NAMES.join(', ')}.`);
+    // A division left out is named as such: "undefined", "nil" and "None" were the same mistake
+    // printed three ways.
+    addScriptTrace('error', '', `${verb}: ${name === undefined || name === null ? 'no division given'
+      : `${shownValue(name)} is not a division`}, so there is no answer. The divisions are ${DIVISION_NAMES.join(', ')}.`);
   }
   return id;
 }
@@ -2116,33 +2123,70 @@ helpers.to14Bit = helpers.to14bit;
 const DEFAULT_ROLE = DEFAULT_DEVICE_ROLE;
 
 function midiInt(v, lo, hi) { v = Math.round(Number(v) || 0); return v < lo ? lo : v > hi ? hi : v; }
-function toByteArray(input) {
-  if (Array.isArray(input)) return input;
-  if (input && typeof input === 'object') return Object.values(input); // wasmoon Lua table → object
-  if (typeof input === 'string') return input.trim().split(/[\s,]+/).filter(Boolean).map((h) => parseInt(h, 16));
-  return [];
+// How a refusal shows a value the script passed, in the same words in every runtime whatever the
+// language would print: "nothing" for nil, undefined or None, NaN and Infinity as JavaScript writes
+// them, a whole number without Lua's or Python's ".0", text in quotes, and "a list" for any list or
+// table. The preludes' __shownValue and BridgeScriptHost's shownScriptValue are its twins.
+function shownValue(v) {
+  if (v === undefined || v === null) return 'nothing';
+  if (typeof v === 'boolean') return String(v);
+  if (typeof v === 'number') {
+    if (Number.isNaN(v)) return 'NaN';
+    return Number.isFinite(v) ? String(v) : v > 0 ? 'Infinity' : '-Infinity';
+  }
+  if (typeof v === 'string') return `"${v}"`;
+  return typeof v === 'function' ? 'a function' : 'a list';
 }
 
 // Hex text is read a token at a time, and a token is one byte: one or two hex digits, with or
 // without 0x. A longer token was read as ONE number and clamped, so "F0411000" went out as F0 FF F7
 // here and as F0 00 F7 from the player (which kept the low byte), and neither said anything. A
 // token that is not one byte is now refused, the message naming it, in the same words as the
-// player's BridgeScriptHost. Lists of numbers are untouched.
+// player's BridgeScriptHost. The separators are the same in every runtime: space, tab, the line
+// breaks, form and vertical tab, and the comma. JavaScript's \s would also split on a no-break
+// space, which Lua and the player do not, so the same text was a message here and a refusal there.
 const HEX_BYTE = /^(0x)?[0-9a-f]{1,2}$/i;
+const hexTokens = (text) => text.split(/[ \t\r\n\f\v,]+/).filter(Boolean);
 function notOneByte(input) {
   if (typeof input !== 'string') return null;
-  return input.trim().split(/[\s,]+/).filter(Boolean).find((token) => !HEX_BYTE.test(token)) ?? null;
+  return hexTokens(input).find((token) => !HEX_BYTE.test(token)) ?? null;
 }
-/** The bytes a script passed, or null after saying why, when its hex text has a token that is not
- *  one byte. `outcome` finishes "so …": what did not happen because of it. */
+// One item of a list of bytes: a whole number from 0 to 255, or text that is one byte by the rule
+// above, so ["F0", "41"] is F0 41. A list item used to be clamped (300 went out as FF, System Reset,
+// inside a SysEx), and a text item read as decimal ("41" went out as 29).
+const byteItem = (v) => (typeof v === 'number' ? (Number.isInteger(v) && v >= 0 && v <= 255 ? v : undefined)
+  : typeof v === 'string' && HEX_BYTE.test(v) ? parseInt(v, 16) : undefined);
+/** The bytes a script passed, as numbers from 0 to 255: hex text, a list, a wasmoon Lua table (which
+ *  arrives as an object) or a typed array. Nothing given is an empty list, for the caller to judge.
+ *  Anything else is null, after saying what was wrong; `outcome` finishes "so …": what did not
+ *  happen because of it. */
 function scriptBytes(verb, input, outcome = 'nothing was sent') {
-  const token = notOneByte(input);
-  if (token === null) return toByteArray(input);
-  const spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(' ') : '';
-  addScriptTrace('error', '', `${verb}: "${token}" is not one byte, so ${outcome}. `
-    + (spaced ? `Put a space between the bytes: "${spaced}".`
-      : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
-  return null;
+  if (input === undefined || input === null) return [];
+  if (typeof input === 'string') {
+    const token = notOneByte(input);
+    if (token === null) return hexTokens(input).map((t) => parseInt(t, 16));
+    const spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(' ') : '';
+    addScriptTrace('error', '', `${verb}: "${token}" is not one byte, so ${outcome}. `
+      + (spaced ? `Put a space between the bytes: "${spaced}".`
+        : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+    return null;
+  }
+  if (typeof input !== 'object') {
+    addScriptTrace('error', '', `${verb}: ${shownValue(input)} is not a list of bytes, so ${outcome}.`);
+    return null;
+  }
+  const items = Array.isArray(input) ? input : Object.values(input);
+  const bytes = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const b = byteItem(items[i]);
+    if (b === undefined) {
+      addScriptTrace('error', '', `${verb}: ${shownValue(items[i])} at position ${i} is not a byte, so ${outcome}. `
+        + 'A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".');
+      return null;
+    }
+    bytes.push(b);
+  }
+  return bytes;
 }
 function toHexMessage(bytes) {
   return bytes.map((v) => (midiInt(v, 0, 255) & 0xff).toString(16).padStart(2, '0').toUpperCase()).join(' ');
@@ -2156,26 +2200,33 @@ function toHexMessage(bytes) {
 // (panel-api-spec Q3). The rules, the same in every prelude and pinned word for word by
 // scriptPreludeAgreement.test.js:
 //   - offsets and bit positions count from 0, in every language, as dump layouts do (Lua too);
-//   - a list may also be hex text, read by scriptBytes' rule, and each byte is read modulo 256;
+//   - a list may also be hex text, and its items are bytes, both by scriptBytes' rule: a number
+//     from 0 to 255 or one hex byte. Anything else is refused, as a send refuses it;
 //   - nothing is answered for a mistake, and the error says what it was. Nothing is clamped,
 //     wrapped or padded into a plausible answer, except that a write may run past the end of a
 //     list and grow it, since that is how a message is built;
 //   - every list that comes back is new. The one passed in is never changed.
-const byteOf = (x) => ((Math.floor(Number(x) || 0) % 256) + 256) % 256;
 const isWholeNumber = (n) => typeof n === 'number' && Number.isInteger(n);
 function bytesRefuse(verb, why, tail = '') {
   addScriptTrace('error', '', `${verb}: ${why}, so there is no answer.${tail ? ` ${tail}` : ''}`);
   return undefined;
 }
+// No bytes at all is refused here, where a send says "no bytes given": an empty list is a list, but
+// toHex(nil) answering "" made a variable left unset look like a message with nothing in it.
 function bytesIn(verb, input) {
-  const raw = scriptBytes(verb, input, 'there is no answer');
-  return raw ? raw.map(byteOf) : undefined;
+  if (input === undefined || input === null) return bytesRefuse(verb, 'no bytes given');
+  return scriptBytes(verb, input, 'there is no answer') ?? undefined;
 }
 const BIT_RANGE = 'start must be a whole number from 0, and count one from 1 to 32';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 // A single position IS past the end; a range RUNS past it, since its first part may be inside.
 const span = (word, a, b) => (a === b ? `${word} ${a} is past` : `${word}s ${a} to ${b} run past`);
 const WRITE_START = 'Writing can run past the end, but not start beyond it.';
+// Why a value to write cannot be written in `bits` bits, or '' when it can. A value left out is
+// named as such rather than printed, since each language would print it as a different word.
+const doesNotFit = (v, bits) => (v === undefined || v === null ? 'the value to write is missing'
+  : !isWholeNumber(v) ? `${shownValue(v)} is not a whole number`
+    : v < 0 || v >= 2 ** bits ? `${v} does not fit in ${plural(bits, 'bit')}` : '');
 function bytesOpts(verb, opts) {
   const bits = opts?.bits ?? 7;
   const order = opts?.order ?? 'msb';
@@ -2189,6 +2240,7 @@ function bytesGetBits(value, start, count) {
     return bytesRefuse(verb, BIT_RANGE);
   }
   if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return bytesRefuse(verb, `${shownValue(value)} is not a finite number`);
     if (start + count > 32) return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the 32 bits a number holds here`);
     const m = 2 ** count;
     return ((Math.floor(Math.floor(value) / 2 ** start) % m) + m) % m;
@@ -2210,8 +2262,10 @@ function bytesSetBits(value, start, count, bits) {
   if (!isWholeNumber(start) || start < 0 || !isWholeNumber(count) || count < 1 || count > 32) {
     return bytesRefuse(verb, BIT_RANGE);
   }
-  if (!isWholeNumber(bits) || bits < 0 || bits >= 2 ** count) return bytesRefuse(verb, `${bits} does not fit in ${plural(count, 'bit')}`);
+  const unfit = doesNotFit(bits, count);
+  if (unfit) return bytesRefuse(verb, unfit);
   if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return bytesRefuse(verb, `${shownValue(value)} is not a finite number`);
     if (start + count > 32) return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the 32 bits a number holds here`);
     const v = Math.floor(value);
     const m = 2 ** count;
@@ -2259,9 +2313,8 @@ function bytesWrite(bytes, offset, count, value, opts) {
   if (!isWholeNumber(count) || count < 1 || count > 4) return bytesRefuse(verb, 'count must be a whole number from 1 to 4');
   const shape = bytesOpts(verb, opts);
   if (!shape) return undefined;
-  if (!isWholeNumber(value) || value < 0 || value >= 2 ** (shape.bits * count)) {
-    return bytesRefuse(verb, `${value} does not fit in ${plural(count * shape.bits, 'bit')}`);
-  }
+  const unfit = doesNotFit(value, count * shape.bits);
+  if (unfit) return bytesRefuse(verb, unfit);
   if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`, WRITE_START);
   const digits = [];
   let v = value;
@@ -2323,7 +2376,12 @@ function bytesToHex(bytes) {
   const list = bytesIn('ce.midi.toHex', bytes);
   return list ? list.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ') : undefined;
 }
-function bytesFromHex(text) { return bytesIn('ce.midi.fromHex', text); }
+function bytesFromHex(text) {
+  const verb = 'ce.midi.fromHex';
+  if (text === undefined || text === null) return bytesRefuse(verb, 'no hex text given');
+  if (typeof text !== 'string') return bytesRefuse(verb, `${shownValue(text)} is not hex text`);
+  return bytesIn(verb, text);
+}
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 function bytesToBase64(bytes) {
   const list = bytesIn('ce.midi.toBase64', bytes);
@@ -2340,6 +2398,7 @@ function bytesToBase64(bytes) {
 }
 function bytesFromBase64(text) {
   const verb = 'ce.midi.fromBase64';
+  if (text === undefined || text === null) return bytesRefuse(verb, 'no base64 text given');
   const clean = typeof text === 'string' ? text.replace(/[ \t\r\n]/g, '') : null;
   if (clean === null || clean.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) {
     return bytesRefuse(verb, 'that is not base64', 'Base64 is groups of four characters from A-Z, a-z, '
@@ -2376,13 +2435,13 @@ function bytesFromBase64(text) {
  * under different names. Two implementations of the same arithmetic is how they drifted apart.
  */
 function checksumOf(kind, bytes, opts) {
-  // Sanitised before the table sees them, so an out-of-range value clamps the way every other
-  // byte-taking verb in ce.midi clamps rather than wrapping.
-  const clean = bytes.map((v) => midiInt(v, 0, 255) & 0xff);
-  const value = computeChecksum(kind, clean, opts);
+  // The bytes have been through scriptBytes, so each one is already 0 to 255.
+  const value = typeof kind === 'string' ? computeChecksum(kind, bytes, opts) : undefined;
   if (value === undefined) {
-    addScriptTrace('error', '',
-      `ce.midi.checksum("${kind}"): no such algorithm. One of: ${checksumNames().join(', ')}.`);
+    // The algorithm left out is named as such, rather than printed as undefined, nil or None.
+    const which = kind === undefined || kind === null ? ': no algorithm given'
+      : `(${typeof kind === 'string' ? `"${kind}"` : shownValue(kind)}): no such algorithm`;
+    addScriptTrace('error', '', `ce.midi.checksum${which}. One of: ${checksumNames().join(', ')}.`);
     return undefined;
   }
   return value;
@@ -2429,20 +2488,77 @@ function releaseTrackedScriptNotes(role, channel, note) {
 // MIDI channel messages — arithmetic over one raw-byte send, the way panic() is over sendCC, which
 // is what makes them identical in every runtime and every exported language. `note` accepts a MIDI
 // number or a name ("C3"), because a script that reads musically should be allowed to say so.
-const midiCh = (c) => midiInt(c, 1, 16) - 1;
-// noteNumber returns nil for a name it cannot read, and so does this. It used to become 0, which
-// kept an undefined out of the message and sent note 0 instead: "c4" (the letter must be a capital)
-// played C-1, the bottom of the keyboard, with nothing to say why. A sender that gets undefined
-// here refuses the message with refuseNote, the way an unknown blend mode or checksum is refused.
-// A note that is missing altogether is refused the same way. It became 0 by the numeric path, so
-// sendNote(1) with the note left out played C-1 just as "c4" did.
-const midiNote = (n) => (n === undefined || n === null ? undefined
-  : typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
+// The numbers a channel message carries, checked before anything is sent. They were clamped, and a
+// clamp is not harmless here: CC 200 went out as CC 127 (Poly Mode On), "cutoff" as CC 0 (Bank
+// Select), channel 0 or 17 as 1 or 16, a missing velocity as 0 (a note off). So an ADDRESS (channel,
+// controller, program, bank, parameter number) outside its range is refused, since clamping it picks
+// a different message; so is anything that is not a number, or is missing where there is no default.
+// A VALUE past the end of its range (a CC value of 128) is still clamped, as before. A number with a
+// fraction is rounded half up, the same in every runtime (the player floored it). The preludes'
+// __midiArg is the twin of this, word for word.
+const MIDI_ARGS = {
+  channel: ['channel', 'a channel', 1, 16, true, 'A channel is a whole number from 1 to 16.'],
+  controller: ['controller number', 'a controller number', 0, 127, true, 'A controller number is a whole number from 0 to 127.'],
+  program: ['program', 'a program', 0, 127, true, 'A program is a whole number from 0 to 127.'],
+  bank: ['bank number', 'a bank number', 0, 127, true, 'A bank number is a whole number from 0 to 127.'],
+  msb: ['MSB', 'an MSB', 0, 127, true, 'An MSB is a whole number from 0 to 127.'],
+  lsb: ['LSB', 'an LSB', 0, 127, true, 'An LSB is a whole number from 0 to 127.'],
+  value: ['value', 'a value', 0, 127, false, 'A value is a number from 0 to 127.'],
+  velocity: ['velocity', 'a velocity', 0, 127, false, 'A velocity is a number from 0 to 127.'],
+  pressure: ['pressure', 'a pressure', 0, 127, false, 'A pressure is a number from 0 to 127.'],
+  value14: ['value', 'a value', 0, 16383, false, 'A value is a number from 0 to 16383.'],
+  bend: ['bend', 'a bend', 0, 16383, false, 'A bend is a number from 0 to 16383, and 8192 is the centre.'],
+  position: ['song position', 'a song position', 0, 16383, false, 'A song position is a number of MIDI beats from 0 to 16383.'],
+};
+/** The number to send for `kind`, or undefined after saying why nothing was sent. */
+function midiArg(verb, kind, v) {
+  const [noun, aNoun, lo, hi, address, hint] = MIDI_ARGS[kind];
+  if (v === undefined || v === null) {
+    addScriptTrace('error', '', `${verb}: no ${noun} given, so nothing was sent.`);
+    return undefined;
+  }
+  const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v + 0.5) : undefined;
+  if (n === undefined || (address && (n < lo || n > hi))) {
+    addScriptTrace('error', '', `${verb}: ${shownValue(v)} is not ${aNoun}, so nothing was sent. ${hint}`);
+    return undefined;
+  }
+  return n < lo ? lo : n > hi ? hi : n;
+}
+// A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that range.
+// An unreadable name used to become note 0, so "c4" (the letter must be a capital) played C-1, the
+// bottom of the keyboard, with nothing to say why; and a name past the top, "C10", put 132 in the
+// data byte, which a synth reads as a status byte. Anything else, NaN or a table included, played
+// C-1 by the numeric path. Each is refused by refuseNote, in the preludes' __badNote words.
+const midiNote = (n) => {
+  const v = typeof n === 'string' ? helpers.noteNumber(n)
+    : typeof n === 'number' && Number.isFinite(n) ? Math.floor(n + 0.5) : undefined;
+  return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
+};
 function refuseNote(verb, note) {
-  addScriptTrace('error', '', note === undefined || note === null
-    ? `${verb}: no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".`
-    : `${verb}: "${note}" is not a note name, so nothing was sent. A name is `
-      + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  const range = 'MIDI notes run from 0 to 127, which is C-1 to G9.';
+  let why;
+  if (note === undefined || note === null) {
+    why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
+  } else if (typeof note === 'string') {
+    why = helpers.noteNumber(note) === undefined
+      ? `"${note}" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it `
+        + 'has one, then the octave: "C4", "Eb3", "F#-1".'
+      : `"${note}" is outside the MIDI notes, so nothing was sent. ${range}`;
+  } else if (typeof note === 'number' && Number.isFinite(note)) {
+    why = `${note} is outside the MIDI notes, so nothing was sent. ${range}`;
+  } else {
+    why = `${shownValue(note)} is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".`;
+  }
+  addScriptTrace('error', '', `${verb}: ${why}`);
+}
+// sendNote's `ms`: left out, the script sends the note off itself; given, it must be a length.
+// "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+function noteLength(verb, ms) {
+  if (ms === undefined || ms === null) return null;
+  if (typeof ms === 'number' && Number.isFinite(ms) && ms > 0) return ms;
+  addScriptTrace('error', '', `${verb}: ${shownValue(ms)} is not a length in milliseconds, so nothing was sent. `
+    + 'Give a number above 0, or leave it out to send the note off yourself.');
+  return undefined;
 }
 
 /* --- the wire filters: interceptIn / interceptOut / feed --------------------------------------
@@ -2482,7 +2598,12 @@ function runMidiChain(list, payload, label) {
       return null;
     }
     if (out === undefined || out === null) continue;    // no opinion — pass it on unchanged
-    const next = toByteArray(out).map((v) => midiInt(v, 0, 255) & 0xff);
+    // What a filter returns is read as a send reads bytes. "903C7F" used to become FF, and an
+    // unreadable token 00, and that went out in place of the message; now the message goes nowhere
+    // and the filter's mistake is named.
+    const next = scriptBytes(label === 'out' ? 'interceptMidiOut' : 'interceptMidiIn', out,
+      label === 'out' ? 'the message was not sent' : 'the message was dropped');
+    if (!next) return null;
     if (!next.length) continue;                          // an empty array is not a decision
     bytes = next;
   }
@@ -2495,20 +2616,36 @@ function installMidiFilters() {
   setOutboundMidiFilter(midiOut.length ? (p) => runMidiChain(midiOut, p, 'out') : null);
 }
 
+/** An NRPN or RPN: the parameter number in two CCs, then the 14-bit value in data entry 6 and 38. */
+function sendParameterNumber(verb, label, msbCc, lsbCc, ch, msb, lsb, v) {
+  const c = midiArg(verb, 'channel', ch);
+  const m = c === undefined ? undefined : midiArg(verb, 'msb', msb);
+  const l = m === undefined ? undefined : midiArg(verb, 'lsb', lsb);
+  const val = l === undefined ? undefined : midiArg(verb, 'value14', v);
+  if (val === undefined) return;
+  const s = 0xB0 | (c - 1);
+  sendRawMidi([s, msbCc, m, s, lsbCc, l, s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `${label}_${m}_${l}`);
+}
+
 const midiApi = {
   sendMidi: (bytes) => {
-    const raw = scriptBytes('sendMidi', bytes);
-    if (!raw) return;
-    const b = raw.map((v) => midiInt(v, 0, 255) & 0xff);
+    const b = scriptBytes('sendMidi', bytes);
+    if (!b) return;
     if (!b.length) { addScriptTrace('error', '', 'sendMidi: no bytes given'); return; }
     sendRawMidi(b, 'raw');
   },
   sendNote: (ch, note, velocity, ms) => {
+    const c = midiArg('sendNote', 'channel', ch);
+    if (c === undefined) return;
     const n = midiNote(note);
     if (n === undefined) { refuseNote('sendNote', note); return; }
-    const channel = midiCh(ch);
+    const vel = midiArg('sendNote', 'velocity', velocity);
+    if (vel === undefined) return;
+    const length = noteLength('sendNote', ms);
+    if (length === undefined) return;
+    const channel = c - 1;
     const role = routedRole ?? DEFAULT_ROLE;
-    sendRawMidi([0x90 | channel, n, midiInt(velocity, 0, 127)], `note_${n}`);
+    sendRawMidi([0x90 | channel, n, vel], `note_${n}`);
     const token = ++activeScriptNoteSeq;
     const active = { role, channel, note: n, timerId: '' };
     activeScriptNotes.set(token, active);
@@ -2516,41 +2653,60 @@ const midiApi = {
     // hand-roll a timer, and getting it wrong meant a hung voice — the one MIDI mistake you hear
     // rather than read. The role is captured now, so a note started inside routeMidi() ends where
     // it began even though the block has long since closed.
-    if (ms === undefined || ms === null) return;
-    const delay = Number(ms);
-    if (!Number.isFinite(delay) || delay <= 0) return;
-    active.timerId = scheduleOneShot(delay, () => {
+    if (length === null) return;
+    active.timerId = scheduleOneShot(length, () => {
       if (!activeScriptNotes.delete(token)) return;
       sendRawMidiForRole([0x80 | channel, n, 0], `noteoff_${n}`, role);
     });
   },
   sendNoteOff: (ch, note, velocity) => {
-    const channel = midiCh(ch);
+    const c = midiArg('sendNoteOff', 'channel', ch);
+    if (c === undefined) return;
     const n = midiNote(note);
     if (n === undefined) { refuseNote('sendNoteOff', note); return; }
+    const vel = midiArg('sendNoteOff', 'velocity', velocity ?? 0);   // release velocity: 0 unless given
+    if (vel === undefined) return;
+    const channel = c - 1;
     const role = routedRole ?? DEFAULT_ROLE;
     releaseTrackedScriptNotes(role, channel, n);
-    sendRawMidi([0x80 | channel, n, midiInt(velocity ?? 0, 0, 127)], `noteoff_${n}`);
+    sendRawMidi([0x80 | channel, n, vel], `noteoff_${n}`);
   },
   sendProgramChange: (ch, program, bankMsb, bankLsb) => {
+    const verb = 'sendProgramChange';
+    const c = midiArg(verb, 'channel', ch);
+    if (c === undefined) return;
+    const p = midiArg(verb, 'program', program);
+    if (p === undefined) return;
+    const msb = bankMsb === undefined || bankMsb === null ? null : midiArg(verb, 'bank', bankMsb);
+    if (msb === undefined) return;
+    const lsb = bankLsb === undefined || bankLsb === null ? null : midiArg(verb, 'bank', bankLsb);
+    if (lsb === undefined) return;
     // Bank select first: a device applies the bank that was in force when the program change lands.
-    const s = 0xB0 | midiCh(ch);
-    if (bankMsb !== undefined && bankMsb !== null) sendRawMidi([s, 0, midiInt(bankMsb, 0, 127)], 'cc_0');
-    if (bankLsb !== undefined && bankLsb !== null) sendRawMidi([s, 32, midiInt(bankLsb, 0, 127)], 'cc_32');
-    sendRawMidi([0xC0 | midiCh(ch), midiInt(program, 0, 127)], `pc_${midiInt(program, 0, 127)}`);
+    const s = 0xB0 | (c - 1);
+    if (msb !== null) sendRawMidi([s, 0, msb], 'cc_0');
+    if (lsb !== null) sendRawMidi([s, 32, lsb], 'cc_32');
+    sendRawMidi([0xC0 | (c - 1), p], `pc_${p}`);
   },
   sendPitchBend: (ch, value) => {
-    const v = midiInt(value ?? 8192, 0, 16383);
-    sendRawMidi([0xE0 | midiCh(ch), v % 128, Math.floor(v / 128) % 128], 'bend');
+    const c = midiArg('sendPitchBend', 'channel', ch);
+    if (c === undefined) return;
+    const v = midiArg('sendPitchBend', 'bend', value ?? 8192);   // left out, the bend centres
+    if (v === undefined) return;
+    sendRawMidi([0xE0 | (c - 1), v % 128, Math.floor(v / 128) % 128], 'bend');
   },
   sendAftertouch: (ch, pressure, note) => {
+    const c = midiArg('sendAftertouch', 'channel', ch);
+    if (c === undefined) return;
     if (note === undefined || note === null) {
-      sendRawMidi([0xD0 | midiCh(ch), midiInt(pressure, 0, 127)], 'aftertouch');
+      const p = midiArg('sendAftertouch', 'pressure', pressure);
+      if (p !== undefined) sendRawMidi([0xD0 | (c - 1), p], 'aftertouch');
       return;
     }
     const n = midiNote(note);
     if (n === undefined) { refuseNote('sendAftertouch', note); return; }
-    sendRawMidi([0xA0 | midiCh(ch), n, midiInt(pressure, 0, 127)], 'polyaftertouch');
+    const p = midiArg('sendAftertouch', 'pressure', pressure);
+    if (p === undefined) return;
+    sendRawMidi([0xA0 | (c - 1), n, p], 'polyaftertouch');
   },
   // feed(bytes) — inject as if the hardware had sent it, so the panel's OWN bindings, note input
   // and transport all act on it. set() moves a control directly and bypasses every binding, which
@@ -2558,9 +2714,8 @@ const midiApi = {
   // fighting it. Inbound filters run on it, so a fed message obeys the same rules as a real one —
   // a velocity curve that applies to the keyboard has to apply to the sequencer too.
   feedMidi: (bytes) => {
-    const raw = scriptBytes('feedMidi', bytes, 'nothing was fed');
-    if (!raw) return;
-    const b = raw.map((v) => midiInt(v, 0, 255) & 0xff);
+    const b = scriptBytes('feedMidi', bytes, 'nothing was fed');
+    if (!b) return;
     if (!b.length) { addScriptTrace('error', '', 'feedMidi: no bytes given'); return; }
     const status = b[0] ?? 0;
     const kind = (status & 0xf0) === 0xb0 ? 'cc' : (status & 0xf0) === 0x90 || (status & 0xf0) === 0x80 ? 'note' : 'raw';
@@ -2573,36 +2728,41 @@ const midiApi = {
   interceptMidiOut: null,
   routeMidi: null,
   sendClock: () => sendRawMidi([0xF8], 'clock'),
+  // Any action but stop and continue used to send Start, so "pause" started the sequencer.
   sendTransport: (action) => {
-    const a = String(action ?? 'start').toLowerCase();
-    sendRawMidi([a === 'stop' ? 0xFC : a === 'continue' ? 0xFB : 0xFA], `transport_${a}`);
+    const verb = 'sendTransport';
+    const actions = 'The actions are "start", "continue" and "stop".';
+    if (action === undefined || action === null) {
+      addScriptTrace('error', '', `${verb}: no action given, so nothing was sent. ${actions}`);
+      return;
+    }
+    const a = typeof action === 'string' ? action.toLowerCase() : '';
+    const status = { start: 0xFA, continue: 0xFB, stop: 0xFC }[a];
+    if (status === undefined) {
+      addScriptTrace('error', '', `${verb}: ${shownValue(action)} is not a transport action, so nothing was sent. ${actions}`);
+      return;
+    }
+    sendRawMidi([status], `transport_${a}`);
   },
 
-  sendCC: (ch, cc, v) =>
-    sendRawMidi([0xB0 | (midiInt(ch, 1, 16) - 1), midiInt(cc, 0, 127), midiInt(v, 0, 127)], `cc_${midiInt(cc, 0, 127)}`),
+  sendCC: (ch, cc, v) => {
+    const c = midiArg('sendCC', 'channel', ch);
+    const n = c === undefined ? undefined : midiArg('sendCC', 'controller', cc);
+    const value = n === undefined ? undefined : midiArg('sendCC', 'value', v);
+    if (value !== undefined) sendRawMidi([0xB0 | (c - 1), n, value], `cc_${n}`);
+  },
   // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range,
   // fine tuning and coarse tuning, which is what a panel sets once at load.
-  sendRPN: (ch, msb, lsb, v) => {
-    const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
-    const val = midiInt(v, 0, 16383);
-    sendRawMidi([s, 0x65, midiInt(msb, 0, 127), s, 0x64, midiInt(lsb, 0, 127),
-      s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `rpn_${midiInt(msb, 0, 127)}_${midiInt(lsb, 0, 127)}`);
-  },
+  sendRPN: (ch, msb, lsb, v) => sendParameterNumber('sendRPN', 'rpn', 0x65, 0x64, ch, msb, lsb, v),
   // Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
   sendSongPosition: (beats) => {
-    const b = midiInt(beats, 0, 16383);
-    sendRawMidi([0xF2, b & 0x7f, (b >> 7) & 0x7f], 'songPosition');
+    const b = midiArg('sendSongPosition', 'position', beats);
+    if (b !== undefined) sendRawMidi([0xF2, b & 0x7f, (b >> 7) & 0x7f], 'songPosition');
   },
-  sendNRPN: (ch, msb, lsb, v) => {
-    const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
-    const val = midiInt(v, 0, 16383);
-    sendRawMidi([s, 0x63, midiInt(msb, 0, 127), s, 0x62, midiInt(lsb, 0, 127),
-      s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `nrpn_${midiInt(msb, 0, 127)}_${midiInt(lsb, 0, 127)}`);
-  },
+  sendNRPN: (ch, msb, lsb, v) => sendParameterNumber('sendNRPN', 'nrpn', 0x63, 0x62, ch, msb, lsb, v),
   sendSysex: (bytes) => {
-    const raw = scriptBytes('sendSysex', bytes);
-    if (!raw) return;
-    let b = raw.map((v) => midiInt(v, 0, 255) & 0xff);
+    let b = scriptBytes('sendSysex', bytes);
+    if (!b) return;
     if (b.length === 0) { addScriptTrace('error', '', 'sendSysex: no bytes given'); return; }
     if (b[0] !== 0xF0) b = [0xF0, ...b];
     if (b[b.length - 1] !== 0xF7) b = [...b, 0xF7];
@@ -2613,9 +2773,20 @@ const midiApi = {
   // requestDump is bound in buildApi, not here: its optional callback belongs to a script, and a
   // throw inside it has to be reported against that script. Same reason the wire filters are.
   checksum: (type, bytes, opts) => {
+    const verb = 'ce.midi.checksum';
     const oneArg = bytes === undefined || bytes === null;   // one-arg form: checksum(bytes)
-    const raw = scriptBytes('checksum', oneArg ? type : bytes, 'there is no checksum');
+    // checksum("roland") with the bytes left out read the NAME as hex text and said "roland" is not
+    // one byte. A name the table knows is a name, and what is missing is the bytes.
+    if (oneArg && typeof type === 'string' && checksumNames().includes(type.toLowerCase())) {
+      addScriptTrace('error', '', `${verb}: no bytes given, so there is no checksum.`);
+      return undefined;
+    }
+    const raw = scriptBytes(verb, oneArg ? type : bytes, 'there is no checksum');
     if (!raw) return undefined;
+    if (oneArg && (type === undefined || type === null)) {
+      addScriptTrace('error', '', `${verb}: no bytes given, so there is no checksum.`);
+      return undefined;
+    }
     return oneArg ? checksumOf('roland', raw) : checksumOf(type, raw, opts);
   },
 
@@ -2626,9 +2797,14 @@ const midiApi = {
   panic: (opts) => {
     const o = opts ?? {};
     const reset = o.resetControllers !== false;
-    const channels = o.channel === undefined || o.channel === null
-      ? Array.from({ length: 16 }, (_, i) => i + 1)
-      : [midiInt(o.channel, 1, 16)];
+    // A channel that is not one ("all", 17) silenced channel 1 or 16 here and nothing at all from
+    // the player's JavaScript; leaving it out is how every channel is named.
+    let channels = Array.from({ length: 16 }, (_, i) => i + 1);
+    if (o.channel !== undefined && o.channel !== null) {
+      const c = midiArg('panic', 'channel', o.channel);
+      if (c === undefined) return;
+      channels = [c];
+    }
     for (const ch of channels) {
       const s = 0xB0 | (ch - 1);
       sendRawMidi([s, 120, 0], 'cc_120');

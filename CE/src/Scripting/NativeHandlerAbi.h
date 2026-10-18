@@ -159,7 +159,7 @@ typedef struct CeHostVtable {
     /* --- appended: the two calls whose VALUE the slots above could not carry ------------------
      * log(message, value) and sendSysex(list | "F0 41 …") are in every language's preview `ctx`,
      * and the scripted engines hand the host the value itself — the host formats a logged value
-     * and clamps or parses SysEx bytes. `log` above carries no value, and `send_sysex` carries
+     * and reads SysEx bytes, refusing any that is not a byte. `log` above carries no value, and `send_sysex` carries
      * bytes already packed to uint8, so a compiled handler either lost the value or had to repeat
      * the host's clamping and hex parsing: a second copy of each, waiting to drift. These pass the
      * value through untouched and the host does exactly what it does for Lua and JS. */

@@ -2,7 +2,8 @@
 //
 // What JUCE's MemoryBlock does, over the plain lists scripts already pass bytes in. These pin the
 // rules that make them safe to reach for: offsets count from 0, the list passed in is never
-// changed, a mistake answers nothing and says why, and the bit order is MemoryBlock's.
+// changed, a mistake answers nothing and says why, the bit order is MemoryBlock's, and a byte is a
+// byte by the one rule every send uses.
 // scriptPreludeAgreement.test.js holds the Lua, JavaScript and Python preludes to the same answers
 // and the same words; this file is about what those answers should be.
 
@@ -114,4 +115,40 @@ test('hex and base64 text round-trip, and base64 is the standard alphabet with p
 test('a typed array is read wherever a list is', () => {
   assert.equal(api.bytesToHex(new Uint8Array([0xF0, 0x41])), 'F0 41');
   assert.equal(api.getBits(new Uint8Array([0, 0xB4]), 12, 3), 3);
+});
+
+test('a list item is a byte by the rule every send uses: 0 to 255, or one hex byte, and nothing else', () => {
+  // Items used to be read modulo 256 here and clamped in a send, two rules for one thing: 300 was 2C
+  // to toHex and FF (System Reset) to sendSysex. Both refuse it now, and say where it was.
+  assert.equal(api.bytesToHex(['F0', '41', '0x10', 0xF7]), 'F0 41 10 F7', 'text items are hex bytes');
+  for (const [item, shown] of [[300, '300'], [-1, '-1'], [1.5, '1.5'], [true, 'true'], [[1], 'a list'],
+    ['F041', '"F041"'], [Number.NaN, 'NaN']]) {
+    assert.deepEqual(run(() => api.bytesToHex([0xF0, item])), {
+      value: undefined,
+      errors: [`ce.midi.toHex: ${shown} at position 1 is not a byte, so there is no answer. `
+        + 'A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".'],
+    });
+  }
+});
+
+test('bytes are a list or hex text: a number is not, and nothing at all is said to be missing', () => {
+  // put([1, 2, 3], 1, 0x7F) read the number as an empty list and gave the list back unchanged.
+  assert.deepEqual(run(() => api.bytesPut([1, 2, 3], 1, 0x7F)), {
+    value: undefined, errors: ['ce.midi.put: 127 is not a list of bytes, so there is no answer.'],
+  });
+  assert.deepEqual(run(() => api.bytesFind([1, 2], 0xF7)).errors, ['ce.midi.find: 247 is not a list of bytes, so there is no answer.']);
+  assert.deepEqual(run(() => api.bytesToHex(undefined)).errors, ['ce.midi.toHex: no bytes given, so there is no answer.']);
+  assert.deepEqual(run(() => api.bytesFromHex([1, 2])).errors, ['ce.midi.fromHex: a list is not hex text, so there is no answer.']);
+  assert.deepEqual(run(() => api.bytesToHex([])), { value: '', errors: [] }, 'an empty list is still a list');
+});
+
+test('hex text splits on the same characters in every runtime: a form feed does, a no-break space does not', () => {
+  assert.equal(api.bytesToHex('F0\f41\v10,F7'), 'F0 41 10 F7');
+  assert.match(run(() => api.bytesToHex('F0\u00A041')).errors[0], /^ce\.midi\.toHex: "F0\u00A041" is not one byte/);
+});
+
+test('a value to write that is left out, or not a number, is named rather than printed', () => {
+  assert.deepEqual(run(() => api.setBits(0, 0, 3)).errors, ['ce.midi.setBits: the value to write is missing, so there is no answer.']);
+  assert.deepEqual(run(() => api.bytesWrite([0], 0, 1, '5')).errors, ['ce.midi.write: "5" is not a whole number, so there is no answer.']);
+  assert.deepEqual(run(() => api.getBits(Number.NaN, 0, 3)).errors, ['ce.midi.getBits: NaN is not a finite number, so there is no answer.']);
 });

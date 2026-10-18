@@ -295,8 +295,21 @@ function __ceMakeSelf() {
   };
 }
 // @module ce.midi
-function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
-function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
+// sendCC and sendNRPN are host bindings; what a script passes is checked here first (__midiArg, in
+// the ce.midi section), as the editor checks it, and only numbers that are a message reach the host.
+function sendCC(ch, cc, v) {
+  var c = __midiArg("sendCC", "channel", ch); if (c === undefined) return;
+  var n = __midiArg("sendCC", "controller", cc); if (n === undefined) return;
+  var value = __midiArg("sendCC", "value", v); if (value === undefined) return;
+  __api.sendCC(c, n, value);
+}
+function sendNRPN(ch, msb, lsb, v) {
+  var c = __midiArg("sendNRPN", "channel", ch); if (c === undefined) return;
+  var m = __midiArg("sendNRPN", "msb", msb); if (m === undefined) return;
+  var l = __midiArg("sendNRPN", "lsb", lsb); if (l === undefined) return;
+  var value = __midiArg("sendNRPN", "value14", v); if (value === undefined) return;
+  __api.sendNRPN(c, m, l, value);
+}
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
 // @module ce.device
 // requestDump is assembled further down, over __api.requestDump: it takes an optional callback,
@@ -1025,10 +1038,11 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55];
 // so scaleNotes("c4") answered with the scale on C-1. Both now answer undefined and say why, through
 // __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
 // helper checks its scale or chord first, then its notes in argument order, and stops at the first.
+// A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
+// unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 function __pitch(v) {
-  if (v === undefined || v === null) return undefined;
-  if (typeof v !== "string") return Math.floor(Number(v) || 0);
-  return noteNumber(v);
+  if (typeof v === "string") return noteNumber(v);
+  return typeof v === "number" && isFinite(v) ? Math.floor(v) : undefined;
 }
 function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
 function __pitchOf(verb, v) {
@@ -1039,8 +1053,11 @@ function __pitchOf(verb, v) {
   }
   var n = __pitch(v);
   if (n === undefined) {
-    logError(verb + ': "' + String(v) + '" is not a note name, so there is no answer. A name is '
-      + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+    logError(typeof v === "string"
+      ? verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
+        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+      : verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
+        + 'number or a name, such as 60 or "C4".');
   }
   return n;
 }
@@ -1319,37 +1336,81 @@ function __ce_crc_ref(bytes, poly, init, xorOut, bits) {
   }
   return ((crc ^ xorOut) & mask) >>> 0;
 }
-// Hex text, read the way every runtime reads it: whitespace and commas between tokens, and each
-// token one byte, one or two hex digits with or without 0x. A token that is not is refused in the
-// words of the WebView runtime's scriptBytes and BridgeScriptHost's notOneByteMessage, rather than
-// read as one number. checksum is the one byte-taking helper that runs here, not in the host.
-function __hexBytes(verb, text, outcome) {
-  var tokens = String(text).trim().split(/[\s,]+/).filter(function (t) { return t !== ""; });
-  var out = [];
-  for (var i = 0; i < tokens.length; i++) {
-    var token = tokens[i];
-    if (!/^(0x)?[0-9a-f]{1,2}$/i.test(token)) {
-      var spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(" ") : "";
-      logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. '
-        + (spaced ? 'Put a space between the bytes: "' + spaced + '".'
-          : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+// How a refusal shows a value the script passed, in the same words in every runtime (the WebView
+// runtime's shownValue): "nothing" for undefined or null, text in quotes, "a list" for any list.
+function __shownValue(v) {
+  if (v === undefined || v === null) return "nothing";
+  if (typeof v === "boolean") return String(v);
+  if (typeof v === "number") return v !== v ? "NaN" : isFinite(v) ? String(v) : (v > 0 ? "Infinity" : "-Infinity");
+  if (typeof v === "string") return '"' + v + '"';
+  return typeof v === "function" ? "a function" : "a list";
+}
+function __hexByte(token) { return /^(0x)?[0-9a-f]{1,2}$/i.test(token) ? parseInt(token, 16) : undefined; }
+// A script's bytes, read the way every runtime reads them (the WebView runtime's scriptBytes,
+// BridgeScriptHost's bytesFromScript). Hex text is split on spaces, tabs, line breaks, form and
+// vertical tab and commas (not \s, which would also take a no-break space), and each token is one
+// byte. A list's items are bytes: a whole number from 0 to 255, or text that is one hex byte. A typed
+// array is a list. Anything else is refused, naming what and where, and undefined comes back;
+// nothing given is an empty list, for the caller to judge.
+function __scriptBytes(verb, input, outcome) {
+  if (input === undefined || input === null) return [];
+  if (typeof input === "string") {
+    var tokens = input.split(/[ \t\r\n\f\v,]+/).filter(function (t) { return t !== ""; });
+    var out = [];
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      var b = __hexByte(token);
+      if (b === undefined) {
+        var spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(" ") : "";
+        logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. '
+          + (spaced ? 'Put a space between the bytes: "' + spaced + '".'
+            : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+        return undefined;
+      }
+      out.push(b);
+    }
+    return out;
+  }
+  if (typeof input !== "object") {
+    logError(verb + ": " + __shownValue(input) + " is not a list of bytes, so " + outcome + ".");
+    return undefined;
+  }
+  var items = typeof input.length === "number" ? Array.prototype.slice.call(input)
+    : Object.keys(input).map(function (k) { return input[k]; });
+  var bytes = [];
+  for (var j = 0; j < items.length; j++) {
+    var v = items[j];
+    var byte = typeof v === "number" ? (__whole(v) && v >= 0 && v <= 255 ? v : undefined)
+      : typeof v === "string" ? __hexByte(v) : undefined;
+    if (byte === undefined) {
+      logError(verb + ": " + __shownValue(v) + " at position " + j + " is not a byte, so " + outcome
+        + '. A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".');
       return undefined;
     }
-    out.push(parseInt(token, 16));
+    bytes.push(byte);
   }
-  return out;
+  return bytes;
 }
 function checksum(kind, bytes, opts) {
-  if (bytes === undefined || bytes === null) { bytes = kind; kind = "roland"; }
-  if (typeof bytes === "string") {
-    bytes = __hexBytes("checksum", bytes, "there is no checksum");
-    if (bytes === undefined) return undefined;
+  var verb = "ce.midi.checksum";
+  if (bytes === undefined || bytes === null) {
+    // checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
+    if (kind === undefined || kind === null
+        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase()))) {
+      logError(verb + ": no bytes given, so there is no checksum.");
+      return undefined;
+    }
+    bytes = kind; kind = "roland";
   }
-  var id = __CE_CKSUM_ALIAS[String(kind === undefined || kind === null ? "" : kind).toLowerCase()];
+  bytes = __scriptBytes(verb, bytes, "there is no checksum");
+  if (bytes === undefined) return undefined;
+  // An own key only: "constructor" or "toString" would otherwise be found on Object's prototype.
+  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase())
+    ? __CE_CKSUM_ALIAS[kind.toLowerCase()] : undefined;
   if (id === undefined) {
     // The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
-    logError('ce.midi.checksum("' + String(kind) + '"): no such algorithm. One of: '
-      + Object.keys(__CE_CKSUM_ALIAS).sort().join(", ") + '.');
+    var which = kind === undefined || kind === null ? ": no algorithm given" : "(" + __shownValue(kind) + "): no such algorithm";
+    logError("ce.midi.checksum" + which + ". One of: " + Object.keys(__CE_CKSUM_ALIAS).sort().join(", ") + ".");
     return undefined;
   }
   var sum7 = 0, sum8 = 0, x = 0;
@@ -1378,8 +1439,9 @@ function checksum(kind, bytes, opts) {
 // Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
 // (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
 // and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
-// count from 0. A list may be hex text, or a typed array such as Uint8Array; each byte is read
-// modulo 256; a mistake answers undefined and says why; every list returned is new.
+// count from 0. A list may be hex text or a typed array such as Uint8Array, and its items must be
+// bytes (0 to 255, or one hex byte), both read by __scriptBytes; a mistake answers undefined and says
+// why; every list returned is new.
 var __BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32";
 var __WRITE_START = "Writing can run past the end, but not start beyond it.";
 var __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1391,16 +1453,14 @@ function __refuse(verb, why, tail) {
   return undefined;
 }
 function __bytesIn(verb, input) {
-  var list = [];
-  if (typeof input === "string") {
-    list = __hexBytes(verb, input, "there is no answer");
-    if (list === undefined) return undefined;
-  } else if (input && typeof input === "object" && typeof input.length === "number") {
-    list = Array.prototype.slice.call(input);
-  }
-  var out = [];
-  for (var i = 0; i < list.length; i++) out.push(((Math.floor(Number(list[i]) || 0) % 256) + 256) % 256);
-  return out;
+  if (input === undefined || input === null) return __refuse(verb, "no bytes given");
+  return __scriptBytes(verb, input, "there is no answer");
+}
+// Why a value to write cannot be written in `bits` bits, or "" when it can.
+function __doesNotFit(v, bits) {
+  if (v === undefined || v === null) return "the value to write is missing";
+  if (!__whole(v)) return __shownValue(v) + " is not a whole number";
+  return v < 0 || v >= Math.pow(2, bits) ? v + " does not fit in " + __plural(bits, "bit") : "";
 }
 function __shape(verb, opts) {
   var bits = 7, order = "msb";
@@ -1416,6 +1476,7 @@ function getBits(value, start, count) {
   var verb = "ce.midi.getBits";
   if (!__whole(start) || start < 0 || !__whole(count) || count < 1 || count > 32) return __refuse(verb, __BIT_RANGE);
   if (typeof value === "number") {
+    if (!isFinite(value)) return __refuse(verb, __shownValue(value) + " is not a finite number");
     if (start + count > 32) return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here");
     var m = Math.pow(2, count);
     return ((Math.floor(Math.floor(value) / Math.pow(2, start)) % m) + m) % m;
@@ -1435,8 +1496,10 @@ function getBits(value, start, count) {
 function setBits(value, start, count, bits) {
   var verb = "ce.midi.setBits";
   if (!__whole(start) || start < 0 || !__whole(count) || count < 1 || count > 32) return __refuse(verb, __BIT_RANGE);
-  if (!__whole(bits) || bits < 0 || bits >= Math.pow(2, count)) return __refuse(verb, bits + " does not fit in " + __plural(count, "bit"));
+  var unfit = __doesNotFit(bits, count);
+  if (unfit) return __refuse(verb, unfit);
   if (typeof value === "number") {
+    if (!isFinite(value)) return __refuse(verb, __shownValue(value) + " is not a finite number");
     if (start + count > 32) return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here");
     var v = Math.floor(value), m = Math.pow(2, count);
     var old = ((Math.floor(v / Math.pow(2, start)) % m) + m) % m;
@@ -1480,9 +1543,8 @@ function bytesWrite(bytes, offset, count, value, opts) {
   if (!__whole(count) || count < 1 || count > 4) return __refuse(verb, "count must be a whole number from 1 to 4");
   var shape = __shape(verb, opts);
   if (shape === undefined) return undefined;
-  if (!__whole(value) || value < 0 || value >= Math.pow(2, shape.bits * count)) {
-    return __refuse(verb, value + " does not fit in " + __plural(count * shape.bits, "bit"));
-  }
+  var unfit = __doesNotFit(value, shape.bits * count);
+  if (unfit) return __refuse(verb, unfit);
   if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"), __WRITE_START);
   var base = Math.pow(2, shape.bits), v = value, digits = [];
   for (var k = 0; k < count; k++) { digits.push(v % base); v = Math.floor(v / base); }
@@ -1539,7 +1601,12 @@ function bytesToHex(bytes) {
   if (list === undefined) return undefined;
   return list.map(function (b) { var h = b.toString(16).toUpperCase(); return h.length < 2 ? "0" + h : h; }).join(" ");
 }
-function bytesFromHex(text) { return __bytesIn("ce.midi.fromHex", text); }
+function bytesFromHex(text) {
+  var verb = "ce.midi.fromHex";
+  if (text === undefined || text === null) return __refuse(verb, "no hex text given");
+  if (typeof text !== "string") return __refuse(verb, __shownValue(text) + " is not hex text");
+  return __bytesIn(verb, text);
+}
 function bytesToBase64(bytes) {
   var list = __bytesIn("ce.midi.toBase64", bytes);
   if (list === undefined) return undefined;
@@ -1555,6 +1622,7 @@ function bytesToBase64(bytes) {
 }
 function bytesFromBase64(text) {
   var verb = "ce.midi.fromBase64";
+  if (text === undefined || text === null) return __refuse(verb, "no base64 text given");
   var clean = typeof text === "string" ? text.replace(/[ \t\r\n]/g, "") : null;
   if (clean === null || clean.length % 4 !== 0 || !/^[A-Za-z0-9+\/]*={0,2}$/.test(clean)) {
     return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.");
@@ -1580,7 +1648,12 @@ function panic(opts) {
   opts = opts || {};
   var reset = opts.resetControllers !== false;
   var first = 1, last = 16;
-  if (opts.channel !== undefined && opts.channel !== null) { first = Math.floor(opts.channel); last = first; }
+  // A channel that is not one ("all", 17) is refused; leaving it out is how every channel is named.
+  if (opts.channel !== undefined && opts.channel !== null) {
+    first = __midiArg("panic", "channel", opts.channel);
+    if (first === undefined) return;
+    last = first;
+  }
   for (var ch = first; ch <= last; ch++) {
     sendCC(ch, 120, 0);
     sendCC(ch, 123, 0);
@@ -1792,34 +1865,80 @@ function logError(message, value) { return __api.logAt("error", String(message),
 
 // @module ce.midi
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
-function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ? 16 : c)) - 1; }
-function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
-// noteNumber is undefined for an unreadable name, and so is this. It used to become 0, which kept an
-// undefined out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded
-// the bottom of the keyboard with nothing to say why. A sender that gets undefined refuses the
-// message with __badNote, the way the WebView runtime's refuseNote does, in the same words.
-// A note left out altogether is undefined here too, not the 0 the numeric path made of it.
+// The numbers a channel message carries, checked before anything is sent: the WebView runtime's
+// MIDI_ARGS and midiArg, word for word. An address (channel, controller, program, bank, parameter
+// number) outside its range is refused, since clamping it picks a different message; a value past
+// the end of its range is clamped, as before; anything that is not a number, or is missing where
+// there is no default, is refused. A fraction rounds half up (this floored it, the editor rounded).
+var __MIDI_ARGS = {
+  channel: ["channel", "a channel", 1, 16, true, "A channel is a whole number from 1 to 16."],
+  controller: ["controller number", "a controller number", 0, 127, true, "A controller number is a whole number from 0 to 127."],
+  program: ["program", "a program", 0, 127, true, "A program is a whole number from 0 to 127."],
+  bank: ["bank number", "a bank number", 0, 127, true, "A bank number is a whole number from 0 to 127."],
+  msb: ["MSB", "an MSB", 0, 127, true, "An MSB is a whole number from 0 to 127."],
+  lsb: ["LSB", "an LSB", 0, 127, true, "An LSB is a whole number from 0 to 127."],
+  value: ["value", "a value", 0, 127, false, "A value is a number from 0 to 127."],
+  velocity: ["velocity", "a velocity", 0, 127, false, "A velocity is a number from 0 to 127."],
+  pressure: ["pressure", "a pressure", 0, 127, false, "A pressure is a number from 0 to 127."],
+  value14: ["value", "a value", 0, 16383, false, "A value is a number from 0 to 16383."],
+  bend: ["bend", "a bend", 0, 16383, false, "A bend is a number from 0 to 16383, and 8192 is the centre."],
+  position: ["song position", "a song position", 0, 16383, false, "A song position is a number of MIDI beats from 0 to 16383."]
+};
+function __midiArg(verb, kind, v) {
+  var a = __MIDI_ARGS[kind];
+  if (v === undefined || v === null) { logError(verb + ": no " + a[0] + " given, so nothing was sent."); return undefined; }
+  var n = typeof v === "number" && isFinite(v) ? Math.floor(v + 0.5) : undefined;
+  if (n === undefined || (a[4] && (n < a[2] || n > a[3]))) {
+    logError(verb + ": " + __shownValue(v) + " is not " + a[1] + ", so nothing was sent. " + a[5]);
+    return undefined;
+  }
+  return n < a[2] ? a[2] : (n > a[3] ? a[3] : n);
+}
+// A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
+// range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a
+// name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
+// table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
 function __note(n) {
-  if (n === undefined || n === null) return undefined;
-  return typeof n === "string" ? noteNumber(n) : __7(n);
+  var v = typeof n === "string" ? noteNumber(n) : (typeof n === "number" && isFinite(n) ? Math.floor(n + 0.5) : undefined);
+  return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
 }
 function __badNote(verb, note) {
+  var range = "MIDI notes run from 0 to 127, which is C-1 to G9.";
+  var why;
   if (note === undefined || note === null) {
-    logError(verb + ': no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".');
-    return;
+    why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
+  } else if (typeof note === "string") {
+    why = noteNumber(note) === undefined
+      ? '"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+        + 'has one, then the octave: "C4", "Eb3", "F#-1".'
+      : '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + range;
+  } else if (typeof note === "number" && isFinite(note)) {
+    why = note + " is outside the MIDI notes, so nothing was sent. " + range;
+  } else {
+    why = __shownValue(note) + ' is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   }
-  logError(verb + ': "' + String(note) + '" is not a note name, so nothing was sent. A name is '
-    + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  logError(verb + ": " + why);
+}
+// sendNote's `ms`: left out (null here), the script sends the note off itself; given, it must be a
+// length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+function __noteLength(verb, ms) {
+  if (ms === undefined || ms === null) return null;
+  if (typeof ms === "number" && isFinite(ms) && ms > 0) return ms;
+  logError(verb + ": " + __shownValue(ms) + " is not a length in milliseconds, so nothing was sent. "
+    + "Give a number above 0, or leave it out to send the note off yourself.");
+  return undefined;
 }
 
 // A duration schedules the note off — otherwise every script that plays a note hand-rolls a timer,
 // and getting that wrong means a hung voice, the one MIDI mistake you hear rather than read.
 function sendNote(channel, note, velocity, ms) {
+  var c = __midiArg("sendNote", "channel", channel); if (c === undefined) return;
   var n = __note(note);
   if (n === undefined) return __badNote("sendNote", note);
-  sendMidi([0x90 | __ch(channel), n, __7(velocity)]);
-  if (ms !== undefined && ms !== null && ms > 0)
-    after(ms, function () { sendMidi([0x80 | __ch(channel), n, 0]); });
+  var v = __midiArg("sendNote", "velocity", velocity); if (v === undefined) return;
+  var length = __noteLength("sendNote", ms); if (length === undefined) return;
+  sendMidi([0x90 | (c - 1), n, v]);
+  if (length !== null) after(length, function () { sendMidi([0x80 | (c - 1), n, 0]); });
 }
 // routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
 // ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
@@ -1845,43 +1964,70 @@ function __applyMidiFilter(inbound, bytes) {
 function sendRPN(channel, msb, lsb, value) {
   // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
   // fine tuning (0,1) and coarse tuning (0,2).
-  var s = 0xB0 | __ch(channel);
-  var v = Math.floor(Number(value) || 0); v = v < 0 ? 0 : (v > 16383 ? 16383 : v);
-  sendMidi([s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F]);
+  var c = __midiArg("sendRPN", "channel", channel); if (c === undefined) return;
+  var m = __midiArg("sendRPN", "msb", msb); if (m === undefined) return;
+  var l = __midiArg("sendRPN", "lsb", lsb); if (l === undefined) return;
+  var v = __midiArg("sendRPN", "value14", value); if (v === undefined) return;
+  var s = 0xB0 | (c - 1);
+  sendMidi([s, 0x65, m, s, 0x64, l, s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F]);
 }
 // Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
 function sendSongPosition(beats) {
-  var b = Math.floor(Number(beats) || 0); b = b < 0 ? 0 : (b > 16383 ? 16383 : b);
+  var b = __midiArg("sendSongPosition", "position", beats); if (b === undefined) return;
   sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F]);
 }
 function sendNoteOff(channel, note, velocity) {
+  var c = __midiArg("sendNoteOff", "channel", channel); if (c === undefined) return;
   var n = __note(note);
   if (n === undefined) return __badNote("sendNoteOff", note);
-  sendMidi([0x80 | __ch(channel), n, __7(velocity || 0)]);
+  var v = __midiArg("sendNoteOff", "velocity", velocity === undefined || velocity === null ? 0 : velocity);
+  if (v === undefined) return;
+  sendMidi([0x80 | (c - 1), n, v]);
 }
 function sendProgramChange(channel, program, bankMsb, bankLsb) {
+  var verb = "sendProgramChange";
+  var c = __midiArg(verb, "channel", channel); if (c === undefined) return;
+  var p = __midiArg(verb, "program", program); if (p === undefined) return;
+  var msb = null, lsb = null;
+  if (bankMsb !== undefined && bankMsb !== null) { msb = __midiArg(verb, "bank", bankMsb); if (msb === undefined) return; }
+  if (bankLsb !== undefined && bankLsb !== null) { lsb = __midiArg(verb, "bank", bankLsb); if (lsb === undefined) return; }
   // Bank select first: a device applies the bank that was in force when the program change lands.
-  if (bankMsb !== undefined && bankMsb !== null) sendCC(channel, 0, __7(bankMsb));
-  if (bankLsb !== undefined && bankLsb !== null) sendCC(channel, 32, __7(bankLsb));
-  sendMidi([0xC0 | __ch(channel), __7(program)]);
+  if (msb !== null) sendCC(c, 0, msb);
+  if (lsb !== null) sendCC(c, 32, lsb);
+  sendMidi([0xC0 | (c - 1), p]);
 }
 function sendPitchBend(channel, value) {
-  var v = Math.floor(Number(value)); if (!isFinite(v)) v = 8192;
-  if (v < 0) v = 0; else if (v > 16383) v = 16383;
-  sendMidi([0xE0 | __ch(channel), v % 128, Math.floor(v / 128) % 128]);
+  var c = __midiArg("sendPitchBend", "channel", channel); if (c === undefined) return;
+  var v = __midiArg("sendPitchBend", "bend", value === undefined || value === null ? 8192 : value);
+  if (v === undefined) return;
+  sendMidi([0xE0 | (c - 1), v % 128, Math.floor(v / 128) % 128]);
 }
 function sendAftertouch(channel, pressure, note) {
-  if (note === undefined || note === null) return sendMidi([0xD0 | __ch(channel), __7(pressure)]);
+  var c = __midiArg("sendAftertouch", "channel", channel); if (c === undefined) return;
+  var p;
+  if (note === undefined || note === null) {
+    p = __midiArg("sendAftertouch", "pressure", pressure); if (p === undefined) return;
+    return sendMidi([0xD0 | (c - 1), p]);
+  }
   var n = __note(note);
   if (n === undefined) return __badNote("sendAftertouch", note);
-  sendMidi([0xA0 | __ch(channel), n, __7(pressure)]);
+  p = __midiArg("sendAftertouch", "pressure", pressure); if (p === undefined) return;
+  sendMidi([0xA0 | (c - 1), n, p]);
 }
 function sendClock() { sendMidi([0xF8]); }
+// Any action but stop and continue used to send Start, so "pause" started the sequencer.
 function sendTransport(action) {
-  action = String(action === undefined || action === null ? "start" : action).toLowerCase();
-  if (action === "stop") sendMidi([0xFC]);
-  else if (action === "continue") sendMidi([0xFB]);
-  else sendMidi([0xFA]);
+  var actions = 'The actions are "start", "continue" and "stop".';
+  if (action === undefined || action === null) {
+    logError("sendTransport: no action given, so nothing was sent. " + actions);
+    return;
+  }
+  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.toLowerCase()] : undefined;
+  if (status === undefined) {
+    logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions);
+    return;
+  }
+  sendMidi([status]);
 }
 
 // @module ce.time
@@ -2018,13 +2164,15 @@ function nowMs() { return __api.nowMs(); }
 // in the words of the WebView runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the
 // names differ only by D and T and nothing is ambiguous.
 function __division(verb, name) {
-  var wanted = String(name).toLowerCase();
-  for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
-    var id = __CE_DIVISION_NAMES[i];
-    if (id.toLowerCase() === wanted) return __CE_DIVISIONS[id];
+  if (typeof name === "string") {
+    var wanted = name.toLowerCase();
+    for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
+      var id = __CE_DIVISION_NAMES[i];
+      if (id.toLowerCase() === wanted) return __CE_DIVISIONS[id];
+    }
   }
-  logError(verb + ': "' + String(name) + '" is not a division, so there is no answer. The divisions are '
-    + __CE_DIVISION_NAMES.join(", ") + '.');
+  logError(verb + ": " + (name === undefined || name === null ? "no division given" : __shownValue(name) + " is not a division")
+    + ", so there is no answer. The divisions are " + __CE_DIVISION_NAMES.join(", ") + ".");
   return undefined;
 }
 function beatsPerDivision(name) { return __division("ce.time.division", name); }

@@ -564,6 +564,108 @@ int main()
                "and each says so in the editor's words (got " + sysexLogs.joinIntoString (" | ") + ")");
     }
 
+    // --- One byte rule for lists, and the channel messages checked before they reach the host ---
+    // A list item was clamped by the callbacks (300 went out as FF, a System Reset inside a SysEx)
+    // and a text item read as decimal; QuickJS's Uint8Array arrived as an object and was "no bytes
+    // given". The engines' sendCC, notes and transport clamped or guessed: CC 200 was CC 127, "C10"
+    // put 132 in a data byte, "pause" sent Start. Each is refused now, in the WebView runtime's words.
+    {
+        juce::StringArray logs, out;
+        auto bytesOf = [] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr) b.add ((int) x);
+            return hex (b);
+        };
+        BridgeScriptHost::Callbacks rcb;
+        rcb.log = [&] (const juce::String& m, const juce::var&) { logs.add (m); };
+        rcb.sendSysex = [&] (const juce::var& bytes) { out.add ("sysex " + bytesOf (bytes)); };
+        rcb.sendMidi  = [&] (const juce::var& bytes) { out.add ("midi " + bytesOf (bytes)); };
+        rcb.applyDump = [&] (const juce::var& bytes) { out.add (bytes.getDynamicObject() != nullptr && ! bytes.isArray()
+                                                                   ? "dump map" : "dump " + bytesOf (bytes)); };
+        rcb.sendCC = [&] (int ch, int cc, const juce::var& v) { out.add ("cc " + juce::String (ch) + " " + juce::String (cc) + " " + v.toString()); };
+        BridgeScriptHost ruleHost (std::move (rcb));
+        ScriptRuntime ruleRuntime (ruleHost);
+        ruleHost.attachRuntime (&ruleRuntime);
+
+        auto script = [] (const char* id, const char* language, const char* event, const char* source)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", id);
+            o->setProperty ("language", language);
+            o->setProperty ("scope", "panel");
+            o->setProperty ("event", event);
+            o->setProperty ("target", "*");
+            o->setProperty ("enabled", true);
+            o->setProperty ("source", source);
+            return juce::var (o);
+        };
+        juce::Array<juce::var> scripts;
+        scripts.add (script ("rulelua", "lua", "onRuleLua",
+            "function onRuleLua()\n"
+            "  sendSysex({ 0x41, 0x10, 300 })\n"
+            "  sendSysex({ \"F0\", \"41\", \"0xF7\" })\n"
+            "  sendMidi(42)\n"
+            "  sendSysex(\"F0\\f41 F7\")\n"
+            "  applyDump({ cutoff = 5 })\n"
+            "  sendCC(1, 200, 5)\n"
+            "  sendCC(1, 7, 64.5)\n"
+            "  sendNote(1, \"C10\", 100)\n"
+            "  sendNote(1, 60)\n"
+            "  sendTransport(\"pause\")\n"
+            "end\n"));
+        scripts.add (script ("rulejs", "javascript", "onRuleJs",
+            "function onRuleJs() {\n"
+            "  sendSysex(new Uint8Array([0xF0, 0x41, 0xF7]));\n"
+            "  sendMidi([0x90, 60, 1.5]);\n"
+            "  sendCC(0, 7, 5);\n"
+            "  sendCC(16, 7.4, 64.5);\n"
+            "  panic({ channel: 'all' });\n"
+            "}\n"));
+        ruleRuntime.loadScripts (juce::var (scripts));
+
+        ruleRuntime.runAction ("onRuleLua", juce::var());
+        check (out.joinIntoString (" | ") == "sysex F0 41 F7 | sysex F0 41 F7 | dump map | cc 1 7 65",
+               "text items are hex bytes, a form feed separates, a decoded map is not bytes, a fraction rounds half up (got "
+                   + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") ==
+                   "sendSysex: 300 at position 2 is not a byte, so nothing was sent. A byte is a whole number from 0 to 255, "
+                   "or one or two hex digits such as \"F7\". | "
+                   "sendMidi: 42 is not a list of bytes, so nothing was sent. | "
+                   "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
+                   "sendNote: \"C10\" is outside the MIDI notes, so nothing was sent. MIDI notes run from 0 to 127, which is C-1 to G9. | "
+                   "sendNote: no velocity given, so nothing was sent. | "
+                   "sendTransport: \"pause\" is not a transport action, so nothing was sent. The actions are \"start\", \"continue\" and \"stop\".",
+               "and the rest are refused in the WebView runtime's words (got " + logs.joinIntoString (" | ") + ")");
+
+        out.clear();
+        logs.clear();
+        ruleRuntime.runAction ("onRuleJs", juce::var());
+        check (out.joinIntoString (" | ") == "sysex F0 41 F7 | cc 16 7 65",
+               "a Uint8Array is a list, and JavaScript rounds as the others do (got " + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") ==
+                   "sendMidi: 1.5 at position 2 is not a byte, so nothing was sent. A byte is a whole number from 0 to 255, "
+                   "or one or two hex digits such as \"F7\". | "
+                   "sendCC: 0 is not a channel, so nothing was sent. A channel is a whole number from 1 to 16. | "
+                   "panic: \"all\" is not a channel, so nothing was sent. A channel is a whole number from 1 to 16.",
+               "and JavaScript refuses in the same words (got " + logs.joinIntoString (" | ") + ")");
+
+        // A native handler's sendCC reaches the host without passing through a prelude, so the host
+        // makes the same check, in the same words.
+        out.clear();
+        logs.clear();
+        ruleHost.sendCC (1, 200, juce::var (5));
+        ruleHost.sendCC (2, 7, juce::var ("loud"));
+        ruleHost.sendCC (2, 7, juce::var (64.5));
+        check (out.joinIntoString (" | ") == "cc 2 7 65", "the host passes a valid CC on, rounded (got " + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") ==
+                   "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
+                   "sendCC: \"loud\" is not a value, so nothing was sent. A value is a number from 0 to 127.",
+               "and refuses the rest itself (got " + logs.joinIntoString (" | ") + ")");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

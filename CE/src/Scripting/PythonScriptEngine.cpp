@@ -698,8 +698,26 @@ def set(path, value, opts=None):
     return __api.set(path, d["value"], opts)
 def get(path, form="value"):      return __api.get(path, form)
 # @module ce.midi
-def sendCC(ch, cc, v):            return __api.sendCC(ch, cc, v)
-def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
+# sendCC and sendNRPN are host bindings; what a script passes is checked here first (__midiArg, in
+# the ce.midi section), as the editor checks it, and only numbers that are a message reach the host.
+def sendCC(ch=None, cc=None, v=None):
+    c = __midiArg("sendCC", "channel", ch)
+    if c is None: return
+    n = __midiArg("sendCC", "controller", cc)
+    if n is None: return
+    value = __midiArg("sendCC", "value", v)
+    if value is None: return
+    __api.sendCC(c, n, value)
+def sendNRPN(ch=None, msb=None, lsb=None, v=None):
+    c = __midiArg("sendNRPN", "channel", ch)
+    if c is None: return
+    m = __midiArg("sendNRPN", "msb", msb)
+    if m is None: return
+    l = __midiArg("sendNRPN", "lsb", lsb)
+    if l is None: return
+    value = __midiArg("sendNRPN", "value14", v)
+    if value is None: return
+    __api.sendNRPN(c, m, l, value)
 def sendSysex(b):                 return __api.sendSysex(b)
 # @module ce.time
 # Musical time. One host primitive behind tempo() / isPlaying() / transportInfo(), so the three can
@@ -844,13 +862,14 @@ def nowMs():
 # runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the names differ only by D and T
 # and nothing is ambiguous.
 def __division(verb, name):
-    wanted = str(name).lower()
-    for i in __CE_DIVISION_NAMES:
-        if i.lower() == wanted: return __CE_DIVISIONS[i]
-    logError(verb + ': "' + str(name) + '" is not a division, so there is no answer. The divisions are '
-             + ", ".join(__CE_DIVISION_NAMES) + '.')
+    if isinstance(name, str):
+        wanted = name.lower()
+        for i in __CE_DIVISION_NAMES:
+            if i.lower() == wanted: return __CE_DIVISIONS[i]
+    logError(verb + ": " + ("no division given" if name is None else __shownValue(name) + " is not a division")
+             + ", so there is no answer. The divisions are " + ", ".join(__CE_DIVISION_NAMES) + ".")
     return None
-def beatsPerDivision(name):
+def beatsPerDivision(name=None):
     return __division("ce.time.division", name)
 def divisionNames():
     return [{ "id": i, "label": __CE_DIVISION_LABELS.get(i), "beats": __CE_DIVISIONS.get(i) }
@@ -870,7 +889,7 @@ def barBeatAt(beats, beatsPerBar=None):
     return { "bar": bar, "beat": beat, "tick": tick,
              "text": str(bar) + "." + str(beat) + "." + str(tick).rjust(2, "0") }
 
-def stepAt(beats, division):
+def stepAt(beats=None, division=None):
     import math
     per = __division("ce.time.step", division)
     if per is None: return None
@@ -882,7 +901,7 @@ def stepAt(beats, division):
 # through rather than drop them - the difference between a stutter and a hole in the bar. Capped so
 # returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
 # an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
-def stepsBetween(fromBeats, toBeats, division, maxSteps=None):
+def stepsBetween(fromBeats=None, toBeats=None, division=None, maxSteps=None):
     import math
     per = __division("ce.time.steps", division)
     if per is None: return None
@@ -902,7 +921,7 @@ def stepsBetween(fromBeats, toBeats, division, maxSteps=None):
 
 # The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
 # same" swing are only the same swing if they compute it the same way.
-def swingOffset(step, amount, division):
+def swingOffset(step=None, amount=None, division=None):
     import math
     per = __division("ce.time.swing", division)
     if per is None: return None
@@ -1865,13 +1884,15 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 # scaleNotes("c4") answered with the scale on C-1. Both now answer None and say why, through __setOf
 # and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each helper
 # checks its scale or chord first, then its notes in argument order, and stops at the first.
+# A number has to be a finite one: NaN, True or a table rooted the answer at C-1 (or raised) where an
+# unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 def __pitch(v):
     import math
-    if v is None:
-        return None
     if isinstance(v, str):
         return noteNumber(v)
-    return math.floor(v or 0)
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
+        return math.floor(v)
+    return None
 def __steps(tbl, name, fallback):
     return tbl.get(fallback if name is None else str(name))
 def __pitchOf(verb, v):
@@ -1881,8 +1902,12 @@ def __pitchOf(verb, v):
         return None
     n = __pitch(v)
     if n is None:
-        logError(verb + ': "' + str(v) + '" is not a note name, so there is no answer. A name is '
-                 + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        if isinstance(v, str):
+            logError(verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
+                     + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        else:
+            logError(verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
+                     + 'number or a name, such as 60 or "C4".')
     return n
 def __setOf(verb, kind, name):
     s = __steps(__CE_CHORDS if kind == "chord" else __CE_SCALES, name, "major")
@@ -2181,35 +2206,79 @@ def __ce_crc_ref(data, poly, init, xor_out, bits):
             crc = ((crc >> 1) ^ poly) & mask if (crc & 1) else (crc >> 1) & mask
     return (crc ^ xor_out) & mask
 
-# Hex text, read the way every runtime reads it: whitespace and commas between tokens, and each
-# token one byte, one or two hex digits with or without 0x. A token that is not is refused in the
-# words of the WebView runtime's scriptBytes and BridgeScriptHost's notOneByteMessage, rather than
-# read as one number. checksum is the one byte-taking helper that runs here, not in the host.
-def __hexBytes(verb, text, outcome):
+# How a refusal shows a value the script passed, in the same words in every runtime (the WebView
+# runtime's shownValue): "nothing" for None, true and false, NaN and Infinity as JavaScript writes
+# them, a whole number without ".0", text in quotes, "a list" for any list, tuple or dict.
+def __shownValue(v):
+    if v is None: return "nothing"
+    if isinstance(v, bool): return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        if v != v: return "NaN"
+        if v in (float("inf"), float("-inf")): return "Infinity" if v > 0 else "-Infinity"
+        return __shown(v)
+    if isinstance(v, str): return '"' + v + '"'
+    if callable(v): return "a function"
+    return "a list"
+def __hexByte(token):
     import re
+    return int(token, 16) if re.fullmatch(r"(0[xX])?[0-9a-fA-F]{1,2}", token) else None
+# A script's bytes, read the way every runtime reads them (the WebView runtime's scriptBytes,
+# BridgeScriptHost's bytesFromScript). Hex text is split on spaces, tabs, line breaks, form and
+# vertical tab and commas (not \s, which would also take a no-break space), and each token is one
+# byte. A list's items are bytes: a whole number from 0 to 255, or text that is one hex byte; bytes
+# and a bytearray are lists, and a dict is read as its values, as a Lua table is in the editor.
+# Anything else is refused, naming what and where, and None comes back; nothing given is an empty
+# list, for the caller to judge.
+def __scriptBytes(verb, data, outcome):
+    import re
+    if data is None: return []
+    if isinstance(data, str):
+        out = []
+        for token in [t for t in re.split(r"[ \t\r\n\f\v,]+", data) if t]:
+            b = __hexByte(token)
+            if b is None:
+                if re.fullmatch(r"[0-9a-fA-F]+", token) and len(token) % 2 == 0:
+                    tail = 'Put a space between the bytes: "' + " ".join(token[i:i + 2] for i in range(0, len(token), 2)) + '".'
+                else:
+                    tail = 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'
+                logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. ' + tail)
+                return None
+            out.append(b)
+        return out
+    if isinstance(data, (bytes, bytearray)): return list(data)
+    if isinstance(data, dict): data = list(data.values())
+    if not isinstance(data, (list, tuple)):
+        logError(verb + ": " + __shownValue(data) + " is not a list of bytes, so " + outcome + ".")
+        return None
     out = []
-    for token in [t for t in re.split(r"[\s,]+", str(text).strip()) if t]:
-        if not re.fullmatch(r"(0[xX])?[0-9a-fA-F]{1,2}", token):
-            if re.fullmatch(r"[0-9a-fA-F]+", token) and len(token) % 2 == 0:
-                tail = 'Put a space between the bytes: "' + " ".join(token[i:i + 2] for i in range(0, len(token), 2)) + '".'
-            else:
-                tail = 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'
-            logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. ' + tail)
+    for i, v in enumerate(data):
+        b = None
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            if v == v and 0 <= v <= 255 and v == int(v): b = int(v)
+        elif isinstance(v, str):
+            b = __hexByte(v)
+        if b is None:
+            logError(verb + ": " + __shownValue(v) + " at position " + str(i) + " is not a byte, so " + outcome
+                     + '. A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".')
             return None
-        out.append(int(token, 16))
+        out.append(b)
     return out
-def checksum(kind, bytes=None, opts=None):
+def checksum(kind=None, bytes=None, opts=None):
     import math
-    if bytes is None: bytes = kind; kind = "roland"
-    if isinstance(bytes, str):
-        bytes = __hexBytes("checksum", bytes, "there is no checksum")
-        if bytes is None: return None
-    key = str(kind if kind is not None else "").lower()
-    cid = __CE_CKSUM_ALIAS.get(key)
+    verb = "ce.midi.checksum"
+    if bytes is None:
+        # checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
+        if kind is None or (isinstance(kind, str) and kind.lower() in __CE_CKSUM_ALIAS):
+            logError(verb + ": no bytes given, so there is no checksum.")
+            return None
+        bytes = kind; kind = "roland"
+    bytes = __scriptBytes(verb, bytes, "there is no checksum")
+    if bytes is None: return None
+    cid = __CE_CKSUM_ALIAS.get(kind.lower()) if isinstance(kind, str) else None
     if cid is None:
         # The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
-        logError('ce.midi.checksum("' + str(kind) + '"): no such algorithm. One of: '
-                 + ", ".join(sorted(__CE_CKSUM_ALIAS.keys())) + '.')
+        which = ": no algorithm given" if kind is None else "(" + __shownValue(kind) + "): no such algorithm"
+        logError("ce.midi.checksum" + which + ". One of: " + ", ".join(sorted(__CE_CKSUM_ALIAS.keys())) + ".")
         return None
     total = 0; total8 = 0; x = 0
     for v in bytes:
@@ -2237,8 +2306,9 @@ def checksum(kind, bytes=None, opts=None):
 # Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
 # (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
 # and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
-# count from 0. A list may be hex text, bytes or a bytearray; each byte is read modulo 256; a mistake
-# answers None and says why; every list returned is new.
+# count from 0. A list may be hex text, bytes or a bytearray, and its items must be bytes (0 to 255,
+# or one hex byte), both read by __scriptBytes; a mistake answers None and says why; every list
+# returned is new.
 __BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32"
 __WRITE_START = "Writing can run past the end, but not start beyond it."
 __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -2256,21 +2326,15 @@ def __span(word, a, b):
 def __refuse(verb, why, tail=None):
     logError(verb + ": " + why + ", so there is no answer." + ((" " + tail) if tail else ""))
     return None
-def __byteOf(x):
-    import math
-    try: v = float(x)
-    except (TypeError, ValueError): v = 0.0
-    if v != v or v in (float("inf"), float("-inf")): v = 0.0
-    return int(math.floor(v)) % 256
 def __bytesIn(verb, data):
-    if isinstance(data, str):
-        data = __hexBytes(verb, data, "there is no answer")
-        if data is None: return None
-    elif isinstance(data, (bytes, bytearray, list, tuple)):
-        data = list(data)
-    else:
-        data = []
-    return [__byteOf(x) for x in data]
+    if data is None: return __refuse(verb, "no bytes given")
+    return __scriptBytes(verb, data, "there is no answer")
+# Why a value to write cannot be written in `bits` bits, or None when it can.
+def __doesNotFit(v, bits):
+    if v is None: return "the value to write is missing"
+    if not __whole(v): return __shownValue(v) + " is not a whole number"
+    if v < 0 or v >= 2 ** bits: return __shown(v) + " does not fit in " + __plural(bits, "bit")
+    return None
 def __shape(verb, opts):
     bits, order = 7, "msb"
     if isinstance(opts, dict):
@@ -2279,11 +2343,12 @@ def __shape(verb, opts):
     if isinstance(bits, bool) or bits not in (7, 8): return __refuse(verb, "bits must be 7 or 8")
     if order not in ("msb", "lsb"): return __refuse(verb, 'order must be "msb" or "lsb"')
     return { "bits": int(bits), "order": order }
-def getBits(value, start, count):
+def getBits(value=None, start=None, count=None):
     verb = "ce.midi.getBits"
     if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
     start = int(start); count = int(count)
     if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value != value or value in (float("inf"), float("-inf")): return __refuse(verb, __shownValue(value) + " is not a finite number")
         import math
         if start + count > 32:
             return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here")
@@ -2297,13 +2362,15 @@ def getBits(value, start, count):
         at = start + k
         out |= ((data[at // 8] >> (at % 8)) & 1) << k
     return out
-def setBits(value, start, count, bits):
+def setBits(value=None, start=None, count=None, bits=None):
     verb = "ce.midi.setBits"
     if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
     start = int(start); count = int(count)
-    if not __whole(bits) or bits < 0 or bits >= 2 ** count: return __refuse(verb, __shown(bits) + " does not fit in " + __plural(count, "bit"))
+    unfit = __doesNotFit(bits, count)
+    if unfit: return __refuse(verb, unfit)
     bits = int(bits)
     if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value != value or value in (float("inf"), float("-inf")): return __refuse(verb, __shownValue(value) + " is not a finite number")
         import math
         if start + count > 32:
             return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here")
@@ -2318,7 +2385,7 @@ def setBits(value, start, count, bits):
         if (bits >> k) & 1: data[i] |= bit
         else: data[i] &= ~bit
     return data
-def bytesRead(data, offset, count, opts=None):
+def bytesRead(data=None, offset=None, count=None, opts=None):
     verb = "ce.midi.read"
     data = __bytesIn(verb, data)
     if data is None: return None
@@ -2334,7 +2401,7 @@ def bytesRead(data, offset, count, opts=None):
     base, v = 1 << shape["bits"], 0
     for b in part: v = v * base + (b % base)
     return v
-def bytesWrite(data, offset, count, value, opts=None):
+def bytesWrite(data=None, offset=None, count=None, value=None, opts=None):
     verb = "ce.midi.write"
     data = __bytesIn(verb, data)
     if data is None: return None
@@ -2343,8 +2410,8 @@ def bytesWrite(data, offset, count, value, opts=None):
     offset = int(offset); count = int(count)
     shape = __shape(verb, opts)
     if shape is None: return None
-    if not __whole(value) or value < 0 or value >= 2 ** (shape["bits"] * count):
-        return __refuse(verb, __shown(value) + " does not fit in " + __plural(count * shape["bits"], "bit"))
+    unfit = __doesNotFit(value, shape["bits"] * count)
+    if unfit: return __refuse(verb, unfit)
     if offset > len(data):
         return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"), __WRITE_START)
     base, v, digits = 1 << shape["bits"], int(value), []
@@ -2355,7 +2422,7 @@ def bytesWrite(data, offset, count, value, opts=None):
         if offset + j < len(data): data[offset + j] = d
         else: data.append(d)
     return data
-def bytesSlice(data, offset, count=None):
+def bytesSlice(data=None, offset=None, count=None):
     verb = "ce.midi.slice"
     data = __bytesIn(verb, data)
     if data is None: return None
@@ -2370,7 +2437,7 @@ def bytesSlice(data, offset, count=None):
         if count == 0: return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"))
         return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(len(data), "byte"))
     return data[offset:offset + count]
-def bytesPut(data, offset, values):
+def bytesPut(data=None, offset=None, values=None):
     verb = "ce.midi.put"
     data = __bytesIn(verb, data)
     if data is None: return None
@@ -2384,7 +2451,7 @@ def bytesPut(data, offset, values):
         if offset + j < len(data): data[offset + j] = b
         else: data.append(b)
     return data
-def bytesFind(data, pattern, start=None):
+def bytesFind(data=None, pattern=None, start=None):
     verb = "ce.midi.find"
     data = __bytesIn(verb, data)
     if data is None: return None
@@ -2397,12 +2464,16 @@ def bytesFind(data, pattern, start=None):
     for i in range(int(first), len(data) - len(wanted) + 1):
         if data[i:i + len(wanted)] == wanted: return i
     return None
-def bytesToHex(data):
+def bytesToHex(data=None):
     data = __bytesIn("ce.midi.toHex", data)
     if data is None: return None
     return " ".join("%02X" % b for b in data)
-def bytesFromHex(text): return __bytesIn("ce.midi.fromHex", text)
-def bytesToBase64(data):
+def bytesFromHex(text=None):
+    verb = "ce.midi.fromHex"
+    if text is None: return __refuse(verb, "no hex text given")
+    if not isinstance(text, str): return __refuse(verb, __shownValue(text) + " is not hex text")
+    return __bytesIn(verb, text)
+def bytesToBase64(data=None):
     data = __bytesIn("ce.midi.toBase64", data)
     if data is None: return None
     out = ""
@@ -2412,9 +2483,10 @@ def bytesToBase64(data):
         out += __B64[(n >> 18) & 63] + __B64[(n >> 12) & 63]
         out += (__B64[(n >> 6) & 63] if len(chunk) > 1 else "=") + (__B64[n & 63] if len(chunk) > 2 else "=")
     return out
-def bytesFromBase64(text):
+def bytesFromBase64(text=None):
     import re
     verb = "ce.midi.fromBase64"
+    if text is None: return __refuse(verb, "no base64 text given")
     clean = re.sub(r"[ \t\r\n]", "", text) if isinstance(text, str) else None
     if clean is None or len(clean) % 4 != 0 or not re.fullmatch(r"[A-Za-z0-9+/]*={0,2}", clean):
         return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.")
@@ -2439,7 +2511,12 @@ def panic(opts=None):
     opts = opts or {}
     reset = opts.get("resetControllers", True) is not False
     ch = opts.get("channel")
-    channels = [math.floor(ch)] if ch is not None else range(1, 17)
+    channels = range(1, 17)
+    # A channel that is not one ("all", 17) is refused; leaving it out is how every channel is named.
+    if ch is not None:
+        c = __midiArg("panic", "channel", ch)
+        if c is None: return
+        channels = [c]
     for c in channels:
         sendCC(c, 120, 0)
         sendCC(c, 123, 0)
@@ -2646,41 +2723,86 @@ def logError(message, value=None): return __api.logAt("error", str(message), val
 
 # @module ce.midi
 def sendMidi(b):                  return __api.sendMidi(b)
-def __ch(c):
+# The numbers a channel message carries, checked before anything is sent: the WebView runtime's
+# MIDI_ARGS and midiArg, word for word. An address (channel, controller, program, bank, parameter
+# number) outside its range is refused, since clamping it picks a different message; a value past
+# the end of its range is clamped, as before; anything that is not a number, or is missing where
+# there is no default, is refused. A fraction rounds half up (this floored it, the editor rounded).
+__MIDI_ARGS = {
+    "channel": ("channel", "a channel", 1, 16, True, "A channel is a whole number from 1 to 16."),
+    "controller": ("controller number", "a controller number", 0, 127, True, "A controller number is a whole number from 0 to 127."),
+    "program": ("program", "a program", 0, 127, True, "A program is a whole number from 0 to 127."),
+    "bank": ("bank number", "a bank number", 0, 127, True, "A bank number is a whole number from 0 to 127."),
+    "msb": ("MSB", "an MSB", 0, 127, True, "An MSB is a whole number from 0 to 127."),
+    "lsb": ("LSB", "an LSB", 0, 127, True, "An LSB is a whole number from 0 to 127."),
+    "value": ("value", "a value", 0, 127, False, "A value is a number from 0 to 127."),
+    "velocity": ("velocity", "a velocity", 0, 127, False, "A velocity is a number from 0 to 127."),
+    "pressure": ("pressure", "a pressure", 0, 127, False, "A pressure is a number from 0 to 127."),
+    "value14": ("value", "a value", 0, 16383, False, "A value is a number from 0 to 16383."),
+    "bend": ("bend", "a bend", 0, 16383, False, "A bend is a number from 0 to 16383, and 8192 is the centre."),
+    "position": ("song position", "a song position", 0, 16383, False, "A song position is a number of MIDI beats from 0 to 16383."),
+}
+def __finite(v):
     import math
-    c = math.floor(c or 1)
-    return (1 if c < 1 else (16 if c > 16 else c)) - 1
-def __7(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+def __midiArg(verb, kind, v):
     import math
-    v = math.floor(v or 0)
-    return 0 if v < 0 else (127 if v > 127 else v)
-# noteNumber is None for an unreadable name, and so is this. It used to become 0, which kept a None
-# out of the message and played C-1 instead: "c4" (the letter must be a capital) sounded the bottom
-# of the keyboard with nothing to say why. A sender that gets None refuses the message with
-# __badNote, the way the WebView runtime's refuseNote does, in the same words.
-# A note left out altogether is None here too, not the 0 the numeric path made of it.
-def __note(n):
-    if n is None:
+    noun, a_noun, lo, hi, address, hint = __MIDI_ARGS[kind]
+    if v is None:
+        logError(verb + ": no " + noun + " given, so nothing was sent.")
         return None
-    if isinstance(n, str):
-        return noteNumber(n)
-    return __7(n)
+    n = int(math.floor(v + 0.5)) if __finite(v) else None
+    if n is None or (address and (n < lo or n > hi)):
+        logError(verb + ": " + __shownValue(v) + " is not " + a_noun + ", so nothing was sent. " + hint)
+        return None
+    return lo if n < lo else (hi if n > hi else n)
+# A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
+# range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a
+# name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
+# table raised or played C-1. __badNote refuses each in the WebView runtime's words.
+def __note(n):
+    import math
+    v = noteNumber(n) if isinstance(n, str) else (int(math.floor(n + 0.5)) if __finite(n) else None)
+    return v if v is not None and 0 <= v <= 127 else None
 def __badNote(verb, note):
+    rng = "MIDI notes run from 0 to 127, which is C-1 to G9."
     if note is None:
-        logError(verb + ': no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".')
-        return
-    logError(verb + ': "' + str(note) + '" is not a note name, so nothing was sent. A name is '
-             + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
+    elif isinstance(note, str):
+        if noteNumber(note) is None:
+            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+                   + 'has one, then the octave: "C4", "Eb3", "F#-1".')
+        else:
+            why = '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + rng
+    elif __finite(note):
+        why = __shown(note) + " is outside the MIDI notes, so nothing was sent. " + rng
+    else:
+        why = __shownValue(note) + ' is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
+    logError(verb + ": " + why)
+# sendNote's `ms`: left out (False here), the script sends the note off itself; given, it must be
+# a length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+def __noteLength(verb, ms):
+    if ms is None: return False
+    if __finite(ms) and ms > 0: return ms
+    logError(verb + ": " + __shownValue(ms) + " is not a length in milliseconds, so nothing was sent. "
+             + "Give a number above 0, or leave it out to send the note off yourself.")
+    return None
 
-def sendNote(channel, note, velocity, ms=None):
+def sendNote(channel=None, note=None, velocity=None, ms=None):
     # A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
     # timer for it, and getting that wrong means a hung voice - the one MIDI mistake you hear rather
     # than read. A panel cannot play a note at all.
+    c = __midiArg("sendNote", "channel", channel)
+    if c is None: return
     n = __note(note)
     if n is None: return __badNote("sendNote", note)
-    sendMidi([0x90 | __ch(channel), n, __7(velocity)])
-    if ms is not None and ms > 0:
-        after(ms, lambda: sendMidi([0x80 | __ch(channel), n, 0]))
+    v = __midiArg("sendNote", "velocity", velocity)
+    if v is None: return
+    length = __noteLength("sendNote", ms)
+    if length is None: return
+    sendMidi([0x90 | (c - 1), n, v])
+    if length is not False:
+        after(length, lambda: sendMidi([0x80 | (c - 1), n, 0]))
 
 # routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
 # ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
@@ -2714,45 +2836,78 @@ def __applyMidiFilter(inbound, b):
         if out is None: continue
         if len(out): b = out
     return {"bytes": b}
-def sendRPN(channel, msb, lsb, value):
+def sendRPN(channel=None, msb=None, lsb=None, value=None):
     # RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
     # fine tuning (0,1) and coarse tuning (0,2).
-    import math
-    s = 0xB0 | __ch(channel)
-    v = math.floor(value or 0)
-    v = 0 if v < 0 else (16383 if v > 16383 else v)
-    sendMidi([s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F])
-# Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
-def sendSongPosition(beats):
-    import math
-    b = math.floor(beats or 0)
-    b = 0 if b < 0 else (16383 if b > 16383 else b)
+    c = __midiArg("sendRPN", "channel", channel)
+    if c is None: return
+    m = __midiArg("sendRPN", "msb", msb)
+    if m is None: return
+    l = __midiArg("sendRPN", "lsb", lsb)
+    if l is None: return
+    v = __midiArg("sendRPN", "value14", value)
+    if v is None: return
+    s = 0xB0 | (c - 1)
+    sendMidi([s, 0x65, m, s, 0x64, l, s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F])
+def sendSongPosition(beats=None):
+    b = __midiArg("sendSongPosition", "position", beats)
+    if b is None: return
     sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F])
-def sendNoteOff(channel, note, velocity=0):
+def sendNoteOff(channel=None, note=None, velocity=None):
+    c = __midiArg("sendNoteOff", "channel", channel)
+    if c is None: return
     n = __note(note)
     if n is None: return __badNote("sendNoteOff", note)
-    sendMidi([0x80 | __ch(channel), n, __7(velocity)])
-def sendProgramChange(channel, program, bankMsb=None, bankLsb=None):
+    v = __midiArg("sendNoteOff", "velocity", 0 if velocity is None else velocity)
+    if v is None: return
+    sendMidi([0x80 | (c - 1), n, v])
+def sendProgramChange(channel=None, program=None, bankMsb=None, bankLsb=None):
+    verb = "sendProgramChange"
+    c = __midiArg(verb, "channel", channel)
+    if c is None: return
+    p = __midiArg(verb, "program", program)
+    if p is None: return
+    msb = lsb = False
+    if bankMsb is not None:
+        msb = __midiArg(verb, "bank", bankMsb)
+        if msb is None: return
+    if bankLsb is not None:
+        lsb = __midiArg(verb, "bank", bankLsb)
+        if lsb is None: return
     # Bank select first: a device applies the bank that was in force when the program change lands.
-    if bankMsb is not None: sendCC(channel, 0, __7(bankMsb))
-    if bankLsb is not None: sendCC(channel, 32, __7(bankLsb))
-    sendMidi([0xC0 | __ch(channel), __7(program)])
-def sendPitchBend(channel, value):
-    import math
-    v = math.floor(value if value is not None else 8192)
-    v = 0 if v < 0 else (16383 if v > 16383 else v)
-    sendMidi([0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128])
-def sendAftertouch(channel, pressure, note=None):
-    if note is None: return sendMidi([0xD0 | __ch(channel), __7(pressure)])
+    if msb is not False: sendCC(c, 0, msb)
+    if lsb is not False: sendCC(c, 32, lsb)
+    sendMidi([0xC0 | (c - 1), p])
+def sendPitchBend(channel=None, value=None):
+    c = __midiArg("sendPitchBend", "channel", channel)
+    if c is None: return
+    v = __midiArg("sendPitchBend", "bend", 8192 if value is None else value)
+    if v is None: return
+    sendMidi([0xE0 | (c - 1), v % 128, (v // 128) % 128])
+def sendAftertouch(channel=None, pressure=None, note=None):
+    c = __midiArg("sendAftertouch", "channel", channel)
+    if c is None: return
+    if note is None:
+        p = __midiArg("sendAftertouch", "pressure", pressure)
+        if p is None: return
+        return sendMidi([0xD0 | (c - 1), p])
     n = __note(note)
     if n is None: return __badNote("sendAftertouch", note)
-    sendMidi([0xA0 | __ch(channel), n, __7(pressure)])
+    p = __midiArg("sendAftertouch", "pressure", pressure)
+    if p is None: return
+    sendMidi([0xA0 | (c - 1), n, p])
 def sendClock(): sendMidi([0xF8])
-def sendTransport(action="start"):
-    action = str(action).lower()
-    if action == "stop": sendMidi([0xFC])
-    elif action == "continue": sendMidi([0xFB])
-    else: sendMidi([0xFA])
+# Any action but stop and continue used to send Start, so "pause" started the sequencer.
+def sendTransport(action=None):
+    actions = 'The actions are "start", "continue" and "stop".'
+    if action is None:
+        logError("sendTransport: no action given, so nothing was sent. " + actions)
+        return
+    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.lower()) if isinstance(action, str) else None
+    if status is None:
+        logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions)
+        return
+    sendMidi([status])
 
 # @module ce.device
 # Device READS — four wrappers over one host primitive, so the shape a script sees is assembled
