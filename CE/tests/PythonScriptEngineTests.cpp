@@ -246,6 +246,9 @@ int main()
             "    log('params ' + str(ce.device.parameters({'grp': 'Filter'})))\n"
             "    log('read ' + str(ce.midi.read([1, 2], 0, 2, {'ordr': 'lsb', 1: 'a list entry'})))\n"
             "    log('goodRead ' + str(ce.midi.read([1, 2], 0, 2, {'order': 'lsb'})))\n"
+            "    log('write ' + str(ce.midi.write([1, 2], 0, 2, 300, {'bit': 8})))\n"
+            "    log('byName ' + str(ce.midi.write([1, 2], 0, 2, 300, opts={'bit': 8})))\n"
+            "    log('goodWrite ' + str(ce.midi.write([0, 0], 0, 2, 300, {'bits': 8})))\n"
             "    set('good', 7, {'transmit': False})\n"));
         runtime.loadScripts (juce::var (optionScripts));
         host.logs.clear();
@@ -256,7 +259,8 @@ int main()
                    && (int) host.values["good"] == 7,
                "Options: a refused set() writes nothing, by position or by name, and the right one writes");
         check (! host.timerStarts.contains ("s"), "Options: the refused sync timer is not started");
-        for (const auto* line : { "to False", "define False", "recall False", "params []", "read None", "goodRead 257" })
+        for (const auto* line : { "to False", "define False", "recall False", "params []", "read None", "goodRead 257",
+                                  "write None", "byName None", "goodWrite [1, 44]" })
             check (host.logs.contains (line), juce::String ("Options: logs ") + line + " (got " + logged + ")");
         for (const auto* line : {
                  "set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit.",
@@ -268,8 +272,12 @@ int main()
                  "ce.device.recallPreset: \"rol\" is not one of its options, so nothing was done. Its only option is role.",
                  "ce.device.parameters: \"grp\" is not one of its options, so nothing was done. Its options are: role, "
                      "query, group, type, access, limit.",
-                 "ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order." })
+                 "ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order.",
+                 "ce.midi.write: \"bit\" is not one of its options, so nothing was done. Its options are: bits, order." })
             check (host.logs.contains (line), juce::String ("Options, refused in Python: ") + line);
+        const auto writeRefusals = std::count (host.logs.begin(), host.logs.end(),
+            juce::String ("ce.midi.write: \"bit\" is not one of its options, so nothing was done. Its options are: bits, order."));
+        check (writeRefusals == 2, "Options: ce.midi.write by the parameter's name is refused as well (got " + logged + ")");
         const auto setRefusals = std::count (host.logs.begin(), host.logs.end(),
             juce::String ("set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit."));
         check (setRefusals == 2, "Options: set() by the parameter's name is refused as well (got " + logged + ")");

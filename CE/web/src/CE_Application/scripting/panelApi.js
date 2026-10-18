@@ -388,6 +388,19 @@ const SHARED_OPTION_FIELDS = {
     summary: 'Which configured device to use, when the panel is set up for more than one.',
   },
 
+  /* --- byte lists (ce.midi.read / .write) ----------------------------------- */
+  // One definition for the two, because a number is read back the way it was written: write's
+  // options were only "the same as read's" in its summary, listed nowhere, so the check of option
+  // keys could not refuse { bit = 8 } there, and a 300 went to the synth as 02 2C rather than 01 2C.
+  bytesBits: {
+    name: 'bits', type: 'number', default: '7', values: [7, 8],
+    summary: 'How many bits of each byte carry the number: 7 for SysEx data, 8 for a whole byte.',
+  },
+  bytesOrder: {
+    name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
+    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").',
+  },
+
   /* --- image layers (ce.image) -------------------------------------------- */
   tint: {
     name: 'tint', type: 'colour',
@@ -3748,23 +3761,22 @@ export const HELPERS = [
       { name: 'bytes', type: 'bytes', required: true },
       { name: 'offset', type: 'number', required: true },
       { name: 'count', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false, fields: [
-        { name: 'bits', type: 'number', default: '7', values: [7, 8],
-          summary: 'How many bits of each byte carry the number: 7 for SysEx data, 8 for a whole byte.' },
-        { name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
-          summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").' },
-      ] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['bytesBits', 'bytesOrder']) },
     ],
   },
   {
     id: 'bytesWrite', category: 'MIDI encoding', signature: 'bytesWrite(bytes, offset, count, value [, opts]) -> list',
-    summary: 'Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` is the same as bytesRead\'s. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message.',
+    // Its signature ends `-> list`, which would make a refused call answer an empty list; but every
+    // byte-list verb answers nothing when it refuses (ce.midi.write already did for a value that does
+    // not fit), because an empty list reads as a message with nothing in it.
+    refusal: 'nothing',
+    summary: 'Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` takes the same `bits` and `order` as bytesRead\'s; any other key is refused with a message, and nothing comes back. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message.',
     params: [
       { name: 'bytes', type: 'bytes', required: true },
       { name: 'offset', type: 'number', required: true },
       { name: 'count', type: 'number', required: true },
       { name: 'value', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['bytesBits', 'bytesOrder']) },
     ],
   },
   {

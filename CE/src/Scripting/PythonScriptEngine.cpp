@@ -3671,6 +3671,7 @@ __CE_OPTIONS = {
     "panic": { "path": "ce.midi.panic", "at": 0, "param": "opts", "refusal": "nothing", "names": ["channel", "resetControllers"] },
     "encodeJson": { "path": "ce.storage.encode", "at": 1, "param": "opts", "refusal": "nothing", "names": ["indent"] },
     "bytesRead": { "path": "ce.midi.read", "at": 3, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
+    "bytesWrite": { "path": "ce.midi.write", "at": 4, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
 }
 # The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
 # option that lists fields of its own, in the contract's order.

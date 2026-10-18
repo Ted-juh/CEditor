@@ -3327,6 +3327,7 @@ local __CE_OPTIONS = {
   ["panic"] = { path = "ce.midi.panic", at = 1, refusal = "nothing", names = { "channel", "resetControllers" } },
   ["encodeJson"] = { path = "ce.storage.encode", at = 2, refusal = "nothing", names = { "indent" } },
   ["bytesRead"] = { path = "ce.midi.read", at = 4, refusal = "nothing", names = { "bits", "order" } },
+  ["bytesWrite"] = { path = "ce.midi.write", at = 5, refusal = "nothing", names = { "bits", "order" } },
 }
 -- Byte order, which is what JavaScript's sort and Python's sorted() give these names. table.sort's
 -- own < compares with the C library's collation, which a locale can change.

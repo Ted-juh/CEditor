@@ -78,6 +78,10 @@ test('each of the reported silent failures is refused, and says which option', (
       'error: ce.device.requestDump: "timout" is not one of its options, so nothing was done. Its only option is timeout.'],
     [() => api.ce.midi.read([1, 2], 0, 2, { ordr: 'lsb' }),
       'error: ce.midi.read: "ordr" is not one of its options, so nothing was done. Its options are: bits, order.'],
+    // write's options were "the same as read's" in its summary and listed nowhere, so { bit = 8 }
+    // was not looked at and 300 went out as 7-bit bytes, 02 2C, where 01 2C was meant.
+    [() => api.ce.midi.write([1, 2], 0, 2, 300, { bit: 8 }),
+      'error: ce.midi.write: "bit" is not one of its options, so nothing was done. Its options are: bits, order.'],
     [() => api.ce.panel.create('Knob', { name: 'k', colour: 'red' }),
       'error: ce.panel.create: "colour" is not one of its options, so nothing was done. Its options are: name, x, y, '
         + 'width, height, parent, and the name of any section, such as Behavior.'],
@@ -99,6 +103,9 @@ test('each of the reported silent failures is refused, and says which option', (
 test('nothing is done, and the call answers what the member answers for any other refusal', () => {
   // A number, read as if the options were right, is no number at all.
   assert.equal(api.ce.midi.read([1, 2], 0, 2, { ordr: 'lsb' }), undefined);
+  // A list answer, but no list: an empty one would read as a message with nothing in it, and every
+  // other refusal of a byte-list verb answers nothing too.
+  assert.equal(api.ce.midi.write([1, 2], 0, 2, 300, { bit: 8 }), undefined);
   assert.equal(api.ce.midi.checksum('roland', [1, 2], { ofset: 1 }), undefined);
   assert.equal(api.ce.storage.encode({ a: 1 }, { indnt: 2 }), undefined);
   // A list is still a list, so a loop over it runs, empty.
@@ -143,6 +150,8 @@ test('nothing is done, and the call answers what the member answers for any othe
 
 test('the call still runs when every key is one it takes', () => {
   assert.equal(api.ce.midi.read([1, 2], 0, 2, { order: 'lsb' }), (2 << 7) | 1);
+  assert.deepEqual(api.ce.midi.write([0, 0], 0, 2, 300, { bits: 8 }), [0x01, 0x2C]);
+  assert.deepEqual(api.ce.midi.write([0, 0], 0, 2, 300, { order: 'lsb' }), [0x2C, 0x02]);
   assert.equal(api.ce.storage.encode({ a: 1 }, { indent: 2 }), '{\n  "a": 1\n}');
   const knob = createControl('Knob', { name: 'k' });
   withPanel([knob], (host) => {
@@ -230,7 +239,7 @@ test('what each checked member answers when it refuses', () => {
   for (const list of Object.values(byAnswer)) list.sort();
   assert.deepEqual(byAnswer, {
     nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform', 'ce.midi.checksum', 'ce.midi.panic',
-      'ce.midi.read', 'ce.panel.clone', 'ce.panel.create', 'ce.storage.encode', 'ce.text.fit', 'ce.time.syncTimer',
+      'ce.midi.read', 'ce.midi.write', 'ce.panel.clone', 'ce.panel.create', 'ce.storage.encode', 'ce.text.fit', 'ce.time.syncTimer',
       'ce.ui.notify', 'set'],
     false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.device.bind', 'ce.device.defineDump',
       'ce.device.defineParameter', 'ce.device.requestDump', 'ce.draw.curve', 'ce.draw.grid', 'ce.draw.image',

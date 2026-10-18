@@ -700,8 +700,11 @@ const REFUSAL_CASES = [
   ['panic', [{ channel: 2, reset: false }]], ['panic', [{ channel: 2, resetControllers: false }]],
   ['encodeJson', [{ a: 1 }, { indnt: 2 }]], ['encodeJson', [{ a: 1 }, { indent: 2 }]],
   ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesRead', [[1, 2], 0, 2, { bits: 8, Order: 'lsb', order: 'lsb' }]],
+  ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]], ['bytesWrite', [[1, 2], 0, 2, 300, { order: 'lsb', bitz: 8, Bits: 8 }]],
+  ['bytesWrite', [[1, 2], 0, 2, 300, { bits: 8, order: 'lsb' }]],
   // Not options tables, so nothing to refuse: a list, numbered keys, and no table at all.
   ['bytesRead', [[1, 2], 0, 2, [8]]], ['bytesRead', [[1, 2], 0, 2, { 1: 8 }]], ['bytesRead', [[1, 2], 0, 2, 'lsb']],
+  ['bytesWrite', [[1, 2], 0, 2, 300, [8]]], ['bytesWrite', [[1, 2], 0, 2, 300, { 1: 8 }]],
 ];
 
 /** The case's arguments with FN made a function in this realm. */
@@ -994,7 +997,7 @@ const OPTION_ANSWER_CASES = [
   ['deviceDefineParameter', ['p', { cc: 7, nmae: 'Cutoff' }]], ['deviceDefineDump', ['d', { header: 'F0' }]],
   ['devicePorts', [{ dir: 'in' }]], ['checksum', ['roland', [1, 2], { ofset: 1 }]],
   ['panic', [{ reset: false }]], ['encodeJson', [{ a: 1 }, { indnt: 2 }]],
-  ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]],
+  ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {

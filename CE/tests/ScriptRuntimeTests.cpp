@@ -3690,6 +3690,8 @@ int main()
               "  set(\"K.good\", 7, { transmit = false })\n"
               "  log(\"good \" .. tostring(ce.device.defineParameter(\"res\", { cc = 71, name = \"Resonance\", nrpn = nil })))\n"
               "  log(\"goodRead \" .. tostring(ce.midi.read({ 1, 2 }, 0, 2, { order = \"lsb\" })))\n"
+              "  log(\"write \" .. tostring(ce.midi.write({ 1, 2 }, 0, 2, 300, { bit = 8 })))\n"
+              "  log(\"goodWrite \" .. table.concat(ce.midi.write({ 0, 0 }, 0, 2, 300, { bits = 8 }), \" \"))\n"
               "  animateTo(\"K.value\", 50, { duration = 500 })\n"
               "end\n"
             : "function onOpts() {\n"
@@ -3706,6 +3708,8 @@ int main()
               "  set(\"K.good\", 7, { transmit: false });\n"
               "  log(\"good \" + ce.device.defineParameter(\"res\", { cc: 71, name: \"Resonance\" }));\n"
               "  log(\"goodRead \" + ce.midi.read([1, 2], 0, 2, { order: \"lsb\" }));\n"
+              "  log(\"write \" + (ce.midi.write([1, 2], 0, 2, 300, { bit: 8 }) === undefined ? \"nil\" : \"a list\"));\n"
+              "  log(\"goodWrite \" + ce.midi.write([0, 0], 0, 2, 300, { bits: 8 }).join(\" \"));\n"
               "  animateTo(\"K.value\", 50, { duration: 500 });\n"
               "}\n"));
         runtime.loadScripts (juce::var (scripts));
@@ -3717,7 +3721,8 @@ int main()
         const juce::String tag (lang);
         const auto logged = host.logs.joinIntoString (" | ");
         for (const char* line : { "to false", "spring false", "running false", "define false", "dump false",
-                                  "recall false", "params 0", "read nil", "good true", "goodRead 257" })
+                                  "recall false", "params 0", "read nil", "good true", "goodRead 257",
+                                  "write nil", "goodWrite 1 44" })
             check (host.logs.contains (line), tag + ": logs " + line + " (got " + logged + ")");
         check (host.values.find ("K.refused") == host.values.end() && (int) host.values["K.good"] == 7,
                tag + ": the refused set() writes nothing, and the right one writes");
@@ -3745,9 +3750,10 @@ int main()
                  "error:ce.device.parameters: \"grp\" is not one of its options, so nothing was done. Its options are: "
                      "role, query, group, type, access, limit.",
                  "error:ce.time.syncTimer: \"folow\" is not one of its options, so nothing was done. Its only option is follow.",
-                 "error:ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order." })
+                 "error:ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order.",
+                 "error:ce.midi.write: \"bit\" is not one of its options, so nothing was done. Its options are: bits, order." })
             check (host.levelled.contains (line), tag + ": " + juce::String (line).fromFirstOccurrenceOf (":", false, false));
-        check (host.levelled.size() == 10, tag + ": one line per refusal and nothing else (got "
+        check (host.levelled.size() == 11, tag + ": one line per refusal and nothing else (got "
                    + host.levelled.joinIntoString (" | ") + ")");
         runtime.stopAnimation ({});
     }
