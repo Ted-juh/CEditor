@@ -333,7 +333,7 @@ int main()
           "scripting": { "modules": ["ce.core", "ce.device", "ce.time"] },
           "scripts": [
             { "id": "d1", "name": "dev", "language": "lua", "scope": "panel", "event": "onPanelLoad", "target": "*", "enabled": true,
-              "source": "function onPanelLoad()\n  ce.device.defineParameter(\"cutoff\", { name = \"Mine\", min = 0, max = 127, cc = 74 })\nend\nfunction onList()\n  for _, p in ipairs(ce.device.parameters()) do log(\"p \" .. p.id .. \" \" .. p.name) end\nend\nfunction onMine() ce.device.write(\"cutoff\", 9) end\nfunction onTheirs() ce.device.write(\"reso\", 9) end\nfunction onAsk() requestDump(\"patch\") end" }
+              "source": "function onPanelLoad()\n  ce.device.defineParameter(\"cutoff\", { name = \"Mine\", min = 0, max = 127, cc = 74 })\nend\nfunction onList()\n  for _, p in ipairs(ce.device.parameters()) do log(\"p \" .. p.id .. \" \" .. p.name) end\nend\nfunction onMine() ce.device.write(\"cutoff\", 9) end\nfunction onTheirs() ce.device.write(\"reso\", 9) end\nfunction onAsk() requestDump(\"patch\") end\nfunction onRefused() ce.device.write(\"cutoff\", \"abc\") end" }
           ],
           "controls": []
         })JSON";
@@ -395,6 +395,13 @@ int main()
         check (devWrites.isEmpty(), "…and never reaches the profile's encoder");
         devRuntime.runAction ("onTheirs", juce::var());
         check (devWrites.contains ("reso=9"), "writing a profile parameter still goes through the profile");
+        // A declared parameter's write that the runtime refuses ends there. It used to fall through
+        // to the profile, whose own "cutoff" then sent whatever it means by that.
+        devWrites.clear();
+        devMidi.clear();
+        devRuntime.runAction ("onRefused", juce::var());
+        check (devWrites.isEmpty() && devMidi.isEmpty(), "a refused write to a declared parameter reaches neither encoder (got "
+                   + devWrites.joinIntoString (" | ") + " / " + devMidi.joinIntoString (" | ") + ")");
 
         // requestDump with nothing declared for that kind falls through to the profile's sync.
         devRuntime.runAction ("onAsk", juce::var());

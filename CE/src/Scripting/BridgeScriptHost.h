@@ -414,13 +414,17 @@ public:
     {
         if (runtime != nullptr)
         {
-            const auto bytes = runtime->encodeDeviceParameter (role.isEmpty() ? defaultDeviceRole : role,
-                                                               parameterId, value);
+            const auto& r = role.isEmpty() ? defaultDeviceRole : role;
+            const auto bytes = runtime->encodeDeviceParameter (r, parameterId, value);
             if (auto* arr = bytes.getArray(); arr != nullptr && ! arr->isEmpty())
             {
                 sendMidi (bytes);
                 return true;
             }
+            // A parameter the script declared, whose write the runtime refused (and said why), is
+            // finished here. Falling through handed the same id to the device profile, which sent
+            // whatever its own parameter of that name means, or nothing.
+            if (runtime->hasDeviceParameter (r, parameterId)) return false;
         }
         return callbacks.deviceWrite && callbacks.deviceWrite (parameterId, value, role);
     }
