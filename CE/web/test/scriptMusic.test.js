@@ -86,6 +86,57 @@ test('scale transposes rather than wrapping — the notes keep going up', () => 
   assert.deepEqual(api.scaleNotes(71), [71, 73, 75, 76, 78, 80, 82]);
 });
 
+test('a note name the music helpers cannot read is refused, not read as C-1', () => {
+  // scaleNotes("c4") used to answer with the scale on C-1: the unreadable name became 0 so that no
+  // undefined could reach the list. It answers nothing now, and says why, in every runtime's words
+  // (scriptPreludeAgreement.test.js compares them).
+  const errorsFrom = (call) => {
+    clearScriptTrace();
+    const value = call();
+    return { value, errors: get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message) };
+  };
+  const unreadable = (verb) => `${verb}: "c4" is not a note name, so there is no answer. A name is a `
+    + 'capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".';
+  for (const [verb, call] of [
+    ['ce.music.scale', () => api.scaleNotes('c4', 'major')],
+    ['ce.music.chord', () => api.chordNotes('c4', 'major')],
+    ['ce.music.quantize', () => api.quantizeNote('c4', 60, 'major')],
+    ['ce.music.quantize', () => api.quantizeNote(61, 'c4', 'major')],
+    ['ce.music.spelling', () => api.noteSpelling('c4', 'major')],
+    ['ce.music.inScale', () => api.inScale('c4', 60, 'major')],
+    ['ce.music.degree', () => api.scaleDegree(60, 'c4', 'major')],
+    ['ce.music.degreeChord', () => api.degreeChord('c4', 'major', 1)],
+  ]) {
+    assert.deepEqual(errorsFrom(call), { value: undefined, errors: [unreadable(verb)] }, verb);
+  }
+  // A right name, and note 0 spelled as a name, are still answers, and say nothing.
+  assert.deepEqual(errorsFrom(() => api.scaleNotes('C-1', 'major')).errors, []);
+  assert.deepEqual(errorsFrom(() => api.scaleNotes('C-1', 'major')).value, api.scaleNotes(0, 'major'));
+});
+
+test('an unknown scale or chord says so, and lists the ones there are', () => {
+  const clear = () => clearScriptTrace();
+  const errors = () => get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+  clear();
+  assert.equal(api.scaleNotes(60, 'lokrian'), undefined);
+  assert.deepEqual(errors(), [`ce.music.scale: "lokrian" is not a scale, so there is no answer. `
+    + `The scales are ${SCALE_NAMES.join(', ')}.`]);
+  clear();
+  assert.equal(api.chordNotes(60, 'maj'), undefined);
+  assert.deepEqual(errors(), [`ce.music.chord: "maj" is not a chord, so there is no answer. `
+    + `The chords are ${CHORD_NAMES.join(', ')}.`]);
+  // The scale is checked before the notes, and only the first problem is reported.
+  clear();
+  assert.equal(api.quantizeNote('c4', 'd4', 'lokrian'), undefined);
+  assert.equal(errors().length, 1);
+  assert.match(errors()[0], /^ce\.music\.quantize: "lokrian" is not a scale/);
+  // Leaving the scale out is the documented default, not a mistake.
+  clear();
+  api.scaleNotes(60);
+  api.degreeChord(60, undefined, 5);
+  assert.deepEqual(errors(), []);
+});
+
 test('an unknown scale returns nothing rather than quietly meaning major', () => {
   assert.equal(api.scaleNotes(60, 'lokrian'), undefined, 'a typo must be findable');
   assert.equal(api.scaleNotes(60, ''), undefined);

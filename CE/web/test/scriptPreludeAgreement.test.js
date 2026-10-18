@@ -74,6 +74,7 @@ const CASES = [
   ['noteNumber', [60]],
   ['noteSpelling', [60, 'major']], ['noteSpelling', [60, 'minor']], ['noteSpelling', ['F4', 'major']],
   ['noteSpelling', ['A4', 'minor']], ['noteSpelling', [60]], ['noteSpelling', [60, 'bogus']],
+  ['noteSpelling', ['c4', 'major']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
   ['inScale', [62, 60, 'major']], ['inScale', [61, 60, 'major']], ['inScale', [61, 60]],
   ['inScale', [75, 60, 'minor']], ['inScale', [61, 60, 'bogus']],
   ['scaleDegree', [60, 60, 'major']], ['scaleDegree', [67, 60, 'major']],
@@ -164,6 +165,9 @@ const STRUCT_CASES = [
   ['nibblize', [[0xAB, 0xCD]]], ['denibblize', [[0xA, 0xB, 0xC, 0xD]]],
   ['toAscii', ['Hi', 4]],
   ['scaleNotes', [60, 'dorian']], ['scaleNotes', [60]], ['scaleNotes', [60, 'bogus']],
+  // An unreadable root is no answer in every runtime, not the scale on C-1.
+  ['scaleNotes', ['c4', 'major']], ['chordNotes', ['c4', 'major']], ['quantizeNote', ['c4', 60, 'major']],
+  ['degreeChord', ['c4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
   ['chordNotes', ['C4', 'min7']], ['chordNotes', [60, 'bogus']],
   ['quantizeNote', [61, 60, 'major']], ['quantizeNote', [66, 60, 'major']], ['quantizeNote', [61, 60, 'bogus']],
   // degreeChord returns a whole record — name, roman numeral, spelling and notes — so every field
@@ -482,6 +486,12 @@ const REFUSAL_CASES = [
   ['beatsPerDivision', ['1/6']], ['stepAt', [2, 'nope']], ['stepsBetween', [0, 1, '1/3']],
   ['swingOffset', [1, 0.5, 'quarter']],
   ['beatsPerDivision', ['1/8t']], ['stepAt', [2.5, '1/16D']], ['swingOffset', [1, 0.5, '1/4d']],
+  // Music helpers: an unreadable note name, an unknown scale or chord, the scale checked first.
+  ['scaleNotes', ['c4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
+  ['chordNotes', ['Hb2', 'min7']], ['quantizeNote', [61, 'c4', 'major']], ['quantizeNote', ['x', 'y', 'nope']],
+  ['noteSpelling', ['c4', 'minor']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
+  ['degreeChord', ['c4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
+  ['scaleNotes', ['C-1', 'major']], ['degreeChord', [60, 'major', 5]],
 ];
 
 function webRefusals(fn, args) {

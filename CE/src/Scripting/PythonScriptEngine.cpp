@@ -1806,6 +1806,8 @@ __CE_MINOR_QUALITIES["m7b5"] = True
 __CE_MINOR_QUALITIES["min"] = True
 __CE_MINOR_QUALITIES["min7"] = True
 __CE_MINOR_QUALITIES["minMaj7"] = True
+__CE_SCALE_NAMES = ["major","minor","harmonicMinor","melodicMinor","dorian","phrygian","lydian","mixolydian","locrian","pentatonicMaj","pentatonicMin","blues"]
+__CE_CHORD_NAMES = ["major","minor","dim","aug","sus2","sus4","power","maj6","min6","dom7","maj7","min7","minMaj7","dim7","m7b5","aug7","add9","dom9","maj9","min9"]
 # @module ce.time
 __CE_DIVISIONS = {}
 __CE_DIVISIONS["1/1"] = 4
@@ -1859,29 +1861,48 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 # Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 # or a name ("C4"), the way sendNote does. An unknown scale or chord name returns None rather than
 # guessing "major" — a script that asked for something this build does not know should find out.
-# noteNumber is None for a name it cannot read; __pitch feeds scaleNotes and friends, where a None
-# root would turn one bad string into an unexplained None list.
+# It found out only by getting None, and an unreadable note NAME was worse: __pitch made it 0, so
+# scaleNotes("c4") answered with the scale on C-1. Both now answer None and say why, through __setOf
+# and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each helper
+# checks its scale or chord first, then its notes in argument order, and stops at the first.
 def __pitch(v):
     import math
     if isinstance(v, str):
-        return noteNumber(v) or 0
+        return noteNumber(v)
     return math.floor(v or 0)
 def __steps(tbl, name, fallback):
     return tbl.get(fallback if name is None else str(name))
+def __pitchOf(verb, v):
+    n = __pitch(v)
+    if n is None:
+        logError(verb + ': "' + str(v) + '" is not a note name, so there is no answer. A name is '
+                 + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+    return n
+def __setOf(verb, kind, name):
+    s = __steps(__CE_CHORDS if kind == "chord" else __CE_SCALES, name, "major")
+    if s is None:
+        logError(verb + ': "' + str(name) + '" is not a ' + kind + ', so there is no answer. The ' + kind
+                 + 's are ' + ", ".join(__CE_CHORD_NAMES if kind == "chord" else __CE_SCALE_NAMES) + '.')
+    return s
 def scaleNotes(root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.scale", "scale", scale)
     if s is None: return None
-    base = __pitch(root)
+    base = __pitchOf("ce.music.scale", root)
+    if base is None: return None
     return [base + x for x in s]
 def chordNotes(root, chordType=None):
-    s = __steps(__CE_CHORDS, chordType, "major")
+    s = __setOf("ce.music.chord", "chord", chordType)
     if s is None: return None
-    base = __pitch(root)
+    base = __pitchOf("ce.music.chord", root)
+    if base is None: return None
     return [base + x for x in s]
 def quantizeNote(note, root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.quantize", "scale", scale)
     if s is None: return None
-    n = __pitch(note); base = __pitch(root)
+    n = __pitchOf("ce.music.quantize", note)
+    if n is None: return None
+    base = __pitchOf("ce.music.quantize", root)
+    if base is None: return None
     # NOT set(): this prelude defines set(path, value) as ce.core's write verb, which shadows the
     # builtin for the whole namespace, so set(<generator>) raises TypeError - which is what
     # quantizeNote did on every call in the Python engine until the prelude was actually executed.
@@ -1901,23 +1922,33 @@ def quantizeNote(note, root, scale=None):
 # chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 def noteSpelling(root, scale=None):
     nm = "major" if scale is None else str(scale)
-    if __CE_SCALES.get(nm) is None: return None
-    pc = __m12(__pitch(root))
+    if __setOf("ce.music.spelling", "scale", scale) is None: return None
+    pitch = __pitchOf("ce.music.spelling", root)
+    if pitch is None: return None
+    pc = __m12(pitch)
     # Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
     if __CE_MINOR_SCALES.get(nm) is True: pc = __m12(pc + 3)
     return __CE_FLAT_KEYS.get(pc) is True
 def inScale(note, root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.inScale", "scale", scale)
     if s is None: return None
-    base = __m12(__pitch(root)); pc = __m12(__pitch(note))
+    n = __pitchOf("ce.music.inScale", note)
+    if n is None: return None
+    r = __pitchOf("ce.music.inScale", root)
+    if r is None: return None
+    base = __m12(r); pc = __m12(n)
     return any(__m12(base + x) == pc for x in s)
 # 1 for the tonic, 5 for the dominant. A note OUTSIDE the key has NO degree and gets None rather
 # than the nearest one - rounding here turns a wrong note into a plausible chord, and quantizeNote
 # is the verb that rounds on purpose.
 def scaleDegree(note, root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.degree", "scale", scale)
     if s is None: return None
-    base = __m12(__pitch(root)); pc = __m12(__pitch(note))
+    n = __pitchOf("ce.music.degree", note)
+    if n is None: return None
+    r = __pitchOf("ce.music.degree", root)
+    if r is None: return None
+    base = __m12(r); pc = __m12(n)
     for i in range(len(s)):
         if __m12(base + s[i]) == pc: return i + 1
     return None
@@ -1984,8 +2015,9 @@ def __roman(rootSemitone, quality):
 def degreeChord(root, scale, degree, size=None):
     import math
     nm = "major" if scale is None else str(scale)
-    s = __CE_SCALES.get(nm)
+    s = __setOf("ce.music.degreeChord", "scale", scale)
     if not s: return None
+    if __pitchOf("ce.music.degreeChord", root) is None: return None
     n = len(s)
     d = __count(degree, 1) - 1
     sz = max(2, __count(size, 3))

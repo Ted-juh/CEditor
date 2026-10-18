@@ -35,7 +35,7 @@ const { MODULES, moduleMemberMap, MODULE_BY_ID, MODULE_CORE, MODULE_GATE_MESSAGE
   = await import(`file://${apiPath}`);
 
 const musicPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'musicTheory.js');
-const { SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
+const { SCALES, CHORDS, SCALE_NAMES, CHORD_NAMES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
         QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES } = await import(`file://${musicPath}`);
 
 const timePath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'timeTables.js');
@@ -679,6 +679,10 @@ const MUSIC_TABLES = [
   { name: '__CE_QUALITY_SUFFIX', kind: 'map', data: QUALITY_SUFFIX },
   { name: '__CE_ROMAN', kind: 'list', data: ROMAN },
   { name: '__CE_MINOR_QUALITIES', kind: 'set', data: MINOR_QUALITY_NAMES },
+  // The names in the table's own order, which a Lua table does not keep: a helper refusing an
+  // unknown scale or chord lists these, and the list has to read the same in every runtime.
+  { name: '__CE_SCALE_NAMES', kind: 'list', data: SCALE_NAMES },
+  { name: '__CE_CHORD_NAMES', kind: 'list', data: CHORD_NAMES },
 ];
 
 // ce.time's division table, emitted the same way and for the same reason: a mistyped fraction is a

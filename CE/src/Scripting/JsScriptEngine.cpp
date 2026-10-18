@@ -893,7 +893,7 @@ function noteNumber(name) {
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME, __CE_EASINGS;
+var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_SCALE_NAMES, __CE_CHORD_NAMES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME, __CE_EASINGS;
 __CE_SCALES = {};
 __CE_SCALES["major"] = [0,2,4,5,7,9,11];
 __CE_SCALES["minor"] = [0,2,3,5,7,8,10];
@@ -966,6 +966,8 @@ __CE_MINOR_QUALITIES["m7b5"] = true;
 __CE_MINOR_QUALITIES["min"] = true;
 __CE_MINOR_QUALITIES["min7"] = true;
 __CE_MINOR_QUALITIES["minMaj7"] = true;
+__CE_SCALE_NAMES = ["major","minor","harmonicMinor","melodicMinor","dorian","phrygian","lydian","mixolydian","locrian","pentatonicMaj","pentatonicMin","blues"];
+__CE_CHORD_NAMES = ["major","minor","dim","aug","sus2","sus4","power","maj6","min6","dom7","maj7","min7","minMaj7","dim7","m7b5","aug7","add9","dom9","maj9","min9"];
 // @module ce.time
 __CE_DIVISIONS = {};
 __CE_DIVISIONS["1/1"] = 4;
@@ -1019,21 +1021,43 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55];
 // Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 // or a name ("C4"), the way sendNote does. An unknown scale or chord name returns undefined rather
 // than guessing "major" — a script that asked for something this build does not know should find out.
-// noteNumber is undefined for a name it cannot read; __pitch feeds scaleNotes and friends, where an
-// undefined root would turn one bad string into an unexplained undefined list.
-function __pitch(v) { if (typeof v !== "string") return Math.floor(Number(v) || 0); var n = noteNumber(v); return n === undefined ? 0 : n; }
+// It found out only by getting undefined, and an unreadable note NAME was worse: __pitch made it 0,
+// so scaleNotes("c4") answered with the scale on C-1. Both now answer undefined and say why, through
+// __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
+// helper checks its scale or chord first, then its notes in argument order, and stops at the first.
+function __pitch(v) { if (typeof v !== "string") return Math.floor(Number(v) || 0); return noteNumber(v); }
 function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
+function __pitchOf(verb, v) {
+  var n = __pitch(v);
+  if (n === undefined) {
+    logError(verb + ': "' + String(v) + '" is not a note name, so there is no answer. A name is '
+      + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  }
+  return n;
+}
+function __setOf(verb, kind, name) {
+  var s = __steps(kind === "chord" ? __CE_CHORDS : __CE_SCALES, name, "major");
+  if (!s) {
+    logError(verb + ': "' + String(name) + '" is not a ' + kind + ', so there is no answer. The ' + kind
+      + 's are ' + (kind === "chord" ? __CE_CHORD_NAMES : __CE_SCALE_NAMES).join(", ") + '.');
+  }
+  return s;
+}
 function scaleNotes(root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var base = __pitch(root); var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
+  var s = __setOf("ce.music.scale", "scale", scale); if (!s) return undefined;
+  var base = __pitchOf("ce.music.scale", root); if (base === undefined) return undefined;
+  var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
 }
 function chordNotes(root, chordType) {
-  var s = __steps(__CE_CHORDS, chordType, "major"); if (!s) return undefined;
-  var base = __pitch(root); var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
+  var s = __setOf("ce.music.chord", "chord", chordType); if (!s) return undefined;
+  var base = __pitchOf("ce.music.chord", root); if (base === undefined) return undefined;
+  var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
 }
 function quantizeNote(note, root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var n = __pitch(note), base = __pitch(root), inKey = {};
+  var s = __setOf("ce.music.quantize", "scale", scale); if (!s) return undefined;
+  var n = __pitchOf("ce.music.quantize", note); if (n === undefined) return undefined;
+  var base = __pitchOf("ce.music.quantize", root); if (base === undefined) return undefined;
+  var inKey = {};
   for (var i = 0; i < s.length; i++) inKey[(((base + s[i]) % 12) + 12) % 12] = true;
   // Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested before
   // the -d one, so a note exactly between two scale tones lands on the same one in every runtime.
@@ -1050,15 +1074,18 @@ function quantizeNote(note, root, scale) {
 // chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 function noteSpelling(root, scale) {
   var nm = (scale === undefined || scale === null) ? "major" : String(scale);
-  if (!__CE_SCALES[nm]) return undefined;
-  var pc = __m12(__pitch(root));
+  if (!__setOf("ce.music.spelling", "scale", scale)) return undefined;
+  var pitch = __pitchOf("ce.music.spelling", root); if (pitch === undefined) return undefined;
+  var pc = __m12(pitch);
   // Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
   if (__CE_MINOR_SCALES[nm] === true) pc = __m12(pc + 3);
   return __CE_FLAT_KEYS[pc] === true;
 }
 function inScale(note, root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var base = __m12(__pitch(root)), pc = __m12(__pitch(note));
+  var s = __setOf("ce.music.inScale", "scale", scale); if (!s) return undefined;
+  var n = __pitchOf("ce.music.inScale", note); if (n === undefined) return undefined;
+  var r = __pitchOf("ce.music.inScale", root); if (r === undefined) return undefined;
+  var base = __m12(r), pc = __m12(n);
   for (var i = 0; i < s.length; i++) if (__m12(base + s[i]) === pc) return true;
   return false;
 }
@@ -1066,8 +1093,10 @@ function inScale(note, root, scale) {
 // rather than the nearest one — rounding here turns a wrong note into a plausible chord, and
 // quantizeNote is the verb that rounds on purpose.
 function scaleDegree(note, root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var base = __m12(__pitch(root)), pc = __m12(__pitch(note));
+  var s = __setOf("ce.music.degree", "scale", scale); if (!s) return undefined;
+  var n = __pitchOf("ce.music.degree", note); if (n === undefined) return undefined;
+  var r = __pitchOf("ce.music.degree", root); if (r === undefined) return undefined;
+  var base = __m12(r), pc = __m12(n);
   for (var i = 0; i < s.length; i++) if (__m12(base + s[i]) === pc) return i + 1;
   return undefined;
 }
@@ -1110,8 +1139,9 @@ function __roman(rootSemitone, quality) {
 // scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size) {
   var nm = (scale === undefined || scale === null) ? "major" : String(scale);
-  var s = __CE_SCALES[nm];
+  var s = __setOf("ce.music.degreeChord", "scale", scale);
   if (!s || !s.length) return undefined;
+  if (__pitchOf("ce.music.degreeChord", root) === undefined) return undefined;
   var n = s.length;
   var d = __count(degree, 1) - 1;
   var sz = Math.max(2, __count(size, 3));

@@ -817,6 +817,8 @@ __CE_MINOR_QUALITIES["m7b5"] = true
 __CE_MINOR_QUALITIES["min"] = true
 __CE_MINOR_QUALITIES["min7"] = true
 __CE_MINOR_QUALITIES["minMaj7"] = true
+__CE_SCALE_NAMES = {"major","minor","harmonicMinor","melodicMinor","dorian","phrygian","lydian","mixolydian","locrian","pentatonicMaj","pentatonicMin","blues"}
+__CE_CHORD_NAMES = {"major","minor","dim","aug","sus2","sus4","power","maj6","min6","dom7","maj7","min7","minMaj7","dim7","m7b5","aug7","add9","dom9","maj9","min9"}
 -- @module ce.time
 __CE_DIVISIONS = {}
 __CE_DIVISIONS["1/1"] = 4
@@ -870,31 +872,54 @@ __CE_EASINGS["inOutBack"] = {0.68,-0.55,0.265,1.55}
 -- Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 -- or a name ("C4"), the way sendNote does. An unknown scale or chord name returns nil rather than
 -- guessing "major" — a script that asked for something this build does not know should find out.
--- noteNumber is nil for a name it cannot read; __pitch feeds scaleNotes and friends, where a nil
--- root would turn one bad string into an unexplained nil list. noteNumber itself stays honest.
-local function __pitch(v) if type(v) == "string" then return noteNumber(v) or 0 end return math.floor(tonumber(v) or 0) end
+-- It found out only by getting nil, and an unreadable note NAME was worse: __pitch made it 0, so
+-- scaleNotes("c4") answered with the scale on C-1. Both now answer nil and say why, through
+-- __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
+-- helper checks its scale or chord first, then its notes in argument order, and stops at the first.
+local function __pitch(v) if type(v) == "string" then return noteNumber(v) end return math.floor(tonumber(v) or 0) end
 local function __steps(tbl, name, fallback)
   local s = tbl[name == nil and fallback or tostring(name)]
   return s
 end
+local function __pitchOf(verb, v)
+  local n = __pitch(v)
+  if n == nil then
+    logError(verb .. ': "' .. tostring(v) .. '" is not a note name, so there is no answer. A name is '
+      .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+  end
+  return n
+end
+local function __setOf(verb, kind, name)
+  local s = __steps(kind == "chord" and __CE_CHORDS or __CE_SCALES, name, "major")
+  if s == nil then
+    logError(verb .. ': "' .. tostring(name) .. '" is not a ' .. kind .. ', so there is no answer. The '
+      .. kind .. 's are ' .. table.concat(kind == "chord" and __CE_CHORD_NAMES or __CE_SCALE_NAMES, ", ") .. '.')
+  end
+  return s
+end
 function scaleNotes(root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.scale", "scale", scale)
   if s == nil then return nil end
-  local base, out = __pitch(root), {}
+  local base, out = __pitchOf("ce.music.scale", root), {}
+  if base == nil then return nil end
   for i = 1, #s do out[i] = base + s[i] end
   return out
 end
 function chordNotes(root, chordType)
-  local s = __steps(__CE_CHORDS, chordType, "major")
+  local s = __setOf("ce.music.chord", "chord", chordType)
   if s == nil then return nil end
-  local base, out = __pitch(root), {}
+  local base, out = __pitchOf("ce.music.chord", root), {}
+  if base == nil then return nil end
   for i = 1, #s do out[i] = base + s[i] end
   return out
 end
 function quantizeNote(note, root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.quantize", "scale", scale)
   if s == nil then return nil end
-  local n, base = __pitch(note), __pitch(root)
+  local n = __pitchOf("ce.music.quantize", note)
+  if n == nil then return nil end
+  local base = __pitchOf("ce.music.quantize", root)
+  if base == nil then return nil end
   local inKey = {}
   for i = 1, #s do inKey[(base + s[i]) % 12] = true end
   -- Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested before
@@ -927,16 +952,22 @@ local function __sortedNotes(list)
 end
 function noteSpelling(root, scale)
   local nm = (scale == nil) and "major" or tostring(scale)
-  if __CE_SCALES[nm] == nil then return nil end
-  local pc = __m12(__pitch(root))
+  if __setOf("ce.music.spelling", "scale", scale) == nil then return nil end
+  local pitch = __pitchOf("ce.music.spelling", root)
+  if pitch == nil then return nil end
+  local pc = __m12(pitch)
   -- Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
   if __CE_MINOR_SCALES[nm] then pc = __m12(pc + 3) end
   return __CE_FLAT_KEYS[pc] == true
 end
 function inScale(note, root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.inScale", "scale", scale)
   if s == nil then return nil end
-  local base, pc = __m12(__pitch(root)), __m12(__pitch(note))
+  local n = __pitchOf("ce.music.inScale", note)
+  if n == nil then return nil end
+  local r = __pitchOf("ce.music.inScale", root)
+  if r == nil then return nil end
+  local base, pc = __m12(r), __m12(n)
   for i = 1, #s do if __m12(base + s[i]) == pc then return true end end
   return false
 end
@@ -944,9 +975,13 @@ end
 -- than the nearest one — rounding here turns a wrong note into a plausible chord, and quantizeNote
 -- is the verb that rounds on purpose.
 function scaleDegree(note, root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.degree", "scale", scale)
   if s == nil then return nil end
-  local base, pc = __m12(__pitch(root)), __m12(__pitch(note))
+  local n = __pitchOf("ce.music.degree", note)
+  if n == nil then return nil end
+  local r = __pitchOf("ce.music.degree", root)
+  if r == nil then return nil end
+  local base, pc = __m12(r), __m12(n)
   for i = 1, #s do if __m12(base + s[i]) == pc then return i end end
   return nil
 end
@@ -998,8 +1033,9 @@ end
 -- scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size)
   local nm = (scale == nil) and "major" or tostring(scale)
-  local s = __CE_SCALES[nm]
+  local s = __setOf("ce.music.degreeChord", "scale", scale)
   if s == nil or #s == 0 then return nil end
+  if __pitchOf("ce.music.degreeChord", root) == nil then return nil end
   local n = #s
   local d = __count(degree, 1) - 1
   local sz = math.max(2, __count(size, 3))

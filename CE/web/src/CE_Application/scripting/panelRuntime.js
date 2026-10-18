@@ -128,7 +128,7 @@ import {
 import { patchOf, isUnchanged } from '../utils/scriptPatchOutcome.js';
 import { typeOfControl, familiesForType } from './componentSchema.js';
 import {
-  SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
+  SCALES, CHORDS, SCALE_NAMES, CHORD_NAMES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
   QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
@@ -909,16 +909,37 @@ const musicAscii = (s) => String(s).replace(/\u266F/g, '#').replace(/\u266D/g, '
 const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 
 // A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is. An unreadable
-// name is 0 HERE — musicPitch feeds scaleNotes and friends, and a nil root would turn one bad
-// string into an unexplained nil list. noteNumber itself is honest about it.
+// name used to be 0 here, because a nil root would have turned one bad string into an unexplained
+// nil list: so ce.music.scale("c4") answered with the scale on C-1, and nothing said why. It is
+// undefined now, and the helper that asked refuses through musicPitchOf, which does the explaining.
+// An unknown scale or chord name already answered nothing, just as silently; musicSetOf says so.
+// Both are in the words of each prelude's __pitchOf and __setOf. Each helper checks its scale or
+// chord first, then its notes in argument order, and stops at the first that cannot be read.
 const musicPitch = (v) => (typeof v === 'string'
-  ? (helpers.noteNumber(v) ?? 0)
+  ? helpers.noteNumber(v)
   : Math.floor(Number(v) || 0));
 const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
-const musicNotes = (table, root, name) => {
-  const steps = musicSteps(table, name);
+function musicPitchOf(verb, v) {
+  const n = musicPitch(v);
+  if (n === undefined) {
+    addScriptTrace('error', '', `${verb}: "${v}" is not a note name, so there is no answer. A name is `
+      + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  }
+  return n;
+}
+function musicSetOf(verb, kind, name) {
+  const steps = musicSteps(kind === 'chord' ? CHORDS : SCALES, name);
+  if (!steps) {
+    addScriptTrace('error', '', `${verb}: "${name}" is not a ${kind}, so there is no answer. The ${kind}s `
+      + `are ${(kind === 'chord' ? CHORD_NAMES : SCALE_NAMES).join(', ')}.`);
+  }
+  return steps;
+}
+const musicNotes = (verb, kind, root, name) => {
+  const steps = musicSetOf(verb, kind, name);
   if (!steps) return undefined;
-  const base = musicPitch(root);
+  const base = musicPitchOf(verb, root);
+  if (base === undefined) return undefined;
   return steps.map((x) => base + x);
 };
 // Sorted ascending, which is what every voicing rule below assumes.
@@ -1796,26 +1817,36 @@ const helpers = {
   // RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the answer straight to
   // noteName and a script's labels match the panel's without deciding anything itself.
   noteSpelling: (root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.spelling', 'scale', scale);
     if (!steps) return undefined;
     const name = scale == null ? 'major' : String(scale);
-    const pc = musicMod12(musicPitch(root));
+    const pitch = musicPitchOf('ce.music.spelling', root);
+    if (pitch === undefined) return undefined;
+    const pc = musicMod12(pitch);
     return FLAT_KEY_PCS.includes(MINOR_SCALE_NAMES.includes(name) ? musicMod12(pc + 3) : pc);
   },
   inScale: (note, root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.inScale', 'scale', scale);
     if (!steps) return undefined;
-    const base = musicMod12(musicPitch(root));
-    return steps.some((x) => musicMod12(base + x) === musicMod12(musicPitch(note)));
+    const n = musicPitchOf('ce.music.inScale', note);
+    if (n === undefined) return undefined;
+    const r = musicPitchOf('ce.music.inScale', root);
+    if (r === undefined) return undefined;
+    const base = musicMod12(r);
+    return steps.some((x) => musicMod12(base + x) === musicMod12(n));
   },
   // Which degree of the key a note is — 1 for the tonic, 5 for the dominant. A note OUTSIDE the key
   // has NO degree and gets nil rather than the nearest one: rounding here is what turns a wrong
   // note into a plausible chord, and quantizeNote is the verb that rounds on purpose.
   scaleDegree: (note, root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.degree', 'scale', scale);
     if (!steps) return undefined;
-    const base = musicMod12(musicPitch(root));
-    const pc = musicMod12(musicPitch(note));
+    const n = musicPitchOf('ce.music.degree', note);
+    if (n === undefined) return undefined;
+    const r = musicPitchOf('ce.music.degree', root);
+    if (r === undefined) return undefined;
+    const base = musicMod12(r);
+    const pc = musicMod12(n);
     const i = steps.findIndex((x) => musicMod12(base + x) === pc);
     return i < 0 ? undefined : i + 1;
   },
@@ -1823,12 +1854,13 @@ const helpers = {
   // are 1-based, like scaleDegree's, so degreeChord(60, 'major', 5) is the V. `size` is how many
   // thirds to stack: 3 a triad, 4 a seventh. Past the top of the scale it keeps going an octave up.
   degreeChord: (root, scale, degree, size) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.degreeChord', 'scale', scale);
     if (!steps || !steps.length) return undefined;
     const name = scale == null ? 'major' : String(scale);
+    const base = musicPitchOf('ce.music.degreeChord', root);
+    if (base === undefined) return undefined;
     const d = musicCount(degree, 1) - 1;
     const offsets = musicStack(steps, d, size);
-    const base = musicPitch(root);
     const quality = helpers.chordQuality(offsets);
     const flats = helpers.noteSpelling(root, name);
     const spell = (n) => (flats ? NOTE_FLAT : NOTE_SHARP)[musicMod12(n)];
@@ -1922,12 +1954,15 @@ const helpers = {
   // that quantises to dorian gets the same note whether the window is open or shut. An unknown
   // name returns undefined rather than guessing "major" — asking for something this build does not
   // know should be findable, not silently corrected.
-  scaleNotes: (root, scale) => musicNotes(SCALES, root, scale),
-  chordNotes: (root, type) => musicNotes(CHORDS, root, type),
+  scaleNotes: (root, scale) => musicNotes('ce.music.scale', 'scale', root, scale),
+  chordNotes: (root, type) => musicNotes('ce.music.chord', 'chord', root, type),
   quantizeNote: (note, root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.quantize', 'scale', scale);
     if (!steps) return undefined;
-    const n = musicPitch(note), base = musicPitch(root);
+    const n = musicPitchOf('ce.music.quantize', note);
+    if (n === undefined) return undefined;
+    const base = musicPitchOf('ce.music.quantize', root);
+    if (base === undefined) return undefined;
     const inKey = new Set(steps.map((x) => (((base + x) % 12) + 12) % 12));
     // Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested
     // before the -d one, so a note exactly between two scale tones lands on the same one in every
