@@ -515,6 +515,15 @@ int main()
             "  applyDump(\"F07D0140F7\")\n"
             "  sendMidi({ 0x80, 0x3C, 0 })\n"
             "end\n"));
+        // Nothing to send: the editor says "no bytes given"; the player used to hand the empty list
+        // on and send nothing without a word.
+        scripts.add (script ("emptylua", "lua", "onEmptyLua",
+            "function onEmptyLua()\n"
+            "  sendMidi(\"\")\n"
+            "  sendSysex({})\n"
+            "  feedMidi(\"  \")\n"
+            "  sendMidi()\n"
+            "end\n"));
         sysexRuntime.loadScripts (juce::var (scripts));
 
         sysexRuntime.runAction ("onSysexLua", juce::var());
@@ -543,6 +552,16 @@ int main()
                    && sysexLogs[0] == "sendMidi: \"903C64\" is not one byte, so nothing was sent. Put a space between the bytes: \"90 3C 64\"."
                    && sysexLogs[1] == "applyDump: \"F07D0140F7\" is not one byte, so nothing was decoded. Put a space between the bytes: \"F0 7D 01 40 F7\".",
                "and refuse an unspaced run in the WebView runtime's words (got " + sysexLogs.joinIntoString (" | ") + ")");
+
+        otherOut.clear();
+        sysexOut.clear();
+        sysexLogs.clear();
+        sysexRuntime.runAction ("onEmptyLua", juce::var());
+        check (otherOut.isEmpty() && sysexOut.isEmpty(), "empty text, an empty table or nothing reaches no callback (got "
+                   + otherOut.joinIntoString (" | ") + sysexOut.joinIntoString (" | ") + ")");
+        check (sysexLogs.joinIntoString (" | ")
+                   == "sendMidi: no bytes given | sendSysex: no bytes given | feedMidi: no bytes given | sendMidi: no bytes given",
+               "and each says so in the editor's words (got " + sysexLogs.joinIntoString (" | ") + ")");
     }
 
     std::cout << "--------------------------------------------\n"

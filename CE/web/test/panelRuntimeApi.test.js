@@ -292,6 +292,19 @@ test('hex text is read a byte at a time, and a token that is not one byte is ref
   assert.match(errors()[0], /^sendMidi: "903C64" is not one byte, so nothing was sent\. Put a space between the bytes: "90 3C 64"\./);
 });
 
+test('nothing to send says so, in the words the player now uses too', () => {
+  // PlayerScriptIntegrationTests holds BridgeScriptHost to the same four lines.
+  clearScriptTrace();
+  api.sendMidi('');
+  api.sendSysex([]);
+  api.feedMidi('  ');
+  api.sendMidi();
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'midi'), []);
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message), [
+    'sendMidi: no bytes given', 'sendSysex: no bytes given', 'feedMidi: no bytes given', 'sendMidi: no bytes given',
+  ]);
+});
+
 test('middle C is C4, and the docs now say so', () => {
   // The contract claimed 60 -> "C3" (the Yamaha convention) while every runtime computed "C4"
   // (scientific pitch notation). A script written from the manual transposed by an octave.

@@ -220,13 +220,13 @@ public:
     void sendSysex (const juce::var& bytes) override
     {
         auto message = bytes;
-        if (! bytesFromScript ("sendSysex", "nothing was sent", message)) return;
+        if (! bytesFromScript ("sendSysex", "nothing was sent", message) || ! hasBytes ("sendSysex", message)) return;
         if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (message);
     }
     void sendMidi (const juce::var& bytes) override
     {
         auto message = bytes;
-        if (! bytesFromScript ("sendMidi", "nothing was sent", message)) return;
+        if (! bytesFromScript ("sendMidi", "nothing was sent", message) || ! hasBytes ("sendMidi", message)) return;
         if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (message);
     }
     // routeMidi / feedMidi. A host that wires neither gets the honest failure rather than the quiet
@@ -245,7 +245,7 @@ public:
     void feedMidi (const juce::var& bytes) override
     {
         auto message = bytes;
-        if (! bytesFromScript ("feedMidi", "nothing was fed", message)) return;
+        if (! bytesFromScript ("feedMidi", "nothing was fed", message) || ! hasBytes ("feedMidi", message)) return;
         if (callbacks.feedMidi) { callbacks.feedMidi (message); return; }
         logAt ("error", "feedMidi(): this host has no MIDI input to inject into — nothing was fed.", juce::var());
     }
@@ -461,6 +461,17 @@ private:
             list.add ((token.startsWithIgnoreCase ("0x") ? token.substring (2) : token).getHexValue32());
         bytes = juce::var (list);
         return true;
+    }
+
+    // Whether there is anything to send. The editor's sendMidi, sendSysex and feedMidi say "no bytes
+    // given" for empty text, an empty list or nothing at all; the player handed its callback the
+    // empty list, which sent nothing without a word. Same words now, and an empty call no longer
+    // spends the flood budget either.
+    bool hasBytes (const juce::String& verb, const juce::var& bytes)
+    {
+        if (auto* list = bytes.getArray(); list != nullptr && ! list->isEmpty()) return true;
+        logAt ("error", verb + ": no bytes given", juce::var());
+        return false;
     }
 
     // `.midiValue` is what the DPD codec would put on the wire, and the codec is the device host's,
