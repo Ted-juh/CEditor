@@ -554,9 +554,13 @@ Each command is shown the way you type it, with its arguments:
   means `nil` in Lua, `undefined` in JavaScript and `None` in Python.
 - **`opts`** is a table (Lua) or object (JavaScript) of optional settings, such as
   `{ duration = 500 }` or `{ duration: 500 }`. When a command takes one, a table lists what it can
-  contain and what each setting is when you leave it out. A setting that is not in that table does
-  nothing, and in the panel window the script console says so and lists the ones the command has,
-  so a misspelling such as `{ duraton = 500 }` is not mistaken for a setting that worked.
+  contain and what each setting is when you leave it out. A setting that is not in that table
+  refuses the whole command: nothing is done, the script console names the setting and lists the
+  ones the command has, and the command gives back what it gives whenever it refuses: false from a
+  command that says whether it worked, 0 from one that counts what it changed, an empty list from
+  one that gives a list, a result whose `ok` is false from `ce.device.recallPreset`, and
+  otherwise nothing. So a misspelling such as `{ duraton = 500 }` cannot pass for a setting that
+  worked, with the panel window open or closed.
 - ***Short name*** gives the other name a command answers to (see
   [chapter 10](#10-command-names-and-modules)).
 - ***Panel window only*** means the command needs the panel window
@@ -2230,7 +2234,7 @@ Moving a value smoothly over time instead of jumping: to a target, with a spring
 
 #### `ce.anim.to(path, target [, opts])`
 
-Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` callback runs with `completed` set to false, because it was cancelled rather than finished.
+Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` is called with false, because it was cancelled rather than finished.
 
 *Short name: `animateTo`.*
 
@@ -2247,9 +2251,9 @@ Move a value smoothly to `target` over time instead of jumping straight there. `
 | `from` | number | — | Start from this value instead of wherever the control is now. |
 | `delay` | number (milliseconds) | 0 | Wait this long before starting. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 0 | How many more times to run it after the first. 0 runs it once and 2 runs it three times in all; a negative number repeats it until you stop it. In Lua, where repeat is a keyword, write it as ["repeat"] = 2. |
+| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one table: `path` and `completed` for a single control, or `paths` and `completed` when you gave a list (then it is called once, after the last of them). `completed` is true if the move got to the end and false if it was stopped or replaced first, so test `info.completed`: the call itself does not mean it arrived. |
+| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
 
 ```lua
 -- Lua
@@ -2278,9 +2282,9 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
 | `delay` | number (milliseconds) | 0 | Wait this long before starting. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 0 | How many more times to run it after the first. 0 runs it once and 2 runs it three times in all; a negative number repeats it until you stop it. In Lua, where repeat is a keyword, write it as ["repeat"] = 2. |
+| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one table: `path` and `completed` for a single control, or `paths` and `completed` when you gave a list (then it is called once, after the last of them). `completed` is true if the move got to the end and false if it was stopped or replaced first, so test `info.completed`: the call itself does not mean it arrived. |
+| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
 
 ```lua
 -- Lua
@@ -2293,7 +2297,7 @@ ce.anim.spring("cutoff", 127);
 
 #### `ce.anim.stop([path])`
 
-Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback runs with `completed` set to false. To jump to the end instead, use `ce.anim.finish()`.
+Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback is called with false. To jump to the end instead, use `ce.anim.finish()`.
 
 *Short name: `animateStop`.*
 
@@ -2338,9 +2342,9 @@ Move a value through a shape with several points — an attack and decay, say, o
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
 | `delay` | number (milliseconds) | 0 | Wait this long before starting. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 0 | How many more times to run it after the first. 0 runs it once and 2 runs it three times in all; a negative number repeats it until you stop it. In Lua, where repeat is a keyword, write it as ["repeat"] = 2. |
+| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one table: `path` and `completed` for a single control, or `paths` and `completed` when you gave a list (then it is called once, after the last of them). `completed` is true if the move got to the end and false if it was stopped or replaced first, so test `info.completed`: the call itself does not mean it arrived. |
+| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
 
 ```lua
 -- Lua
@@ -2383,7 +2387,7 @@ Turn a running animation round so it heads back to where it started, at the same
 
 #### `ce.anim.finish(path)`
 
-End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` runs with `completed` set to true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.
+End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` is called with true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.
 
 *Short name: `animateFinish`.*
 
@@ -3350,7 +3354,7 @@ Look up one image in the icon library or among the icons the panel carries, by i
 
 #### `ce.image.set(target, src [, opts]) -> boolean`
 
-Put a picture on one of a control's four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option the chosen layer does not have is refused with a message, and the command returns false.
+Put a picture on one of a control's four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option it does not take at all refuses the whole call; one the chosen layer does not have is refused with a message. Either way the command returns false.
 
 *Short name: `imageSet`.*
 
@@ -3445,7 +3449,7 @@ Look up one font by family name. Returns its description, with the same fields a
 
 #### `ce.text.style(target, opts) -> boolean`
 
-Set a control's typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. A font that is not available, a typographic feature the font does not have, or an option that is not a text option is refused with a message, while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.
+Set a control's typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. An option it does not take refuses the whole call. A font that is not available, or a typographic feature the font does not have, is refused with a message while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.
 
 *Short name: `textStyle`.*
 
