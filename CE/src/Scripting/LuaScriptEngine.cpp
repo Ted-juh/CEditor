@@ -1658,7 +1658,20 @@ function nowMs() return __nowMs() end
 
 -- The panel's division vocabulary, in both directions. An unknown name returns nil rather than the
 -- component's 1/16 fallback: a component has to keep running, a script that mistyped should find out.
-function beatsPerDivision(name) return __CE_DIVISIONS[tostring(name)] end
+-- It found out only by getting nil, so __division says so as well, in the words of the WebView
+-- runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the names differ only by D and
+-- T and nothing is ambiguous.
+local function __division(verb, name)
+  local wanted = string.lower(tostring(name))
+  for i = 1, #__CE_DIVISION_NAMES do
+    local id = __CE_DIVISION_NAMES[i]
+    if string.lower(id) == wanted then return __CE_DIVISIONS[id] end
+  end
+  logError(verb .. ': "' .. tostring(name) .. '" is not a division, so there is no answer. The divisions are '
+    .. table.concat(__CE_DIVISION_NAMES, ", ") .. '.')
+  return nil
+end
+function beatsPerDivision(name) return __division("ce.time.division", name) end
 function divisionNames()
   local out = {}
   for i = 1, #__CE_DIVISION_NAMES do
@@ -1681,7 +1694,7 @@ function barBeatAt(beats, beatsPerBar)
 end
 
 function stepAt(beats, division)
-  local per = __CE_DIVISIONS[tostring(division)]
+  local per = __division("ce.time.step", division)
   if per == nil then return nil end
   local b = __tnum(beats, 0); if b < 0 then b = 0 end
   return math.floor(b / per)
@@ -1692,7 +1705,7 @@ end
 -- returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
 -- an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
 function stepsBetween(fromBeats, toBeats, division, maxSteps)
-  local per = __CE_DIVISIONS[tostring(division)]
+  local per = __division("ce.time.steps", division)
   if per == nil then return nil end
   local from = __tnum(fromBeats, 0); if from < 0 then from = 0 end
   local to = __tnum(toBeats, 0); if to < 0 then to = 0 end
@@ -1711,7 +1724,7 @@ end
 -- The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
 -- same" swing are only the same swing if they compute it the same way.
 function swingOffset(step, amount, division)
-  local per = __CE_DIVISIONS[tostring(division)]
+  local per = __division("ce.time.swing", division)
   if per == nil then return nil end
   local s = __tclamp(amount, 0, 1)
   if math.abs(math.floor(__tnum(step, 0) + 0.5)) % 2 == 1 then return s * 0.5 * per end

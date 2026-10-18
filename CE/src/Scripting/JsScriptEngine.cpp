@@ -1743,8 +1743,20 @@ function nowMs() { return __api.nowMs(); }
 
 // The panel's division vocabulary, in both directions. An unknown name returns undefined rather
 // than the component's 1/16 fallback: a component has to keep running, a script that mistyped a
-// division should find out.
-function beatsPerDivision(name) { return __CE_DIVISIONS[String(name)]; }
+// division should find out. It found out only by getting undefined, so __division says so as well,
+// in the words of the WebView runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the
+// names differ only by D and T and nothing is ambiguous.
+function __division(verb, name) {
+  var wanted = String(name).toLowerCase();
+  for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
+    var id = __CE_DIVISION_NAMES[i];
+    if (id.toLowerCase() === wanted) return __CE_DIVISIONS[id];
+  }
+  logError(verb + ': "' + String(name) + '" is not a division, so there is no answer. The divisions are '
+    + __CE_DIVISION_NAMES.join(", ") + '.');
+  return undefined;
+}
+function beatsPerDivision(name) { return __division("ce.time.division", name); }
 function divisionNames() {
   var out = [];
   for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
@@ -1768,7 +1780,7 @@ function barBeatAt(beats, beatsPerBar) {
 }
 
 function stepAt(beats, division) {
-  var per = __CE_DIVISIONS[String(division)];
+  var per = __division("ce.time.step", division);
   if (per === undefined) return undefined;
   var b = __tnum(beats, 0); if (b < 0) b = 0;
   return Math.floor(b / per);
@@ -1779,7 +1791,7 @@ function stepAt(beats, division) {
 // returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
 // an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
 function stepsBetween(fromBeats, toBeats, division, maxSteps) {
-  var per = __CE_DIVISIONS[String(division)];
+  var per = __division("ce.time.steps", division);
   if (per === undefined) return undefined;
   var from = __tnum(fromBeats, 0); if (from < 0) from = 0;
   var to = __tnum(toBeats, 0); if (to < 0) to = 0;
@@ -1798,7 +1810,7 @@ function stepsBetween(fromBeats, toBeats, division, maxSteps) {
 // The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
 // same" swing are only the same swing if they compute it the same way.
 function swingOffset(step, amount, division) {
-  var per = __CE_DIVISIONS[String(division)];
+  var per = __division("ce.time.swing", division);
   if (per === undefined) return undefined;
   var s = __tclamp(amount, 0, 1);
   return (Math.abs(Math.round(__tnum(step, 0))) % 2 === 1) ? s * 0.5 * per : 0;

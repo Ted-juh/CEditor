@@ -988,8 +988,19 @@ const nowMsRead = () => (NOW_EPOCH === null ? performance.now() : Date.now() - N
 
 // A division is the panel's own vocabulary — "1/16", "1/8T", "1/4D" — and every sequencer property
 // speaks it. An unknown name returns nothing rather than the component's 1/16 fallback: a component
-// must keep running, a script that mistyped one should find out.
-const timeDivision = (name) => DIVISIONS[String(name)];
+// must keep running, a script that mistyped one should find out. It found out only by getting
+// nothing, so this says so as well, in the same words as each prelude's __division. Any case is
+// read: "1/8t" is "1/8T", because the names differ only by D and T and nothing is ambiguous. The
+// table's own id comes back, because the transport's functions look the name up again.
+function divisionId(verb, name) {
+  const wanted = String(name).toLowerCase();
+  const id = DIVISION_NAMES.find((d) => d.toLowerCase() === wanted);
+  if (id === undefined) {
+    addScriptTrace('error', '', `${verb}: "${name}" is not a division, so there is no answer. `
+      + `The divisions are ${DIVISION_NAMES.join(', ')}.`);
+  }
+  return id;
+}
 
 // @module ce.math
 // A seeded xorshift32, written the same way in every prelude and masked to 32 bits at every step.
@@ -1933,7 +1944,10 @@ const helpers = {
   nowMs: () => nowMsRead(),
   // The panel's division vocabulary, in both directions. Every sequencer property in the app is
   // one of these strings, and a script could set one and never convert it.
-  beatsPerDivision: (name) => timeDivision(name),
+  beatsPerDivision: (name) => {
+    const id = divisionId('ce.time.division', name);
+    return id === undefined ? undefined : DIVISIONS[id];
+  },
   divisionNames: () => DIVISION_NAMES.map((id) => ({ id, label: DIVISION_LABELS[id], beats: DIVISIONS[id] })),
   // Where a beat position falls, musically — for ANY position, not only the one the transport is
   // at. `text` is the Transport's own readout ("3.2.00"), so a script's label and the component's
@@ -1943,24 +1957,27 @@ const helpers = {
     return { ...panelBarBeat(beats, signature), text: panelFormatBarBeat(beats, signature) };
   },
   // Which step of the grid a position is on, counting from 0 at the transport origin.
-  stepAt: (beats, division) => (timeDivision(division) === undefined
-    ? undefined
-    : panelStepAtBeat(beats, division)),
+  stepAt: (beats, division) => {
+    const id = divisionId('ce.time.step', division);
+    return id === undefined ? undefined : panelStepAtBeat(beats, id);
+  },
   // The step boundaries crossed between two readings — the never-lose-an-event rule every synced
   // follower in the panel runs on. A stalled frame must FIRE the steps it slept through rather than
   // drop them: that is the difference between a stutter and a hole in the bar. `max` caps the
   // catch-up (default 16) and what was dropped is REPORTED rather than swallowed, so a script can
   // say it happened. On an overrun the most RECENT steps are kept — catching up to now matters
   // more than replaying where you were.
-  stepsBetween: (fromBeats, toBeats, division, max) => (timeDivision(division) === undefined
-    ? undefined
-    : panelCrossedSteps(fromBeats, toBeats, division, max == null ? 16 : max)),
+  stepsBetween: (fromBeats, toBeats, division, max) => {
+    const id = divisionId('ce.time.steps', division);
+    return id === undefined ? undefined : panelCrossedSteps(fromBeats, toBeats, id, max == null ? 16 : max);
+  },
   // The panel's shuffle: every odd step pushed later by up to half a step. In BEATS, to add to a
   // step's position. Two sequencers at "the same" swing really are the same swing only if they
   // compute it the same way, which is why this is the transport's function and not a second one.
-  swingOffset: (step, amount, division) => (timeDivision(division) === undefined
-    ? undefined
-    : panelSwungBeatOffset(step, amount, division)),
+  swingOffset: (step, amount, division) => {
+    const id = divisionId('ce.time.swing', division);
+    return id === undefined ? undefined : panelSwungBeatOffset(step, amount, id);
+  },
   // For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep.
   // Derived from the position, never accumulated, so a cycle running for an hour is still exactly
   // on the bar line. `length` is the cycle in beats; `count` is how many have completed.

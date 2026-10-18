@@ -19,8 +19,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { get } from 'svelte/store';
 
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import {
   JSON_CASES, JSON_DECODE_CASES, JSON_REJECTS, NATIVE_ENCODE_CASES,
 } from './fixtures/jsonCases.js';
@@ -90,6 +92,9 @@ const CASES = [
   ['beatsPerDivision', ['1/1']], ['beatsPerDivision', ['1/32']], ['beatsPerDivision', ['1/3']],
   ['stepAt', [2.5, '1/16']], ['stepAt', [0, '1/16']], ['stepAt', [-1, '1/16']],
   ['stepAt', [2.5, '1/8T']], ['stepAt', [2.5, 'nope']],
+  // Any case is the same division: the names differ only by D and T.
+  ['beatsPerDivision', ['1/8t']], ['beatsPerDivision', ['1/4d']], ['stepAt', [2.5, '1/16t']],
+  ['swingOffset', [1, 0.5, '1/8d']],
   ['swingOffset', [0, 0.5, '1/16']], ['swingOffset', [1, 0.5, '1/16']],
   ['swingOffset', [3, 1, '1/8']], ['swingOffset', [-1, 0.5, '1/16']],
   ['swingOffset', [1, 2, '1/16']], ['swingOffset', [1, 0.5, 'nope']],
@@ -193,7 +198,7 @@ const STRUCT_CASES = [
   ['stepsBetween', [0, 1, '1/16']], ['stepsBetween', [1, 1, '1/16']],
   ['stepsBetween', [0.9, 1.1, '1/4']], ['stepsBetween', [0, 100, '1/16']],
   ['stepsBetween', [0, 100, '1/16', 4]], ['stepsBetween', [0, 100, '1/16', 0]],
-  ['stepsBetween', [5, 1, '1/16']], ['stepsBetween', [0, 1, 'nope']],
+  ['stepsBetween', [5, 1, '1/16']], ['stepsBetween', [0, 1, 'nope']], ['stepsBetween', [0, 1, '1/16t']],
   ['cycleAt', [0, 1]], ['cycleAt', [6, 1]], ['cycleAt', [6, 1, 3]],
   ['cycleAt', [6, 0]], ['cycleAt', [6, 1000]], ['cycleAt', [-3, 2]],
   ['loopedBeats', [0, 4, 8]], ['loopedBeats', [4, 4, 8]], ['loopedBeats', [13, 4, 8]],
@@ -458,6 +463,112 @@ test('the Python engine prelude computes what the WebView runtime computes', asy
     // happens to print a float or order a dict's keys.
     assert.equal(canonical(got[i].value ?? null), canonical(web[fn](...args) ?? null),
       `Python prelude ${fn}(${JSON.stringify(args)}) disagrees with the WebView runtime`);
+  });
+});
+
+/* ------------------------------------------------------------- the refusals, word for word */
+
+// A mistake a helper refuses has to be refused in the same words everywhere, or the editor and the
+// exported plugin tell the author two different things about one line. Each case runs in all four
+// engines, and the error lines it raises are compared with the WebView runtime's exactly. A case
+// that must raise nothing (a division in another case, say) is here too, so "accepted" is pinned
+// as firmly as "refused". Arguments are strings and numbers only: how each language prints a nil
+// is not a disagreement worth having.
+const REFUSAL_CASES = [
+  // MIDI senders: an unreadable note name sends nothing.
+  ['sendNote', [1, 'c4', 100]], ['sendNoteOff', [1, 'c4']], ['sendAftertouch', [1, 90, 'c4']],
+  ['sendNote', [1, 'C4', 100]],
+  // Divisions: any case is read, and a name that is not a division says so.
+  ['beatsPerDivision', ['1/6']], ['stepAt', [2, 'nope']], ['stepsBetween', [0, 1, '1/3']],
+  ['swingOffset', [1, 0.5, 'quarter']],
+  ['beatsPerDivision', ['1/8t']], ['stepAt', [2.5, '1/16D']], ['swingOffset', [1, 0.5, '1/4d']],
+];
+
+function webRefusals(fn, args) {
+  clearScriptTrace();
+  web[fn](...args);
+  return get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+}
+
+test('the engines refuse the same mistakes in the same words', async (t) => {
+  const want = REFUSAL_CASES.map(([fn, args]) => webRefusals(fn, args));
+  assert.ok(want.some((lines) => lines.length), 'the cases must include some refusals');
+
+  // JavaScript, under node:vm.
+  {
+    const errors = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {},
+      logError: (m) => errors.push(String(m)) };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    // The prelude declares its own logError, forwarding to __api.logAt, so capture it there.
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error') errors.push(String(m)); } : () => undefined),
+    });
+    REFUSAL_CASES.forEach(([fn, args], i) => {
+      errors.length = 0;
+      sandbox[fn](...args);
+      assert.deepEqual([...errors], want[i], `JS prelude ${fn}(${JSON.stringify(args)})`);
+    });
+  }
+
+  // Lua, under wasmoon: one crossing for every case, for the reason LUA_SERIALISER gives.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'sendCC', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = REFUSAL_CASES.map(([fn, args]) =>
+        `__errs = {}; ${fn}(${args.map(luaLiteral).join(', ')}); out[#out + 1] = table.concat(__errs, "\\1")`);
+      const chunk = `__errs = {}\nlogError = function(m) __errs[#__errs + 1] = tostring(m) end\n`
+        + `local out = {}\n${calls.join('\n')}\nreturn table.concat(out, "\\n")`;
+      const got = String(await lua.doString(chunk)).split('\n');
+      REFUSAL_CASES.forEach(([fn, args], i) => {
+        assert.deepEqual(got[i] ? got[i].split('\u0001') : [], want[i], `Lua prelude ${fn}(${JSON.stringify(args)})`);
+      });
+    } finally {
+      lua.global.close();
+    }
+  }
+
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.diagnostic('Python 3 is not on this machine: its refusals were not compared');
+    return;
+  }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+errors = []
+g["logError"] = lambda m, *rest: errors.append(str(m))
+out = []
+for fn, args in payload["cases"]:
+    del errors[:]
+    g[fn](*args)
+    out.append(list(errors))
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: REFUSAL_CASES }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  const got = JSON.parse(run.stdout);
+  REFUSAL_CASES.forEach(([fn, args], i) => {
+    assert.deepEqual(got[i], want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
   });
 });
 

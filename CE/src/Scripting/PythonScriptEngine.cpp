@@ -840,8 +840,18 @@ def nowMs():
 
 # The panel's division vocabulary, in both directions. An unknown name returns None rather than the
 # component's 1/16 fallback: a component has to keep running, a script that mistyped should find out.
+# It found out only by getting None, so __division says so as well, in the words of the WebView
+# runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the names differ only by D and T
+# and nothing is ambiguous.
+def __division(verb, name):
+    wanted = str(name).lower()
+    for i in __CE_DIVISION_NAMES:
+        if i.lower() == wanted: return __CE_DIVISIONS[i]
+    logError(verb + ': "' + str(name) + '" is not a division, so there is no answer. The divisions are '
+             + ", ".join(__CE_DIVISION_NAMES) + '.')
+    return None
 def beatsPerDivision(name):
-    return __CE_DIVISIONS.get(str(name))
+    return __division("ce.time.division", name)
 def divisionNames():
     return [{ "id": i, "label": __CE_DIVISION_LABELS.get(i), "beats": __CE_DIVISIONS.get(i) }
             for i in __CE_DIVISION_NAMES]
@@ -862,7 +872,7 @@ def barBeatAt(beats, beatsPerBar=None):
 
 def stepAt(beats, division):
     import math
-    per = __CE_DIVISIONS.get(str(division))
+    per = __division("ce.time.step", division)
     if per is None: return None
     b = __tnum(beats, 0)
     if b < 0: b = 0
@@ -874,7 +884,7 @@ def stepAt(beats, division):
 # an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
 def stepsBetween(fromBeats, toBeats, division, maxSteps=None):
     import math
-    per = __CE_DIVISIONS.get(str(division))
+    per = __division("ce.time.steps", division)
     if per is None: return None
     frm = __tnum(fromBeats, 0)
     if frm < 0: frm = 0
@@ -894,7 +904,7 @@ def stepsBetween(fromBeats, toBeats, division, maxSteps=None):
 # same" swing are only the same swing if they compute it the same way.
 def swingOffset(step, amount, division):
     import math
-    per = __CE_DIVISIONS.get(str(division))
+    per = __division("ce.time.swing", division)
     if per is None: return None
     s = __tclamp(amount, 0, 1)
     idx = math.floor(__tnum(step, 0) + 0.5)
