@@ -290,6 +290,12 @@ double ScriptRuntime::animationValueOf (const Animation& a, double progress) con
 // The completion callback lives in the SCRIPT, so the host cannot call it: it emits, and each
 // prelude routes the emit to the function it stored. Exactly how after()'s one-shot already works,
 // and the reason `done` can be a plain function argument in every language.
+//
+// The emit carries what the prelude needs to FIND the function (`path`, or `group` for a list) and
+// `completed`; the prelude calls done(completed) with that boolean alone, as the contract says and
+// the WebView's fireAnimationDone does. It used to hand the script this table, { path, completed }
+// or { paths, completed }, and a table is always true, so `if completed then` read a cancelled move
+// as a finished one.
 void ScriptRuntime::fireAnimationDone (const Animation& a, bool completed)
 {
     if (a.groupId != 0)
@@ -301,10 +307,6 @@ void ScriptRuntime::fireAnimationDone (const Animation& a, bool completed)
         if (it->second.remaining > 0) return;
         auto* obj = new juce::DynamicObject();
         obj->setProperty ("group", a.groupId);
-        obj->setProperty ("paths", juce::var (juce::Array<juce::var> {}));
-        auto paths = juce::Array<juce::var>();
-        for (const auto& p : it->second.paths) paths.add (p);
-        obj->setProperty ("paths", paths);
         obj->setProperty ("completed", it->second.completed);
         animationGroups.erase (it);
         host.emitEvent ("__animDone", juce::var (obj));
@@ -337,6 +339,38 @@ juce::var ScriptRuntime::animationDescribe (const Animation& a) const
     obj->setProperty ("cycle", a.cycle);
     obj->setProperty ("sync", a.sync);
     return juce::var (obj);
+}
+
+// How many times a move runs IN ALL, from its `repeat` option, as the WebView's startAnimationImpl
+// reads it: a number, or text that is one (realNumber's grammar: "3", " -1 ", "2e1"); anything else,
+// or no option, is the default single run. A plain (double) cast would read "abc", nothing and false
+// as 0, and 0 means until stopped.
+static double animationRuns (const juce::DynamicObject* o)
+{
+    if (o == nullptr || ! o->hasProperty ("repeat")) return 1.0;
+    const auto v = o->getProperty ("repeat");
+    if (v.isInt() || v.isInt64() || v.isDouble())
+    {
+        const double d = (double) v;
+        return std::isfinite (d) ? d : 1.0;
+    }
+    if (! v.isString()) return 1.0;
+    const auto t = v.toString().trim();
+    int i = 0, digits = 0;
+    if (t[i] == '+' || t[i] == '-') ++i;
+    while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; }
+    if (t[i] == '.') { ++i; while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; } }
+    if (digits == 0) return 1.0;
+    if (t[i] == 'e' || t[i] == 'E')
+    {
+        ++i;
+        if (t[i] == '+' || t[i] == '-') ++i;
+        if (! juce::CharacterFunctions::isDigit (t[i])) return 1.0;
+        while (juce::CharacterFunctions::isDigit (t[i])) ++i;
+    }
+    if (i != t.length()) return 1.0;
+    const double d = t.getDoubleValue();
+    return std::isfinite (d) ? d : 1.0;
 }
 
 ScriptRuntime::Animation* ScriptRuntime::animationFor (const juce::String& path)
@@ -377,7 +411,6 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
             groupId = animationGroupSeq;
             AnimationGroup g;
             g.remaining = paths.size();
-            g.paths = paths;
             animationGroups[groupId] = g;
         }
         for (int i = 0; i < paths.size(); ++i)
@@ -434,8 +467,13 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     a.frequency = number ("frequency", 12.0);
     a.delay = juce::jmax (0.0, number ("delay", 0.0));
     a.pingpong = flag ("pingpong");
-    const int repeat = (int) std::llround (number ("repeat", 0.0));
-    a.repeat = repeat < 0 ? -1 : repeat;
+    // `repeat` is how many times the move runs in all: 1 (the default) once, 3 three times, 0 or
+    // less until it is stopped, rounded to a whole number. This read it as runs AFTER the first, so
+    // repeat = 1 ran twice and repeat = 0 once, where the contract always said otherwise. Held as
+    // the runs left after this one, -1 for until stopped; clamped first, because llround of a number
+    // past what it can hold is undefined.
+    const auto runs = std::llround (juce::jlimit (-1.0, 2147483647.0, animationRuns (o)));
+    a.repeat = runs <= 0 ? -1 : (int) (runs - 1);
 
     // `beats` gives the duration a musical length; `sync` is the stronger thing — the position is
     // derived from the transport's beat count, so the animation FREEZES when the transport stops

@@ -2504,18 +2504,21 @@ function animateReverse(path) { return __api.animateReverse(path === undefined |
 function animateFinish(path) { return __api.animateFinish(path === undefined || path === null ? "" : String(path)); }
 
 // Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+// done(completed): one argument, true or false, for one path and for a list alike. It was handed an
+// object, { path, completed } or { paths, completed }, and an object is always truthy, so
+// `if (completed)` read a cancelled move as a finished one.
 on("*", "__animDone", function (info) {
   if (!info) return;
   if (info.group !== undefined && info.group !== null) {
     var g = __animGroup[info.group];
     delete __animGroup[info.group];
-    if (g) g({ paths: info.paths, completed: info.completed === true });
+    if (g) g(info.completed === true);
     return;
   }
   var key = String(info.path === undefined ? "" : info.path);
   var fn = __animDone[key];
   delete __animDone[key];
-  if (fn) fn({ path: key, completed: info.completed === true });
+  if (fn) fn(info.completed === true);
 });
 
 // @module ce.device

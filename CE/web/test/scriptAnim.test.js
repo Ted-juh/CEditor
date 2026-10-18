@@ -297,20 +297,20 @@ test('an envelope needs at least two points, and says so', () => {
 
 test('repeat runs the move again; pingpong brings it back', () => {
   withClock(() => {
-    api.animateTo('r', 10, { duration: 100, from: 0, repeat: 2, pingpong: true });
+    api.animateTo('r', 10, { duration: 100, from: 0, repeat: 3, pingpong: true });
     tickAnimations(100);
     assert.equal(api.animateValue('r').value, 10, 'the first cycle arrives…');
     assert.equal(api.animateValue('r').cycle, 1);
     tickAnimations(200);
     assert.equal(api.animateValue('r').value, 0, '…and the second comes back');
     tickAnimations(300);
-    assert.equal(api.animateRunning('r'), false, 'three cycles in all: the first plus two repeats');
+    assert.equal(api.animateRunning('r'), false, 'three cycles in all: repeat is the runs in all');
   });
 });
 
-test('repeat = -1 runs until it is stopped, and list() is how you find it', () => {
+test('repeat = 0 runs until it is stopped, and list() is how you find it', () => {
   withClock(() => {
-    api.animateTo('forever', 1, { duration: 10, from: 0, repeat: -1, pingpong: true });
+    api.animateTo('forever', 1, { duration: 10, from: 0, repeat: 0, pingpong: true });
     tickAnimations(1000);
     assert.equal(api.animateRunning('forever'), true);
     assert.deepEqual(api.animateList().map((a) => a.path), ['forever'],
@@ -325,25 +325,24 @@ test('repeat = -1 runs until it is stopped, and list() is how you find it', () =
 test('done says whether it FINISHED or was cancelled', () => {
   withClock(() => {
     let got = null;
-    api.animateTo('d', 5, { duration: 100, done: (i) => { got = i; } });
+    api.animateTo('d', 5, { duration: 100, done: (completed) => { got = completed; } });
     tickAnimations(100);
-    assert.deepEqual(got, { path: 'd', completed: true });
+    assert.equal(got, true);
   });
   withClock(() => {
     let got = null;
-    api.animateTo('d', 5, { duration: 100, done: (i) => { got = i; } });
+    api.animateTo('d', 5, { duration: 100, done: (completed) => { got = completed; } });
     api.animateStop('d');
-    assert.deepEqual(got, { path: 'd', completed: false },
-      'a cancel is an outcome — "then do X" has to be able to tell');
+    assert.equal(got, false, 'a cancel is an outcome — "then do X" has to be able to tell');
   });
 });
 
 test('replacing an animation completes the one it replaced, as not-finished', () => {
   withClock(() => {
     let got = null;
-    api.animateTo('d', 5, { duration: 100, done: (i) => { got = i; } });
+    api.animateTo('d', 5, { duration: 100, done: (completed) => { got = completed; } });
     api.animateTo('d', 9, { duration: 100 });
-    assert.deepEqual(got, { path: 'd', completed: false }, 'a value has one destination');
+    assert.equal(got, false, 'a value has one destination');
   });
 });
 
@@ -351,12 +350,12 @@ test('done fires ONCE for a whole list, when the last one lands', () => {
   withClock(() => {
     let got = null;
     let calls = 0;
-    api.animateTo(['x', 'y', 'z'], 1, { duration: 100, stagger: 50, done: (i) => { got = i; calls += 1; } });
+    api.animateTo(['x', 'y', 'z'], 1, { duration: 100, stagger: 50, done: (completed) => { got = completed; calls += 1; } });
     tickAnimations(100);
     assert.equal(calls, 0, 'not when the first one lands');
     tickAnimations(200);
     assert.equal(calls, 1, '"when the sweep is over" means once, not three times');
-    assert.deepEqual(got, { paths: ['x', 'y', 'z'], completed: true });
+    assert.equal(got, true);
   });
 });
 
@@ -468,10 +467,10 @@ test('reverse is exact: turning around twice is where you started', () => {
 test('finish lands on the target and completes; stop leaves it stranded', () => {
   withClock(() => {
     let got = null;
-    api.animateTo('a', 100, { duration: 1000, from: 0, done: (i) => { got = i; } });
+    api.animateTo('a', 100, { duration: 1000, from: 0, done: (completed) => { got = completed; } });
     tickAnimations(300);
     assert.equal(api.animateFinish('a'), true);
-    assert.deepEqual(got, { path: 'a', completed: true });
+    assert.equal(got, true);
     assert.equal(api.animateRunning('a'), false);
   });
   withClock(() => {
@@ -492,7 +491,7 @@ test('finish refuses when there is nothing to finish', () => {
 test('panel teardown cancels without firing anything into a dead panel', () => {
   let calls = 0;
   tickAnimations(0);
-  api.animateTo('a', 1, { duration: 100, repeat: -1, done: () => { calls += 1; } });
+  api.animateTo('a', 1, { duration: 100, repeat: 0, done: () => { calls += 1; } });
   stopAllAnimations();
   assert.equal(api.animateRunning(), false, 'including a repeat that would otherwise run forever');
   assert.equal(calls, 0, 'a completion into a script set that no longer exists is noise');

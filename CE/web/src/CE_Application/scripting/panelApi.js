@@ -304,30 +304,31 @@ const SHARED_OPTION_FIELDS = {
     summary: 'When `path` is a list, offset each move after the first by this much, so they start '
       + 'in turn.',
   },
-  // What every runtime does: 0 runs once, n runs n MORE times, a negative number until stopped
-  // (startAnimationImpl, ScriptRuntime::startAnimation). This said "default 1, how many times, 0 or
-  // less forever", so a script asking for one run with repeat = 1 got two, and repeat = 0 meant
-  // forever to the reader and once to every engine.
+  // The runs IN ALL, which is what this always said. Every runtime used to read it as runs after
+  // the first (repeat = 1 ran twice, repeat = 0 once); startAnimationImpl and
+  // ScriptRuntime::startAnimation now do what it says. apiContractRuntimes.test.js counts the runs.
   repeat: {
-    name: 'repeat', type: 'number', default: '0',
-    summary: 'How many more times to run it after the first. 0 runs it once and 2 runs it three '
-      + 'times in all; a negative number repeats it until you stop it. In Lua, where repeat is a '
-      + 'keyword, write it as ["repeat"] = 2.',
+    name: 'repeat', type: 'number', default: '1',
+    summary: 'How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or '
+      + 'less repeats it until you stop it. A fraction is rounded to the nearest whole number, text '
+      + 'that is a number is read as one, and anything else runs it once. In Lua, where repeat is a '
+      + 'keyword, write it as ["repeat"] = 3.',
   },
   pingpong: {
     name: 'pingpong', type: 'true or false', default: 'false',
     summary: 'On a repeat, run the move backwards every other time instead of jumping back to the '
       + 'start.',
   },
-  // Every runtime passes ONE table (fireAnimationDone, ScriptRuntime::fireAnimationDone, the
-  // preludes' __animDone). This said done(completed), and a table is always true, so
-  // `if completed then` read a cancelled move as a finished one.
+  // done(completed), which is what this always said. Every runtime used to pass one table,
+  // { path, completed } or { paths, completed }, and a table is always true, so `if completed then`
+  // read a cancelled move as a finished one. fireAnimationDone and the preludes' __animDone
+  // listeners now pass the boolean alone.
   done: {
     name: 'done', type: 'function',
-    summary: 'Called once when the move ends, with one table: `path` and `completed` for a single '
-      + 'control, or `paths` and `completed` when you gave a list (then it is called once, after the '
-      + 'last of them). `completed` is true if the move got to the end and false if it was stopped '
-      + 'or replaced first, so test `info.completed`: the call itself does not mean it arrived.',
+    summary: 'Called once when the move ends, with one argument: done(completed). `completed` is '
+      + 'true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped '
+      + 'or replaced first. When `path` is a list it is called once, after the last of them ends, '
+      + 'and `completed` is true only if every one of them got to the end.',
   },
   animFrom: {
     name: 'from', type: 'number', sample: '0',
@@ -1001,7 +1002,7 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
-    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` callback runs with `completed` set to false, because it was cancelled rather than finished.',
+    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -1055,7 +1056,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
-    summary: 'Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback runs with `completed` set to false. To jump to the end instead, use `ce.anim.finish()`.',
+    summary: 'Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback is called with false. To jump to the end instead, use `ce.anim.finish()`.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
@@ -1128,7 +1129,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateFinish', category: 'Animation', signature: 'animateFinish(path)',
-    summary: 'End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` runs with `completed` set to true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.',
+    summary: 'End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` is called with true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },

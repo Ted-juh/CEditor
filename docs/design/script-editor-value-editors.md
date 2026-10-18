@@ -659,7 +659,7 @@ And the options, timers and panel commands:
 | a timer given `"fast"` or -100 fired every millisecond, and `after("1s")` at once | refused; a musical length may be a division's name | WebView runtime; the three preludes |
 | `get()` of a control or property that is not there answered nil without a word | reports it in `set()`'s words | WebView runtime; every player engine |
 | `ce.panel.find` with an unknown key returned every control; `patch` counted keys it did not apply; `match` with a `to` not in the list used the first | each refuses or reports, and counts only what it did | WebView runtime |
-| the contract said `repeat` 0 runs forever and `done(completed)`; every runtime ran 0 once and passed a table | the contract says what the runtimes do | `panelApi.js` |
+| the contract said `repeat` is the runs in all, 0 forever, and `done(completed)`; every runtime ran n as n more times (0 once, 1 twice) and passed `done` a table, which is always true | by the owner's decision, the runtimes do what the contract said: 1 runs once, 3 three times, 0 or less until stopped, and `done` gets one boolean, for one path and for a list | WebView runtime; `ScriptRuntime`; the three preludes |
 
 Still open, for the owner:
 
@@ -670,8 +670,6 @@ Still open, for the owner:
   curve that overshoots its end), so the warning points at it without filling the console when an
   animation sends sixty a second. In every runtime, and in `BridgeScriptHost` for a native handler.
 - **An unknown option** warns and the call runs. Whether it should refuse instead.
-- **`ce.anim`'s `repeat` and `done`**: the contract was changed to say what the runtimes do.
-  Whether the runtimes should do what the contract used to say instead.
 - **A colour property: decided, accept.** The short forms with one reading are stored written out
   in the panel's form, the conversion the refusal used to print: `"#RGB"` as `"#RRGGBB"`, a CSS
   name in any case as its `"#RRGGBB"` (and `transparent` as `"00000000"`), and `rgb()`, `rgba()`,

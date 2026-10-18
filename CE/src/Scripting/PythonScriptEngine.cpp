@@ -1119,16 +1119,19 @@ def animateFinish(path=None):
     return __api.animateFinish("" if path is None else str(path))
 
 # Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+# done(completed): one argument, True or False, for one path and for a list alike. It was handed a
+# dict, { "path", "completed" } or { "paths", "completed" }, and a dict that is not empty is always
+# true, so `if completed:` read a cancelled move as a finished one.
 def __animDoneTick(info):
     if not hasattr(info, "get"): return
     gid = info.get("group")
     if gid is not None:
         fn = __animGroup.pop(gid, None)
-        if fn is not None: fn({ "paths": info.get("paths"), "completed": info.get("completed") is True })
+        if fn is not None: fn(info.get("completed") is True)
         return
     key = str(info.get("path") or "")
     fn = __animDone.pop(key, None)
-    if fn is not None: fn({ "path": key, "completed": info.get("completed") is True })
+    if fn is not None: fn(info.get("completed") is True)
 on("*", "__animDone", __animDoneTick)
 
 # @module ce.device

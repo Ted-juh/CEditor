@@ -743,6 +743,65 @@ int main()
                "and said once, in the preludes' words (got " + logs.joinIntoString (" | ") + ")");
     }
 
+    // ce.anim in the player: `repeat` is the runs in all, and done(completed) gets one boolean,
+    // through BridgeScriptHost as PluginProcessor wires it: the host forwards the move to the
+    // runtime, and the completion's emit falls through to it. ScriptRuntimeTests.cpp §39b and
+    // PythonScriptEngineTests.cpp run the full set of moves in each language.
+    {
+        juce::StringArray animLogs;
+        BridgeScriptHost::Callbacks acb;
+        acb.log = [&] (const juce::String& m, const juce::var&) { animLogs.add (m); };
+        BridgeScriptHost animHost (std::move (acb));
+        ScriptRuntime animRuntime (animHost);
+        animHost.attachRuntime (&animRuntime);
+        animRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+
+        auto script = [] (const char* id, const char* language, const char* source)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", id);
+            o->setProperty ("language", language);
+            o->setProperty ("scope", "panel");
+            o->setProperty ("event", "onMove");
+            o->setProperty ("target", "*");
+            o->setProperty ("enabled", true);
+            o->setProperty ("source", source);
+            return juce::var (o);
+        };
+        juce::Array<juce::var> scripts;
+        scripts.add (script ("animlua", "lua",
+            "function onMove()\n"
+            "  ce.anim.to('cutoff', 100, { duration = 100, from = 0, ['repeat'] = 2,\n"
+            "    done = function(c, extra) log('lua ' .. type(c) .. ' ' .. tostring(c) .. ' ' .. tostring(extra)) end })\n"
+            "end\n"));
+        scripts.add (script ("animjs", "javascript",
+            "function onMove() {\n"
+            "  ce.anim.to(['reso', 'drive'], 100, { duration: 100, from: 0, repeat: 1,\n"
+            "    done: function (c) { log('js ' + arguments.length + ' ' + typeof c + ' ' + c); } });\n"
+            "  ce.anim.to('pan', 100, { duration: 100, from: 0, repeat: 0,\n"
+            "    done: function (c) { log('pan ' + typeof c + ' ' + c); } });\n"
+            "}\n"));
+        animRuntime.loadScripts (juce::var (scripts));
+        animRuntime.tickAnimations (0.0);
+        animRuntime.dispatchEvent ("onMove", "panel", juce::var());
+
+        animRuntime.tickAnimations (100.0);
+        check (animLogs.joinIntoString (" | ") == "js 1 boolean true",
+               "ce.anim: repeat = 1 is one run, and a list's done gets one boolean (got " + animLogs.joinIntoString (" | ") + ")");
+        check (animRuntime.animationRunning ("cutoff"), "ce.anim: repeat = 2 is still on its second run");
+        animLogs.clear();
+        animRuntime.tickAnimations (200.0);
+        check (animLogs.joinIntoString (" | ") == "lua boolean true nil",
+               "ce.anim: …which ends there, with done(true) and nothing else (got " + animLogs.joinIntoString (" | ") + ")");
+        animLogs.clear();
+        animRuntime.tickAnimations (1000.0);
+        check (animRuntime.animationRunning ("pan") && animLogs.isEmpty(), "ce.anim: repeat = 0 runs until it is stopped");
+        animRuntime.stopAnimation ("pan");
+        check (animLogs.joinIntoString (" | ") == "pan boolean false",
+               "ce.anim: …and stopping it is done(false) (got " + animLogs.joinIntoString (" | ") + ")");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

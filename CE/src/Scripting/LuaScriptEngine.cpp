@@ -2506,18 +2506,21 @@ function animateReverse(path) return __animateReverse(path == nil and "" or tost
 function animateFinish(path) return __animateFinish(path == nil and "" or tostring(path)) end
 
 -- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+-- done(completed): one argument, true or false, for one path and for a list alike. It was handed a
+-- table, { path, completed } or { paths, completed }, and a table is always true, so
+-- `if completed then` read a cancelled move as a finished one.
 on("*", "__animDone", function(info)
   if info == nil then return end
   if info.group ~= nil then
     local fn = __animGroup[info.group]
     __animGroup[info.group] = nil
-    if fn ~= nil then fn({ paths = info.paths, completed = info.completed == true }) end
+    if fn ~= nil then fn(info.completed == true) end
     return
   end
   local key = tostring(info.path or "")
   local fn = __animDone[key]
   __animDone[key] = nil
-  if fn ~= nil then fn({ path = key, completed = info.completed == true }) end
+  if fn ~= nil then fn(info.completed == true) end
 end)
 
 -- @module ce.device

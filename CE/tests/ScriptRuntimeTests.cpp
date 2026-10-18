@@ -3197,6 +3197,145 @@ int main()
         anim.stopAnimation();
     }
 
+    // 39b) ce.anim's `repeat` is the runs in all, and done(completed) gets one boolean --------------
+    // What the contract always said, and what no runtime did: repeat = 1 ran twice, repeat = 0 once,
+    // and done was handed a table ({ path, completed } or { paths, completed }), which is always
+    // true, so `if completed then` read a cancelled move as a finished one. The same fixtures as
+    // CE/web/test/apiContractRuntimes.test.js.
+    {
+        // How many 100 ms runs a move makes before it ends; -1 when it is still going after 12.
+        auto runsOf = [] (std::function<void (juce::DynamicObject&)> setRepeat)
+        {
+            TestHost countHost;
+            ScriptRuntime count (countHost);
+            count.tickAnimations (0.0);
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("duration", 100.0);
+            o->setProperty ("from", 0.0);
+            setRepeat (*o);
+            count.startAnimation ("to", juce::var ("count"), 100.0, juce::var (o));
+            for (int i = 1; i <= 12; ++i)
+            {
+                count.tickAnimations (i * 100.0);
+                if (! count.animationRunning ("count")) return i;
+            }
+            count.stopAnimation ("count");
+            return count.animationRunning ("count") ? -2 : -1;   // until stopped, and stop() stops it
+        };
+        auto repeatOf = [] (juce::var v) { return [v] (juce::DynamicObject& o) { o.setProperty ("repeat", v); }; };
+
+        check (runsOf ([] (juce::DynamicObject&) {}) == 1, "repeat left out: once");
+        check (runsOf (repeatOf (1)) == 1, "repeat = 1: once, not twice");
+        check (runsOf (repeatOf (3)) == 3, "repeat = 3: three times, not four");
+        check (runsOf (repeatOf (0)) == -1, "repeat = 0: until stopped, not once");
+        check (runsOf (repeatOf (-1)) == -1, "a negative number: until stopped");
+        check (runsOf (repeatOf (2.6)) == 3 && runsOf (repeatOf (2.5)) == 3, "a fraction is rounded, a half up");
+        check (runsOf (repeatOf (0.4)) == -1, "…so 0.4 is 0, which is until stopped");
+        check (runsOf (repeatOf ("3")) == 3 && runsOf (repeatOf (" -1 ")) == -1, "text that is a number is read as one");
+        check (runsOf (repeatOf ("three")) == 1 && runsOf (repeatOf ("")) == 1 && runsOf (repeatOf ("0x3")) == 1
+                   && runsOf (repeatOf (juce::var())) == 1 && runsOf (repeatOf (false)) == 1
+                   && runsOf (repeatOf (true)) == 1,
+               "anything else runs once, as before: a plain cast would read most of it as 0, which is now until stopped");
+
+        // pingpong under the same count: repeat = 2 is there and back, and no more.
+        TestHost ppHost;
+        ScriptRuntime pp (ppHost);
+        pp.tickAnimations (0.0);
+        pp.startAnimation ("to", juce::var ("pp"), 10.0,
+                           juce::JSON::parse (R"JSON({"duration":100,"from":0,"repeat":2,"pingpong":true})JSON"));
+        pp.tickAnimations (100.0);
+        check (std::abs ((double) ppHost.values["pp"] - 10.0) < 1e-9, "pingpong, repeat = 2: the first run arrives…");
+        pp.tickAnimations (150.0);
+        check (std::abs ((double) ppHost.values["pp"] - 5.0) < 1e-9, "…the second comes back…");
+        pp.tickAnimations (200.0);
+        check (! pp.animationRunning ("pp") && std::abs ((double) ppHost.values["pp"]) < 1e-9, "…and that is all");
+
+        // done, through the Lua and JavaScript preludes: one argument, exactly true or false, for a
+        // single path and for a list, with stagger and repeat counted the same way. The same moves in
+        // each language, each in a runtime of its own; what is logged at each step must be the same.
+        auto doneSteps = [] (const char* language, const juce::String& source)
+        {
+            TestHost h;
+            ScriptRuntime r (h);
+            h.runtime = &r;
+            juce::StringArray errors;
+            r.setErrorLogger ([&errors] (const juce::String& line)
+                { errors.add (line); std::cout << "  [error] " << line << "\n"; });
+            juce::Array<juce::var> list;
+            list.add (makeScript ("done", language, "panel", "onDone", "*", source));
+            r.loadScripts (juce::var (list));
+            juce::StringArray steps;
+            auto step = [&] { steps.add (h.logs.joinIntoString (" | ")); h.logs.clear(); };
+            r.tickAnimations (0.0);
+            r.runAction ("onDone", juce::var());
+            step();                                                      // 0: at the start
+            r.tickAnimations (100.0); step();                            // 1
+            r.tickAnimations (150.0); r.tickAnimations (200.0);
+            steps.add (juce::String (r.animationRunning ("d") ? "d running" : "d over") + ", "
+                       + (r.animationRunning ("e") ? "e running" : "e over") + ", "
+                       + (r.animationRunning ("h") ? "h running" : "h over"));
+            step();                                                      // 2, 3
+            r.tickAnimations (250.0); r.tickAnimations (300.0); step();  // 4
+            r.tickAnimations (1300.0);
+            steps.add (r.animationRunning ("i") ? "i running" : "i over");
+            r.stopAnimation(); step();                                   // 5, 6
+            steps.add (errors.isEmpty() ? "no errors" : errors.joinIntoString (" / "));
+            return steps;
+        };
+        const auto lua = doneSteps ("lua",
+            "local function say(name) return function(...)\n"
+            "  local c = ...\n"
+            "  log(name .. ' ' .. select('#', ...) .. ' ' .. type(c) .. ' ' .. tostring(c))\n"
+            "end end\n"
+            "function onDone()\n"
+            "  ce.anim.to('a', 1, { duration = 100, from = 0, done = say('a') })\n"
+            "  ce.anim.to('b', 1, { duration = 100, from = 0, done = say('b') })\n"
+            "  ce.anim.to('c', 1, { duration = 100, from = 0, done = say('c') })\n"
+            "  ce.anim.to({ 'd', 'e' }, 1, { duration = 100, from = 0, stagger = 50, ['repeat'] = 2, done = say('d,e') })\n"
+            "  ce.anim.to({ 'f', 'g' }, 1, { duration = 100, from = 0, done = say('f,g') })\n"
+            "  ce.anim.to('h', 1, { duration = 100, from = 0, ['repeat'] = 3, done = say('h') })\n"
+            "  ce.anim.to('i', 1, { duration = 100, from = 0, ['repeat'] = 0, done = say('i') })\n"
+            "  ce.anim.to('j', 1, { duration = 100, from = 0, done = say('j') })\n"
+            "  ce.anim.stop('b')\n"
+            "  ce.anim.finish('c')\n"
+            "  ce.anim.stop('f')\n"
+            "  ce.anim.to('j', 5, { duration = 100 })\n"
+            "end\n");
+        const auto js = doneSteps ("javascript",
+            "function say(name) { return function (c) {\n"
+            "  log(name + ' ' + arguments.length + ' ' + typeof c + ' ' + c);\n"
+            "}; }\n"
+            "function onDone() {\n"
+            "  ce.anim.to('a', 1, { duration: 100, from: 0, done: say('a') });\n"
+            "  ce.anim.to('b', 1, { duration: 100, from: 0, done: say('b') });\n"
+            "  ce.anim.to('c', 1, { duration: 100, from: 0, done: say('c') });\n"
+            "  ce.anim.to(['d', 'e'], 1, { duration: 100, from: 0, stagger: 50, repeat: 2, done: say('d,e') });\n"
+            "  ce.anim.to(['f', 'g'], 1, { duration: 100, from: 0, done: say('f,g') });\n"
+            "  ce.anim.to('h', 1, { duration: 100, from: 0, repeat: 3, done: say('h') });\n"
+            "  ce.anim.to('i', 1, { duration: 100, from: 0, repeat: 0, done: say('i') });\n"
+            "  ce.anim.to('j', 1, { duration: 100, from: 0, done: say('j') });\n"
+            "  ce.anim.stop('b');\n"
+            "  ce.anim.finish('c');\n"
+            "  ce.anim.stop('f');\n"
+            "  ce.anim.to('j', 5, { duration: 100 });\n"
+            "}\n");
+        const juce::StringArray expected {
+            "b 1 boolean false | c 1 boolean true | j 1 boolean false",   // stopped, finished, replaced
+            "a 1 boolean true | f,g 1 boolean false",                      // arrived; a list with one stopped
+            "d over, e running, h running",                                // at 200, d's two runs are over, e's
+            "",                                                            // (staggered by 50) are not: no done yet
+            "d,e 1 boolean true | h 1 boolean true",                       // the list, once at 250; repeat = 3 at 300
+            "i running",                                                   // repeat = 0: until stopped
+            "i 1 boolean false",
+            "no errors",
+        };
+        for (const auto& [name, got] : { std::pair { "Lua", lua }, std::pair { "JavaScript", js } })
+            for (int i = 0; i < expected.size(); ++i)
+                check (i < got.size() && got[i] == expected[i],
+                       juce::String (name) + " step " + juce::String (i) + ": done(completed) is one boolean, repeat the runs in all (want \""
+                           + expected[i] + "\", got \"" + (i < got.size() ? got[i] : juce::String ("nothing")) + "\")");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

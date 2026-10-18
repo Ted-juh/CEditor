@@ -13,7 +13,7 @@
 // tab shows beside the (far larger) Python runtime cost.
 export const MODULE_COST = {
   "-": { "javascript": 41524, "lua": 30052, "python": 33110, "webview": 179483 },
-  "ce.anim": { "javascript": 5549, "lua": 5281, "python": 5128, "webview": 26089 },
+  "ce.anim": { "javascript": 5742, "lua": 5467, "python": 5320, "webview": 27054 },
   "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 31968 },
   "ce.components.arp": { "javascript": 407, "lua": 407, "python": 407, "webview": 0 },
   "ce.components.chordpad": { "javascript": 417, "lua": 417, "python": 417, "webview": 0 },

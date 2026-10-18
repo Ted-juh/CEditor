@@ -4164,8 +4164,12 @@ function animationValueOf(a, progress) {
   return a.from + (a.to - a.from) * (Number.isFinite(eased) ? eased : progress);
 }
 
-/** Run (and forget) the completion callback for one animation. `completed` says whether it got
- *  there: a stopped animation reports false, so "then do X" can tell finishing from cancelling. */
+/** Run (and forget) the completion callback for one animation, as done(completed): one argument,
+ *  true or false, for a single path and for a list alike. A stopped animation reports false, so
+ *  "then do X" can tell finishing from cancelling. It used to be handed a table, { path, completed }
+ *  or { paths, completed }, where the contract says done(completed), and a table is always true:
+ *  `if completed then` read a cancelled move as a finished one. Every engine passes the boolean now
+ *  (ScriptRuntime::fireAnimationDone and the preludes' __animDone listeners). */
 function fireAnimationDone(a, completed) {
   if (a.groupId != null) {
     const group = animationGroups.get(a.groupId);
@@ -4175,13 +4179,13 @@ function fireAnimationDone(a, completed) {
     if (group.remaining > 0) return;
     animationGroups.delete(a.groupId);
     if (typeof group.done !== 'function') return;
-    runScriptCallback(group.scriptId, 'done', () => group.done({ paths: group.paths, completed: group.completed }));
+    runScriptCallback(group.scriptId, 'done', () => group.done(group.completed === true));
     return;
   }
   if (typeof a.done !== 'function') return;
   const fn = a.done;
   a.done = null;                          // once, whatever happens next
-  runScriptCallback(a.scriptId, 'done', () => fn({ path: a.path, completed }));
+  runScriptCallback(a.scriptId, 'done', () => fn(completed === true));
 }
 
 /** Drop an animation without firing anything — panel teardown, and the internal half of stop(). */
@@ -4237,7 +4241,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
       animationGroupSeq += 1;
       groupId = animationGroupSeq;
       animationGroups.set(groupId, {
-        remaining: paths.length, done, completed: true, paths,
+        remaining: paths.length, done, completed: true,
         scriptId: scriptId,
       });
     }
@@ -4308,10 +4312,17 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   }
 
   const delay = Math.max(0, animNumber(opts, 'delay', 0));
-  // repeat: 0 runs once, n runs n more times, -1 runs until stopped. Anything a script can start
-  // forever it must be able to stop, which is what list()/value() and panel teardown are for.
-  const repeatRaw = Math.round(animNumber(opts, 'repeat', 0));
-  const repeat = repeatRaw < 0 ? -1 : repeatRaw;
+  // `repeat` is how many times the move runs IN ALL: 1 (the default) once, 3 three times, and 0 or
+  // less until it is stopped, as the contract always said. Every runtime used to read it as runs
+  // AFTER the first, so repeat = 1 ran twice and repeat = 0 once. Rounded to a whole number. Text
+  // that is a number is read as one (realNumber); anything else runs it once, as all of it but true
+  // did before. That is why this is not animNumber: Number() reads null, false and "" as 0, which
+  // would now mean forever. Held below as the runs LEFT after this one, -1 for until stopped.
+  // Anything a script can start forever it must be able to stop, which is what list()/value() and
+  // panel teardown are for. ScriptRuntime::startAnimation reads it the same way.
+  const runsGiven = realNumber(opts?.repeat);
+  const runs = runsGiven === undefined ? 1 : Math.round(runsGiven);
+  const repeat = runs <= 0 ? -1 : runs - 1;
 
   const previous = animations.get(key);
   if (previous) fireAnimationDone(previous, false);   // replaced is not finished
@@ -4412,7 +4423,7 @@ function animationValueImpl(path) {
 }
 
 /** Every animation running, in path order. The read `ce.time.timers()` and `ce.panel.entries()`
- *  both got, and the one that makes `repeat = -1` safe to offer: a script can always find what it
+ *  both got, and the one that makes `repeat = 0` safe to offer: a script can always find what it
  *  started and stop it. */
 function animationListImpl() {
   return [...animations.keys()].sort().map((k) => animationValueImpl(k));

@@ -61,6 +61,21 @@ public:
     }
 };
 
+// ce.anim through the Python prelude: the host forwards to the runtime, the way BridgeScriptHost
+// does, and an emitted event comes back into it, so a move's done() reaches the script.
+class AnimHost : public TestHost
+{
+public:
+    ScriptRuntime* runtime = nullptr;
+    void startAnimation (const juce::String& kind, const juce::var& path, double target, const juce::var& opts) override
+    { if (runtime != nullptr) runtime->startAnimation (kind, path, target, opts); }
+    void stopAnimation (const juce::String& path) override { if (runtime != nullptr) runtime->stopAnimation (path); }
+    bool animationRunning (const juce::String& path) override { return runtime != nullptr && runtime->animationRunning (path); }
+    bool animationFinish (const juce::String& path) override { return runtime != nullptr && runtime->animationFinish (path); }
+    void emitEvent (const juce::String& name, const juce::var& data) override
+    { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
+};
+
 static int failures = 0;
 static void check (bool ok, const juce::String& name)
 {
@@ -285,6 +300,66 @@ int main()
                  "ce.math.alpha: the alpha is a number from 0 to 1, and none was given, so there is no answer.",
                  "ce.anim.to: \"100px\" is not a number, so nothing was started." })
             check (host.logs.contains (line), juce::String ("Colours: refused in the WebView runtime's words: ") + line);
+    }
+
+    // ce.anim's `repeat` is the runs in all, and done(completed) gets one argument, True or False:
+    // the same moves as ScriptRuntimeTests.cpp §39b runs through the Lua and JavaScript preludes.
+    // done was handed a dict, { "path", "completed" } or { "paths", "completed" }, and a dict that is
+    // not empty is always true, so `if completed:` read a cancelled move as a finished one.
+    {
+        AnimHost animHost;
+        ScriptRuntime anim (animHost);
+        animHost.runtime = &anim;
+        juce::StringArray animErrors;
+        anim.setErrorLogger ([&animErrors] (const juce::String& line)
+            { animErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+        juce::Array<juce::var> animScripts;
+        animScripts.add (makeScript ("pyDone", "onDone", "*",
+            "def say(name):\n"
+            "    def done(*args):\n"
+            "        log(name + ' ' + str(len(args)) + ' ' + type(args[0]).__name__ + ' ' + str(args[0]))\n"
+            "    return done\n"
+            "def onDone(value=None):\n"
+            "    ce.anim.to('a', 1, { 'duration': 100, 'from': 0, 'done': say('a') })\n"
+            "    ce.anim.to('b', 1, { 'duration': 100, 'from': 0, 'done': say('b') })\n"
+            "    ce.anim.to('c', 1, { 'duration': 100, 'from': 0, 'done': say('c') })\n"
+            "    ce.anim.to(['d', 'e'], 1, { 'duration': 100, 'from': 0, 'stagger': 50, 'repeat': 2, 'done': say('d,e') })\n"
+            "    ce.anim.to(['f', 'g'], 1, { 'duration': 100, 'from': 0, 'done': say('f,g') })\n"
+            "    ce.anim.to('h', 1, { 'duration': 100, 'from': 0, 'repeat': 3, 'done': say('h') })\n"
+            "    ce.anim.to('i', 1, { 'duration': 100, 'from': 0, 'repeat': 0, 'done': say('i') })\n"
+            "    ce.anim.to('j', 1, { 'duration': 100, 'from': 0, 'done': say('j') })\n"
+            "    ce.anim.stop('b')\n"
+            "    ce.anim.finish('c')\n"
+            "    ce.anim.stop('f')\n"
+            "    ce.anim.to('j', 5, { 'duration': 100 })\n"));
+        anim.loadScripts (juce::var (animScripts));
+        auto steps = [&animHost] { const auto line = animHost.logs.joinIntoString (" | "); animHost.logs.clear(); return line; };
+        anim.tickAnimations (0.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onDone", "panel", juce::var());
+        const auto atStart = steps();
+        check (atStart == "b 1 bool False | c 1 bool True | j 1 bool False",
+               "ce.anim: stopped is done(False), finished done(True), replaced done(False), one argument each (got " + atStart + ")");
+        anim.tickAnimations (100.0);
+        const auto at100 = steps();
+        check (at100 == "a 1 bool True | f,g 1 bool False",
+               "ce.anim: arrived is done(True); a list with one stopped is done(False) once, after the last (got " + at100 + ")");
+        anim.tickAnimations (150.0);
+        anim.tickAnimations (200.0);
+        const auto at200 = steps();
+        check (at200.isEmpty() && ! anim.animationRunning ("d") && anim.animationRunning ("e") && anim.animationRunning ("h"),
+               "ce.anim: repeat = 2 is two runs; the staggered one is still on its second, so no done yet (got " + at200 + ")");
+        anim.tickAnimations (250.0);
+        anim.tickAnimations (300.0);
+        const auto at300 = steps();
+        check (at300 == "d,e 1 bool True | h 1 bool True",
+               "ce.anim: the list's done comes once; repeat = 3 ends on the third (got " + at300 + ")");
+        anim.tickAnimations (1300.0);
+        check (anim.animationRunning ("i"), "ce.anim: repeat = 0 runs until it is stopped");
+        anim.stopAnimation();
+        const auto atStop = steps();
+        check (atStop == "i 1 bool False", "ce.anim: ...and stopping it is done(False) (got " + atStop + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised doing any of it");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------

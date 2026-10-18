@@ -639,13 +639,13 @@ private:
         std::array<double, 4> bezier {};   // a drawn curve's control points, when hasBezier
         bool hasBezier = false;
         double damping = 6.0, frequency = 12.0;
-        int repeat = 0, cycle = 0;     // repeat < 0 runs until stopped
+        int repeat = 0, cycle = 0;     // runs LEFT after this one; < 0 runs until stopped
         bool pingpong = false, paused = false;
         double heldProgress = 0.0;
         int groupId = 0;               // 0 = alone; otherwise one completion for the whole call
     };
     std::vector<Animation> animations;
-    struct AnimationGroup { int remaining = 0; bool completed = true; juce::StringArray paths; };
+    struct AnimationGroup { int remaining = 0; bool completed = true; };
     std::map<int, AnimationGroup> animationGroups;
     int animationGroupSeq = 0;
     /** Progress, value, and the completion emit — shared by the tick and by the four verbs that
