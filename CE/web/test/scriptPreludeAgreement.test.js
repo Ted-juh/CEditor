@@ -120,6 +120,9 @@ const CASES = [
   ['mixColour', ['000000', 'FFFFFF', 5]], ['mixColour', ['000000', 'zz', 0.5]],
   ['colourAlpha', ['336699', 0.4]], ['colourAlpha', ['336699', 0]], ['colourAlpha', ['336699', 1]],
   ['colourAlpha', ['336699', 2]],
+  // Eight digits are AARRGGBB, as a property reads them, and an amount may be text that is a number.
+  ['lighten', ['#5B9BD580', 0]], ['darken', ['FF336699', 0.5]], ['colourAlpha', ['80336699', '0.5']],
+  ['lighten', ['336699', '0.25']], ['lighten', ['336699', null]], ['colourAlpha', ['336699', 1.5]],
   ['rgbToHex', [51, 102, 153]], ['rgbToHex', [0, 0, 0]], ['rgbToHex', [300, -5, 127.5]],
   ['hslToHex', [210, 50, 40]], ['hslToHex', [0, 0, 100]], ['hslToHex', [359, 100, 50]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
@@ -224,6 +227,7 @@ const STRUCT_CASES = [
   ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
   ['divisionNames', []],
   ['hexToRgb', ['336699']], ['hexToRgb', ['#0A0B0C']], ['hexToRgb', ['bad']],
+  ['hexToRgb', ['#5B9BD580']], ['hexToRgb', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToRgb', [0xFF0000]],
   ['hexToHsl', ['336699']], ['hexToHsl', ['808080']], ['hexToHsl', ['FF0000']],
   ['barBeatAt', [0]], ['barBeatAt', [4.5]], ['barBeatAt', [4.5, 3]], ['barBeatAt', [-1]],
   ['barBeatAt', [0.999]], ['barBeatAt', [12.25, 7]],
@@ -625,6 +629,25 @@ const REFUSAL_CASES = [
   ['getBits', [5]], ['bytesPut', [[1], 1]],
   ['beatsPerDivision', [null]], ['stepAt', [2.5]], ['stepAt', [2.5, 8]], ['swingOffset', [1, 0.5]],
   ['checksum', [null, [1, 2]]], ['checksum', [true, [1, 2]]], ['checksum', ['constructor', [1, 2]]],
+  // Colours are read as a property reads them: 6 or 8 hex digits, one "#" at most. Anything else
+  // is refused with the forms, and with the full form for CSS shorthand or a number. Eight digits
+  // are AARRGGBB, so "#5B9BD580" is accepted (as the panel's green), and must stay silent.
+  ['lighten', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToHsl', ['#000']], ['darken', ['#0008']],
+  ['colourAlpha', [0xFF0000, 0.5]], ['lighten', [0xFF5B9BD5]], ['hexToRgb', [1.5]], ['hexToRgb', [true]],
+  ['mixColour', ['000000', 'red', 0.5]], ['mixColour', ['nope', 'zz', 0.5]], ['lighten', [null]],
+  ['hexToHsl', ['']], ['lighten', ['#5B9BD580']], ['hexToRgb', ['FF5B9BD5']],
+  // Amounts on a 0..1 scale: outside it is refused, with the number out of 100 when that lands
+  // inside, and the colour is checked first. Left out is the default, except for alpha's.
+  ['lighten', ['336699', 40]], ['darken', ['336699', 55]], ['colourAlpha', ['336699', 128]],
+  ['colourAlpha', ['336699', 1.5]], ['colourAlpha', ['336699', -0.5]], ['colourAlpha', ['336699', null]],
+  ['lighten', ['336699', 'lots']], ['lighten', ['336699', '40']], ['darken', ['336699', true]],
+  ['lighten', ['nope', 40]],
+  ['lighten', ['336699', '0.5']], ['darken', ['336699', 1]], ['colourAlpha', ['336699', 0]],
+  ['lighten', ['336699', null]],
+  // ce.anim's target is a number, or text that is one; anything else starts nothing.
+  ['animateTo', ['K.value', 'full']], ['animateSpring', ['K.value', '100px']],
+  ['animateTo', ['K.value', '#FF0000']], ['animateTo', [['K.value', 'R.value'], null]],
+  ['animateSpring', ['K.value', true]],
 ];
 
 function webRefusals(fn, args) {

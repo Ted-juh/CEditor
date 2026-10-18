@@ -698,6 +698,47 @@ int main()
                "and refuse in the WebView runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
     }
 
+    // 12c) ce.math's colours and 0..1 amounts, and ce.anim's target, through the real engines. The
+    // words are compared across engines in scriptPreludeAgreement.test.js; this proves the engines
+    // that ship refuse rather than answer. Lightening by 40 was white, an alpha of 128 was solid,
+    // "x5B9BD5" was read from its last six characters, and ce.anim.to("full") swept the value to 0.
+    {
+        juce::Array<juce::var> visualScripts;
+        visualScripts.add (makeScript ("visuallua", "lua", "panel", "onVisualLua", "*",
+            "function onVisualLua()\n"
+            "  log('lua ' .. tostring(ce.math.lighten('#5B9BD5', 40)) .. ' ' .. ce.math.alpha('80336699', 0.5)\n"
+            "      .. ' ' .. tostring(ce.math.rgb('x5B9BD5')))\n"
+            "  ce.anim.to('cutoff', 'full', { duration = 10 })\n"
+            "  log('lua running ' .. tostring(ce.anim.running('cutoff')))\n"
+            "end\n"));
+        visualScripts.add (makeScript ("visualjs", "javascript", "panel", "onVisualJs", "*",
+            "function onVisualJs() {\n"
+            "  log('js ' + ce.math.alpha('5B9BD5', 128) + ' ' + ce.math.darken('FFFFFF', '0.5'));\n"
+            "  ce.anim.spring('cutoff', '100px');\n"
+            "  log('js running ' + ce.anim.running('cutoff'));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (visualScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onVisualLua", "panel", juce::var());
+        runtime.dispatchEvent ("onVisualJs", "panel", juce::var());
+        const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
+        check (host.logs.contains ("lua nil 80336699 nil"), "ce.math refuses in the Lua engine, and reads AARRGGBB" + got);
+        check (host.logs.contains ("lua running false"), "ce.anim.to starts nothing for a target that is not a number (Lua)");
+        check (host.logs.contains ("js undefined #808080"), "ce.math refuses in the JS engine, and reads text that is a number" + got);
+        check (host.logs.contains ("js running false"), "ce.anim.spring starts nothing for a target that is not a number (JS)");
+        for (const auto* line : {
+                 "error:ce.math.lighten: the amount is a number from 0 to 1, and 40 is not, so there is no answer. "
+                 "If you meant 40 out of 100, write 0.4.",
+                 "error:ce.math.rgb: \"x5B9BD5\" is not a colour, so there is no answer. A colour is 6 hex digits "
+                 "(RRGGBB) or 8 (AARRGGBB), with or without \"#\".",
+                 "error:ce.anim.to: \"full\" is not a number, so nothing was started.",
+                 "error:ce.math.alpha: the alpha is a number from 0 to 1, and 128 is not, so there is no answer.",
+                 "error:ce.anim.spring: \"100px\" is not a number, so nothing was started." })
+            check (host.levelled.contains (line), juce::String ("refused in the WebView runtime's words: ") + line);
+        check (host.levelled.size() == 5, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
     // 13) ce.storage ------------------------------------------------------------------------------
     juce::Array<juce::var> storeScripts;
     storeScripts.add (makeScript ("store", "lua", "panel", "onStore", "*",

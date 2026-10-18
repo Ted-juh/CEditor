@@ -567,8 +567,9 @@ export function resolveColourLiteral(value, set = BASE_CONTROL_SET, fallback = '
 
 // A key names a colour when it is `colour`, ends in `Colour` (`underlineColour`, `accentColour`)
 // or is a dotted property path ending in `.colour` (the keys of a State's patch map). Nothing
-// else is looked at — see the note on text content at the top of the file.
-function isColourKey(key) {
+// else is looked at — see the note on text content at the top of the file. Exported for the script
+// runtime, which accepts a reference in a script's colour write only where this resolves one.
+export function isColourKey(key) {
   return key === 'colour' || key.endsWith('Colour') || key.endsWith('.colour') || key === 'cellBg' || key.endsWith('.cellBg');
 }
 

@@ -645,15 +645,91 @@ end
 -- reason every table here is: a script lightening a colour and the border renderer lightening the
 -- same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 --
--- In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" - the last six characters are the colour. Out is
+-- In takes "RRGGBB", "AARRGGBB" or "#RRGGBB", read the way the panel reads a colour property: 6 hex
+-- digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. Out is
 -- "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
 -- returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round, and that is
 -- a trap worth one asymmetry to avoid.
-local function __cchan(hex)
-  local h = string.gsub(tostring(hex == nil and "" or hex), "#", "")
-  h = string.sub(h, -6)
-  if #h ~= 6 or string.match(h, "^%x%x%x%x%x%x$") == nil then return nil end
-  return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
+--
+-- Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
+-- the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
+-- (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
+-- colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
+-- checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
+local __CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"'
+-- A number as JavaScript prints it, for the numbers a script writes: whole ones without ".0".
+local function __cshown(n)
+  if n == math.floor(n) and math.abs(n) < 2 ^ 53 then return string.format("%d", math.floor(n)) end
+  return tostring(n)
+end
+-- n / 100 to four places with the trailing zeros dropped, as Number(x.toFixed(4)) prints it.
+local function __cfour(x)
+  local s = string.format("%.4f", x)
+  s = string.gsub(s, "0+$", "")
+  s = string.gsub(s, "%.$", "")
+  return s
+end
+local function __chint(v)
+  if type(v) == "number" then
+    if v ~= v or v ~= math.floor(v) or v < 0 or v > 0xFFFFFFFF then return "" end
+    local text
+    if v <= 0xFFFFFF then text = string.format("#%06X", math.floor(v)) else text = string.format("%08X", math.floor(v)) end
+    return " As text, " .. __cshown(v) .. ' is "' .. text .. '".'
+  end
+  if type(v) ~= "string" then return "" end
+  local p, d = string.match(v, "^(#?)(%x+)$")
+  if d == nil or (#d ~= 3 and #d ~= 4) then return "" end
+  d = string.upper(d)
+  local function two(i) local c = string.sub(d, i, i) return c .. c end
+  if #d == 3 then return ' Write "' .. p .. two(1) .. two(2) .. two(3) .. '".' end
+  return ' Write "' .. two(4) .. two(1) .. two(2) .. two(3) .. '".'
+end
+local function __realNumber(v)
+  if type(v) == "number" then
+    if v ~= v or v == math.huge or v == -math.huge then return nil end
+    return v
+  end
+  if type(v) ~= "string" then return nil end
+  local t = string.match(v, "^%s*(.-)%s*$")
+  local mantissa = string.match(t, "^(.-)[eE][+-]?%d+$") or t
+  if string.match(mantissa, "^[+-]?%d+%.?%d*$") == nil and string.match(mantissa, "^[+-]?%.%d+$") == nil then
+    return nil
+  end
+  local n = tonumber(t)
+  if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
+  return n
+end
+local function __cunit(verb, what, v, fallback)
+  if v == nil and fallback ~= nil then return fallback end
+  local n = __realNumber(v)
+  if n ~= nil and n >= 0 and n <= 1 then return n end
+  local shown
+  if v == nil then shown = "none was given"
+  elseif type(v) == "string" then shown = '"' .. v .. '" is not'
+  elseif type(v) == "number" and __realNumber(v) ~= nil then shown = __cshown(v) .. " is not"
+  else shown = "the value given is not" end
+  local hint = ""
+  if n ~= nil and n / 100 >= 0 and n / 100 <= 1 then
+    hint = " If you meant " .. __cshown(n) .. " out of 100, write " .. __cfour(n / 100) .. "."
+  end
+  logError(verb .. ": " .. what .. " is a number from 0 to 1, and " .. shown .. ", so there is no answer." .. hint)
+  return nil
+end
+local function __cchan(verb, hex)
+  if type(hex) == "string" then
+    local h = string.match(hex, "^#?(%x+)$")
+    if h ~= nil and (#h == 6 or #h == 8) then
+      h = string.sub(h, -6)
+      return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
+    end
+  end
+  local why
+  if hex == nil then why = "no colour was given"
+  elseif type(hex) == "string" then why = '"' .. hex .. '" is not a colour'
+  elseif type(hex) == "number" and __realNumber(hex) ~= nil then why = __cshown(hex) .. " is not a colour"
+  else why = "the colour given is not text" end
+  logError(verb .. ": " .. why .. ", so there is no answer. " .. __CFORMS .. "." .. __chint(hex))
+  return nil
 end
 local function __cbyte(v)
   local n = math.floor((tonumber(v) or 0) + 0.5)
@@ -664,44 +740,44 @@ function rgbToHex(r, g, b)
   return string.upper(string.format("#%02x%02x%02x", __cbyte(r), __cbyte(g), __cbyte(b)))
 end
 function hexToRgb(hex)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.rgb", hex)
   if r == nil then return nil end
   return { r = r, g = g, b = b }
 end
 function lighten(hex, amount)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.lighten", hex)
   if r == nil then return nil end
-  local f = tonumber(amount)
-  if f == nil then f = 0.4 end
+  local f = __cunit("ce.math.lighten", "the amount", amount, 0.4)
+  if f == nil then return nil end
   return rgbToHex(r + (255 - r) * f, g + (255 - g) * f, b + (255 - b) * f)
 end
 function darken(hex, amount)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.darken", hex)
   if r == nil then return nil end
-  local f = tonumber(amount)
-  if f == nil then f = 0.55 end
+  local f = __cunit("ce.math.darken", "the amount", amount, 0.55)
+  if f == nil then return nil end
   return rgbToHex(r * f, g * f, b * f)
 end
 -- NOT an app algorithm, and said so: lerp() per channel in plain RGB.
 function mixColour(a, b, t)
-  local r1, g1, b1 = __cchan(a)
-  local r2, g2, b2 = __cchan(b)
-  if r1 == nil or r2 == nil then return nil end
+  local r1, g1, b1 = __cchan("ce.math.mix", a)
+  if r1 == nil then return nil end
+  local r2, g2, b2 = __cchan("ce.math.mix", b)
+  if r2 == nil then return nil end
   local f = tonumber(t) or 0
   if f < 0 then f = 0 elseif f > 1 then f = 1 end
   return rgbToHex(r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f)
 end
 -- The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
 function colourAlpha(hex, a)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.alpha", hex)
   if r == nil then return nil end
-  local f = tonumber(a)
-  if f == nil then f = 1 end
-  if f < 0 then f = 0 elseif f > 1 then f = 1 end
+  local f = __cunit("ce.math.alpha", "the alpha", a)
+  if f == nil then return nil end
   return string.upper(string.format("%02x", math.floor(f * 255 + 0.5)) .. string.sub(rgbToHex(r, g, b), 2))
 end
 function hexToHsl(hex)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.hsl", hex)
   if r == nil then return nil end
   r = r / 255; g = g / 255; b = b / 255
   local mx = math.max(r, g, b)
@@ -2322,8 +2398,27 @@ local function __animStart(kind, path, target, opts)
   __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o)
 end
 
-function animateTo(path, target, opts) __animStart("to", path, target, opts) end
-function animateSpring(path, target, opts) __animStart("spring", path, target, opts) end
+-- to and spring move to a number, and only a number. A target that is not one ("full", "100px",
+-- "#FF0000") used to move the value to 0; text that is a number ("100") is read as one, as it always
+-- was. In the words of the WebView runtime's animationTarget.
+local function __animTarget(verb, target)
+  local n = __realNumber(target)
+  if n ~= nil then return n end
+  local why
+  if target == nil then why = "no number to move to was given"
+  elseif type(target) == "string" then why = '"' .. target .. '" is not a number'
+  else why = "the target given is not a number" end
+  logError(verb .. ": " .. why .. ", so nothing was started.")
+  return nil
+end
+function animateTo(path, target, opts)
+  local n = __animTarget("ce.anim.to", target)
+  if n ~= nil then __animStart("to", path, n, opts) end
+end
+function animateSpring(path, target, opts)
+  local n = __animTarget("ce.anim.spring", target)
+  if n ~= nil then __animStart("spring", path, n, opts) end
+end
 -- envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 -- `to` has one destination; an envelope goes up before it comes down, which is the single most
 -- obvious thing a synth panel animates and the one thing `to` cannot express.

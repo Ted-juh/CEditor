@@ -878,7 +878,7 @@ The commands nearly every script uses: reading and changing values, deciding whe
 
 #### `set(path, value [, opts])`
 
-Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.
+Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; with the panel open, anything else is refused with a message and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.
 
 **`opts`** can contain:
 
@@ -2110,31 +2110,31 @@ Helper functions for working out values: scaling a value from one range to anoth
 
 #### `ce.math.lighten(colour [, amount]) -> string`
 
-Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4. Returns nothing if the colour cannot be read.
+Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#". One that cannot be read is refused with a message, and nothing is returned.
 
 *Short name: `lighten`.*
 
 #### `ce.math.darken(colour [, amount]) -> string`
 
-Make a colour darker. `amount` is how much of the colour's brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. Returns nothing if the colour cannot be read.
+Make a colour darker. `amount` is how much of the colour's brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55; a number outside 0 to 1 is refused with a message. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. The colour is read as `ce.math.lighten()` reads it, and one that cannot be read is refused with a message, so nothing is returned.
 
 *Short name: `darken`.*
 
 #### `ce.math.mix(a, b, t) -> string`
 
-Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Returns nothing if either colour cannot be read.
+Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. If either colour cannot be read, it is refused with a message and nothing is returned.
 
 *Short name: `mixColour`.*
 
 #### `ce.math.alpha(colour, a) -> string`
 
-Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid). The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. Returns nothing if the colour cannot be read.
+Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. A colour that cannot be read is refused with a message, and nothing is returned.
 
 *Short name: `colourAlpha`.*
 
 #### `ce.math.rgb(colour) -> table`
 
-Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Returns nothing if the colour cannot be read.
+Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Eight hex digits are read as AARRGGBB, and the alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.
 
 *Short name: `hexToRgb`.*
 
@@ -2146,7 +2146,7 @@ Build a colour from red, green and blue parts, each from 0 to 255, and return it
 
 #### `ce.math.hsl(colour) -> table`
 
-Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. Returns nothing if the colour cannot be read.
+Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. A colour that cannot be read is refused with a message, and nothing is returned.
 
 *Short name: `hexToHsl`.*
 
@@ -2218,7 +2218,7 @@ Moving a value smoothly over time instead of jumping: to a target, with a spring
 
 #### `ce.anim.to(path, target [, opts])`
 
-Move a value smoothly to `target` over time instead of jumping straight there. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` callback runs with `completed` set to false, because it was cancelled rather than finished.
+Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` callback runs with `completed` set to false, because it was cancelled rather than finished.
 
 *Short name: `animateTo`.*
 
@@ -2250,7 +2250,7 @@ ce.anim.to("cutoff", 127, { duration: 500, curve: "s" });
 
 #### `ce.anim.spring(path, target [, opts])`
 
-Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way.
+Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number is refused with a message, as it is there.
 
 *Short name: `animateSpring`.*
 
@@ -2709,7 +2709,7 @@ ce.panel.undefine("knob", "States", "Disabled");
 
 #### `ce.panel.patch(control, state, patch [, part])`
 
-Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. This is the way to reach the settings inside a state, which `set()` cannot.
+Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. A colour the panel cannot read is refused as `set()` refuses it, and then nothing in the patch is applied. This is the way to reach the settings inside a state, which `set()` cannot.
 
 *Short name: `panelPatch` · Panel window only.*
 
@@ -2968,7 +2968,7 @@ ce.draw.clear();
 
 #### `ce.draw.fill(colour)`
 
-Set the fill colour for the shapes drawn after this: a hex string such as "#5B9BD5", or a gradient from `ce.draw.gradient()`. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.
+Set the fill colour for the shapes drawn after this: the panel's own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web's way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.
 
 *Short name: `drawFill`.*
 
@@ -2983,7 +2983,7 @@ ce.draw.fill("#5B9BD5");
 
 #### `ce.draw.stroke([colour] [, width] [, opts])`
 
-Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` can be a hex string or a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. `opts` adds dashes and sets the style of line ends and corners.
+Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.
 
 *Short name: `drawStroke`.*
 
@@ -3089,7 +3089,7 @@ ce.draw.arc(30, 30, 24, 135, 135 + 270 * value);
 
 #### `ce.draw.gradient(stops [, angle]) -> value`
 
-Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` runs from 0 to 1); you can mix the two. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section's gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two usable colours.
+Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` and `opacity` run from 0 to 1); you can mix the two. Colours are read as `ce.draw.fill()` reads them. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section's gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two colours, and refuses a stop it cannot read with a message, returning nothing.
 
 *Short name: `drawGradient`.*
 
@@ -3104,7 +3104,7 @@ ce.draw.fill(ce.draw.gradient(["#2A6BD4", "#0A1830"], 180));
 
 #### `ce.draw.opacity(a)`
 
-Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. To make a single colour see-through instead, use `ce.math.alpha()`.
+Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. A number outside 0 to 1, such as 50 written for 0.5, or anything that is not a number, is refused with a message, and the opacity stays as it was. To make a single colour see-through instead, use `ce.math.alpha()`.
 
 *Short name: `drawOpacity`.*
 
@@ -3262,7 +3262,7 @@ Bring back the style saved by the most recent `ce.draw.save()`. If nothing was s
 
 #### `ce.draw.text(x, y, text [, opts])`
 
-Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.
+Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.
 
 *Short name: `drawText`.*
 
@@ -3271,7 +3271,7 @@ Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `size` | number (pixels) | — | How big the text is. |
-| `align` | text | "left" | Which part of the text sits at the x you gave. One of "left", "middle" or "right". |
+| `align` | text | "left" | Which part of the text sits at the x you gave. "center", "centre" and "centred" are read as "middle". One of "left", "middle" or "right". |
 | `family` | text | — | The font family to draw in. |
 
 ```lua
@@ -3337,7 +3337,7 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit. One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
 | `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens. One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
 | `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
-| `tint` | colour | — | Tint colour, as "#RRGGBB". Omit to leave the image untinted. |
+| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. Any other form is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
 | `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only. One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
 | `offsetX` | number (pixels) | 0 | Nudge the image sideways. |
@@ -3377,7 +3377,7 @@ Show an image from the icon library (or one the panel carries) in a control's Ic
 |---|---|---|---|
 | `size` | number (pixels) | 16 | How big the icon is drawn. |
 | `fit` | text | "contain" | How the icon fills its box, using the Icon section's own values. |
-| `tint` | colour | — | Tint colour, as "#RRGGBB". Omit to leave the image untinted. |
+| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. Any other form is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
 | `opacity` | number (0 to 1) | 1 | Image opacity. 0 is invisible, 1 is fully opaque. A value above 1, such as 50 written for ce.image.set's scale, draws fully opaque and writes a warning. |
 | `rotation` | number (degrees) | 0 | Turn the image clockwise, with 0 upright. |
 

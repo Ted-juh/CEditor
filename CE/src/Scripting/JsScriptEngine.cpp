@@ -806,14 +806,59 @@ function randomChoice(values, weights) {
 // reason every table here is: a script lightening a colour and the border renderer lightening the
 // same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 //
-// In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" — the last six characters are the colour. Out is
+// In takes "RRGGBB", "AARRGGBB" or "#RRGGBB", read the way the panel reads a colour property: 6 hex
+// digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. Out is
 // "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
 // returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round.
-function __cchan(hex) {
-  var h = String(hex === undefined || hex === null ? "" : hex).split("#").join("");
-  h = h.slice(-6);
-  if (h.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(h)) return null;
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+//
+// Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
+// the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
+// (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
+// colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
+// checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
+var __CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"';
+function __chex(n, width) { var s = n.toString(16).toUpperCase(); while (s.length < width) s = "0" + s; return s; }
+function __chint(v) {
+  if (typeof v === "number") {
+    if (!isFinite(v) || Math.floor(v) !== v || v < 0 || v > 0xFFFFFFFF) return "";
+    return " As text, " + String(v) + ' is "' + (v <= 0xFFFFFF ? "#" + __chex(v, 6) : __chex(v, 8)) + '".';
+  }
+  if (typeof v !== "string") return "";
+  var m = /^(#?)([0-9a-fA-F]{3,4})$/.exec(v);
+  if (!m) return "";
+  var d = m[2].toUpperCase();
+  var two = function (i) { return d.charAt(i) + d.charAt(i); };
+  return d.length === 3 ? ' Write "' + m[1] + two(0) + two(1) + two(2) + '".'
+                        : ' Write "' + two(3) + two(0) + two(1) + two(2) + '".';
+}
+function __realNumber(v) {
+  if (typeof v === "number") return isFinite(v) ? v : undefined;
+  if (typeof v !== "string" || !/^\s*[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\s*$/.test(v)) return undefined;
+  var n = Number(v);
+  return isFinite(n) ? n : undefined;
+}
+function __cunit(verb, what, v, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  var n = __realNumber(v);
+  if (n !== undefined && n >= 0 && n <= 1) return n;
+  var shown = v === undefined || v === null ? "none was given"
+    : (typeof v === "string" ? '"' + v + '" is not'
+      : (typeof v === "number" && isFinite(v) ? String(v) + " is not" : "the value given is not"));
+  var hint = n !== undefined && n / 100 >= 0 && n / 100 <= 1
+    ? " If you meant " + String(n) + " out of 100, write " + String(Number((n / 100).toFixed(4))) + "." : "";
+  logError(verb + ": " + what + " is a number from 0 to 1, and " + shown + ", so there is no answer." + hint);
+  return undefined;
+}
+function __cchan(verb, hex) {
+  if (typeof hex === "string" && /^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(hex)) {
+    var h = hex.slice(-6);
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  var why = hex === undefined || hex === null ? "no colour was given"
+    : (typeof hex === "string" ? '"' + hex + '" is not a colour'
+      : (typeof hex === "number" && isFinite(hex) ? String(hex) + " is not a colour" : "the colour given is not text"));
+  logError(verb + ": " + why + ", so there is no answer. " + __CFORMS + "." + __chint(hex));
+  return null;
 }
 function __cbyte(v) {
   var n = Math.round(Number(v) || 0);
@@ -824,39 +869,44 @@ function rgbToHex(r, g, b) {
   return ("#" + c(r) + c(g) + c(b)).toUpperCase();
 }
 function hexToRgb(hex) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.rgb", hex);
   return c === null ? undefined : { r: c[0], g: c[1], b: c[2] };
 }
 function lighten(hex, amount) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.lighten", hex);
   if (c === null) return undefined;
-  var f = isFinite(Number(amount)) ? Number(amount) : 0.4;
+  var f = __cunit("ce.math.lighten", "the amount", amount, 0.4);
+  if (f === undefined) return undefined;
   return rgbToHex(c[0] + (255 - c[0]) * f, c[1] + (255 - c[1]) * f, c[2] + (255 - c[2]) * f);
 }
 function darken(hex, amount) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.darken", hex);
   if (c === null) return undefined;
-  var f = isFinite(Number(amount)) ? Number(amount) : 0.55;
+  var f = __cunit("ce.math.darken", "the amount", amount, 0.55);
+  if (f === undefined) return undefined;
   return rgbToHex(c[0] * f, c[1] * f, c[2] * f);
 }
 // NOT an app algorithm, and said so: lerp() per channel in plain RGB.
 function mixColour(a, b, t) {
-  var x = __cchan(a), y = __cchan(b);
-  if (x === null || y === null) return undefined;
+  var x = __cchan("ce.math.mix", a);
+  if (x === null) return undefined;
+  var y = __cchan("ce.math.mix", b);
+  if (y === null) return undefined;
   var f = Math.min(1, Math.max(0, Number(t) || 0));
   return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
 // The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
 function colourAlpha(hex, a) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.alpha", hex);
   if (c === null) return undefined;
-  var f = Math.min(1, Math.max(0, isFinite(Number(a)) ? Number(a) : 1));
+  var f = __cunit("ce.math.alpha", "the alpha", a);
+  if (f === undefined) return undefined;
   var aa = Math.round(f * 255).toString(16);
   if (aa.length < 2) aa = "0" + aa;
   return (aa + rgbToHex(c[0], c[1], c[2]).slice(1)).toUpperCase();
 }
 function hexToHsl(hex) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.hsl", hex);
   if (c === null) return undefined;
   var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
   var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -2338,8 +2388,25 @@ function __animStart(kind, path, target, opts) {
   __api.animate(kind, list ? list : String(path), Number(target) || 0, o);
 }
 
-function animateTo(path, target, opts) { __animStart("to", path, target, opts); }
-function animateSpring(path, target, opts) { __animStart("spring", path, target, opts); }
+// to and spring move to a number, and only a number. A target that is not one ("full", "100px",
+// "#FF0000") used to move the value to 0; text that is a number ("100") is read as one, as it always
+// was. In the words of the WebView runtime's animationTarget.
+function __animTarget(verb, target) {
+  var n = __realNumber(target);
+  if (n !== undefined) return n;
+  var why = target === undefined || target === null ? "no number to move to was given"
+    : (typeof target === "string" ? '"' + target + '" is not a number' : "the target given is not a number");
+  logError(verb + ": " + why + ", so nothing was started.");
+  return undefined;
+}
+function animateTo(path, target, opts) {
+  var n = __animTarget("ce.anim.to", target);
+  if (n !== undefined) __animStart("to", path, n, opts);
+}
+function animateSpring(path, target, opts) {
+  var n = __animTarget("ce.anim.spring", target);
+  if (n !== undefined) __animStart("spring", path, n, opts);
+}
 // envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 // `to` has one destination; an envelope goes up before it comes down, which is the single most
 // obvious thing a synth panel animates and the one thing `to` cannot express.

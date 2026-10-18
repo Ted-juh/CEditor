@@ -216,6 +216,30 @@ int main()
                    + host.logs.joinIntoString (" | ") + ")");
     }
 
+    // ce.math's colours and amounts, and ce.anim's target, in the embedded interpreter. An alpha left
+    // out raised TypeError here, a target of "100px" raised ValueError, and "#000" was refused with
+    // no word; scriptPreludeAgreement.test.js compares the words across engines.
+    {
+        juce::Array<juce::var> visualScripts;
+        visualScripts.add (makeScript ("pyVisual", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    log('py ' + str(ce.math.hsl('#000')) + ' ' + ce.math.lighten('336699', '0.5') + ' ' + str(ce.math.alpha('336699')))\n"
+            "    ce.anim.to('cutoff', '100px')\n"
+            "    log('py done')\n"));
+        runtime.loadScripts (juce::var (visualScripts));
+        host.logs.clear();
+        runtime.onPanelReady (true);
+        const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
+        check (host.logs.contains ("py None #99B3CC None"), "Colours: ce.math refuses in Python, and reads text that is a number" + got);
+        check (host.logs.contains ("py done"), "Colours: a refusal is a message, not an exception" + got);
+        for (const auto* line : {
+                 "ce.math.hsl: \"#000\" is not a colour, so there is no answer. A colour is 6 hex digits (RRGGBB) "
+                 "or 8 (AARRGGBB), with or without \"#\". Write \"#000000\".",
+                 "ce.math.alpha: the alpha is a number from 0 to 1, and none was given, so there is no answer.",
+                 "ce.anim.to: \"100px\" is not a number, so nothing was started." })
+            check (host.logs.contains (line), juce::String ("Colours: refused in the WebView runtime's words: ") + line);
+    }
+
     // ---- Two instances in one process ------------------------------------------------------------
     // What the user asked for: every instance of a panel is on its own, even two copies of the same
     // panel. Each runtime is one instance (one plug-in, one standalone window).

@@ -1030,11 +1030,26 @@ def __animStart(kind, path, target, opts):
             __animDone[str(path)] = fn
     __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o)
 
+# to and spring move to a number, and only a number. A target that is not one ("full", "100px",
+# "#FF0000") used to raise ValueError here, and moved the value to 0 everywhere else; text that is
+# a number ("100") is read as one, as it always was. In the words of the WebView runtime's
+# animationTarget.
+def __animTarget(verb, target):
+    n = __realNumber(target)
+    if n is not None: return n
+    if target is None: why = "no number to move to was given"
+    elif isinstance(target, str): why = '"' + target + '" is not a number'
+    else: why = "the target given is not a number"
+    logError(verb + ": " + why + ", so nothing was started.")
+    return None
+
 def animateTo(path, target, opts=None):
-    __animStart("to", path, target, opts)
+    n = __animTarget("ce.anim.to", target)
+    if n is not None: __animStart("to", path, n, opts)
 
 def animateSpring(path, target, opts=None):
-    __animStart("spring", path, target, opts)
+    n = __animTarget("ce.anim.spring", target)
+    if n is not None: __animStart("spring", path, n, opts)
 
 # envelope(path, points, opts) - drive a value THROUGH a shape rather than between two numbers.
 # `to` has one destination; an envelope goes up before it comes down, which is the single most
@@ -1656,14 +1671,73 @@ def randomChoice(values, weights=None):
 # reason every table here is: a script lightening a colour and the border renderer lightening the
 # same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 #
-# In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" - the last six characters are the colour. Out is
+# In takes "RRGGBB", "AARRGGBB" or "#RRGGBB", read the way the panel reads a colour property: 6 hex
+# digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. Out is
 # "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
 # returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round.
-def __cchan(hex_):
+#
+# Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
+# the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
+# (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
+# colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
+# checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
+__CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"'
+def __cshown(n):
+    # A number as JavaScript prints it, for the numbers a script writes: whole ones without ".0".
+    if isinstance(n, float) and n.is_integer() and abs(n) < 2 ** 53: return str(int(n))
+    return str(n)
+def __cfour(x):
+    # x to four places with the trailing zeros dropped, as Number(x.toFixed(4)) prints it.
+    return ("%.4f" % x).rstrip("0").rstrip(".")
+def __chint(v):
+    import math, re as __re
+    if isinstance(v, bool): return ""
+    if isinstance(v, (int, float)):
+        if isinstance(v, float) and (not math.isfinite(v) or not v.is_integer()): return ""
+        n = int(v)
+        if n < 0 or n > 0xFFFFFFFF: return ""
+        text = ("#%06X" % n) if n <= 0xFFFFFF else ("%08X" % n)
+        return " As text, " + __cshown(v) + ' is "' + text + '".'
+    if not isinstance(v, str): return ""
+    m = __re.fullmatch(r"(#?)([0-9a-fA-F]{3,4})", v)
+    if not m: return ""
+    d = m.group(2).upper()
+    if len(d) == 3: return ' Write "' + m.group(1) + d[0] * 2 + d[1] * 2 + d[2] * 2 + '".'
+    return ' Write "' + d[3] * 2 + d[0] * 2 + d[1] * 2 + d[2] * 2 + '".'
+def __realNumber(v):
+    import math, re as __re
+    if isinstance(v, bool): return None
+    if isinstance(v, (int, float)):
+        try: return v if math.isfinite(v) else None
+        except OverflowError: return None
+    if not isinstance(v, str): return None
+    if not __re.fullmatch(r"\s*[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\s*", v): return None
+    n = float(v)
+    return n if math.isfinite(n) else None
+def __cunit(verb, what, v, fallback=None):
+    if v is None and fallback is not None: return fallback
+    n = __realNumber(v)
+    if n is not None and 0 <= n <= 1: return n
+    if v is None: shown = "none was given"
+    elif isinstance(v, str): shown = '"' + v + '" is not'
+    elif isinstance(v, (int, float)) and __realNumber(v) is not None: shown = __cshown(v) + " is not"
+    else: shown = "the value given is not"
+    hint = ""
+    if n is not None and 0 <= n / 100 <= 1:
+        hint = " If you meant " + __cshown(n) + " out of 100, write " + __cfour(n / 100) + "."
+    logError(verb + ": " + what + " is a number from 0 to 1, and " + shown + ", so there is no answer." + hint)
+    return None
+def __cchan(verb, hex_):
     import re as __re
-    h = str("" if hex_ is None else hex_).replace("#", "")[-6:]
-    if len(h) != 6 or not __re.match(r"^[0-9a-fA-F]{6}$", h): return None
-    return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+    if isinstance(hex_, str) and __re.fullmatch(r"#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", hex_):
+        h = hex_[-6:]
+        return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+    if hex_ is None: why = "no colour was given"
+    elif isinstance(hex_, str): why = '"' + hex_ + '" is not a colour'
+    elif isinstance(hex_, (int, float)) and __realNumber(hex_) is not None: why = __cshown(hex_) + " is not a colour"
+    else: why = "the colour given is not text"
+    logError(verb + ": " + why + ", so there is no answer. " + __CFORMS + "." + __chint(hex_))
+    return None
 def __cbyte(v):
     import math
     n = math.floor((float(v) if isinstance(v, (int, float)) else 0) + 0.5)
@@ -1671,35 +1745,39 @@ def __cbyte(v):
 def rgbToHex(r, g, b):
     return ("#%02x%02x%02x" % (__cbyte(r), __cbyte(g), __cbyte(b))).upper()
 def hexToRgb(hex_):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.rgb", hex_)
     return None if c is None else { "r": c[0], "g": c[1], "b": c[2] }
 def lighten(hex_, amount=None):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.lighten", hex_)
     if c is None: return None
-    f = 0.4 if not isinstance(amount, (int, float)) else float(amount)
+    f = __cunit("ce.math.lighten", "the amount", amount, 0.4)
+    if f is None: return None
     return rgbToHex(c[0] + (255 - c[0]) * f, c[1] + (255 - c[1]) * f, c[2] + (255 - c[2]) * f)
 def darken(hex_, amount=None):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.darken", hex_)
     if c is None: return None
-    f = 0.55 if not isinstance(amount, (int, float)) else float(amount)
+    f = __cunit("ce.math.darken", "the amount", amount, 0.55)
+    if f is None: return None
     return rgbToHex(c[0] * f, c[1] * f, c[2] * f)
 # NOT an app algorithm, and said so: lerp() per channel in plain RGB.
 def mixColour(a, b, t):
-    x = __cchan(a); y = __cchan(b)
-    if x is None or y is None: return None
+    x = __cchan("ce.math.mix", a)
+    if x is None: return None
+    y = __cchan("ce.math.mix", b)
+    if y is None: return None
     f = float(t) if isinstance(t, (int, float)) else 0.0
     f = 0.0 if f < 0 else (1.0 if f > 1 else f)
     return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f)
 # The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
-def colourAlpha(hex_, a):
+def colourAlpha(hex_, a=None):
     import math
-    c = __cchan(hex_)
+    c = __cchan("ce.math.alpha", hex_)
     if c is None: return None
-    f = float(a) if isinstance(a, (int, float)) else 1.0
-    f = 0.0 if f < 0 else (1.0 if f > 1 else f)
+    f = __cunit("ce.math.alpha", "the alpha", a)
+    if f is None: return None
     return ("%02x" % math.floor(f * 255 + 0.5) + rgbToHex(c[0], c[1], c[2])[1:]).upper()
 def hexToHsl(hex_):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.hsl", hex_)
     if c is None: return None
     r = c[0] / 255.0; g = c[1] / 255.0; b = c[2] / 255.0
     mx = max(r, g, b); mn = min(r, g, b)

@@ -200,8 +200,10 @@ const BOOLEANS = {
  *
  * `Src` and `Enabled` are always written together: they are two fields that must agree, and a layer
  * left enabled with a blank source is the commonest way to get a bug you cannot see.
+ *
+ * `tintProblem(tint)` returns why a tint cannot be read, as a refusal's reason, or null.
  */
-export function planImage(layer, src, opts) {
+export function planImage(layer, src, opts, { tintProblem = null } = {}) {
   const writes = [];
   const refused = [];
   const warnings = [];
@@ -261,7 +263,14 @@ export function planImage(layer, src, opts) {
     } else put('ClipMode', String(source.clipMode));
   }
 
-  if (source.tint !== undefined) put('Tint', String(source.tint).replace(/^#/, ''));
+  // A tint the panel cannot read ("#000", "red") used to be stored and painted white. The runtime
+  // hands in its colour check (scriptColours.panelColourProblem, in the words set() uses), which
+  // keeps this module free of the panel model it would otherwise have to import.
+  if (source.tint !== undefined) {
+    const problem = tintProblem?.(source.tint);
+    if (problem) refused.push({ option: 'tint', reason: problem });
+    else put('Tint', String(source.tint).replace(/^#/, ''));
+  }
 
   for (const [key, value] of Object.entries(source)) {
     const lower = key.toLowerCase();

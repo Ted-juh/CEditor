@@ -347,7 +347,9 @@ const SHARED_OPTION_FIELDS = {
   /* --- image layers (ce.image) -------------------------------------------- */
   tint: {
     name: 'tint', type: 'colour',
-    summary: 'Tint colour, as "#RRGGBB". Omit to leave the image untinted.',
+    summary: 'Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. '
+      + 'Any other form is refused with a message, and the other options still apply. Omit it to '
+      + 'leave the image untinted.',
   },
   opacity: {
     name: 'opacity', type: 'number', default: '1', unit: '0 to 1',
@@ -611,7 +613,7 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
+    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; with the panel open, anything else is refused with a message and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
@@ -864,7 +866,8 @@ export const COMMANDS = [
      own search pattern, which is worth writing down because it is the failure mode of any sweep.
 
      ONE input form, and a trap worth naming. Every verb here accepts "RRGGBB", "AARRGGBB" or
-     "#RRGGBB" — the app's own parser reads the last six characters — and returns "#RRGGBB", which
+     "#RRGGBB", read as a colour property is read (6 or 8 hex digits, one "#" at most; anything else
+     is refused with a message), and returns "#RRGGBB", which
      CSS, SVG and a panel property all accept. The app STORES colours as AARRGGBB (JUCE's order:
      "66FFFFFF" is a 40%-opaque white in every panel document) while CSS wants #RRGGBBAA — the same
      four bytes the other way round. So exactly one verb, `alpha`, returns the panel's form, and
@@ -872,7 +875,7 @@ export const COMMANDS = [
      answer. Case is normalised to upper; hex is case-insensitive everywhere it is read. */
   {
     id: 'lighten', category: 'Value / range', signature: 'lighten(colour [, amount]) -> string',
-    summary: 'Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4. Returns nothing if the colour cannot be read.',
+    summary: 'Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#". One that cannot be read is refused with a message, and nothing is returned.',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'amount', type: 'number', required: false },
@@ -881,7 +884,7 @@ export const COMMANDS = [
   },
   {
     id: 'darken', category: 'Value / range', signature: 'darken(colour [, amount]) -> string',
-    summary: 'Make a colour darker. `amount` is how much of the colour\'s brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. Returns nothing if the colour cannot be read.',
+    summary: 'Make a colour darker. `amount` is how much of the colour\'s brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55; a number outside 0 to 1 is refused with a message. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. The colour is read as `ce.math.lighten()` reads it, and one that cannot be read is refused with a message, so nothing is returned.',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'amount', type: 'number', required: false },
@@ -890,7 +893,7 @@ export const COMMANDS = [
   },
   {
     id: 'mixColour', category: 'Value / range', signature: 'mixColour(a, b, t) -> string',
-    summary: 'Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Returns nothing if either colour cannot be read.',
+    summary: 'Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. If either colour cannot be read, it is refused with a message and nothing is returned.',
     params: [
       { name: 'a', type: 'string', required: true },
       { name: 'b', type: 'string', required: true },
@@ -900,7 +903,7 @@ export const COMMANDS = [
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'Give a colour a transparency, ready to store in a control\'s colour property. `a` runs from 0 (fully transparent) to 1 (fully solid). The result is in the panel\'s own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web\'s `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. Returns nothing if the colour cannot be read.',
+    summary: 'Give a colour a transparency, ready to store in a control\'s colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel\'s own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web\'s `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. A colour that cannot be read is refused with a message, and nothing is returned.',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'a', type: 'number', required: true },
@@ -909,7 +912,7 @@ export const COMMANDS = [
   },
   {
     id: 'hexToRgb', category: 'Value / range', signature: 'hexToRgb(colour) -> table',
-    summary: 'Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Returns nothing if the colour cannot be read.',
+    summary: 'Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Eight hex digits are read as AARRGGBB, and the alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.',
     params: [{ name: 'colour', type: 'string', required: true }],
     scopes: 'any',
   },
@@ -925,7 +928,7 @@ export const COMMANDS = [
   },
   {
     id: 'hexToHsl', category: 'Value / range', signature: 'hexToHsl(colour) -> table',
-    summary: 'Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. Returns nothing if the colour cannot be read.',
+    summary: 'Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. A colour that cannot be read is refused with a message, and nothing is returned.',
     params: [{ name: 'colour', type: 'string', required: true }],
     scopes: 'any',
   },
@@ -951,7 +954,7 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
-    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` callback runs with `completed` set to false, because it was cancelled rather than finished.',
+    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` callback runs with `completed` set to false, because it was cancelled rather than finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -982,7 +985,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
-    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way.',
+    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number is refused with a message, as it is there.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -1271,7 +1274,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawFill', category: 'Drawing', signature: 'drawFill(colour)',
-    summary: 'Set the fill colour for the shapes drawn after this: a hex string such as "#5B9BD5", or a gradient from `ce.draw.gradient()`. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.',
+    summary: 'Set the fill colour for the shapes drawn after this: the panel\'s own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web\'s way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'colour', type: 'string', required: false }],
     scopes: 'any',
@@ -1279,7 +1282,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` can be a hex string or a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. `opts` adds dashes and sets the style of line ends and corners.',
+    summary: 'Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'colour', type: 'value', required: false },
@@ -1372,7 +1375,7 @@ export const COMMANDS = [
      script could do none of it. */
   {
     id: 'drawGradient', category: 'Drawing', signature: 'drawGradient(stops [, angle]) -> value',
-    summary: 'Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` runs from 0 to 1); you can mix the two. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section\'s gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two usable colours.',
+    summary: 'Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` and `opacity` run from 0 to 1); you can mix the two. Colours are read as `ce.draw.fill()` reads them. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section\'s gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two colours, and refuses a stop it cannot read with a message, returning nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'stops', type: 'list', required: true },
@@ -1386,7 +1389,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawOpacity', category: 'Drawing', signature: 'drawOpacity(a)',
-    summary: 'Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. To make a single colour see-through instead, use `ce.math.alpha()`.',
+    summary: 'Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. A number outside 0 to 1, such as 50 written for 0.5, or anything that is not a number, is refused with a message, and the opacity stays as it was. To make a single colour see-through instead, use `ce.math.alpha()`.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'a', type: 'number', required: true }],
     scopes: 'any',
@@ -1862,7 +1865,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
-    summary: 'Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.',
+    summary: 'Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
@@ -1870,7 +1873,8 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'size', type: 'number', unit: 'pixels', sample: '12', summary: 'How big the text is.' },
         { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
-          summary: 'Which part of the text sits at the x you gave.' },
+          summary: 'Which part of the text sits at the x you gave. "center", "centre" and "centred" '
+            + 'are read as "middle".' },
         { name: 'family', type: 'text', sample: '"Inter Tight"', summary: 'The font family to draw in.' },
       ]) },
     ],
@@ -2219,7 +2223,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. This is the way to reach the settings inside a state, which `set()` cannot.',
+    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. A colour the panel cannot read is refused as `set()` refuses it, and then nothing in the patch is applied. This is the way to reach the settings inside a state, which `set()` cannot.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },

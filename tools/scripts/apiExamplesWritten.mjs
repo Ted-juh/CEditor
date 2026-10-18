@@ -382,8 +382,8 @@ export const WRITTEN = {
     js: `const m = ce.draw.measure("CUTOFF", { size: 9 });\nif (!m.exact) log("estimated, not measured");\nce.draw.rect(2, 2, m.width + 4, m.height + 2);`,
   },
   drawGradient: {
-    lua: `local g = ce.draw.gradient({ { 0, "#101116" }, { 1, "#3A6EA5" } }, 90)\nce.draw.fill(g)`,
-    js: `const g = ce.draw.gradient([[0, "#101116"], [1, "#3A6EA5"]], 90);\nce.draw.fill(g);`,
+    lua: `local g = ce.draw.gradient({ { at = 0, colour = "#101116" }, { at = 1, colour = "#3A6EA5" } }, 90)\nce.draw.fill(g)`,
+    js: `const g = ce.draw.gradient([{ at: 0, colour: "#101116" }, { at: 1, colour: "#3A6EA5" }], 90);\nce.draw.fill(g);`,
   },
   drawOpacity: { code: 'ce.draw.opacity(0.4)' },
   drawTransform: {

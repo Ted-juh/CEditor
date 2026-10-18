@@ -31,7 +31,11 @@ import { recallPreset as recallPresetAction } from '../stores/presetLibrarian.js
 import { noteScriptTouchedControl, noteScriptTouchedControls } from '../stores/scriptTouchedControls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { deepClone } from '../utils/deepClone.js';
-import { controlSetForPanel, isTokenReference, resolveColourValue } from '../models/controlSets.js';
+import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
+import {
+  COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, drawColour, eachColourWrite, hexHint, isPanelColour,
+  panelColourProblem, percentHint, percentTextHint, realNumber, shownNumber, unitProblem,
+} from './scriptColours.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
 import { documentIcons } from '../utils/documentIcons.js';
@@ -600,6 +604,32 @@ function valueBindingFor(control) {
     && String(b.port ?? 'value') === 'value') ?? null;
 }
 
+/**
+ * Refuse a write that would put something the panel cannot read into a colour property, and say
+ * so, once for each such property. True when anything was refused, and then nothing is written.
+ *
+ * Which properties hold colours comes from the section templates (scriptColours.colourFieldAt), so
+ * Icon.tint is one and Pixel.imageColour, a switch, is not. `root` is the control, or for a state's
+ * part patch the part, and `path` is relative to it: set()'s model path, or a patch map's key. A
+ * whole section or list written at once is looked into, field by field. `named` puts the path in
+ * the message, for a call whose own arguments do not already say which property it was.
+ */
+function refuseColourWrites(call, outcome, root, path, value, named = false) {
+  // Asked only of a control-set reference, so an ordinary write does not look the set up.
+  const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
+  let refused = false;
+  eachColourWrite(root, path, value, (at, written, field) => {
+    const problem = panelColourProblem(written, field, resolves);
+    if (!problem) return;
+    refused = true;
+    let where = '';
+    if (named) where = `at "${at}", `;
+    else if (at !== path) where = `at ${at.slice(path.length + 1)}, `;
+    addScriptTrace('error', '', `${call}: ${where}${problem.why}, so ${outcome}. ${problem.advice}`);
+  });
+  return refused;
+}
+
 // The third argument carries two different things, as the contract's own signature does:
 // set(path, value, opts) with { transmit }, and the second-argument spelling of the value form.
 // A string is a form, an object is opts.
@@ -642,6 +672,11 @@ function setValue(path, value, formOrOpts = '') {
     if (decided === REJECTED) return;
     value = decided;
   }
+
+  // A colour the panel cannot read used to be stored as written and painted white ("#000", "red",
+  // a number). Refused here, after the filters have had their say and before anything is written,
+  // with the form to write instead. ce.panel.patch asks the same question of its entries.
+  if (refuseColourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value)) return;
 
   // A write that goes nowhere used to VANISH. The contract's own headline (Q1) is that coverage is
   // total and you can never pick wrong, so a path that resolves to nothing has to say so — without
@@ -809,20 +844,46 @@ export function readWatch(path) {
 // One accepted input, three forms out, and the difference matters. The app STORES colours as
 // AARRGGBB (JUCE's order — '66FFFFFF' is a 40%-opaque white in every panel document). CSS and SVG
 // want #RRGGBB or #RRGGBBAA — the SAME four bytes in a DIFFERENT order, which is the trap this
-// pair of formats sets. So: everything takes "RRGGBB", "AARRGGBB" or "#RRGGBB" (the app's own
-// parser, which reads the last six characters), everything returns "#RRGGBB" which both CSS and a
-// panel property accept, and ONE verb — alpha() — returns the panel's AARRGGBB, because that is
-// the only form a stored colour can carry an alpha in. Making a DRAWING translucent is
-// ce.draw.opacity(), which is a different question with a different answer.
+// pair of formats sets. So: everything takes "RRGGBB", "AARRGGBB" or "#RRGGBB", everything returns
+// "#RRGGBB" which both CSS and a panel property accept, and ONE verb — alpha() — returns the
+// panel's AARRGGBB, because that is the only form a stored colour can carry an alpha in. Making a
+// DRAWING translucent is ce.draw.opacity(), which is a different question with a different answer.
+//
+// READING. A colour is read the way the panel reads a property (scriptColours.isPanelColour): 6 hex
+// digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. This used
+// to take the last six characters of whatever it was given, so text that is no colour at all
+// ("x5B9BD5", "#12#34#56", the number 0xFF0000) read as one and nothing said so. Anything else is
+// now refused, in the words of each prelude's __cchan. Eight digits are still AARRGGBB, so CSS's
+// "#5B9BD580" reads as 9BD580, which is the colour a property would paint for it.
+//
+// AMOUNTS. lighten, darken and alpha take a number from 0 to 1. One outside it used to be used as
+// it was (lightening by 40 gave white) or clamped (an alpha of 128 gave solid). It is refused, with
+// the number out of 100 when that is what it looks like, in the words of each prelude's __cunit.
 
 const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
 
-/** "RRGGBB" | "AARRGGBB" | "#RRGGBB" -> [r, g, b]. The app's parseHexRGB: the last six characters
- *  are the colour, whatever came before them. Nothing readable gives black rather than NaN. */
-function colourChannels(hex) {
-  const h = String(hex ?? '').replace(/#/g, '').slice(-6);
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+/** A colour the panel can read -> [r, g, b], or null after saying why it cannot be read. */
+function colourChannels(verb, hex) {
+  if (isPanelColour(hex)) {
+    const h = hex.slice(-6);
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  let why;
+  if (hex === undefined || hex === null) why = 'no colour was given';
+  else if (typeof hex === 'string') why = `"${hex}" is not a colour`;
+  else if (typeof hex === 'number' && Number.isFinite(hex)) why = `${shownNumber(hex)} is not a colour`;
+  else why = 'the colour given is not text';
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer. ${COLOUR_FORMS}.${hexHint(hex)}`);
+  return null;
+}
+
+/** A 0..1 amount, or its default when one was left out, or undefined after saying why not. */
+function colourUnit(verb, what, value, fallback) {
+  if ((value === undefined || value === null) && fallback !== undefined) return fallback;
+  const problem = unitProblem(what, value);
+  if (!problem) return realNumber(value);
+  addScriptTrace('error', '', `${verb}: ${problem.why}, so there is no answer.${problem.hint}`);
+  return undefined;
 }
 
 function colourFromRgb(r, g, b) {
@@ -831,33 +892,36 @@ function colourFromRgb(r, g, b) {
 }
 
 function colourToRgb(hex) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.rgb', hex);
   return rgb ? { r: rgb[0], g: rgb[1], b: rgb[2] } : undefined;
 }
 
 /** Scale each channel toward 255. The border renderer's `lighten`, default and all. */
 function colourLighten(hex, amount) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.lighten', hex);
   if (!rgb) return undefined;
-  const f = Number.isFinite(Number(amount)) ? Number(amount) : 0.4;
+  const f = colourUnit('ce.math.lighten', 'the amount', amount, 0.4);
+  if (f === undefined) return undefined;
   return colourFromRgb(rgb[0] + (255 - rgb[0]) * f, rgb[1] + (255 - rgb[1]) * f, rgb[2] + (255 - rgb[2]) * f);
 }
 
 /** Scale each channel toward 0. The border renderer's `darken`, whose 0.55 default is the groove
  *  shading — so a script drawing a bevel matches the one the panel draws. */
 function colourDarken(hex, amount) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.darken', hex);
   if (!rgb) return undefined;
-  const f = Number.isFinite(Number(amount)) ? Number(amount) : 0.55;
+  const f = colourUnit('ce.math.darken', 'the amount', amount, 0.55);
+  if (f === undefined) return undefined;
   return colourFromRgb(rgb[0] * f, rgb[1] * f, rgb[2] * f);
 }
 
 /** Blend two colours. NOT an app algorithm and said so: it is lerp() per channel, in plain RGB,
  *  which is the blend a meter fading from green to red actually wants. */
 function colourMix(a, b, t) {
-  const x = colourChannels(a);
-  const y = colourChannels(b);
-  if (!x || !y) return undefined;
+  const x = colourChannels('ce.math.mix', a);
+  if (!x) return undefined;
+  const y = colourChannels('ce.math.mix', b);
+  if (!y) return undefined;
   const f = Math.min(1, Math.max(0, Number(t) || 0));
   return colourFromRgb(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
@@ -865,16 +929,17 @@ function colourMix(a, b, t) {
 /** The PANEL's form: AARRGGBB, which is what a stored colour property holds. See the note above —
  *  CSS's #RRGGBBAA is the same bytes the other way round, and mixing them up is silent. */
 function colourWithAlpha(hex, a) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.alpha', hex);
   if (!rgb) return undefined;
-  const f = Math.min(1, Math.max(0, Number.isFinite(Number(a)) ? Number(a) : 1));
+  const f = colourUnit('ce.math.alpha', 'the alpha', a);
+  if (f === undefined) return undefined;
   const aa = Math.round(f * 255).toString(16).padStart(2, '0');
   return (aa + colourFromRgb(rgb[0], rgb[1], rgb[2]).slice(1)).toUpperCase();
 }
 
 /** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
 function colourToHsl(hex) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.hsl', hex);
   if (!rgb) return undefined;
   const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -4042,7 +4107,38 @@ function dropAnimation(key) {
   }
 }
 
+/**
+ * The number ce.anim.to or ce.anim.spring moves to, or undefined after saying why there is none.
+ * A target that is not a number ("full", "100px", "#FF0000") used to be read as 0, so the control
+ * swept to its bottom; text that is a number ("100") is read as one, as it always was. In the words
+ * of each prelude's __animTarget.
+ */
+function animationTarget(verb, target) {
+  const n = realNumber(target);
+  if (n !== undefined) return n;
+  let why;
+  if (target === undefined || target === null) why = 'no number to move to was given';
+  else if (typeof target === 'string') why = `"${target}" is not a number`;
+  else why = 'the target given is not a number';
+  addScriptTrace('error', '', `${verb}: ${why}, so nothing was started.`);
+  return undefined;
+}
+
+/** True, after saying so, when `path` is a colour property: ce.anim moves numbers, and every tick
+ *  would write one into the colour (set() refuses each, sixty times a second). */
+function animatesColour(verb, path) {
+  const { name, segs } = splitScriptPath(String(path));
+  if (isPanelTarget(name)) return false;
+  const control = findControlByName(name);
+  if (!control || !segs.length) return false;
+  if (!colourFieldAt(control, resolveModelPath(control, segs))) return false;
+  addScriptTrace('error', '', `${verb}: "${path}" is a colour, and ce.anim moves numbers, so nothing was started.`);
+  return true;
+}
+
 function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = null) {
+  // to and spring move to a number, and only a number. An envelope's ends come from its own opts.
+  if (kind !== 'envelope' && animationTarget(`ce.anim.${kind}`, target) === undefined) return false;
   // A LIST of paths is one call, one shape, one completion. Six paths with six hand-computed
   // delays was the alternative, and `stagger` is why the list is worth having at all.
   if (Array.isArray(path)) {
@@ -4069,6 +4165,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
 
   const key = String(path ?? '');
   if (!key) return false;
+  if (animatesColour(`ce.anim.${kind}`, key)) return false;
 
   const groupId = group;
   const spring = kind === 'spring';
@@ -4137,7 +4234,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     kind: envelope ? 'envelope' : (spring ? 'spring' : 'to'),   // a value has one destination
     path: key,
     from,
-    to: Number(target) || 0,
+    to: envelope ? (Number(target) || 0) : realNumber(target),
     samples: envelope ? opts.samples : null,
     startMs: animationNowMs + delay,
     startBeats: animationBeats() + (sync ? (msToBeatsRead(delay) ?? 0) : 0),
@@ -4481,6 +4578,39 @@ const DRAW_STYLE_KEYS = [
   'opacity', 'transform', 'clip', 'blend',
 ];
 
+/**
+ * A fill or stroke as the overlay paints it, or undefined after saying why it cannot be painted.
+ *
+ * The overlay hands a string to SVG as it is, so "FF5B9BD5" (the panel's own AARRGGBB, what get()
+ * returns for a colour property and what ce.math.alpha() makes) and a bare "5B9BD5" painted nothing,
+ * and a number painted nothing either. scriptColours.drawColour turns the panel's forms into CSS
+ * and keeps what CSS reads as written; anything else is refused here and `what` stays as it was.
+ */
+function drawPaint(call, what, colour) {
+  const read = drawColour(colour);
+  if ('css' in read) return read.css;
+  addScriptTrace('error', '', `${call}: ${read.why}, so ${what} stays as it was. ${DRAW_COLOUR_FORMS}${read.hint}`);
+  return undefined;
+}
+
+// ce.draw.text's alignments, read without regard to case. The app spells centre three ways (ce.text.style
+// says "centred", an image's alignment "center", this call "middle"), and "center" written here used
+// to draw left-aligned without a word. All of them are the middle here.
+const DRAW_TEXT_ALIGNS = {
+  left: 'left', right: 'right', middle: 'middle', center: 'middle', centre: 'middle', centred: 'middle',
+};
+
+/** The alignment a text command carries, or undefined after saying the word is not one. */
+function drawTextAlign(align) {
+  if (align === undefined || align === null || align === '') return 'left';
+  const read = typeof align === 'string' ? DRAW_TEXT_ALIGNS[align.toLowerCase()] : undefined;
+  if (read) return read;
+  const shown = typeof align === 'string' ? `"${align}"` : (typeof align === 'number' ? shownNumber(align) : 'the value given');
+  addScriptTrace('error', '', `ce.draw.text: ${shown} is not an alignment, so nothing was drawn. `
+    + 'The alignments are "left", "middle" (or "center", "centre" or "centred") and "right".');
+  return undefined;
+}
+
 // Gradients get an id because SVG paints them by reference: the overlay defines each one once in
 // <defs> and every shape using it points at that. Per panel rather than per draw pass, so a
 // gradient reused across a redraw does not churn the defs list.
@@ -4495,20 +4625,46 @@ let gradientSeq = 0;
  */
 function drawGradientImpl(stops, angle) {
   const raw = Array.isArray(stops) ? stops : Object.values(stops ?? {});
+  // Fewer than two is documented as no gradient, and says nothing: a gradient between one colour
+  // and nothing is a colour.
+  if (raw.length < 2) return undefined;
   const list = [];
-  for (const stop of raw) {
+  for (const [i, stop] of raw.entries()) {
     // Two spellings, because two shapes are natural: { at, colour } for a positioned stop, and a
     // bare colour string for "space these evenly", which is what a two-colour fade actually is.
-    const colour = typeof stop === 'string' ? stop : String(stop?.colour ?? stop?.color ?? '');
-    if (!colour) continue;
-    const at = typeof stop === 'string' ? null : Number(stop?.at);
-    list.push({
-      colour,
-      at: Number.isFinite(at) ? Math.min(1, Math.max(0, at)) : null,
-      opacity: Number.isFinite(Number(stop?.opacity)) ? Math.min(1, Math.max(0, Number(stop.opacity))) : 1,
-    });
+    //
+    // A stop that cannot be read refuses the whole gradient, where it used to be dropped or bent:
+    // a colour SVG cannot paint stayed in and painted black, `at = 50` was clamped to 1 (so the
+    // middle stop went to the end), and `opacity = 50` to fully solid. The panel's own colour forms
+    // are turned into CSS, as fill() turns them.
+    const which = `stop ${i + 1} of ${raw.length}`;
+    const refuse = (why, hint = '') => {
+      addScriptTrace('error', '', `ce.draw.gradient: ${why}, so there is no gradient.${hint}`);
+      return undefined;
+    };
+    const object = stop && typeof stop === 'object' ? stop : null;
+    const given = object ? (object.colour ?? object.color) : stop;
+    if (given === undefined || given === null || given === '') {
+      return refuse(`${which} has no colour`, ' A stop is a colour, or { at, colour, opacity }.');
+    }
+    const read = typeof given === 'object' ? { why: 'the colour given is not a colour' } : drawColour(given);
+    if (typeof read.css !== 'string') {
+      return refuse(`in ${which}, ${read.why ?? `"${given}" is not a colour`}`, ` ${DRAW_COLOUR_FORMS}${read.hint ?? ''}`);
+    }
+    let at = null;
+    if (object?.at !== undefined && object?.at !== null) {
+      const problem = unitProblem(`the position (at) of ${which}`, object.at);
+      if (problem) return refuse(problem.why, `${problem.hint}${percentTextHint(object.at)}`);
+      at = realNumber(object.at);
+    }
+    let opacity = 1;
+    if (object?.opacity !== undefined && object?.opacity !== null) {
+      const problem = unitProblem(`the opacity of ${which}`, object.opacity);
+      if (problem) return refuse(problem.why, `${problem.hint}${percentTextHint(object.opacity)}`);
+      opacity = realNumber(object.opacity);
+    }
+    list.push({ colour: read.css, at, opacity });
   }
-  if (list.length < 2) return undefined;   // a gradient between one colour and nothing is a colour
   // Unpositioned stops spread evenly across whatever room the positioned ones left them.
   list.forEach((st, i) => { if (st.at == null) st.at = list.length === 1 ? 0 : i / (list.length - 1); });
   gradientSeq += 1;
@@ -4863,7 +5019,11 @@ function imageSetImpl(target, src, opts) {
   if (!layer) return false;
   if (!imageNode(name, layer)) return imageNeedsNode('set', name, layer) ?? false;
 
-  const { writes, refused, warnings } = planImage(layer, src, opts);
+  const { writes, refused, warnings } = planImage(layer, src, opts, { tintProblem: (tint) => {
+    const problem = panelColourProblem(tint);
+    // The refusal line adds its own full stop.
+    return problem ? `${problem.why}. ${problem.advice.replace(/\.$/, '')}` : null;
+  } });
   for (const problem of refused) {
     addScriptTrace('error', '',
       `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
@@ -4974,17 +5134,30 @@ function imageIconImpl(target, idOrName, opts) {
     setValue(`${name}.Icon.${field}`, value);
     if (getValue(`${name}.Icon.${field}`) !== value) all = false;
   }
+  let refused = false;
   for (const [key, field] of [['size', 'size'], ['fit', 'fit'], ['tint', 'tint'],
     ['opacity', 'opacity'], ['rotation', 'rotation']]) {
     if (opts?.[key] === undefined) continue;
+    // A tint the panel cannot read used to be stored with its "#" taken off, so "#000" became "000",
+    // which the renderer reads as no tint at all. Refused as ce.image.set refuses one; the other
+    // options are still applied, and the call answers false.
+    if (key === 'tint') {
+      const problem = panelColourProblem(opts.tint);
+      if (problem) {
+        addScriptTrace('error', '', `ce.image.icon("${name}"): tint refused — ${problem.why}. ${problem.advice}`);
+        refused = true;
+        continue;
+      }
+    }
     const value = key === 'tint' ? String(opts[key]).replace(/^#/, '') : opts[key];
     setValue(`${name}.Icon.${field}`, value);
     // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
-    // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading.
+    // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading, and
+    // the number out of 100 only when that lands on this scale (150 out of 100 is still above 1).
     const amount = Number(value);
     if (key === 'opacity' && amount > 1) {
       addScriptTrace('warn', '', `ce.image.icon("${name}"): opacity runs from 0 to 1 here, so ${amount} is `
-        + `fully solid. If you meant ${amount} out of 100, write ${Number((amount / 100).toFixed(4))}.`);
+        + `fully solid.${percentHint(amount)}`);
     }
   }
   // A control showing text only draws no icon; the same rule as the editor's icon pickers
@@ -4994,7 +5167,7 @@ function imageIconImpl(target, idOrName, opts) {
     Text: { content: getValue(`${name}.Text.content`) },
   } });
   if (mode) setValue(`${name}.ContentLayout.mode`, mode);
-  return all;
+  return all && !refused;
 }
 
 function textStyleImpl(target, opts) {
@@ -6003,6 +6176,18 @@ function panelPatchImpl(controlName, stateName, patch, part) {
   }
   const entries = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : null;
   if (!entries) { addScriptTrace('error', '', 'ce.panel.patch(control, state, patch): patch must be a table of path -> value'); return 0; }
+
+  // A colour the panel cannot read is refused as set() refuses it, and the whole patch with it:
+  // asked before the loop below writes into the state, so a refused patch leaves the state as it
+  // was. Each key is a path on the control, or on the part the patch is for.
+  const patchRoot = part == null || part === ''
+    ? found.control : found.control?._children?.Parts?._children?.[String(part)];
+  let refusedColour = false;
+  for (const [path, value] of Object.entries(entries)) {
+    if (refuseColourWrites(`ce.panel.patch("${controlName}", "${stateName}")`, 'nothing was patched',
+      patchRoot, String(path), value, true)) refusedColour = true;
+  }
+  if (refusedColour) return 0;
 
   const state = kids[key];
   const target = String(part ?? '');
@@ -7329,12 +7514,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // ce.draw — immediate-mode drawing on top of a control
     drawClear: (target) => drawClearImpl(target, ownerName),
     // A gradient is an OBJECT, so fill/stroke pass it through rather than stringifying it — the
-    // overlay turns it into the url(#…) reference SVG needs.
+    // overlay turns it into the url(#…) reference SVG needs. A colour is read by drawPaint: the
+    // panel's own forms become CSS, and what SVG could not paint is refused with the style unchanged.
     drawFill: (colour) => {
-      drawState.fill = colour == null ? null : (typeof colour === 'object' ? colour : String(colour));
+      const paint = drawPaint('ce.draw.fill', 'the fill', colour);
+      if (paint !== undefined) drawState.fill = paint;
     },
     drawStroke: (colour, width, opts) => {
-      drawState.stroke = colour == null ? null : (typeof colour === 'object' ? colour : String(colour));
+      const paint = drawPaint('ce.draw.stroke', 'the stroke', colour);
+      if (paint === undefined) return;
+      drawState.stroke = paint;
       drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
       // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
@@ -7353,9 +7542,18 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     drawGradient: (stops, angle) => drawGradientImpl(stops, angle),
     // Applies to everything drawn after it, like fill and stroke — not to one shape, because the
     // whole style model here is "what is in force when the command is issued".
+    // Nothing given switches it off. A number outside 0..1, or something that is not a number, used
+    // to be clamped (50 was fully solid) or to switch it off ("50%"); it is refused, and what is in
+    // force stays.
     drawOpacity: (a) => {
-      const v = Number(a);
-      drawState.opacity = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : null;
+      if (a === undefined || a === null) { drawState.opacity = null; return; }
+      const problem = unitProblem('the opacity', a);
+      if (problem) {
+        addScriptTrace('error', '', `ce.draw.opacity: ${problem.why}, so the opacity stays as it was.`
+          + `${problem.hint}${percentTextHint(a)}`);
+        return;
+      }
+      drawState.opacity = realNumber(a);
     },
     // rotate/move/scale for what follows. Without it a knob pointer means computing every corner
     // with sin and cos by hand — and getting the centre of rotation wrong is the classic way a
@@ -7507,11 +7705,15 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       { op: 'line', x1: Number(x1) || 0, y1: Number(y1) || 0, x2: Number(x2) || 0, y2: Number(y2) || 0 }),
     drawPath: (points, closed) => pushCommand(null, ownerName,
       { op: 'path', points: toPointList(points), closed: closed === true }),
-    drawText: (x, y, text, opts) => pushCommand(null, ownerName,
-      { op: 'text', x: Number(x) || 0, y: Number(y) || 0, text: String(text ?? ''),
-        size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
-        align: ['left', 'middle', 'right'].includes(opts?.align) ? opts.align : 'left',
-        family: opts?.family ? String(opts.family) : null }),
+    drawText: (x, y, text, opts) => {
+      const align = drawTextAlign(opts?.align);
+      if (align === undefined) return false;
+      return pushCommand(null, ownerName,
+        { op: 'text', x: Number(x) || 0, y: Number(y) || 0, text: String(text ?? ''),
+          size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
+          align,
+          family: opts?.family ? String(opts.family) : null });
+    },
     drawRedraw: (target) => drawRedrawImpl(target, ownerName),
     // ce.panel — structure
     panelCreate: (type, props) => panelCreateImpl(type, props, scriptId),
