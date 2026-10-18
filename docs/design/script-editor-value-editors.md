@@ -1,6 +1,8 @@
 # Editing values in place in the script editor
 
-Status: **proposal, nothing built.** 2026-10-18.
+Status: **proposal, nothing built.** 2026-10-18. Four of the silent failures it found were then
+fixed in the script runtimes, and [Fixed since, and still open](#fixed-since-and-still-open) says
+which and what was left.
 
 It started as a question about colour. A script's colours are typed out as hex, so why is there no
 swatch beside them that opens the display panel's colour and gradient editors? Colour turned out to
@@ -70,27 +72,26 @@ no unit or range.
 
 ## What looking into it showed
 
-1. **The checks may matter more than the editors.** Several mistakes in a script fail with no
+1. **The checks may matter more than the editors.** Several mistakes in a script failed with no
    error at all. Each of these was traced through the WebView runtime (`panelRuntime.js`) on this
-   date:
-   - `ce.midi.sendNote(1, "c4", 100)` plays note 0, C-1. The name parser wants a capital letter
-     (`noteNumber`, `panelRuntime.js:1775`), and `sendNote` turns a name it cannot read into 0
-     (`midiNote`, `panelRuntime.js:2133`).
-   - `ce.midi.sendSysex("F0411000")` sends `F0 FF F7`. Hex text is split on spaces and commas, so
-     the whole string is read as one number, clamped to 255, then framed (`toByteArray`,
-     `panelRuntime.js:2049`).
+   date. The first, second, fourth and fifth were then fixed in the runtimes (see
+   [Fixed since, and still open](#fixed-since-and-still-open)):
+   - `ce.midi.sendNote(1, "c4", 100)` played note 0, C-1. The name parser wants a capital letter,
+     and `sendNote` turned a name it could not read into 0.
+   - `ce.midi.sendSysex("F0411000")` sent `F0 FF F7`. Hex text is split on spaces and commas, so
+     the whole string was read as one number and clamped to 255. The player kept the low byte
+     instead and sent `F0 00 F7`.
    - `ce.time.step(beats, "1/8t")` returns nothing, because divisions are case-sensitive: the
      table spells it `"1/8T"`.
-   - `ce.draw.image("knob-cap", …)` draws nothing, because it wants the image data and not an
+   - `ce.draw.image("knob-cap", …)` drew nothing, because it wants the image data and not an
      asset's name.
    - A Roland SysEx template with `$checksum` and no `$checksumStart` sums the header as well, and
-     *"a message the synth rejects silently"* is the result (`deviceDefinitions.js:224`).
+     *"a message the synth rejects silently"* is the result (`deviceDefinitions.js`).
 
-   Others do report themselves, but only when the script runs: `ce.draw.blend` with an unknown mode
-   and `ce.text.style` with a font that is not available. A check moves the same message to the
-   moment it is typed. The checks for lists of names are also the cheapest to build, which makes
-   them the best next step after colour. The silent ones could also be reported by the runtime
-   itself. The editor's check does not replace that.
+   Others report themselves, but only when the script runs: `ce.draw.blend` with an unknown mode,
+   `ce.text.style` with a font that is not available, and now the four fixed above. A check moves
+   the same message to the moment it is typed. The checks for lists of names are also the cheapest
+   to build, which makes them the best next step after colour.
 2. **A value is recognised by where it is, not by what it looks like.** `"F0411000"` is a colour
    when it is set on a property and SysEx when it is passed to `sendSysex`. So the order is: what
    the API says that argument is, then a property path or key name, and only then the text itself.
@@ -365,9 +366,9 @@ ce.core.log("F0411000")
 ```
 
 - **Line 1 is SysEx**, because `sendSysex`'s parameter is typed `bytes`, and the schema is asked
-  first. Hover: *"Sent as F0 FF F7. Hex without spaces is read as one number. Separate the bytes:
-  "F0 41 10 00"."* That is an error-level check, because the message that goes out is not the one
-  written.
+  first. When this was written it went out as `F0 FF F7`. The runtimes now refuse it when the
+  script runs: *"sendSysex: "F0411000" is not one byte, so nothing was sent. Put a space between the
+  bytes: "F0 41 10 00"."* The check says the same thing as it is typed.
 - **Line 2 is a colour**, from the path's last segment. The tint is a very dark red at 94% opacity
   (alpha `F0`, colour `411000`).
 - **Line 3 is nothing.** `log` takes free text, and no kind claims it.
@@ -443,15 +444,17 @@ ce.anim.to("cutoff", 127, { duration = 500, curve = "outBack" })
 - **`500`** is a number in milliseconds (`duration` carries `unit: 'milliseconds'`). Hover: *"500 ms,
   1 beat at the current 120 BPM"*, using `ce.time.msToBeats`. Alt-drag changes it in steps of 10 ms.
 
-### 7. Note names: the silent C-1
+### 7. Note names: what was the silent C-1
 
 ```lua
 ce.midi.sendNote(1, "c4", 100, 250)
 local triad = ce.music.chord("C4", "major")
 ```
 
-- **`"c4"`** gets an error: *"Not a note name the runtime reads (the letter must be a capital).
-  This sends note 0, C-1."* Completion offers `"C4"`.
+- **`"c4"`** played note 0, C-1, when this was written. The runtimes now refuse it when the script
+  runs: *"sendNote: "c4" is not a note name, so nothing was sent. A name is a capital letter, then
+  # or b if it has one, then the octave: "C4", "Eb3", "F#-1"."* The check says the same thing as it
+  is typed, and completion offers `"C4"`.
 - **`"C4"`** on line 2 has hover text: *"MIDI note 60, middle C"*. A number in the same place, `48`,
   reads *"C3"*.
 - **No editor** for a single note. A `MiniKeys` keyboard to pick one from is possible, but typing a
@@ -504,8 +507,10 @@ ce.draw.image("knob-cap", 0, 0, 32, 32)
 local cap = ce.image.asset("knob-cap")
 ```
 
-- **Line 1** gets a warning: *"An asset's name draws nothing here: ce.draw.image wants the image
-  data. Use ce.image.asset("knob-cap").dataUrl."*
+- **Line 1** drew nothing and said nothing when this was written. The runtime now refuses it when
+  the script runs, and when the name is an icon's it gives the call to use: *"ce.draw.image:
+  "knob-cap" is an icon's name, not its image, so nothing was drawn. Pass
+  ce.image.asset("knob-cap").dataUrl."* The check says the same thing as it is typed.
 - **Line 2** gets a gutter thumbnail when the library or the panel has an image of that name, and a
   warning when neither has. Clicking the thumbnail opens the Assets tab, and choosing another image
   writes its name.
@@ -563,12 +568,42 @@ ce.device.defineParameter("level", {
   the runtime uses (`encodeParameter`, `deviceDefinitions.js`): *"At 0, 64 and 127: … F0 41 10 42
   12 40 01 33 40 4C F7 …"*. The checksum of address and data for 64 is `4C`.
 - **Remove `"$checksumStart"`** and the sum starts right after `F0`, header included, which gives
-  `27`. The check: *"A Roland checksum covers the address and data only. Without $checksumStart
-  this one includes the header, and the synth will ignore the message."* Here a check really does
-  matter more than an editor would.
+  `27`. Both runtimes now warn when the parameter is defined: *"defineParameter("level"): this is a
+  Roland template (41 after F0) with $checksum and no $checksumStart, so the checksum includes the
+  header, and a Roland synth ignores the message. Put $checksumStart where the address begins."*
+  The check says the same thing as it is typed. Here a check really does matter more than an editor
+  would.
 - **A bare literal**, such as `sendSysex("F0 41 10 42 12 40 00 7F 00 41 F7")` (the GS reset),
   does not say where its checksum starts. So the editor shows the bytes as sent and leaves the
   checksum alone. The template form is the one that says.
+
+## Fixed since, and still open
+
+Four of the silent failures above were fixed in the script runtimes on 2026-10-18. The rule each
+one follows is the one the runtimes already used for an unknown blend mode: refuse, say what was
+refused, and send or draw nothing. Each was fixed in every runtime that has the call, in the same
+words, so the editor and the exported player agree:
+
+| Was | Now | Where |
+|---|---|---|
+| `sendNote(1, "c4", 100)` played C-1 (also `sendNoteOff`, and `sendAftertouch` with a note) | refused with an error naming the note | WebView runtime; Lua, JavaScript and Python preludes |
+| `sendSysex("F0411000")` sent `F0 FF F7` (`F0 00 F7` from the player) | refused, with the spaced form to copy | WebView runtime (every call that reads hex text); `BridgeScriptHost::sendSysex` |
+| a Roland template without `$checksumStart` was silently wrong | defined, with a warning | `deviceDefinitions.js`; `ScriptRuntime::defineDeviceParameter` |
+| `ce.draw.image("knob-cap", …)` drew nothing | refused, with the call to use when it is an icon's name | WebView runtime (the verb is panel-view only) |
+
+Still open, found on the way and left alone because each is a decision rather than a fix:
+
+- **A division in the wrong case returns nothing**, with no message (`ce.time.step(beats, "1/8t")`).
+  Reading it case-insensitively, or reporting it, means changing the generated division table in
+  every prelude.
+- **The music helpers still read an unreadable root as note 0.** `ce.music.scale("c4")` gives the
+  scale from C-1, by the same fallback `sendNote` had. They are pure functions, and their comment
+  chooses 0 over an unexplained nil list.
+- **Hex text is read only by the editor in `sendMidi`, `feedMidi` and `checksum`.** The player's
+  `sendMidi` takes a list of numbers and does nothing with text, and its preludes' `checksum` does
+  not read text either. Only `sendSysex` is documented to take text.
+- **Two scales for `opacity`** (`ce.image.set` from 0 to 100, `ce.image.icon` from 0 to 1), and
+  **`ce.draw.arc`'s angles carry no unit**. Both are the schema work this record calls step zero.
 
 ## Rules every edit session follows
 
