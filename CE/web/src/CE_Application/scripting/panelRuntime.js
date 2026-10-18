@@ -2052,6 +2052,28 @@ function toByteArray(input) {
   if (typeof input === 'string') return input.trim().split(/[\s,]+/).filter(Boolean).map((h) => parseInt(h, 16));
   return [];
 }
+
+// Hex text is read a token at a time, and a token is one byte: one or two hex digits, with or
+// without 0x. A longer token was read as ONE number and clamped, so "F0411000" went out as F0 FF F7
+// here and as F0 00 F7 from the player (which kept the low byte), and neither said anything. A
+// token that is not one byte is now refused, the message naming it, in the same words as the
+// player's BridgeScriptHost. Lists of numbers are untouched.
+const HEX_BYTE = /^(0x)?[0-9a-f]{1,2}$/i;
+function notOneByte(input) {
+  if (typeof input !== 'string') return null;
+  return input.trim().split(/[\s,]+/).filter(Boolean).find((token) => !HEX_BYTE.test(token)) ?? null;
+}
+/** The bytes a script passed, or null after saying why, when its hex text has a token that is not
+ *  one byte. `outcome` finishes "so …": what did not happen because of it. */
+function scriptBytes(verb, input, outcome = 'nothing was sent') {
+  const token = notOneByte(input);
+  if (token === null) return toByteArray(input);
+  const spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(' ') : '';
+  addScriptTrace('error', '', `${verb}: "${token}" is not one byte, so ${outcome}. `
+    + (spaced ? `Put a space between the bytes: "${spaced}".`
+      : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+  return null;
+}
 function toHexMessage(bytes) {
   return bytes.map((v) => (midiInt(v, 0, 255) & 0xff).toString(16).padStart(2, '0').toUpperCase()).join(' ');
 }
@@ -2190,7 +2212,9 @@ function installMidiFilters() {
 
 const midiApi = {
   sendMidi: (bytes) => {
-    const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    const raw = scriptBytes('sendMidi', bytes);
+    if (!raw) return;
+    const b = raw.map((v) => midiInt(v, 0, 255) & 0xff);
     if (!b.length) { addScriptTrace('error', '', 'sendMidi: no bytes given'); return; }
     sendRawMidi(b, 'raw');
   },
@@ -2249,7 +2273,9 @@ const midiApi = {
   // fighting it. Inbound filters run on it, so a fed message obeys the same rules as a real one —
   // a velocity curve that applies to the keyboard has to apply to the sequencer too.
   feedMidi: (bytes) => {
-    const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    const raw = scriptBytes('feedMidi', bytes, 'nothing was fed');
+    if (!raw) return;
+    const b = raw.map((v) => midiInt(v, 0, 255) & 0xff);
     if (!b.length) { addScriptTrace('error', '', 'feedMidi: no bytes given'); return; }
     const status = b[0] ?? 0;
     const kind = (status & 0xf0) === 0xb0 ? 'cc' : (status & 0xf0) === 0x90 || (status & 0xf0) === 0x80 ? 'note' : 'raw';
@@ -2289,7 +2315,9 @@ const midiApi = {
       s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `nrpn_${midiInt(msb, 0, 127)}_${midiInt(lsb, 0, 127)}`);
   },
   sendSysex: (bytes) => {
-    let b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    const raw = scriptBytes('sendSysex', bytes);
+    if (!raw) return;
+    let b = raw.map((v) => midiInt(v, 0, 255) & 0xff);
     if (b.length === 0) { addScriptTrace('error', '', 'sendSysex: no bytes given'); return; }
     if (b[0] !== 0xF0) b = [0xF0, ...b];
     if (b[b.length - 1] !== 0xF7) b = [...b, 0xF7];
@@ -2299,10 +2327,12 @@ const midiApi = {
   // The parameter is `kind`, the name the contract and every other runtime use for it.
   // requestDump is bound in buildApi, not here: its optional callback belongs to a script, and a
   // throw inside it has to be reported against that script. Same reason the wire filters are.
-  checksum: (type, bytes, opts) =>
-    (bytes === undefined || bytes === null
-      ? checksumOf('roland', toByteArray(type))     // one-arg form: checksum(bytes)
-      : checksumOf(type, toByteArray(bytes), opts)),
+  checksum: (type, bytes, opts) => {
+    const oneArg = bytes === undefined || bytes === null;   // one-arg form: checksum(bytes)
+    const raw = scriptBytes('checksum', oneArg ? type : bytes, 'there is no checksum');
+    if (!raw) return undefined;
+    return oneArg ? checksumOf('roland', raw) : checksumOf(type, raw, opts);
+  },
 
   // panic([opts]) — All Sound Off (120) FIRST, then All Notes Off (123), then Reset All
   // Controllers (121). The order matters: 120 cuts a note that is already ringing, 123 only stops
@@ -2340,7 +2370,9 @@ const midiApi = {
       return n;
     }
     if (isJuceAvailable()) {
-      parseDumpMessage({ deviceRole: role, message: toHexMessage(toByteArray(data)) });
+      const raw = scriptBytes('applyDump', data, 'nothing was decoded');
+      if (!raw) return 0;
+      parseDumpMessage({ deviceRole: role, message: toHexMessage(raw) });
       addScriptTrace('midi', '', 'applyDump: decoding bulk dump via the device host…');
     } else {
       addScriptTrace('midi', '', 'applyDump(bytes): decoding raw dumps needs the device host — pass a decoded { parameter: value } map to fill now');

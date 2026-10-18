@@ -18,6 +18,45 @@
 namespace ceditor::scripting
 {
 
+// Hex text is read a token at a time, and a token is one byte: one or two hex digits, with or
+// without 0x. A longer token was read as ONE number and the low byte kept, so "F0411000" went out
+// as F0 00 F7 (the WebView runtime clamped it and sent F0 FF F7), and neither said anything. These
+// find the token that is not one byte and say so, in the same words as scriptBytes in the WebView
+// runtime (panelRuntime.js). Splits on the same separators: whitespace and commas.
+inline juce::StringArray hexTextTokens (const juce::String& text)
+{
+    auto tokens = juce::StringArray::fromTokens (text, " ,\t\r\n", "");
+    tokens.removeEmptyStrings();
+    return tokens;
+}
+
+/** The first token of `bytes`' hex text that is not one byte, or empty when it is all bytes (or not
+ *  text at all: a list of numbers is never refused here). */
+inline juce::String firstTokenNotOneByte (const juce::var& bytes)
+{
+    if (! bytes.isString()) return {};
+    for (const auto& token : hexTextTokens (bytes.toString()))
+    {
+        const auto digits = token.startsWithIgnoreCase ("0x") ? token.substring (2) : token;
+        if (digits.isEmpty() || digits.length() > 2 || ! digits.containsOnly ("0123456789abcdefABCDEF"))
+            return token;
+    }
+    return {};
+}
+
+/** "sendSysex: "F0411000" is not one byte, so nothing was sent. Put a space between …" */
+inline juce::String notOneByteMessage (const juce::String& verb, const juce::String& token, const juce::String& outcome)
+{
+    auto message = verb + ": \"" + token + "\" is not one byte, so " + outcome + ". ";
+    if (token.containsOnly ("0123456789abcdefABCDEF") && token.length() % 2 == 0)
+    {
+        juce::StringArray pairs;
+        for (int i = 0; i < token.length(); i += 2) pairs.add (token.substring (i, i + 2));
+        return message + "Put a space between the bytes: \"" + pairs.joinIntoString (" ") + "\".";
+    }
+    return message + "Each byte is one or two hex digits, with spaces between the bytes: \"F0 41 10 F7\".";
+}
+
 class BridgeScriptHost final : public ScriptHostApi
 {
 public:
@@ -178,7 +217,27 @@ public:
 
     void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
     void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
-    void sendSysex (const juce::var& bytes) override                 { if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (bytes); }
+    void sendSysex (const juce::var& bytes) override
+    {
+        // Every engine's sendSysex comes through here, so this is the one place the player reads a
+        // script's hex text: refused when a token is not one byte (see firstTokenNotOneByte above),
+        // otherwise turned into the list of numbers the callback is handed. The app's callback then
+        // never parses text of its own, so it cannot split it differently.
+        juce::var message = bytes;
+        if (bytes.isString())
+        {
+            if (const auto token = firstTokenNotOneByte (bytes); token.isNotEmpty())
+            {
+                logAt ("error", notOneByteMessage ("sendSysex", token, "nothing was sent"), juce::var());
+                return;
+            }
+            juce::Array<juce::var> list;
+            for (const auto& token : hexTextTokens (bytes.toString()))
+                list.add ((token.startsWithIgnoreCase ("0x") ? token.substring (2) : token).getHexValue32());
+            message = juce::var (list);
+        }
+        if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (message);
+    }
     void sendMidi (const juce::var& bytes) override                  { if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (bytes); }
     // routeMidi / feedMidi. A host that wires neither gets the honest failure rather than the quiet
     // one: the block still RUNS (its sends go to the default device, which is what they did before

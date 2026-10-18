@@ -1292,7 +1292,7 @@ ce.midi.sendTransport("start")
 
 #### `ce.midi.sendSysex(bytes)`
 
-Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7".
+Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7". In hex text each byte is one or two digits, with spaces or commas between the bytes; text with a longer run, such as "F04110", is refused with a message and nothing is sent.
 
 *Short name: `sendSysex`.*
 

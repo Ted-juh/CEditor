@@ -455,6 +455,70 @@ int main()
         check (sent == 1000, "a real flood of bound writes is still cut at 1,000 a second (sent " + juce::String (sent) + ")");
     }
 
+    // --- SysEx hex text is read a byte at a time -----------------------------------------------
+    // "F0411000" was one number to PluginProcessor's parser, which kept the low byte and sent
+    // F0 00 F7 (the WebView runtime clamped it to F0 FF F7). BridgeScriptHost now refuses a token
+    // that is not one byte, in the WebView runtime's words, and hands the callback a list.
+    {
+        juce::StringArray sysexLogs, sysexOut;
+        BridgeScriptHost::Callbacks scb;
+        scb.log = [&] (const juce::String& m, const juce::var&) { sysexLogs.add (m); };
+        scb.sendSysex = [&] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
+            sysexOut.add (bytes.isString() ? "text:" + bytes.toString() : hex (b));
+        };
+        BridgeScriptHost sysexHost (std::move (scb));
+        ScriptRuntime sysexRuntime (sysexHost);
+        sysexHost.attachRuntime (&sysexRuntime);
+        sysexRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+
+        auto script = [] (const char* id, const char* language, const char* event, const char* source)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", id);
+            o->setProperty ("language", language);
+            o->setProperty ("scope", "panel");
+            o->setProperty ("event", event);
+            o->setProperty ("target", "*");
+            o->setProperty ("enabled", true);
+            o->setProperty ("source", source);
+            return juce::var (o);
+        };
+        juce::Array<juce::var> scripts;
+        scripts.add (script ("sxlua", "lua", "onSysexLua",
+            "function onSysexLua()\n"
+            "  sendSysex(\"F0411000\")\n"
+            "  sendSysex(\"F0 41 zz F7\")\n"
+            "  sendSysex(\"F0 41 10 00 F7\")\n"
+            "  sendSysex(\"0xF0,0x41\\n10 0 F7\")\n"     // 0x, commas, a newline and a one-digit byte
+            "  sendSysex({ 0xF0, 0x41, 0x10, 0x00, 0xF7 })\n"
+            "end\n"));
+        scripts.add (script ("sxjs", "javascript", "onSysexJs",
+            "function onSysexJs() { ce.midi.sendSysex('903C64'); }"));
+        sysexRuntime.loadScripts (juce::var (scripts));
+
+        sysexRuntime.runAction ("onSysexLua", juce::var());
+        check (sysexOut.size() == 3, "two refused, three sent (got " + sysexOut.joinIntoString (" | ") + ")");
+        for (const auto& sent : sysexOut)
+            check (sent == "F0 41 10 00 F7", "hex text reaches the callback as a list of the bytes written (got " + sent + ")");
+        check (sysexLogs.contains ("sendSysex: \"F0411000\" is not one byte, so nothing was sent. "
+                                   "Put a space between the bytes: \"F0 41 10 00\"."),
+               "an unspaced run is refused, with the spaced form to copy");
+        check (sysexLogs.contains ("sendSysex: \"zz\" is not one byte, so nothing was sent. "
+                                   "Each byte is one or two hex digits, with spaces between the bytes: \"F0 41 10 F7\"."),
+               "a token that is not hex is refused");
+
+        sysexOut.clear();
+        sysexLogs.clear();
+        sysexRuntime.runAction ("onSysexJs", juce::var());
+        check (sysexOut.isEmpty() && sysexLogs.size() == 1 && sysexLogs[0].startsWith ("sendSysex: \"903C64\" is not one byte"),
+               "the same refusal from JavaScript (got " + sysexLogs.joinIntoString (" | ") + ")");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

@@ -254,6 +254,44 @@ test('the message verbs are bound and assemble without throwing', () => {
   assert.doesNotThrow(() => api.sendTransport('stop'));
 });
 
+test('hex text is read a byte at a time, and a token that is not one byte is refused', () => {
+  // "F0411000" was read as one number and clamped: F0 FF F7 went out here (F0 00 F7 from the
+  // player), and nothing said so. The player's BridgeScriptHost refuses it in the same words.
+  const midiLines = () => get(scriptTrace).filter((e) => e.kind === 'midi').map((e) => e.message);
+  const errors = () => get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+
+  clearScriptTrace();
+  api.sendSysex('F0411000');
+  assert.deepEqual(midiLines(), [], 'nothing goes out');
+  assert.deepEqual(errors(), ['sendSysex: "F0411000" is not one byte, so nothing was sent. '
+    + 'Put a space between the bytes: "F0 41 10 00".']);
+
+  clearScriptTrace();
+  api.sendSysex('F0 41 zz F7');
+  assert.deepEqual(midiLines(), []);
+  assert.deepEqual(errors(), ['sendSysex: "zz" is not one byte, so nothing was sent. '
+    + 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".']);
+
+  // What was right before still is: spaces, commas, one-digit bytes, 0x, and lists.
+  for (const good of ['F0 41 10 00 F7', 'F0,41,10,00,F7', 'f0 41 10 0 f7', '0xF0 0x41 0x10 0x00 0xF7',
+    [0xF0, 0x41, 0x10, 0x00, 0xF7]]) {
+    clearScriptTrace();
+    api.sendSysex(good);
+    assert.deepEqual(errors(), [], `${JSON.stringify(good)} is fine`);
+    assert.ok(midiLines().some((m) => m.includes('F0 41 10 00 F7')), `${JSON.stringify(good)} goes out whole`);
+  }
+
+  // The other calls that read hex text read it the same way.
+  clearScriptTrace();
+  assert.equal(api.checksum('roland', '40007F00'), undefined);
+  assert.match(errors()[0], /^checksum: "40007F00" is not one byte, so there is no checksum\./);
+  assert.equal(api.checksum('roland', '40 00 7F 00'), 0x41, 'the GS reset checksum, from spaced text');
+  clearScriptTrace();
+  api.sendMidi('903C64');
+  assert.deepEqual(midiLines(), []);
+  assert.match(errors()[0], /^sendMidi: "903C64" is not one byte, so nothing was sent\. Put a space between the bytes: "90 3C 64"\./);
+});
+
 test('middle C is C4, and the docs now say so', () => {
   // The contract claimed 60 -> "C3" (the Yamaha convention) while every runtime computed "C4"
   // (scientific pitch notation). A script written from the manual transposed by an octave.

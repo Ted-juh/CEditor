@@ -48,7 +48,7 @@ export const MODULE_COST = {
   "ce.draw": { "javascript": 351, "lua": 351, "python": 351, "webview": 37071 },
   "ce.image": { "javascript": 106, "lua": 106, "python": 106, "webview": 0 },
   "ce.math": { "javascript": 23942, "lua": 26701, "python": 23331, "webview": 39300 },
-  "ce.midi": { "javascript": 11162, "lua": 9501, "python": 10385, "webview": 21466 },
+  "ce.midi": { "javascript": 11162, "lua": 9501, "python": 10385, "webview": 23218 },
   "ce.music": { "javascript": 14790, "lua": 14962, "python": 14048, "webview": 13380 },
   "ce.panel": { "javascript": 1974, "lua": 1776, "python": 1766, "webview": 37295 },
   "ce.storage": { "javascript": 7922, "lua": 15686, "python": 11572, "webview": 13370 },
