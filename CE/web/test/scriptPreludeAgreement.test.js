@@ -713,7 +713,7 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
     try {
       // __transportState answers nothing, as a host with no transport does, so a musical timer
       // that is accepted stops at "no tempo" (a log line, not an error).
-      for (const name of ['log', 'logError', 'sendCC', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
         lua.global.set(name, () => {});
       }
       await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
@@ -771,6 +771,85 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   REFUSAL_CASES.forEach(([fn, args], i) => {
     assert.deepEqual(got[i], want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
   });
+});
+
+/* ------------------------------------------------- a value past its end: sent, and said once */
+
+// A value one step past its range (a CC value of 128, a bend of -1) is sent as the nearest end, and
+// the first time for each command a warning says so. Two calls, one warning, the same words in every
+// engine; an address past its range is refused instead, and is in REFUSAL_CASES above.
+const EDGE_CALLS = [['sendCC', [1, 7, 200]], ['sendCC', [1, 7, 300]], ['sendNote', [1, 60, -5]],
+  ['sendPitchBend', [1, 20000]], ['sendNRPN', [1, 0, 0, -1]], ['sendAftertouch', [1, 128.4]]];
+
+test('a value past its end is sent as the nearest end and said once, in the same words everywhere', async (t) => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  for (const [fn, args] of EDGE_CALLS) web[fn](...args);
+  const want = get(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+  assert.deepEqual(want, [
+    'sendCC: the value 200 is outside 0 to 127, so 127 was sent. This is said only the first time.',
+    'sendNote: the velocity -5 is outside 0 to 127, so 0 was sent. This is said only the first time.',
+    'sendPitchBend: the bend 20000 is outside 0 to 16383, so 16383 was sent. This is said only the first time.',
+    'sendNRPN: the value -1 is outside 0 to 16383, so 0 was sent. This is said only the first time.',
+    'sendAftertouch: the pressure 128.4 is outside 0 to 127, so 127 was sent. This is said only the first time.',
+  ], 'the second sendCC says nothing');
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
+
+  // JavaScript, under node:vm.
+  {
+    const warns = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'warn') warns.push(String(m)); } : () => undefined),
+    });
+    for (const [fn, args] of EDGE_CALLS) sandbox[fn](...args);
+    assert.deepEqual(warns, want, 'JS prelude');
+  }
+  // Lua, under wasmoon.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = EDGE_CALLS.map(([fn, args]) => `${fn}(${args.map(luaLiteral).join(', ')})`).join('\n');
+      const got = String(await lua.doString(`local w = {}\nlogWarn = function(m) w[#w + 1] = tostring(m) end\n${calls}\nreturn table.concat(w, "\\n")`));
+      assert.deepEqual(got.split('\n'), want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its warnings were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+warns = []
+g["logWarn"] = lambda m, *rest: warns.append(str(m))
+for fn, args in payload["calls"]:
+    g[fn](*args)
+sys.stdout.write(json.dumps(warns, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: EDGE_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
 });
 
 /* ---------------------------------------------- each language's own byte type, as a list */

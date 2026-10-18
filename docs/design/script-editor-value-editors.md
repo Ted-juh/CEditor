@@ -662,8 +662,12 @@ And the options, timers and panel commands:
 
 Still open, for the owner:
 
-- **Values at the edge of their range** are still clamped: a CC value of 128 goes out as 127, a
-  velocity of 200 as 127, a bend of -1 as 0. Clamp, warn or refuse.
+- ~~**Values at the edge of their range**~~ *Decided: clamp, and say so once.* A CC value of 128
+  goes out as 127, a velocity of 200 as 127, a bend of -1 as 0, as before, and the first time for
+  each command a warning names the value ("the value 200 is outside 0 to 127, so 127 was sent").
+  Such a value comes from a script's own arithmetic (a 0..1 value times 128, an offset added, a
+  curve that overshoots its end), so the warning points at it without filling the console when an
+  animation sends sixty a second. In every runtime, and in `BridgeScriptHost` for a native handler.
 - **An unknown option** warns and the call runs. Whether it should refuse instead.
 - **`ce.anim`'s `repeat` and `done`**: the contract was changed to say what the runtimes do.
   Whether the runtimes should do what the contract used to say instead.

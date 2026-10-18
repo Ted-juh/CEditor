@@ -2620,8 +2620,11 @@ function releaseTrackedScriptNotes(role, channel, note) {
 // controller, program, bank, parameter number) outside its range is refused, since clamping it picks
 // a different message; so is anything that is not a number, or is missing where there is no default.
 // Text that is a number ("64", from a label say) is read as one, as it always was, by realNumber's
-// rule. A VALUE past the end of its range (a CC value of 128) is still clamped, as before. A number
-// with a fraction is rounded half up, the same in every runtime (the player floored it). The
+// rule. A VALUE past the end of its range (a CC value of 128) is sent as the nearest end, which is
+// the same message one step along, and the first time for each command a warning says so: such a
+// value comes from the script's own arithmetic (0..1 times 128, an offset added, a curve that
+// overshoots), and the warning points at it without filling the console sixty times a second. A
+// number with a fraction is rounded half up, the same in every runtime (the player floored it). The
 // preludes' __midiArg is the twin of this, word for word.
 const MIDI_ARGS = {
   channel: ['channel', 'a channel', 1, 16, true, 'A channel is a whole number from 1 to 16.'],
@@ -2637,6 +2640,7 @@ const MIDI_ARGS = {
   bend: ['bend', 'a bend', 0, 16383, false, 'A bend is a number from 0 to 16383, and 8192 is the centre.'],
   position: ['song position', 'a song position', 0, 16383, false, 'A song position is a number of MIDI beats from 0 to 16383.'],
 };
+const edgeWarned = new Set();   // the commands that have said a value was past its end; resetScriptState clears it
 /** The number to send for `kind`, or undefined after saying why nothing was sent. */
 function midiArg(verb, kind, v) {
   const [noun, aNoun, lo, hi, address, hint] = MIDI_ARGS[kind];
@@ -2650,7 +2654,14 @@ function midiArg(verb, kind, v) {
     addScriptTrace('error', '', `${verb}: ${shownValue(v)} is not ${aNoun}, so nothing was sent. ${hint}`);
     return undefined;
   }
-  return n < lo ? lo : n > hi ? hi : n;
+  if (n >= lo && n <= hi) return n;
+  const sent = n < lo ? lo : hi;
+  if (!edgeWarned.has(verb)) {
+    edgeWarned.add(verb);
+    addScriptTrace('warn', '', `${verb}: the ${noun} ${shownValue(v)} is outside ${lo} to ${hi}, so ${sent} was sent. `
+      + 'This is said only the first time.');
+  }
+  return sent;
 }
 // A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that range.
 // An unreadable name used to become note 0, so "c4" (the letter must be a capital) played C-1, the
@@ -9166,6 +9177,7 @@ export function destroyLoadedScripts() {
 /** Drop all cached handlers, listeners and timers — the script set or the panel changed. */
 function resetScriptState() {
   executionEpoch += 1;
+  edgeWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

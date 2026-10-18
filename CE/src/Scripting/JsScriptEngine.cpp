@@ -1984,6 +1984,7 @@ var __MIDI_ARGS = {
   bend: ["bend", "a bend", 0, 16383, false, "A bend is a number from 0 to 16383, and 8192 is the centre."],
   position: ["song position", "a song position", 0, 16383, false, "A song position is a number of MIDI beats from 0 to 16383."]
 };
+var __edgeWarned = {};
 function __midiArg(verb, kind, v) {
   var a = __MIDI_ARGS[kind];
   if (v === undefined || v === null) { logError(verb + ": no " + a[0] + " given, so nothing was sent."); return undefined; }
@@ -1993,7 +1994,15 @@ function __midiArg(verb, kind, v) {
     logError(verb + ": " + __shownValue(v) + " is not " + a[1] + ", so nothing was sent. " + a[5]);
     return undefined;
   }
-  return n < a[2] ? a[2] : (n > a[3] ? a[3] : n);
+  if (n >= a[2] && n <= a[3]) return n;
+  // A value past the end of its range is sent as the nearest end, and said once per command.
+  var sent = n < a[2] ? a[2] : a[3];
+  if (!__edgeWarned[verb]) {
+    __edgeWarned[verb] = true;
+    logWarn(verb + ": the " + a[0] + " " + __shownValue(v) + " is outside " + a[2] + " to " + a[3]
+      + ", so " + sent + " was sent. This is said only the first time.");
+  }
+  return sent;
 }
 // A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
 // range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a

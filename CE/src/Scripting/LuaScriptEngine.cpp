@@ -1676,6 +1676,7 @@ local __MIDI_ARGS = {
   bend = { "bend", "a bend", 0, 16383, false, "A bend is a number from 0 to 16383, and 8192 is the centre." },
   position = { "song position", "a song position", 0, 16383, false, "A song position is a number of MIDI beats from 0 to 16383." },
 }
+local __edgeWarned = {}
 local function __midiArg(verb, kind, v)
   local a = __MIDI_ARGS[kind]
   if v == nil then
@@ -1688,8 +1689,15 @@ local function __midiArg(verb, kind, v)
     logError(verb .. ": " .. __shownValue(v) .. " is not " .. a[2] .. ", so nothing was sent. " .. a[6])
     return nil
   end
-  if n < a[3] then return a[3] elseif n > a[4] then return a[4] end
-  return n
+  if n >= a[3] and n <= a[4] then return n end
+  -- A value past the end of its range is sent as the nearest end, and said once per command.
+  local sent = n < a[3] and a[3] or a[4]
+  if not __edgeWarned[verb] then
+    __edgeWarned[verb] = true
+    logWarn(verb .. ": the " .. a[1] .. " " .. __shownValue(v) .. " is outside " .. a[3] .. " to " .. a[4]
+      .. ", so " .. sent .. " was sent. This is said only the first time.")
+  end
+  return sent
 end
 
 -- panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that

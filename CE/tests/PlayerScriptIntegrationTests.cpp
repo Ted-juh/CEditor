@@ -731,6 +731,16 @@ int main()
                    "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
                    "sendCC: \"loud\" is not a value, so nothing was sent. A value is a number from 0 to 127.",
                "and refuses the rest itself (got " + logs.joinIntoString (" | ") + ")");
+
+        // A value past its end is sent as the nearest end, and said the first time only.
+        out.clear();
+        logs.clear();
+        ruleHost.sendCC (2, 7, juce::var (200));
+        ruleHost.sendCC (2, 7, juce::var (300));
+        check (out.joinIntoString (" | ") == "cc 2 7 127 | cc 2 7 127", "a value past its end is sent as the end (got "
+                   + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") == "sendCC: the value 200 is outside 0 to 127, so 127 was sent. This is said only the first time.",
+               "and said once, in the preludes' words (got " + logs.joinIntoString (" | ") + ")");
     }
 
     std::cout << "--------------------------------------------\n"

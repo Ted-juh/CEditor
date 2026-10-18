@@ -2890,6 +2890,7 @@ __MIDI_ARGS = {
 def __finite(v):
     import math
     return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+__edgeWarned = {}   # a dict: the panel API's own set() shadows the builtin here
 def __midiArg(verb, kind, v):
     import math
     noun, a_noun, lo, hi, address, hint = __MIDI_ARGS[kind]
@@ -2901,7 +2902,14 @@ def __midiArg(verb, kind, v):
     if n is None or (address and (n < lo or n > hi)):
         logError(verb + ": " + __shownValue(v) + " is not " + a_noun + ", so nothing was sent. " + hint)
         return None
-    return lo if n < lo else (hi if n > hi else n)
+    if lo <= n <= hi: return n
+    # A value past the end of its range is sent as the nearest end, and said once per command.
+    sent = lo if n < lo else hi
+    if verb not in __edgeWarned:
+        __edgeWarned[verb] = True
+        logWarn(verb + ": the " + noun + " " + __shownValue(v) + " is outside " + str(lo) + " to " + str(hi)
+                + ", so " + str(sent) + " was sent. This is said only the first time.")
+    return sent
 # A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
 # range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a
 # name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a

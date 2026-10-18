@@ -15,6 +15,7 @@
 #include "ScriptRuntime.h"
 #include <cmath>
 #include <map>
+#include <set>
 
 namespace ceditor::scripting
 {
@@ -540,6 +541,7 @@ private:
     // Whether the host actually wired routing, so endRouteOverride does not unbalance a host
     // that never began one.
     bool routeWired = false;
+    std::set<juce::String> edgeWarned;   // the commands that have said a value was past its end
 
     // Scope (Q7) is NOT enforced here, and that is a decision rather than an omission. The
     // Device/MIDI verbs used to declare device/panel/project scope; enforcing that list denied a
@@ -626,7 +628,12 @@ private:
             logAt ("error", verb + ": " + shownScriptValue (v) + " is not a value, so nothing was sent. " + hint, juce::var());
             return false;
         }
-        out = juce::jlimit (0, hi, static_cast<int> (std::floor (d + 0.5)));
+        const int n = static_cast<int> (std::floor (d + 0.5));
+        out = juce::jlimit (0, hi, n);
+        // Past the end is sent as the nearest end, and said once per command, in the preludes' words.
+        if (n != static_cast<int> (out) && edgeWarned.insert (verb).second)
+            logAt ("warn", verb + ": the value " + shownScriptValue (v) + " is outside 0 to " + juce::String (hi) + ", so "
+                               + juce::String (static_cast<int> (out)) + " was sent. This is said only the first time.", juce::var());
         return true;
     }
 
