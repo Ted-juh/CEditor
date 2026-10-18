@@ -166,8 +166,8 @@ test('both spellings of the value accessor are accepted', () => {
   assert.match(runtimeSource, /function splitAccessor\(path, explicitForm\)/);
   assert.match(runtimeSource, /DERIVED_ACCESSORS\.has\(tail\)/,
     'a trailing .normalizedValue / .midiValue should be recognised as an accessor');
-  assert.match(runtimeSource, /get: \(path, form\) => getValue\(path, form\)/,
-    'get should pass a form argument through');
+  assert.match(runtimeSource, /get: \(path, form\) => getValue\(path, form, true\)/,
+    'get should pass a form argument through (and ask getValue to report a read that finds nothing)');
 });
 
 test('normalizedValue is arithmetic over the control\'s own range, and is clamped', () => {

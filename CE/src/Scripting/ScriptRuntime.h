@@ -119,6 +119,13 @@ public:
     // Values (Q1, Q2, Q8). `form` is "value" (default) | "normalizedValue" | "midiValue".
     // `transmit`: whether to also send to the synth (the runtime computes the default from origin).
     virtual juce::var getValue (const juce::String& path, const juce::String& form) = 0;
+    /** Why a script's get() of `path` that answered nothing found nothing, as the line to write, or
+        empty when nothing is wrong (the value is simply not set). Asked by each engine's get() only
+        after it got nothing, and only for a script's own get(): the engines' watch, compute and
+        snapshot read through getValue and stay quiet, as the editor's do. Default empty: a host
+        that cannot tell says nothing, which is what get() always did. */
+    virtual juce::String whyNoValue (const juce::String& path, const juce::String& form)
+    { juce::ignoreUnused (path, form); return {}; }
     // `options` may carry { transmit: bool }. If absent, the host applies the origin-based default
     // (loud, unless inbound or inside a noTransmit block) via ScriptRuntime::defaultTransmit().
     virtual void      setValue (const juce::String& path, const juce::var& value, const juce::var& options) = 0;

@@ -127,11 +127,37 @@ public:
         if (! control.isObject()) return {};
         const auto raw = valueAtPath (control, resolveModelPath (control, split.second));
         if (form != "normalizedValue") return raw;
+        // Nothing there is nothing as a position too, as the WebView runtime answers: (double) of
+        // nothing is 0, a plausible position that hid the missing path behind it.
+        if (raw.isVoid()) return {};
 
         double lo = 0.0, hi = 0.0;
         if (! rangeOf (control, lo, hi)) return {};
         const double n = (double) raw;
         return juce::var (juce::jlimit (0.0, 1.0, (n - lo) / (hi - lo)));
+    }
+
+    /** Why a read of `scriptPath` that found nothing found nothing, as the line to write, or empty
+        when the read was a fair question whose answer is nothing (a property not set yet).
+
+        set() always said when it could not find a control, and get() said nothing, so a misspelled
+        name read exactly like an unset value. This gives get() set()'s words, the same as the
+        WebView runtime's getValue: a control that is not there, and a path no reading of which
+        resolves (not a shorthand, not a section, not a property of any section). The WebView also
+        reports an explicit section path that names a property its section's type does not have; it
+        has the section templates to tell that from a default the document left out, and this model
+        does not, so it stays silent there rather than guess. `panel.*` is not checked here or there:
+        the panel document takes any key. */
+    juce::String whyNoAnswer (const juce::String& scriptPath) const
+    {
+        const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return {};
+        const auto control = findControlByName (split.first);
+        if (! control.isObject())
+            return "get: control \"" + split.first + "\" not found on the active panel, so there is no answer.";
+        if (! readsNothing (control, split.second)) return {};
+        return "get(\"" + scriptPath + "\"): \"" + split.second.joinIntoString (".") + "\" does not lead anywhere on \""
+             + split.first + "\", so there is no answer.";
     }
 
     /** Write a script path. Returns true if the control + path resolved and the write landed.
@@ -502,6 +528,20 @@ public:
             return {};
         }
         return out.joinIntoString (".");
+    }
+
+    // No reading of `segments` resolves: resolveModelPath would fall through every branch to the
+    // segments as written. Mirrors pathReadsNothing in panelRuntime.js.
+    static bool readsNothing (const juce::var& control, const juce::StringArray& segments)
+    {
+        if (segments.isEmpty()) return false;
+        const auto first = segments[0].toLowerCase();
+        if (shorthand (first).isNotEmpty() || firstSegmentIsSection (control, first)) return false;
+        if (auto* obj = control.getDynamicObject())
+            if (auto* children = obj->getProperty ("_children").getDynamicObject())
+                for (const auto& p : children->getProperties())
+                    if (walkCaseInsensitive (p.value, segments).isNotEmpty()) return false;
+        return true;
     }
 
     static bool firstSegmentIsSection (const juce::var& control, const juce::String& lowerFirst)

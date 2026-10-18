@@ -642,7 +642,7 @@ export const COMMANDS = [
   },
   {
     id: 'get', category: 'Values', signature: 'get(path [, form])',
-    summary: 'Read a value from the panel. A control\'s value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form\'s name as `form`. Returns nothing if the control or property does not exist.',
+    summary: 'Read a value from the panel. A control\'s value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form\'s name as `form`. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'form', type: 'string', required: false, values: VALUE_ACCESSOR_IDS },

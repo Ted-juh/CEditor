@@ -161,7 +161,14 @@ int  CE_CALL host_set (void* ctx, const CeStr* key, const CeValue* v, const CeVa
 int  CE_CALL host_get (void* ctx, const CeStr* key, const CeStr* form, CeValue* out)
 {
     auto* h = static_cast<HostCtx*> (ctx)->host;
-    if (out != nullptr) *out = buildCeValue (h->getValue (key ? fromCeStr (*key) : juce::String(), form ? fromCeStr (*form) : juce::String ("value")));
+    const auto path = key ? fromCeStr (*key) : juce::String();
+    const auto asked = form ? fromCeStr (*form) : juce::String ("value");
+    const auto value = h->getValue (path, asked);
+    // A handler's get() of a control or path that is not there says so, as every engine's does
+    // (ScriptHostApi::whyNoValue).
+    if (value.isVoid())
+        if (const auto why = h->whyNoValue (path, asked); why.isNotEmpty()) h->logAt ("error", why, juce::var());
+    if (out != nullptr) *out = buildCeValue (value);
     return 0;
 }
 void CE_CALL host_send_cc   (void* ctx, int32_t ch, int32_t cc, const CeValue* v)            { static_cast<HostCtx*> (ctx)->host->sendCC (ch, cc, ceToVar (v)); }

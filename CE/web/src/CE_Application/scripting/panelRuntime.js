@@ -81,6 +81,8 @@ import {
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
   allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
 } from './panelApi.js';
+// Each section type's template: what get() checks a path against, and create's `<section>` keys.
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
 import {
@@ -792,12 +794,59 @@ function setValue(path, value, formOrOpts = '') {
   });
 }
 
-function getValue(path, form = '') {
+/* What get() says when it has no answer because the script asked for something that is not there.
+ *
+ * set() always reported a control it could not find and a path that led nowhere. get() returned
+ * nothing for both, so get("cutof.value") and get("cutoff.vlaue") read exactly like a control whose
+ * value is unset, and the mistake surfaced wherever the nothing was used. It says so now, in set()'s
+ * words, and still returns nothing.
+ *
+ * Only for a script's own get(): the runtime asks getValue whether a section exists all the time
+ * (ce.image, ce.text, snapshot), and the debugger's watch panel reads whatever is typed into it.
+ *
+ * "Not there" is decided without false alarms: a value the session holds (a knob's live value, a
+ * custom component's channel) is never reported, nor a key absent from a free-form map (a state's
+ * `when`), nor a property the section's own type has, written or not. What is reported is a path no
+ * reading of which resolves (not a shorthand, a section or a property of any section), and an
+ * explicit section path that stops short or names a property its section's type does not have.
+ * The exported plug-in's PanelValueModel::whyNoAnswer gives the first two cases in the same words. */
+function getFoundNothing(path, what, control) {
+  addScriptTrace('error', '', `get("${path}"): "${what}" does not lead anywhere on "${control}", so there is no answer.`);
+}
+
+/** No reading of `segs` resolves on `control`: resolveModelPath fell through every branch. */
+function pathReadsNothing(control, segs) {
+  if (!segs.length) return false;
+  const first = String(segs[0]).toLowerCase();
+  if (SHORTHANDS[first]) return false;
+  const sections = Object.keys(control?._children ?? {});
+  if (sections.some((k) => k.toLowerCase() === first)) return false;
+  return !sections.some((key) => walkCaseInsensitive(control._children[key], segs));
+}
+
+/** An explicit section path that stops short, or names what its section's type does not have. */
+function sectionPathMisses(control, modelPath) {
+  if (!probeNestedWrite(control, modelPath, undefined).writes) return true;
+  const parts = String(modelPath).split('.');
+  if (parts.length < 2) return false;
+  const parent = valueAtPath(control, parts.slice(0, -1).join('.'));
+  // A parent that is only a template (an effect nobody has edited) cannot be asked.
+  if (!parent || typeof parent !== 'object' || typeof parent._type !== 'string') return false;
+  const key = parts[parts.length - 1];
+  if (parent[key] !== undefined || parent._children?.[key] !== undefined) return false;
+  const template = SECTION_DEFAULTS[parent._type];
+  return !(template && (key in template || template._children?.[key] !== undefined));
+}
+
+function getValue(path, form = '', report = false) {
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
   if (isPanelTarget(name)) return getPanelValue(segs);
   const control = findControlByName(name);
-  if (!control) return undefined;
+  if (!control) {
+    if (report) addScriptTrace('error', '', `get: control "${name}" not found on the active panel, so there is no answer.`);
+    return undefined;
+  }
 
   if (addressed.form === 'midiValue') { reportNeedsDeviceHost('get(.midiValue)', addressed.path); return undefined; }
 
@@ -816,6 +865,18 @@ function getValue(path, form = '') {
   // reads as the literal the panel's set gives it — the answer the exported plugin gives too,
   // whose payload was baked at export. A script should never see the reference.
   if (typeof raw === 'string' && isTokenReference(raw)) raw = resolveColourValue(raw, controlSetForPanel(activePanel()));
+  if (report && raw === undefined && !readsLiveValue(control, modelPath) && customChannelOfPath(control, modelPath) == null) {
+    const explicitSection = segs.length > 1
+      && Object.keys(control._children ?? {}).some((k) => k.toLowerCase() === String(segs[0]).toLowerCase());
+    if (pathReadsNothing(control, segs)) {
+      getFoundNothing(addressed.path, segs.join('.'), name);
+      return undefined;
+    }
+    if (explicitSection && sectionPathMisses(control, modelPath)) {
+      getFoundNothing(addressed.path, modelPath, name);
+      return undefined;
+    }
+  }
   if (addressed.form !== 'normalizedValue') return raw;
 
   const range = rangeOf(control);
@@ -7525,14 +7586,14 @@ const andList = (items) => (items.length < 2 ? items.join('')
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
-    get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form),
+    get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form, true),
   };
   const api = {
     // The third argument is the value form for the second-argument spelling. `set` also takes an
     // opts object in that position in the contract; only a string is read as a form, so
     // set(path, v, { transmit: false }) is unaffected.
     set: (path, value, form) => setValue(path, value, typeof form === 'string' ? form : ''),
-    get: (path, form) => getValue(path, form),
+    get: (path, form) => getValue(path, form, true),
     log: (msg, val) => scriptPrint('log', scriptId, msg, val),
     // Levels the console already renders differently — the runtime uses the distinction constantly
     // and a script could not, so a real failure read exactly like a debug print.

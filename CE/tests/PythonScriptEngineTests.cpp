@@ -44,6 +44,13 @@ public:
     void emitEvent (const juce::String&, const juce::var&) override {}
     void log (const juce::String& message, const juce::var&) override { logs.add (message); }
 
+    // A host that can say why a read found nothing, the way BridgeScriptHost asks the app.
+    juce::String whyNoValue (const juce::String& path, const juce::String&) override
+    { return path.startsWith ("ghost") ? "get: control \"ghost\" not found on the active panel, so there is no answer." : juce::String(); }
+
+    juce::StringArray timerStarts;
+    void startTimer (const juce::String& id, int) override { timerStarts.add (id); }
+
     juce::StringArray rawSends;   // sendMidi, as "90 3C 64"
     void sendMidi (const juce::var& bytes) override
     {
@@ -164,6 +171,46 @@ int main()
                                        "A name is a capital letter, then # or b if it has one, then the octave: "
                                        "\"C4\", \"Eb3\", \"F#-1\"."),
                    juce::String ("Notes: ") + verb + " names the note it refused");
+    }
+
+    // self.set and self.get, a script's own get() of something that is not there, and the intervals
+    // and storage option keys a script got wrong.
+    //  - self's methods called out through `__api`, which a class body MANGLES to `_Self__api`, so
+    //    both raised NameError on every call in the exported plug-in.
+    //  - get() asks the host why it found nothing, as every engine's does; watch() does not.
+    //  - startTimer(id, "fast") reached the host as 0 ms, and saveSetting(k, v, {"scop": "script"})
+    //    saved into the shared store. Both are refused in the words the other engines use.
+    {
+        juce::Array<juce::var> mistakeScripts;
+        mistakeScripts.add (makeScript ("pyMistakes", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    self.set('selfPath', 5)\n"
+            "    log('self ' + str(self.get('selfPath')))\n"
+            "    watch('ghost.value', lambda v, p: None)\n"
+            "    log('ghost ' + str(get('ghost.value')))\n"
+            "    startTimer('t', 'fast')\n"
+            "    startTimer('t', True)\n"
+            "    saveSetting('k', 1, {'scop': 'script'})\n"
+            "    after(-5, lambda: None)\n"
+            "    startTimer('ok', 250)\n"));
+        runtime.loadScripts (juce::var (mistakeScripts));
+        host.logs.clear();
+        host.timerStarts.clear();
+        runtime.onPanelReady (true);
+        const auto logged = host.logs.joinIntoString (" | ");
+        check (host.logs.contains ("self 5"), "self.set and self.get work (they raised NameError before; got " + logged + ")");
+        check (host.logs.contains ("ghost None")
+                   && host.logs.indexOf ("get: control \"ghost\" not found on the active panel, so there is no answer.")
+                          == host.logs.indexOf ("ghost None") - 1,
+               "get() of a missing control says so once, and the watch on it says nothing (got " + logged + ")");
+        check (host.timerStarts.size() == 1 && host.timerStarts[0] == "ok",
+               "only the 250 ms timer reaches the host (got " + host.timerStarts.joinIntoString (", ") + ")");
+        for (const auto* line : {
+                 "ce.time.startTimer(\"t\"): \"fast\" is not a number of milliseconds, so no timer was started.",
+                 "ce.time.startTimer(\"t\"): the interval is not a number of milliseconds, so no timer was started.",
+                 "ce.storage.saveSetting: \"scop\" is not one of its options, so nothing was done. Its only option is scope.",
+                 "ce.time.after: -5 is less than 0 milliseconds, so nothing was scheduled." })
+            check (host.logs.contains (line), juce::String ("refused in Python: ") + line);
     }
 
     // ce.midi byte lists in the embedded interpreter, with Python's own bytes and bytearray read as

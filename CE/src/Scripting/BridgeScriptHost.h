@@ -109,6 +109,10 @@ public:
     {
         // Values (path = "control.value" style; form = value|normalizedValue|midiValue).
         std::function<juce::var (const juce::String& path, const juce::String& form)> getValue;
+        // Why a read that answered nothing found nothing, as the line to write, or empty when the
+        // answer is simply nothing (PanelValueModel::whyNoAnswer). Optional: unset, get() of a
+        // control that is not there says nothing, which is what it always did.
+        std::function<juce::String (const juce::String& path)> whyNoValue;
         // `form` is the value representation the script asked for: "value" (default) or
         // "normalizedValue". The app maps it, because only the app knows the control's range.
         std::function<void (const juce::String& path, const juce::var& value, bool transmit,
@@ -224,6 +228,16 @@ public:
             return {};
         }
         return callbacks.getValue ? callbacks.getValue (addressed.first, addressed.second) : juce::var();
+    }
+
+    // set() reports a control it cannot find; get() returned nothing, the same nothing an unset value
+    // is. The app says why (PanelValueModel::whyNoAnswer), in the editor's words, of the path with
+    // its accessor taken off, as getValue hands it over. .midiValue has its own message already.
+    juce::String whyNoValue (const juce::String& path, const juce::String& form) override
+    {
+        const auto addressed = splitAccessor (path, form);
+        if (addressed.second == "midiValue" || ! callbacks.whyNoValue) return {};
+        return callbacks.whyNoValue (addressed.first);
     }
 
     void setValue (const juce::String& path, const juce::var& value, const juce::var& options) override

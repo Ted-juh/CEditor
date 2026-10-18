@@ -206,6 +206,65 @@ int main()
                ".midiValue explains itself rather than returning a quiet nothing");
     }
 
+    // --- get() of something that is not there, window-closed --------------------------------
+    // set() always said "nothing was written" for a path that led nowhere; get() returned the
+    // nothing an unset value returns, so a misspelled control or property read as an empty one. It
+    // says why now, in the WebView runtime's words (PanelValueModel::whyNoAnswer, wired the way
+    // PluginProcessor wires it), from a script's own get() in Lua and in JavaScript, and still
+    // returns nothing. A watch on a path that is not there stays quiet, as the editor's does.
+    {
+        const char* kGetPanel = R"JSON({
+          "name": "Gets",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "gl", "name": "gl", "language": "lua", "scope": "panel", "event": "onGetsLua", "target": "*", "enabled": true,
+              "source": "function onGetsLua()\n  watch(\"ghost.value\", function() end)\n  local a = get(\"ghost.value\")\n  local b = get(\"cutoff.vlaue\")\n  log(\"lua \" .. tostring(get(\"cutoff.value\")) .. \" \" .. tostring(a) .. \" \" .. tostring(b))\nend\n" },
+            { "id": "gj", "name": "gj", "language": "javascript", "scope": "panel", "event": "onGetsJs", "target": "*", "enabled": true,
+              "source": "function onGetsJs(){ watch('ghost.value', function(){}); var a = get('ghost.value'); var b = get('cutoff.vlaue.normalizedValue'); log('js ' + get('cutoff.value') + ' ' + a + ' ' + b); }" }
+          ],
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+              "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 200 },
+              "Value": { "_type": "Value", "value": 40 }
+            } }
+          ]
+        })JSON";
+
+        PanelValueModel getModel;
+        check (getModel.loadFromJson (kGetPanel), "loaded the get panel");
+        juce::StringArray getLogs;
+        BridgeScriptHost::Callbacks gcb;
+        gcb.getValue = [&] (const juce::String& path, const juce::String& form) { return getModel.getValue (path, form); };
+        gcb.whyNoValue = [&] (const juce::String& path) { return getModel.whyNoAnswer (path); };
+        gcb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { getModel.setValue (path, v, form); };
+        gcb.log = [&] (const juce::String& m, const juce::var&) { getLogs.add (m); };
+        BridgeScriptHost getHost (std::move (gcb));
+        ScriptRuntime getRuntime (getHost);
+        getHost.attachRuntime (&getRuntime);
+        getRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        getRuntime.loadScripts (gatherPanelScripts (getModel.panel()));
+
+        const juce::String ghost = "get: control \"ghost\" not found on the active panel, so there is no answer.";
+        const juce::String vlaue = "get(\"cutoff.vlaue\"): \"vlaue\" does not lead anywhere on \"cutoff\", so there is no answer.";
+        for (const char* lang : { "Lua", "Js" })
+        {
+            getLogs.clear();
+            getRuntime.runAction (juce::String ("onGets") + lang, juce::var());
+            const juce::String tag (lang);
+            // Three lines and no more: the watch on the same missing path said nothing, and the
+            // missing path answered nothing (nil, or null from JavaScript), not a plausible 0.
+            const bool nothing = getLogs.size() == 3
+                && (getLogs[2] == "lua 40 nil nil" || getLogs[2] == "js 40 null null");
+            check (getLogs.size() == 3 && getLogs[0] == ghost && getLogs[1] == vlaue && nothing,
+                   tag + ": get() names the missing control and the path that leads nowhere, once each, and a watch "
+                         "says nothing (got: " + getLogs.joinIntoString (" | ") + ")");
+        }
+        check (getModel.whyNoAnswer ("cutoff.value").isEmpty() && getModel.whyNoAnswer ("panel.anything").isEmpty()
+                   && getModel.whyNoAnswer ("cutoff.Value.value").isEmpty(),
+               "whyNoAnswer is silent for a path that is there, and for the panel document");
+    }
+
     // --- slice 2: ce.midi channel messages + ce.storage, window-closed -----------------------
     {
         PanelValueModel modModel;

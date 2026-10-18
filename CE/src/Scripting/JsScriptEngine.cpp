@@ -196,7 +196,7 @@ function __putRule(list, rule) {
   for (var i = 0; i < list.length; i++) if (list[i].path === rule.path) { list[i] = rule; return; }
   list.push(rule);
 }
-function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(get(path)), prev: undefined }); }
+function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(__read(path)), prev: undefined }); }
 function compute(path, fn) { __putRule(__computeds, { path: path, fn: fn, failed: false }); }
 function intercept(path, fn) { __putRule(__filters, { path: path, fn: fn }); }
 function defineAction(name, fn) {
@@ -243,7 +243,7 @@ function __runReactive() {
         var next;
         try { next = c.fn(); } catch (err) { logError("compute " + c.path + ": " + err); c.failed = true; continue; }
         if (next === undefined) continue;
-        if (__sig(next) === __sig(get(c.path))) continue;
+        if (__sig(next) === __sig(__read(c.path))) continue;
         set(c.path, next); wrote = true;
       }
       if (!wrote) break;
@@ -255,14 +255,14 @@ function __runReactive() {
     // landing — still obey their filter. Needs an idempotent filter to settle, which snapping,
     // clamping and quantising all are.
     for (var f = 0; f < __filters.length; f++) {
-      var cur = get(__filters[f].path);
+      var cur = __read(__filters[f].path);
       if (cur === undefined) continue;
       var d = __applyIntercepts(__filters[f].path, cur);
       if (d.reject) continue;                       // a veto has nothing to revert to
       if (__sig(d.value) !== __sig(cur)) set(__filters[f].path, d.value);
     }
     for (var w = 0; w < __watchers.length; w++) {
-      var rule = __watchers[w], v = get(rule.path), s = __sig(v);
+      var rule = __watchers[w], v = __read(rule.path), s = __sig(v);
       if (s === rule.last) continue;
       var previous = rule.prev;
       rule.last = s; rule.prev = v;
@@ -278,7 +278,20 @@ function set(path, value, opts) {
   if (d.reject) return undefined;
   return __api.set(path, d.value, opts || null);
 }
-function get(path, form) { return __api.get(path, form || "value"); }
+// A script's own get() says why it has no answer when the control or the path is not there, in the
+// editor's words (ScriptHostApi::whyNoValue asks the app). __read is the quiet read the prelude's
+// own watch, compute and snapshot use, as the editor's do: a watch on a path that is not there yet
+// would otherwise say so on every pass.
+function __read(path) { return __api.get(path, "value"); }
+function __scriptGet(path, form) {
+  var v = __api.get(path, form || "value");
+  if (v === undefined || v === null) {
+    var why = __api.whyNoValue(path, form || "value");
+    if (why) logError(why);
+  }
+  return v;
+}
+function get(path, form) { return __scriptGet(path, form); }
 
 // `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is the running
 // script's (__CE_OWN), and each script gets its own `self` from __ceMakeSelf. Plain object literal
@@ -291,7 +304,7 @@ function __ownerPrefix(p) {
 function __ceMakeSelf() {
   return {
     set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
-    get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
+    get: function (p, form) { return __scriptGet(__ownerPrefix(p), form); }
   };
 }
 // @module ce.midi
@@ -2524,7 +2537,7 @@ function panelSnapshot() {
   var out = {}, names = __panelQuery("controls", null);
   if (!names) return out;
   for (var i = 0; i < names.length; i++) {
-    var v = get(names[i] + ".value");
+    var v = __read(names[i] + ".value");
     if (v !== undefined && v !== null) out[names[i]] = v;
   }
   return out;
@@ -2536,7 +2549,7 @@ function panelRestore(snap) {
     if (!Object.prototype.hasOwnProperty.call(snap, name)) continue;
     // A name the panel no longer has is skipped rather than failing the whole restore: a snapshot
     // taken before an edit is still worth most of what it holds.
-    var cur = get(name + ".value");
+    var cur = __read(name + ".value");
     if (cur !== undefined && cur !== null) { set(name + ".value", snap[name]); n += 1; }
   }
   return n;
@@ -3031,6 +3044,9 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
         { host->setValue (arg (a, 0).toString(), arg (a, 1), arg (a, 2)); return {}; });
     api->setMethod ("get", [host, arg] (const Args& a) -> juce::var
         { return host->getValue (arg (a, 0).toString(), arg (a, 1).toString()); });
+    api->setMethod ("whyNoValue", [host, arg] (const Args& a) -> juce::var
+        { const auto why = host->whyNoValue (arg (a, 0).toString(), arg (a, 1).toString());
+          return why.isEmpty() ? juce::var() : juce::var (why); });
     api->setMethod ("sendCC", [host, arg] (const Args& a) -> juce::var
         { host->sendCC ((int) arg (a, 0), (int) arg (a, 1), arg (a, 2)); return {}; });
     api->setMethod ("sendNRPN", [host, arg] (const Args& a) -> juce::var

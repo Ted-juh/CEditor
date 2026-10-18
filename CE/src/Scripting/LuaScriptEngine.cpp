@@ -3315,7 +3315,7 @@ public:
             host->setValue (juce::String (path), v, buildOptions (opts));
         });
         g.set_function ("get", [this] (std::string path, sol::optional<std::string> form)
-            { return varToSol (lua, host->getValue (juce::String (path), form ? juce::String (*form) : juce::String ("value"))); });
+            { return varToSol (lua, scriptGet (juce::String (path), form ? juce::String (*form) : juce::String ("value"))); });
 
         g.set_function ("sendCC",   [this] (int ch, int cc, sol::object v) { host->sendCC (ch, cc, solToVar (v)); });
         g.set_function ("sendNRPN", [this] (int ch, int msb, int lsb, sol::object v) { host->sendNRPN (ch, msb, lsb, solToVar (v)); });
@@ -3519,7 +3519,7 @@ public:
         sol::table self = lua.create_table();
         self.set_function ("set", [this, prefix] (std::string p, sol::object v) { host->setValue (prefix (p), solToVar (v), juce::var()); });
         self.set_function ("get", [this, prefix] (std::string p, sol::optional<std::string> form)
-            { return varToSol (lua, host->getValue (prefix (p), form ? juce::String (*form) : juce::String ("value"))); });
+            { return varToSol (lua, scriptGet (prefix (p), form ? juce::String (*form) : juce::String ("value"))); });
         env["self"] = self;
 
         const Watchdog guard (*this); // top-level statements obey the instruction budget too
@@ -3731,6 +3731,18 @@ private:
         for (auto& r : list)
             if (r.scriptId == rule.scriptId && r.path == rule.path) { r = std::move (rule); return; }
         list.push_back (std::move (rule));
+    }
+
+    /** A script's own get(): the value, and when there is none because the control or the path is
+        not there, the host's line saying so (ScriptHostApi::whyNoValue). watch, compute and the
+        filters read through host->getValue and stay quiet, as the editor's do. */
+    juce::var scriptGet (const juce::String& path, const juce::String& form)
+    {
+        auto value = host->getValue (path, form);
+        if (value.isVoid())
+            if (const auto why = host->whyNoValue (path, form); why.isNotEmpty())
+                host->logAt ("error", why, juce::var());
+        return value;
     }
 
     /** Run every filter registered for `path`. False = a filter rejected the write outright;

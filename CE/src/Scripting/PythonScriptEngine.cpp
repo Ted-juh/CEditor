@@ -270,6 +270,15 @@ PyObject* api_get (PyObject* self, PyObject* args)
     if (! PyArg_ParseTuple (args, "s|s", &path, &form)) return nullptr;
     return varToPy (hostOf (self).getValue (juce::String::fromUTF8 (path), juce::String::fromUTF8 (form)));
 }
+// Why a script's get() found nothing, or None (ScriptHostApi::whyNoValue).
+PyObject* api_whyNoValue (PyObject* self, PyObject* args)
+{
+    const char* path = nullptr; const char* form = "value";
+    if (! PyArg_ParseTuple (args, "s|s", &path, &form)) return nullptr;
+    const auto why = hostOf (self).whyNoValue (juce::String::fromUTF8 (path), juce::String::fromUTF8 (form));
+    if (why.isEmpty()) Py_RETURN_NONE;
+    return PyUnicode_FromString (why.toRawUTF8());
+}
 PyObject* api_sendCC (PyObject* self, PyObject* args)
 {
     int ch = 0, cc = 0; PyObject* v = nullptr;
@@ -519,6 +528,7 @@ PyObject* api_off (PyObject* self, PyObject* args);
 PyMethodDef apiMethods[] = {
     { "set",           api_set,           METH_VARARGS, nullptr },
     { "get",           api_get,           METH_VARARGS, nullptr },
+    { "whyNoValue",    api_whyNoValue,    METH_VARARGS, nullptr },
     { "sendCC",        api_sendCC,        METH_VARARGS, nullptr },
     { "sendNRPN",      api_sendNRPN,      METH_VARARGS, nullptr },
     { "sendSysex",     api_sendSysex,     METH_VARARGS, nullptr },
@@ -608,7 +618,7 @@ def __putRule(lst, rule):
             return
     lst.append(rule)
 
-def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(get(path)), "prev": None})
+def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(__read(path)), "prev": None})
 def compute(path, fn):   __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
 def intercept(path, fn): __putRule(__filters, {"path": path, "fn": fn})
 
@@ -661,7 +671,7 @@ def __runReactive():
                     c["failed"] = True
                     continue
                 if nxt is None: continue
-                if __sig(nxt) == __sig(get(c["path"])): continue
+                if __sig(nxt) == __sig(__read(c["path"])): continue
                 set(c["path"], nxt)
                 wrote = True
             if not wrote: break
@@ -672,13 +682,13 @@ def __runReactive():
         # landing — still obey their filter. Needs an idempotent filter to settle, which snapping,
         # clamping and quantising all are.
         for f in __filters:
-            cur = get(f["path"])
+            cur = __read(f["path"])
             if cur is None: continue
             d = __applyIntercepts(f["path"], cur)
             if d.get("reject"): continue      # a veto has nothing to revert to
             if __sig(d["value"]) != __sig(cur): set(f["path"], d["value"])
         for w in __watchers:
-            v = get(w["path"])
+            v = __read(w["path"])
             s = __sig(v)
             if s == w["last"]: continue
             previous = w["prev"]
@@ -696,7 +706,18 @@ def set(path, value, opts=None):
     d = __applyIntercepts(path, value)
     if d.get("reject"): return None
     return __api.set(path, d["value"], opts)
-def get(path, form="value"):      return __api.get(path, form)
+# A script's own get() says why it has no answer when the control or the path is not there, in the
+# editor's words (ScriptHostApi::whyNoValue asks the app). __read is the quiet read the prelude's own
+# watch, compute and snapshot use, as the editor's do: a watch on a path that is not there yet would
+# otherwise say so on every pass.
+def __read(path):                 return __api.get(path, "value")
+def __scriptGet(path, form="value"):
+    v = __api.get(path, form)
+    if v is None:
+        why = __api.whyNoValue(path, form)
+        if why: logError(why)
+    return v
+def get(path, form="value"):      return __scriptGet(path, form)
 # @module ce.midi
 # sendCC and sendNRPN are host bindings; what a script passes is checked here first (__midiArg, in
 # the ce.midi section), as the editor checks it, and only numbers that are a message reach the host.
@@ -1188,12 +1209,17 @@ def transmit(fn):
     finally: __api.endTransmit()
 
 # `self` — owner-relative set/get (Q7). __owner is injected per-script before this prelude runs.
+# The methods call out through _ce-named functions because a name that starts with two underscores
+# is MANGLED inside a class body: `__api` written in a method is looked up as `_Self__api`, so
+# self.set and self.get raised NameError on every call until this.
+def _ceSelfSet(p, value, opts): return __api.set(p, value, opts)
+def _ceSelfGet(p, form):         return __scriptGet(p, form)
 class _Self:
     def _p(self, p):
         o = globals().get("__owner", "")
         return p if not o else (o + "." + p)
-    def set(self, p, value, opts=None): return __api.set(self._p(p), value, opts)
-    def get(self, p, form="value"):     return __api.get(self._p(p), form)
+    def set(self, p, value, opts=None): return _ceSelfSet(self._p(p), value, opts)
+    def get(self, p, form="value"):     return _ceSelfGet(self._p(p), form)
 self = _Self()
 
 # @module ce.math
@@ -3058,7 +3084,7 @@ def panelSnapshot():
     names = __panelQuery("controls", None)
     if not names: return out
     for name in names:
-        v = get(name + ".value")
+        v = __read(name + ".value")
         if v is not None: out[name] = v
     return out
 def panelRestore(snap):
@@ -3067,7 +3093,7 @@ def panelRestore(snap):
     for name, v in snap.items():
         # A name the panel no longer has is skipped rather than failing the whole restore: a
         # snapshot taken before an edit is still worth most of what it holds.
-        if get(name + ".value") is not None:
+        if __read(name + ".value") is not None:
             set(name + ".value", v)
             n += 1
     return n

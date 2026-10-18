@@ -1702,6 +1702,7 @@ private:
         // control's own Behavior.min/max, so get("cutoff.normalizedValue") answers window-closed
         // exactly as it does in the panel view.
         cb.getValue = [this] (const juce::String& path, const juce::String& form) { return scriptValues.getValue (path, form); };
+        cb.whyNoValue = [this] (const juce::String& path) { return scriptValues.whyNoAnswer (path); };
         cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER
