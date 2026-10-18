@@ -6928,12 +6928,23 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     drawCurve: (points, opts) => drawCurveImpl(null, ownerName, points, opts),
     drawPolygon: (cx, cy, r, sides, opts) => drawPolygonImpl(null, ownerName, cx, cy, r, sides, opts),
     // An image needs a source the renderer can actually load: a data URL, or an icon from the
-    // library resolved through ce.image. A bare name would be a string that silently draws nothing.
+    // library resolved through ce.image. A bare name would be a string that silently draws nothing,
+    // and until this refused it, it did: the command was pushed, and the overlay drew an image
+    // that never loaded. An icon's name gets the exact call to use instead.
     drawImage: (src, x, y, w, h, opts) => {
       const source = String(src ?? '');
       if (!source) {
         addScriptTrace('error', '',
           'ce.draw.image: no source. Pass a data URL, or ce.image.asset(name).dataUrl for a library icon.');
+        return false;
+      }
+      if (!/^data:/i.test(source)) {
+        const shown = source.length > 60 ? `${source.slice(0, 57)}…` : source;
+        addScriptTrace('error', '', findAsset(imageCatalogue(), source)
+          ? `ce.draw.image: "${shown}" is an icon's name, not its image, so nothing was drawn. `
+            + `Pass ce.image.asset("${shown}").dataUrl.`
+          : `ce.draw.image: "${shown}" is not image data, so nothing was drawn. Pass a data URL, or `
+            + 'ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
       return pushCommand(null, ownerName, {

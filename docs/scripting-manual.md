@@ -3212,7 +3212,7 @@ Draw a shape with `sides` equal sides, such as a triangle or a hexagon, centred 
 
 #### `ce.draw.image(src, x, y, w, h [, opts]) -> boolean`
 
-Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. An asset's name on its own draws nothing, and an empty `src` is refused with a message. `opts.fit` sets how the image fills the box.
+Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. Anything else, an asset's name included, is refused with a message and nothing is drawn. `opts.fit` sets how the image fills the box.
 
 *Short name: `drawImage`.*
 
