@@ -278,6 +278,11 @@ positions:
 set("resonance.normalizedValue", get("cutoff.normalizedValue"))
 ```
 
+The form's name can also go after the path as an argument of its own: `get("cutoff",
+"normalizedValue")`, and `set("cutoff", 0.5, "normalizedValue")`. A name that is not one of the
+three is refused with a message, and nothing is read or written. When it is a form written another
+way, other capitals or the British "normalised", the message names the one to write.
+
 ### The script's own control: self
 
 The control or panel this script belongs to: the control for a control script, the panel for a panel script. Use it instead of a fixed name, so that one script works on every copy of a control.
@@ -898,7 +903,7 @@ set("path", value)
 
 #### `get(path [, form])`
 
-Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.
+Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. A `form` that is not one of the three is refused with a message that names them, and the one you meant when it is one written another way ("normalisedValue" is answered with "Write normalizedValue."), and nothing comes back. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.
 
 ```lua
 get("path")

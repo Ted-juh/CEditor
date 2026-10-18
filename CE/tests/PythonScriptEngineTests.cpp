@@ -14,6 +14,7 @@
 // Requires the bundled/installed stdlib to be discoverable (env CEDITOR_PYTHONHOME or a dev install).
 
 #include "Scripting/ScriptRuntime.h"
+#include "Scripting/BridgeScriptHost.h"
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <functional>
@@ -281,6 +282,55 @@ int main()
         const auto setRefusals = std::count (host.logs.begin(), host.logs.end(),
             juce::String ("set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit."));
         check (setRefusals == 2, "Options: set() by the parameter's name is refused as well (got " + logged + ")");
+    }
+
+    // get(path, form) and set(path, value, form) through BridgeScriptHost, the exported plug-in's
+    // host: a form that is not one refuses the call in the WebView runtime's words
+    // (scriptGetReports.test.js), naming the form meant, and nothing reaches the app; a right one
+    // reaches it with its form. Python's set always handed text on; it is the host that now reads it.
+    {
+        juce::StringArray formLogs, reached;
+        BridgeScriptHost::Callbacks fcb;
+        fcb.getValue = [&] (const juce::String& path, const juce::String& form)
+            { reached.add ("get " + path + " " + form); return juce::var (0.5); };
+        fcb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form)
+            { reached.add ("set " + path + " " + v.toString() + " " + form); };
+        fcb.log = [&] (const juce::String& m, const juce::var&) { formLogs.add (m); };
+        BridgeScriptHost formHost (std::move (fcb));
+        ScriptRuntime formRuntime (formHost);
+        formHost.attachRuntime (&formRuntime);
+        formRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        auto formScript = makeScript ("pyForms", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    log('a ' + str(get('cutoff', 'normalisedValue')))\n"
+            "    set('cutoff', 0.5, 'normalisedValue')\n"
+            "    self.set('value', 1, 'Normalized')\n"
+            "    log('b ' + str(self.get('value', '.normalizedValue')))\n"
+            "    log('c ' + str(get('cutoff', 'normalizedValue')))\n"
+            "    set('cutoff', 0.25, 'normalizedValue')\n"
+            "    set('cutoff', 120, {'transmit': False})\n");
+        formScript.getDynamicObject()->setProperty ("owner", "cutoff");   // self is the control
+        juce::Array<juce::var> formScripts;
+        formScripts.add (formScript);
+        formRuntime.loadScripts (juce::var (formScripts));
+        formRuntime.onPanelReady (true);
+
+        const juce::String forms = " The forms are value, normalizedValue and midiValue.";
+        const juce::StringArray expectedLogs {
+            "get(\"cutoff\"): \"normalisedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "a None",
+            "set(\"cutoff\"): \"normalisedValue\" is not a value form, so nothing was set." + forms + " Write normalizedValue.",
+            "set(\"cutoff.value\"): \"Normalized\" is not a value form, so nothing was set." + forms,
+            "get(\"cutoff.value\"): \".normalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "b None",
+            "c 0.5",
+        };
+        check (formLogs == expectedLogs,
+               "Forms: a form that is not one refuses get and set in Python, in the WebView's words (got "
+                   + formLogs.joinIntoString (" | ") + ")");
+        check (reached == juce::StringArray { "get cutoff normalizedValue", "set cutoff 0.25 normalizedValue", "set cutoff 120 value" },
+               "Forms: nothing refused reaches the app, and a right form, or set's options, does (got "
+                   + reached.joinIntoString (" | ") + ")");
     }
 
     // ce.midi byte lists in the embedded interpreter, with Python's own bytes and bytearray read as

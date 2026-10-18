@@ -551,6 +551,29 @@ function setPanelValue(segs, value) {
 
 const DERIVED_ACCESSORS = new Set(VALUE_ACCESSOR_IDS.filter((id) => id !== 'value'));
 
+// An explicit form that is not one of the three used to be dropped here without a word, so
+// get("cutoff", "normalisedValue"), British spelling and all, answered the raw 64 rather than 0.5,
+// and set("cutoff", 0.5, "normalisedValue") wrote 0.5 into a 0..127 control. A string that is not a
+// form now refuses the call: get answers nothing, set writes nothing, and the console names the
+// forms, and the one meant when the text is a form written another way (other capitals, the label's
+// leading dot, or "normalised"/"normalise" for "normalized"). The player says the same in the same
+// words (BridgeScriptHost::formRefusal). Anything but a string is not a form at all and is left as
+// it was: set's options table, and whatever else reaches get's second argument.
+
+/** The form `text` is another way of writing, or ''. */
+function formMeant(text) {
+  const canonical = String(text).trim().toLowerCase().replace(/^\./, '').replace(/normali[sz]e?d?/, 'normalized');
+  return VALUE_ACCESSOR_IDS.find((id) => id.toLowerCase() === canonical) ?? '';
+}
+
+/** The console's line refusing `form`, given explicitly to `call`, or '' when it is a form or none. */
+function formRefusal(call, outcome, form) {
+  if (typeof form !== 'string' || form === '' || VALUE_ACCESSOR_IDS.includes(form)) return '';
+  const meant = formMeant(form);
+  return `${call}: "${form}" is not a value form, so ${outcome}. The forms are ${andList(VALUE_ACCESSOR_IDS)}.`
+    + (meant ? ` Write ${meant}.` : '');
+}
+
 function splitAccessor(path, explicitForm) {
   const text = String(path ?? '');
   const form = VALUE_ACCESSOR_IDS.includes(explicitForm) ? explicitForm : '';
@@ -647,6 +670,8 @@ function colourWrites(call, outcome, root, path, value, named = false) {
 function setValue(path, value, formOrOpts = '') {
   const form = typeof formOrOpts === 'string' ? formOrOpts : '';
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
+  const notAForm = formRefusal(`set("${path}")`, 'nothing was set', form);
+  if (notAForm) { addScriptTrace('error', '', notAForm); return; }
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
   if (isPanelTarget(name)) { setPanelValue(segs, value); return; }
@@ -852,6 +877,8 @@ function sectionPathMisses(control, modelPath) {
 }
 
 function getValue(path, form = '', report = false) {
+  const notAForm = formRefusal(`get("${path}")`, 'there is no answer', form);
+  if (notAForm) { addScriptTrace('error', '', notAForm); return undefined; }
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
   if (isPanelTarget(name)) return getPanelValue(segs);

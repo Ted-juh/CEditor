@@ -3258,10 +3258,18 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
 
     api->setMethod ("set", [host, arg] (const Args& a) -> juce::var
         { host->setValue (arg (a, 0).toString(), arg (a, 1), arg (a, 2)); return {}; });
-    api->setMethod ("get", [host, arg] (const Args& a) -> juce::var
-        { return host->getValue (arg (a, 0).toString(), arg (a, 1).toString()); });
-    api->setMethod ("whyNoValue", [host, arg] (const Args& a) -> juce::var
-        { const auto why = host->whyNoValue (arg (a, 0).toString(), arg (a, 1).toString());
+    // get's form is text or it is no form, as in the WebView runtime: a table or a number where the
+    // form goes means the value, rather than the text a var makes of it, which the host would now
+    // refuse as a form that is not one (BridgeScriptHost::formRefusal).
+    auto formOf = [arg] (const Args& a, int i) -> juce::String
+    {
+        const auto form = arg (a, i);
+        return form.isString() ? form.toString() : juce::String ("value");
+    };
+    api->setMethod ("get", [host, arg, formOf] (const Args& a) -> juce::var
+        { return host->getValue (arg (a, 0).toString(), formOf (a, 1)); });
+    api->setMethod ("whyNoValue", [host, arg, formOf] (const Args& a) -> juce::var
+        { const auto why = host->whyNoValue (arg (a, 0).toString(), formOf (a, 1));
           return why.isEmpty() ? juce::var() : juce::var (why); });
     api->setMethod ("sendCC", [host, arg] (const Args& a) -> juce::var
         { host->sendCC ((int) arg (a, 0), (int) arg (a, 1), arg (a, 2)); return {}; });

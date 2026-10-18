@@ -224,6 +224,39 @@ public:
         return { path, explicitIsDerived ? explicitForm : juce::String ("value") };
     }
 
+    /** The form `text` is another way of writing (other capitals, the label's leading dot, or
+        "normalised"/"normalise"/"normalize" for "normalized"), or empty. Mirrors formMeant in
+        panelRuntime.js, regular expression and all: the first normali[sz]e?d? becomes normalized. */
+    static juce::String formMeant (const juce::String& text)
+    {
+        auto canonical = text.trim().toLowerCase();
+        if (canonical.startsWithChar ('.')) canonical = canonical.substring (1);
+        const int s = canonical.indexOf ("normalis"), z = canonical.indexOf ("normaliz");
+        if (const int at = (s < 0 || (z >= 0 && z < s)) ? z : s; at >= 0)
+        {
+            int end = at + 8;
+            if (end < canonical.length() && canonical[end] == 'e') ++end;
+            if (end < canonical.length() && canonical[end] == 'd') ++end;
+            canonical = canonical.substring (0, at) + "normalized" + canonical.substring (end);
+        }
+        for (const char* form : { "value", "normalizedValue", "midiValue" })
+            if (canonical == juce::String (form).toLowerCase()) return form;
+        return {};
+    }
+
+    /** The console's line refusing an explicit `form` that is not one of a value's three, or empty
+        when it is one or none was given. A form that was not one used to be dropped here without a
+        word, so get("cutoff", "normalisedValue") answered the raw value and set("cutoff", 0.5,
+        "normalisedValue") wrote 0.5 into a 0..200 control. The WebView runtime refuses the same
+        calls in the same words (formRefusal in panelRuntime.js; scriptGetReports.test.js). */
+    static juce::String formRefusal (const juce::String& call, const juce::String& outcome, const juce::String& form)
+    {
+        if (form.isEmpty() || form == "value" || form == "normalizedValue" || form == "midiValue") return {};
+        const auto meant = formMeant (form);
+        return call + ": \"" + form + "\" is not a value form, so " + outcome
+             + ". The forms are value, normalizedValue and midiValue." + (meant.isNotEmpty() ? " Write " + meant + "." : juce::String());
+    }
+
     /** Does this path write a read-only property of the panel document? Mirrors
         PANEL_READONLY_PROPERTIES in panelApi.js — panelApiParity.test.js checks the two agree. */
     static bool isPanelReadOnlyPath (const juce::String& path)
@@ -244,6 +277,11 @@ public:
 
     juce::var getValue (const juce::String& path, const juce::String& form) override
     {
+        if (const auto refusal = formRefusal ("get(\"" + path + "\")", "there is no answer", form); refusal.isNotEmpty())
+        {
+            logAt ("error", refusal, juce::var());
+            return {};
+        }
         const auto addressed = splitAccessor (path, form);
         if (addressed.second == "midiValue")
         {
@@ -258,14 +296,25 @@ public:
     // its accessor taken off, as getValue hands it over. .midiValue has its own message already.
     juce::String whyNoValue (const juce::String& path, const juce::String& form) override
     {
+        // A form that is not one has been refused by getValue, in words of its own.
+        if (formRefusal ({}, {}, form).isNotEmpty()) return {};
         const auto addressed = splitAccessor (path, form);
         if (addressed.second == "midiValue" || ! callbacks.whyNoValue) return {};
         return callbacks.whyNoValue (addressed.first);
     }
 
+    // The third argument is set()'s options table, or, as text, the value form, as the WebView
+    // runtime reads it: set("cutoff", 0.5, "normalizedValue") is the form-argument spelling of
+    // set("cutoff.normalizedValue", 0.5). Text was dropped here, so that spelling wrote 0.5 as it was.
     void setValue (const juce::String& path, const juce::var& value, const juce::var& options) override
     {
-        const auto addressed = splitAccessor (path, {});
+        const auto form = options.isString() ? options.toString() : juce::String();
+        if (const auto refusal = formRefusal ("set(\"" + path + "\")", "nothing was set", form); refusal.isNotEmpty())
+        {
+            logAt ("error", refusal, juce::var());
+            return;
+        }
+        const auto addressed = splitAccessor (path, form);
         if (addressed.second == "midiValue")
         {
             reportNeedsDeviceHost ("set(.midiValue)", addressed.first);

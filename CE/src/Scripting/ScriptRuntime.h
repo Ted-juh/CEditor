@@ -128,6 +128,8 @@ public:
     { juce::ignoreUnused (path, form); return {}; }
     // `options` may carry { transmit: bool }. If absent, the host applies the origin-based default
     // (loud, unless inbound or inside a noTransmit block) via ScriptRuntime::defaultTransmit().
+    // Text in its place is the value form, set(path, value, form), as the WebView runtime reads it;
+    // BridgeScriptHost refuses text that is not one of the three, as it does get()'s `form`.
     virtual void      setValue (const juce::String& path, const juce::var& value, const juce::var& options) = 0;
 
     // Device / MIDI (Q9).

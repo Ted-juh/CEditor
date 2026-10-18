@@ -56,6 +56,20 @@ juce::var solToVar (const sol::object& o)
     }
 }
 
+/** set()'s third argument for the host: its options table, as { transmit }, or the value form as
+    text, which the host reads as the WebView runtime does (BridgeScriptHost::setValue). Taken as a
+    table only, text never reached the host, so set("cutoff", 0.5, "normalizedValue") wrote 0.5 as
+    it was, and a form that is not one was dropped without a word. */
+juce::var setOptionsOf (const sol::object& opts)
+{
+    if (opts.get_type() == sol::type::string) return juce::var (juce::String (opts.as<std::string>()));
+    if (opts.get_type() != sol::type::table) return {};
+    auto* o = new juce::DynamicObject();
+    sol::object t = opts.as<sol::table>()["transmit"];
+    if (t.valid() && t.get_type() == sol::type::boolean) o->setProperty ("transmit", t.as<bool>());
+    return juce::var (o);
+}
+
 sol::object varToSol (sol::state_view lua, const juce::var& v)
 {
     if (v.isVoid() || v.isUndefined()) return sol::make_object (lua, sol::nil);
@@ -3615,24 +3629,15 @@ public:
         host = &h;
         auto g = lua.globals();
 
-        // optionsFromOpts: turn a Lua opts table {transmit=...} into a juce::var for the host.
-        auto buildOptions = [this] (sol::optional<sol::table> opts) -> juce::var
-        {
-            if (! opts) return {};
-            auto* o = new juce::DynamicObject();
-            sol::object t = (*opts)["transmit"];
-            if (t.valid() && t.get_type() == sol::type::boolean) o->setProperty ("transmit", t.as<bool>());
-            return juce::var (o);
-        };
-
         // set() runs this script set's intercept() filters before the host sees the value, so a
         // rule like "this knob only takes even numbers" holds for every write instead of being
-        // re-checked at each call site.
-        g.set_function ("set", [this, buildOptions] (std::string path, sol::object value, sol::optional<sol::table> opts)
+        // re-checked at each call site. Its third argument is the options table or the value form
+        // (setOptionsOf).
+        g.set_function ("set", [this] (std::string path, sol::object value, sol::object opts)
         {
             auto v = solToVar (value);
             if (! runFilters (juce::String (path), v)) return;
-            host->setValue (juce::String (path), v, buildOptions (opts));
+            host->setValue (juce::String (path), v, setOptionsOf (opts));
         });
         g.set_function ("get", [this] (std::string path, sol::optional<std::string> form)
             { return varToSol (lua, scriptGet (juce::String (path), form ? juce::String (*form) : juce::String ("value"))); });
@@ -3837,7 +3842,10 @@ public:
             return owner + "." + juce::String (p);
         };
         sol::table self = lua.create_table();
-        self.set_function ("set", [this, prefix] (std::string p, sol::object v) { host->setValue (prefix (p), solToVar (v), juce::var()); });
+        // self.set took no third argument at all, so its options and its form were both dropped;
+        // the WebView's self.set reads them as set() does.
+        self.set_function ("set", [this, prefix] (std::string p, sol::object v, sol::object opts)
+            { host->setValue (prefix (p), solToVar (v), setOptionsOf (opts)); });
         self.set_function ("get", [this, prefix] (std::string p, sol::optional<std::string> form)
             { return varToSol (lua, scriptGet (prefix (p), form ? juce::String (*form) : juce::String ("value"))); });
         env["self"] = self;

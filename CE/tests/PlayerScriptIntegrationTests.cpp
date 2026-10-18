@@ -265,6 +265,87 @@ int main()
                "whyNoAnswer is silent for a path that is there, and for the panel document");
     }
 
+    // --- an explicit form that is not one of the three, window-closed ------------------------
+    // get(path, form) and set(path, value, form): a form that was not value, normalizedValue or
+    // midiValue was dropped without a word (BridgeScriptHost::splitAccessor), so get("cutoff",
+    // "normalisedValue") answered the raw value. And set's text form never arrived at all: Lua's
+    // set took only a table there and self.set no third argument, and the host read only options
+    // from it, so set("cutoff", 0.5, "normalizedValue") wrote 0.5 as it was, where the WebView
+    // runtime wrote 100 of 0..200. A form that is not one now refuses the call in the WebView's
+    // words (scriptGetReports.test.js), naming the form meant, and a right one works in every spelling.
+    {
+        const char* kFormPanel = R"JSON({
+          "name": "Forms",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "fl", "name": "fl", "language": "lua", "scope": "panel", "owner": "cutoff", "event": "onFormsLua", "target": "*", "enabled": true,
+              "source": "function onFormsLua()\n  log(\"a \" .. tostring(get(\"cutoff\", \"normalisedValue\")))\n  set(\"cutoff\", 0.5, \"normalisedValue\")\n  log(\"b \" .. tostring(get(\"cutoff\")))\n  log(\"c \" .. tostring(get(\"cutoff\", \"NormalizedValue\")))\n  set(\"cutoff\", 50, \"percent\")\n  self.set(\"value\", 1, \"Normalized\")\n  log(\"d \" .. tostring(self.get(\"value\", \".normalizedValue\")))\n  log(\"e \" .. tostring(get(\"cutoff\")))\n  set(\"cutoff\", 0.25, \"normalizedValue\")\n  log(\"f \" .. tostring(get(\"cutoff\")))\n  self.set(\"value\", 0.75, \"normalizedValue\")\n  log(\"g \" .. tostring(get(\"cutoff\", \"normalizedValue\")))\n  set(\"cutoff\", 120, { transmit = false })\n  log(\"h \" .. tostring(get(\"cutoff\", { transmit = false })))\nend\n" },
+            { "id": "fj", "name": "fj", "language": "javascript", "scope": "panel", "owner": "cutoff", "event": "onFormsJs", "target": "*", "enabled": true,
+              "source": "function onFormsJs(){ log('a ' + get('cutoff', 'normalisedValue')); set('cutoff', 0.5, 'normalisedValue'); log('b ' + get('cutoff')); log('c ' + get('cutoff', 'NormalizedValue')); set('cutoff', 50, 'percent'); self.set('value', 1, 'Normalized'); log('d ' + self.get('value', '.normalizedValue')); log('e ' + get('cutoff')); set('cutoff', 0.25, 'normalizedValue'); log('f ' + get('cutoff')); self.set('value', 0.75, 'normalizedValue'); log('g ' + get('cutoff', 'normalizedValue')); set('cutoff', 120, { transmit: false }); log('h ' + get('cutoff', { transmit: false })); }" }
+          ],
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+              "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 200 },
+              "Value": { "_type": "Value", "value": 100 }
+            } }
+          ]
+        })JSON";
+
+        const juce::String forms = " The forms are value, normalizedValue and midiValue.";
+        const juce::StringArray expectedRefusals {
+            "get(\"cutoff\"): \"normalisedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "set(\"cutoff\"): \"normalisedValue\" is not a value form, so nothing was set." + forms + " Write normalizedValue.",
+            "get(\"cutoff\"): \"NormalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "set(\"cutoff\"): \"percent\" is not a value form, so nothing was set." + forms,
+            "set(\"cutoff.value\"): \"Normalized\" is not a value form, so nothing was set." + forms,
+            "get(\"cutoff.value\"): \".normalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+        };
+
+        for (const char* lang : { "Lua", "Js" })
+        {
+            PanelValueModel formModel;
+            check (formModel.loadFromJson (kFormPanel), "loaded the form panel");
+            juce::StringArray formLogs;
+            BridgeScriptHost::Callbacks fcb;
+            fcb.getValue = [&] (const juce::String& path, const juce::String& form) { return formModel.getValue (path, form); };
+            fcb.whyNoValue = [&] (const juce::String& path) { return formModel.whyNoAnswer (path); };
+            fcb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { formModel.setValue (path, v, form); };
+            fcb.log = [&] (const juce::String& m, const juce::var&) { formLogs.add (m); };
+            BridgeScriptHost formHost (std::move (fcb));
+            ScriptRuntime formRuntime (formHost);
+            formHost.attachRuntime (&formRuntime);
+            formRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+            formRuntime.loadScripts (gatherPanelScripts (formModel.panel()));
+            formRuntime.runAction (juce::String ("onForms") + lang, juce::var());
+
+            const juce::String tag (lang);
+            const juce::String nothing = tag == "Lua" ? "nil" : "null";
+            const juce::StringArray expected {
+                expectedRefusals[0], "a " + nothing,
+                expectedRefusals[1],
+                "b 100",
+                expectedRefusals[2], "c " + nothing,
+                expectedRefusals[3],
+                expectedRefusals[4],
+                expectedRefusals[5], "d " + nothing,
+                "e 100",
+                "f 50",
+                "g 0.75",
+                "h 120",
+            };
+            check (formLogs == expected,
+                   tag + ": a form that is not one refuses get and set in the WebView's words, writes nothing, and the "
+                         "right one works by set, self.set and get (got: " + formLogs.joinIntoString (" | ") + ")");
+        }
+        // The host's own reading, without an engine: what a native handler reaches.
+        check (BridgeScriptHost::formMeant ("normalised") == "" && BridgeScriptHost::formMeant (" Normalisedvalue ") == "normalizedValue"
+                   && BridgeScriptHost::formMeant ("MIDIVALUE") == "midiValue" && BridgeScriptHost::formMeant (".value") == "value"
+                   && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "normalizedValue").isEmpty()
+                   && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "").isEmpty(),
+               "formMeant names the form written another way, and formRefusal passes a form and no form");
+    }
+
     // --- slice 2: ce.midi channel messages + ce.storage, window-closed -----------------------
     {
         PanelValueModel modModel;

@@ -580,6 +580,11 @@ positions:
 set("resonance.normalizedValue", get("cutoff.normalizedValue"))
 \`\`\`
 
+The form's name can also go after the path as an argument of its own: \`get("cutoff",
+"normalizedValue")\`, and \`set("cutoff", 0.5, "normalizedValue")\`. A name that is not one of the
+three is refused with a message, and nothing is read or written. When it is a form written another
+way, other capitals or the British "normalised", the message names the one to write.
+
 ### The script's own control: self
 
 ${SELF.summary}
