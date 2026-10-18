@@ -3596,7 +3596,7 @@ export const HELPERS = [
   // every list that comes back is new.
   {
     id: 'getBits', category: 'MIDI encoding', signature: 'getBits(value, start, count) -> number',
-    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte, as JUCE\'s MemoryBlock counts them. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0.',
+    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0.',
     params: [
       { name: 'value', type: 'value', required: true },
       { name: 'start', type: 'number', required: true },
