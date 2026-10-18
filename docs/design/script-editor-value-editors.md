@@ -2,7 +2,7 @@
 
 Status: **proposal, nothing built.** 2026-10-18. The silent failures it found, and four more found
 on the way, were then fixed in the script runtimes; [Fixed since, and still open](#fixed-since-and-still-open)
-lists them and the little that is left.
+lists them.
 
 It started as a question about colour. A script's colours are typed out as hex, so why is there no
 swatch beside them that opens the display panel's colour and gradient editors? Colour turned out to
@@ -584,7 +584,7 @@ ce.device.defineParameter("level", {
 ## Fixed since, and still open
 
 Eight silent failures were fixed in the script runtimes on 2026-10-18: the four this record found,
-then the four it first left open as decisions. Each follows the rule the runtimes already used for
+then the four it first left open as decisions. Two smaller gaps followed (the end of this section). Each follows the rule the runtimes already used for
 an unknown blend mode: say what was wrong, and send or draw nothing rather than something
 plausible. Where a value had to be read rather than refused, it is applied as written, with a
 warning. Each was fixed in every runtime that has the call, in the same words, so the editor and
@@ -605,14 +605,11 @@ across the WebView runtime and the Lua, JavaScript and Python preludes.
 `ce.draw.arc`'s `from` and `to`, and `ce.draw.gradient`'s `angle`, now carry `unit: 'degrees'` in
 the schema, which is the step zero the number kind needs.
 
-Still open, noticed on the way and small:
-
-- **A root that is missing altogether is still read as note 0.** The music helpers now refuse a
-  note name they cannot read, but `ce.music.scale(nil)` (as opposed to `"c4"`) is still the scale on
-  C-1, by the numeric fallback.
-- **Empty hex text is reported by the editor and not by the player.** `sendMidi("")` writes "no
-  bytes given" in the editor; the player hands its callback an empty list, which sends nothing
-  without a word.
+Two small gaps noticed on the way were then closed as well. A note left out altogether
+(`sendNote(1)`, `ce.music.scale(nil)`) was still read as note 0 by the numeric path, and is now
+refused like an unreadable name, everywhere but aftertouch, where no note means channel pressure.
+And the player now says "no bytes given" for an empty `sendMidi`, `sendSysex` or `feedMidi`, as the
+editor always did, instead of handing its callback nothing to send.
 
 ## Rules every edit session follows
 
