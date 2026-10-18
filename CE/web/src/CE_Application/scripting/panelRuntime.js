@@ -5110,6 +5110,17 @@ function ensureLayerOrder(name, layer) {
   setValue(path, [...order, layer.prefix]);
 }
 
+/** ce.text.style and ce.image.set read their own option keys (image.set in any case, which the
+ *  shared check does not), but an unknown one refuses the whole call as it does everywhere else:
+ *  they used to drop the unknown key alone and apply the rest. True after saying so. */
+function refusedForUnknownOptions(path, memberId, refused, unknownReason) {
+  const keys = refused.filter((p) => p.reason === unknownReason).map((p) => p.option).sort();
+  if (!keys.length) return false;
+  const names = (MEMBER_BY_ID[memberId].params ?? []).find((p) => Array.isArray(p.fields))?.fields.map((f) => f.name) ?? [];
+  addScriptTrace('error', '', unknownOptionsMessage(path, { parent: '', keys, shape: { names, sections: false } }));
+  return true;
+}
+
 function imageSetImpl(target, src, opts) {
   const name = String(target ?? '');
   const layer = resolveImageLayer('set', name, opts?.layer);
@@ -5121,6 +5132,7 @@ function imageSetImpl(target, src, opts) {
     // The refusal line adds its own full stop.
     return read.why ? { reason: `${read.why}. ${read.advice.replace(/\.$/, '')}` } : { colour: read.colour };
   } });
+  if (refusedForUnknownOptions('ce.image.set', 'imageSet', refused, 'not an image option')) return false;
   for (const problem of refused) {
     addScriptTrace('error', '',
       `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
@@ -5279,6 +5291,7 @@ function textStyleImpl(target, opts) {
   const { writes, refused } = planStyle(opts, {
     descriptor: findFont(catalogue, font.family), catalogue,
   });
+  if (refusedForUnknownOptions('ce.text.style', 'textStyle', refused, 'not a style option')) return false;
 
   for (const problem of refused) {
     addScriptTrace('error', '',

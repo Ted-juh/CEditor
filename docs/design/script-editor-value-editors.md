@@ -677,8 +677,9 @@ Still open, for the owner:
   same in every runtime that implements the member: `gen-script-modules.mjs` writes the contract's
   lists and the check into the three preludes, and `scriptPreludeAgreement.test.js` holds their
   words and answers to the editor's. Every committed panel's scripts and every written example
-  passed the check before it became a refusal. ce.text.style and ce.image.set keep their own,
-  older check, which refuses the unknown option alone and applies the rest. Not checked, because
+  passed the check before it became a refusal. ce.text.style and ce.image.set read their own
+  keys (image.set in any case) and refuse the whole call in the same words; they used to drop the
+  unknown option alone and apply the rest. Not checked, because
   the contract lists no fields for them: `ce.midi.write`'s options (every runtime reads `bits` and
   `order`) and `ce.panel.define`'s spec, which checks a state's keys itself.
 - **A colour property: decided, accept.** The short forms with one reading are stored written out

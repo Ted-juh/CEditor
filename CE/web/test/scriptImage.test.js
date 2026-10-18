@@ -244,9 +244,13 @@ test('an unknown layer or option is reported', () => {
     clearScriptTrace();
     assert.equal(api.imageSet('L', PNG, { layer: 'nope' }), false);
     assert.match(traced(), /no such layer/);
+    // An option it does not take refuses the whole call, in the words every member uses; it used to
+    // drop that option alone and apply the rest.
     clearScriptTrace();
-    assert.equal(api.imageSet('L', PNG, { nonsense: 1 }), false);
-    assert.match(traced(), /not an image option/);
+    const before = api.get('L.Background.Fill.imageOpacity');
+    assert.equal(api.imageSet('L', PNG, { nonsense: 1, opacity: 40 }), false);
+    assert.match(traced(), /^ce\.image\.set: "nonsense" is not one of its options, so nothing was done\. Its options are: /);
+    assert.equal(api.get('L.Background.Fill.imageOpacity'), before, 'nothing from the refused call landed');
   });
 });
 
