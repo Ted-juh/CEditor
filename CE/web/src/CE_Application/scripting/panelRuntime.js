@@ -6154,6 +6154,7 @@ function deviceDefineParameterImpl(id, spec, role) {
   if (!result.ok) { addScriptTrace('error', '', result.error); return false; }
   const p = result.parameter;
   addScriptTrace('log', '', `defineParameter ${p.id} — ${p.name} (${p.type}, ${p.min}..${p.max})`);
+  if (result.warning) addScriptTrace('warn', '', result.warning);
   return true;
 }
 

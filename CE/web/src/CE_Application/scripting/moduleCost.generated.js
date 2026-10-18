@@ -44,7 +44,7 @@ export const MODULE_COST = {
   "ce.components.transport": { "javascript": 324, "lua": 324, "python": 324, "webview": 0 },
   "ce.components.turing": { "javascript": 250, "lua": 250, "python": 250, "webview": 0 },
   "ce.core": { "javascript": 5032, "lua": 0, "python": 5012, "webview": 0 },
-  "ce.device": { "javascript": 7199, "lua": 6426, "python": 6839, "webview": 29405 },
+  "ce.device": { "javascript": 7199, "lua": 6426, "python": 6839, "webview": 29471 },
   "ce.draw": { "javascript": 351, "lua": 351, "python": 351, "webview": 37071 },
   "ce.image": { "javascript": 106, "lua": 106, "python": 106, "webview": 0 },
   "ce.math": { "javascript": 23942, "lua": 26701, "python": 23331, "webview": 39300 },

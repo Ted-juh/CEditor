@@ -117,6 +117,16 @@ test('writing a declared parameter sends its own bytes, with no profile involved
   });
 });
 
+test('a Roland template without $checksumStart is declared, and the console warns about it', () => {
+  withPanel(panelWith(), (api) => {
+    clearScriptTrace();
+    assert.equal(api.deviceDefineParameter('lvl', { sysex: ['F0', '41', '10', '42', '12', '40', '01', '33', '$value', '$checksum', 'F7'] }), true);
+    const warns = get(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+    assert.equal(warns.length, 1);
+    assert.match(warns[0], /^defineParameter\("lvl"\): this is a Roland template .* Put \$checksumStart where the address begins\.$/);
+  });
+});
+
 test('a parameter with no wire format is refused, and the panel does not look built', () => {
   withPanel(panelWith(), (api) => {
     assert.equal(api.deviceDefineParameter('cutoff', { name: 'Cutoff', max: 127 }), false);

@@ -2173,6 +2173,29 @@ int main()
                    && (int) (*sy.getArray())[11] == 0xF7,
                "$checksumStart makes the Roland checksum right rather than nearly right");
 
+        // Without the marker the definition stands, the checksum covers the header (27 where 4C is
+        // right, for this message at 64), and a warning says so in deviceDefinitions.js's words.
+        const juce::String rolandWarning = "warn:defineParameter(\"lvl\"): this is a Roland template (41 after F0) "
+            "with $checksum and no $checksumStart, so the checksum includes the header, and a Roland synth ignores "
+            "the message. Put $checksumStart where the address begins.";
+        host.levelled.clear();
+        check (runtime.defineDeviceParameter ("mainSynth", "lvl", spec (
+                   R"({ "sysex": ["F0","41","10","42","12","40","01","33","$value","$checksum","F7"], "min": 0, "max": 127 })")),
+               "a Roland template without $checksumStart is still defined");
+        check (host.levelled.size() == 1 && host.levelled[0] == rolandWarning,
+               "…with a warning that names the missing marker (got " + host.levelled.joinIntoString (" | ") + ")");
+        const auto lvl = runtime.encodeDeviceParameter ("mainSynth", "lvl", 64);
+        check (lvl.getArray() != nullptr && lvl.getArray()->size() == 11 && (int) (*lvl.getArray())[9] == 0x27,
+               "…and the warning is about something real: the header is in the sum");
+        host.levelled.clear();
+        check (runtime.defineDeviceParameter ("mainSynth", "lvl", spec (
+                   R"({ "sysex": ["F0","41","10","42","12","$checksumStart","40","01","33","$value","$checksum","F7"], "min": 0, "max": 127 })"))
+                   && host.levelled.isEmpty(),
+               "with the marker there is nothing to warn about");
+        check (runtime.defineDeviceParameter ("mainSynth", "yam", spec (R"({ "sysex": ["F0","43","10","$value","$checksum","F7"] })"))
+                   && host.levelled.isEmpty(),
+               "a template that is not Roland's gets no Roland warning");
+
         check (! runtime.encodeDeviceParameter ("mainSynth", "notMine", 1).isArray(),
                "encoding an undeclared parameter is void, so the caller falls through to the profile");
 

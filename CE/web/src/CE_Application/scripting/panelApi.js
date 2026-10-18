@@ -2557,7 +2557,10 @@ export const COMMANDS = [
         { name: 'sysex', type: 'list', group: 'how it reaches the synth — pick one',
           summary: 'Send it as a SysEx message built from this template. Entries are hex literals '
             + 'or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you '
-            + 'listed in `variables`.' },
+            + 'listed in `variables`. The checksum covers everything after F0 unless $checksumStart '
+            + 'says where it begins. A Roland checksum covers only the address and the data, so a '
+            + 'Roland template (41 after F0) with $checksum and no $checksumStart is defined with a '
+            + 'warning.' },
         { name: 'channel', type: 'number', default: 'the panel\'s channel', sample: '1',
           summary: 'The MIDI channel to send on.' },
         { name: 'encoding', type: 'text', sample: '"to14bit"',

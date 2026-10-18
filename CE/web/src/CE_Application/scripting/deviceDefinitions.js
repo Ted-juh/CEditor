@@ -193,7 +193,24 @@ export function defineParameter(role, id, spec = {}) {
   const s = slot(role);
   s.parameters.set(key, entry);
   invalidate(s);
-  return { ok: true, parameter: entry.descriptor };
+  const warning = wire.kind === 'sysex' ? rolandChecksumWarning(key, wire.template) : '';
+  return { ok: true, parameter: entry.descriptor, ...(warning ? { warning } : {}) };
+}
+
+/**
+ * Is this a Roland template (41 straight after F0) whose $checksum has no $checksumStart? Then the
+ * sum runs from the first byte after F0, header included, which is right for short templates and
+ * a message a Roland synth rejects without a word (encodeParameter says why the marker is not
+ * inferred). The definition still stands; defineParameter returns a warning that says so, in the
+ * same words as ScriptRuntime::defineDeviceParameter.
+ */
+function rolandChecksumWarning(key, template) {
+  const hex = (t) => String(t ?? '').replace(/^0x/i, '').toLowerCase();
+  const first = hex(template[0]) === 'f0' ? template[1] : template[0];
+  if (hex(first) !== '41' || !template.includes('$checksum') || template.includes('$checksumStart')) return '';
+  return `defineParameter("${key}"): this is a Roland template (41 after F0) with $checksum and no `
+    + '$checksumStart, so the checksum includes the header, and a Roland synth ignores the message. '
+    + 'Put $checksumStart where the address begins.';
 }
 
 /** The number a value becomes on the wire — the parameter's own units, clamped to what fits. */

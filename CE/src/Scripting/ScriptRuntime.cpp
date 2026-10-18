@@ -1053,6 +1053,17 @@ bool ScriptRuntime::defineDeviceParameter (const juce::String& role, const juce:
         }
         p.wireKind = "sysex";
         p.checksumKind = propOr (spec, "checksum", "roland").toString();
+
+        // A Roland template (41 straight after F0) whose $checksum has no $checksumStart sums the
+        // header too, and a Roland synth rejects the message without a word. The marker is not
+        // inferred (see encodeDeviceParameter), so the definition stands, with a warning in the
+        // words of rolandChecksumWarning in deviceDefinitions.js.
+        auto hexOf = [] (const juce::String& t) { return (t.startsWithIgnoreCase ("0x") ? t.substring (2) : t).toLowerCase(); };
+        const auto first = hexOf (p.tmpl[0]) == "f0" ? p.tmpl[1] : p.tmpl[0];
+        if (hexOf (first) == "41" && p.tmpl.contains ("$checksum") && ! p.tmpl.contains ("$checksumStart"))
+            host.logAt ("warn", "defineParameter(\"" + id + "\"): this is a Roland template (41 after F0) with $checksum "
+                                "and no $checksumStart, so the checksum includes the header, and a Roland synth "
+                                "ignores the message. Put $checksumStart where the address begins.", juce::var());
     }
     else
     {

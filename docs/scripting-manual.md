@@ -1575,7 +1575,7 @@ Describe a synth parameter from your script, for a synth that has no device prof
 | `choices` | list of text | — | The names of the settings, in order, when the parameter is a choice rather than a number. |
 | `cc` | number | — | Send it as this CC number. The simplest of the three wire formats. |
 | `nrpn` | object | — | Send it as an NRPN, as { msb, lsb }. |
-| `sysex` | list | — | Send it as a SysEx message built from this template. Entries are hex literals or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you listed in `variables`. |
+| `sysex` | list | — | Send it as a SysEx message built from this template. Entries are hex literals or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you listed in `variables`. The checksum covers everything after F0 unless $checksumStart says where it begins. A Roland checksum covers only the address and the data, so a Roland template (41 after F0) with $checksum and no $checksumStart is defined with a warning. |
 | `channel` | number | the panel's channel | The MIDI channel to send on. |
 | `encoding` | text | — | How the number is packed into bytes when one byte is not enough — the same names ce.midi's encoders use. |
 | `checksum` | text | — | Which checksum to compute for a SysEx template that asks for one. The names are ce.midi.checksum's. |

@@ -101,6 +101,38 @@ test('$checksumStart is what makes a Roland checksum right rather than nearly ri
   ]);
 });
 
+test('a Roland template without $checksumStart is defined, with a warning that says why it will fail', () => {
+  // The marker is documented rather than inferred, so the definition stands; but without it the
+  // checksum covers the header too, and the synth ignores every message. This says so up front.
+  const warning = 'defineParameter("lvl"): this is a Roland template (41 after F0) with $checksum and no '
+    + '$checksumStart, so the checksum includes the header, and a Roland synth ignores the message. '
+    + 'Put $checksumStart where the address begins.';
+  const missing = defineParameter(ROLE, 'lvl', {
+    sysex: ['F0', '41', '10', '42', '12', '40', '01', '33', '$value', '$checksum', 'F7'], min: 0, max: 127,
+  });
+  assert.equal(missing.ok, true);
+  assert.equal(missing.warning, warning);
+  // The bytes it will send, to show the warning is about something real: 27 where 4C is right.
+  assert.deepEqual(encodeParameter(ROLE, 'lvl', 64).bytes.slice(-2), [0x27, 0xf7]);
+
+  // With F0 left off, 41 is still the first byte.
+  assert.equal(defineParameter(ROLE, 'lvl', { sysex: ['41', '10', '42', '12', '$value', '$checksum'] }).warning, warning);
+
+  const marked = defineParameter(ROLE, 'lvl', {
+    sysex: ['F0', '41', '10', '42', '12', '$checksumStart', '40', '01', '33', '$value', '$checksum', 'F7'],
+    min: 0, max: 127,
+  });
+  assert.equal(marked.warning, undefined, 'with the marker there is nothing to say');
+  assert.deepEqual(encodeParameter(ROLE, 'lvl', 64).bytes.slice(-2), [0x4c, 0xf7]);
+
+  for (const quiet of [
+    { sysex: ['F0', '43', '10', '$value', '$checksum', 'F7'] },   // not Roland
+    { sysex: ['F0', '41', '10', '42', '12', '$value', 'F7'] },    // no checksum asked for
+  ]) {
+    assert.equal(defineParameter(ROLE, 'q', quiet).warning, undefined, JSON.stringify(quiet.sysex));
+  }
+});
+
 test('a u14 value occupies two template bytes', () => {
   defineParameter(ROLE, 'p', { sysex: ['7d', '$value'], encoding: 'u14', min: 0, max: 16383 });
   assert.deepEqual(encodeParameter(ROLE, 'p', 300).bytes, [0xf0, 0x7d, 2, 44, 0xf7]);
