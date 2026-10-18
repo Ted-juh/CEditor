@@ -302,19 +302,30 @@ const SHARED_OPTION_FIELDS = {
     summary: 'When `path` is a list, offset each move after the first by this much, so they start '
       + 'in turn.',
   },
+  // What every runtime does: 0 runs once, n runs n MORE times, a negative number until stopped
+  // (startAnimationImpl, ScriptRuntime::startAnimation). This said "default 1, how many times, 0 or
+  // less forever", so a script asking for one run with repeat = 1 got two, and repeat = 0 meant
+  // forever to the reader and once to every engine.
   repeat: {
-    name: 'repeat', type: 'number', default: '1',
-    summary: 'How many times to run it. 0 or less repeats until you stop it.',
+    name: 'repeat', type: 'number', default: '0',
+    summary: 'How many more times to run it after the first. 0 runs it once and 2 runs it three '
+      + 'times in all; a negative number repeats it until you stop it. In Lua, where repeat is a '
+      + 'keyword, write it as ["repeat"] = 2.',
   },
   pingpong: {
     name: 'pingpong', type: 'true or false', default: 'false',
     summary: 'On a repeat, run the move backwards every other time instead of jumping back to the '
       + 'start.',
   },
+  // Every runtime passes ONE table (fireAnimationDone, ScriptRuntime::fireAnimationDone, the
+  // preludes' __animDone). This said done(completed), and a table is always true, so
+  // `if completed then` read a cancelled move as a finished one.
   done: {
     name: 'done', type: 'function',
-    summary: 'Called when the move ends: done(completed). `completed` is false if the move was '
-      + 'stopped early.',
+    summary: 'Called once when the move ends, with one table: `path` and `completed` for a single '
+      + 'control, or `paths` and `completed` when you gave a list (then it is called once, after the '
+      + 'last of them). `completed` is true if the move got to the end and false if it was stopped '
+      + 'or replaced first, so test `info.completed`: the call itself does not mean it arrived.',
   },
   animFrom: {
     name: 'from', type: 'number', sample: '0',
@@ -2045,7 +2056,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
-    summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align` also lines them up the other way. Needs at least two controls; returns how many it moved.',
+    summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control\'s ("hSpacing") or every left edge in line with the topmost control\'s ("vSpacing"). Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2055,9 +2066,13 @@ export const COMMANDS = [
           unit: 'pixels',
           summary: 'Force a fixed gap between the controls rather than spreading them to fill '
             + 'what is there.' },
-        { name: 'align', type: 'text', sample: '"top"',
-          summary: 'Also line them up on this edge across the other axis, so a row ends up level '
-            + 'as well as evenly spaced. Takes the same words as ce.panel.align.' },
+        // true is all distributePatches acts on (alignOpposite). This was typed as text, sampled
+        // "top" and said it took ce.panel.align's words, every one of which did nothing.
+        { name: 'align', type: 'true or false', default: 'false',
+          summary: 'With "hSpacing" or "vSpacing" only. true also lines them up across the other '
+            + 'axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge '
+            + 'level with the leftmost control\'s, and "vSpacing" puts every left edge in line with '
+            + 'the topmost control\'s. It is not an edge name: "top" or "left" does nothing.' },
       ]) },
     ],
     scopes: 'any',
@@ -2107,7 +2122,7 @@ export const COMMANDS = [
         { name: 'radius', type: 'number', default: '100', unit: 'pixels',
           summary: 'How far from the centre to place each control.' },
         { name: 'startAngle', type: 'number', default: '0', unit: 'degrees',
-          summary: 'Where the first control goes, clockwise from twelve o\'clock.' },
+          summary: 'Where the first control goes, clockwise from three o\'clock.' },
       ]) },
     ],
     scopes: 'any',
