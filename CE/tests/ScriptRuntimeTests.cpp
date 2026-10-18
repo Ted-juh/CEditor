@@ -3617,6 +3617,98 @@ int main()
             check (host.levelled.contains (line), tag + ": " + juce::String (line).fromFirstOccurrenceOf (":", false, false));
     }
 
+    // ---- An option key a call does not take refuses it, in the real engines ----------------------
+    // ce.anim.to("K.value", 100, { easing = "outBack" }) moved in a straight line, a parameter
+    // declared with a misspelled key was defined without it, and set() with a key it does not take
+    // wrote anyway. Each is refused now, before the host or the runtime sees it, by the check
+    // gen-script-modules.mjs writes into each prelude from panelApi.js, in the WebView runtime's
+    // words (scriptPreludeAgreement.test.js): nothing is done, and the call answers what the member
+    // answers for any other refusal. The runtime's own animation and definition code is never
+    // reached, which is what this pins; the same calls with the keys spelled right still work.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        TestHost host;
+        ScriptRuntime runtime (host);
+        host.runtime = &runtime;
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("opts", lang, "panel", "onOpts", "*", isLua
+            ? "function onOpts()\n"
+              "  log(\"to \" .. tostring(animateTo(\"K.value\", 100, { easing = \"outBack\" })))\n"
+              "  log(\"spring \" .. tostring(ce.anim.spring(\"K.value\", 100, { curve = \"outBack\" })))\n"
+              "  log(\"running \" .. tostring(animateRunning(\"K.value\")))\n"
+              "  log(\"define \" .. tostring(ce.device.defineParameter(\"cut\", { cc = 74, nmae = \"Cutoff\", nrpn = { mbs = 1 } })))\n"
+              "  log(\"dump \" .. tostring(ce.device.defineDump(\"patch\", { header = \"F0\", match = { prefix = \"F0 7D\" }, fields = {} })))\n"
+              "  set(\"K.refused\", 5, { transmit = false, quiet = true })\n"
+              "  log(\"recall \" .. tostring(recallPreset(0, { rol = \"mainSynth\" }).ok))\n"
+              "  log(\"params \" .. #ce.device.parameters({ grp = \"Filter\" }))\n"
+              "  syncTimer(\"s\", 1, { folow = false })\n"
+              "  log(\"read \" .. tostring(ce.midi.read({ 1, 2 }, 0, 2, { ordr = \"lsb\" })))\n"
+              "  set(\"K.good\", 7, { transmit = false })\n"
+              "  log(\"good \" .. tostring(ce.device.defineParameter(\"res\", { cc = 71, name = \"Resonance\", nrpn = nil })))\n"
+              "  log(\"goodRead \" .. tostring(ce.midi.read({ 1, 2 }, 0, 2, { order = \"lsb\" })))\n"
+              "  animateTo(\"K.value\", 50, { duration = 500 })\n"
+              "end\n"
+            : "function onOpts() {\n"
+              "  log(\"to \" + animateTo(\"K.value\", 100, { easing: \"outBack\" }));\n"
+              "  log(\"spring \" + ce.anim.spring(\"K.value\", 100, { curve: \"outBack\" }));\n"
+              "  log(\"running \" + animateRunning(\"K.value\"));\n"
+              "  log(\"define \" + ce.device.defineParameter(\"cut\", { cc: 74, nmae: \"Cutoff\", nrpn: { mbs: 1 } }));\n"
+              "  log(\"dump \" + ce.device.defineDump(\"patch\", { header: \"F0\", match: { prefix: \"F0 7D\" }, fields: [] }));\n"
+              "  set(\"K.refused\", 5, { transmit: false, quiet: true });\n"
+              "  log(\"recall \" + recallPreset(0, { rol: \"mainSynth\" }).ok);\n"
+              "  log(\"params \" + ce.device.parameters({ grp: \"Filter\" }).length);\n"
+              "  syncTimer(\"s\", 1, { folow: false });\n"
+              "  log(\"read \" + (ce.midi.read([1, 2], 0, 2, { ordr: \"lsb\" }) === undefined ? \"nil\" : \"a number\"));\n"
+              "  set(\"K.good\", 7, { transmit: false });\n"
+              "  log(\"good \" + ce.device.defineParameter(\"res\", { cc: 71, name: \"Resonance\" }));\n"
+              "  log(\"goodRead \" + ce.midi.read([1, 2], 0, 2, { order: \"lsb\" }));\n"
+              "  animateTo(\"K.value\", 50, { duration: 500 });\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.logs.clear();
+        host.levelled.clear();
+        host.timerStarts.clear();
+        host.deviceQueries.clear();
+        runtime.runAction ("onOpts", juce::var());
+        const juce::String tag (lang);
+        const auto logged = host.logs.joinIntoString (" | ");
+        for (const char* line : { "to false", "spring false", "running false", "define false", "dump false",
+                                  "recall false", "params 0", "read nil", "good true", "goodRead 257" })
+            check (host.logs.contains (line), tag + ": logs " + line + " (got " + logged + ")");
+        check (host.values.find ("K.refused") == host.values.end() && (int) host.values["K.good"] == 7,
+               tag + ": the refused set() writes nothing, and the right one writes");
+        check (! runtime.hasDeviceParameter ("mainSynth", "cut") && runtime.hasDeviceParameter ("mainSynth", "res"),
+               tag + ": the refused definition defines nothing, and the right one defines");
+        check (! runtime.hasDeviceDump ("mainSynth", "patch"), tag + ": the refused dump layout is not declared");
+        check (! host.timerStarts.contains ("s"), tag + ": the refused sync timer is not started");
+        check (host.deviceQueries.isEmpty(), tag + ": neither refused device read reaches the host (got "
+                   + host.deviceQueries.joinIntoString (", ") + ")");
+        check (runtime.animationRunning ("K.value"), tag + ": the move with the right options runs");
+        for (const char* line : {
+                 "error:ce.anim.to: \"easing\" is not one of its options, so nothing was done. Its options are: duration, "
+                     "beats, sync, curve, damping, frequency, from, delay, stagger, repeat, pingpong, done.",
+                 "error:ce.anim.spring: \"curve\" is not one of its options, so nothing was done. Its options are: duration, "
+                     "damping, frequency, from, beats, sync, delay, stagger, repeat, pingpong, done.",
+                 "error:ce.device.defineParameter: \"nmae\" is not one of its options, so nothing was done. Its options are: "
+                     "name, group, type, min, max, access, choices, trueValue, falseValue, cc, nrpn, sysex, channel, encoding, "
+                     "nibbles, checksum, variables, length, pad.",
+                 "error:ce.device.defineParameter: \"nrpn.mbs\" is not one of its options, so nothing was done. The options "
+                     "of nrpn are: msb, lsb.",
+                 "error:ce.device.defineDump: \"header\" is not one of its options, so nothing was done. Its options are: "
+                     "name, request, match, prefix, suffix, offset, size, checksum, fields.",
+                 "error:set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit.",
+                 "error:ce.device.recallPreset: \"rol\" is not one of its options, so nothing was done. Its only option is role.",
+                 "error:ce.device.parameters: \"grp\" is not one of its options, so nothing was done. Its options are: "
+                     "role, query, group, type, access, limit.",
+                 "error:ce.time.syncTimer: \"folow\" is not one of its options, so nothing was done. Its only option is follow.",
+                 "error:ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order." })
+            check (host.levelled.contains (line), tag + ": " + juce::String (line).fromFirstOccurrenceOf (":", false, false));
+        check (host.levelled.size() == 10, tag + ": one line per refusal and nothing else (got "
+                   + host.levelled.joinIntoString (" | ") + ")");
+        runtime.stopAnimation ({});
+    }
+
     // ---- Two instances in one process ------------------------------------------------------------
     // Each ScriptRuntime is one plug-in instance (one standalone window). Two copies of one panel,
     // in one DAW, must keep their own variables in Lua and in JavaScript — a global JavaScript

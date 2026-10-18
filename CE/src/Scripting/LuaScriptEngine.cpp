@@ -3091,6 +3091,104 @@ function decodeJson(text)
 end
 
 -- @module -
+-- BEGIN GENERATED option keys — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- An options table holding a key its member does not take REFUSES the call: nothing is done, the
+-- console names the keys and the options the member has, and the call answers what the member
+-- answers for any other refusal. The WebView runtime does the same from the same lists in
+-- panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+-- list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+-- order a message could follow.
+local __CE_OPTIONS = {
+  ["set"] = { path = "set", at = 3, refusal = "nothing", names = { "transmit" } },
+  ["requestDump"] = { path = "ce.device.requestDump", at = 3, refusal = "false", names = { "timeout" } },
+  ["recallPreset"] = { path = "ce.device.recallPreset", at = 2, refusal = "result", names = { "role" } },
+  ["animateTo"] = { path = "ce.anim.to", at = 3, refusal = "false", names = { "duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["animateSpring"] = { path = "ce.anim.spring", at = 3, refusal = "false", names = { "duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["animateEnvelope"] = { path = "ce.anim.envelope", at = 3, refusal = "false", names = { "from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["syncTimer"] = { path = "ce.time.syncTimer", at = 3, refusal = "nothing", names = { "follow" } },
+  ["deviceParameters"] = { path = "ce.device.parameters", at = 1, refusal = "empty list", names = { "role", "query", "group", "type", "access", "limit" } },
+  ["deviceDefineParameter"] = { path = "ce.device.defineParameter", at = 2, refusal = "false", names = { "name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad" }, nested = { ["nrpn"] = { names = { "msb", "lsb" } } } },
+  ["deviceDefineDump"] = { path = "ce.device.defineDump", at = 2, refusal = "false", names = { "name", "request", "match", "prefix", "suffix", "offset", "size", "checksum", "fields" }, nested = { ["match"] = { names = { "prefix", "suffix" } } } },
+  ["devicePorts"] = { path = "ce.device.ports", at = 1, refusal = "empty list", names = { "direction" } },
+  ["checksum"] = { path = "ce.midi.checksum", at = 3, refusal = "nothing", names = { "offset" } },
+  ["panic"] = { path = "ce.midi.panic", at = 1, refusal = "nothing", names = { "channel", "resetControllers" } },
+  ["encodeJson"] = { path = "ce.storage.encode", at = 2, refusal = "nothing", names = { "indent" } },
+  ["bytesRead"] = { path = "ce.midi.read", at = 4, refusal = "nothing", names = { "bits", "order" } },
+}
+-- Byte order, which is what JavaScript's sort and Python's sorted() give these names. table.sort's
+-- own < compares with the C library's collation, which a locale can change.
+local function __ce_optionLess(a, b)
+  for i = 1, math.min(#a, #b) do
+    local x, y = string.byte(a, i), string.byte(b, i)
+    if x ~= y then return x < y end
+  end
+  return #a < #b
+end
+local function __ce_optionShape(shape)
+  shape.known = {}
+  for _, name in ipairs(shape.names) do shape.known[name] = true end
+  for _, inner in pairs(shape.nested or {}) do __ce_optionShape(inner) end
+end
+-- The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
+-- option that lists fields of its own, in the contract's order.
+local function __ce_unknownOptions(opts, shape, parent, out)
+  local unknown = {}
+  for k in pairs(opts) do
+    if type(k) == "string" and not shape.known[k] and not string.match(k, "^%d+$") then unknown[#unknown + 1] = k end
+  end
+  if #unknown > 0 then
+    table.sort(unknown, __ce_optionLess)
+    out[#out + 1] = { parent = parent, keys = unknown, shape = shape }
+  end
+  for _, name in ipairs(shape.names) do
+    local inner = shape.nested and shape.nested[name]
+    if inner ~= nil and type(opts[name]) == "table" then
+      __ce_unknownOptions(opts[name], inner, parent == "" and name or (parent .. "." .. name), out)
+    end
+  end
+  return out
+end
+local function __ce_optionsLine(path, group)
+  local p = group.parent
+  local quoted = {}
+  for i, k in ipairs(group.keys) do quoted[i] = '"' .. (p == "" and "" or (p .. ".")) .. k .. '"' end
+  local what
+  if #quoted == 1 then what = quoted[1] .. " is not one of its options, so nothing was done."
+  else what = table.concat(quoted, ", ", 1, #quoted - 1) .. " and " .. quoted[#quoted] .. " are not among its options, so nothing was done." end
+  local names, listed = group.shape.names, nil
+  if #names == 1 then listed = (p == "" and "Its only option" or ("The only option of " .. p)) .. " is " .. names[1] .. "."
+  else listed = (p == "" and "Its options" or ("The options of " .. p)) .. " are: " .. table.concat(names, ", ") .. "." end
+  return path .. ": " .. what .. " " .. listed
+end
+local function __ce_refused(refusal, lines)
+  if refusal == "false" then return false end
+  if refusal == "zero" then return 0 end
+  if refusal == "empty list" then return {} end
+  if refusal == "result" then return { ok = false, error = table.concat(lines, " ") } end
+  return nil
+end
+for __id, __spec in pairs(__CE_OPTIONS) do
+  local __fn = _G[__id]
+  if type(__fn) == "function" then
+    __ce_optionShape(__spec)
+    _G[__id] = function(...)
+      local __opts = (select(__spec.at, ...))
+      if type(__opts) == "table" then
+        local __groups = __ce_unknownOptions(__opts, __spec, "", {})
+        if #__groups > 0 then
+          local __lines = {}
+          for __i, __group in ipairs(__groups) do
+            __lines[__i] = __ce_optionsLine(__spec.path, __group)
+            logError(__lines[__i])
+          end
+          return __ce_refused(__spec.refusal, __lines)
+        end
+      end
+      return __fn(...)
+    end
+  end
+end
+-- END GENERATED option keys
 -- BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for

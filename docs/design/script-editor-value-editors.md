@@ -654,7 +654,7 @@ And the options, timers and panel commands:
 
 | Was | Now | Where |
 |---|---|---|
-| an option a call does not have was ignored almost everywhere (`easing` for `curve`, `rotation` for `rotate`) | a warning names it and lists the call's options, which come from the contract; the call still runs | WebView runtime |
+| an option a call does not have was ignored almost everywhere (`easing` for `curve`, `rotation` for `rotate`) | it refuses the call: nothing is done, the console names it and lists the call's options, which come from the contract, and the call answers as for any other refusal | WebView runtime; the three preludes, from lists generated out of the contract |
 | `saveSetting(k, v, {scop="script"})` stored the value where every script reads it | the storage calls refuse any key but `scope` | WebView runtime; the three preludes |
 | a timer given `"fast"` or -100 fired every millisecond, and `after("1s")` at once | refused; a musical length may be a division's name | WebView runtime; the three preludes |
 | `get()` of a control or property that is not there answered nil without a word | reports it in `set()`'s words | WebView runtime; every player engine |
@@ -669,7 +669,18 @@ Still open, for the owner:
   Such a value comes from a script's own arithmetic (a 0..1 value times 128, an offset added, a
   curve that overshoots its end), so the warning points at it without filling the console when an
   animation sends sixty a second. In every runtime, and in `BridgeScriptHost` for a native handler.
-- **An unknown option** warns and the call runs. Whether it should refuse instead.
+- **An unknown option** — decided: it refuses the call. Nothing is done, the console says so in
+  the storage calls' words (`ce.anim.to: "easing" is not one of its options, so nothing was done.
+  Its options are: …`, every unknown key named, sorted), and the call answers what the member
+  answers for any other refusal: nothing, false, 0, an empty list, recallPreset's `{ ok = false }`,
+  or false from a dialog after its callback has run unanswered (`refusalOf` in `panelApi.js`). The
+  same in every runtime that implements the member: `gen-script-modules.mjs` writes the contract's
+  lists and the check into the three preludes, and `scriptPreludeAgreement.test.js` holds their
+  words and answers to the editor's. Every committed panel's scripts and every written example
+  passed the check before it became a refusal. ce.text.style and ce.image.set keep their own,
+  older check, which refuses the unknown option alone and applies the rest. Not checked, because
+  the contract lists no fields for them: `ce.midi.write`'s options (every runtime reads `bits` and
+  `order`) and `ce.panel.define`'s spec, which checks a state's keys itself.
 - **A colour property: decided, accept.** The short forms with one reading are stored written out
   in the panel's form, the conversion the refusal used to print: `"#RGB"` as `"#RRGGBB"`, a CSS
   name in any case as its `"#RRGGBB"` (and `transparent` as `"00000000"`), and `rgb()`, `rgba()`,

@@ -79,7 +79,7 @@ import {
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
-  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, memberPath,
+  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, optionChecks,
 } from './panelApi.js';
 // Each section type's template: what get() checks a path against, and create's `<section>` keys.
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -7485,10 +7485,10 @@ const LOCAL_STORAGE_PREFIX = 'ce.storage:';
  *
  *  A typo in the KEY is the same leak by another door, and it used to walk straight through:
  *  `saveSetting(k, v, { scop = "script" })` has no `scope`, so it was "panel", and another script
- *  read the value. So an options table with any key but `scope` is refused too, where the other
- *  verbs only warn (applyOptionChecks): here the fallback is not harmless. The keys are sorted, so
- *  the four runtimes, whose tables keep different orders, say the same words. A key that is a
- *  number is a list entry, as everywhere else, and is left alone.
+ *  read the value. So an options table with any key but `scope` is refused too, in the words every
+ *  other member's unknown key is refused in (applyOptionChecks), which leaves these to say it
+ *  here. The keys are sorted, so the four runtimes, whose tables keep different orders, say the
+ *  same words. A key that is a number is a list entry, as everywhere else, and is left alone.
  *
  *  `verb` is the call's namespaced path, ce.storage.saveSetting and so on.
  */
@@ -7764,91 +7764,69 @@ const LIST_KEY = /^\d+$/;
 const andList = (items) => (items.length < 2 ? items.join('')
   : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 
-/* ------------------------------------------------------------- option keys nothing reads
+/* ------------------------------------------------------- option keys a call does not take
  * An options table is the one argument where a mistake cannot show. `{ easing = "outBack" }` on
  * ce.anim.to moved in a straight line, `{ time = 800 }` took 300 ms, `{ onDone = fn }` never ran,
  * ce.draw.transform({ rotation = 45 }) turned nothing because the option is `rotate`, and a NRPN
- * declared with `{ mbs = 1 }` sent MSB 0. Every one of those calls succeeded, and only ce.text.style
- * and ce.image.set said anything about a key they did not know.
+ * declared with `{ mbs = 1 }` sent MSB 0. Every one of those calls succeeded.
  *
- * So every call is checked against the fields panelApi.js lists for that member's options, here
- * where the functions are handed to scripts rather than inside each one: one check, driven by the
- * contract, so a field the contract gains is a field the check accepts. A key that is not listed is
- * WARNED about and the call still runs, which is what it always did; whether it should refuse
- * instead is the owner's decision. The message names the member by its namespaced path and lists
- * the options it does have.
+ * So every call is checked against the fields panelApi.js lists for that member's options
+ * (optionChecks), here where the functions are handed to scripts rather than inside each one: one
+ * check, driven by the contract, so a field the contract gains is a field the check accepts. A key
+ * that is not listed REFUSES the call: nothing is done, the console says which keys and lists the
+ * options the member has, and the call answers what the member answers for any other refusal
+ * (refusalOf). The owner decided that over the warning this used to be: a call that runs without
+ * an option it was given has not done what it was asked.
  *
- * What is not a mistake, and is not reported:
+ * The C++ engines' preludes carry the same check, generated from the same lists by
+ * tools/scripts/gen-script-modules.mjs, in the same words, so a panel cannot work in the exported
+ * plug-in and refuse here, or the other way round; scriptPreludeAgreement.test.js holds them to it.
+ * The keys are named sorted, because a Lua table and a Python dict keep no order a message could
+ * follow, and the groups come own options first, then each option's own, in the contract's order.
+ *
+ * What is not a mistake, and is not checked:
  *  · a key that is a number. wasmoon hands a Lua list over as an object with keys "1", "2", …, and
  *    a list is not an options table, whatever argument it arrived in.
  *  · anything inside an option's value, unless the contract lists that option's own fields (a
  *    NRPN's msb and lsb): a curve's four numbers, a SysEx template, a state's `when`.
+ *  · a section name where `<section>` is listed: ce.panel.create's and clone's props.
  *  · a member whose options list no fields. The contract does not say what it takes, so nothing
  *    here can say what it does not.
+ *  · the members that check their own keys, in words of their own (MEMBERS_CHECKING_OWN_OPTIONS).
  */
-
-// These check their own option keys and REFUSE an unknown one, so a warning here would say it
-// twice, and would say "ignored" of a call that was refused whole. ce.storage refuses because a
-// misspelled scope key is how a private setting would land in the shared store (storageScopeOf).
-const REFUSES_UNKNOWN_OPTIONS = new Set([
-  'textStyle', 'imageSet', 'panelFind',
-  'saveSetting', 'loadSetting', 'listSettings', 'forgetSetting', 'allSettings', 'clearSettings',
-  'storageInfo',
-]);
 
 /** The section names a control can carry: what a `<section>` field accepts. */
 const SECTION_NAMES = new Set(Object.keys(SECTION_DEFAULTS));
 
-/** A field list as the check reads it: the names in contract order, and the nested lists. */
-function optionShape(fields) {
-  const names = [];
-  const nested = new Map();
-  let sections = false;
-  for (const field of fields) {
-    if (field.name === '<section>') { sections = true; continue; }
-    names.push(field.name);
-    if (Array.isArray(field.fields) && field.fields.length) nested.set(field.name, optionShape(field.fields));
-  }
-  return { names, known: new Set(names), nested, sections };
-}
+/** Member id -> { path, refusal, callback, params: [{ index, shape }] }, from the contract. */
+const OPTION_CHECKS = new Map(optionChecks().map((check) => [check.id, {
+  ...check,
+  // Where 'unanswered' finds the callback it calls with nothing: dialog's onChoice, and so on.
+  callback: (MEMBER_BY_ID[check.id].params ?? []).findIndex((p) => p.type === 'function'),
+}]));
 
-/** Member id -> { path, checks: [{ index, shape }] }, for every member whose options list fields. */
-const OPTION_CHECKS = (() => {
-  const out = new Map();
-  for (const member of Object.values(MEMBER_BY_ID)) {
-    if (member.kind === 'lifecycle' || REFUSES_UNKNOWN_OPTIONS.has(member.id)) continue;
-    const checks = [];
-    (member.params ?? []).forEach((param, index) => {
-      if (Array.isArray(param.fields) && param.fields.length) checks.push({ index, shape: optionShape(param.fields) });
-    });
-    if (checks.length) out.set(member.id, { path: memberPath(member.id), checks });
-  }
-  return out;
-})();
-
-/** The keys `opts` holds that `shape` does not list, grouped by the option they sit inside. */
+/** The keys `opts` holds that `shape` does not list, as groups: its own first, then those inside
+ *  each option that lists fields of its own, in the contract's order. Each group's keys sorted. */
 function unknownOptionKeys(opts, shape, parent = '', out = []) {
-  const unknown = [];
-  for (const key of Object.keys(opts)) {
-    if (LIST_KEY.test(key)) continue;
-    if (shape.known.has(key)) {
-      const inner = shape.nested.get(key);
-      if (inner && isOptionsTable(opts[key])) unknownOptionKeys(opts[key], inner, parent ? `${parent}.${key}` : key, out);
-      continue;
-    }
-    if (shape.sections && SECTION_NAMES.has(key)) continue;
-    unknown.push(key);
-  }
+  const unknown = Object.keys(opts).filter((key) => !LIST_KEY.test(key) && !shape.names.includes(key)
+    && !(shape.sections && SECTION_NAMES.has(key))).sort();
   if (unknown.length) out.push({ parent, keys: unknown, shape });
+  for (const name of shape.names) {
+    const inner = shape.nested[name];
+    if (inner && Object.hasOwn(opts, name) && isOptionsTable(opts[name])) {
+      unknownOptionKeys(opts[name], inner, parent ? `${parent}.${name}` : name, out);
+    }
+  }
   return out;
 }
 
-/** `ce.anim.to: "easing" is not one of its options, so it was ignored. Its options are: …` */
+/** `ce.anim.to: "easing" is not one of its options, so nothing was done. Its options are: …`, in
+ *  the words the storage calls, the first to refuse an unknown key, already used in every runtime. */
 function unknownOptionsMessage(path, { parent, keys, shape }) {
   const quoted = keys.map((key) => `"${parent ? `${parent}.` : ''}${key}"`);
   const what = keys.length === 1
-    ? `${quoted[0]} is not one of its options, so it was ignored.`
-    : `${andList(quoted)} are not among its options, so they were ignored.`;
+    ? `${quoted[0]} is not one of its options, so nothing was done.`
+    : `${andList(quoted)} are not among its options, so nothing was done.`;
   const names = shape.sections
     ? [...shape.names, 'and the name of any section, such as Behavior']
     : shape.names;
@@ -7858,21 +7836,41 @@ function unknownOptionsMessage(path, { parent, keys, shape }) {
   return `${path}: ${what} ${listed}`;
 }
 
+/** What a refused call answers, by the kinds panelApi.js's REFUSAL_ANSWERS names. */
+function refusedAnswer({ refusal, callback }, lines, args) {
+  switch (refusal) {
+    case 'false': return false;
+    case 'zero': return 0;
+    case 'empty list': return [];
+    case 'result': return { ok: false, error: lines.join(' ') };
+    case 'unanswered': {
+      // False from dialog, prompt and choose means the callback has already run with no answer, so
+      // a script waiting on it never has to wonder whether it still might. It runs inside the
+      // script's own call, so a throw from it is the calling handler's, reported as that is.
+      const fn = args[callback];
+      if (typeof fn === 'function') fn(undefined);
+      return false;
+    }
+    default: return undefined;
+  }
+}
+
 // One wrapper per function, so a function every script shares (checksum, panic, encodeJson) stays
 // one function, as the approval guard needs it to be.
 const optionCheckers = new WeakMap();
 
-function withOptionCheck(fn, { path, checks }) {
+function withOptionCheck(fn, check) {
   let checked = optionCheckers.get(fn);
   if (!checked) {
     checked = function checkedOptions(...args) {
-      for (const { index, shape } of checks) {
+      const lines = [];
+      for (const { index, shape } of check.params) {
         if (!isOptionsTable(args[index])) continue;
-        for (const group of unknownOptionKeys(args[index], shape)) {
-          addScriptTrace('warn', '', unknownOptionsMessage(path, group));
-        }
+        for (const group of unknownOptionKeys(args[index], shape)) lines.push(unknownOptionsMessage(check.path, group));
       }
-      return fn.apply(this, args);
+      if (!lines.length) return fn.apply(this, args);
+      for (const line of lines) addScriptTrace('error', '', line);
+      return refusedAnswer(check, lines, args);
     };
     optionCheckers.set(fn, checked);
   }
@@ -7976,7 +7974,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // prompt and choose are dialog() with a different SHAPE of question — one modal at a time,
     // one callback contract, one teardown, whatever is being asked. Each names its own shape after
     // the script's options, dialog included: `ask` is how these three tell the store apart, not an
-    // option of any of them, so a script's `ask` is reported as unknown and is not obeyed.
+    // option of any of them, so a script's `ask` is refused as an unknown key, never obeyed.
     uiDialog: (opts, onChoice) => uiDialogImpl(scriptId,
       isOptionsTable(opts) ? { ...opts, ask: 'choice' } : opts, onChoice),
     uiPrompt: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'text' }, onAnswer),
@@ -8294,8 +8292,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     ...helpers,
   };
 
-  // Unknown option keys are reported for every member the contract lists options for, before the
-  // guard and the namespace see the functions, so every spelling of a member carries the check.
+  // An unknown option key refuses the call, for every member the contract lists options for, before
+  // the guard and the namespace see the functions, so every spelling of a member carries the check.
   applyOptionChecks(api);
 
   // Installed third-party modules (ce.ext.*) contribute their members to the SAME flat surface a

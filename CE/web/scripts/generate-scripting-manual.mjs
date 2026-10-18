@@ -848,9 +848,13 @@ Each command is shown the way you type it, with its arguments:
   means \`nil\` in Lua, \`undefined\` in JavaScript and \`None\` in Python.
 - **\`opts\`** is a table (Lua) or object (JavaScript) of optional settings, such as
   \`{ duration = 500 }\` or \`{ duration: 500 }\`. When a command takes one, a table lists what it can
-  contain and what each setting is when you leave it out. A setting that is not in that table does
-  nothing, and in the panel window the script console says so and lists the ones the command has,
-  so a misspelling such as \`{ duraton = 500 }\` is not mistaken for a setting that worked.
+  contain and what each setting is when you leave it out. A setting that is not in that table
+  refuses the whole command: nothing is done, the script console names the setting and lists the
+  ones the command has, and the command gives back what it gives whenever it refuses: false from a
+  command that says whether it worked, 0 from one that counts what it changed, an empty list from
+  one that gives a list, a result whose \`ok\` is false from \`ce.device.recallPreset\`, and
+  otherwise nothing. So a misspelling such as \`{ duraton = 500 }\` cannot pass for a setting that
+  worked, with the panel window open or closed.
 - ***Short name*** gives the other name a command answers to (see
   [chapter 10](#10-command-names-and-modules)).
 - ***${PANEL_WINDOW_ONLY.replace(/\.$/, '')}*** means the command needs the panel window

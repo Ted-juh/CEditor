@@ -3514,6 +3514,87 @@ def decodeJson(text):
     return None if v is None else __jsonStripNulls(v)
 
 # @module -
+# BEGIN GENERATED option keys — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# An options table holding a key its member does not take REFUSES the call: nothing is done, the
+# console names the keys and the options the member has, and the call answers what the member
+# answers for any other refusal. The WebView runtime does the same from the same lists in
+# panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+# list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+# order a message could follow.
+# In Python an options argument can also be passed by its parameter's name, so it is looked for there.
+__CE_OPTIONS = {
+    "set": { "path": "set", "at": 2, "param": "opts", "refusal": "nothing", "names": ["transmit"] },
+    "requestDump": { "path": "ce.device.requestDump", "at": 2, "param": "opts", "refusal": "false", "names": ["timeout"] },
+    "recallPreset": { "path": "ce.device.recallPreset", "at": 1, "param": "opts", "refusal": "result", "names": ["role"] },
+    "animateTo": { "path": "ce.anim.to", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "animateSpring": { "path": "ce.anim.spring", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "animateEnvelope": { "path": "ce.anim.envelope", "at": 2, "param": "opts", "refusal": "false", "names": ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "syncTimer": { "path": "ce.time.syncTimer", "at": 2, "param": "opts", "refusal": "nothing", "names": ["follow"] },
+    "deviceParameters": { "path": "ce.device.parameters", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "query", "group", "type", "access", "limit"] },
+    "deviceDefineParameter": { "path": "ce.device.defineParameter", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], "nested": { "nrpn": { "names": ["msb", "lsb"] } } },
+    "deviceDefineDump": { "path": "ce.device.defineDump", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "request", "match", "prefix", "suffix", "offset", "size", "checksum", "fields"], "nested": { "match": { "names": ["prefix", "suffix"] } } },
+    "devicePorts": { "path": "ce.device.ports", "at": 0, "param": "opts", "refusal": "empty list", "names": ["direction"] },
+    "checksum": { "path": "ce.midi.checksum", "at": 2, "param": "opts", "refusal": "nothing", "names": ["offset"] },
+    "panic": { "path": "ce.midi.panic", "at": 0, "param": "opts", "refusal": "nothing", "names": ["channel", "resetControllers"] },
+    "encodeJson": { "path": "ce.storage.encode", "at": 1, "param": "opts", "refusal": "nothing", "names": ["indent"] },
+    "bytesRead": { "path": "ce.midi.read", "at": 3, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
+}
+# The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
+# option that lists fields of its own, in the contract's order.
+def __ce_unknownOptions(opts, shape, parent, out):
+    names = shape["names"]
+    unknown = sorted(k for k in opts
+                     if isinstance(k, str) and k not in names and not (k.isascii() and k.isdigit()))
+    if unknown:
+        out.append({ "parent": parent, "keys": unknown, "shape": shape })
+    nested = shape.get("nested") or {}
+    for name in names:
+        if name in nested and isinstance(opts.get(name), dict):
+            __ce_unknownOptions(opts[name], nested[name], (parent + "." + name) if parent else name, out)
+    return out
+
+def __ce_optionsLine(path, group):
+    p = group["parent"]
+    quoted = ['"' + (p + "." if p else "") + k + '"' for k in group["keys"]]
+    if len(quoted) == 1:
+        what = quoted[0] + " is not one of its options, so nothing was done."
+    else:
+        what = ", ".join(quoted[:-1]) + " and " + quoted[-1] + " are not among its options, so nothing was done."
+    names = group["shape"]["names"]
+    if len(names) == 1:
+        listed = ("The only option of " + p if p else "Its only option") + " is " + names[0] + "."
+    else:
+        listed = ("The options of " + p if p else "Its options") + " are: " + ", ".join(names) + "."
+    return path + ": " + what + " " + listed
+
+def __ce_refused(refusal, lines):
+    if refusal == "false": return False
+    if refusal == "zero": return 0
+    if refusal == "empty list": return []
+    if refusal == "result": return { "ok": False, "error": " ".join(lines) }
+    return None
+
+def __ce_optionChecked(fn, spec):
+    def checked(*args, **kwargs):
+        at = spec["at"]
+        opts = args[at] if len(args) > at else kwargs.get(spec["param"])
+        if isinstance(opts, dict):
+            groups = __ce_unknownOptions(opts, spec, "", [])
+            if groups:
+                lines = [__ce_optionsLine(spec["path"], g) for g in groups]
+                for line in lines:
+                    logError(line)
+                return __ce_refused(spec["refusal"], lines)
+        return fn(*args, **kwargs)
+    return checked
+
+__ceOptionId = None
+for __ceOptionId in __CE_OPTIONS:
+    if callable(globals().get(__ceOptionId)):
+        globals()[__ceOptionId] = __ce_optionChecked(globals()[__ceOptionId], __CE_OPTIONS[__ceOptionId])
+# del, for the reason the stub list gives: a module-level loop variable outlives its loop.
+del __ceOptionId
+# END GENERATED option keys
 # BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 # on top. ce.core is global: its members are never namespaced, so they appear here only for

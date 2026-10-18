@@ -845,6 +845,7 @@ export const COMMANDS = [
   /* --- Device / MIDI: bulk (Q9) --- */
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
+    refusal: 'false',
     summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile knows, such as "patch" or "global", or one declared with defineDump. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).',
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
@@ -863,6 +864,7 @@ export const COMMANDS = [
   },
   {
     id: 'recallPreset', category: 'Device / MIDI', signature: 'recallPreset(slot [, opts])',
+    refusal: 'result',
     summary: 'Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank\'s first preset, whatever program number it uses.',
     params: [
       { name: 'slot', type: 'number', required: true },
@@ -1002,6 +1004,7 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
+    refusal: 'false',
     summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
     params: [
       { name: 'path', type: 'path', required: true },
@@ -1033,6 +1036,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
+    refusal: 'false',
     summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number is refused with a message, as it is there.',
     params: [
       { name: 'path', type: 'path', required: true },
@@ -1079,6 +1083,7 @@ export const COMMANDS = [
      now. These seven are the other direction: things a stored property structurally cannot be. */
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
+    refusal: 'false',
     summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console.',
     params: [
       { name: 'path', type: 'path', required: true },
@@ -1170,6 +1175,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
+    refusal: 'false',
     summary: 'Show a line of text in the status bar. It stays until you replace it; call this with no message to clear it. Use it for an ongoing state, such as "Recording" or "Synced" — for a one-off event, use `ce.ui.notify()`. Read the current status back with `ce.ui.state()`.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1181,6 +1187,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
+    refusal: 'unanswered',
     summary: 'Ask a question with buttons. The answer arrives later through `onChoice`, which receives the label of the button that was clicked, or nothing if the dialog was closed without a choice. Only one dialog can be open at a time. The call itself returns true if the dialog appeared; if it returns false, nothing was shown — for example because another dialog is already open — and `onChoice` has already been called with nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1213,6 +1220,7 @@ export const COMMANDS = [
      them, and it copies to the clipboard in six places. A script could do none of those. */
   {
     id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
+    refusal: 'unanswered',
     summary: 'Ask the user to type some text. The answer arrives through `onAnswer`: the text they typed, or nothing if they cancelled. An empty answer (they accepted an empty field) is not the same as no answer. Pressing Enter accepts. Returns true if the dialog appeared; if it returns false, `onAnswer` has already been called with nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1225,7 +1233,7 @@ export const COMMANDS = [
             summary: 'Grey hint text shown while the field is empty.' },
           'uiAccept', 'uiCancel', 'uiKind',
           // Read by the dialog store for every shape, and listed so the check of option keys
-          // (panelRuntime.js) does not call a key that works unknown.
+          // (panelRuntime.js) does not refuse a key that works.
           { name: 'default', type: 'text', default: 'the accept label', sample: '"Cancel"',
             summary: 'Which of the two buttons is drawn as the default one: the accept label or the '
               + 'cancel label. Pressing Enter in the field accepts either way.' },
@@ -1240,6 +1248,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
+    refusal: 'unanswered',
     summary: 'Ask the user to pick from a list. The answer arrives through `onAnswer`: the chosen item, a list of items if `opts.multiple` is set, or nothing if they cancelled. A long list scrolls rather than making the dialog taller. Returns true if the dialog appeared; if it returns false — for example because `opts.items` is empty — `onAnswer` has already been called with nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1918,6 +1927,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
+    refusal: 'false',
     summary: 'Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2072,6 +2082,7 @@ export const COMMANDS = [
      back through it, exactly as the canvas does. */
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2091,6 +2102,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control\'s ("hSpacing") or every left edge in line with the topmost control\'s ("vSpacing"). Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2114,6 +2126,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelMatch', category: 'Panel structure', signature: 'panelMatch(names, what [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2128,6 +2141,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Arrange controls in a grid of equal cells, each as big as the largest control. They are placed in reading order (top to bottom, then left to right, with controls at about the same height, within roughly 20 pixels, counted as one row), not in the order you list them. The first control in that order stays where it is and the grid grows from there. Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2149,6 +2163,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Arrange controls evenly around a circle, centred on the middle of the box they currently fill, in the order you list them. Each control\'s centre sits on the circle. `opts.startAngle` is in degrees, with 0 at three o\'clock and angles running clockwise, which differs from `ce.draw.arc()`, where 0 is twelve o\'clock. Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2499,6 +2514,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
+    refusal: 'empty list',
     summary: 'List the synth\'s parameters as the device profile describes them, each as { id, name, group, type, min, max, access }. Use `opts` to narrow the list, for example to one group. Returns an empty list when there is nothing to show, and nothing at all only when the ce.device module is switched off.',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
@@ -2627,8 +2643,8 @@ export const COMMANDS = [
           summary: 'What a boolean sends when it is off.' },
         { name: 'cc', type: 'number', sample: '74', group: 'how it reaches the synth — pick one',
           summary: 'Send it as this CC number, 0 to 127. The simplest of the three wire formats.' },
-        // `fields` here are msb and lsb, which the check of option keys (panelRuntime.js) reads one
-        // level down: { mbs = 1 } was accepted and sent MSB 0.
+        // `fields` here are msb and lsb, which the check of option keys reads one level down, in
+        // every runtime: { mbs = 1 } was accepted and sent MSB 0.
         { name: 'nrpn', type: 'object', group: 'how it reaches the synth — pick one',
           summary: 'Send it as an NRPN, as { msb, lsb } or the two numbers as a list.',
           fields: [
@@ -2662,7 +2678,7 @@ export const COMMANDS = [
           summary: 'Extra named bytes your SysEx template can refer to as $name, such as an address '
             + 'or a part number. Each is a number from 0 to 255, or one or two hex digits as text.' },
         // Read by both runtimes (deviceDefinitions.js, ScriptRuntime::defineDeviceParameter) and
-        // listed nowhere, so the check of option keys would have called them unknown.
+        // listed nowhere, so the check of option keys would have refused them.
         { name: 'length', type: 'number', default: '0',
           summary: 'For a text parameter, how many characters it holds.' },
         { name: 'pad', type: 'number', default: '32',
@@ -4599,6 +4615,85 @@ export const ALL_MEMBERS = [
 ];
 
 export const MEMBER_BY_ID = Object.fromEntries(ALL_MEMBERS.map((m) => [m.id, m]));
+
+/* ------------------------------------------------------------ option keys a call does not take
+ * An options table is the one argument where a mistake cannot show: `{ easing = "outBack" }` on
+ * ce.anim.to moved in a straight line, and the call succeeded. So a key a member's options do not
+ * list REFUSES the call, in every runtime that implements the member: the WebView runtime checks
+ * each call against what is listed here (panelRuntime.js, applyOptionChecks), and
+ * tools/scripts/gen-script-modules.mjs writes the same lists, and the same check, into each C++
+ * engine's prelude. A panel cannot then work in the exported plug-in and refuse in the editor, or
+ * the other way round.
+ *
+ * What is not a mistake, and is not checked: a key that is a number (a Lua list arrives as a table of
+ * numbered keys, and a list is not an options table); anything inside an option's value, unless
+ * the option lists fields of its own (a NRPN's msb and lsb); a section name where `<section>` is
+ * listed; and every key of a member whose options list no fields, since nothing says what such a
+ * member does not take. */
+
+/** Members that check their own option keys, and refuse an unknown one in words of their own:
+ *  ce.text.style and ce.image.set per option, ce.panel.find for its filters, and the storage calls,
+ *  where a misspelled `scope` key would share a private setting. The common check leaves them to it
+ *  rather than saying it twice. */
+export const MEMBERS_CHECKING_OWN_OPTIONS = new Set([
+  'textStyle', 'imageSet', 'panelFind',
+  'saveSetting', 'loadSetting', 'listSettings', 'forgetSetting', 'allSettings', 'clearSettings',
+  'storageInfo',
+]);
+
+/** What a refused call answers. A call refused before it does anything, as an unknown option key
+ *  refuses it, answers what the member answers when it refuses anything else:
+ *    'nothing'     nil, undefined or None, as most members do;
+ *    'false'       a member that answers whether it did what was asked;
+ *    'zero'        a count of what it changed, as ce.panel's arranging verbs answer;
+ *    'empty list'  a member that answers a list, so a loop over the answer still runs;
+ *    'result'      a result table, { ok = false, error = <what the console says> }, recallPreset's;
+ *    'unanswered'  false, with the callback already called with nothing, which is what false
+ *                  always means from ce.ui.dialog, prompt and choose.
+ *  A member names its own with `refusal`; without one, a signature that ends `-> boolean` answers
+ *  'false', one that ends `-> list` 'empty list', and anything else 'nothing'. */
+export const REFUSAL_ANSWERS = ['nothing', 'false', 'zero', 'empty list', 'result', 'unanswered'];
+
+export function refusalOf(member) {
+  if (member?.refusal) return member.refusal;
+  const returns = /->\s*(\w+)\s*$/.exec(String(member?.signature ?? ''))?.[1];
+  if (returns === 'boolean') return 'false';
+  if (returns === 'list') return 'empty list';
+  return 'nothing';
+}
+
+/** A field list as the check reads it: the names in the contract's order (which is the order a
+ *  refusal lists them in), the fields of any option that lists its own, and whether a section name
+ *  is an option too. */
+function optionShape(fields) {
+  const names = [];
+  const nested = {};
+  let sections = false;
+  for (const field of fields) {
+    if (field.name === '<section>') { sections = true; continue; }
+    names.push(field.name);
+    if (Array.isArray(field.fields) && field.fields.length) nested[field.name] = optionShape(field.fields);
+  }
+  return { names, nested, sections };
+}
+
+/** Every member whose calls have their option keys checked, with what is checked:
+ *  [{ id, path, refusal, params: [{ index, name, shape }] }], one entry per member whose options
+ *  list fields, except the members that check their own. Built-in members only. */
+export function optionChecks() {
+  const out = [];
+  for (const member of ALL_MEMBERS) {
+    if (member.kind === 'lifecycle' || MEMBERS_CHECKING_OWN_OPTIONS.has(member.id)) continue;
+    const params = [];
+    (member.params ?? []).forEach((param, index) => {
+      if (Array.isArray(param.fields) && param.fields.length) {
+        params.push({ index, name: param.name, shape: optionShape(param.fields) });
+      }
+    });
+    if (params.length) out.push({ id: member.id, path: memberPath(member.id), refusal: refusalOf(member), params });
+  }
+  return out;
+}
 
 /** Where a member runs — 'any' unless it explicitly declares otherwise. */
 export function memberRuntime(member) {

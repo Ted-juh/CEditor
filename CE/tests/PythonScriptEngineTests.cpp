@@ -15,6 +15,7 @@
 
 #include "Scripting/ScriptRuntime.h"
 #include <juce_core/juce_core.h>
+#include <algorithm>
 #include <functional>
 #include <iostream>
 
@@ -226,6 +227,52 @@ int main()
                  "ce.storage.saveSetting: \"scop\" is not one of its options, so nothing was done. Its only option is scope.",
                  "ce.time.after: -5 is less than 0 milliseconds, so nothing was scheduled." })
             check (host.logs.contains (line), juce::String ("refused in Python: ") + line);
+    }
+
+    // An option key a call does not take refuses it, before the host sees anything, by the check
+    // gen-script-modules.mjs writes into the prelude, in the words of the other engines; the call
+    // answers what the member answers for any other refusal. In Python the options can be passed by
+    // the parameter's name too, and are checked there as well.
+    {
+        juce::Array<juce::var> optionScripts;
+        optionScripts.add (makeScript ("pyOptions", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    set('refused', 5, {'transmit': False, 'quiet': True})\n"
+            "    set('byName', 6, opts={'quiet': True})\n"
+            "    syncTimer('s', 1, {'folow': False})\n"
+            "    log('to ' + str(ce.anim.to('K.value', 1, {'easing': 'outBack'})))\n"
+            "    log('define ' + str(ce.device.defineParameter('cut', {'cc': 74, 'nrpn': {'mbs': 1}})))\n"
+            "    log('recall ' + str(recallPreset(0, {'rol': 'mainSynth'})['ok']))\n"
+            "    log('params ' + str(ce.device.parameters({'grp': 'Filter'})))\n"
+            "    log('read ' + str(ce.midi.read([1, 2], 0, 2, {'ordr': 'lsb', 1: 'a list entry'})))\n"
+            "    log('goodRead ' + str(ce.midi.read([1, 2], 0, 2, {'order': 'lsb'})))\n"
+            "    set('good', 7, {'transmit': False})\n"));
+        runtime.loadScripts (juce::var (optionScripts));
+        host.logs.clear();
+        host.timerStarts.clear();
+        runtime.onPanelReady (true);
+        const auto logged = host.logs.joinIntoString (" | ");
+        check (host.values.find ("refused") == host.values.end() && host.values.find ("byName") == host.values.end()
+                   && (int) host.values["good"] == 7,
+               "Options: a refused set() writes nothing, by position or by name, and the right one writes");
+        check (! host.timerStarts.contains ("s"), "Options: the refused sync timer is not started");
+        for (const auto* line : { "to False", "define False", "recall False", "params []", "read None", "goodRead 257" })
+            check (host.logs.contains (line), juce::String ("Options: logs ") + line + " (got " + logged + ")");
+        for (const auto* line : {
+                 "set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit.",
+                 "ce.time.syncTimer: \"folow\" is not one of its options, so nothing was done. Its only option is follow.",
+                 "ce.anim.to: \"easing\" is not one of its options, so nothing was done. Its options are: duration, beats, "
+                     "sync, curve, damping, frequency, from, delay, stagger, repeat, pingpong, done.",
+                 "ce.device.defineParameter: \"nrpn.mbs\" is not one of its options, so nothing was done. The options of "
+                     "nrpn are: msb, lsb.",
+                 "ce.device.recallPreset: \"rol\" is not one of its options, so nothing was done. Its only option is role.",
+                 "ce.device.parameters: \"grp\" is not one of its options, so nothing was done. Its options are: role, "
+                     "query, group, type, access, limit.",
+                 "ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order." })
+            check (host.logs.contains (line), juce::String ("Options, refused in Python: ") + line);
+        const auto setRefusals = std::count (host.logs.begin(), host.logs.end(),
+            juce::String ("set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit."));
+        check (setRefusals == 2, "Options: set() by the parameter's name is refused as well (got " + logged + ")");
     }
 
     // ce.midi byte lists in the embedded interpreter, with Python's own bytes and bytearray read as

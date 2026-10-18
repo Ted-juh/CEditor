@@ -2870,6 +2870,87 @@ function decodeJson(text) {
 }
 
 // @module -
+// BEGIN GENERATED option keys — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// An options table holding a key its member does not take REFUSES the call: nothing is done, the
+// console names the keys and the options the member has, and the call answers what the member
+// answers for any other refusal. The WebView runtime does the same from the same lists in
+// panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+// list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+// order a message could follow.
+var __CE_OPTIONS = {
+  "set": { path: "set", at: 2, refusal: "nothing", names: ["transmit"] },
+  "requestDump": { path: "ce.device.requestDump", at: 2, refusal: "false", names: ["timeout"] },
+  "recallPreset": { path: "ce.device.recallPreset", at: 1, refusal: "result", names: ["role"] },
+  "animateTo": { path: "ce.anim.to", at: 2, refusal: "false", names: ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "animateSpring": { path: "ce.anim.spring", at: 2, refusal: "false", names: ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "animateEnvelope": { path: "ce.anim.envelope", at: 2, refusal: "false", names: ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "syncTimer": { path: "ce.time.syncTimer", at: 2, refusal: "nothing", names: ["follow"] },
+  "deviceParameters": { path: "ce.device.parameters", at: 0, refusal: "empty list", names: ["role", "query", "group", "type", "access", "limit"] },
+  "deviceDefineParameter": { path: "ce.device.defineParameter", at: 1, refusal: "false", names: ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], nested: { "nrpn": { names: ["msb", "lsb"] } } },
+  "deviceDefineDump": { path: "ce.device.defineDump", at: 1, refusal: "false", names: ["name", "request", "match", "prefix", "suffix", "offset", "size", "checksum", "fields"], nested: { "match": { names: ["prefix", "suffix"] } } },
+  "devicePorts": { path: "ce.device.ports", at: 0, refusal: "empty list", names: ["direction"] },
+  "checksum": { path: "ce.midi.checksum", at: 2, refusal: "nothing", names: ["offset"] },
+  "panic": { path: "ce.midi.panic", at: 0, refusal: "nothing", names: ["channel", "resetControllers"] },
+  "encodeJson": { path: "ce.storage.encode", at: 1, refusal: "nothing", names: ["indent"] },
+  "bytesRead": { path: "ce.midi.read", at: 3, refusal: "nothing", names: ["bits", "order"] },
+};
+function __ce_isOptions(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v)
+    && !(typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(v));
+}
+// The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
+// option that lists fields of its own, in the contract's order.
+function __ce_unknownOptions(opts, shape, parent, out) {
+  var unknown = [];
+  for (var key in opts) {
+    if (Object.prototype.hasOwnProperty.call(opts, key) && shape.names.indexOf(key) < 0 && !/^\d+$/.test(key)) unknown.push(key);
+  }
+  if (unknown.length) { unknown.sort(); out.push({ parent: parent, keys: unknown, shape: shape }); }
+  for (var i = 0; i < shape.names.length; i++) {
+    var name = shape.names[i], inner = shape.nested ? shape.nested[name] : undefined;
+    if (inner && Object.prototype.hasOwnProperty.call(opts, name) && __ce_isOptions(opts[name]))
+      __ce_unknownOptions(opts[name], inner, parent ? parent + "." + name : name, out);
+  }
+  return out;
+}
+function __ce_optionsLine(path, group) {
+  var p = group.parent, quoted = [];
+  for (var i = 0; i < group.keys.length; i++) quoted.push('"' + (p ? p + "." : "") + group.keys[i] + '"');
+  var what = quoted.length === 1 ? quoted[0] + " is not one of its options, so nothing was done."
+    : quoted.slice(0, -1).join(", ") + " and " + quoted[quoted.length - 1] + " are not among its options, so nothing was done.";
+  var names = group.shape.names;
+  var listed = names.length === 1 ? (p ? "The only option of " + p : "Its only option") + " is " + names[0] + "."
+    : (p ? "The options of " + p : "Its options") + " are: " + names.join(", ") + ".";
+  return path + ": " + what + " " + listed;
+}
+function __ce_refused(refusal, lines) {
+  if (refusal === "false") return false;
+  if (refusal === "zero") return 0;
+  if (refusal === "empty list") return [];
+  if (refusal === "result") return { ok: false, error: lines.join(" ") };
+  return undefined;
+}
+(function () {
+  var __g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  for (var id in __CE_OPTIONS) {
+    if (!Object.prototype.hasOwnProperty.call(__CE_OPTIONS, id) || typeof __g[id] !== "function") continue;
+    __g[id] = (function (fn, spec) {
+      return function () {
+        var opts = arguments[spec.at];
+        if (__ce_isOptions(opts)) {
+          var groups = __ce_unknownOptions(opts, spec, "", []);
+          if (groups.length) {
+            var lines = [];
+            for (var i = 0; i < groups.length; i++) { lines.push(__ce_optionsLine(spec.path, groups[i])); logError(lines[i]); }
+            return __ce_refused(spec.refusal, lines);
+          }
+        }
+        return fn.apply(this, arguments);
+      };
+    })(__g[id], __CE_OPTIONS[id]);
+  }
+})();
+// END GENERATED option keys
 // BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 // on top. ce.core is global: its members are never namespaced, so they appear here only for

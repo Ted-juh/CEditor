@@ -22,6 +22,9 @@ import vm from 'node:vm';
 import { get } from 'svelte/store';
 
 import { resetScriptStateForTesting, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import {
+  MEMBER_BY_ID, memberRuntime, optionChecks, RUNTIME_WEBVIEW,
+} from '../src/CE_Application/scripting/panelApi.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import {
   JSON_CASES, JSON_DECODE_CASES, JSON_REJECTS, NATIVE_ENCODE_CASES,
@@ -448,11 +451,16 @@ test('panic expands to the same CC sequence in the Lua prelude as in the WebView
 
 /* --------------------------------------------------------------------------------- helpers */
 
+// A table key as Lua must write it: bare when it is a name, bracketed when it is a keyword such as
+// `repeat` or text such as "1", which bare would be a parse error or the number 1.
+const LUA_KEYWORDS = new Set(['and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function',
+  'goto', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while']);
+const luaKey = (k) => (/^[A-Za-z_]\w*$/.test(k) && !LUA_KEYWORDS.has(k) ? k : `[${JSON.stringify(k)}]`);
 function luaLiteral(v) {
   if (v === FN) return 'function() end';
   if (v === null || v === undefined) return 'nil';
   if (Array.isArray(v)) return `{${v.map(luaLiteral).join(', ')}}`;
-  if (typeof v === 'object') return `{${Object.entries(v).map(([k, x]) => `${k} = ${luaLiteral(x)}`).join(', ')}}`;
+  if (typeof v === 'object') return `{${Object.entries(v).map(([k, x]) => `${luaKey(k)} = ${luaLiteral(x)}`).join(', ')}}`;
   if (typeof v === 'string') return JSON.stringify(v);
   if (typeof v === 'number' && !Number.isFinite(v)) {
     return Number.isNaN(v) ? '(0/0)' : v > 0 ? 'math.huge' : '(-math.huge)';
@@ -671,6 +679,28 @@ const REFUSAL_CASES = [
   ['after', [0, FN]], ['after', [10, FN]],
   ['afterBeats', ['1/6', FN]], ['afterBeats', [-1, FN]], ['afterBeats', [null, FN]], ['afterBeats', ['1/4', FN]],
   ['afterBeats', [0, FN]],
+  // Options: a key the member does not take refuses the call, for every member the preludes
+  // implement whose options list fields, from the lists gen-script-modules.mjs writes into them.
+  // Several keys are named sorted; a misspelling inside an option with fields of its own is named
+  // with the option, after the call's own. Each is checked before anything else the call reads.
+  ['set', ['K.value', 1, { transmit: false, quiet: true }]],
+  ['requestDump', ['patch', FN, { timout: 50 }]], ['recallPreset', [0, { rol: 'mainSynth' }]],
+  ['animateTo', ['K.value', 1, { easing: 'outBack' }]],
+  ['animateTo', ['K.value', 1, { time: 800, ease: 'out', onDone: 1, repeat: 2 }]],
+  ['animateTo', ['K.value', 'full', { easing: 'outBack' }]],
+  ['animateSpring', ['K.value', 1, { curve: 'outBack' }]],
+  ['animateEnvelope', ['K.value', [{ x: 0, y: 0 }, { x: 1, y: 1 }], { damping: 3, frequency: 2 }]],
+  ['syncTimer', ['s', '1/16', { folow: false }]],
+  ['deviceParameters', [{ grp: 'Filter' }]], ['devicePorts', [{ dir: 'in' }]],
+  ['deviceDefineParameter', ['p', { nrpn: { mbs: 1, lsb: 2 } }]],
+  ['deviceDefineParameter', ['p', { nmae: 'Cutoff', cc: 7, nrpn: { msb: 1, lbs: 2 } }]],
+  ['deviceDefineDump', ['patch', { header: 'F0', match: { prefx: 'F0', suffix: 'F7' }, fields: [] }]],
+  ['checksum', ['roland', [1, 2], { ofset: 1 }]], ['checksum', ['roland', [1, 2], { offset: 0 }]],
+  ['panic', [{ channel: 2, reset: false }]], ['panic', [{ channel: 2, resetControllers: false }]],
+  ['encodeJson', [{ a: 1 }, { indnt: 2 }]], ['encodeJson', [{ a: 1 }, { indent: 2 }]],
+  ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesRead', [[1, 2], 0, 2, { bits: 8, Order: 'lsb', order: 'lsb' }]],
+  // Not options tables, so nothing to refuse: a list, numbered keys, and no table at all.
+  ['bytesRead', [[1, 2], 0, 2, [8]]], ['bytesRead', [[1, 2], 0, 2, { 1: 8 }]], ['bytesRead', [[1, 2], 0, 2, 'lsb']],
 ];
 
 /** The case's arguments with FN made a function in this realm. */
@@ -713,7 +743,9 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
     try {
       // __transportState answers nothing, as a host with no transport does, so a musical timer
       // that is accepted stops at "no tempo" (a log line, not an error).
-      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
+      // `set` is a host binding in this engine, and has to exist before the prelude loads for the
+      // option check to wrap it, as the real engine binds it first.
+      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
         lua.global.set(name, () => {});
       }
       await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
@@ -770,6 +802,95 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   const got = JSON.parse(run.stdout);
   REFUSAL_CASES.forEach(([fn, args], i) => {
     assert.deepEqual(got[i], want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
+  });
+});
+
+// The generated option check finds a member's options by position (and in Python by the parameter's
+// name too), from the contract's list of parameters. A prelude function taking them anywhere else
+// would be checked on the wrong argument, or not at all, and its refusals would stop agreeing with
+// the editor's only for the calls nobody thought to write a case for.
+test('each prelude takes the options it checks where the contract says', () => {
+  const checks = optionChecks().filter((c) => memberRuntime(MEMBER_BY_ID[c.id]) !== RUNTIME_WEBVIEW);
+  const preludes = [
+    ['Lua', extractRawString('LuaScriptEngine.cpp', 'LUA'), 'function'],
+    ['JS', extractRawString('JsScriptEngine.cpp', 'JS'), 'function'],
+    ['Python', extractRawString('PythonScriptEngine.cpp', 'PY'), 'def'],
+  ];
+  const notInSource = [];
+  for (const [language, source, keyword] of preludes) {
+    for (const { id, params: [{ index, name }] } of checks) {
+      const m = new RegExp(`^${keyword} ${id}\\(([^)]*)\\)`, 'm').exec(source);
+      if (!m) { notInSource.push(`${language} ${id}`); continue; }
+      const names = m[1].split(',').map((p) => p.split('=')[0].trim());
+      assert.equal(names[index], name, `${language} ${id}(${m[1]}): its options are argument ${index + 1}, ${name}`);
+    }
+  }
+  // Lua's set is a host binding rather than prelude source; the check wraps it all the same.
+  assert.deepEqual(notInSource, ['Lua set']);
+});
+
+// A refused call answers what its member answers for any other refusal (panelApi.js, refusalOf),
+// and that answer has to be the same everywhere too: a script testing `if not ce.device.ports(...)`
+// or reading `r.ok` from recallPreset must take the same branch in the editor and in the export.
+// One unknown key per member the preludes implement, so every kind of answer they give is here.
+const OPTION_ANSWER_CASES = [
+  ['set', ['K.value', 1, { quiet: true }]], ['requestDump', ['patch', null, { timout: 50 }]],
+  ['recallPreset', [0, { rol: 'mainSynth' }]], ['animateTo', ['K.value', 1, { easing: 'outBack' }]],
+  ['animateSpring', ['K.value', 1, { curve: 'outBack' }]],
+  ['animateEnvelope', ['K.value', [{ x: 0, y: 0 }, { x: 1, y: 1 }], { damping: 3 }]],
+  ['syncTimer', ['s', '1/16', { folow: false }]], ['deviceParameters', [{ grp: 'Filter' }]],
+  ['deviceDefineParameter', ['p', { cc: 7, nmae: 'Cutoff' }]], ['deviceDefineDump', ['d', { header: 'F0' }]],
+  ['devicePorts', [{ dir: 'in' }]], ['checksum', ['roland', [1, 2], { ofset: 1 }]],
+  ['panic', [{ reset: false }]], ['encodeJson', [{ a: 1 }, { indnt: 2 }]],
+  ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]],
+];
+
+test('a refused call answers the same in every engine', async (t) => {
+  const covered = new Set(OPTION_ANSWER_CASES.map(([fn]) => fn));
+  for (const c of optionChecks().filter((x) => memberRuntime(MEMBER_BY_ID[x.id]) !== RUNTIME_WEBVIEW)) {
+    assert.ok(covered.has(c.id), `${c.id} needs a case here`);
+  }
+  const want = OPTION_ANSWER_CASES.map(([fn, args]) => canonical(web[fn](...args)));
+  resetScriptStateForTesting();
+
+  {
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    OPTION_ANSWER_CASES.forEach(([fn, args], i) => {
+      assert.equal(canonical(sandbox[fn](...args)), want[i], `JS prelude ${fn}(${JSON.stringify(args)})`);
+    });
+  }
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'set', 'sendCC', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = OPTION_ANSWER_CASES.map(([fn, args]) => `__ser(${fn}(${args.map(luaLiteral).join(', ')}))`);
+      const got = String(await lua.doString(`${LUA_SERIALISER}\nreturn table.concat({${calls.join(',\n')}}, "\\n")`)).split('\n');
+      OPTION_ANSWER_CASES.forEach(([fn, args], i) => {
+        assert.equal(got[i], want[i], `Lua prelude ${fn}(${JSON.stringify(args)})`);
+      });
+    } finally {
+      lua.global.close();
+    }
+  }
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its answers were not compared'); return; }
+  const run = spawnSync(python, ['-c', PY_DRIVER], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: OPTION_ANSWER_CASES }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  const got = JSON.parse(run.stdout);
+  OPTION_ANSWER_CASES.forEach(([fn, args], i) => {
+    assert.equal(got[i].error, undefined, `Python prelude ${fn}(${JSON.stringify(args)}) raised ${got[i].error}`);
+    assert.equal(canonical(got[i].value ?? null), want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
   });
 });
 
