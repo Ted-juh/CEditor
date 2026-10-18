@@ -2,8 +2,12 @@
 
 #include <juce_events/juce_events.h>
 
+#include "../DeviceProfile/ProfileChecksums.h"
+
 #include <algorithm>
+#include <charconv>
 #include <cmath>
+#include <optional>
 
 namespace ceditor::scripting
 {
@@ -908,64 +912,15 @@ bool ScriptRuntime::filterMidi (bool inbound, juce::var& bytes)
 // The WebView runtime's twin is deviceDefinitions.js. Every rule below is stated there too, and the
 // two suites pin the same cases, because "a synth with no profile" is exactly the panel a user
 // takes to a gig with the plugin window shut.
+//
+// A definition is checked when it is made, and one that is wrong is refused with a message and not
+// defined. These parsers used to clamp, drop and guess, differently from the editor's: "F07D00F7"
+// as a request became one number and went out as 00 (FF from the editor), "100" in a template was
+// FF here and 64 there, a template's 0x41 was read back as hex 65, an unknown checksum was Roland
+// and an unknown $token 00. The refusals are deviceDefinitions.js's, word for word.
 
 namespace
 {
-    int clamp7 (double v, int lo = 0, int hi = 127)
-    {
-        const int n = (int) std::lround (v);
-        return n < lo ? lo : n > hi ? hi : n;
-    }
-
-    /** A byte list as a script may write it: an array of numbers, or "f0 41 10" hex text. */
-    juce::Array<int> varToByteList (const juce::var& v)
-    {
-        juce::Array<int> out;
-        if (auto* arr = v.getArray())
-        {
-            for (const auto& item : *arr)
-            {
-                if (item.isString())
-                {
-                    const auto text = item.toString().trim();
-                    out.add (text.startsWith ("$") ? -1 : (int) text.getHexValue32());
-                }
-                else out.add (clamp7 ((double) item, 0, 255));
-            }
-            return out;
-        }
-        if (v.isString())
-            for (const auto& token : juce::StringArray::fromTokens (v.toString(), " ,", ""))
-                if (token.isNotEmpty()) out.add ((int) token.getHexValue32());
-        return out;
-    }
-
-    juce::StringArray varToTokens (const juce::var& v)
-    {
-        if (auto* arr = v.getArray())
-        {
-            juce::StringArray out;
-            for (const auto& item : *arr) out.add (item.toString().trim());
-            return out;
-        }
-        if (v.isString()) return juce::StringArray::fromTokens (v.toString(), " ,", "");
-        return {};
-    }
-
-    int checksumOver (const juce::String& kind, const juce::Array<int>& bytes, int from, int toInclusive)
-    {
-        int sum = 0, x = 0;
-        for (int i = juce::jmax (0, from); i <= juce::jmin (toInclusive, bytes.size() - 1); ++i)
-        {
-            sum = (sum + (bytes[i] & 0xff)) % 128;
-            x = (x ^ (bytes[i] & 0xff)) & 0x7f;
-        }
-        const auto k = kind.toLowerCase();
-        if (k == "xor") return x;
-        if (k == "sum" || k == "sum-7bit") return sum;
-        return (128 - sum) % 128;                       // roland / yamaha / two's complement
-    }
-
     juce::var propOr (const juce::var& spec, const char* key, const juce::var& fallback = {})
     {
         auto* o = spec.getDynamicObject();
@@ -976,6 +931,236 @@ namespace
     {
         auto* o = spec.getDynamicObject();
         return o != nullptr && o->hasProperty (key) && ! o->getProperty (key).isVoid();
+    }
+
+    // -- what went wrong, in deviceDefinitions.js's words ------------------------------------
+
+    const juce::String parameterRefused { "the parameter was not defined" };
+    const juce::String dumpRefused      { "the dump was not defined" };
+    const juce::String notSent          { "nothing was sent" };
+
+    juce::String refusal (const juce::String& call, const juce::String& what, const juce::String& outcome,
+                          const juce::String& advice = {})
+    {
+        return call + ": " + what + ", so " + outcome + "." + (advice.isNotEmpty() ? " " + advice : juce::String());
+    }
+
+    bool isNothing (const juce::var& v) { return v.isVoid() || v.isUndefined(); }
+    bool isNumber (const juce::var& v)  { return v.isInt() || v.isInt64() || v.isDouble(); }
+    bool isWhole (const juce::var& v)
+    {
+        if (! isNumber (v)) return false;
+        const double d = (double) v;
+        return std::isfinite (d) && d == std::floor (d);
+    }
+    // A list is a list in every engine; an object is anything with properties, an empty Lua table
+    // included (the Lua bridge turns {} into an object), which reads as an empty list where a list
+    // is wanted. deviceDefinitions.js's isList/isObject/listOf draw the same lines.
+    bool isList (const juce::var& v)   { return v.isArray(); }
+    bool isObject (const juce::var& v) { return v.getDynamicObject() != nullptr; }
+    bool listOf (const juce::var& v, juce::Array<juce::var>& out)
+    {
+        if (auto* arr = v.getArray()) { out = *arr; return true; }
+        if (auto* o = v.getDynamicObject(); o != nullptr && o->getProperties().isEmpty()) { out.clear(); return true; }
+        return false;
+    }
+
+    /** A number as JavaScript prints it, for the cases a script writes: whole numbers bare, others
+        in the shortest form that reads back the same. */
+    juce::String shownNumber (double d)
+    {
+        if (std::isnan (d)) return "NaN";
+        if (std::isinf (d)) return d > 0 ? "Infinity" : "-Infinity";
+        if (d == std::floor (d) && std::abs (d) < 1.0e15) return juce::String ((juce::int64) d);
+        char text[64];
+        const auto written = std::to_chars (text, text + sizeof (text), d);
+        return juce::String (text, (size_t) (written.ptr - text));
+    }
+
+    /** A value as a message shows it: a number as the script wrote it, text in double quotes, and
+        nil, undefined or None as "nothing". deviceDefinitions.js's shown(). */
+    juce::String shownValue (const juce::var& v)
+    {
+        if (isNothing (v)) return "nothing";
+        if (v.isString()) return "\"" + v.toString() + "\"";
+        if (v.isBool()) return (bool) v ? "true" : "false";
+        if (isNumber (v)) return shownNumber ((double) v);
+        if (v.isMethod()) return "a function";
+        return isList (v) ? "a list" : "an object";
+    }
+
+    /** Text as JavaScript's String() gives it, for a choice id. */
+    juce::String textOf (const juce::var& v)
+    {
+        if (isNothing (v)) return {};
+        if (v.isBool()) return (bool) v ? "true" : "false";
+        if (isNumber (v)) return shownNumber ((double) v);
+        return v.toString();
+    }
+
+    /** "a", "a and b", "a, b and c". */
+    juce::String listWords (const juce::StringArray& items)
+    {
+        if (items.size() < 2) return items.joinIntoString ("");
+        juce::StringArray head (items);
+        head.remove (head.size() - 1);
+        return head.joinIntoString (", ") + " and " + items[items.size() - 1];
+    }
+
+    /** A whole number from lo to hi, or what was wrong with it, worded to follow "<call>: ". */
+    juce::String wholeIn (const juce::String& name, const juce::var& v, juce::int64 lo, juce::int64 hi)
+    {
+        if (isWhole (v) && (double) v >= (double) lo && (double) v <= (double) hi) return {};
+        return name + " is " + shownValue (v) + ", not a whole number from " + juce::String (lo) + " to " + juce::String (hi);
+    }
+
+    // -- bytes, by one rule --------------------------------------------------------------------
+    // The rule every send reads hex text by (firstTokenNotOneByte in BridgeScriptHost.h, scriptBytes
+    // in panelRuntime.js), and its words. Text: a token is one byte, one or two hex digits in any
+    // case with or without 0x, separated by spaces, tabs, line breaks or commas and nothing else. A
+    // list: each item a whole number from 0 to 255, or text that is one such token.
+
+    juce::StringArray byteTokens (const juce::String& text)
+    {
+        auto tokens = juce::StringArray::fromTokens (text, " \t\r\n\f\v,", "");
+        tokens.removeEmptyStrings();
+        return tokens;
+    }
+    bool isHexByte (const juce::String& token)
+    {
+        const auto digits = token.startsWithIgnoreCase ("0x") ? token.substring (2) : token;
+        return digits.isNotEmpty() && digits.length() <= 2 && digits.containsOnly ("0123456789abcdefABCDEF");
+    }
+    int hexByteOf (const juce::String& token)
+    { return (token.startsWithIgnoreCase ("0x") ? token.substring (2) : token).getHexValue32(); }
+    /** A byte as the template carries it: two lower-case hex digits. */
+    juce::String hex2 (int byte) { return juce::String::toHexString (byte).paddedLeft ('0', 2); }
+
+    /** notOneByteMessage's advice, word for word. */
+    juce::String oneByteAdvice (const juce::String& token)
+    {
+        if (token.containsOnly ("0123456789abcdefABCDEF") && token.length() % 2 == 0)
+        {
+            juce::StringArray pairs;
+            for (int i = 0; i < token.length(); i += 2) pairs.add (token.substring (i, i + 2));
+            return "Put a space between the bytes: \"" + pairs.joinIntoString (" ") + "\".";
+        }
+        return "Each byte is one or two hex digits, with spaces between the bytes: \"F0 41 10 F7\".";
+    }
+
+    /** The bytes a definition was given: `items` as two hex digits each, or a `$name` where `tokens`
+        allows them (the caller checks the name), or `what` and `advice` saying what was wrong. */
+    struct ReadBytes
+    {
+        juce::StringArray items;
+        juce::String what, advice;
+    };
+
+    ReadBytes readBytes (const juce::var& input, const juce::String& field, bool tokens)
+    {
+        ReadBytes read;
+        if (isNothing (input)) return read;
+        if (input.isString())
+        {
+            for (const auto& token : byteTokens (input.toString()))
+            {
+                if (tokens && token.startsWith ("$")) read.items.add (token);
+                else if (isHexByte (token)) read.items.add (hex2 (hexByteOf (token)));
+                else
+                {
+                    read.what = "in the " + field + ", \"" + token + "\" is not one byte";
+                    read.advice = oneByteAdvice (token);
+                    return read;
+                }
+            }
+            return read;
+        }
+        juce::Array<juce::var> list;
+        if (! listOf (input, list))
+        {
+            read.what = "the " + field + " is " + shownValue (input) + ", not a list of bytes or hex text";
+            return read;
+        }
+        for (int i = 0; i < list.size(); ++i)
+        {
+            const auto& item = list.getReference (i);
+            const auto one = item.isString() ? byteTokens (item.toString()) : juce::StringArray();
+            if (isWhole (item) && (double) item >= 0 && (double) item <= 255) read.items.add (hex2 ((int) (double) item));
+            else if (one.size() == 1 && tokens && one[0].startsWith ("$")) read.items.add (one[0]);
+            else if (one.size() == 1 && isHexByte (one[0])) read.items.add (hex2 (hexByteOf (one[0])));
+            else
+            {
+                read.what = "in the " + field + ", " + shownValue (item) + " at position " + juce::String (i) + " is not a byte";
+                return read;
+            }
+        }
+        return read;
+    }
+
+    // -- the vocabularies ------------------------------------------------------------------------
+
+    const juce::StringArray deviceTypes { "boolean", "choice", "enum", "integer", "number", "text" };
+    /** Every spelling `encoding` accepts, in the order a refusal lists them, and what each means. */
+    const juce::StringArray encodingNames { "boolean-u7", "nibbled", "to14bit", "u14", "u7" };
+    juce::String encodingFor (const juce::String& name)
+    {
+        if (name == "to14bit") return "u14";
+        return encodingNames.contains (name) ? name : juce::String();
+    }
+    const juce::StringArray templateTokens { "$value", "$deviceId", "$channel", "$checksumStart", "$checksum" };
+    const juce::StringArray builtInNames { "value", "encodedValue", "deviceId", "channel", "checksumStart", "checksum" };
+    const juce::StringArray patternTokens { "$deviceId", "$channel" };
+    int patternValue (const juce::String& token) { return token == "$deviceId" ? 16 : 1; }
+
+    /** What the wire can carry, and the words for it. Nothing in this codec sends a negative number. */
+    struct Capacity { juce::int64 max; juce::String carrier; };
+    Capacity capacityOf (const juce::String& wireKind, const juce::String& encoding, int nibbles)
+    {
+        if (wireKind == "cc")   return { 127, "a CC carries 0 to 127" };
+        if (wireKind == "nrpn") return { 16383, "an NRPN carries 0 to 16383" };
+        if (encoding == "u14")  return { 16383, "two SysEx data bytes carry 0 to 16383" };
+        if (encoding == "nibbled")
+        {
+            const auto max = ((juce::int64) 1 << (4 * nibbles)) - 1;
+            return { max, nibbles == 1 ? juce::String ("one nibble carries 0 to 15")
+                                       : juce::String (nibbles) + " nibbles carry 0 to " + juce::String (max) };
+        }
+        return { 127, "a SysEx data byte carries 0 to 127" };
+    }
+
+    // -- what a write may give ------------------------------------------------------------------
+
+    /** A number as a write may give one: a number, true or false, or decimal text such as "64". */
+    std::optional<double> numberOf (const juce::var& v)
+    {
+        if (isNumber (v)) { const double d = (double) v; return std::isfinite (d) ? std::optional<double> (d) : std::nullopt; }
+        if (v.isBool()) return (bool) v ? 1.0 : 0.0;
+        if (! v.isString()) return std::nullopt;
+        // ^[+-]?[0-9]+(\.[0-9]+)?$ — deviceDefinitions.js's DECIMAL.
+        const auto text = v.toString();
+        int i = (text.startsWithChar ('+') || text.startsWithChar ('-')) ? 1 : 0;
+        const int digitsFrom = i;
+        while (i < text.length() && juce::CharacterFunctions::isDigit (text[i])) ++i;
+        if (i == digitsFrom) return std::nullopt;
+        if (i < text.length() && text[i] == '.')
+        {
+            const int fractionFrom = ++i;
+            while (i < text.length() && juce::CharacterFunctions::isDigit (text[i])) ++i;
+            if (i == fractionFrom) return std::nullopt;
+        }
+        if (i != text.length()) return std::nullopt;
+        return text.getDoubleValue();
+    }
+
+    /** On or off: true/false, a number (0 is off), or "on"/"off"/"true"/"false" in any case. */
+    std::optional<bool> switchOf (const juce::var& v)
+    {
+        if (v.isBool()) return (bool) v;
+        if (isNumber (v)) { const double d = (double) v; return std::isfinite (d) ? std::optional<bool> (d != 0) : std::nullopt; }
+        const auto word = v.isString() ? v.toString().toLowerCase() : juce::String();
+        if (word == "on" || word == "true") return true;
+        if (word == "off" || word == "false") return false;
+        return std::nullopt;
     }
 }
 
@@ -1004,74 +1189,216 @@ bool ScriptRuntime::defineDeviceParameter (const juce::String& role, const juce:
         reportError ("runtime", "defineParameter(id, spec): a parameter id is required.");
         return false;
     }
+    const auto call = "defineParameter(\"" + id + "\")";
+    auto refuse = [this, &call] (const juce::String& what, const juce::String& advice = {})
+    {
+        reportError ("runtime", refusal (call, what, parameterRefused, advice));
+        return false;
+    };
 
     DeclaredParameter p;
     p.id = id;
     p.name = propOr (spec, "name", id).toString();
     p.group = propOr (spec, "group", "Script").toString();
-    p.type = propOr (spec, "type", "number").toString();
     p.access = propOr (spec, "access", "readWrite").toString();
 
-    const auto declaredEncoding = propOr (spec, "encoding").toString();
-    p.encoding = (declaredEncoding == "u7" || declaredEncoding == "u14" || declaredEncoding == "nibbled"
-                  || declaredEncoding == "boolean-u7")
-                 ? declaredEncoding : (p.type == "boolean" ? juce::String ("boolean-u7") : juce::String ("u7"));
-    const double widthMax = p.encoding == "u14" ? 16383.0 : 127.0;
+    // Names are read in any case, the way divisions and checksums are.
+    const auto typeVar = propOr (spec, "type");
+    p.type = isNothing (typeVar) ? juce::String ("number") : typeVar.isString() ? typeVar.toString().toLowerCase() : juce::String();
+    if (! deviceTypes.contains (p.type))
+        return refuse (shownValue (typeVar) + " is not a type", "One of: " + deviceTypes.joinIntoString (", ") + ".");
 
-    p.min = hasProp (spec, "min") ? (double) propOr (spec, "min") : 0.0;
-    p.max = hasProp (spec, "max") ? (double) propOr (spec, "max")
-                                  : (p.type == "boolean" ? 1.0 : widthMax);
-    p.channel = juce::jlimit (1, 16, hasProp (spec, "channel") ? (int) propOr (spec, "channel") : 1);
-    p.nibbles = hasProp (spec, "nibbles") ? juce::jmax (1, (int) propOr (spec, "nibbles")) : 2;
-    p.length  = hasProp (spec, "length") ? juce::jmax (0, (int) propOr (spec, "length")) : 0;
-    p.pad     = hasProp (spec, "pad") ? (int) propOr (spec, "pad") : 32;
-    p.trueValue  = hasProp (spec, "trueValue") ? (int) propOr (spec, "trueValue") : 1;
-    p.falseValue = hasProp (spec, "falseValue") ? (int) propOr (spec, "falseValue") : 0;
-    if (auto* choices = propOr (spec, "choices").getArray()) p.choices = *choices;
-    if (auto* vars = propOr (spec, "variables").getDynamicObject()) p.variables = vars->getProperties();
+    p.encoding = p.type == "boolean" ? "boolean-u7" : "u7";
+    if (const auto encodingVar = propOr (spec, "encoding"); ! isNothing (encodingVar))
+    {
+        p.encoding = encodingFor (encodingVar.isString() ? encodingVar.toString().toLowerCase() : juce::String());
+        if (p.encoding.isEmpty())
+            return refuse (shownValue (encodingVar) + " is not an encoding", "One of: " + encodingNames.joinIntoString (", ") + ".");
+    }
+    p.nibbles = 2;
+    if (const auto nibbles = propOr (spec, "nibbles"); ! isNothing (nibbles))
+    {
+        if (const auto wrong = wholeIn ("nibbles", nibbles, 1, 8); wrong.isNotEmpty()) return refuse (wrong);
+        p.nibbles = (int) (double) nibbles;
+    }
+    p.channel = 1;
+    if (const auto channel = propOr (spec, "channel"); ! isNothing (channel))
+    {
+        if (const auto wrong = wholeIn ("channel", channel, 1, 16); wrong.isNotEmpty()) return refuse (wrong);
+        p.channel = (int) (double) channel;
+    }
 
     if (hasProp (spec, "cc"))
     {
+        const auto cc = propOr (spec, "cc");
+        if (const auto wrong = wholeIn ("cc", cc, 0, 127); wrong.isNotEmpty()) return refuse (wrong);
         p.wireKind = "cc";
-        p.cc = clamp7 ((double) propOr (spec, "cc"));
+        p.cc = (int) (double) cc;
     }
     else if (hasProp (spec, "nrpn"))
     {
+        // { msb, lsb }, or the two as a list.
         const auto n = propOr (spec, "nrpn");
+        if (! isList (n) && ! isObject (n)) return refuse ("the nrpn is " + shownValue (n) + ", not { msb, lsb }");
+        juce::Array<juce::var> pair;
+        if (isList (n)) listOf (n, pair);
+        const auto msb = isList (n) ? pair[0] : propOr (n, "msb");
+        const auto lsb = isList (n) ? pair[1] : propOr (n, "lsb");
+        auto wrong = wholeIn ("nrpn.msb", msb, 0, 127);
+        if (wrong.isEmpty()) wrong = wholeIn ("nrpn.lsb", lsb, 0, 127);
+        if (wrong.isNotEmpty()) return refuse (wrong);
         p.wireKind = "nrpn";
-        p.msb = clamp7 ((double) propOr (n, "msb"));
-        p.lsb = clamp7 ((double) propOr (n, "lsb"));
+        p.msb = (int) (double) msb;
+        p.lsb = (int) (double) lsb;
     }
     else if (hasProp (spec, "sysex"))
     {
-        p.tmpl = varToTokens (propOr (spec, "sysex"));
-        if (p.tmpl.isEmpty())
+        const auto read = readBytes (propOr (spec, "sysex"), "sysex template", true);
+        if (read.what.isNotEmpty()) return refuse (read.what, read.advice);
+        if (read.items.isEmpty())
         {
-            reportError ("runtime", "defineParameter(\"" + id + "\"): the sysex template is empty — it needs the "
-                         "bytes to send, with $value where the value goes.");
+            reportError ("runtime", call + ": the sysex template is empty — it needs the bytes to send, with $value "
+                                    "where the value goes.");
             return false;
         }
+        // Every variable is a byte the template can put on the wire, so each is read by the byte
+        // rule. In name order, so the first one reported does not depend on how a table iterates.
+        if (auto* declared = propOr (spec, "variables").getDynamicObject())
+        {
+            juce::StringArray names;
+            for (const auto& entry : declared->getProperties()) names.add (entry.name.toString());
+            std::sort (names.begin(), names.end(), [] (const juce::String& a, const juce::String& b) { return a.compare (b) < 0; });
+            for (const auto& name : names)
+            {
+                const auto value = declared->getProperty (juce::Identifier (name));
+                const auto one = value.isString() ? byteTokens (value.toString()) : juce::StringArray();
+                if (isWhole (value) && (double) value >= 0 && (double) value <= 255) p.variables.set (name, (int) (double) value);
+                else if (one.size() == 1 && isHexByte (one[0])) p.variables.set (name, hexByteOf (one[0]));
+                else return refuse ("in the variables, " + name + " = " + shownValue (value) + " is not a byte");
+            }
+        }
+        juce::StringArray own;
+        for (const auto& entry : p.variables)
+            if (! builtInNames.contains (entry.name.toString())) own.add (entry.name.toString());
+        std::sort (own.begin(), own.end(), [] (const juce::String& a, const juce::String& b) { return a.compare (b) < 0; });
+        for (const auto& token : read.items)
+        {
+            if (! token.startsWith ("$") || token == "$encodedValue" || templateTokens.contains (token)
+                || own.contains (token.substring (1)))
+                continue;
+            const auto tokens = "The tokens are " + listWords (templateTokens);
+            juce::StringArray named;
+            for (const auto& name : own) named.add ("$" + name);
+            return refuse ("in the sysex template, \"" + token + "\" is not a token",
+                           own.isEmpty() ? tokens + ", and any $name you list in variables."
+                                         : tokens + ", and the variable" + (own.size() == 1 ? "" : "s") + " "
+                                               + listWords (named) + ".");
+        }
+        const auto checksumVar = propOr (spec, "checksum");
+        p.checksumKind = ce::checksums::canonicalName (isNothing (checksumVar) ? juce::String ("roland")
+                                                       : checksumVar.isString() ? checksumVar.toString() : juce::String());
+        if (p.checksumKind.isEmpty())
+            return refuse (shownValue (checksumVar) + " is not a checksum",
+                           "One of: " + ce::checksums::acceptedNames().joinIntoString (", ") + ".");
         p.wireKind = "sysex";
-        p.checksumKind = propOr (spec, "checksum", "roland").toString();
-
-        // A Roland template (41 straight after F0) whose $checksum has no $checksumStart sums the
-        // header too, and a Roland synth rejects the message without a word. The marker is not
-        // inferred (see encodeDeviceParameter), so the definition stands, with a warning in the
-        // words of rolandChecksumWarning in deviceDefinitions.js.
-        auto hexOf = [] (const juce::String& t) { return (t.startsWithIgnoreCase ("0x") ? t.substring (2) : t).toLowerCase(); };
-        const auto first = hexOf (p.tmpl[0]) == "f0" ? p.tmpl[1] : p.tmpl[0];
-        if (hexOf (first) == "41" && p.tmpl.contains ("$checksum") && ! p.tmpl.contains ("$checksumStart"))
-            host.logAt ("warn", "defineParameter(\"" + id + "\"): this is a Roland template (41 after F0) with $checksum "
-                                "and no $checksumStart, so the checksum includes the header, and a Roland synth "
-                                "ignores the message. Put $checksumStart where the address begins.", juce::var());
+        p.tmpl = read.items;            // normalised: 0x41 and "41" are both "41" by now
     }
     else
     {
         // Refusing is deliberate. A descriptor with no wire enumerates fine and sends nothing, so
         // the panel LOOKS built — which is a worse failure than an error, and a much later one.
-        reportError ("runtime", "defineParameter(\"" + id + "\"): no wire format — give it { cc = 74 }, "
+        reportError ("runtime", call + ": no wire format — give it { cc = 74 }, "
                      "{ nrpn = { msb = 1, lsb = 2 } } or { sysex = { … } }, or nothing will be sent.");
         return false;
+    }
+
+    const auto capacity = capacityOf (p.wireKind, p.encoding, p.nibbles);
+    const auto negative = "A negative number cannot be sent. Declare the numbers the synth receives, such as "
+                          "min = 0 and max = " + juce::String (capacity.max)
+                        + ", and add the offset in your script with ce.midi.toOffset(value, 64).";
+
+    // Choices are a choice parameter's: a name each, worth its position plus min, or { id, value }.
+    p.min = hasProp (spec, "min") ? (double) propOr (spec, "min") : 0.0;
+    int named = 0;
+    if ((p.type == "choice" || p.type == "enum") && hasProp (spec, "choices"))
+    {
+        const auto choicesVar = propOr (spec, "choices");
+        juce::Array<juce::var> list;
+        if (! listOf (choicesVar, list)) return refuse ("the choices are " + shownValue (choicesVar) + ", not a list");
+        for (int i = 0; i < list.size(); ++i)
+        {
+            const auto& c = list.getReference (i);
+            auto* choice = new juce::DynamicObject();
+            const juce::var owned (choice);
+            if (c.isString())
+            {
+                choice->setProperty ("id", c.toString());
+                choice->setProperty ("value", p.min + i);
+                ++named;
+            }
+            else if (isObject (c))
+            {
+                const auto choiceId = textOf (hasProp (c, "id") ? propOr (c, "id") : propOr (c, "name"));
+                const auto value = propOr (c, "value");
+                if (! isWhole (value))
+                    return refuse ("the value of choice \"" + choiceId + "\" is " + shownValue (value) + ", not a whole number");
+                choice->setProperty ("id", choiceId);
+                choice->setProperty ("value", value);
+            }
+            else return refuse ("in the choices, " + shownValue (c) + " at position " + juce::String (i) + " is not a choice",
+                                "A choice is its name, or { id, value }.");
+            p.choices.add (owned);
+        }
+    }
+
+    const double widthMax = p.encoding == "u14" ? 16383.0 : 127.0;
+    p.max = hasProp (spec, "max") ? (double) propOr (spec, "max")
+          : p.type == "boolean" ? 1.0
+          : (named > 0 && named == p.choices.size()) ? p.min + p.choices.size() - 1
+          : juce::jmin (widthMax, (double) capacity.max);
+
+    p.trueValue = 1;
+    p.falseValue = 0;
+    if (p.type != "text")
+    {
+        for (const auto& [name, value] : { std::pair<const char*, double> { "min", p.min }, { "max", p.max } })
+        {
+            if (value < 0) return refuse (juce::String (name) + " is " + shownNumber (value) + ", and " + capacity.carrier, negative);
+            if (value > (double) capacity.max) return refuse (juce::String (name) + " is " + shownNumber (value) + ", and " + capacity.carrier);
+        }
+        for (const auto& c : p.choices)
+        {
+            const double value = (double) propOr (c, "value");
+            if (value < 0 || value > (double) capacity.max)
+                return refuse ("the value of choice \"" + propOr (c, "id").toString() + "\" is " + shownNumber (value)
+                               + ", and " + capacity.carrier);
+        }
+        for (const char* name : { "trueValue", "falseValue" })
+        {
+            const auto value = propOr (spec, name);
+            if (isNothing (value)) continue;
+            if (! isWhole (value)) return refuse (juce::String (name) + " is " + shownValue (value) + ", not a whole number");
+            const double d = (double) value;
+            if (d < 0 || d > (double) capacity.max)
+                return refuse (juce::String (name) + " is " + shownNumber (d) + ", and " + capacity.carrier, d < 0 ? negative : juce::String());
+            (juce::String (name) == "trueValue" ? p.trueValue : p.falseValue) = (int) d;
+        }
+    }
+    p.length = hasProp (spec, "length") ? juce::jmax (0, (int) propOr (spec, "length")) : 0;
+    p.pad    = hasProp (spec, "pad") ? (int) propOr (spec, "pad") : 32;
+
+    if (p.wireKind == "sysex")
+    {
+        // A Roland template (41 straight after F0) whose $checksum has no $checksumStart sums the
+        // header too, and a Roland synth rejects the message without a word. The marker is not
+        // inferred (see encodeDeviceParameter), so the definition stands, with a warning in the
+        // words of rolandChecksumWarning in deviceDefinitions.js. The template is normalised by now,
+        // so one written as numbers ({ 0xF0, 0x41, … }) is recognised too.
+        const auto first = p.tmpl[0] == "f0" ? p.tmpl[1] : p.tmpl[0];
+        if (first == "41" && p.tmpl.contains ("$checksum") && ! p.tmpl.contains ("$checksumStart"))
+            host.logAt ("warn", "defineParameter(\"" + id + "\"): this is a Roland template (41 after F0) with $checksum "
+                                "and no $checksumStart, so the checksum includes the header, and a Roland synth "
+                                "ignores the message. Put $checksumStart where the address begins.", juce::var());
     }
 
     auto& slot = deviceDeclarations[role.isEmpty() ? juce::String ("mainSynth") : role];
@@ -1090,13 +1417,18 @@ bool ScriptRuntime::defineDeviceDump (const juce::String& role, const juce::Stri
         reportError ("runtime", "defineDump(kind, spec): a dump kind is required.");
         return false;
     }
+    const auto call = "defineDump(\"" + kind + "\")";
+    auto refuse = [this, &call] (const juce::String& what, const juce::String& advice = {})
+    {
+        reportError ("runtime", refusal (call, what, dumpRefused, advice));
+        return false;
+    };
 
     const auto resolvedRole = role.isEmpty() ? juce::String ("mainSynth") : role;
     auto* fields = propOr (spec, "fields").getArray();
     if (fields == nullptr || fields->isEmpty())
     {
-        reportError ("runtime", "defineDump(\"" + kind + "\"): no fields — a layout with nothing in it "
-                     "decodes to nothing.");
+        reportError ("runtime", call + ": no fields — a layout with nothing in it decodes to nothing.");
         return false;
     }
 
@@ -1108,15 +1440,14 @@ bool ScriptRuntime::defineDeviceDump (const juce::String& role, const juce::Stri
         const auto parameterId = propOr (field, "parameter", propOr (field, "id")).toString().trim();
         if (parameterId.isEmpty())
         {
-            reportError ("runtime", "defineDump(\"" + kind + "\"): a field has no parameter — every field "
-                         "names the parameter it carries.");
+            reportError ("runtime", call + ": a field has no parameter — every field names the parameter it carries.");
             return false;
         }
         // Refused here rather than at decode time: a layout naming a parameter that does not exist
         // decodes to fewer values than the author thinks, months later, in front of an audience.
         if (findDeclaredParameter (resolvedRole, parameterId) == nullptr)
         {
-            reportError ("runtime", "defineDump(\"" + kind + "\"): \"" + parameterId + "\" is not a defined "
+            reportError ("runtime", call + ": \"" + parameterId + "\" is not a defined "
                          "parameter. Call defineParameter(\"" + parameterId + "\", …) first — the layout "
                          "describes where a parameter sits, so the parameter has to exist to sit anywhere.");
             return false;
@@ -1125,20 +1456,60 @@ bool ScriptRuntime::defineDeviceDump (const juce::String& role, const juce::Stri
         dump.fieldOffsets.add (juce::jmax (0, (int) propOr (field, "offset", 0)));
     }
 
+    // A prefix or suffix: bytes, and the two tokens the editor's decoder resolves ($deviceId as 16,
+    // $channel as 1). They used to match ANY byte here, so the two runtimes matched different dumps.
     const auto match = propOr (spec, "match");
-    dump.prefix = varToByteList (hasProp (match, "prefix") ? propOr (match, "prefix") : propOr (spec, "prefix"));
-    dump.suffix = varToByteList (hasProp (match, "suffix") ? propOr (match, "suffix") : propOr (spec, "suffix"));
+    auto readPattern = [&] (const char* key, const juce::String& field, juce::Array<int>& out) -> bool
+    {
+        const auto read = readBytes (hasProp (match, key) ? propOr (match, key) : propOr (spec, key), field, true);
+        if (read.what.isNotEmpty()) return refuse (read.what, read.advice);
+        for (const auto& item : read.items)
+        {
+            if (item.startsWith ("$") && ! patternTokens.contains (item))
+                return refuse ("in the " + field + ", \"" + item + "\" is not a token",
+                               "The tokens are " + listWords (patternTokens) + ".");
+            out.add (item.startsWith ("$") ? patternValue (item) : item.getHexValue32());
+        }
+        return true;
+    };
+    if (! readPattern ("prefix", "prefix", dump.prefix)) return false;
+    if (dump.prefix.isEmpty())
+    {
+        reportError ("runtime", call + ": no prefix — a layout with nothing to recognise it by would decode every SysEx "
+                                "that arrives. Give it match = { prefix = { \"F0\", … } }, the bytes the dump starts with.");
+        return false;
+    }
+    if (! readPattern ("suffix", "suffix", dump.suffix)) return false;
+    const auto request = readBytes (propOr (spec, "request"), "request", false);
+    if (request.what.isNotEmpty()) return refuse (request.what, request.advice);
+    for (const auto& item : request.items) dump.request.add (item.getHexValue32());
+
     dump.offset = juce::jmax (0, (int) propOr (spec, "offset", 0));
     dump.size   = juce::jmax (0, (int) propOr (spec, "size", 0));
-    dump.request = varToByteList (propOr (spec, "request"));
 
-    if (hasProp (spec, "checksum"))
+    // A checksum is a name, placed where a SysEx dump keeps it, or { type, fromOffset, toOffset,
+    // byteOffset }; an offset left out takes the name's default, placed per message (decodeDeclaredDump).
+    if (const auto cs = propOr (spec, "checksum"); ! isNothing (cs))
     {
-        const auto cs = propOr (spec, "checksum");
-        dump.checksumType = propOr (cs, "type", "roland-7bit").toString();
-        dump.checksumFrom = juce::jmax (0, (int) propOr (cs, "fromOffset", 0));
-        dump.checksumTo   = hasProp (cs, "toOffset") ? (int) propOr (cs, "toOffset") : -1;
-        dump.checksumAt   = hasProp (cs, "byteOffset") ? (int) propOr (cs, "byteOffset") : -1;
+        const bool object = isObject (cs);
+        if (! cs.isString() && ! object)
+            return refuse ("the checksum is " + shownValue (cs) + ", not a name such as \"roland\" or "
+                           "{ type, fromOffset, toOffset, byteOffset }");
+        const auto type = object ? (hasProp (cs, "type") ? propOr (cs, "type") : juce::var ("roland-7bit")) : cs;
+        dump.checksumType = type.isString() ? ce::checksums::canonicalName (type.toString()) : juce::String();
+        if (dump.checksumType.isEmpty())
+            return refuse (shownValue (type) + " is not a checksum",
+                           "One of: " + ce::checksums::acceptedNames().joinIntoString (", ") + ".");
+        dump.checksumWidth = ce::checksums::widthOf (dump.checksumType);
+        for (const auto& [name, target] : { std::pair<const char*, int*> { "fromOffset", &dump.checksumFrom },
+                                          { "toOffset", &dump.checksumTo }, { "byteOffset", &dump.checksumAt } })
+        {
+            if (! object || ! hasProp (cs, name)) continue;
+            const auto value = propOr (cs, name);
+            if (! isWhole (value) || (double) value < 0)
+                return refuse ("checksum." + juce::String (name) + " is " + shownValue (value) + ", not a whole number of 0 or more");
+            *target = (int) (double) value;
+        }
     }
 
     auto& slot = deviceDeclarations[resolvedRole];
@@ -1187,24 +1558,59 @@ juce::var ScriptRuntime::declaredDeviceParameter (const juce::String& role, cons
     return {};
 }
 
-int ScriptRuntime::declaredParameterNumber (const DeclaredParameter& p, const juce::var& value)
+bool ScriptRuntime::declaredParameterNumber (const DeclaredParameter& p, const juce::var& value,
+                                             juce::int64& number, juce::String& error)
 {
+    if (p.type == "text")
+    {
+        error = "a text parameter is read out of a dump and cannot be written on its own, so " + notSent + ".";
+        return false;
+    }
     if (p.type == "boolean")
     {
-        const bool on = value.isBool() ? (bool) value
-                                       : value.toString().trim().toLowerCase() == "true"
-                                         || value.toString() == "1" || value.toString().toLowerCase() == "on";
-        return on ? p.trueValue : p.falseValue;
+        const auto on = switchOf (value);
+        if (! on.has_value())
+        {
+            error = shownValue (value) + " is not on or off, so " + notSent + ". Write true or false, a number "
+                    "(0 is off, any other number is on), or \"on\", \"off\", \"true\" or \"false\".";
+            return false;
+        }
+        number = *on ? p.trueValue : p.falseValue;
+        return true;
     }
     if (p.type == "choice" || p.type == "enum")
-        for (const auto& choice : p.choices)
-            if (propOr (choice, "id").toString() == value.toString())
-                return (int) propOr (choice, "value", 0);
-
+    {
+        // A name is matched in any case, the way divisions are; a number is the value itself.
+        if (value.isString())
+        {
+            const auto wanted = value.toString();
+            const juce::var* match = nullptr;
+            for (const auto& c : p.choices) if (propOr (c, "id").toString() == wanted) { match = &c; break; }
+            if (match == nullptr)
+                for (const auto& c : p.choices) if (propOr (c, "id").toString().equalsIgnoreCase (wanted)) { match = &c; break; }
+            if (match != nullptr) { number = (juce::int64) (double) propOr (*match, "value"); return true; }
+        }
+        if (! numberOf (value).has_value())
+        {
+            juce::StringArray ids;
+            for (const auto& c : p.choices) ids.add ("\"" + propOr (c, "id").toString() + "\"");
+            const auto list = ids.isEmpty() ? juce::String ("It has no choices.")
+                            : ids.size() == 1 ? "The only choice is " + ids[0] + "."
+                            : "The choices are " + listWords (ids) + ".";
+            error = shownValue (value) + " is not one of its choices, so " + notSent + ". " + list;
+            return false;
+        }
+    }
+    const auto n = numberOf (value);
+    if (! n.has_value())
+    {
+        error = shownValue (value) + " is not a number, so " + notSent + ".";
+        return false;
+    }
     const double lo = juce::jmin (p.min, p.max);
     const double hi = juce::jmax (p.min, p.max);
-    const double n = (double) value;
-    return (int) std::lround (n < lo ? lo : n > hi ? hi : n);
+    number = std::llround (*n < lo ? lo : *n > hi ? hi : *n);
+    return true;
 }
 
 juce::var ScriptRuntime::encodeDeviceParameter (const juce::String& role, const juce::String& id,
@@ -1213,29 +1619,33 @@ juce::var ScriptRuntime::encodeDeviceParameter (const juce::String& role, const 
     const auto* p = findDeclaredParameter (role, id);
     if (p == nullptr) return {};      // not ours — the caller falls through to the device profile
 
-    const int number = declaredParameterNumber (*p, value);
-    juce::Array<int> valueBytes;
-    if (p->encoding == "u14") { valueBytes.add ((number >> 7) & 0x7f); valueBytes.add (number & 0x7f); }
-    else if (p->encoding == "nibbled")
-        for (int i = p->nibbles - 1; i >= 0; --i) valueBytes.add ((number >> (i * 4)) & 0x0f);
-    else valueBytes.add (clamp7 ((double) number));
+    juce::int64 number = 0;
+    juce::String error;
+    if (! declaredParameterNumber (*p, value, number, error))
+    {
+        host.logAt ("error", "deviceWrite(\"" + id + "\"): " + error, juce::var());
+        return {};
+    }
 
     juce::Array<int> bytes;
     if (p->wireKind == "cc")
     {
-        bytes.add (0xb0 | (p->channel - 1));
-        bytes.add (p->cc);
-        bytes.add (clamp7 ((double) number));
+        bytes.addArray ({ 0xb0 | (p->channel - 1), p->cc, (int) number });
     }
     else if (p->wireKind == "nrpn")
     {
         const int status = 0xb0 | (p->channel - 1);
-        const int hi = p->encoding == "u14" ? valueBytes[0] : ((number >> 7) & 0x7f);
-        const int lo = p->encoding == "u14" ? valueBytes[1] : (number & 0x7f);
-        bytes.addArray ({ status, 99, p->msb, status, 98, p->lsb, status, 6, hi, status, 38, lo });
+        bytes.addArray ({ status, 99, p->msb, status, 98, p->lsb,
+                          status, 6, (int) ((number >> 7) & 0x7f), status, 38, (int) (number & 0x7f) });
     }
     else
     {
+        juce::Array<int> valueBytes;
+        if (p->encoding == "u14") valueBytes.addArray ({ (int) ((number >> 7) & 0x7f), (int) (number & 0x7f) });
+        else if (p->encoding == "nibbled")
+            for (int i = p->nibbles - 1; i >= 0; --i) valueBytes.add ((int) ((number >> (i * 4)) & 0x0f));
+        else valueBytes.add ((int) number);
+
         int sumFrom = -1;
         for (const auto& token : p->tmpl)
         {
@@ -1245,17 +1655,20 @@ juce::var ScriptRuntime::encodeDeviceParameter (const juce::String& role, const 
                 // The marker is documented rather than inferred: a Roland checksum covers the
                 // ADDRESS AND DATA, and no rule read off a template can know where the header stops.
                 const int from = sumFrom >= 0 ? sumFrom : (bytes.size() > 0 && bytes[0] == 0xf0 ? 1 : 0);
-                bytes.add (checksumOver (p->checksumKind, bytes, from, bytes.size() - 1));
+                juce::Array<int> covered;
+                for (int i = from; i < bytes.size(); ++i) covered.add (bytes[i]);
+                bytes.addArray (ce::checksums::toBytes (p->checksumKind, covered));
                 continue;
             }
             if (token == "$value" || token == "$encodedValue") { bytes.addArray (valueBytes); continue; }
             if (token.startsWith ("$"))
             {
-                bytes.add (clamp7 ((double) p->variables.getWithDefault (
-                    juce::Identifier (token.substring (1)), 0), 0, 255));
+                const auto name = token.substring (1);
+                bytes.add (p->variables.contains (juce::Identifier (name)) ? (int) p->variables[juce::Identifier (name)]
+                           : name == "channel" ? p->channel : 16);
                 continue;
             }
-            bytes.add ((int) token.getHexValue32());
+            bytes.add (token.getHexValue32());
         }
         if (bytes.isEmpty()) return {};
         if (bytes[0] != 0xf0) bytes.insert (0, 0xf0);
@@ -1279,19 +1692,30 @@ juce::var ScriptRuntime::decodeDeclaredDump (const juce::String& role, const Dec
                                              const juce::Array<int>& bytes) const
 {
     for (int i = 0; i < dump.prefix.size(); ++i)
-        if (i >= bytes.size() || (dump.prefix[i] >= 0 && bytes[i] != dump.prefix[i])) return {};
+        if (i >= bytes.size() || bytes[i] != dump.prefix[i]) return {};
     for (int i = 0; i < dump.suffix.size(); ++i)
     {
         const int at = bytes.size() - dump.suffix.size() + i;
-        if (at < 0 || (dump.suffix[i] >= 0 && bytes[at] != dump.suffix[i])) return {};
+        if (at < 0 || bytes[at] != dump.suffix[i]) return {};
     }
 
-    if (dump.checksumAt >= 0)
+    // A checksum named alone sits just before the suffix (at the end when there is none) and covers
+    // every byte from the end of the prefix up to it — deviceDefinitions.js's placedChecksum. The
+    // whole table is used: anything but sum-7bit used to be checked as Roland, and a name with no
+    // byteOffset was never checked at all.
+    if (dump.checksumType.isNotEmpty())
     {
-        const int to = dump.checksumTo >= 0 ? dump.checksumTo : bytes.size() - 2;
-        if (dump.checksumAt >= bytes.size() || dump.checksumFrom > to) return {};
-        const auto kind = dump.checksumType == "sum-7bit" ? juce::String ("sum") : juce::String ("roland");
-        if (bytes[dump.checksumAt] != checksumOver (kind, bytes, dump.checksumFrom, to)) return {};
+        const int width = dump.checksumWidth;
+        const int at = dump.checksumAt >= 0 ? dump.checksumAt : bytes.size() - dump.suffix.size() - width;
+        const int from = dump.checksumFrom >= 0 ? dump.checksumFrom : dump.prefix.size();
+        const int to = dump.checksumTo >= 0 ? dump.checksumTo : at - 1;
+        if (at < 0 || at + width > bytes.size() || from < 0 || from > to || to >= bytes.size()) return {};
+        juce::Array<int> covered;
+        for (int i = from; i <= to; ++i) covered.add (bytes[i]);
+        const auto expected = ce::checksums::toBytes (dump.checksumType, covered);
+        if (expected.size() != width) return {};
+        for (int i = 0; i < width; ++i)
+            if (bytes[at + i] != expected[i]) return {};
     }
 
     // Owned from the start: every malformed-dump path below returns {} before `values` is wrapped
@@ -1366,7 +1790,12 @@ juce::var ScriptRuntime::matchDeviceDump (const juce::String& role, const juce::
 
     juce::Array<int> raw;
     if (auto* arr = bytes.getArray()) for (const auto& b : *arr) raw.add ((int) b);
-    else raw = varToByteList (bytes);
+    else
+    {
+        const auto read = readBytes (bytes, "message", false);
+        if (read.what.isNotEmpty()) return {};
+        for (const auto& item : read.items) raw.add (item.getHexValue32());
+    }
     if (raw.isEmpty()) return {};
 
     for (const auto& dump : it->second.dumps)

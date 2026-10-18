@@ -2534,7 +2534,7 @@ export const COMMANDS = [
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
     signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
-    summary: 'Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with no MIDI form is refused, with a message saying why. In a SysEx template you can use hex bytes, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
+    summary: 'Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with anything wrong in it is refused and nothing is defined, with a message saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry. A value that write() cannot read is refused the same way, and nothing is sent.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
@@ -2542,37 +2542,60 @@ export const COMMANDS = [
           summary: 'What to call it in the parameter list.' },
         { name: 'group', type: 'text', sample: '"Filter"', summary: 'Which group to file it under, such as "Filter".' },
         { name: 'type', type: 'text', default: '"number"',
-          summary: 'What kind of value it holds — a number, or a choice from `choices`.' },
-        { name: 'min', type: 'number', default: '0', summary: 'The lowest value it accepts.' },
+          summary: 'What kind of value it holds: "number" (or "integer"), "boolean", "choice" (or '
+            + '"enum") for one of `choices`, or "text" for a name read out of a dump, which cannot be '
+            + 'written on its own. A number reads a number or decimal text such as "64". A boolean '
+            + 'reads true or false, a number (0 is off, any other number is on), or "on", "off", '
+            + '"true" or "false" in any case. Any case of the type is read; another type is refused.' },
+        { name: 'min', type: 'number', default: '0',
+          summary: 'The lowest value it accepts. Nothing here sends a negative number, so a minimum '
+            + 'below 0 is refused: declare what the synth receives and add the offset in your script '
+            + 'with ce.midi.toOffset.' },
         { name: 'max', type: 'number', default: '127',
-          summary: 'The highest value it accepts.' },
+          summary: 'The highest value it accepts, up to what the MIDI form carries: 127 for a CC or '
+            + 'one SysEx byte, 16383 for an NRPN or "u14". With choices given as names it is the last '
+            + 'one\'s value unless you say otherwise. A higher maximum is refused.' },
         { name: 'access', type: 'text', default: '"readwrite"',
           summary: 'Whether the synth lets you read this parameter, write it, or both.' },
         { name: 'choices', type: 'list of text',
-          summary: 'The names of the settings, in order, when the parameter is a choice rather '
-            + 'than a number.' },
+          summary: 'The settings, in order, when the parameter is a choice: their names, each worth '
+            + 'its position plus `min` (so { "LP", "HP", "BP" } sends 0, 1 and 2), or { id, value } '
+            + 'pairs. write() takes a name in any case, or the number itself; another name is '
+            + 'refused, with the choices listed.' },
+        { name: 'trueValue', type: 'number', default: '1',
+          summary: 'What a boolean sends when it is on.' },
+        { name: 'falseValue', type: 'number', default: '0',
+          summary: 'What a boolean sends when it is off.' },
         { name: 'cc', type: 'number', sample: '74', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as this CC number. The simplest of the three wire formats.' },
+          summary: 'Send it as this CC number, 0 to 127. The simplest of the three wire formats.' },
         { name: 'nrpn', type: 'object', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as an NRPN, as { msb, lsb }.' },
-        { name: 'sysex', type: 'list', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as a SysEx message built from this template. Entries are hex literals '
-            + 'or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you '
-            + 'listed in `variables`. The checksum covers everything after F0 unless $checksumStart '
-            + 'says where it begins. A Roland checksum covers only the address and the data, so a '
-            + 'Roland template (41 after F0) with $checksum and no $checksumStart is defined with a '
-            + 'warning.' },
-        { name: 'channel', type: 'number', default: 'the panel\'s channel', sample: '1',
-          summary: 'The MIDI channel to send on.' },
-        { name: 'encoding', type: 'text', sample: '"to14bit"',
-          summary: 'How the number is packed into bytes when one byte is not enough — the same '
-            + 'names ce.midi\'s encoders use.' },
-        { name: 'checksum', type: 'text', sample: '"roland-7bit"',
-          summary: 'Which checksum to compute for a SysEx template that asks for one. The names '
-            + 'are ce.midi.checksum\'s.' },
+          summary: 'Send it as an NRPN, as { msb, lsb } or the two numbers as a list.' },
+        { name: 'sysex', type: 'text or list', group: 'how it reaches the synth — pick one',
+          summary: 'Send it as a SysEx message built from this template, a list or text such as '
+            + '"F0 41 10 $value F7". Each entry is one byte, a number from 0 to 255 or one or two hex '
+            + 'digits, or one of the tokens $value, $deviceId (16 unless `variables` says otherwise), '
+            + '$channel, $checksumStart, $checksum, or any $name you listed in `variables`. Anything '
+            + 'else is refused. The checksum covers everything after F0 unless $checksumStart says '
+            + 'where it begins. A Roland checksum covers only the address and the data, so a Roland '
+            + 'template (41 after F0) with $checksum and no $checksumStart is defined with a warning.' },
+        { name: 'channel', type: 'number', default: '1',
+          summary: 'The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel '
+            + 'puts there.' },
+        { name: 'encoding', type: 'text', default: '"u7"', sample: '"to14bit"',
+          summary: 'How the number is packed into a SysEx template\'s $value: "u7" is one byte, '
+            + '"u14" two, most significant first, as ce.midi.to14bit gives them ("to14bit" is read as '
+            + 'the same), and "nibbled" is `nibbles` 4-bit nibbles, most significant first. '
+            + '"boolean-u7", the device profiles\' name for a switch\'s byte, is one byte too. Any case '
+            + 'is read; another name is refused.' },
+        { name: 'nibbles', type: 'number', default: '2',
+          summary: 'How many nibbles a "nibbled" value takes, 1 to 8.' },
+        { name: 'checksum', type: 'text', default: '"roland"', sample: '"xor-7bit"',
+          summary: 'Which checksum $checksum puts in the template: any of ce.midi.checksum\'s names, '
+            + 'in any case, computed the same way. One wider than a byte, such as a CRC, takes as '
+            + 'many bytes as it needs. An unknown name is refused, with the names listed.' },
         { name: 'variables', type: 'object',
-          summary: 'Extra named values your SysEx template can refer to as $name, such as an '
-            + 'address or a part number.' },
+          summary: 'Extra named bytes your SysEx template can refer to as $name, such as an address '
+            + 'or a part number. Each is a number from 0 to 255, or one or two hex digits as text.' },
       ]) },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2585,23 +2608,30 @@ export const COMMANDS = [
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
     signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
-    summary: 'Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.',
+    summary: 'Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Bytes are read the way defineParameter reads them, and a layout with anything wrong in it, or with no prefix to recognise it by, is refused with a message saying what. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.',
     params: [
       { name: 'kind', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
         { name: 'name', type: 'text', default: 'the kind', sample: '"Patch"',
           summary: 'What to call this dump where it is listed.' },
-        { name: 'request', type: 'text or list', summary: 'The bytes that ask the synth for it.' },
+        { name: 'request', type: 'text or list',
+          summary: 'The bytes that ask the synth for it, a list or text such as "F0 7D 00 F7", one '
+            + 'byte to an entry.' },
         { name: 'match', type: 'object', required: true,
           summary: 'How to recognise the reply, as { prefix, suffix } — the bytes a matching '
-            + 'message starts and ends with.' },
+            + 'message starts and ends with, which may include $deviceId (16) and $channel (1). A '
+            + 'layout with no prefix is refused, because it would match every SysEx that arrives.' },
         { name: 'offset', type: 'number', default: '0',
           summary: 'How many bytes in from the start of the message the values begin.' },
         { name: 'size', type: 'number', default: 'whatever is left', sample: '256',
           summary: 'How many bytes of values there are.' },
-        { name: 'checksum', type: 'text', sample: '"roland-7bit"',
-          summary: 'Which checksum the message carries, so it can be verified. The names are '
-            + 'ce.midi.checksum\'s.' },
+        { name: 'checksum', type: 'text or object', sample: '"roland-7bit"',
+          summary: 'Which checksum the message carries, so it is checked on the way in and computed '
+            + 'by buildDump: any of ce.midi.checksum\'s names. Named alone, it sits just before the '
+            + 'suffix (at the end when there is none) and covers every byte from the end of the '
+            + 'prefix up to it, which is the Roland layout when the prefix is the header. Anywhere '
+            + 'else, give { type, fromOffset, toOffset, byteOffset }, counted from the start of the '
+            + 'message; any you leave out are placed as for a name. An unknown name is refused.' },
         { name: 'fields', type: 'list of objects', required: true,
           summary: 'Where each value sits among those bytes, one { parameter, offset } per '
             + 'value. Every parameter must already be declared with defineParameter; an unknown '

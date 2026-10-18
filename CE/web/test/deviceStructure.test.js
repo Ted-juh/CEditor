@@ -271,10 +271,48 @@ test('a declared layout is asked for with its own request bytes', () => {
 test('a layout with no request says there is nothing to send, rather than sending nothing', () => {
   withPanel(panelWith(), (api) => {
     api.deviceDefineParameter('cutoff', { cc: 74 });
-    api.deviceDefineDump('patch', { fields: [{ parameter: 'cutoff', offset: 0 }] });
+    api.deviceDefineDump('patch', { match: { prefix: ['f0', '7d', '01'] }, fields: [{ parameter: 'cutoff', offset: 0 }] });
     clearScriptTrace();
     assert.equal(api.requestDump('patch'), false);
     assert.match(traced(), /has no request bytes/);
+  });
+});
+
+test('a request that is not bytes is refused when declared, so requestDump never sends FF', () => {
+  // "F07D00F7" was read as one number, clamped to 255, and requestDump sent FF: System Reset.
+  withPanel(panelWith(), (api) => {
+    api.deviceDefineParameter('cutoff', { cc: 74 });
+    clearScriptTrace();
+    assert.equal(api.deviceDefineDump('patch', {
+      request: 'F07D00F7', match: { prefix: ['f0', '7d', '01'] }, fields: [{ parameter: 'cutoff', offset: 0 }],
+    }), false);
+    const errors = get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+    assert.deepEqual(errors, ['defineDump("patch"): in the request, "F07D00F7" is not one byte, so the dump was '
+      + 'not defined. Put a space between the bytes: "F0 7D 00 F7".']);
+    clearScriptTrace();
+    api.requestDump('patch');
+    assert.ok(!midiLines().some((l) => /\bFF\b/.test(l)), `something was sent:\n${traced()}`);
+  });
+});
+
+test('a write the parameter cannot read is refused on the console, from write() and from a bound control', () => {
+  const knob = createControl('Knob', { name: 'k' });
+  withPanel(panelWith([knob]), (api) => {
+    api.deviceDefineParameter('sw', { type: 'boolean', cc: 65, trueValue: 127 });
+    api.deviceDefineParameter('filter', { type: 'choice', cc: 70, choices: ['LP', 'HP', 'BP'] });
+    clearScriptTrace();
+    assert.equal(api.deviceWrite('sw', 'enabled'), false);
+    assert.equal(api.deviceWrite('filter', 'hp'), true);
+    assert.ok(midiLines().some((l) => l.includes('B0 46 01')), `expected B0 46 01 in:\n${traced()}`);
+
+    api.deviceBind('k', 'filter');
+    api.set('k.value', 'Notch');
+    const errors = get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+    assert.deepEqual(errors, [
+      'deviceWrite("sw"): "enabled" is not on or off, so nothing was sent. Write true or false, a number '
+        + '(0 is off, any other number is on), or "on", "off", "true" or "false".',
+      'set("k.value"): "Notch" is not one of its choices, so nothing was sent. The choices are "LP", "HP" and "BP".',
+    ]);
   });
 });
 

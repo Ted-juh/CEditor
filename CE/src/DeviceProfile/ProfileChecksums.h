@@ -110,6 +110,20 @@ inline juce::String canonicalName (const juce::String& name)
     return {};
 }
 
+/** Every spelling canonicalName accepts, sorted: the list checksumNames() in checksums.js gives, for
+    a refusal that says what could have been written. Sorted the way JavaScript sorts, which for
+    these ASCII names is plain code-point order. */
+inline juce::StringArray acceptedNames()
+{
+    juce::StringArray names { "sum-7bit", "sum", "roland-7bit", "roland", "yamaha", "twos-complement-7bit",
+                              "ones-complement-7bit", "ones", "ones-complement", "xor-7bit", "xor",
+                              "offset-7bit", "offset", "kawai", "sum-8bit", "twos-complement-8bit",
+                              "twos-complement", "crc8", "crc16-ccitt", "crc16", "crc16-modbus", "crc32" };
+    std::sort (names.begin(), names.end(),
+               [] (const juce::String& a, const juce::String& b) { return a.compare (b) < 0; });
+    return names;
+}
+
 /** How many 7-bit bytes one algorithm's answer needs. Zero for an unknown name. */
 inline int widthOf (const juce::String& canonical)
 {

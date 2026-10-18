@@ -148,12 +148,12 @@ export const WRITTEN = {
   },
   deviceWrite: { code: 'ce.device.write("filter.cutoff", 96)   -- in the parameter\'s own units' },
   deviceDefineParameter: {
-    lua: `ce.device.defineParameter("osc1.fine", {\n  name = "Osc 1 Fine", group = "Oscillator",\n  type = "int", min = -64, max = 63, cc = 76,\n})`,
-    js: `ce.device.defineParameter("osc1.fine", {\n  name: "Osc 1 Fine", group: "Oscillator",\n  type: "int", min: -64, max: 63, cc: 76,\n});`,
+    lua: `-- the synth takes -64..+63 as 0..127\nce.device.defineParameter("osc1.fine", {\n  name = "Osc 1 Fine", group = "Oscillator",\n  min = 0, max = 127, cc = 76,\n})\nce.device.write("osc1.fine", ce.midi.toOffset(-12, 64))`,
+    js: `// the synth takes -64..+63 as 0..127\nce.device.defineParameter("osc1.fine", {\n  name: "Osc 1 Fine", group: "Oscillator",\n  min: 0, max: 127, cc: 76,\n});\nce.device.write("osc1.fine", ce.midi.toOffset(-12, 64));`,
   },
   deviceDefineDump: {
-    lua: `ce.device.defineDump("patch", {\n  request = { 0xF0, 0x41, 0x11, 0xF7 },\n  header  = { 0xF0, 0x41, 0x12 },\n  checksum = "roland",\n})`,
-    js: `ce.device.defineDump("patch", {\n  request: [0xF0, 0x41, 0x11, 0xF7],\n  header:  [0xF0, 0x41, 0x12],\n  checksum: "roland",\n});`,
+    lua: `ce.device.defineDump("patch", {\n  request  = { 0xF0, 0x7D, 0x11, 0xF7 },\n  match    = { prefix = { 0xF0, 0x7D, 0x12 }, suffix = { 0xF7 } },\n  offset   = 3,\n  checksum = "roland",   -- just before F7, over everything after the prefix\n  fields   = { { parameter = "osc1.fine", offset = 0 } },\n})`,
+    js: `ce.device.defineDump("patch", {\n  request:  [0xF0, 0x7D, 0x11, 0xF7],\n  match:    { prefix: [0xF0, 0x7D, 0x12], suffix: [0xF7] },\n  offset:   3,\n  checksum: "roland",   // just before F7, over everything after the prefix\n  fields:   [{ parameter: "osc1.fine", offset: 0 }],\n});`,
   },
   deviceBind: {
     lua: `ce.device.bind("Cutoff", "filter.cutoff", { role = "mainSynth" })`,

@@ -2273,6 +2273,126 @@ int main()
         check (namedValues != nullptr && namedValues->getProperty ("patchName").toString() == "Pad",
                "…while a clean one decodes, trimmed");
 
+        // -- the cases deviceDefinitions.test.js runs through the editor's codec, from the same file
+        // (CE/web/test/fixtures/deviceCodecCases.json). Every refusal must be the editor's sentence
+        // word for word, every write the editor's bytes, every dump the editor's values. Each case
+        // gets a role of its own, so none can see another's declarations.
+        {
+            const auto fixture = juce::File (__FILE__).getParentDirectory()   // CE/tests
+                                     .getParentDirectory()                     // CE
+                                     .getChildFile ("web/test/fixtures/deviceCodecCases.json");
+            const auto cases = juce::JSON::parse (fixture.loadFileAsString());
+            check (cases.isObject(), "the shared device codec cases are where deviceDefinitions.test.js reads them ("
+                                         + fixture.getFullPathName() + ")");
+
+            auto hexOf = [] (const juce::var& bytes)
+            {
+                juce::StringArray hex;
+                if (auto* arr = bytes.getArray())
+                    for (const auto& b : *arr) hex.add (juce::String::toHexString ((int) b).paddedLeft ('0', 2).toUpperCase());
+                return hex.joinIntoString (" ");
+            };
+            auto bytesOf = [] (const juce::String& hex)
+            {
+                juce::Array<juce::var> out;
+                for (const auto& token : juce::StringArray::fromTokens (hex, " ", "")) out.add (token.getHexValue32());
+                return juce::var (out);
+            };
+            auto lastError = [&errors] { return errors.isEmpty() ? juce::String() : errors[errors.size() - 1]; };
+            auto warnings = [&host]
+            {
+                juce::StringArray out;
+                for (const auto& line : host.levelled) if (line.startsWith ("warn:")) out.add (line.substring (5));
+                return out;
+            };
+
+            int index = 0;
+            if (auto* parameters = cases["parameters"].getArray())
+                for (const auto& c : *parameters)
+                {
+                    const auto role = "codecCase" + juce::String (++index);
+                    const auto name = "parameter case agrees with the editor: " + c["case"].toString();
+                    errors.clear();
+                    host.levelled.clear();
+                    const bool defined = runtime.defineDeviceParameter (role, "p", c["spec"]);
+                    if (c.hasProperty ("error"))
+                    {
+                        check (! defined && lastError() == "[script runtime] " + c["error"].toString()
+                                   && ! runtime.hasDeviceParameter (role, "p"),
+                               name + " (got " + lastError() + ")");
+                        continue;
+                    }
+                    check (defined, name + " — it is defined (got " + lastError() + ")");
+                    const auto warned = warnings();
+                    check (c.hasProperty ("warning") ? (warned.size() == 1 && warned[0] == c["warning"].toString()) : warned.isEmpty(),
+                           name + " — the warning (got " + warned.joinIntoString (" | ") + ")");
+                    if (c.hasProperty ("max"))
+                        check ((double) runtime.declaredDeviceParameter (role, "p")["max"] == (double) c["max"],
+                               name + " — the range it reports");
+                    if (auto* writes = c["writes"].getArray())
+                        for (const auto& w : *writes)
+                        {
+                            host.levelled.clear();
+                            const auto bytes = runtime.encodeDeviceParameter (role, "p", w["value"]);
+                            const auto what = name + " — writing " + juce::JSON::toString (w["value"], true);
+                            if (w.hasProperty ("error"))
+                                check (bytes.isVoid() && host.levelled.size() == 1
+                                           && host.levelled[0] == "error:" + w["error"].toString(),
+                                       what + " is refused alike (got " + host.levelled.joinIntoString (" | ") + ")");
+                            else
+                                check (hexOf (bytes) == w["bytes"].toString() && host.levelled.isEmpty(),
+                                       what + " sends " + w["bytes"].toString() + " (got " + hexOf (bytes) + ")");
+                        }
+                }
+
+            if (auto* dumps = cases["dumps"].getArray())
+                for (const auto& c : *dumps)
+                {
+                    const auto role = "codecCase" + juce::String (++index);
+                    const auto name = "dump case agrees with the editor: " + c["case"].toString();
+                    if (auto* own = c["parameters"].getDynamicObject())
+                        for (const auto& entry : own->getProperties())
+                            runtime.defineDeviceParameter (role, entry.name.toString(), entry.value);
+                    else
+                        runtime.defineDeviceParameter (role, "cutoff", spec (R"({ "cc": 74 })"));
+                    errors.clear();
+                    const bool defined = runtime.defineDeviceDump (role, "d", c["spec"]);
+                    if (c.hasProperty ("error"))
+                    {
+                        check (! defined && lastError() == "[script runtime] " + c["error"].toString()
+                                   && ! runtime.hasDeviceDump (role, "d"),
+                               name + " (got " + lastError() + ")");
+                        continue;
+                    }
+                    check (defined, name + " — it is defined (got " + lastError() + ")");
+                    if (c.hasProperty ("request"))
+                        check (hexOf (runtime.deviceDumpRequest (role, "d")) == c["request"].toString(),
+                               name + " — the request (got " + hexOf (runtime.deviceDumpRequest (role, "d")) + ")");
+                    if (auto* decodes = c["decodes"].getArray())
+                        for (const auto& d : *decodes)
+                        {
+                            const auto decoded = runtime.matchDeviceDump (role, bytesOf (d["hex"].toString()));
+                            const auto what = name + " — " + d["hex"].toString();
+                            auto* expected = d["values"].getDynamicObject();
+                            if (expected == nullptr)
+                            {
+                                check (decoded.isVoid(), what + " matches nothing (got " + juce::JSON::toString (decoded, true) + ")");
+                                continue;
+                            }
+                            auto* values = decoded["values"].getDynamicObject();
+                            bool same = values != nullptr && values->getProperties().size() == expected->getProperties().size();
+                            for (const auto& entry : expected->getProperties())
+                            {
+                                const auto got = values != nullptr ? values->getProperty (entry.name) : juce::var();
+                                same = same && (entry.value.isString() ? got.isString() && got.toString() == entry.value.toString()
+                                                                       : ! got.isString() && (double) got == (double) entry.value);
+                            }
+                            check (same, what + " decodes to " + juce::JSON::toString (d["values"], true)
+                                             + " (got " + juce::JSON::toString (decoded, true) + ")");
+                        }
+                }
+        }
+
         // -- the same, driven from a script, in both always-on engines.
         for (const char* lang : { "lua", "javascript" })
         {
@@ -2358,6 +2478,56 @@ int main()
             host.logs.clear();
             runtime.dispatchEvent ("onDumpReceived", "", dumpPayload);
             check (host.logs.isEmpty(), juce::String (lang) + ": …and is not armed for the next one");
+        }
+
+        // -- what the shared cases cannot carry: numbers as each engine hands them over (a template's
+        // 0x41 was read back as hex 65), a Lua table with a hole, and a refused write from a script.
+        for (const char* lang : { "lua", "javascript" })
+        {
+            const bool isLua = juce::String (lang) == "lua";
+            juce::Array<juce::var> scripts;
+            scripts.add (makeScript ("codec", lang, "panel", "onDefs", "*", isLua
+                ? "function onDefs()\n"
+                  "  ce.device.defineParameter(\"num\", { sysex = { 0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x01, 0x33, \"$value\", \"$checksum\", 0xF7 } })\n"
+                  "  ce.device.defineParameter(\"hole\", { sysex = { 0xF0, nil, 0x41 } })\n"
+                  "  ce.device.defineParameter(\"sw\", { type = \"boolean\", cc = 65, trueValue = 127 })\n"
+                  "end\n"
+                  "function onNum() ce.device.write(\"num\", 64) end\n"
+                  "function onSw() ce.device.write(\"sw\", \"enabled\") end\n"
+                : "function onDefs() {\n"
+                  "  ce.device.defineParameter(\"num\", { sysex: [0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x01, 0x33, \"$value\", \"$checksum\", 0xF7] });\n"
+                  "  ce.device.defineParameter(\"hole\", { sysex: [0xF0, null, 0x41] });\n"
+                  "  ce.device.defineParameter(\"sw\", { type: \"boolean\", cc: 65, trueValue: 127 });\n"
+                  "}\n"
+                  "function onNum() { ce.device.write(\"num\", 64); }\n"
+                  "function onSw() { ce.device.write(\"sw\", \"enabled\"); }\n"));
+            runtime.loadScripts (juce::var (scripts));
+            errors.clear();
+            host.levelled.clear();
+            runtime.runAction ("onDefs", juce::var());
+            const auto engine = juce::String (" (") + lang + ")";
+            check (host.levelled.size() == 1 && host.levelled[0].startsWith ("warn:defineParameter(\"num\"): this is a Roland template"),
+                   "a Roland template written as numbers gets the Roland warning" + engine
+                       + " (got " + host.levelled.joinIntoString (" | ") + ")");
+            check (errors.contains ("[script runtime] defineParameter(\"hole\"): in the sysex template, nothing at position 1 "
+                                    "is not a byte, so the parameter was not defined."),
+                   "a hole in a template is nothing, at the position the editor names" + engine
+                       + " (got " + errors.joinIntoString (" | ") + ")");
+
+            host.rawSends.clear();
+            runtime.runAction ("onNum", juce::var());
+            check (host.rawSends.size() == 1 && host.rawSends[0] == "F0 41 10 42 12 40 01 33 40 27 F7",
+                   "numbers in a template are the bytes they say" + engine
+                       + " (got " + host.rawSends.joinIntoString (" | ") + ")");
+
+            host.rawSends.clear();
+            host.levelled.clear();
+            runtime.runAction ("onSw", juce::var());
+            check (host.rawSends.isEmpty() && host.levelled.contains (
+                       "error:deviceWrite(\"sw\"): \"enabled\" is not on or off, so nothing was sent. Write true or false, a "
+                       "number (0 is off, any other number is on), or \"on\", \"off\", \"true\" or \"false\"."),
+                   "a switch written as a word it does not know sends nothing, and says so" + engine
+                       + " (got " + host.levelled.joinIntoString (" | ") + ")");
         }
 
         // Reloading the script set drops the declarations with it: a parameter declared by the

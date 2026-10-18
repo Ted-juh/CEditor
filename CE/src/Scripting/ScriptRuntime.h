@@ -552,7 +552,9 @@ public:
     juce::var declaredDeviceParameter  (const juce::String& role, const juce::String& id) const;
 
     /** The bytes that SET a declared parameter, or void when the parameter is not declared here —
-        which is how the caller knows to fall through to the device profile. */
+        which is how the caller knows to fall through to the device profile. Also void, after an
+        error saying why, when the value is one the parameter cannot read: a switch written as
+        "enabled", a choice it does not have, a number written as text that is not one. */
     juce::var encodeDeviceParameter (const juce::String& role, const juce::String& id,
                                      const juce::var& value) const;
 
@@ -661,22 +663,23 @@ private:
     struct DeclaredParameter
     {
         juce::String id, name, group, type { "number" }, access { "readWrite" };
-        juce::String wireKind, encoding { "u7" }, checksumKind { "roland" };
+        juce::String wireKind, encoding { "u7" }, checksumKind { "roland-7bit" };
         double min = 0.0, max = 127.0;
         int cc = 0, channel = 1, msb = 0, lsb = 0;
         int nibbles = 2, length = 0, pad = 32, trueValue = 1, falseValue = 0;
-        juce::StringArray tmpl;                       // sysex template tokens
-        juce::NamedValueSet variables;
-        juce::Array<juce::var> choices;               // { id, value } pairs
+        juce::StringArray tmpl;                       // sysex template: "41" (two hex digits) or "$token"
+        juce::NamedValueSet variables;                // each one byte, checked when declared
+        juce::Array<juce::var> choices;               // { id, value } pairs; a list of names becomes these
         juce::var descriptor() const;
     };
 
     struct DeclaredDump
     {
-        juce::String id, name, checksumType;
+        juce::String id, name, checksumType;          // checksumType canonical; empty means none
         juce::Array<int> prefix, suffix, request;
         int offset = 0, size = 0;
-        int checksumFrom = -1, checksumTo = -1, checksumAt = -1;
+        int checksumWidth = 1;
+        int checksumFrom = -1, checksumTo = -1, checksumAt = -1;   // -1: placed per message
         juce::StringArray fieldParameters;
         juce::Array<int> fieldOffsets;
     };
@@ -691,8 +694,10 @@ private:
 
     const DeclaredParameter* findDeclaredParameter (const juce::String& role, const juce::String& id) const;
     const DeclaredDump*      findDeclaredDump      (const juce::String& role, const juce::String& kind) const;
-    /** The number a value becomes on the wire — the parameter's own units, clamped to what fits. */
-    static int declaredParameterNumber (const DeclaredParameter& p, const juce::var& value);
+    /** The number a value becomes on the wire, in the parameter's own units, or false with `error`
+        saying why the value cannot be read (it is refused, not sent as the minimum). */
+    static bool declaredParameterNumber (const DeclaredParameter& p, const juce::var& value,
+                                         juce::int64& number, juce::String& error);
     /** Decode one declared layout against one message. Void unless it matched cleanly. */
     juce::var decodeDeclaredDump (const juce::String& role, const DeclaredDump& dump,
                                   const juce::Array<int>& bytes) const;
