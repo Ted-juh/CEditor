@@ -60,6 +60,12 @@ const CASES = [
   ['scale', [64, 0, 127, 0, 1000]], ['scale', [5, 0, 0, 9, 10]],
   ['snap', [7, 5]], ['snap', [7, 0]],
   ['lerp', [0, 10, 0.25]],
+  // Helpers that read their numbers through the prelude's own __num. A second __num, defined for
+  // the byte helpers' messages, once replaced it in Python and made every one of these raise there.
+  ['norm', [5, 0, 10]], ['denorm', [0.5, 0, 10]], ['bipolar', [0.25]], ['unipolar', [-0.5]],
+  ['fold', [12, 0, 10]], ['roundTo', [3.14159, 2]], ['toDegrees', [Math.PI]], ['toRadians', [180]],
+  ['distance', [0, 0, 3, 4]], ['euclid', [8, 3]], ['almost', [0.1 + 0.2, 0.3]],
+  ['indexOfRange', [0.5, 4]], ['approach', [0, 10, 0.5]],
   ['curve', [0.5, 'exp']], ['curve', [0.25, 'log']], ['curve', [0.5, 's']], ['curve', [0.5, 'linear']],
   ['noteName', [60]], ['noteName', [61]], ['noteName', [0]],
   // The panel's spelling, selected by the second argument being PRESENT — so all three states
@@ -246,6 +252,31 @@ const STRUCT_CASES = [
 const near = (a, b) => (typeof a === 'number' && typeof b === 'number'
   ? Math.abs(a - b) < 1e-9
   : JSON.stringify(a) === JSON.stringify(b));
+
+test('no prelude defines a top-level name twice', () => {
+  // Each prelude is one long file of helpers, and a second definition under a name already taken
+  // replaces the first without a word: in Python for every caller, since a global is looked up when
+  // the function runs; in Lua for every function written below it. The byte helpers' __num, a
+  // number for a message, once replaced ce.math's __num, which reads one, and 28 helpers raised in
+  // the exported plugin's Python while every test here passed.
+  const preludes = [
+    ['LuaScriptEngine.cpp', 'LUA', /^local function (\w+)|^local (\w+)\s*=/],
+    ['JsScriptEngine.cpp', 'JS', /^function (\w+)|^(?:var|let|const) (\w+)\s*=/],
+    ['PythonScriptEngine.cpp', 'PY', /^def (\w+)|^(\w+)\s*=/],
+  ];
+  for (const [file, tag, definition] of preludes) {
+    const seen = new Map();
+    const twice = [];
+    extractRawString(file, tag).split('\n').forEach((line, i) => {
+      const m = line.match(definition);
+      if (!m) return;
+      const name = m[1] ?? m[2];
+      if (seen.has(name)) twice.push(`${name} (prelude lines ${seen.get(name)} and ${i + 1})`);
+      else seen.set(name, i + 1);
+    });
+    assert.deepEqual(twice, [], `${tag} prelude defines a name twice`);
+  }
+});
 
 // A value built inside a vm context (or handed back by wasmoon) carries that realm's
 // Object.prototype, and deepStrictEqual compares prototypes — so a structurally identical result

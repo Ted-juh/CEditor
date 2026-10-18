@@ -1300,7 +1300,7 @@ local __WRITE_START = "Writing can run past the end, but not start beyond it."
 local __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local function __whole(n) return type(n) == "number" and n == math.floor(n) and n > -math.huge and n < math.huge end
 -- A whole number prints as one ("9", not Lua's "9.0" for a float), as it does in the other runtimes.
-local function __num(n)
+local function __shown(n)
   if type(n) == "number" and n == math.floor(n) and math.abs(n) < 2 ^ 53 then return string.format("%d", math.floor(n)) end
   return tostring(n)
 end
@@ -1359,7 +1359,7 @@ function setBits(value, start, count, bits)
   local verb = "ce.midi.setBits"
   if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32 then return __refuse(verb, __BIT_RANGE) end
   start = math.floor(start); count = math.floor(count)
-  if not __whole(bits) or bits < 0 or bits >= 2 ^ count then return __refuse(verb, __num(bits) .. " does not fit in " .. __plural(count, "bit")) end
+  if not __whole(bits) or bits < 0 or bits >= 2 ^ count then return __refuse(verb, __shown(bits) .. " does not fit in " .. __plural(count, "bit")) end
   bits = math.floor(bits)
   if type(value) == "number" then
     if start + count > 32 then
@@ -1408,7 +1408,7 @@ function bytesWrite(bytes, offset, count, value, opts)
   local shape = __shape(verb, opts)
   if shape == nil then return nil end
   if not __whole(value) or value < 0 or value >= 2 ^ (shape.bits * count) then
-    return __refuse(verb, __num(value) .. " does not fit in " .. __plural(count * shape.bits, "bit"))
+    return __refuse(verb, __shown(value) .. " does not fit in " .. __plural(count * shape.bits, "bit"))
   end
   if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte"), __WRITE_START) end
   local v, base, digits = math.floor(value), 1 << shape.bits, {}

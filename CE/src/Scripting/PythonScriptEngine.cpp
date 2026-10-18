@@ -2246,7 +2246,7 @@ def __whole(n):
     import math
     return isinstance(n, (int, float)) and not isinstance(n, bool) and math.isfinite(n) and n == math.floor(n)
 # A whole number prints as one ("9", not Python's "9.0" for a float), as it does in the other runtimes.
-def __num(n):
+def __shown(n):
     if isinstance(n, float) and n.is_integer(): return str(int(n))
     return str(n)
 def __plural(n, word): return str(n) + " " + word + ("" if n == 1 else "s")
@@ -2301,7 +2301,7 @@ def setBits(value, start, count, bits):
     verb = "ce.midi.setBits"
     if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
     start = int(start); count = int(count)
-    if not __whole(bits) or bits < 0 or bits >= 2 ** count: return __refuse(verb, __num(bits) + " does not fit in " + __plural(count, "bit"))
+    if not __whole(bits) or bits < 0 or bits >= 2 ** count: return __refuse(verb, __shown(bits) + " does not fit in " + __plural(count, "bit"))
     bits = int(bits)
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         import math
@@ -2344,7 +2344,7 @@ def bytesWrite(data, offset, count, value, opts=None):
     shape = __shape(verb, opts)
     if shape is None: return None
     if not __whole(value) or value < 0 or value >= 2 ** (shape["bits"] * count):
-        return __refuse(verb, __num(value) + " does not fit in " + __plural(count * shape["bits"], "bit"))
+        return __refuse(verb, __shown(value) + " does not fit in " + __plural(count * shape["bits"], "bit"))
     if offset > len(data):
         return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"), __WRITE_START)
     base, v, digits = 1 << shape["bits"], int(value), []
