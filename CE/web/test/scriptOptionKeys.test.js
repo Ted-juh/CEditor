@@ -87,7 +87,7 @@ test('nothing that is not a mistake is reported', () => {
     // Every option a member lists.
     () => api.ce.anim.to('x', 1, {
       duration: 5, beats: 1, sync: false, curve: 'linear', damping: 6, frequency: 12, from: 0, delay: 0,
-      stagger: 0, repeat: 0, pingpong: false, done: () => {},
+      stagger: 0, repeat: 1, pingpong: false, done: () => {},
     }),
     // An option's own value is not looked into unless the contract lists its fields: a curve's
     // four numbers, as a list or as a Lua list arrives (an object of numbered keys).
