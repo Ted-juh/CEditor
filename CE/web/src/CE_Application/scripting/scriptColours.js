@@ -10,8 +10,9 @@
 // So a script writing "#000" or "red" into a property got white, and a script drawing in
 // "FF5B9BD5", the very value get() returns for a colour property, got nothing at all. Each reader
 // now refuses what it cannot read, saying what to write instead, and the overlay is handed the
-// panel's own forms already turned into CSS. The "#RGB" shorthand and the CSS names stay refused
-// in properties (the message gives the six-digit form); whether to accept them is the owner's call.
+// panel's own forms already turned into CSS. A property also takes the CSS forms that have one
+// reading ("#RGB", the names, rgb() and hsl()) and stores them written out in the panel's form, by
+// the owner's decision; what has two readings, or none, is still refused (panelColour).
 //
 // The ce.math colour helpers read the panel's forms as well, and they exist in the exported
 // plug-in's Lua, JavaScript and Python preludes too. COLOUR_FORMS, hexHint, unitProblem and
@@ -202,7 +203,25 @@ function panelFormOf({ r, g, b, a }) {
   return a >= 1 ? `#${rgb}` : `${hexDigits(Math.round(a * 255), 2)}${rgb}`;
 }
 
-/** For a property refusal: what a CSS colour (a name, rgb(), hsl()) is in the panel's form, or ''. */
+/**
+ * A colour a script wrote to a property in one of CSS's shorter forms, written out in the panel's:
+ * "#RGB" as "#RRGGBB", a name in any case as its "#RRGGBB", and rgb(), rgba(), hsl() and hsla() as
+ * "#RRGGBB", or as AARRGGBB when their alpha is below 1. "transparent" is "00000000". '' otherwise.
+ *
+ * Left out is what has more than one reading, so that storing it would be a guess: "#" with four
+ * digits is RGBA to CSS and would be ARGB in the panel's order, and a number could be RRGGBB or
+ * AARRGGBB. Three digits with no "#" are not CSS, and as text are as likely a number ("255").
+ * currentColor has no colour of its own here, and text with space around it is refused as the panel
+ * refuses " 5B9BD5". "#" with six or eight digits never gets here: the panel reads those as written.
+ */
+function longForm(value) {
+  if (typeof value !== 'string' || value !== value.trim()) return '';
+  if (value.startsWith('#') && !/^#[0-9a-f]{3}$/i.test(value)) return '';
+  const channels = cssChannels(value);
+  return channels ? panelFormOf(channels) : '';
+}
+
+/** For a property refusal: what a CSS colour with space around it is in the panel's form, or ''. */
 function cssHint(value) {
   if (typeof value !== 'string' || isPanelColour(value)) return '';
   const channels = cssChannels(value);
@@ -247,19 +266,27 @@ export function drawColour(value) {
 /* ------------------------------------------------------------------- colour properties */
 
 /**
- * Why `value` cannot be written to a colour property, or null when it can. Returns `{ why, advice }`
- * for the caller to set in its own sentence: `set("…"): <why>, so nothing was set. <advice>`.
+ * What writing `value` to a colour property stores: `{ colour }`, or `{ why, advice }` when the
+ * panel cannot read it, for the caller to set in its own sentence: `set("…"): <why>, so nothing was
+ * set. <advice>`. set(), ce.panel.patch and both image tints ask here, so all four agree.
+ *
+ * What the panel reads is stored exactly as written. CSS's shorter forms are stored written out
+ * (longForm), so get() afterwards answers "#FF0000" for "red". Nothing is said when that happens:
+ * the owner chose to accept them, each has one reading, and a note on every such write would fill
+ * the console of a script that recolours a control on every tick.
  *
  * `field` is what colourFieldAt found: `empty` when the property's own default is "" (no colour of
  * its own, like a Font's underlineColour, which then draws in the text's colour), and `tokens` when
  * the renderer resolves a control-set reference such as "{accent}" in it. `resolvesToken(name)`
  * says whether the panel's control set (or the base set behind it) defines that name.
  */
-export function panelColourProblem(value, field = {}, resolvesToken = () => false) {
-  if (isPanelColour(value)) return null;
-  if (value === '' && field.empty) return null;
+export function panelColour(value, field = {}, resolvesToken = () => false) {
+  if (isPanelColour(value)) return { colour: value };
+  if (value === '' && field.empty) return { colour: value };
   const reference = typeof value === 'string' && isTokenReference(value);
-  if (reference && field.tokens && resolvesToken(tokenNameOf(value))) return null;
+  if (reference && field.tokens && resolvesToken(tokenNameOf(value))) return { colour: value };
+  const long = longForm(value);
+  if (long) return { colour: long };
 
   let why;
   if (value === undefined || value === null) why = 'no colour was given';
@@ -351,7 +378,7 @@ function templateChild(type, segment, atRoot) {
 
 /**
  * Is `path` on `root` (a control, or one of its parts) a colour property? Returns
- * `{ empty, tokens }` (see panelColourProblem) or null.
+ * `{ empty, tokens }` (see panelColour) or null.
  *
  * It walks the document where the document has the node and the section templates where it does
  * not, the way set() walks, so a section a control has not materialised yet is still typed. A
@@ -382,17 +409,26 @@ export function colourFieldAt(root, path) {
 }
 
 /**
- * Call `visit(path, value, field)` for every colour property that writing `value` at `path` on
- * `root` would set: the path itself, or, when `value` is a whole section or list, each colour
- * field inside it.
+ * `value` as it is to be written at `path` on `root`, with every colour property the write would
+ * set passed through `colour(path, value, field)`, which returns what to store there: the path
+ * itself, or, when `value` is a whole section or list, each colour field inside it.
+ *
+ * Only what changes is copied, so a write with nothing to write out hands back the very value it
+ * was given, and a script's own table is never changed under it.
  */
-export function eachColourWrite(root, path, value, visit, depth = 0) {
+export function mapColourWrites(root, path, value, colour, depth = 0) {
   const field = colourFieldAt(root, path);
-  if (field) { visit(path, value, field); return; }
+  if (field) return colour(path, value, field);
   // A typed array holds numbers only, and walking one written whole would visit every byte.
-  if (!value || typeof value !== 'object' || ArrayBuffer.isView(value) || depth > 12) return;
+  if (!value || typeof value !== 'object' || ArrayBuffer.isView(value) || depth > 12) return value;
+  let copy = null;
   for (const [key, child] of Object.entries(value)) {
     if (key === '_type') continue;
-    eachColourWrite(root, key === '_children' ? path : `${path}.${key}`, child, visit, depth + 1);
+    const stored = mapColourWrites(root, key === '_children' ? path : `${path}.${key}`, child, colour,
+      depth + 1);
+    if (stored === child) continue;
+    copy ??= Array.isArray(value) ? [...value] : { ...value };
+    copy[key] = stored;
   }
+  return copy ?? value;
 }

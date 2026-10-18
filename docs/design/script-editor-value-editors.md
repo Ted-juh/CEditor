@@ -248,8 +248,9 @@ seen from the script side.
 The swatch shows what the reader will paint. Writing `#RRGGBBAA` into a property gives a green
 swatch, which is the trap the `colourAlpha` documentation warns about, caught as it is typed.
 
-Both readers have since changed: `ce.draw` now paints the panel's own forms, and a property refuses
-what it cannot read. [Fixed since, and still open](#fixed-since-and-still-open) has the detail. The
+Both readers have since changed: `ce.draw` now paints the panel's own forms, and a property writes
+CSS's short forms out in full and refuses what it cannot read.
+[Fixed since, and still open](#fixed-since-and-still-open) has the detail. The
 eight-digit trap itself remains, because each reader keeps its own meaning for `#` with eight digits.
 
 ### Claiming
@@ -621,7 +622,7 @@ fixed on the same rule:
 
 | Was | Now | Where |
 |---|---|---|
-| a colour property took any string: `"#000"`, `"red"` and `"rgb(0,0,0)"` were stored and painted white, through `set()`, `ce.panel.patch` and both image tints; `"#000"` as an icon tint was stored as `"000"`, no tint at all | refused, with the six- or eight-digit form to write (`"#000000"`, and `"#FF0000"` for `"red"`). Which properties are colours comes from the section templates, not from names (`scriptColours.js`) | WebView runtime |
+| a colour property took any string: `"#000"`, `"red"` and `"rgb(0,0,0)"` were stored and painted white, through `set()`, `ce.panel.patch` and both image tints; `"#000"` as an icon tint was stored as `"000"`, no tint at all | refused, with the six- or eight-digit form to write (`"#000000"`, and `"#FF0000"` for `"red"`); since then, by the owner's decision, stored in that form instead (see the colour bullet below). Which properties are colours comes from the section templates, not from names (`scriptColours.js`) | WebView runtime |
 | `ce.draw.fill("FF5B9BD5")`, the panel's own form and what `get()` returns, painted nothing, as did a bare `"5B9BD5"`, a number or an unknown name; gradient stops the same | the panel's forms are turned into CSS, with `rgba()` where there is alpha; what CSS reads is kept as written; anything else is refused and the style in force stays | WebView runtime (the verbs are panel-view only) |
 | a number on a 0..1 scale written out of 100 was clamped or used as it was: `ce.draw.opacity(50)` was solid and `("50%")` switched it off, `ce.math.alpha(c, 128)` was solid, `lighten(c, 40)` white, and a gradient stop's `at: 50` went to the end | refused, with the number out of 100 when that lands inside the scale. The icon-opacity warning no longer offers 1.5 for 150 | WebView runtime; `lighten`, `darken` and `alpha` in the three preludes |
 | the `ce.math` colour readers took the last six characters of anything, so `"x5B9BD5"`, `"#12#34#56"` and `0xFF0000` were colours | 6 or 8 hex digits, the 8 being AARRGGBB, with one `#` at most; anything else is refused | WebView runtime; the three preludes |
@@ -671,10 +672,19 @@ Still open, for the owner:
 - **An unknown option** warns and the call runs. Whether it should refuse instead.
 - **`ce.anim`'s `repeat` and `done`**: the contract was changed to say what the runtimes do.
   Whether the runtimes should do what the contract used to say instead.
-- **A colour property** refuses `"#RGB"` and the CSS names, giving the long form to write.
-  Whether to accept them instead. And `#` with eight digits still means AARRGGBB in a property and
-  in `ce.math`, and RRGGBBAA in a drawing, CSS's own meaning, which was kept. The swatch proposed
-  above is where that difference would show.
+- **A colour property: decided, accept.** The short forms with one reading are stored written out
+  in the panel's form, the conversion the refusal used to print: `"#RGB"` as `"#RRGGBB"`, a CSS
+  name in any case as its `"#RRGGBB"` (and `transparent` as `"00000000"`), and `rgb()`, `rgba()`,
+  `hsl()` and `hsla()` as `"#RRGGBB"`, or AARRGGBB when the alpha is below 1. `set()`,
+  `ce.panel.patch` and both image tints read through the one function (`scriptColours.panelColour`),
+  nothing is written to the console when a form is expanded, and `get()` returns the stored form.
+  Still refused, with the messages they had: a number (is `0xFF0000FF` AARRGGBB?), `"#"` with four
+  digits (RGBA or ARGB?), three digits without the `"#"` (not CSS, and as likely a number),
+  `currentColor`, text with space around it, and anything unreadable. The `ce.math` colour readers
+  stay strict in the WebView and the three preludes; taking the short forms there too would be a
+  separate change. Still open: `#` with eight digits means AARRGGBB in a property and in `ce.math`,
+  and RRGGBBAA in a drawing, CSS's own meaning, which was kept. The swatch proposed above is where
+  that difference would show.
 - **Decisions the device-definition fix made** that change what a definition means: a variable's
   text is hex (`"10"` is 0x10, not 10), `$channel` follows the parameter's channel, `$deviceId`
   defaults to 16 in the player as in the editor, a layout with no prefix is refused, and a text

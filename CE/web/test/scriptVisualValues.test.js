@@ -8,6 +8,10 @@
 // rule now is the one the rest of the API follows: what cannot be read is refused, nothing is drawn,
 // set or answered, and the message names the call and says what to write instead.
 //
+// A colour property, by the owner's later decision, also takes CSS's shorter forms where each has
+// one reading ("#RGB", the names, rgb(), hsl()) and stores them written out, without a word; what
+// has two readings (a number, "#" with four digits) or none is refused as before.
+//
 // scriptPreludeAgreement.test.js holds the exported plug-in's preludes to the same words for the
 // ce.math helpers and ce.anim; this file is about the behaviour itself, in the panel view.
 
@@ -27,7 +31,7 @@ import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scri
 import { scriptDrawings } from '../src/CE_Application/stores/scriptDraw.js';
 import { MODULES } from '../src/CE_Application/scripting/panelApi.js';
 import {
-  CSS_NAMED_COLOURS, colourFieldAt, drawColour, isPanelColour,
+  CSS_NAMED_COLOURS, colourFieldAt, drawColour, isPanelColour, mapColourWrites, panelColour,
 } from '../src/CE_Application/scripting/scriptColours.js';
 import { parseHexColor } from '../src/CE_Application/editor/canvasControlStyles.js';
 import ScriptDrawOverlay from '../src/CE_Application/editor/ScriptDrawOverlay.svelte';
@@ -39,6 +43,38 @@ const DRAW_FORMS = 'A drawing colour is the panel\'s RRGGBB or AARRGGBB, as get(
 
 const errors = () => storeGet(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
 const warns = () => storeGet(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+const everything = () => storeGet(scriptTrace).map((e) => `${e.kind}: ${e.message}`);
+
+/** CSS's shorter forms, as a colour property stores them: the panel's RRGGBB, or AARRGGBB with alpha. */
+const WRITTEN_OUT = [
+  ['#000', '#000000'],
+  ['#abc', '#AABBCC'],
+  ['red', '#FF0000'],
+  ['RED', '#FF0000'],
+  ['SteelBlue', '#4682B4'],
+  ['transparent', '00000000'],
+  ['rgb(0, 0, 0)', '#000000'],
+  ['rgb(91 155 213)', '#5B9BD5'],
+  ['rgba(255, 0, 0, 0.5)', '80FF0000'],
+  ['rgba(255, 0, 0, 1)', '#FF0000'],
+  ['rgb(255 0 0 / 50%)', '80FF0000'],
+  ['hsl(0, 100%, 50%)', '#FF0000'],
+  ['HSL(210deg 60% 60%)', '#5C99D6'],
+  ['hsla(120, 100%, 50%, 0.25)', '4000FF00'],
+];
+
+/** What stays refused in a colour property, with the end of each refusal: the form to write, if any. */
+const STILL_REFUSED = [
+  ['000', ' Write "000000".'],
+  ['#0008', ' Write "88000000".'],
+  ['0008', ' Write "88000000".'],
+  ['currentColor', ''],
+  [' red', ' Write "#FF0000".'],
+  ['#5B9BD5 ', ' Write "#5B9BD5".'],
+  ['#12345', ''],
+  ['blurple', ''],
+  ['nonsense', ''],
+];
 
 /** An editor panel (the store, not a host) with a Label, a Knob and a Button, every module on. */
 function withControls(fn) {
@@ -113,31 +149,45 @@ test('what the panel can read is what its renderer reads', () => {
 
 /* ======================================================================== set() on a colour */
 
-test('set() refuses a colour the panel cannot read, writes nothing, and says what to write', () => {
+test('set() writes CSS\'s short forms out in full, says nothing, and get() returns what was stored', () => {
+  // These were refused, with the long form in the message. The owner chose to accept them.
+  withControls((api) => {
+    const path = 'L.Background.Fill.colour';
+    for (const [value, stored] of WRITTEN_OUT) {
+      api.set(path, 'FF112233');
+      clearScriptTrace();
+      api.set(path, value);
+      assert.deepEqual(everything(), [], `${value} is taken without a word`);
+      assert.equal(api.get(path), stored, value);
+      assert.ok(isPanelColour(stored), `${stored} is a form the panel reads`);
+    }
+    // What is stored is the colour CSS means: the renderer reads "#4682B4" as steelblue.
+    const { r, g, b } = parseHexColor(panelColour('SteelBlue').colour, null);
+    assert.deepEqual([r, g, b], [0x46, 0x82, 0xB4]);
+  });
+});
+
+test('set() still refuses what has more than one reading, or none, and says what to write', () => {
   withControls((api) => {
     const path = 'L.Background.Fill.colour';
     api.set(path, 'FF112233');
-    for (const [value, hint] of [
-      ['#000', ' Write "#000000".'],
-      ['000', ' Write "000000".'],
-      ['#0008', ' Write "88000000".'],
-      ['red', ' Write "#FF0000".'],
-      ['rgb(0, 0, 0)', ' Write "#000000".'],
-      ['rgba(255, 0, 0, 0.5)', ' Write "80FF0000".'],
-      ['hsl(0, 100%, 50%)', ' Write "#FF0000".'],
-      ['transparent', ' Write "00000000".'],
-      ['nonsense', ''],
-    ]) {
+    for (const [value, hint] of STILL_REFUSED) {
       clearScriptTrace();
       api.set(path, value);
       assert.deepEqual(errors(), [`set("${path}"): "${value}" is not a colour the panel can read, so nothing `
         + `was set. ${FORMS}${hint}`]);
       assert.equal(api.get(path), 'FF112233', `${value} must not be stored`);
     }
-    clearScriptTrace();
-    api.set(path, 0xFF0000);
-    assert.deepEqual(errors(), [`set("${path}"): 16711680 is not a colour the panel can read, so nothing `
-      + `was set. ${FORMS} As text, 16711680 is "#FF0000".`]);
+    // A number could be RRGGBB or AARRGGBB, so it is not guessed at; the refusal says how it reads.
+    for (const [value, hint] of [
+      [0xFF0000, ' As text, 16711680 is "#FF0000".'],
+      [0xFF0000FF, ' As text, 4278190335 is "FF0000FF".'],
+    ]) {
+      clearScriptTrace();
+      api.set(path, value);
+      assert.deepEqual(errors(), [`set("${path}"): ${value} is not a colour the panel can read, so nothing `
+        + `was set. ${FORMS}${hint}`]);
+    }
     clearScriptTrace();
     api.set(path, undefined);
     assert.deepEqual(errors(), [`set("${path}"): no colour was given, so nothing was set. ${FORMS}`]);
@@ -167,9 +217,12 @@ test('"" is a colour only where the property has none of its own', () => {
     assert.deepEqual(errors(), []);
     assert.equal(api.get('L.Text.Font.underlineColour'), '');
     api.set('L.Text.Font.underlineColour', '#000');
-    assert.deepEqual(errors(), [`set("L.Text.Font.underlineColour"): "#000" is not a colour the panel can `
+    assert.deepEqual(errors(), []);
+    assert.equal(api.get('L.Text.Font.underlineColour'), '#000000', 'a short form is written out here too');
+    api.set('L.Text.Font.underlineColour', 'none');
+    assert.deepEqual(errors(), ['set("L.Text.Font.underlineColour"): "none" is not a colour the panel can '
       + 'read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
-      + 'or "" for none. Write "#000000".']);
+      + 'or "" for none.']);
     clearScriptTrace();
     api.set('L.Background.Fill.colour', '');
     assert.equal(errors().length, 1, 'a fill has a colour of its own, and "" painted it white');
@@ -191,12 +244,29 @@ test('a control-set reference is read where the renderer resolves one, and only 
 test('a whole section or list written at once is looked into, field by field', () => {
   withControls((api) => {
     const before = api.get('L.Background.Border.top.colour');
-    api.set('L.Background.Border.top', { style: 'solid', thickness: 3, colour: 'red' });
-    assert.deepEqual(errors(), ['set("L.Background.Border.top"): at colour, "red" is not a colour the panel '
-      + `can read, so nothing was set. ${FORMS} Write "#FF0000".`]);
+    api.set('L.Background.Border.top', { style: 'solid', thickness: 3, colour: '#0008' });
+    assert.deepEqual(errors(), ['set("L.Background.Border.top"): at colour, "#0008" is not a colour the panel '
+      + `can read, so nothing was set. ${FORMS} Write "88000000".`]);
     assert.equal(api.get('L.Background.Border.top.colour'), before);
     assert.notEqual(api.get('L.Background.Border.top.thickness'), 3, 'and nothing else in it was written');
+    // A short form inside it is written out, and the script's own table is left as it wrote it.
+    clearScriptTrace();
+    const top = { style: 'solid', thickness: 3, colour: 'red' };
+    api.set('L.Background.Border.top', top);
+    assert.deepEqual(errors(), []);
+    assert.equal(api.get('L.Background.Border.top.colour'), '#FF0000');
+    assert.equal(api.get('L.Background.Border.top.thickness'), 3);
+    assert.equal(top.colour, 'red');
   });
+  // A list, at every position, copied only where something changed.
+  const bare = { _children: {} };
+  const zones = [{ from: 0, colour: 'lime' }, { from: 0.8, colour: 'FFFF0000' }];
+  const stored = mapColourWrites(bare, 'Meter.zones', zones, (at, value, field) => panelColour(value, field).colour);
+  assert.deepEqual(stored, [{ from: 0, colour: '#00FF00' }, { from: 0.8, colour: 'FFFF0000' }]);
+  assert.equal(stored[1], zones[1], 'an entry with nothing to write out is the same entry');
+  assert.equal(zones[0].colour, 'lime');
+  const unchanged = { from: 0, colour: '#00FF00' };
+  assert.equal(mapColourWrites(bare, 'Meter.zones.0', unchanged, (at, value) => value), unchanged);
 });
 
 test('a property that is not a colour is left alone, whatever it is called', () => {
@@ -210,44 +280,52 @@ test('a property that is not a colour is left alone, whatever it is called', () 
 
 /* ========================================================================== ce.panel.patch */
 
-test('ce.panel.patch refuses an unreadable colour as set() does, and the whole patch with it', () => {
+test('ce.panel.patch reads a colour as set() does, and refuses the whole patch over one it cannot read', () => {
   // On the Button, which has a Background to patch (a Knob draws through its parts and has none,
   // so a patch of its Background leads nowhere, which ce.panel.patch reports on its own).
   withControls((api) => {
     api.panelDefine('B', 'States', 'Hot', {});
     clearScriptTrace();
-    api.panelPatch('B', 'Hot', { 'Background.Fill.colour': '#000', 'Transform.opacity': 60 });
-    assert.deepEqual(errors(), ['ce.panel.patch("B", "Hot"): at "Background.Fill.colour", "#000" is not a '
-      + `colour the panel can read, so nothing was patched. ${FORMS} Write "#000000".`]);
+    assert.equal(api.panelPatch('B', 'Hot', { 'Background.Fill.colour': '#0008', 'Transform.opacity': 60 }), 0);
+    assert.deepEqual(errors(), ['ce.panel.patch("B", "Hot"): at "Background.Fill.colour", "#0008" is not a '
+      + `colour the panel can read, so nothing was patched. ${FORMS} Write "88000000".`]);
     assert.deepEqual(api.panelEntry('B', 'States', 'Hot').patches?.component ?? {}, {},
       'the state is as it was: nothing from the refused patch landed');
     // A part's patch is typed by the part's sections, or by the templates when it has none.
     api.panelDefine('K', 'States', 'Hot', {});
     clearScriptTrace();
-    api.panelPatch('K', 'Hot', { 'Background.Fill.colour': 'red' }, 'cap');
+    api.panelPatch('K', 'Hot', { 'Background.Fill.colour': 'currentColor' }, 'cap');
     assert.equal(errors().length, 1);
-    assert.match(errors()[0], /^ce\.panel\.patch\("K", "Hot"\): at "Background\.Fill\.colour", "red" is not/);
-    // What the panel reads goes in as written.
-    clearScriptTrace();
-    api.panelPatch('B', 'Hot', { 'Background.Fill.colour': '#000000' });
-    assert.deepEqual(errors(), []);
-    assert.equal(api.panelEntry('B', 'States', 'Hot').patches.component['Background.Fill.colour'], '#000000');
+    assert.match(errors()[0], /^ce\.panel\.patch\("K", "Hot"\): at "Background\.Fill\.colour", "currentColor" is not/);
+    // A short form is stored written out, as set() stores it; what the panel reads goes in as written.
+    for (const [value, stored] of [['#000', '#000000'], ['hsla(0, 100%, 50%, 0.5)', '80FF0000'],
+      ['#000000', '#000000']]) {
+      clearScriptTrace();
+      assert.equal(api.panelPatch('B', 'Hot', { 'Background.Fill.colour': value }), 1, value);
+      assert.deepEqual(errors(), []);
+      assert.equal(api.panelEntry('B', 'States', 'Hot').patches.component['Background.Fill.colour'], stored);
+    }
   });
 });
 
 /* ===================================================================================== tints */
 
-test('ce.image.icon refuses a tint the panel cannot read, and applies the rest', () => {
+test('ce.image.icon writes a short tint out, refuses one the panel cannot read, and applies the rest', () => {
   // "#000" had its "#" taken off and was stored as "000", which the renderer reads as no tint.
   withIcons([{ id: 'i1', name: 'waveform', enabled: true, dataUrl: PNG }], () => withControls((api) => {
-    assert.equal(api.imageIcon('B', 'waveform', { size: 20, tint: '#000' }), false);
-    assert.deepEqual(errors(), [`ce.image.icon("B"): tint refused — "#000" is not a colour the panel can `
-      + `read. ${FORMS} Write "#000000".`]);
+    assert.equal(api.imageIcon('B', 'waveform', { size: 20, tint: '#0008' }), false);
+    assert.deepEqual(errors(), [`ce.image.icon("B"): tint refused — "#0008" is not a colour the panel can `
+      + `read. ${FORMS} Write "88000000".`]);
     assert.equal(api.get('B.Icon.size'), 20, 'the other options are applied');
     assert.equal(api.get('B.Icon.tint'), 'FFFFFFFF', 'the tint is not');
-    clearScriptTrace();
-    assert.equal(api.imageIcon('B', 'waveform', { tint: '#80FF0000' }), true);
-    assert.equal(api.get('B.Icon.tint'), '80FF0000');
+    // Stored without its "#", as a tint always was, and with its digits written out.
+    for (const [tint, stored] of [['#000', '000000'], ['red', 'FF0000'], ['rgba(255, 0, 0, 0.5)', '80FF0000'],
+      ['#80FF0000', '80FF0000']]) {
+      clearScriptTrace();
+      assert.equal(api.imageIcon('B', 'waveform', { tint }), true, tint);
+      assert.deepEqual(everything(), [], tint);
+      assert.equal(api.get('B.Icon.tint'), stored, tint);
+    }
   }));
 });
 
@@ -263,16 +341,21 @@ test('ce.image.icon\'s opacity warning only offers a number that is on its scale
   }));
 });
 
-test('ce.image.set refuses a tint the panel cannot read, in its own refusal\'s words', () => {
+test('ce.image.set writes a short tint out, and refuses one the panel cannot read in its own words', () => {
   withControls((api) => {
-    assert.equal(api.imageSet('L', PNG, { tint: 'red' }), false);
-    assert.deepEqual(errors(), [`ce.image.set("L"): tint refused — "red" is not a colour the panel can `
-      + `read. ${FORMS} Write "#FF0000".`]);
+    const before = api.get('L.Background.Fill.imageTint');
+    assert.equal(api.imageSet('L', PNG, { tint: 'currentColor' }), false);
+    assert.deepEqual(errors(), [`ce.image.set("L"): tint refused — "currentColor" is not a colour the panel `
+      + `can read. ${FORMS}`]);
     assert.equal(api.get('L.Background.Fill.imageSrc'), PNG, 'the picture still goes on');
-    assert.notEqual(api.get('L.Background.Fill.imageTint'), 'red');
-    clearScriptTrace();
-    assert.equal(api.imageSet('L', PNG, { tint: '#5B9BD5' }), true);
-    assert.equal(api.get('L.Background.Fill.imageTint'), '5B9BD5');
+    assert.equal(api.get('L.Background.Fill.imageTint'), before);
+    for (const [tint, stored] of [['red', 'FF0000'], ['#abc', 'AABBCC'], ['hsl(0 100% 50% / 25%)', '40FF0000'],
+      ['#5B9BD5', '5B9BD5']]) {
+      clearScriptTrace();
+      assert.equal(api.imageSet('L', PNG, { tint }), true, tint);
+      assert.deepEqual(errors(), [], tint);
+      assert.equal(api.get('L.Background.Fill.imageTint'), stored, tint);
+    }
   });
 });
 

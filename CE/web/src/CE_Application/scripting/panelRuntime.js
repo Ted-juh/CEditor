@@ -33,8 +33,8 @@ import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
 import {
-  COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, drawColour, eachColourWrite, hexHint, isPanelColour,
-  panelColourProblem, percentHint, percentTextHint, realNumber, shownNumber, unitProblem,
+  COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, drawColour, hexHint, isPanelColour, mapColourWrites,
+  panelColour, percentHint, percentTextHint, realNumber, shownNumber, unitProblem,
 } from './scriptColours.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -607,8 +607,10 @@ function valueBindingFor(control) {
 }
 
 /**
- * Refuse a write that would put something the panel cannot read into a colour property, and say
- * so, once for each such property. True when anything was refused, and then nothing is written.
+ * What a write stores in the colour properties it reaches: `{ value }`, the value to write, with
+ * each colour in it as scriptColours.panelColour stores it ("red" as "#FF0000", "#000" as
+ * "#000000"); or null when one of them is something the panel cannot read, and then each such
+ * property has been reported, once, and nothing is to be written.
  *
  * Which properties hold colours comes from the section templates (scriptColours.colourFieldAt), so
  * Icon.tint is one and Pixel.imageColour, a switch, is not. `root` is the control, or for a state's
@@ -616,20 +618,21 @@ function valueBindingFor(control) {
  * whole section or list written at once is looked into, field by field. `named` puts the path in
  * the message, for a call whose own arguments do not already say which property it was.
  */
-function refuseColourWrites(call, outcome, root, path, value, named = false) {
+function colourWrites(call, outcome, root, path, value, named = false) {
   // Asked only of a control-set reference, so an ordinary write does not look the set up.
   const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
   let refused = false;
-  eachColourWrite(root, path, value, (at, written, field) => {
-    const problem = panelColourProblem(written, field, resolves);
-    if (!problem) return;
+  const stored = mapColourWrites(root, path, value, (at, written, field) => {
+    const read = panelColour(written, field, resolves);
+    if (!read.why) return read.colour;
     refused = true;
     let where = '';
     if (named) where = `at "${at}", `;
     else if (at !== path) where = `at ${at.slice(path.length + 1)}, `;
-    addScriptTrace('error', '', `${call}: ${where}${problem.why}, so ${outcome}. ${problem.advice}`);
+    addScriptTrace('error', '', `${call}: ${where}${read.why}, so ${outcome}. ${read.advice}`);
+    return written;
   });
-  return refused;
+  return refused ? null : { value: stored };
 }
 
 // The third argument carries two different things, as the contract's own signature does:
@@ -676,9 +679,13 @@ function setValue(path, value, formOrOpts = '') {
   }
 
   // A colour the panel cannot read used to be stored as written and painted white ("#000", "red",
-  // a number). Refused here, after the filters have had their say and before anything is written,
-  // with the form to write instead. ce.panel.patch asks the same question of its entries.
-  if (refuseColourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value)) return;
+  // a number). Read here, after the filters have had their say (so what a filter returns is read
+  // too) and before anything is written: CSS's short forms are written out, so "red" is stored as
+  // "#FF0000", and what has no one reading is refused with the form to write instead.
+  // ce.panel.patch asks the same question of its entries.
+  const colours = colourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value);
+  if (!colours) return;
+  value = colours.value;
 
   // A write that goes nowhere used to VANISH. The contract's own headline (Q1) is that coverage is
   // total and you can never pick wrong, so a path that resolves to nothing has to say so — without
@@ -916,6 +923,10 @@ export function readWatch(path) {
 // ("x5B9BD5", "#12#34#56", the number 0xFF0000) read as one and nothing said so. Anything else is
 // now refused, in the words of each prelude's __cchan. Eight digits are still AARRGGBB, so CSS's
 // "#5B9BD580" reads as 9BD580, which is the colour a property would paint for it.
+//
+// set() writes CSS's short forms ("#000", "red", rgb()) out before it stores them (colourWrites).
+// These readers do not, here or in the preludes: the decision to accept them was about properties,
+// and taking them here would mean the names table in every prelude.
 //
 // AMOUNTS. lighten, darken and alpha take a number from 0 to 1. One outside it used to be used as
 // it was (lightening by 40 gave white) or clamped (an alpha of 128 gave solid). It is refused, with
@@ -5094,10 +5105,10 @@ function imageSetImpl(target, src, opts) {
   if (!layer) return false;
   if (!imageNode(name, layer)) return imageNeedsNode('set', name, layer) ?? false;
 
-  const { writes, refused, warnings } = planImage(layer, src, opts, { tintProblem: (tint) => {
-    const problem = panelColourProblem(tint);
+  const { writes, refused, warnings } = planImage(layer, src, opts, { tintColour: (tint) => {
+    const read = panelColour(tint);
     // The refusal line adds its own full stop.
-    return problem ? `${problem.why}. ${problem.advice.replace(/\.$/, '')}` : null;
+    return read.why ? { reason: `${read.why}. ${read.advice.replace(/\.$/, '')}` } : { colour: read.colour };
   } });
   for (const problem of refused) {
     addScriptTrace('error', '',
@@ -5214,17 +5225,20 @@ function imageIconImpl(target, idOrName, opts) {
     ['opacity', 'opacity'], ['rotation', 'rotation']]) {
     if (opts?.[key] === undefined) continue;
     // A tint the panel cannot read used to be stored with its "#" taken off, so "#000" became "000",
-    // which the renderer reads as no tint at all. Refused as ce.image.set refuses one; the other
-    // options are still applied, and the call answers false.
+    // which the renderer reads as no tint at all. Read as ce.image.set reads one: a short form is
+    // written out ("#000" is stored as "000000"), and anything else is refused; the other options
+    // are still applied, and the call answers false.
+    let tint;
     if (key === 'tint') {
-      const problem = panelColourProblem(opts.tint);
-      if (problem) {
-        addScriptTrace('error', '', `ce.image.icon("${name}"): tint refused — ${problem.why}. ${problem.advice}`);
+      const read = panelColour(opts.tint);
+      if (read.why) {
+        addScriptTrace('error', '', `ce.image.icon("${name}"): tint refused — ${read.why}. ${read.advice}`);
         refused = true;
         continue;
       }
+      tint = read.colour;
     }
-    const value = key === 'tint' ? String(opts[key]).replace(/^#/, '') : opts[key];
+    const value = key === 'tint' ? tint.replace(/^#/, '') : opts[key];
     setValue(`${name}.Icon.${field}`, value);
     // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
     // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading, and
@@ -6338,15 +6352,19 @@ function panelPatchImpl(controlName, stateName, patch, part) {
   const entries = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : null;
   if (!entries) { addScriptTrace('error', '', 'ce.panel.patch(control, state, patch): patch must be a table of path -> value'); return 0; }
 
-  // A colour the panel cannot read is refused as set() refuses it, and the whole patch with it:
-  // asked before the loop below writes into the state, so a refused patch leaves the state as it
-  // was. Each key is a path on the control, or on the part the patch is for.
+  // A colour is read as set() reads it: a short form is written out ("red" is stored as "#FF0000"),
+  // and one the panel cannot read is refused, and the whole patch with it. Asked before the loop
+  // below writes into the state, so a refused patch leaves the state as it was. Each key is a path
+  // on the control, or on the part the patch is for.
   const patchRoot = part == null || part === ''
     ? found.control : found.control?._children?.Parts?._children?.[String(part)];
   let refusedColour = false;
+  const written = [];
   for (const [path, value] of Object.entries(entries)) {
-    if (refuseColourWrites(`ce.panel.patch("${controlName}", "${stateName}")`, 'nothing was patched',
-      patchRoot, String(path), value, true)) refusedColour = true;
+    const colours = colourWrites(`ce.panel.patch("${controlName}", "${stateName}")`, 'nothing was patched',
+      patchRoot, String(path), value, true);
+    if (colours) written.push([path, colours.value]);
+    else refusedColour = true;
   }
   if (refusedColour) return 0;
 
@@ -6369,7 +6387,7 @@ function panelPatchImpl(controlName, stateName, patch, part) {
   // key or a nested table used to be stored as written and counted, so the call answered 1 for a
   // change the panel never showed.
   const applied = [];
-  const entriesList = Object.entries(entries);
+  const entriesList = written;
   for (const [path, value] of entriesList) {
     const where = patchKeyPath(node, String(path), value, owner);
     if (where.why) {

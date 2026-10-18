@@ -391,7 +391,10 @@ const SHARED_OPTION_FIELDS = {
   tint: {
     name: 'tint', type: 'colour',
     summary: 'Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. '
-      + 'Any other form is refused with a message, and the other options still apply. Omit it to '
+      + 'A web colour with only one meaning is taken too and stored as those digits, as `set()` '
+      + 'stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the '
+      + 'same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four '
+      + 'digits included, is refused with a message, and the other options still apply. Omit it to '
       + 'leave the image untinted.',
   },
   opacity: {
@@ -656,7 +659,7 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; with the panel open, anything else is refused with a message and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
+    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". With the panel open, "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), which `get()` returns; a number, "#" with four digits and anything else are refused with a message, and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
@@ -909,8 +912,9 @@ export const COMMANDS = [
      own search pattern, which is worth writing down because it is the failure mode of any sweep.
 
      ONE input form, and a trap worth naming. Every verb here accepts "RRGGBB", "AARRGGBB" or
-     "#RRGGBB", read as a colour property is read (6 or 8 hex digits, one "#" at most; anything else
-     is refused with a message), and returns "#RRGGBB", which
+     "#RRGGBB", read as the panel reads a stored colour property (6 or 8 hex digits, one "#" at most;
+     anything else is refused with a message; set() writes CSS's short forms out before it stores
+     them, and these verbs do not take those), and returns "#RRGGBB", which
      CSS, SVG and a panel property all accept. The app STORES colours as AARRGGBB (JUCE's order:
      "66FFFFFF" is a 40%-opaque white in every panel document) while CSS wants #RRGGBBAA — the same
      four bytes the other way round. So exactly one verb, `alpha`, returns the panel's form, and
@@ -2268,7 +2272,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. A colour the panel cannot read is refused as `set()` refuses it, and then nothing is applied. This reaches the settings inside a state, which `set()` cannot.',
+    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
