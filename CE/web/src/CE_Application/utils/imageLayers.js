@@ -204,6 +204,7 @@ const BOOLEANS = {
 export function planImage(layer, src, opts) {
   const writes = [];
   const refused = [];
+  const warnings = [];
   const source = opts && typeof opts === 'object' ? opts : {};
   const has = (name) => layer.fields.includes(name);
   const put = (name, value) => {
@@ -278,13 +279,20 @@ export function planImage(layer, src, opts) {
         ? Math.max(0, Math.min(100, asNumber))
         : (lower === 'tilescale' ? Math.max(0.1, asNumber) : asNumber);
       put(NUMBERS[lower], clamped);
+      // ce.image.icon's opacity, one call away, runs from 0 to 1, so 0.5 is an easy thing to write
+      // here and it means almost invisible. Applied as written (the scale is the panel's), with a
+      // warning that says how it was read. Up to and including 1, since 1% is as unlikely a wish.
+      if (lower === 'opacity' && asNumber > 0 && asNumber <= 1) {
+        warnings.push(`opacity runs from 0 to 100 here, so ${asNumber} is almost invisible. `
+          + `If you meant ${asNumber} out of 1, write ${Number((asNumber * 100).toFixed(4))}.`);
+      }
       continue;
     }
     if (BOOLEANS[lower]) { put(BOOLEANS[lower], value === true); continue; }
     refused.push({ option: key, reason: 'not an image option' });
   }
 
-  return { writes, refused };
+  return { writes, refused, warnings };
 }
 
 /** The writes that turn a layer OFF, which is two or three fields rather than one. */

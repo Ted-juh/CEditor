@@ -3322,7 +3322,7 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported. One of "image", "overlay", "textImage" or "textTexture". |
 | `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit. One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
 | `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens. One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
-| `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. |
+| `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
 | `tint` | colour | — | Tint colour, as "#RRGGBB". Omit to leave the image untinted. |
 | `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only. One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
@@ -3364,7 +3364,7 @@ Show an image from the icon library (or one the panel carries) in a control's Ic
 | `size` | number (pixels) | 16 | How big the icon is drawn. |
 | `fit` | text | "contain" | How the icon fills its box, using the Icon section's own values. |
 | `tint` | colour | — | Tint colour, as "#RRGGBB". Omit to leave the image untinted. |
-| `opacity` | number (0 to 1) | 1 | Image opacity. 0 is invisible, 1 is fully opaque. |
+| `opacity` | number (0 to 1) | 1 | Image opacity. 0 is invisible, 1 is fully opaque. A value above 1, such as 50 written for ce.image.set's scale, draws fully opaque and writes a warning. |
 | `rotation` | number (degrees) | 0 | Turn the image clockwise, with 0 upright. |
 
 #### `ce.image.embed(target [, layer]) -> boolean`

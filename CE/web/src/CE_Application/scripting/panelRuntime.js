@@ -4454,11 +4454,12 @@ function imageSetImpl(target, src, opts) {
   if (!layer) return false;
   if (!imageNode(name, layer)) return imageNeedsNode('set', name, layer) ?? false;
 
-  const { writes, refused } = planImage(layer, src, opts);
+  const { writes, refused, warnings } = planImage(layer, src, opts);
   for (const problem of refused) {
     addScriptTrace('error', '',
       `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
   }
+  for (const warning of warnings) addScriptTrace('warn', '', `ce.image.set("${name}"): ${warning}`);
   if (!writes.length) return false;
 
   let all = true;
@@ -4569,6 +4570,13 @@ function imageIconImpl(target, idOrName, opts) {
     if (opts?.[key] === undefined) continue;
     const value = key === 'tint' ? String(opts[key]).replace(/^#/, '') : opts[key];
     setValue(`${name}.Icon.${field}`, value);
+    // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
+    // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading.
+    const amount = Number(value);
+    if (key === 'opacity' && amount > 1) {
+      addScriptTrace('warn', '', `ce.image.icon("${name}"): opacity runs from 0 to 1 here, so ${amount} is `
+        + `fully solid. If you meant ${amount} out of 100, write ${Number((amount / 100).toFixed(4))}.`);
+    }
   }
   // A control showing text only draws no icon; the same rule as the editor's icon pickers
   // (utils/iconLayout.js), so the icon this call asked for is seen.

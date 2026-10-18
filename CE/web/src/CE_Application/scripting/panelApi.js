@@ -351,7 +351,7 @@ const SHARED_OPTION_FIELDS = {
   },
   opacity: {
     name: 'opacity', type: 'number', default: '1', unit: '0 to 1',
-    summary: 'Image opacity. 0 is invisible, 1 is fully opaque.',
+    summary: 'Image opacity. 0 is invisible, 1 is fully opaque. A value above 1, such as 50 written for ce.image.set\'s scale, draws fully opaque and writes a warning.',
   },
   imageRotation: {
     name: 'rotation', type: 'number', default: '0', unit: 'degrees',
@@ -1355,7 +1355,8 @@ export const COMMANDS = [
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
       { name: 'radius', type: 'number', required: true },
-      { name: 'from', type: 'number', required: true }, { name: 'to', type: 'number', required: true },
+      { name: 'from', type: 'number', required: true, unit: 'degrees' },
+      { name: 'to', type: 'number', required: true, unit: 'degrees' },
     ],
     scopes: 'any',
     snippet: {
@@ -1375,7 +1376,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'stops', type: 'list', required: true },
-      { name: 'angle', type: 'number', required: false },
+      { name: 'angle', type: 'number', required: false, unit: 'degrees' },
     ],
     scopes: 'any',
     snippet: {
@@ -1632,7 +1633,7 @@ export const COMMANDS = [
             summary: 'Where the image sits when it does not fill the layer. Background layers '
               + 'only — on a text layer use offsetX and offsetY instead. Note the hyphens.' },
           { like: 'opacity', unit: '0 to 100', default: '100',
-            summary: 'How solid the layer is, on the panel\'s own 0 to 100 scale — not 0 to 1.' },
+            summary: 'How solid the layer is, on the panel\'s own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning.' },
           'tint',
           { name: 'blend', type: 'text', default: '"normal"', values: IMAGE_BLENDS,
             summary: 'How the layer mixes with what is underneath it. Background layers only.' },
