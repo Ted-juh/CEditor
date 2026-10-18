@@ -1,8 +1,8 @@
 # Editing values in place in the script editor
 
-Status: **proposal, nothing built.** 2026-10-18. Four of the silent failures it found were then
-fixed in the script runtimes, and [Fixed since, and still open](#fixed-since-and-still-open) says
-which and what was left.
+Status: **proposal, nothing built.** 2026-10-18. The silent failures it found, and four more found
+on the way, were then fixed in the script runtimes; [Fixed since, and still open](#fixed-since-and-still-open)
+lists them and the little that is left.
 
 It started as a question about colour. A script's colours are typed out as hex, so why is there no
 swatch beside them that opens the display panel's colour and gradient editors? Colour turned out to
@@ -74,22 +74,22 @@ no unit or range.
 
 1. **The checks may matter more than the editors.** Several mistakes in a script failed with no
    error at all. Each of these was traced through the WebView runtime (`panelRuntime.js`) on this
-   date. The first, second, fourth and fifth were then fixed in the runtimes (see
+   date. All five were then fixed in the runtimes (see
    [Fixed since, and still open](#fixed-since-and-still-open)):
    - `ce.midi.sendNote(1, "c4", 100)` played note 0, C-1. The name parser wants a capital letter,
      and `sendNote` turned a name it could not read into 0.
    - `ce.midi.sendSysex("F0411000")` sent `F0 FF F7`. Hex text is split on spaces and commas, so
      the whole string was read as one number and clamped to 255. The player kept the low byte
      instead and sent `F0 00 F7`.
-   - `ce.time.step(beats, "1/8t")` returns nothing, because divisions are case-sensitive: the
+   - `ce.time.step(beats, "1/8t")` returned nothing, because divisions were case-sensitive: the
      table spells it `"1/8T"`.
    - `ce.draw.image("knob-cap", …)` drew nothing, because it wants the image data and not an
      asset's name.
    - A Roland SysEx template with `$checksum` and no `$checksumStart` sums the header as well, and
-     *"a message the synth rejects silently"* is the result (`deviceDefinitions.js`).
+     *"a message the synth rejects silently"* is the result (`deviceDefinitions.js`). It now warns.
 
    Others report themselves, but only when the script runs: `ce.draw.blend` with an unknown mode,
-   `ce.text.style` with a font that is not available, and now the four fixed above. A check moves
+   `ce.text.style` with a font that is not available, and now the ones fixed above. A check moves
    the same message to the moment it is typed. The checks for lists of names are also the cheapest
    to build, which makes them the best next step after colour.
 2. **A value is recognised by where it is, not by what it looks like.** `"F0411000"` is a colour
@@ -98,11 +98,12 @@ no unit or range.
    Only `#RRGGBB` is clear enough to recognise on its own.
 3. **The API description needs work first.** It calls most of these parameters `string`. One
    parameter is typed `colour`. Scales and divisions have their own tables, and the parameters do
-   not point at them. Units are uneven too. `ce.draw.arc`'s angles are degrees in the summary and
-   carry no `unit`, and two neighbouring commands read `opacity` on different scales:
-   `ce.image.set` from 0 to 100 and `ce.image.icon` from 0 to 1. So for most kinds the first change
-   is giving parameters real types and units in `panelApi.js`. That also improves the scripting
-   manual, completion and checking, which all read the same description.
+   not point at them. Units were uneven too. `ce.draw.arc`'s angles were degrees in the summary and
+   carried no `unit` (they do now), and two neighbouring commands read `opacity` on different
+   scales, `ce.image.set` from 0 to 100 and `ce.image.icon` from 0 to 1 (each now warns about the
+   other's numbers). So for most kinds the first change is giving parameters real types and units
+   in `panelApi.js`. That also improves the scripting manual, completion and checking, which all
+   read the same description.
 4. **One set of editing rules covers every kind.** The script stays the truth, and only its text
    changes. A drag writes once, when you let go, because with Live on every change resets the
    script's running state and could fire handlers that send MIDI. Cancel puts the original text
@@ -463,15 +464,17 @@ local triad = ce.music.chord("C4", "major")
 ### 8. Divisions and scales
 
 ```lua
-local step = ce.time.step(beats, "1/8t")
+local step = ce.time.step(beats, "1/6")
 local notes = ce.music.scale("C3", "harmonicMinr")
 ```
 
-- **`"1/8t"`** gets a warning: *"Not a division (they are case-sensitive). ce.time.step returns
-  nothing."* Completion lists the fourteen, each with its label from `DIVISION_LABELS`: *1/8T, 8th
-  T*.
-- **`"harmonicMinr"`** gets the same kind of check against `SCALE_NAMES`, and the same consequence:
-  `ce.music.scale` returns nothing for a scale it does not know.
+- **`"1/6"`** is not a division. The runtimes now say so when the script runs: *"ce.time.step:
+  "1/6" is not a division, so there is no answer. The divisions are 1/1, 1/2, …"*. When this was
+  written, `"1/8t"` was refused the same way, without the message. Any case is read now, so that
+  one is simply right. The check says the same as it is typed, and completion lists the fourteen,
+  each with its label from `DIVISION_LABELS`: *1/8T, 8th T*.
+- **`"harmonicMinr"`** is checked against `SCALE_NAMES`. The runtimes now refuse it with the list
+  of scales, where `ce.music.scale` used to return nothing silently.
 - **Hover on `"harmonicMinor"`**, once it is spelled right, lists the notes from C3: *C D E♭ F G A♭
   B*.
 
@@ -522,9 +525,10 @@ ce.image.set("Logo", logoData, { opacity = 0.5 })
 ce.image.icon("Badge", "star", { opacity = 0.5 })
 ```
 
-- **Line 1** is on the 0 to 100 scale. Hover: *"0.5 of 100: almost invisible. Did you mean 50?"*,
-  as a warning.
-- **Line 2** is on the 0 to 1 scale, so 0.5 is half.
+- **Line 1** is on the 0 to 100 scale, so 0.5 is almost invisible. The runtime now applies it and
+  warns: *"ce.image.set("Logo"): opacity runs from 0 to 100 here, so 0.5 is almost invisible. If
+  you meant 0.5 out of 1, write 50."* The hover would say the same.
+- **Line 2** is on the 0 to 1 scale, so 0.5 is half. Writing 50 there now warns the other way.
 - **Alt-drag** reads each option's own `unit`, so the first moves in whole numbers up to 100 and the
   second in hundredths up to 1. None of this works unless the unit is in the schema. Here it is.
 
@@ -534,10 +538,10 @@ ce.image.icon("Badge", "star", { opacity = 0.5 })
 ce.draw.arc(cx, cy, 40, -135, 135)
 ```
 
-`from` and `to` are degrees, with 0 at twelve o'clock and increasing clockwise, but only the
-summary says so: the parameters carry no `unit`. Until they do, these are plain numbers and get no
-drag. Step zero for this kind is one line in `panelApi.js` per parameter. After that, Alt-drag
-moves them in whole degrees, and hover says where 0 is.
+`from` and `to` are degrees, with 0 at twelve o'clock and increasing clockwise. When this was
+written only the summary said so. The parameters carried no `unit`, so they were plain numbers and
+would get no drag. They carry `unit: 'degrees'` now, which was step zero for this kind: Alt-drag
+can move them in whole degrees, and hover can say where 0 is.
 
 ### 14. Controls, paths and animation names
 
@@ -579,31 +583,36 @@ ce.device.defineParameter("level", {
 
 ## Fixed since, and still open
 
-Four of the silent failures above were fixed in the script runtimes on 2026-10-18. The rule each
-one follows is the one the runtimes already used for an unknown blend mode: refuse, say what was
-refused, and send or draw nothing. Each was fixed in every runtime that has the call, in the same
-words, so the editor and the exported player agree:
+Eight silent failures were fixed in the script runtimes on 2026-10-18: the four this record found,
+then the four it first left open as decisions. Each follows the rule the runtimes already used for
+an unknown blend mode: say what was wrong, and send or draw nothing rather than something
+plausible. Where a value had to be read rather than refused, it is applied as written, with a
+warning. Each was fixed in every runtime that has the call, in the same words, so the editor and
+the exported player agree. `scriptPreludeAgreement.test.js` now compares the refusals word for word
+across the WebView runtime and the Lua, JavaScript and Python preludes.
 
 | Was | Now | Where |
 |---|---|---|
 | `sendNote(1, "c4", 100)` played C-1 (also `sendNoteOff`, and `sendAftertouch` with a note) | refused with an error naming the note | WebView runtime; Lua, JavaScript and Python preludes |
-| `sendSysex("F0411000")` sent `F0 FF F7` (`F0 00 F7` from the player) | refused, with the spaced form to copy | WebView runtime (every call that reads hex text); `BridgeScriptHost::sendSysex` |
+| `sendSysex("F0411000")` sent `F0 FF F7` (`F0 00 F7` from the player) | refused, with the spaced form to copy | WebView runtime (every call that reads hex text); `BridgeScriptHost` |
 | a Roland template without `$checksumStart` was silently wrong | defined, with a warning | `deviceDefinitions.js`; `ScriptRuntime::defineDeviceParameter` |
 | `ce.draw.image("knob-cap", …)` drew nothing | refused, with the call to use when it is an icon's name | WebView runtime (the verb is panel-view only) |
+| `ce.time.step(beats, "1/8t")` returned nothing, with no message | any case is read (the names differ only by D and T); a name that is not a division is reported, with the list | WebView runtime; the three preludes |
+| `ce.music.scale("c4")` gave the scale on C-1; an unknown scale or chord returned nothing silently | both answer nothing and say why, listing the scales or chords | WebView runtime; the three preludes (the generator now emits the name lists in order) |
+| `sendMidi("90 3C 64")` sent a note from the editor and nothing from the player; `feedMidi`, `applyDump` and `checksum` read text in the editor only | the player reads hex text in all of them, by the same rule | `BridgeScriptHost::bytesFromScript`; each prelude's `checksum` |
+| `opacity = 0.5` on a layer was almost invisible, and `opacity = 50` on an icon fully solid, both silently | applied as written, with a warning giving the other scale's number | WebView runtime (both verbs are panel-view only) |
 
-Still open, found on the way and left alone because each is a decision rather than a fix:
+`ce.draw.arc`'s `from` and `to`, and `ce.draw.gradient`'s `angle`, now carry `unit: 'degrees'` in
+the schema, which is the step zero the number kind needs.
 
-- **A division in the wrong case returns nothing**, with no message (`ce.time.step(beats, "1/8t")`).
-  Reading it case-insensitively, or reporting it, means changing the generated division table in
-  every prelude.
-- **The music helpers still read an unreadable root as note 0.** `ce.music.scale("c4")` gives the
-  scale from C-1, by the same fallback `sendNote` had. They are pure functions, and their comment
-  chooses 0 over an unexplained nil list.
-- **Hex text is read only by the editor in `sendMidi`, `feedMidi` and `checksum`.** The player's
-  `sendMidi` takes a list of numbers and does nothing with text, and its preludes' `checksum` does
-  not read text either. Only `sendSysex` is documented to take text.
-- **Two scales for `opacity`** (`ce.image.set` from 0 to 100, `ce.image.icon` from 0 to 1), and
-  **`ce.draw.arc`'s angles carry no unit**. Both are the schema work this record calls step zero.
+Still open, noticed on the way and small:
+
+- **A root that is missing altogether is still read as note 0.** The music helpers now refuse a
+  note name they cannot read, but `ce.music.scale(nil)` (as opposed to `"c4"`) is still the scale on
+  C-1, by the numeric fallback.
+- **Empty hex text is reported by the editor and not by the player.** `sendMidi("")` writes "no
+  bytes given" in the editor; the player hands its callback an empty list, which sends nothing
+  without a word.
 
 ## Rules every edit session follows
 
