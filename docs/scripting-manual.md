@@ -2708,17 +2708,17 @@ const st = ce.panel.entry("knob", "States", "Hover");
 
 #### `ce.panel.define(control, section, name, spec)`
 
-Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. For a state, a key other than name, group, description, enabled, when, rule and patches (whose maps are component and parts) is refused and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.
+Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, as the Animation tab makes one, or with `kind = "keyframes"` one that plays all the time over the frames you give. A key the section's entries do not have, capitals included, is refused with a message listing the keys it takes, and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.
 
 *Short name: `panelDefine` · Panel window only.*
 
 ```lua
 -- Lua
-ce.panel.define("knob", "States", "Warn", { when = { valueGreaterThan = 0.9 } })
+ce.panel.define("knob", "States", "Held", { when = { pressed = true } })
 ```
 ```js
 // JavaScript
-ce.panel.define("knob", "States", "Warn", { when: { valueGreaterThan: 0.9 } });
+ce.panel.define("knob", "States", "Held", { when: { pressed: true } });
 ```
 
 #### `ce.panel.undefine(control, section, name)`

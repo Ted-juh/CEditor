@@ -1,5 +1,6 @@
 <script>
   import { applyControlPatchesById, getSection, updateControlProperty, removeControlNode } from '../stores/controls.js';
+  import { createGenerator } from '../utils/customComponentFactory.js';
   import {
     extractDetachedGeneratedHitZones,
     extractDetachedGeneratedParts,
@@ -137,23 +138,7 @@
   function addGenerator() {
     const name = String(newName ?? '').trim();
     if (!core?.id || !name || generators?._children?.[name]) return;
-    updateControlProperty(core.id, `Generators.${name}`, {
-      _type: 'Generator',
-      name,
-      type: 'ticks',
-      enabled: true,
-      targetBehavior: behaviorNames[0] ?? '',
-      geometry: 'linear',
-      count: 11,
-      minorCount: 3,
-      rows: 4,
-      columns: 4,
-      placement: 'outside',
-      generatedPartPrefix: name,
-      generatedHitZones: true,
-      hitZoneAction: 'setValue',
-      detachable: true,
-    });
+    updateControlProperty(core.id, `Generators.${name}`, createGenerator(name, { targetBehavior: behaviorNames[0] ?? '' }));
     newName = '';
     selectedName = name;
   }

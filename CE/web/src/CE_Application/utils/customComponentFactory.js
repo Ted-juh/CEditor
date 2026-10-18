@@ -527,6 +527,58 @@ export function createHitZone(name, {
   return hitZone;
 }
 
+// What the Generators, Links and Variants editors' Add makes. They were written out inside each
+// editor; here, so ce.panel.define can hold a script's spec against the same entry the editor
+// makes (scripting/panelRuntime.js), and a field added to one is a field define accepts.
+
+/** A new generator, as the Generators editor's Add makes one: 11 ticks with 3 between each. */
+export function createGenerator(name, { targetBehavior = '' } = {}) {
+  return {
+    _type: 'Generator',
+    name,
+    type: 'ticks',
+    enabled: true,
+    targetBehavior,
+    geometry: 'linear',
+    count: 11,
+    minorCount: 3,
+    rows: 4,
+    columns: 4,
+    placement: 'outside',
+    generatedPartPrefix: name,
+    generatedHitZones: true,
+    hitZoneAction: 'setValue',
+    detachable: true,
+  };
+}
+
+/** A new link, as the Links editor's Add makes one: a map from the main value to nothing yet. */
+export function createLink(name) {
+  return {
+    _type: 'Link',
+    name,
+    enabled: true,
+    type: 'map',
+    source: 'mainValue',
+    target: '',
+    condition: '',
+    expression: '',
+    notes: '',
+  };
+}
+
+/** A new variant, as the Variants editor's Add makes one: labelled with its name, changing nothing. */
+export function createVariant(name) {
+  return {
+    _type: 'Variant',
+    name,
+    label: name,
+    enabled: true,
+    description: '',
+    patches: {},
+  };
+}
+
 export function createCustomComponentDesignerDefaults() {
   return {
     _type: 'Designer',

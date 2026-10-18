@@ -83,6 +83,12 @@ import {
 } from './panelApi.js';
 // Each section type's template: what get() checks a path against, and create's `<section>` keys.
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+// The entries the app makes for a control's lists: what ce.panel.define holds a spec against.
+import { ENTRY_BASELINES } from '../stores/documentEntries.js';
+import {
+  createPartNode, createValueChannel, createArrayChannel, createBehaviorModule, createHitZone,
+  createGenerator, createLink, createVariant,
+} from '../utils/customComponentFactory.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
 import {
@@ -6233,29 +6239,134 @@ const COLLECTION_TEMPLATES = {
     }),
 };
 
-// What a state carries: the template's fields and `rule`, the compound condition evaluateState reads
-// beside `when` (utils/interactionRuntime.js). A spec key outside these was stored as written and
-// read by nothing, so define("k", "States", "Warn", { wen = { hover = true } }) made a state with no
-// condition at all, which is a state that always applies. `patches` holds two maps, by name.
-const STATE_FIELDS = ['name', 'group', 'description', 'enabled', 'when', 'rule', 'patches'];
-const STATE_PATCH_MAPS = ['component', 'parts'];
+/* What define takes in a spec, section by section.
+ *
+ * A spec key no entry of the section has was stored as written and read by nothing:
+ * define("k", "States", "Warn", { wen = { hover = true } }) made a state with no condition, which is
+ * a state that always applies, and { durration = 400 } made a 120 ms animation. So a key the section
+ * does not take refuses the whole call, as an unknown option refuses any other (applyOptionChecks):
+ * nothing is defined, define answers false, and the console names every such key, sorted, and lists
+ * what the section takes, in the same words.
+ *
+ * What a section takes is read off the entry the app makes for it, so a field added there is a
+ * field define accepts: the templates above for a state and an animation (both kinds), the entry
+ * baselines the saved format holds bindings, grab areas, value channels and behaviours against
+ * (stores/documentEntries.js) together with the functions that make a new one, and the editors'
+ * own Add for a part, a generator, a link and a variant (utils/customComponentFactory.js). An
+ * entry's `_type` is always taken and never listed: it is how an entry says what it is.
+ *
+ * `extra` is what the readers read beyond those, each because a new entry has no reason to carry
+ * it: an option that only one mode or kind uses, an older spelling still read, or something only
+ * the app's own generated entries carry. Each is named with the reader that reads it.
+ *
+ * `nested` names the fields whose own keys are checked too, one level down, from the template's
+ * value: a state's patches holds two maps, by name. Every other value is a script's to fill (a
+ * state's `when`, a binding's enumMap, a part's sections), as an option's value is elsewhere.
+ *
+ * A key is matched exactly, capitals included, where the section and the entry name are matched as
+ * paths are: the key is stored as written and read by its exact name, so { When = … } would sit
+ * beside an empty `when`. */
+const DEFINE_SPECS = {
+  States: {
+    templates: [COLLECTION_TEMPLATES.States('')],
+    // The compound condition evaluateState reads beside `when` (utils/interactionRuntime.js).
+    extra: ['rule'],
+    nested: ['patches'],
+  },
+  Animations: {
+    templates: [COLLECTION_TEMPLATES.Animations('', {}), COLLECTION_TEMPLATES.Animations('', { kind: 'keyframes' })],
+    // A keyframe animation's playing (utils/keyframeAnimation.js readKeyframes, keyframePlayer.js),
+    // and the curve of the "custom" easing and the feel of "spring" (utils/easing.js readEasing).
+    // The Animation tab writes all six.
+    extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring'],
+  },
+  Bindings: {
+    templates: [ENTRY_BASELINES.Bindings],
+    // mapMode "format" and "template" (utils/interactionRuntime.js resolveBindingValue); the app's
+    // own readouts are format bindings (utils/customComponentFactory.js).
+    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template'],
+  },
+  Parts: {
+    templates: [createPartNode('')],
+    // What the slider family's renderer reads off a part, and the control-set designs write
+    // (editor/SliderFamilyRenderer.svelte), and the marks of a generated part and of one detached
+    // from its generator (utils/customComponentMaterializer.js, the designer surface).
+    extra: ['shadow', 'glow', 'sheen', 'slot', 'inset', 'grooveColour', 'plateColour',
+      'generated', 'detachedFromGenerator', 'locked'],
+  },
+  ValueChannels: {
+    // An array channel's size, items and itemFields come from its own maker.
+    templates: [ENTRY_BASELINES.ValueChannels, createValueChannel(''), createArrayChannel('', { itemFields: {} })],
+    // An enum channel's choices, and `constraint`, the older spelling of constraints, still read
+    // in its place (utils/customComponentInteraction.js).
+    extra: ['values', 'options', 'constraint'],
+  },
+  Behaviors: {
+    templates: [ENTRY_BASELINES.Behaviors, createBehaviorModule('')],
+    // How an XY or rotary drag feels and where its centre is, set in the Behaviors editor; the
+    // second channel of an XY behaviour, in both its spellings; and the slider part a behaviour
+    // drives (utils/customComponentInteraction.js).
+    extra: ['combine', 'invertX', 'invertY', 'weightX', 'weightY', 'increaseAngle', 'dragSensitivity',
+      'centerX', 'centerY', 'targetValueChannelY', 'targetYValueChannel', 'part'],
+  },
+  HitZones: {
+    templates: [ENTRY_BASELINES.HitZones, createHitZone('', { payload: {} })],
+    // The older spellings of the X and Y channels, still read in their place; the probe position a
+    // zone without a payload is tried at (utils/customComponentInteraction.js); and the marks of a
+    // generated zone and of one detached from its generator (utils/customComponentMaterializer.js).
+    extra: ['targetXValueChannel', 'targetYValueChannel', 'probeNormalized', 'probeYNormalized',
+      'generated', 'detachedFromGenerator'],
+  },
+  Generators: {
+    templates: [createGenerator('')],
+    // A new generator draws ticks; each other type reads its own (utils/customComponentMaterializer.js),
+    // and the app's starters write them (utils/customComponentFactory.js). `rect` is bounds' older
+    // spelling, `scrollChannel` valueSource's and `size` ledSize's, each still read in its place.
+    extra: ['zIndex', 'bounds', 'rect', 'targetValueChannel', 'targetValueChannelY', 'targetYValueChannel',
+      'valueSource', 'scrollChannel', 'activationMode', 'labels', 'values', 'min', 'max', 'precision',
+      'suffix', 'baseNote', 'startAngle', 'endAngle', 'radius', 'gap', 'fontSize', 'ledSize', 'size',
+      'minBarHeight', 'colour', 'activeColour', 'inactiveColour', 'activeBorderColour',
+      'inactiveBorderColour', 'inactiveOpacity', 'assetName'],
+  },
+  Links: {
+    templates: [createLink('')],
+    // A new link is a map; each other type reads its own, `map`, `offset`, `whenTrue` and `whenFalse`
+    // being older spellings of cases, amount, trueValue and falseValue still read in their place
+    // (utils/customComponentInteraction.js applyCustomLinks). A route to another control's port
+    // names it, in either spelling, and carries what it was made from
+    // (utils/panelCustomComponentLinks.js createPanelCustomRouteLink).
+    extra: ['value', 'amount', 'offset', 'cases', 'map', 'inputMin', 'inputMax', 'outputMin', 'outputMax',
+      'min', 'max', 'clamp', 'round', 'invert', 'trueValue', 'falseValue', 'whenTrue', 'whenFalse',
+      'targetControlId', 'targetComponentId', 'targetPort', 'targetInput', 'routeMeta'],
+  },
+  Variants: {
+    templates: [createVariant('')],
+    extra: [],
+  },
+};
 
-/** Why a States spec cannot be defined as given, or null. */
-function stateSpecProblem(spec) {
-  const unknown = Object.keys(spec).filter((key) => key !== '_type' && !STATE_FIELDS.includes(key));
-  const patches = isOptionsTable(spec.patches) ? spec.patches : null;
-  const unknownMaps = patches ? Object.keys(patches).filter((key) => !STATE_PATCH_MAPS.includes(key)) : [];
-  if (unknown.length) {
-    const quoted = andList(unknown.map((key) => `"${key}"`));
-    return `${quoted} ${unknown.length === 1 ? 'is not one of the fields a state has' : 'are not among the fields a state has'}, `
-      + `so nothing was defined. A state's fields are: ${STATE_FIELDS.join(', ')}.`;
+/** Each section's spec as the check of option keys reads it (unknownOptionKeys): the names in the
+ *  templates' order, then the extras, and the nested ones from the template's own value. */
+const DEFINE_SPEC_SHAPES = Object.fromEntries(Object.entries(DEFINE_SPECS).map(([section, spec]) => {
+  const names = [...new Set([...spec.templates.flatMap((t) => Object.keys(t)), ...spec.extra])]
+    .filter((key) => key !== '_type');
+  const nested = {};
+  for (const field of spec.nested ?? []) {
+    const inner = spec.templates.find((t) => isOptionsTable(t[field]))?.[field];
+    nested[field] = { names: Object.keys(inner ?? {}), nested: {}, sections: false };
   }
-  if (unknownMaps.length) {
-    const quoted = andList(unknownMaps.map((key) => `"patches.${key}"`));
-    return `${quoted} ${unknownMaps.length === 1 ? 'is not one of the maps patches holds' : 'are not among the maps patches holds'}, `
-      + `so nothing was defined. patches holds: ${STATE_PATCH_MAPS.join(', ')}.`;
-  }
-  return null;
+  return [section, { names, nested, sections: false }];
+}));
+
+/** The console's lines for a spec holding keys its section does not take, or none. */
+function defineSpecProblems(call, section, spec) {
+  const keys = Object.fromEntries(Object.entries(spec).filter(([key]) => key !== '_type'));
+  return unknownOptionKeys(keys, DEFINE_SPEC_SHAPES[section]).map((group) => unknownOptionsMessage(call, group));
+}
+
+/** For the tests: what define takes in a spec, by section, in the order a refusal lists it. */
+export function defineSpecFieldsForTesting() {
+  return Object.fromEntries(Object.entries(DEFINE_SPEC_SHAPES).map(([section, shape]) => [section, [...shape.names]]));
 }
 
 /** Resolve (control, section) with the section name matched case-insensitively, as paths are. */
@@ -6294,7 +6405,7 @@ function panelEntryImpl(controlName, section, name) {
  * define(control, section, name, spec) — create an entry, or replace one that is there.
  *
  * The spec is MERGED over the section's template rather than used as-is, so
- * `define("k", "States", "Warn", { when = { valueGreaterThan = 0.9 } })` produces a state that
+ * `define("k", "States", "Held", { when = { pressed = true } })` produces a state that
  * actually works. Hand-writing `_type`, `patches.component` and `patches.parts` every time is how
  * a verb like this ends up unused.
  */
@@ -6309,9 +6420,9 @@ function panelDefineImpl(controlName, section, name, spec) {
   }
 
   const given = spec && typeof spec === 'object' && !Array.isArray(spec) ? spec : {};
-  const problem = found.key === 'States' ? stateSpecProblem(given) : null;
-  if (problem) {
-    addScriptTrace('error', '', `ce.panel.define("${controlName}", "States", "${key}"): ${problem}`);
+  const problems = defineSpecProblems(`ce.panel.define("${controlName}", "${found.key}", "${key}")`, found.key, given);
+  if (problems.length) {
+    for (const line of problems) addScriptTrace('error', '', line);
     return false;
   }
   const template = COLLECTION_TEMPLATES[found.key]?.(key, given) ?? { _type: found.key.replace(/s$/, '') };

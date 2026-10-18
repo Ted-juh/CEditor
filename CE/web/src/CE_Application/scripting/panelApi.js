@@ -2271,7 +2271,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. For a state, a key other than name, group, description, enabled, when, rule and patches (whose maps are component and parts) is refused and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.',
+    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, as the Animation tab makes one, or with `kind = "keyframes"` one that plays all the time over the frames you give. A key the section\'s entries do not have, capitals included, is refused with a message listing the keys it takes, and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2281,8 +2281,8 @@ export const COMMANDS = [
     ],
     scopes: 'any',
     snippet: {
-      lua: 'ce.panel.define("${1:knob}", "States", "${2:Warn}", { when = { valueGreaterThan = 0.9 } })$0',
-      javascript: 'ce.panel.define("${1:knob}", "States", "${2:Warn}", { when: { valueGreaterThan: 0.9 } });$0',
+      lua: 'ce.panel.define("${1:knob}", "States", "${2:Held}", { when = { pressed = true } })$0',
+      javascript: 'ce.panel.define("${1:knob}", "States", "${2:Held}", { when: { pressed: true } });$0',
     },
   },
   {
@@ -4647,10 +4647,12 @@ export const MEMBER_BY_ID = Object.fromEntries(ALL_MEMBERS.map((m) => [m.id, m])
 /** Members that check their own option keys: ce.text.style and ce.image.set (whose keys image.set
  *  reads in any case), which refuse the whole call for an unknown one in the common words
  *  (panelRuntime's refusedForUnknownOptions), ce.panel.find for its filters, and the storage calls,
- *  where a misspelled `scope` key would share a private setting. The common check leaves them to it
- *  rather than saying it twice. */
+ *  where a misspelled `scope` key would share a private setting. ce.panel.define checks its spec,
+ *  whose keys depend on the section it defines in, in the common words with the call before them
+ *  (panelRuntime's DEFINE_SPECS); its spec lists no fields, so the common check would pass it by in
+ *  any case. The common check leaves them to it rather than saying it twice. */
 export const MEMBERS_CHECKING_OWN_OPTIONS = new Set([
-  'textStyle', 'imageSet', 'panelFind',
+  'textStyle', 'imageSet', 'panelFind', 'panelDefine',
   'saveSetting', 'loadSetting', 'listSettings', 'forgetSetting', 'allSettings', 'clearSettings',
   'storageInfo',
 ]);

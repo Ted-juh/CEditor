@@ -440,8 +440,8 @@ export const WRITTEN = {
     js: `const hover = ce.panel.entry("Cutoff", "States", "Hover");`,
   },
   panelDefine: {
-    lua: `ce.panel.define("Cutoff", "States", "Warn", {\n  when = { over = 0.9 },\n  patch = { ["Background.Fill.colour"] = "E05C5C" },\n})`,
-    js: `ce.panel.define("Cutoff", "States", "Warn", {\n  when: { over: 0.9 },\n  patch: { "Background.Fill.colour": "E05C5C" },\n});`,
+    lua: `ce.panel.define("Cutoff", "States", "Held", {\n  when = { pressed = true },\n  patches = { component = { ["Transform.opacity"] = 60 } },\n})`,
+    js: `ce.panel.define("Cutoff", "States", "Held", {\n  when: { pressed: true },\n  patches: { component: { "Transform.opacity": 60 } },\n});`,
   },
   panelUndefine: { code: 'ce.panel.undefine("Cutoff", "States", "Warn")' },
   panelPatch: {

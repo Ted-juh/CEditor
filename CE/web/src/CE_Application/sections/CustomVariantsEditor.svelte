@@ -1,5 +1,6 @@
 <script>
   import { getSection, updateControlProperty, removeControlNode, applyControlPatch } from '../stores/controls.js';
+  import { createVariant } from '../utils/customComponentFactory.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
   import { describeVariantPatches } from '../utils/customComponentVariants.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
@@ -148,14 +149,7 @@
   function addVariant() {
     const name = String(newName ?? '').trim();
     if (!core?.id || !name || variants?._children?.[name]) return;
-    updateControlProperty(core.id, `Variants.${name}`, {
-      _type: 'Variant',
-      name,
-      label: name,
-      enabled: true,
-      description: '',
-      patches: {},
-    });
+    updateControlProperty(core.id, `Variants.${name}`, createVariant(name));
     updateControlProperty(core.id, 'Variants.active', name);
     updateControlProperty(core.id, 'Designer.activeVariant', name);
     newName = '';
