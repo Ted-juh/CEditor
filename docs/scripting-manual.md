@@ -554,7 +554,9 @@ Each command is shown the way you type it, with its arguments:
   means `nil` in Lua, `undefined` in JavaScript and `None` in Python.
 - **`opts`** is a table (Lua) or object (JavaScript) of optional settings, such as
   `{ duration = 500 }` or `{ duration: 500 }`. When a command takes one, a table lists what it can
-  contain and what each setting is when you leave it out.
+  contain and what each setting is when you leave it out. A setting that is not in that table does
+  nothing, and in the panel window the script console says so and lists the ones the command has,
+  so a misspelling such as `{ duraton = 500 }` is not mistaken for a setting that worked.
 - ***Short name*** gives the other name a command answers to (see
   [chapter 10](#10-command-names-and-modules)).
 - ***Panel window only*** means the command needs the panel window
@@ -892,7 +894,7 @@ set("path", value)
 
 #### `get(path [, form])`
 
-Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. Returns nothing if the control or property does not exist.
+Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.
 
 ```lua
 get("path")
@@ -1594,6 +1596,8 @@ Describe a synth parameter from your script, for a synth that has no device prof
 | `nibbles` | number | 2 | How many nibbles a "nibbled" value takes, 1 to 8. |
 | `checksum` | text | "roland" | Which checksum $checksum puts in the template: any of ce.midi.checksum's names, in any case, computed the same way. One wider than a byte, such as a CRC, takes as many bytes as it needs. An unknown name is refused, with the names listed. |
 | `variables` | object | — | Extra named bytes your SysEx template can refer to as $name, such as an address or a part number. Each is a number from 0 to 255, or one or two hex digits as text. |
+| `length` | number | 0 | For a text parameter, how many characters it holds. |
+| `pad` | number | 32 | For a text parameter, the character code that fills it out to `length` (32 is a space). |
 
 ```lua
 -- Lua
@@ -1617,6 +1621,8 @@ Describe a SysEx dump layout from your script: `request` (the bytes that ask for
 | `name` | text | the kind | What to call this dump where it is listed. |
 | `request` | text or list | — | The bytes that ask the synth for it, a list or text such as "F0 7D 00 F7", one byte to an entry. |
 | `match` | object | required | How to recognise the reply, as { prefix, suffix } — the bytes a matching message starts and ends with, which may include $deviceId (16) and $channel (1). A layout with no prefix is refused, because it would match every SysEx that arrives. |
+| `prefix` | text or list | — | The same as `match.prefix`, used when `match` does not give one. |
+| `suffix` | text or list | — | The same as `match.suffix`, used when `match` does not give one. |
 | `offset` | number | 0 | How many bytes in from the start of the message the values begin. |
 | `size` | number | whatever is left | How many bytes of values there are. |
 | `checksum` | text or object | — | Which checksum the message carries, so it is checked on the way in and computed by buildDump: any of ce.midi.checksum's names. Named alone, it sits just before the suffix (at the end when there is none) and covers every byte from the end of the prefix up to it, which is the Roland layout when the prefix is the header. Anywhere else, give { type, fromOffset, toOffset, byteOffset }, counted from the start of the message; any you leave out are placed as for a name. An unknown name is refused. |
@@ -1835,7 +1841,7 @@ Timers, and the musical clock. A timer runs your code later or repeatedly; the m
 
 #### `ce.time.startTimer(id, ms)`
 
-Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one.
+Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.
 
 *Short name: `startTimer`.*
 
@@ -1845,7 +1851,7 @@ ce.time.startTimer("id", 250)
 
 #### `ce.time.after(ms, fn) -> id`
 
-Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs.
+Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs. 0 runs it as soon as the handler that asked has returned. A missing delay, text (even "1000") or a negative number schedules nothing and writes a message.
 
 *Short name: `after`.*
 
@@ -1951,9 +1957,15 @@ const beats = ce.time.msToBeats(500);
 
 #### `ce.time.syncTimer(id, beats [, opts])`
 
-Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. If there is no tempo to work from, no timer starts and a note is written to the script console.
+Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division's name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.
 
 *Short name: `syncTimer`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `follow` | true or false | true | Change the interval when the tempo changes. false keeps the interval the tempo gave it when it started. |
 
 ```lua
 -- Lua
@@ -1966,7 +1978,7 @@ ce.time.syncTimer("step", 0.25);
 
 #### `ce.time.afterBeats(beats, fn) -> id`
 
-Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.
+Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. `beats` may also be a division's name, such as "1/4", read as `ce.time.division()` reads it; 0 runs `fn` as soon as the handler has returned. A negative number, a name that is not a division, or no delay at all schedules nothing and writes a message. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.
 
 *Short name: `afterBeats`.*
 
@@ -2235,9 +2247,9 @@ Move a value smoothly to `target` over time instead of jumping straight there. `
 | `from` | number | — | Start from this value instead of wherever the control is now. |
 | `delay` | number (milliseconds) | 0 | Wait this long before starting. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run it. 0 or less repeats until you stop it. |
+| `repeat` | number | 0 | How many more times to run it after the first. 0 runs it once and 2 runs it three times in all; a negative number repeats it until you stop it. In Lua, where repeat is a keyword, write it as ["repeat"] = 2. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called when the move ends: done(completed). `completed` is false if the move was stopped early. |
+| `done` | function | — | Called once when the move ends, with one table: `path` and `completed` for a single control, or `paths` and `completed` when you gave a list (then it is called once, after the last of them). `completed` is true if the move got to the end and false if it was stopped or replaced first, so test `info.completed`: the call itself does not mean it arrived. |
 
 ```lua
 -- Lua
@@ -2266,9 +2278,9 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
 | `delay` | number (milliseconds) | 0 | Wait this long before starting. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run it. 0 or less repeats until you stop it. |
+| `repeat` | number | 0 | How many more times to run it after the first. 0 runs it once and 2 runs it three times in all; a negative number repeats it until you stop it. In Lua, where repeat is a keyword, write it as ["repeat"] = 2. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called when the move ends: done(completed). `completed` is false if the move was stopped early. |
+| `done` | function | — | Called once when the move ends, with one table: `path` and `completed` for a single control, or `paths` and `completed` when you gave a list (then it is called once, after the last of them). `completed` is true if the move got to the end and false if it was stopped or replaced first, so test `info.completed`: the call itself does not mean it arrived. |
 
 ```lua
 -- Lua
@@ -2325,9 +2337,10 @@ Move a value through a shape with several points — an attack and decay, say, o
 | `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
 | `delay` | number (milliseconds) | 0 | Wait this long before starting. |
-| `repeat` | number | 1 | How many times to run it. 0 or less repeats until you stop it. |
+| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
+| `repeat` | number | 0 | How many more times to run it after the first. 0 runs it once and 2 runs it three times in all; a negative number repeats it until you stop it. In Lua, where repeat is a keyword, write it as ["repeat"] = 2. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called when the move ends: done(completed). `completed` is false if the move was stopped early. |
+| `done` | function | — | Called once when the move ends, with one table: `path` and `completed` for a single control, or `paths` and `completed` when you gave a list (then it is called once, after the last of them). `completed` is true if the move got to the end and false if it was stopped or replaced first, so test `info.completed`: the call itself does not mean it arrived. |
 
 ```lua
 -- Lua
@@ -2404,7 +2417,7 @@ Create a new control of the given `type`, such as "Knob", and return its name, o
 | `width` | number (pixels) | the type's own | How wide to make it. |
 | `height` | number (pixels) | the type's own | How tall to make it. |
 | `parent` | text | the panel itself | The name of a container to put it inside. |
-| `<section>` | object | — | Any section of the control, to set up as you create it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses. |
+| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses. |
 
 ```lua
 -- Lua
@@ -2420,6 +2433,18 @@ ce.panel.create("Knob", { name: "cutoff", x: 20, y: 40 });
 Copy an existing control, with all its settings, and return the copy's name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it.
 
 *Short name: `panelClone` · Panel window only.*
+
+**`props`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `name` | text | the original's name with _copy added | The control's name. Every other command addresses the control by this name. |
+| `x` | number (pixels) | 0 | Distance from the left edge of whatever contains it. |
+| `y` | number (pixels) | 0 | Distance from the top edge. |
+| `width` | number (pixels) | the type's own | How wide to make it. |
+| `height` | number (pixels) | the type's own | How tall to make it. |
+| `parent` | text | the original's container | The name of a container to put it inside. |
+| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses. |
 
 ```lua
 -- Lua
@@ -2462,7 +2487,7 @@ ce.panel.parent("knob", "row");
 
 #### `ce.panel.find([query])`
 
-List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control.
+List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.
 
 *Short name: `panelFind` · Panel window only.*
 
@@ -2472,7 +2497,7 @@ List the names of the controls that match `query`, including controls inside con
 |---|---|---|
 | `name` | text | Match controls whose name contains this. |
 | `type` | text | Match one kind of control, such as "Knob". ce.panel.types() lists the spellings. |
-| `generated` | true or false | Match only controls a script created, or only ones you placed by hand. |
+| `generated` | true or false | `true` matches only controls a script created, `false` only the ones you placed by hand. The text "true" is refused. |
 | `parent` | text | Match only what is inside the container of this name. |
 
 ```lua
@@ -2520,7 +2545,7 @@ log(ce.panel.types().join(", "));
 
 #### `ce.panel.align(names, edge [, opts]) -> number`
 
-Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead. Returns how many controls it moved. Names that are not controls are reported and skipped.
+Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.
 
 *Short name: `panelAlign` · Panel window only.*
 
@@ -2541,7 +2566,7 @@ ce.panel.align(["knob1", "knob2"], "left");
 
 #### `ce.panel.distribute(names, what [, opts]) -> number`
 
-Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align` also lines them up the other way. Needs at least two controls; returns how many it moved.
+Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control's ("hSpacing") or every left edge in line with the topmost control's ("vSpacing"). Needs at least two controls; returns how many it moved.
 
 *Short name: `panelDistribute` · Panel window only.*
 
@@ -2550,11 +2575,11 @@ Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "v
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `gap` | number (pixels) | worked out from the space available | Force a fixed gap between the controls rather than spreading them to fill what is there. |
-| `align` | text | — | Also line them up on this edge across the other axis, so a row ends up level as well as evenly spaced. Takes the same words as ce.panel.align. |
+| `align` | true or false | false | With "hSpacing" or "vSpacing" only. true also lines them up across the other axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge level with the leftmost control's, and "vSpacing" puts every left edge in line with the topmost control's. It is not an edge name: "top" or "left" does nothing. |
 
 #### `ce.panel.match(names, what [, opts]) -> number`
 
-Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. Needs at least two controls. Returns how many controls changed.
+Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.
 
 *Short name: `panelMatch` · Panel window only.*
 
@@ -2598,7 +2623,7 @@ Arrange controls evenly around a circle, centred on the middle of the box they c
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `radius` | number (pixels) | 100 | How far from the centre to place each control. |
-| `startAngle` | number (degrees) | 0 | Where the first control goes, clockwise from twelve o'clock. |
+| `startAngle` | number (degrees) | 0 | Where the first control goes, clockwise from three o'clock. |
 
 #### `ce.panel.flip(names, axis) -> number`
 
@@ -2679,7 +2704,7 @@ const st = ce.panel.entry("knob", "States", "Hover");
 
 #### `ce.panel.define(control, section, name, spec)`
 
-Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. Returns true if the entry was written.
+Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. For a state, a key other than name, group, description, enabled, when, rule and patches (whose maps are component and parts) is refused and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.
 
 *Short name: `panelDefine` · Panel window only.*
 
@@ -2709,7 +2734,7 @@ ce.panel.undefine("knob", "States", "Disabled");
 
 #### `ce.panel.patch(control, state, patch [, part])`
 
-Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. A colour the panel cannot read is refused as `set()` refuses it, and then nothing in the patch is applied. This is the way to reach the settings inside a state, which `set()` cannot.
+Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. A colour the panel cannot read is refused as `set()` refuses it, and then nothing is applied. This reaches the settings inside a state, which `set()` cannot.
 
 *Short name: `panelPatch` · Panel window only.*
 
@@ -2800,7 +2825,7 @@ Save a value under `key` so it outlasts the script — unlike `ce.storage.state`
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 ce.storage.saveSetting("key", value)
@@ -2816,7 +2841,7 @@ Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if n
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2837,7 +2862,7 @@ List the keys saved in one scope, in no particular order. An empty list only mea
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2858,7 +2883,7 @@ Delete a saved setting. Returns true if there was a value to delete and false if
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2879,7 +2904,7 @@ Return every setting in one scope as a table of keys and values. `opts.scope` is
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2900,7 +2925,7 @@ Delete every setting in one scope and return how many were deleted. Clearing the
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 #### `ce.storage.info([opts]) -> table`
 
@@ -2912,7 +2937,7 @@ Describe where one scope's settings are kept: `scope`, `backing`, `available`, `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 #### `ce.storage.encode(value [, opts]) -> string`
 
@@ -3586,6 +3611,7 @@ Ask the user to type some text. The answer arrives through `onAnswer`: the text 
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
 | `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `default` | text | the accept label | Which of the two buttons is drawn as the default one: the accept label or the cancel label. Pressing Enter in the field accepts either way. |
 
 ```lua
 -- Lua

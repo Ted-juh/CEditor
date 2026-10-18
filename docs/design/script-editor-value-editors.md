@@ -588,7 +588,8 @@ ce.device.defineParameter("level", {
 ## Fixed since, and still open
 
 Eight silent failures were fixed in the script runtimes on 2026-10-18: the four this record found,
-then the four it first left open as decisions. Two smaller gaps followed (the end of this section). Each follows the rule the runtimes already used for
+then the four it first left open as decisions. Two smaller gaps followed, and then the rest of the
+API was gone through (the end of this section). Each follows the rule the runtimes already used for
 an unknown blend mode: say what was wrong, and send or draw nothing rather than something
 plausible. Where a value had to be read rather than refused, it is applied as written, with a
 warning. Each was fixed in every runtime that has the call, in the same words, so the editor and
@@ -627,10 +628,58 @@ fixed on the same rule:
 | `ce.draw.text` drew `"center"`, `"centre"` and `"Right"` left-aligned | any case, and all three spellings of centre the app uses mean `"middle"`; another word is refused | WebView runtime |
 | `ce.anim.to(path, "full")` moved the value to 0 (the Python prelude raised), and a colour path had the number written into it | refused; text that is a number is still read as one; a colour property as the path is refused | WebView runtime; the three preludes (the colour path in the WebView only) |
 
-Two decisions are left with the owner. A property refuses `"#RGB"` and the CSS names, giving the
-long form to write; whether to accept them instead is open. And `#` with eight digits still means
-AARRGGBB in a property and in `ce.math`, and RRGGBBAA in a drawing, CSS's own meaning, which was
-kept. The swatch proposed above is where that difference would show.
+An audit of the rest of the API then found about forty more, and they were fixed on the same rule,
+in every runtime that has the call. The senders and the bytes first, since what they got wrong
+reached a synth:
+
+| Was | Now | Where |
+|---|---|---|
+| a list item was clamped by every send (300 inside a SysEx went out as FF, a System Reset), read modulo 256 by the byte helpers, and read as decimal when it was text (`"41"` went out as 29); a number where a list belonged was an empty list | one rule: an item is a whole number from 0 to 255 or text that is one hex byte, anything else is refused, naming it and where it is. Hex text splits on the same characters everywhere | WebView runtime; the three preludes; `BridgeScriptHost::bytesFromScript` |
+| what an `interceptMidiOut` filter returned was clamped, so `"903C7F"` replaced the message with FF | read as a send reads it; if it is not bytes, the message goes nowhere and the console says why | WebView runtime |
+| CC 200 went out as CC 127 (Poly Mode On), `"cutoff"` as CC 0, channel 0 or 17 as 1 or 16, `"C10"` as note 132 (a status byte in a data slot), NaN or a table as C-1 | an address (channel, controller, program, bank, parameter number) or note outside its range, or anything that is not a number, is refused. Text that is a number is read as one, as it always was | WebView runtime; the three preludes; `BridgeScriptHost` for a native handler's CC |
+| a missing velocity sent a note off; `"500ms"` sent the note on and never its note off; any transport action but stop and continue sent Start; `panic` with channel `"all"` silenced channel 1 | each is refused, and nothing is sent | WebView runtime; the three preludes |
+| a value left out printed as undefined, nil or None, and Python raised a TypeError for an argument left out | named ("no division given", "the value to write is missing"); Python's helpers take None and refuse | WebView runtime; the three preludes |
+
+The device definitions next (`defineParameter`, `defineDump`), whose parsers were their own:
+
+| Was | Now | Where |
+|---|---|---|
+| a dump request written `"F07D00F7"` sent FF; a bad token was dropped; an unspaced prefix matched every SysEx and decoded garbage | the senders' byte rule, refused when the definition is made | `deviceDefinitions.js`; `ScriptRuntime.cpp` |
+| `$vaule` sent 00, a template written as numbers was encoded wrongly (0x41 as 0x65), and the Roland warning missed it | an unknown `$token` is refused; numbers are bytes; the warning fires | both |
+| `checksum` knew three names and computed Roland for the rest; `"to14bit"`, the summary's own sample, was 7-bit; choices given as text sent 0; a boolean of 127 sent off; a dump checksum given as text never verified | the shared checksum table and every name; the encodings by name, `to14bit` an alias of `u14`; choices by position; booleans read by a fixed set; the text checksum read | both |
+| a refused write to a declared parameter fell through to the device profile in the player | it ends there | `BridgeScriptHost::deviceWrite` |
+
+And the options, timers and panel commands:
+
+| Was | Now | Where |
+|---|---|---|
+| an option a call does not have was ignored almost everywhere (`easing` for `curve`, `rotation` for `rotate`) | a warning names it and lists the call's options, which come from the contract; the call still runs | WebView runtime |
+| `saveSetting(k, v, {scop="script"})` stored the value where every script reads it | the storage calls refuse any key but `scope` | WebView runtime; the three preludes |
+| a timer given `"fast"` or -100 fired every millisecond, and `after("1s")` at once | refused; a musical length may be a division's name | WebView runtime; the three preludes |
+| `get()` of a control or property that is not there answered nil without a word | reports it in `set()`'s words | WebView runtime; every player engine |
+| `ce.panel.find` with an unknown key returned every control; `patch` counted keys it did not apply; `match` with a `to` not in the list used the first | each refuses or reports, and counts only what it did | WebView runtime |
+| the contract said `repeat` 0 runs forever and `done(completed)`; every runtime ran 0 once and passed a table | the contract says what the runtimes do | `panelApi.js` |
+
+Still open, for the owner:
+
+- **Values at the edge of their range** are still clamped: a CC value of 128 goes out as 127, a
+  velocity of 200 as 127, a bend of -1 as 0. Clamp, warn or refuse.
+- **An unknown option** warns and the call runs. Whether it should refuse instead.
+- **`ce.anim`'s `repeat` and `done`**: the contract was changed to say what the runtimes do.
+  Whether the runtimes should do what the contract used to say instead.
+- **A colour property** refuses `"#RGB"` and the CSS names, giving the long form to write.
+  Whether to accept them instead. And `#` with eight digits still means AARRGGBB in a property and
+  in `ce.math`, and RRGGBBAA in a drawing, CSS's own meaning, which was kept. The swatch proposed
+  above is where that difference would show.
+- **Decisions the device-definition fix made** that change what a definition means: a variable's
+  text is hex (`"10"` is 0x10, not 10), `$channel` follows the parameter's channel, `$deviceId`
+  defaults to 16 in the player as in the editor, a layout with no prefix is refused, and a text
+  parameter refuses writes.
+- **One stored value** in `Yamaha AN1x.cepanel` is unreadable: a shared drawing's border colour is
+  `"FF11151800"`, ten digits, so 34 sliders paint that border white. Probably `"FF111518"`.
+- **Not checked yet:** colours in `ce.panel.create` and `clone`, colours written by component
+  verbs, and every colour with the plug-in's window closed (the player has no section templates);
+  `get()` with a misspelled form, which still answers the raw value.
 
 ## Rules every edit session follows
 
