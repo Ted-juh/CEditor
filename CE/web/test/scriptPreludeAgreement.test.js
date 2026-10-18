@@ -151,6 +151,11 @@ const CASES = [
   ['checksum', ['crc32', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
   // An unknown algorithm must come back as nothing in every runtime, not as a Roland checksum.
   ['checksum', ['crc17', [0x01, 0x02, 0x03]]],
+  // Hex text, as the editor always took it and the preludes now do: spaced, with commas and 0x,
+  // one-digit bytes, and the one-argument form.
+  ['checksum', ['roland', '40 00 7F 00']], ['checksum', ['roland', '0x40,0x00 7f 0']],
+  ['checksum', ['40 00 7F 00']], ['checksum', ['xor-7bit', '01 02 03']],
+  ['checksum', ['roland', '40007F00']],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
@@ -492,6 +497,9 @@ const REFUSAL_CASES = [
   ['noteSpelling', ['c4', 'minor']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
   ['degreeChord', ['c4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
   ['scaleNotes', ['C-1', 'major']], ['degreeChord', [60, 'major', 5]],
+  // checksum reads hex text a byte at a time, and names the algorithms it knows.
+  ['checksum', ['roland', '40007F00']], ['checksum', ['roland', '40 00 zz 00']], ['checksum', ['40 0 7F 00']],
+  ['checksum', ['crc17', [1, 2, 3]]],
 ];
 
 function webRefusals(fn, args) {

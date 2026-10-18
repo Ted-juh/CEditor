@@ -1131,7 +1131,7 @@ ce.midi.sendSongPosition(0);
 
 #### `ce.midi.sendMidi(bytes)`
 
-Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits.
+Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run is refused with a message.
 
 *Short name: `sendMidi`.*
 
@@ -1198,7 +1198,7 @@ ce.midi.interceptOut((bytes) => {
 
 #### `ce.midi.feed(bytes)`
 
-Pretend a MIDI message arrived from the synth. The panel's controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first.
+Pretend a MIDI message arrived from the synth. The panel's controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run is refused with a message.
 
 *Short name: `feedMidi`.*
 
@@ -1414,7 +1414,7 @@ const p = ce.device.preset();
 
 #### `ce.device.applyDump(bytes)`
 
-Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth.
+Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth. Raw bytes can be a list of numbers or hex text, read a byte at a time as `sendSysex` reads it.
 
 *Short name: `applyDump`.*
 

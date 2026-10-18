@@ -1310,11 +1310,37 @@ function __ce_crc_ref(bytes, poly, init, xorOut, bits) {
   }
   return ((crc ^ xorOut) & mask) >>> 0;
 }
+// Hex text, read the way every runtime reads it: whitespace and commas between tokens, and each
+// token one byte, one or two hex digits with or without 0x. A token that is not is refused in the
+// words of the WebView runtime's scriptBytes and BridgeScriptHost's notOneByteMessage, rather than
+// read as one number. checksum is the one byte-taking helper that runs here, not in the host.
+function __hexBytes(verb, text, outcome) {
+  var tokens = String(text).trim().split(/[\s,]+/).filter(function (t) { return t !== ""; });
+  var out = [];
+  for (var i = 0; i < tokens.length; i++) {
+    var token = tokens[i];
+    if (!/^(0x)?[0-9a-f]{1,2}$/i.test(token)) {
+      var spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(" ") : "";
+      logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. '
+        + (spaced ? 'Put a space between the bytes: "' + spaced + '".'
+          : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+      return undefined;
+    }
+    out.push(parseInt(token, 16));
+  }
+  return out;
+}
 function checksum(kind, bytes, opts) {
   if (bytes === undefined || bytes === null) { bytes = kind; kind = "roland"; }
+  if (typeof bytes === "string") {
+    bytes = __hexBytes("checksum", bytes, "there is no checksum");
+    if (bytes === undefined) return undefined;
+  }
   var id = __CE_CKSUM_ALIAS[String(kind === undefined || kind === null ? "" : kind).toLowerCase()];
   if (id === undefined) {
-    logError('ce.midi.checksum("' + String(kind) + '"): no such algorithm.');
+    // The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
+    logError('ce.midi.checksum("' + String(kind) + '"): no such algorithm. One of: '
+      + Object.keys(__CE_CKSUM_ALIAS).sort().join(", ") + '.');
     return undefined;
   }
   var sum7 = 0, sum8 = 0, x = 0;

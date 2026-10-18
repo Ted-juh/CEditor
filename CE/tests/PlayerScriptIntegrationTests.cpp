@@ -460,16 +460,21 @@ int main()
     // F0 00 F7 (the WebView runtime clamped it to F0 FF F7). BridgeScriptHost now refuses a token
     // that is not one byte, in the WebView runtime's words, and hands the callback a list.
     {
-        juce::StringArray sysexLogs, sysexOut;
-        BridgeScriptHost::Callbacks scb;
-        scb.log = [&] (const juce::String& m, const juce::var&) { sysexLogs.add (m); };
-        scb.sendSysex = [&] (const juce::var& bytes)
+        juce::StringArray sysexLogs, sysexOut, otherOut;
+        // What each callback was handed, as the bytes or as "text:…" if text got through.
+        auto shown = [] (const juce::var& bytes)
         {
             juce::Array<int> b;
             if (auto* arr = bytes.getArray())
                 for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
-            sysexOut.add (bytes.isString() ? "text:" + bytes.toString() : hex (b));
+            return bytes.isString() ? "text:" + bytes.toString() : hex (b);
         };
+        BridgeScriptHost::Callbacks scb;
+        scb.log = [&] (const juce::String& m, const juce::var&) { sysexLogs.add (m); };
+        scb.sendSysex = [&] (const juce::var& bytes) { sysexOut.add (shown (bytes)); };
+        scb.sendMidi  = [&] (const juce::var& bytes) { otherOut.add ("midi " + shown (bytes)); };
+        scb.feedMidi  = [&] (const juce::var& bytes) { otherOut.add ("feed " + shown (bytes)); };
+        scb.applyDump = [&] (const juce::var& bytes) { otherOut.add ("dump " + shown (bytes)); };
         BridgeScriptHost sysexHost (std::move (scb));
         ScriptRuntime sysexRuntime (sysexHost);
         sysexHost.attachRuntime (&sysexRuntime);
@@ -499,6 +504,17 @@ int main()
             "end\n"));
         scripts.add (script ("sxjs", "javascript", "onSysexJs",
             "function onSysexJs() { ce.midi.sendSysex('903C64'); }"));
+        // sendMidi, feedMidi and applyDump took text in the editor only: the player's sendMidi
+        // dropped it without a word. They read it now, by the same rule, refusing the same way.
+        scripts.add (script ("textlua", "lua", "onTextLua",
+            "function onTextLua()\n"
+            "  sendMidi(\"90 3C 64\")\n"
+            "  sendMidi(\"903C64\")\n"
+            "  feedMidi(\"0x90,0x3C,0x40\")\n"
+            "  applyDump(\"F0 7D 01 40 F7\")\n"
+            "  applyDump(\"F07D0140F7\")\n"
+            "  sendMidi({ 0x80, 0x3C, 0 })\n"
+            "end\n"));
         sysexRuntime.loadScripts (juce::var (scripts));
 
         sysexRuntime.runAction ("onSysexLua", juce::var());
@@ -517,6 +533,16 @@ int main()
         sysexRuntime.runAction ("onSysexJs", juce::var());
         check (sysexOut.isEmpty() && sysexLogs.size() == 1 && sysexLogs[0].startsWith ("sendSysex: \"903C64\" is not one byte"),
                "the same refusal from JavaScript (got " + sysexLogs.joinIntoString (" | ") + ")");
+
+        sysexLogs.clear();
+        sysexRuntime.runAction ("onTextLua", juce::var());
+        check (otherOut.joinIntoString (" | ") == "midi 90 3C 64 | feed 90 3C 40 | dump F0 7D 01 40 F7 | midi 80 3C 00",
+               "sendMidi, feedMidi and applyDump read hex text as lists, and lists as before (got "
+                   + otherOut.joinIntoString (" | ") + ")");
+        check (sysexLogs.size() == 2
+                   && sysexLogs[0] == "sendMidi: \"903C64\" is not one byte, so nothing was sent. Put a space between the bytes: \"90 3C 64\"."
+                   && sysexLogs[1] == "applyDump: \"F07D0140F7\" is not one byte, so nothing was decoded. Put a space between the bytes: \"F0 7D 01 40 F7\".",
+               "and refuse an unspaced run in the WebView runtime's words (got " + sysexLogs.joinIntoString (" | ") + ")");
     }
 
     std::cout << "--------------------------------------------\n"

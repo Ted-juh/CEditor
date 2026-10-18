@@ -219,26 +219,16 @@ public:
     void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
     void sendSysex (const juce::var& bytes) override
     {
-        // Every engine's sendSysex comes through here, so this is the one place the player reads a
-        // script's hex text: refused when a token is not one byte (see firstTokenNotOneByte above),
-        // otherwise turned into the list of numbers the callback is handed. The app's callback then
-        // never parses text of its own, so it cannot split it differently.
-        juce::var message = bytes;
-        if (bytes.isString())
-        {
-            if (const auto token = firstTokenNotOneByte (bytes); token.isNotEmpty())
-            {
-                logAt ("error", notOneByteMessage ("sendSysex", token, "nothing was sent"), juce::var());
-                return;
-            }
-            juce::Array<juce::var> list;
-            for (const auto& token : hexTextTokens (bytes.toString()))
-                list.add ((token.startsWithIgnoreCase ("0x") ? token.substring (2) : token).getHexValue32());
-            message = juce::var (list);
-        }
+        auto message = bytes;
+        if (! bytesFromScript ("sendSysex", "nothing was sent", message)) return;
         if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (message);
     }
-    void sendMidi (const juce::var& bytes) override                  { if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (bytes); }
+    void sendMidi (const juce::var& bytes) override
+    {
+        auto message = bytes;
+        if (! bytesFromScript ("sendMidi", "nothing was sent", message)) return;
+        if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (message);
+    }
     // routeMidi / feedMidi. A host that wires neither gets the honest failure rather than the quiet
     // one: the block still RUNS (its sends go to the default device, which is what they did before
     // routing existed), and feedMidi says it could not. Silence here is exactly the defect the
@@ -254,7 +244,9 @@ public:
 
     void feedMidi (const juce::var& bytes) override
     {
-        if (callbacks.feedMidi) { callbacks.feedMidi (bytes); return; }
+        auto message = bytes;
+        if (! bytesFromScript ("feedMidi", "nothing was fed", message)) return;
+        if (callbacks.feedMidi) { callbacks.feedMidi (message); return; }
         logAt ("error", "feedMidi(): this host has no MIDI input to inject into — nothing was fed.", juce::var());
     }
     // A layout the SCRIPT declared carries its own request bytes, so asking for it is a raw send
@@ -277,7 +269,12 @@ public:
         }
         if (callbacks.requestDump) callbacks.requestDump (kind);
     }
-    void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
+    void applyDump (const juce::var& bytes) override
+    {
+        auto dump = bytes;
+        if (! bytesFromScript ("applyDump", "nothing was decoded", dump)) return;
+        if (callbacks.applyDump) callbacks.applyDump (dump);
+    }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
 
@@ -443,6 +440,28 @@ private:
     // verbs 'any' and the only genuinely scoped members left are the panel-component verbs, which
     // need a component to exist. Those are webview-only: the C++ engines define them as stubs that
     // explain themselves, which is the enforcement. scriptValidate flags the misuse at edit time.
+
+    // A script's bytes as the app's callbacks take them. Every engine's sendSysex, sendMidi, feedMidi
+    // and applyDump comes through here, so this is the one place the player reads a script's hex
+    // text: refused when a token is not one byte (see firstTokenNotOneByte above), in the WebView
+    // runtime's words, and otherwise turned into the list of numbers the callback is handed. The
+    // app's callbacks never parse text of their own, so they cannot split it differently. Text was
+    // the editor's alone until now for every verb but sendSysex: the player's sendMidi took a list
+    // and dropped text without a word. Anything that is not text passes through untouched.
+    bool bytesFromScript (const juce::String& verb, const juce::String& outcome, juce::var& bytes)
+    {
+        if (! bytes.isString()) return true;
+        if (const auto token = firstTokenNotOneByte (bytes); token.isNotEmpty())
+        {
+            logAt ("error", notOneByteMessage (verb, token, outcome), juce::var());
+            return false;
+        }
+        juce::Array<juce::var> list;
+        for (const auto& token : hexTextTokens (bytes.toString()))
+            list.add ((token.startsWithIgnoreCase ("0x") ? token.substring (2) : token).getHexValue32());
+        bytes = juce::var (list);
+        return true;
+    }
 
     // `.midiValue` is what the DPD codec would put on the wire, and the codec is the device host's,
     // not the panel's. Say so once and clearly rather than returning a quiet nothing and leaving the

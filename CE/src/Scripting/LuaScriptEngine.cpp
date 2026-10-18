@@ -1222,11 +1222,43 @@ function __ce_crc_ref(bytes, poly, init, xorOut, bits)
   end
   return (crc ~ xorOut) & mask
 end
+-- Hex text, read the way every runtime reads it: whitespace and commas between tokens, and each
+-- token one byte, one or two hex digits with or without 0x. A token that is not is refused in the
+-- words of the WebView runtime's scriptBytes and BridgeScriptHost's notOneByteMessage, rather than
+-- read as one number. checksum is the one byte-taking helper that runs here, not in the host.
+local function __hexBytes(verb, text, outcome)
+  local out = {}
+  for token in string.gmatch(text, "[^%s,]+") do
+    local digits = (token:gsub("^0[xX]", ""))
+    if #digits < 1 or #digits > 2 or digits:find("[^%x]") then
+      local message = verb .. ': "' .. token .. '" is not one byte, so ' .. outcome .. '. '
+      if not token:find("[^%x]") and #token % 2 == 0 then
+        local pairs_ = {}
+        for i = 1, #token, 2 do pairs_[#pairs_ + 1] = token:sub(i, i + 1) end
+        message = message .. 'Put a space between the bytes: "' .. table.concat(pairs_, " ") .. '".'
+      else
+        message = message .. 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'
+      end
+      logError(message)
+      return nil
+    end
+    out[#out + 1] = tonumber(digits, 16)
+  end
+  return out
+end
 function checksum(kind, bytes, opts)
   if bytes == nil then bytes = kind; kind = "roland" end
+  if type(bytes) == "string" then
+    bytes = __hexBytes("checksum", bytes, "there is no checksum")
+    if bytes == nil then return nil end
+  end
   local id = __CE_CKSUM_ALIAS[string.lower(tostring(kind or ""))]
   if id == nil then
-    logError('ce.midi.checksum("' .. tostring(kind) .. '"): no such algorithm.')
+    -- The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
+    local names = {}
+    for name in pairs(__CE_CKSUM_ALIAS) do names[#names + 1] = name end
+    table.sort(names)
+    logError('ce.midi.checksum("' .. tostring(kind) .. '"): no such algorithm. One of: ' .. table.concat(names, ", ") .. '.')
     return nil
   end
   local sum7, sum8, x = 0, 0, 0

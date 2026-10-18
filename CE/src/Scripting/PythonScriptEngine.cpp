@@ -2175,13 +2175,35 @@ def __ce_crc_ref(data, poly, init, xor_out, bits):
             crc = ((crc >> 1) ^ poly) & mask if (crc & 1) else (crc >> 1) & mask
     return (crc ^ xor_out) & mask
 
+# Hex text, read the way every runtime reads it: whitespace and commas between tokens, and each
+# token one byte, one or two hex digits with or without 0x. A token that is not is refused in the
+# words of the WebView runtime's scriptBytes and BridgeScriptHost's notOneByteMessage, rather than
+# read as one number. checksum is the one byte-taking helper that runs here, not in the host.
+def __hexBytes(verb, text, outcome):
+    import re
+    out = []
+    for token in [t for t in re.split(r"[\s,]+", str(text).strip()) if t]:
+        if not re.fullmatch(r"(0[xX])?[0-9a-fA-F]{1,2}", token):
+            if re.fullmatch(r"[0-9a-fA-F]+", token) and len(token) % 2 == 0:
+                tail = 'Put a space between the bytes: "' + " ".join(token[i:i + 2] for i in range(0, len(token), 2)) + '".'
+            else:
+                tail = 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'
+            logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. ' + tail)
+            return None
+        out.append(int(token, 16))
+    return out
 def checksum(kind, bytes=None, opts=None):
     import math
     if bytes is None: bytes = kind; kind = "roland"
+    if isinstance(bytes, str):
+        bytes = __hexBytes("checksum", bytes, "there is no checksum")
+        if bytes is None: return None
     key = str(kind if kind is not None else "").lower()
     cid = __CE_CKSUM_ALIAS.get(key)
     if cid is None:
-        logError('ce.midi.checksum("' + str(kind) + '"): no such algorithm.')
+        # The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
+        logError('ce.midi.checksum("' + str(kind) + '"): no such algorithm. One of: '
+                 + ", ".join(sorted(__CE_CKSUM_ALIAS.keys())) + '.')
         return None
     total = 0; total8 = 0; x = 0
     for v in bytes:
