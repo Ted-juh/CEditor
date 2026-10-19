@@ -166,15 +166,22 @@
     if (!stopEdit) closeStaleStopEdit();
   }
 
+  // A target that can hold only a linear gradient says so (gradientTarget.js): a script's
+  // ce.draw.gradient, opened from the script editor's Values tab, has stops and an angle and
+  // nothing else. Its type is not offered, nor what only another type has (a centre, a radius), nor
+  // the edge and the presets, which would set what it cannot keep.
+  let linearOnly = $derived($gradientTarget?.linearOnly === true);
+
   // Contextual controls based on gradient type
-  let showAngle = $derived(['linear', 'linearRamp', 'conical', 'reflected', 'duotone', 'tricolor', 'banding'].includes(gradient.type));
-  let showCenter = $derived(['radial', 'conical', 'radialRamp', 'squareRamp', 'mesh', 'volumeMesh'].includes(gradient.type));
-  let showRadius = $derived(['radial', 'radialRamp', 'linearRamp', 'squareRamp'].includes(gradient.type));
+  let showAngle = $derived(linearOnly || ['linear', 'linearRamp', 'conical', 'reflected', 'duotone', 'tricolor', 'banding'].includes(gradient.type));
+  let showCenter = $derived(!linearOnly && ['radial', 'conical', 'radialRamp', 'squareRamp', 'mesh', 'volumeMesh'].includes(gradient.type));
+  let showRadius = $derived(!linearOnly && ['radial', 'radialRamp', 'linearRamp', 'squareRamp'].includes(gradient.type));
 
   let sortedStops = $derived([...gradient.stops]
     .map((s, origIdx) => ({ ...s, origIdx }))
     .sort((a, b) => a.position - b.position));
-  let visibleSectionOrder = $derived(sectionOrder.filter((id) => id !== 'geometry' || showAngle || showCenter || showRadius));
+  let visibleSectionOrder = $derived(sectionOrder.filter((id) => (id !== 'geometry' || showAngle || showCenter || showRadius)
+    && !(linearOnly && (id === 'edge' || id === 'presets'))));
 
   $effect(() => {
     writeStoredJson(SECTION_ORDER_STORAGE_KEY, sectionOrder);
@@ -223,6 +230,9 @@
             <button class="section-order-btn" disabled={!canMoveSection(sectionId, 1)} onclick={() => moveSection(sectionId, 1)} title="Move Type down"><ChevronDown size={12} strokeWidth={2} /></button>
           </div>
         </div>
+        {#if linearOnly}
+          <div class="linear-only" data-testid="gradient-linear-only">Linear. A drawing's gradient has no other type.</div>
+        {:else}
         <select class="combo" value={gradient.type} onchange={(e) => update({ type: e.target.value })}>
           <optgroup label="Basic">
             <option value="linear">Linear</option>
@@ -243,6 +253,7 @@
             <option value="banding">Banding</option>
           </optgroup>
         </select>
+        {/if}
       </div>
     {:else if sectionId === 'geometry'}
       <div class="section">
@@ -418,6 +429,7 @@
 </div>
 
 <style>
+  .linear-only { font-size: 11px; color: #AAA; padding: 3px 0; line-height: 1.4; }
   .gradient-settings {
     padding: 8px;
     overflow-y: auto;

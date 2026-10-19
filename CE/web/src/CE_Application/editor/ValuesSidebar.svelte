@@ -38,6 +38,7 @@
   // that ends because the viewer left for the panel editor must hide the script's panel, not theirs.
   import { showDisplayPanelInScript as scriptDisplay } from '../stores/panelVisibility.js';
   import EasingCurve from '../components/animation/EasingCurve.svelte';
+  import BezierEditor from '../components/animation/BezierEditor.svelte';
 
   let {
     source = '',
@@ -150,6 +151,12 @@
   function hasEditor(arg) {
     if (readOnly) return false;
     if (arg.editable === 'number') return typeof arg.value === 'number';
+    // A font by its family, an image by its name, from the lists the runtime checks against. An
+    // image ce.draw.image is given is its data, which no list holds, so that one has no dropdown.
+    if (arg.editable === 'font' || arg.editable === 'image') {
+      const m = arg.meaning ?? {};
+      return typeof arg.value === 'string' && !m.dataUrl && !m.wantsData && Array.isArray(m.choices) && m.choices.length > 0;
+    }
     const choices = arg.meaning?.choices;
     return (arg.editable === 'choice' || (arg.editable === 'curve' && typeof arg.value === 'string'))
       && Array.isArray(choices) && choices.length > 0;
@@ -282,9 +289,10 @@
     const s = startSession(arg, 'gradient');
     if (!s) return;
     revealArg(s.arg, { focus: false });
-    const linear = arg.meaning.stored ? '' : ' (linear only)';
+    // A drawing's gradient is linear (ce.draw.gradient has stops and an angle): the Gradient tab
+    // is told, and offers neither a type nor what only another type has.
     const target = {
-      type: 'callback', label: `${labelFor(row)}${linear}`,
+      type: 'callback', label: labelFor(row), linearOnly: !arg.meaning.stored,
       apply: (g) => s.preview(gradientToWrite(s.arg, g)),
       cancel: () => s.cancel(),
     };
@@ -352,6 +360,22 @@
     closeInRow();
   }
 
+  /** A drawn curve, from the Animation tab's editor: written once a handle is let go (or a number
+   *  entered), one edit each time, in the form it was written in, a list or x1..y2 by name. */
+  function commitCurve(arg, points) {
+    if (readOnly || !Array.isArray(points) || points.length !== 4) return;
+    const [x1, y1, x2, y2] = points.map((n) => Number(Number(n).toFixed(3)));
+    const named = arg.value !== null && typeof arg.value === 'object' && !Array.isArray(arg.value);
+    const s = openInRow(arg, 'curve');
+    if (!s) return;
+    s.commit(named ? { x1, y1, x2, y2 } : [x1, y1, x2, y2]);
+    s.done();
+  }
+
+  /** A drawn curve with an editor in its row: a literal list (or table) of four numbers. */
+  const drawnCurve = (arg) => !readOnly && arg.kind === 'curve' && arg.literal && arg.value !== null
+    && typeof arg.value === 'object' && Array.isArray(arg.meaning?.bezier);
+
   function choiceCurrent(arg) {
     return typeof arg.value === 'string' ? arg.value : arg.value === undefined ? arg.text : String(arg.value);
   }
@@ -380,6 +404,18 @@
     });
   });
   $effect(() => { if (folded) untrack(() => session?.end('folded')); });
+  // A field's or a dropdown's edit ends when the caret leaves its statement. Blurring the control
+  // ends it too (closeInRow), but the control can be drawn anew by its own write, and a focused
+  // element that is taken away gives no blur: the tab then stayed on that statement for good, with
+  // the caret elsewhere. A colour or a gradient is the display panel's, and ends there.
+  $effect(() => {
+    const at = caret;
+    untrack(() => {
+      if (!session || (sessView?.kind !== 'number' && sessView?.kind !== 'choice')) return;
+      const r = statement?.range;
+      if (r && (at < r.start || at > r.end)) session.done();
+    });
+  });
   $effect(() => { if (readOnly) untrack(() => session?.end('left')); });
 
   onMount(() => {
@@ -488,7 +524,9 @@
       <span class="vstrip still" style:--strip={strip ?? 'none'} aria-hidden="true"></span>
     {/if}
   {:else if arg.kind === 'curve'}
-    {#if m.bezier && (Array.isArray(arg.value) || typeof arg.value === 'object')}
+    {#if drawnCurve(arg)}
+      <!-- The editor below draws it. -->
+    {:else if m.bezier && (Array.isArray(arg.value) || typeof arg.value === 'object')}
       <EasingCurve easing={{ easing: 'custom', bezier: m.bezier }} width={52} height={26} label="the drawn curve" />
     {:else if m.name}
       <EasingCurve fn={curveFn(m.name)} width={52} height={26} label={`${m.name} curve`} />
@@ -580,7 +618,7 @@
               <div class="vbody">
                 <div class="vline">
                   {@render valueControl(row)}
-                  {#if !hasEditor(arg) && arg.kind !== 'gradient'}
+                  {#if !hasEditor(arg) && !drawnCurve(arg) && arg.kind !== 'gradient'}
                     <code class="vtext">{@html shownText(arg)}</code>
                   {/if}
                   {@render valueEdit(row)}
@@ -590,10 +628,14 @@
                 {#if editingArg(arg) && sessView?.refused !== null && sessView?.refused !== undefined}
                   <div class="vproblem warning">That cannot be written here{arg.meaning?.takesAlpha === false ? ': this colour takes no alpha' : ''}, so the text was left as it was.</div>
                 {/if}
-                {#if arg.kind === 'curve' && arg.literal && typeof arg.value !== 'string'}
-                  <div class="vmeaning">A drawn curve is shown as it is; it has no editor here yet.</div>
-                {/if}
               </div>
+              {#if drawnCurve(arg)}
+                <!-- Under the row, the row's whole width: its four cells need the room. -->
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                <div class="vbezier" onclick={(e) => e.stopPropagation()}>
+                  <BezierEditor points={arg.meaning.bezier} width={248} height={140} onchange={(points) => commitCurve(arg, points)} />
+                </div>
+              {/if}
             {/if}
           </div>
         {/if}
@@ -641,6 +683,8 @@
   .vwarn { color: var(--amber); margin-right: 4px; }
   .vbody { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .vline { display: flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap; }
+  /* A drawn curve's editor goes under the row, across both of its columns. */
+  .vbezier { grid-column: 1 / -1; cursor: default; min-width: 0; }
   .vtext {
     font-family: var(--mono); font-size: 12px; color: #cfe3d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     min-width: 0; max-width: 100%;

@@ -426,12 +426,6 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     assertMessageThread();
 
     auto* o = opts.getDynamicObject();
-    auto number = [o] (const char* key, double fallback)
-    {
-        if (o == nullptr || ! o->hasProperty (key)) return fallback;
-        const double v = (double) o->getProperty (key);
-        return std::isfinite (v) ? v : fallback;
-    };
     auto flag = [o] (const char* key)
     { return o != nullptr && o->hasProperty (key) && (bool) o->getProperty (key); };
 
@@ -474,6 +468,18 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         }
         return n;
     };
+    // stagger, damping and frequency, as the WebView's animOption reads them: what is not a number
+    // is said, and the default used. A number below 0 is used as it is.
+    auto option = [o, &warnTiming] (const char* name, double fallback, const juce::String& words)
+    {
+        if (o == nullptr || ! o->hasProperty (name)) return fallback;
+        const auto v = o->getProperty (name);
+        if (v.isVoid() || v.isUndefined()) return fallback;
+        double n = 0.0;
+        if (animationNumber (v, n)) return n;
+        warnTiming (name, animationShown (v) + " is " + words);
+        return fallback;
+    };
     auto beatsOf = [o, &warnTiming]() -> double
     {
         if (o == nullptr || ! o->hasProperty ("beats")) return 0.0;
@@ -510,7 +516,7 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         for (const auto& p : paths) colour = refusesColour (p) || colour;
         if (colour) return false;
 
-        const double stagger = number ("stagger", 0.0);
+        const double stagger = option ("stagger", 0.0, "not a number of milliseconds, so the moves start together, as they do when no stagger is given.");
         const double baseDelay = juce::jmax (0.0, timing ("delay", 0.0));
         int groupId = 0;
         if (const auto token = o != nullptr ? o->getProperty ("__done").toString() : juce::String(); token.isNotEmpty())
@@ -578,8 +584,8 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
 
     const double defaultMs = a.kind == "spring" ? 600.0 : 300.0;
     a.duration = juce::jmax (1.0, timing ("duration", defaultMs));
-    a.damping = number ("damping", 6.0);
-    a.frequency = number ("frequency", 12.0);
+    a.damping = option ("damping", 6.0, "not a number, so the spring's damping is 6, as it is when none is given.");
+    a.frequency = option ("frequency", 12.0, "not a number, so the spring's frequency is 12, as it is when none is given.");
     a.delay = juce::jmax (0.0, timing ("delay", 0.0));
     a.pingpong = flag ("pingpong");
     // `repeat` is how many times the move runs in all: 1 (the default) once, 3 three times, 0 or

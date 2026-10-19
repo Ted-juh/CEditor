@@ -691,6 +691,10 @@ test('ce.anim\'s duration, delay and beats are said in the words the move says t
     ['delay = -100', 'delay', (api) => api.ce.anim.to('X.value', 1, { delay: -100 })],
     ['beats = "1/4"', 'beats', (api) => api.ce.anim.to('X.value', 1, { beats: '1/4' })],
     ['beats = 0', 'beats', (api) => api.ce.anim.to('X.value', 1, { beats: 0 })],
+    // A stagger is read only for a list of paths: it spaces their starts.
+    ['stagger = "lots"', 'stagger', (api) => api.ce.anim.to(['X.value'], 1, { stagger: 'lots' })],
+    ['damping = "soft"', 'damping', (api) => api.ce.anim.to('X.value', 1, { damping: 'soft' })],
+    ['frequency = true', 'frequency', (api) => api.ce.anim.to('X.value', 1, { frequency: true })],
   ];
   for (const [opt, name, run] of cases) {
     const row = optionOf(`ce.anim.to("X.value", 1, { ${opt} })`, name);
@@ -705,7 +709,8 @@ test('ce.anim\'s duration, delay and beats are said in the words the move says t
   resetScriptStateForTesting();
   const twice = withPanel([knob], (api) => runtimeLines(() => { api.ce.anim.to('X.value', 1, { duration: -5 }); api.ce.anim.to('X.value', 1, { duration: -9 }); }));
   assert.equal(twice.length, 1);
-  for (const ok of ['duration = 0', 'duration = 250', 'duration = "250"', 'delay = 0', 'beats = 2', 'beats = "0.5"']) {
+  for (const ok of ['duration = 0', 'duration = 250', 'duration = "250"', 'delay = 0', 'beats = 2', 'beats = "0.5"',
+    'stagger = -50', 'stagger = "40"', 'damping = 3', 'frequency = -2']) {
     const [field] = ok.split(' ');
     assert.equal(optionOf(`ce.anim.to("X.value", 1, { ${ok} })`, field).problem, null, ok);
     resetScriptStateForTesting();
@@ -743,6 +748,17 @@ test('every member the WebView runtime has under a module is in the contract\'s 
     for (const key of Object.keys(own)) if (!Object.hasOwn(map, key)) extra.push(`${module.id}.${key}`);
   }
   assert.deepEqual(extra, []);
+});
+
+test('a font and an image name carry their lists, and ce.draw.image, which takes the picture, says so', () => {
+  const ctx = { fonts: ['Arial', 'Georgia'], images: [{ id: 'i1', name: 'knob-cap' }, { id: 'i2', name: 'fader-cap' }] };
+  const firstOf = (src) => everyArg(readStatement(src, 'lua', 3, ctx)).find((a) => a.kind === 'font' || a.kind === 'image');
+  const font = firstOf('ce.text.style("Title", { family = "Arial" })');
+  assert.deepEqual([font.editable, font.meaning.choices, font.meaning.found], ['font', ['Arial', 'Georgia'], true]);
+  const named = firstOf('ce.image.set("Title", "knob-cap")');
+  assert.deepEqual([named.editable, named.meaning.choices, named.meaning.wantsData], ['image', ['knob-cap', 'fader-cap'], false]);
+  const drawn = firstOf('ce.draw.image("knob-cap", 0, 0, 8, 8)');
+  assert.equal(drawn.meaning.wantsData, true, 'the Values tab offers no names for it');
 });
 
 test('ce.anim takes text that is a number as its target, and a number property as its path', () => {

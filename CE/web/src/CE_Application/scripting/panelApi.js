@@ -1055,9 +1055,9 @@ export const COMMANDS = [
               + 'four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an '
               + 'animation\'s `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name '
               + 'it does not know is reported, and the move runs in a straight line.' },
-          { name: 'damping', type: 'number', default: '6',
+          { name: 'damping', type: 'number', default: '6', kind: 'number',
             summary: 'With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it.' },
-          { name: 'frequency', type: 'number', default: '12',
+          { name: 'frequency', type: 'number', default: '12', kind: 'number',
             summary: 'With curve = "spring": how fast it wobbles, as ce.anim.spring reads it.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
@@ -1078,10 +1078,10 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { like: 'duration', default: '600' },
-          { name: 'damping', type: 'number', default: '6',
+          { name: 'damping', type: 'number', default: '6', kind: 'number',
             summary: 'How quickly the wobble dies away. Higher settles sooner; lower keeps '
               + 'bouncing.' },
-          { name: 'frequency', type: 'number', default: '12',
+          { name: 'frequency', type: 'number', default: '12', kind: 'number',
             summary: 'How fast it wobbles. Higher is a tighter, faster bounce.' },
           'animFrom', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },

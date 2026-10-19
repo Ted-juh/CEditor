@@ -4231,10 +4231,6 @@ function sampleAt(samples, t) {
   return samples[i] + (samples[i + 1] - samples[i]) * (x - i);
 }
 
-const animNumber = (opts, name, fallback) => {
-  const v = Number(opts?.[name]);
-  return Number.isFinite(v) ? v : fallback;
-};
 
 /** The transport position an animation with `sync` measures against. */
 function animationBeats() {
@@ -4369,6 +4365,23 @@ function animTiming(verb, opts, name, fallback) {
   }
   return n;
 }
+/** `stagger`, `damping` and `frequency`: a number, or text that is one, or after saying why not, the
+ *  default. A number below 0 is used as it is: a stagger below 0 runs the list back to front behind
+ *  a delay, and a damping or frequency is the curve's own business. */
+const ANIM_OPTION_FALLBACK_WORDS = {
+  stagger: () => 'not a number of milliseconds, so the moves start together, as they do when no stagger is given.',
+  damping: (d) => `not a number, so the spring's damping is ${d}, as it is when none is given.`,
+  frequency: (d) => `not a number, so the spring's frequency is ${d}, as it is when none is given.`,
+};
+function animOption(verb, opts, name, fallback) {
+  const v = opts?.[name];
+  if (v === undefined || v === null) return fallback;
+  const n = realNumber(v);
+  if (n !== undefined) return n;
+  warnAnimTiming(verb, name, `${shownValue(v)} is ${ANIM_OPTION_FALLBACK_WORDS[name](fallback)}`);
+  return fallback;
+}
+
 /** `beats` as a number above 0, or null: none given, or said why not. */
 function animBeats(verb, opts) {
   const v = opts?.beats;
@@ -4394,7 +4407,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     // ScriptRuntime::startAnimation checks a list the same way before it starts any of it.
     const refused = paths.filter((p) => animatesColour(`ce.anim.${kind}`, p));
     if (refused.length) return false;
-    const stagger = animNumber(opts, 'stagger', 0);
+    const stagger = animOption(`ce.anim.${kind}`, opts, 'stagger', 0);
     const baseDelay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
     const done = typeof opts?.done === 'function' ? opts.done : null;
     let groupId = null;
@@ -4477,7 +4490,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // less until it is stopped, as the contract always said. Every runtime used to read it as runs
   // AFTER the first, so repeat = 1 ran twice and repeat = 0 once. Rounded to a whole number. Text
   // that is a number is read as one (realNumber); anything else runs it once, as all of it but true
-  // did before. That is why this is not animNumber: Number() reads null, false and "" as 0, which
+  // did before. That is why this is not Number(): Number() reads null, false and "" as 0, which
   // would now mean forever. Held below as the runs LEFT after this one, -1 for until stopped.
   // Anything a script can start forever it must be able to stop, which is what list()/value() and
   // panel teardown are for. ScriptRuntime::startAnimation reads it the same way.
@@ -4502,8 +4515,8 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     syncBeats,
     curve,
     bezier,
-    damping: animNumber(opts, 'damping', SPRING_DEFAULT_DAMPING),
-    frequency: animNumber(opts, 'frequency', SPRING_DEFAULT_FREQUENCY),
+    damping: animOption(`ce.anim.${kind}`, opts, 'damping', SPRING_DEFAULT_DAMPING),
+    frequency: animOption(`ce.anim.${kind}`, opts, 'frequency', SPRING_DEFAULT_FREQUENCY),
     repeat,
     cycle: 0,
     pingpong: opts?.pingpong === true,

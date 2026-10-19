@@ -481,6 +481,13 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     if (name === 'beats') {
       if (n === undefined) return said(`${shownValue(value)} is not a number of beats, so the move's length is its duration.`);
       if (n <= 0) return said(`${shownValue(n)} beats is not more than 0, so the move's length is its duration.`);
+    } else if (name === 'stagger' || name === 'damping' || name === 'frequency') {
+      // panelRuntime's animOption: only what is not a number; a number below 0 is used as it is.
+      if (n === undefined) {
+        return said(`${shownValue(value)} is ${name === 'stagger'
+          ? 'not a number of milliseconds, so the moves start together, as they do when no stagger is given.'
+          : `not a number, so the spring's ${name} is ${fallback}, as it is when none is given.`}`);
+      }
     } else {
       const duration = name === 'duration';
       if (n === undefined) {
@@ -520,6 +527,8 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     }
     return { meaning, problem: null };
   }
+  // ce.anim's timing has said above all the runtime says of it: a stagger below 0 is used as it is.
+  if (site.animTiming) return { meaning, problem: null };
   if ((min !== null && n < min) || (max !== null && n > max)) {
     if (unit === '0 to 1' && site.unitWhat) {
       const p = unitProblem(site.unitWhat, value);
@@ -818,7 +827,8 @@ const imageId = (i) => (typeof i === 'string' ? i : i?.id ?? '');
 
 /** An image: a library or panel image's id or name, or the image data itself. */
 export function readImage(value, { images, wantsData, path }) {
-  const meaning = { name: value, dataUrl: typeof value === 'string' && /^data:/i.test(value), found: null };
+  // wantsData: ce.draw.image takes the picture itself, so a name is no value there to choose.
+  const meaning = { name: value, dataUrl: typeof value === 'string' && /^data:/i.test(value), found: null, wantsData: Boolean(wantsData) };
   if (typeof value !== 'string') return { meaning, problem: null };
   const list = Array.isArray(images) ? images : null;
   const has = list && list.some((i) => imageId(i) === value || imageName(i).toLowerCase() === value.toLowerCase());

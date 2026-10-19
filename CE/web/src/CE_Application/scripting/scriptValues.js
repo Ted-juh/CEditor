@@ -640,8 +640,9 @@ function numberSite(site, param) {
   out.time = timeSpec(site, param);
   if (site.memberId === 'sendNote' && param.name === 'ms') out.noteLength = 'sendNote';
   // ce.anim's duration, delay and beats, as the moves read them (panelRuntime's animTiming).
-  if (ANIM_VERBS[site.memberId] && ['duration', 'delay', 'beats'].includes(param.name)) {
-    out.animTiming = { name: param.name, fallback: param.name === 'duration' ? Number(param.default ?? 300) : 0 };
+  if (ANIM_VERBS[site.memberId] && ['duration', 'delay', 'beats', 'stagger', 'damping', 'frequency'].includes(param.name)) {
+    const fallback = { duration: 300, damping: 6, frequency: 12 }[param.name] ?? 0;
+    out.animTiming = { name: param.name, fallback: Number(param.default ?? fallback) || fallback };
   }
   if (site.option === 'opacity' && OPACITY_SCALE_WARNINGS[site.memberId]) {
     out.scaleWarning = OPACITY_SCALE_WARNINGS[site.memberId](sibling(site, 'target') ?? '');

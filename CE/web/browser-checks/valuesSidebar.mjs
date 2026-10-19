@@ -25,6 +25,9 @@
  *   nested     a call inside another has its own rows, indented under it
  *   gradient   a gradient's strip opens the Gradient tab at the runtime's 180 and writes its stops and
  *              the angle in one edit
+ *   editors    a font family is picked from the fonts there are, an image by its name (not where the
+ *              call takes the picture itself), and a drawn curve with the Animation tab's editor,
+ *              written once per drag or cell, in the form it was written in
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
  *              file are rows only, the whole file's at the line clicked
@@ -472,7 +475,16 @@ try {
   await page.waitForSelector('.gradient-settings');
   await kit.settle(400);
   const angleCell = page.locator('.gradient-settings .nc-value').first();
-  const opened = { tab: await activeDisplayTab(), label: (await page.locator('.context-label').first().textContent()).trim(), angle: await angleCell.inputValue() };
+  const opened = {
+    tab: await activeDisplayTab(), label: (await page.locator('.context-label').first().textContent()).trim(), angle: await angleCell.inputValue(),
+    // A drawing's gradient is linear: no type to choose, and nothing only another type has.
+    ...(await page.evaluate(() => {
+      const settings = document.querySelector('.gradient-settings');
+      const labels = [...settings.querySelectorAll('.section-label')].map((n) => n.textContent.trim());
+      return { typeChoice: !!settings.querySelector('select.combo'), linearNote: !!settings.querySelector('[data-testid="gradient-linear-only"]'),
+        sections: labels, centre: [...settings.querySelectorAll('.section-sub-label')].some((n) => /Centre|Radius/.test(n.textContent)) };
+    })),
+  };
   await angleCell.focus();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('135');
@@ -480,8 +492,9 @@ try {
   await until(() => window.__inputs.length > 0);
   await kit.settle(500);
   text = await editorText();
-  led.check(S, 'a gradient opens the Gradient tab', 'the stops\' strip opens the Gradient tab on a script gradient at the runtime\'s 180 (none is written), named as linear only',
-    { tab: 'Gradient', label: 'Editing: Script · ce.draw.gradient stops, line 9 (linear only)', angle: '180' }, opened);
+  led.check(S, 'a gradient opens the Gradient tab', 'the stops\' strip opens the Gradient tab on a script gradient at the runtime\'s 180 (none is written), and a drawing\'s gradient being linear, the tab offers no type, centre, radius, edge or presets',
+    { tab: 'Gradient', label: 'Editing: Script · ce.draw.gradient stops, line 9', angle: '180', typeChoice: false, linearNote: true,
+      sections: ['Type', 'Angle / Position', 'Shape', 'Stops'], centre: false }, opened);
   led.check(S, 'a gradient is written in one edit', 'turning it to 135 writes the angle after the stops, the stops as they were, in one edit',
     { line: '  ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "#0A1830" }, 135))', edits: 1 },
     { line: text.split('\n')[8], edits: await inputs() });
@@ -508,6 +521,80 @@ try {
   await page.locator('.vrow[data-name="curve"] select').selectOption('inBack');
   await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('curve: "inBack"'));
   led.check(S, 'a JavaScript dropdown', 'the curve is written in JavaScript\'s own syntax, as one edit', 1, await inputs());
+
+  // ===============================================================================================
+  // FONT, IMAGE and DRAWN CURVE — editors in the row.
+  // ===============================================================================================
+  // Two images in the library, as a person adds them, so an image's name has something to pick from.
+  await page.evaluate(async () => {
+    const { appSettings } = await import('/src/CE_Application/stores/appSettings.js');
+    const dot = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><circle cx="4" cy="4" r="4" fill="#5B9BD5"/></svg>')}`;
+    appSettings.update((s) => ({ ...s, icons: [...(s.icons ?? []),
+      { id: 'icon_knobcap', name: 'knob-cap', dataUrl: dot, enabled: true },
+      { id: 'icon_fadercap', name: 'fader-cap', dataUrl: dot, enabled: true }] }));
+  });
+  const MORE = `function onValueChanged(value) {
+  ce.text.style("Title", { family: "Arial" });
+  ce.image.set("Title", "knob-cap");
+  ce.draw.image("knob-cap", 0, 0, 8, 8);
+  ce.anim.to("Cutoff.value", 100, { curve: [0.2, 0.9, 0.3, 1.4] });
+}
+`;
+  await typeScript(MORE);
+  await clickAt(MORE.indexOf('Arial') + 1);
+  await waitHead('Line 2');
+  await countInputs();
+  const fonts = await page.locator('.vrow[data-name="family"] select option').allTextContents();
+  await page.locator('.vrow[data-name="family"] select').selectOption('Georgia');
+  await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('family: "Georgia"'));
+  led.check(S, 'a font is chosen from the fonts there are', 'a font family\'s row lists the fonts the runtime knows, and the one picked is written as one edit',
+    { listed: true, edits: 1 }, { listed: fonts.includes('Arial') && fonts.includes('Georgia'), edits: await inputs() });
+
+  let more = await editorText();
+  await clickAt(more.indexOf('"knob-cap"') + 2);
+  await waitHead('Line 3');
+  await countInputs();
+  const images = await page.locator('.vrow[data-name="src"] select option').allTextContents();
+  await page.locator('.vrow[data-name="src"] select').selectOption('fader-cap');
+  await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('ce.image.set("Title", "fader-cap")'));
+  more = await editorText();
+  await clickAt(more.indexOf('ce.draw.image') + 12);
+  await waitHead('Line 4');
+  led.check(S, 'an image is chosen by its name', 'an image\'s row lists the library\'s by name and writes the one picked as one edit; ce.draw.image, which takes the picture itself, offers none',
+    { listed: ['knob-cap', 'fader-cap'], edits: 1, drawImageChoice: 0 },
+    { listed: images.filter((n) => ['knob-cap', 'fader-cap'].includes(n)), edits: await inputs(),
+      drawImageChoice: await page.locator('.vrow[data-name="src"] select').count() });
+
+  more = await editorText();
+  await clickAt(more.indexOf('0.9') + 1);
+  await waitHead('Line 5');
+  await page.waitForSelector('.vrow[data-name="curve"] .vbezier svg');
+  await countInputs();
+  const x1 = page.locator('.vrow[data-name="curve"] .vbezier .nc-value').first();
+  await x1.focus();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('0.5');
+  await page.keyboard.press('Enter');
+  await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('curve: [0.5, 0.9, 0.3, 1.4]'));
+  const afterCell = await inputs();
+  await kit.settle(300);   // the tab reads the text again at most every 60 ms: the handles move to the cell's value
+  // A drag of the second handle: nothing is written while it moves, once when it is let go.
+  const h2 = await page.locator('.vrow[data-name="curve"] .vbezier circle.h2').boundingBox();
+  await page.mouse.move(h2.x + h2.width / 2, h2.y + h2.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i += 1) { await page.mouse.move(h2.x + h2.width / 2 - i * 3, h2.y + h2.height / 2 + i * 2); await page.waitForTimeout(20); }
+  const duringDrag = await inputs();
+  await page.mouse.up();
+  await until((n) => window.__inputs.length > n, duringDrag);
+  await kit.settle(300);
+  const dragged = (await editorText()).match(/curve: \[([^\]]*)\]/)?.[1].split(', ').map(Number) ?? [];
+  led.check(S, 'a drawn curve has the Animation tab\'s editor', 'a curve written as four numbers is edited by its handles or its cells: a cell writes once, a drag writes nothing while it moves and once when let go, in the list form it was written in',
+    { cell: 1, duringDrag: 1, afterDrag: 2, first: [0.5, 0.9], moved: true },
+    { cell: afterCell, duringDrag, afterDrag: await inputs(), first: dragged.slice(0, 2), moved: dragged.length === 4 && (dragged[2] !== 0.3 || dragged[3] !== 1.4) });
+  await page.locator(`${SCRIPT} textarea.ce-ta`).focus();
+  await page.keyboard.press('Control+z');
+  await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('curve: [0.5, 0.9, 0.3, 1.4]'));
+  led.check(S, 'a drag is one undo step', 'one Ctrl+Z takes the drag back, to the curve the cell wrote', true, true);
 
   // ===============================================================================================
   // FILE — the panel file view's Values tab.

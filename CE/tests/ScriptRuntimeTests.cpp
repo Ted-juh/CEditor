@@ -3236,6 +3236,15 @@ int main()
         check (said().isEmpty(), "text that is a number is read as one, and nothing is said");
         timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "i", "j" }), 100.0, opts ({ { "delay", true } }));
         check (said().isEmpty(), "a list's delay is the same option: said already by this command, so quiet");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "l", "m" }), 100.0, opts ({ { "stagger", "lots" } }));
+        check (said() == "warn:ce.anim.to: \"lots\" is not a number of milliseconds, so the moves start together, as they do "
+                         "when no stagger is given." + once, "a list's stagger that is not a number starts them together, and says so");
+        timing.startAnimation ("spring", juce::var ("n"), 100.0, opts ({ { "damping", "soft" }, { "frequency", true } }));
+        check (said() == "warn:ce.anim.spring: \"soft\" is not a number, so the spring's damping is 6, as it is when none is given." + once
+                       + "\nwarn:ce.anim.spring: true is not a number, so the spring's frequency is 12, as it is when none is given." + once,
+               "a spring's damping and frequency that are not numbers are their defaults, and say so");
+        timing.startAnimation ("spring", juce::var ("o"), 100.0, opts ({ { "damping", -2.0 }, { "frequency", "8" } }));
+        check (said().isEmpty(), "a number below 0, and text that is a number, are used as they are");
         timing.loadScripts (juce::var (juce::Array<juce::var>()));
         said();
         timing.startAnimation ("to", juce::var ("k"), 100.0, opts ({ { "duration", -1.0 } }));
