@@ -705,7 +705,7 @@ Still open, for the owner:
   preludes, and then do what they did with that long form: `"red"` is `"#FF0000"`, and
   `rgba(255, 0, 0, 0.5)` is `"80FF0000"`, its alpha set aside as an AARRGGBB's always was. What a
   property refuses they refuse, ending with the property's hint (`colourHint`), and the sentence
-  both end with now names the short forms: *A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with
+  that every colour refusal ends with now names the short forms: *A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with
   or without "#", or "#RGB", a CSS colour name, rgb() or hsl().* The names table is generated into
   each prelude from `CSS_NAMED_COLOURS` (`gen-script-modules.mjs`, "colour names"); the rest of the
   reading is ported by hand, Lua's as a tokenizer, each rounding as `Math.round` does, and
@@ -713,6 +713,23 @@ Still open, for the owner:
   port found two faults in the property path, both fixed: `"constructor"` and `"__proto__"` threw,
   and `hsl(1e400, …)` was stored as `"#NANNANNAN"`. The hint for `"#5B9BD580 "` now reads it as
   AARRGGBB, as the property does, rather than as CSS's RRGGBBAA.
+- **A colour property with the plug-in's window shut: the editor's rule.** With the window open the
+  panel view runs every script, so the rule above held there already. With it shut, the plug-in's
+  own engines run them, and a script's `set()` reached the C++ panel model and was written as it
+  came: `"red"`, `"#000"` and numbers were stored and handed back by `get()`, and `ce.anim` swept
+  colours through numbers. Every door now passes through `BridgeScriptHost::setValue`, which reads
+  each colour by `CE/src/Scripting/ScriptColours.h`, a function-for-function port of
+  `scriptColours.js`: each engine's `set()`, Lua's `self.set`, a native handler's set, `compute()`,
+  `ce.panel.restore` and `ce.anim`'s ticks. What it stores, writes out or refuses, and the sentence
+  it refuses in, are the editor's. `ScriptRuntime::startAnimation` refuses a colour property as a
+  move's path in the editor's words. Which properties are colours is said once:
+  `gen-colour-fields.mjs` writes the C++ tables from the section templates and `scriptColours.js`,
+  and `colourPropertyCases.json` (163 cases) holds both runtimes to the same answers. A control-set
+  reference is taken where the panel's carried sets, or the built-in set it names, resolve it, as
+  the player's page does. Found on the way: `ce.anim.envelope` sampled its shape with `map()`, which
+  no prelude defines, so in the plug-in Lua and JavaScript stopped with an error and Python's own
+  `map()` made every sample 0; the three preludes call `mapCurve()` now, and each engine's tests run
+  an envelope through it.
 - **Decisions the device-definition fix made** — decided: all kept. They change what a definition
   means: a variable's text is hex (`"10"` is 0x10, not 10), `$channel` follows the parameter's
   channel, `$deviceId` defaults to 16 in the player as in the editor, a layout with no prefix is
@@ -723,8 +740,9 @@ Still open, for the owner:
   (`tools/scripts/gaia-panel/components.mjs`) and the panel regenerated
   (`tools/scripts/an1x-panel/make-an1x-panel.mjs`).
 - **Not checked yet:** colours in `ce.panel.create` and `clone`, colours written by component
-  verbs, and every colour with the plug-in's window closed (the player has no section templates);
-  `get()` with a misspelled form, which still answers the raw value.
+  verbs, and `panel.*` colours (such as `panel.bgColour`) in either runtime, since the panel
+  document has no section templates to say which of its keys are colours. A list given to `ce.anim`
+  with one colour path in it refuses that path and never calls its `done`, in both runtimes.
 
 ## Rules every edit session follows
 
