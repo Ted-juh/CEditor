@@ -929,9 +929,10 @@ Still open, for the owner:
 
 0. **The registry and the context resolver**, with colour as the first kind. Pure functions with
    tests: for a statement, its calls, their arguments and options, and what each value is.
-1. **The Values sidebar, display only.** The fourth dock tab, its rows for the statement the caret
-   is in, and the three highlights in the text. Nothing is edited yet, and every kind the registry
-   knows is already worth seeing.
+1. **The Values sidebar, display only, in the script editor and the panel file view.** The fourth
+   dock tab, its rows for the statement the caret is in (in the panel file view, for the object the
+   caret is in), and the three highlights in the text. Nothing is edited yet, and every kind the
+   registry knows is already worth seeing.
 2. **Colour editing through the shared display panel**, allowed in the script workspace and opened
    from a row's swatch, with the session rules above.
 3. **Lists of names.** Type the parameters in `panelApi.js`, add the row's dropdown and reopen
@@ -943,17 +944,22 @@ Still open, for the owner:
 7. **The rest:** font, image, control names and property paths, SysEx, notes, device parameters.
    Each is a small change once the registry exists.
 
-The panel file view gets each kind for free wherever a property name gives the context.
+Each step after the first works in the panel file view too, wherever a property name gives the
+context.
 
 ## Open questions for the owner
 
-Decided on 2026-10-19: the edit surface is the Values sidebar, a row's swatch opens the shared
-display panel, which the script workspace is allowed to show, and the sidebar covers the whole
-statement the caret is in ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).
-Dragging numbers is not planned. Still open:
+None left from this record. Decided on 2026-10-19:
 
-- **Which dock tab opens first?** The dock opens on Insert today. Values could be the first tab, or
-  the one the dock remembers per viewer, as the minimap's toggle is remembered (`ce-minimap` in
-  local storage).
-- **The panel file view in the same change, or after?** It has keys and no calls, so its rows would
-  come from property names alone.
+- **The edit surface** is the Values sidebar, and it covers the whole statement the caret is in
+  ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).
+- **A row's swatch opens the shared display panel**, which the script workspace is allowed to show.
+- **Dragging numbers** is not planned.
+- **The dock remembers its tab, per viewer.** It opens on the tab last used, kept in local storage
+  as the minimap's toggle is (`ce-minimap`), and on Insert the first time. Someone who works with
+  Values gets Values, and someone browsing the API gets Insert.
+- **The panel file view gets the sidebar in the first version.** Tools → Panel file shows the
+  panel's file in the same code editor. It has keys and no calls, so its rows come from property
+  names alone (`colour`, `tint`, a stop's `color`, a `gradient`), for the object the caret is in:
+  with the caret in a `Fill`, its colour and its gradient's stops. A swatch opens the display panel
+  there too.
