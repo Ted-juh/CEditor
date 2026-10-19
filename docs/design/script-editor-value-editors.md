@@ -45,8 +45,11 @@ column has to change to make room for it. Three decisions shape it:
 2. **A colour's or a gradient's swatch opens the display panel.** The rule recorded in
    `stores/colorTarget.js` stands: one place to edit colour, everywhere. The row shows the swatch,
    and a click opens the display panel's Colors or Gradient tab on that value through a callback
-   target, with its label, Done and Cancel. The script editor gets a `DisplayPanel` of its own, as
-   the Custom Component Designer has (constraint 2). No colour chooser opens in the sidebar.
+   target, with its label, Done and Cancel. It is the app's shared display panel, the one the panel
+   editor docks, not a second copy: the owner chose it on 2026-10-19. The script workspace hides it
+   today, because `utils/workspaceChrome.js` counts `'script'` among the workspaces that own their
+   layout (constraint 2), so that rule changes to let the display panel, and only it, show in the
+   script workspace. No colour chooser opens in the sidebar.
 3. **It covers the whole statement, not the line.** A call often runs over several lines: a
    gradient's stops, or an options table with one key per line. So the sidebar shows every call in
    the statement the caret is in, and when a line holds several statements, all of them. A call
@@ -248,14 +251,16 @@ The sidebar's highlights are boxes of the second kind.
 ### 2. The display panel is not on screen while you script
 
 `utils/workspaceChrome.js:18` counts `'script'` among the workspaces that own their own layout, so
-the App-level dock is hidden in the script editor. The Custom Component Designer already solves the
-same problem by putting a `DisplayPanel` of its own in its layout
-(`sections/CustomDesignSurfaceEditor.svelte:4194`). The script editor could do the same in its
-right-hand column, beside Insert / Library / History. It is the same component, so the rule recorded
+the App-level dock is hidden in the script editor. Two ways round it were weighed. The Custom
+Component Designer puts a `DisplayPanel` of its own in its layout
+(`sections/CustomDesignSurfaceEditor.svelte:4194`), and the script editor could have done the same.
+The owner chose the other on 2026-10-19: the shared display panel, which is there already, is
+allowed in the script workspace, so `resolveWorkspaceChrome` lets the display panel, and not the
+tree or the properties panel, show there. Either way it is the same component, so the rule recorded
 in `stores/colorTarget.js:20–37` still holds: colour and gradient editing happen in the display
 panel, and there is one place to edit colour everywhere. That rule is the owner's. A pop-up editor
-beside the text would mean reopening it on purpose. For lists of names, the editor's own completion
-list does the job instead (see the edit surfaces below), so no second surface is needed there.
+beside the text would mean reopening it on purpose. For lists of names, a dropdown in the sidebar's
+row and the editor's own completion list do the job instead, so no second surface is needed there.
 
 ### 3. A value means what its reader reads
 
@@ -927,8 +932,8 @@ Still open, for the owner:
 1. **The Values sidebar, display only.** The fourth dock tab, its rows for the statement the caret
    is in, and the three highlights in the text. Nothing is edited yet, and every kind the registry
    knows is already worth seeing.
-2. **Colour editing through a `DisplayPanel` embedded in the script editor**, opened from a row's
-   swatch, with the session rules above.
+2. **Colour editing through the shared display panel**, allowed in the script workspace and opened
+   from a row's swatch, with the session rules above.
 3. **Lists of names.** Type the parameters in `panelApi.js`, add the row's dropdown and reopen
    completion over an existing value, add the checks. Divisions, scales, chords, the 16 `values`
    lists, events, animation names, and the option keys the contract already lists.
@@ -942,14 +947,11 @@ The panel file view gets each kind for free wherever a property name gives the c
 
 ## Open questions for the owner
 
-Decided on 2026-10-19: the edit surface is the Values sidebar, a row's swatch opens the display
-panel, and the sidebar covers the whole statement the caret is in
-([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)). Dragging numbers is
-not planned. Still open:
+Decided on 2026-10-19: the edit surface is the Values sidebar, a row's swatch opens the shared
+display panel, which the script workspace is allowed to show, and the sidebar covers the whole
+statement the caret is in ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).
+Dragging numbers is not planned. Still open:
 
-- **The display panel embedded in the script editor, or the shared dock allowed in the script
-  workspace?** This record plans the first, which follows the Component Designer's precedent. The
-  second changes what `workspaceOwnsChrome` means.
 - **Which dock tab opens first?** The dock opens on Insert today. Values could be the first tab, or
   the one the dock remembers per viewer, as the minimap's toggle is remembered (`ce-minimap` in
   local storage).
