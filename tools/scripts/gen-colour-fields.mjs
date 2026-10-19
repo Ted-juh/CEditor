@@ -8,11 +8,12 @@
 // into CE/src/Scripting/ScriptColours.generated.h:
 //
 //   - COLOUR_FIELDS, as scriptColours.js builds it: every colour field, by the section type it is
-//     in and its path below it, with whether "" is a value there (`empty`) and whether the renderer
-//     resolves a control-set reference in it (`tokens`);
+//     in and its path below it, with whether "" is a value there (`empty`), whether the renderer
+//     resolves a control-set reference in it (`tokens`) and whether it is a gradient stop's colour
+//     (`stop`), which is stored in the stop's own form, RRGGBB with no alpha;
 //   - PANEL_COLOUR_FIELDS, the panel document's own colours (bgColour, the tints, the grid's, the
 //     gradient's stops), read by the same rule from the document a new panel starts as
-//     (models/panelDefaults.js), by their path below the panel;
+//     (models/panelDefaults.js), by their path below the panel, with the same three marks;
 //   - the section templates' shape (their objects, lists and `_type`s), which colourFieldAt walks
 //     where a control has not made a section yet, with EFFECT_TYPES and MADE_CHILDREN, the children
 //     set() makes that no template lists;
@@ -121,19 +122,22 @@ function resolvingNames(set) {
 
 /* -------------------------------------------------------------------------------- the header */
 
+/** A field's three marks, as the C++ initialiser lists them: empty, tokens, stop. */
+const marks = (...flags) => flags.map((flag) => (flag ? 'true' : 'false')).join(', ');
+
 export function headerText() {
   const fieldRows = [];
   for (const type of [...COLOUR_FIELDS.keys()].sort()) {
     const fields = COLOUR_FIELDS.get(type);
     for (const path of [...fields.keys()].sort()) {
-      const { empty, tokens } = fields.get(path);
-      fieldRows.push(`    { ${cString(type)}, ${cString(path)}, ${empty ? 'true' : 'false'}, ${tokens ? 'true' : 'false'} },`);
+      const { empty, tokens, stop } = fields.get(path);
+      fieldRows.push(`    { ${cString(type)}, ${cString(path)}, ${marks(empty, tokens, stop)} },`);
     }
   }
 
   const panelRows = [...PANEL_COLOUR_FIELDS.keys()].sort().map((path) => {
-    const { empty, tokens } = PANEL_COLOUR_FIELDS.get(path);
-    return `    { ${cString(path)}, ${empty ? 'true' : 'false'}, ${tokens ? 'true' : 'false'} },`;
+    const { empty, tokens, stop } = PANEL_COLOUR_FIELDS.get(path);
+    return `    { ${cString(path)}, ${marks(empty, tokens, stop)} },`;
   });
 
   const tree = templateShape();
@@ -175,15 +179,16 @@ inline constexpr const char* kColourForms = ${cString(COLOUR_FORMS)};
 
 /** COLOUR_FIELDS: each colour field, by the type of the section it is in and its path below that
     section, lower case, a list position as "*". \`empty\`: "" is a value there (no colour of its
-    own). \`tokens\`: the renderer resolves a control-set reference in it. */
-struct ColourField { const char* type; const char* path; bool empty; bool tokens; };
+    own). \`tokens\`: the renderer resolves a control-set reference in it. \`stop\`: a gradient
+    stop's colour, stored as RRGGBB with no "#", and refused with an alpha below FF. */
+struct ColourField { const char* type; const char* path; bool empty; bool tokens; bool stop; };
 inline constexpr ColourField kColourFields[] = {
 ${fieldRows.join('\n')}
 };
 
 /** PANEL_COLOUR_FIELDS: the panel document's own colours, by their path below the panel, lower case,
     a list position as "*", read from the document a new panel starts as by the rule above. */
-struct PanelColourField { const char* path; bool empty; bool tokens; };
+struct PanelColourField { const char* path; bool empty; bool tokens; bool stop; };
 inline constexpr PanelColourField kPanelColourFields[] = {
 ${panelRows.join('\n')}
 };

@@ -32,7 +32,8 @@
 //
 // The panel document's own colours (set("panel.bgColour", …)) are read by the same rule, from the
 // document a new panel starts as (models/panelDefaults.js), as a control's are from the section
-// templates: see PANEL_COLOUR_FIELDS.
+// templates: see PANEL_COLOUR_FIELDS. A gradient's stops, the panel's and every control's, are read
+// by it too and stored in a stop's own form, RRGGBB with no alpha: see GRADIENT and stopColour.
 
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { panelDefaults } from '../models/panelDefaults.js';
@@ -337,14 +338,16 @@ export function drawColour(value) {
  * its own, like a Font's underlineColour, which then draws in the text's colour), and `tokens` when
  * the renderer resolves a control-set reference such as "{accent}" in it. `resolvesToken(name)`
  * says whether the panel's control set (or the base set behind it) defines that name.
+ *
+ * `stop` marks a gradient stop's colour, which is read by the same rule and stored in the stop's
+ * own form (stopColour): "red" is "FF0000" there, and a colour with an alpha below FF is refused.
  */
 export function panelColour(value, field = {}, resolvesToken = () => false) {
-  if (isPanelColour(value)) return { colour: value };
   if (value === '' && field.empty) return { colour: value };
   const reference = typeof value === 'string' && isTokenReference(value);
   if (reference && field.tokens && resolvesToken(tokenNameOf(value))) return { colour: value };
-  const long = longForm(value);
-  if (long) return { colour: long };
+  const colour = isPanelColour(value) ? value : longForm(value);
+  if (colour) return field.stop ? stopColour(value, colour) : { colour };
 
   let why;
   if (value === undefined || value === null) why = 'no colour was given';
@@ -358,6 +361,24 @@ export function panelColour(value, field = {}, resolvesToken = () => false) {
       : ' A control-set colour is not read in this property.';
   }
   return { why, advice: `${COLOUR_FORMS}${field.empty ? ', or "" for none' : ''}.${hint}` };
+}
+
+/**
+ * `colour`, read by panelColour from what a script wrote (`value`), in a gradient stop's own form:
+ * RRGGBB, upper case, with no "#", which is what the gradient editors store (utils/stopColourEdit.js
+ * normalizeStopColour) and what most readers of a stop take (outlineBorder's stopsColourAt,
+ * partsToSvg, the part bake). A stop has no alpha of its own: the gradient's opacity is its layer's.
+ * So eight digits are stored as their colour when the alpha is FF, and refused otherwise, as are
+ * rgba() and hsla() with an alpha below 1 and "transparent". `value` is text here: nothing else is
+ * a colour.
+ */
+function stopColour(value, colour) {
+  const hex = colour.replace(/^#/, '').toUpperCase();
+  if (hex.length === 6 || hex.startsWith('FF')) return { colour: hex.slice(-6) };
+  return {
+    why: `"${value}" has an alpha, and a gradient stop has none: its opacity is the gradient layer's`,
+    advice: `Write "${hex.slice(2)}", the colour without its alpha.`,
+  };
 }
 
 // WHICH PROPERTIES ARE COLOURS, read from the section templates (models/sectionDefaults.js): a
@@ -398,24 +419,50 @@ export const LIST_ITEMS = Object.freeze({
   DrumPads: Object.freeze({ pads: Object.freeze({ colour: '' }) }),
 });
 
+// A GRADIENT, as the gradient editors make one and every reader takes it ({ type, angle, centerX,
+// …, stops: [{ color, position }, …] }), reduced to the one colour in it: a stop's. The section
+// templates give a control's gradient as null (Fill's, Border's and each side's, Corners' and each
+// corner's), so there is no first stop to type the rest by, as there is no first pad in LIST_ITEMS'
+// lists; a template key called `gradient` whose default is null is read as this. (Meter's
+// `gradient` is a true/false switch, and is not.) The panel's own gradient, bgGradient, is a whole
+// one in its template and is read as it stands.
+export const GRADIENT = Object.freeze({ stops: Object.freeze([Object.freeze({ color: 'FFFFFF', position: 0 })]) });
+
+// A GRADIENT STOP'S COLOUR is told by where it is: `color` in an item of a list called `stops`. That
+// is a gradient's own shape, wherever the gradient is (bgGradient on the panel, a Fill's, a Border
+// side's), and no other list in the templates or the panel document is called `stops`, so no list
+// of gradients is kept beside the templates to fall out of step with them. It is marked `stop` in
+// both tables as they are built, and the C++ reads the mark from the generated rows rather than
+// telling it again. panelColour reads a stop by the same rule as any colour and stores it in the
+// stop's own form (stopColour). No reader of a stop resolves a control-set reference, so `tokens`
+// is false in every one.
+const isStopPath = (rel, key) => key === 'color' && rel.length >= 2
+  && rel[rel.length - 1] === '*' && String(rel[rel.length - 2]).toLowerCase() === 'stops';
+
 /**
- * Is a template's `key: value` a colour field? `{ empty }` when it is (`empty`: its default is "",
- * no colour of its own), or null. The one rule the section templates and the panel's are read by.
+ * Is a template's `key: value`, at `rel` below its section (or the panel), a colour field?
+ * `{ empty, stop }` when it is (`empty`: its default is "", no colour of its own; `stop`: a gradient
+ * stop's colour), or null. The one rule the section templates and the panel's are read by.
  */
-function colourDefault(key, value) {
+function colourDefault(key, value, rel) {
   if (typeof value !== 'string') return null;
-  if (isPanelColour(value) || isTokenReference(value)) return { empty: false };
-  if (value === '' && isColourKey(key)) return { empty: true };
+  const stop = isStopPath(rel, key);
+  if (isPanelColour(value) || isTokenReference(value)) return { empty: false, stop };
+  if (value === '' && !stop && isColourKey(key)) return { empty: true, stop };
   return null;
 }
 
+/** A colour field as both tables hold it: `stop` is there only on a stop, so every other reads
+ *  { empty, tokens } as it always did. */
+const fieldOf = (empty, tokens, stop) => (stop ? { empty, tokens: false, stop: true } : { empty, tokens });
+
 export const COLOUR_FIELDS = (() => {
   const fields = new Map();
-  const add = (type, path, key, empty) => {
+  const add = (type, path, key, { empty, stop }) => {
     if (!fields.has(type)) fields.set(type, new Map());
     const id = path.join('.').toLowerCase();
     const was = fields.get(type).get(id);
-    fields.get(type).set(id, { empty: empty || was?.empty === true, tokens: isColourKey(key) });
+    fields.get(type).set(id, fieldOf(empty || was?.empty === true, isColourKey(key), stop));
   };
   const visit = (node, type, rel) => {
     if (Array.isArray(node)) { for (const item of node) visit(item, type, [...rel, '*']); return; }
@@ -429,10 +476,12 @@ export const COLOUR_FIELDS = (() => {
         for (const [name, child] of Object.entries(value ?? {})) visit(child, t, [...r, name]);
       } else if (typeof value === 'string') {
         if (!t) continue;
-        const field = colourDefault(key, value);
-        if (field) add(t, [...r, key], key, field.empty);
+        const field = colourDefault(key, value, r);
+        if (field) add(t, [...r, key], key, field);
       } else if (value && typeof value === 'object') {
         visit(value, t, [...r, key]);
+      } else if (value === null && key === 'gradient') {
+        visit(GRADIENT, t, [...r, key]);
       }
     }
   };
@@ -447,10 +496,11 @@ export const COLOUR_FIELDS = (() => {
 // THE PANEL'S OWN COLOURS, read from the document a new panel starts as (models/panelDefaults.js)
 // by the rule above: a key whose default is one of the panel's forms or a control-set reference, or
 // "" under a colour's name. Today that is bgColour, bgImageTint, bgTextureTint, gridColour,
-// gridSubColour and each of bgGradient's stops' `color`; a key added to the template with a colour
-// default is one without anything written here. The parts createPanel fills in from the user's
-// settings are given as nothing, so nothing is read from them: a control set's own token colours
-// are the set's, not the panel's.
+// gridSubColour and each of bgGradient's stops' `color`, which is marked `stop` and stored in the
+// stop's own form, as a control's gradient's is; a key added to the template with a colour default
+// is one without anything written here. The parts createPanel fills in from the user's settings are
+// given as nothing, so nothing is read from them: a control set's own token colours are the set's,
+// not the panel's.
 //
 // Keyed by the path below the panel, lower case, a list position as "*": "bggradient.stops.*.color".
 // The panel document is flat, with no sections and no `_type`, so the path alone says it.
@@ -466,10 +516,10 @@ export const PANEL_COLOUR_FIELDS = (() => {
     if (Array.isArray(node)) { for (const item of node) visit(item, [...rel, '*']); return; }
     if (!node || typeof node !== 'object') return;
     for (const [key, value] of Object.entries(node)) {
-      const field = colourDefault(key, value);
+      const field = colourDefault(key, value, rel);
       if (field) {
         const id = [...rel, key].join('.').toLowerCase();
-        fields.set(id, { empty: field.empty || fields.get(id)?.empty === true, tokens: false });
+        fields.set(id, fieldOf(field.empty || fields.get(id)?.empty === true, false, field.stop));
       } else if (value && typeof value === 'object') {
         visit(value, [...rel, key]);
       }

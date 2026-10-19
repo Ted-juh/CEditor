@@ -11,6 +11,8 @@
 //     "#RGB", a named colour in any case, "transparent", rgb(), rgba(), hsl() and hsla();
 //   - "" is stored where the field has no colour of its own, and a control-set reference such as
 //     "{accent}" where the renderer resolves one and the panel's set defines the name;
+//   - a gradient stop's colour is read by the same rule and stored in the stop's own form, RRGGBB in
+//     upper case with no "#", and refused when its alpha is below FF: a stop has none of its own;
 //   - anything else is refused with the editor's sentence, and nothing is written.
 //
 // Which fields are colours is not written here. ScriptColours.generated.h carries the editor's own
@@ -588,11 +590,13 @@ inline bool controlSetResolves (const juce::var& panel, const juce::String& name
 /* ---------------------------------------------------------------------------- colour properties */
 
 /** What colourFieldAt finds at a colour property: `empty` when "" is a value there (the property has
-    no colour of its own), `tokens` when the renderer resolves a control-set reference in it. */
+    no colour of its own), `tokens` when the renderer resolves a control-set reference in it, `stop`
+    when it is a gradient stop's colour, which panelColour stores in the stop's own form. */
 struct Field
 {
     bool empty = false;
     bool tokens = false;
+    bool stop = false;
 };
 
 /** What writing a value to a colour property stores (`ok`, with `colour`), or why it cannot, in the
@@ -606,14 +610,27 @@ struct Decision
 
 using ResolvesToken = std::function<bool (const juce::String& name)>;
 
+/** stopColour: `colour`, read by panelColour from what a script wrote (`value`, text), in a gradient
+    stop's own form: RRGGBB, upper case, with no "#". Eight digits are stored as their colour when
+    the alpha is FF and refused otherwise: a stop has no alpha of its own, the gradient's opacity is
+    its layer's. */
+inline Decision stopColour (const juce::var& value, const juce::String& colour)
+{
+    const auto hex = (colour.startsWithChar ('#') ? colour.substring (1) : colour).toUpperCase();
+    if (hex.length() == 6 || hex.startsWith ("FF")) return { true, hex.getLastCharacters (6), {}, {} };
+    return { false, {},
+             "\"" + value.toString() + "\" has an alpha, and a gradient stop has none: its opacity is the gradient layer's",
+             "Write \"" + hex.substring (2) + "\", the colour without its alpha." };
+}
+
 /** panelColour: the editor's decision for one colour property, in its words. */
 inline Decision panelColour (const juce::var& value, Field field = {}, const ResolvesToken& resolvesToken = {})
 {
-    if (isPanelColour (value)) return { true, value, {}, {} };
     if (value.isString() && value.toString().isEmpty() && field.empty) return { true, value, {}, {} };
     const bool reference = isTokenReference (value);
     if (reference && field.tokens && resolvesToken && resolvesToken (tokenNameOf (value))) return { true, value, {}, {} };
-    if (const auto written = longForm (value); written.isNotEmpty()) return { true, written, {}, {} };
+    const auto colour = isPanelColour (value) ? value.toString() : longForm (value);
+    if (colour.isNotEmpty()) return field.stop ? stopColour (value, colour) : Decision { true, colour, {}, {} };
 
     juce::String why;
     if (isNullish (value)) why = "no colour was given";
@@ -636,7 +653,7 @@ namespace detail
         static const auto table = []
         {
             std::map<juce::String, std::map<juce::String, Field>> out;
-            for (const auto& f : generated::kColourFields) out[f.type][f.path] = Field { f.empty, f.tokens };
+            for (const auto& f : generated::kColourFields) out[f.type][f.path] = Field { f.empty, f.tokens, f.stop };
             return out;
         }();
         return table;
@@ -756,7 +773,7 @@ inline std::optional<Field> panelColourFieldAt (const juce::String& path)
     if (segments.isEmpty()) return {};
     const auto key = segments.joinIntoString (".").toLowerCase();
     for (const auto& f : generated::kPanelColourFields)
-        if (key == f.path) return Field { f.empty, f.tokens };
+        if (key == f.path) return Field { f.empty, f.tokens, f.stop };
     return {};
 }
 

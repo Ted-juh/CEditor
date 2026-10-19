@@ -597,8 +597,15 @@ sets it. Write it with a dot, not a colon, in Lua as well.
 Paths that start with \`panel\` reach the panel rather than a control: \`get("panel.width")\`,
 \`set("panel.bgColour", "FF202020")\`. Its name, size and background can be read and changed this
 way; the things that identify the panel, such as its file path, can only be read. Its colours
-(\`bgColour\`, \`gridColour\`, \`gridSubColour\`, the image and texture tints, and the colour of each
-of \`bgGradient\`'s stops) take what a control's colour properties take, and refuse the same.
+(\`bgColour\`, \`gridColour\`, \`gridSubColour\` and the image and texture tints) take what a
+control's colour properties take, and refuse the same.
+
+The colour of each of \`bgGradient\`'s stops is read the same way and stored as six digits,
+RRGGBB, with no "#": \`set("panel.bgGradient.stops.0.color", "red")\` stores "FF0000". A stop has
+no alpha of its own, because the gradient's opacity belongs to its layer (\`bgGradientOpacity\`),
+so a colour with one, such as "80FF0000" or rgba() below 1, is refused. A control's gradients take
+their stops the same way, \`Background.Fill.gradient\` and the rest, whether a stop is written by
+its path or the gradient is written whole.
 
 ## 5. Talking to your synth
 

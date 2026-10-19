@@ -895,7 +895,7 @@ int main()
             { "id": "cl", "name": "cl", "language": "lua", "scope": "panel", "event": "onColoursLua", "target": "*", "enabled": true,
               "source": "function onColoursLua()\n  set(\"lbl.background.fill.colour\", \"red\")\n  log(\"lua \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.fill.colour\", \"redd\")\n  set(\"lbl.background.fill.colour\", 16711680)\n  log(\"lua kept \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.border.top\", { style = \"solid\", thickness = 3, colour = \"#0008\" })\n  log(\"lua top \" .. tostring(get(\"lbl.background.border.top.thickness\")))\n  set(\"lbl.text.content\", \"red\")\n  log(\"lua text \" .. tostring(get(\"lbl.text.content\")))\nend\n" },
             { "id": "cj", "name": "cj", "language": "javascript", "scope": "panel", "event": "onColoursJs", "target": "*", "enabled": true,
-              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ var a = ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); var b = ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour', 'panel.bgColour'], 50, { duration: 10, done: function (c) { log('js list done ' + c); } }); var c = ce.anim.to(['lbl.transform.x', 'lbl.transform.y'], 50, { duration: 10, done: function (c) { log('js done ' + c); } }); var d = ce.anim.to('lbl.transform.width', 'wide'); log('js moving ' + a + ' ' + b + ' ' + c + ' ' + d + ' ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }\nfunction onPanelJs(){ set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: 'nope', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: '0000FF', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); }" },
+              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ var a = ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); var b = ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour', 'panel.bgColour'], 50, { duration: 10, done: function (c) { log('js list done ' + c); } }); var c = ce.anim.to(['lbl.transform.x', 'lbl.transform.y'], 50, { duration: 10, done: function (c) { log('js done ' + c); } }); var d = ce.anim.to('lbl.transform.width', 'wide'); log('js moving ' + a + ' ' + b + ' ' + c + ' ' + d + ' ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }\nfunction onPanelJs(){ set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: 'nope', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: '0000FF', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('lbl.background.fill.gradient', { type: 'linear', stops: [ { color: 'teal', position: 0 }, { color: '80FF0000', position: 100 } ] }); set('lbl.background.fill.gradient', { type: 'linear', stops: [ { color: 'teal', position: 0 }, { color: 'red', position: 100 } ] }); set('lbl.background.fill.gradient.stops.1.color', '#5b9bd5'); log('js control stops ' + get('lbl.background.fill.gradient.stops.0.color') + ' ' + get('lbl.background.fill.gradient.stops.1.color') + ' ' + ce.anim.to('lbl.background.fill.gradient.stops.1.color', 1)); }" },
             { "id": "cm", "name": "cm", "language": "lua", "scope": "panel", "event": "onMovesLua", "target": "*", "enabled": true,
               "source": "function onMovesLua()\n  local r = ce.anim.envelope({ \"lbl.transform.width\", \"lbl.text.font.underlineColour\" }, { { x = 0, y = 0 }, { x = 1, y = 1 } }, { to = 10, duration = 10, done = function(c) log(\"lua list done \" .. tostring(c)) end })\n  log(\"lua envelope \" .. tostring(r) .. \" \" .. tostring(ce.anim.running(\"lbl.transform.width\")))\n  log(\"lua panel move \" .. tostring(ce.anim.to(\"panel.gridColour\", 1)))\nend\nfunction onPanelLua()\n  set(\"panel.bgColour\", \"red\")\n  set(\"panel.gridColour\", \"{accent}\")\n  set(\"panel.bgGradient.stops.0.color\", \"#abc\")\n  log(\"lua panel \" .. tostring(get(\"panel.bgColour\")) .. \" \" .. tostring(get(\"panel.gridColour\")) .. \" \" .. tostring(get(\"panel.bgGradient.stops.0.color\")))\nend\n" },
             { "id": "cs", "name": "cs", "language": "lua", "scope": "component", "event": "onColoursSelf", "target": "lbl", "enabled": true,
@@ -908,7 +908,7 @@ int main()
               "Core": { "_type": "Core", "id": "l1", "name": "lbl", "controlType": "Label" },
               "Transform": { "_type": "Transform", "x": 0, "y": 0, "width": 100, "height": 40 },
               "Background": { "_type": "Background", "_children": {
-                "Fill": { "_type": "Fill", "colour": "FF112233" },
+                "Fill": { "_type": "Fill", "colour": "FF112233", "gradient": null },
                 "Border": { "_type": "Border", "top": { "style": "solid", "thickness": 1, "colour": "FF000000" } } } },
               "Text": { "_type": "Text", "content": "Hi", "_children": {
                 "Font": { "_type": "Font", "colour": "FFFFFFFF", "underlineColour": "FF00FF00" } } }
@@ -976,22 +976,29 @@ int main()
         colourHost.setValue ("lbl.background.fill.colour", juce::var ("#abc"), juce::var());
 
         // The panel's own colours, through both engines' set() and get(): written out, refused in the
-        // editor's words, a gradient's stop by its path and the gradient written whole.
+        // editor's words, a gradient's stop by its path and the gradient written whole. A stop is stored
+        // in its own form, RRGGBB with no "#", the panel's and a control's alike, and refused with an
+        // alpha; ce.anim refuses a control's stop as its path, as it refuses any colour.
         colourLogs.clear();
         colourRuntime.runAction ("onPanelLua", juce::var());
         check (colourLogs.joinIntoString (" | ") ==
                    "set(\"panel.gridColour\"): \"{accent}\" is not a colour the panel can read, so nothing was set. " + forms
                        + ". A control-set colour is not read in this property. | "
-                   "lua panel #FF0000 33FFFFFF #AABBCC",
+                   "lua panel #FF0000 33FFFFFF AABBCC",
                "Lua's set() reads the panel's own colours by the editor's rule (got " + colourLogs.joinIntoString (" | ") + ")");
         colourLogs.clear();
         colourRuntime.runAction ("onPanelJs", juce::var());
         check (colourLogs.joinIntoString (" | ") ==
                    "set(\"panel.bgGradient\"): at stops.1.color, \"nope\" is not a colour the panel can read, so nothing was set. "
                        + forms + ". | "
-                   "js stop #AABBCC | js stop #000080",
-               "JavaScript's set() reads a gradient written whole stop by stop, and writes none of it for one it cannot "
-               "read (got " + colourLogs.joinIntoString (" | ") + ")");
+                   "js stop AABBCC | js stop 000080 | "
+                   "set(\"lbl.background.fill.gradient\"): at stops.1.color, \"80FF0000\" has an alpha, and a gradient stop has "
+                   "none: its opacity is the gradient layer's, so nothing was set. Write \"FF0000\", the colour without its alpha. | "
+                   "ce.anim.to: \"lbl.background.fill.gradient.stops.1.color\" is a colour, and ce.anim moves numbers, so nothing was "
+                   "started. | "
+                   "js control stops 008080 5B9BD5 false",
+               "JavaScript's set() reads a gradient written whole stop by stop, the panel's and a control's, and writes none "
+               "of it for one it cannot read (got " + colourLogs.joinIntoString (" | ") + ")");
 
         // A list with a colour in it is refused whole: each colour named, nothing started, its done
         // never called, and the call answers false, as a target that is not a number does.

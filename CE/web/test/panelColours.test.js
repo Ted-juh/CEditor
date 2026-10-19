@@ -9,6 +9,10 @@
 // reader now drops one leading "#" and reads eight digits as AARRGGBB, so the forms set() stores
 // paint, and set() reads the panel's colours by the rule (colourPropertyCases.json has the cases
 // both runtimes run; this file is the panel view's own behaviour around them).
+//
+// A gradient's stops, the panel's and each control's, are read by the same rule and stored in a
+// stop's own form, RRGGBB with no "#" and no alpha, which is what the gradient editors store and
+// every stop reader takes.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +29,9 @@ import {
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { MODULES } from '../src/CE_Application/scripting/panelApi.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { normalizeStopColour } from '../src/CE_Application/utils/stopColourEdit.js';
+import { stopsColourAt } from '../src/CE_Application/utils/outlineBorder.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 
 const errors = () => storeGet(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
@@ -90,9 +97,9 @@ test('the panel\'s colours are read from the document a new panel starts as', ()
 /* ======================================================================== set() and ce.anim */
 
 /** An editor panel as createPanel makes it, active, with nothing on it and every module on. */
-function withPanel(fn) {
+function withPanel(fn, controls = []) {
   const made = createPanel('Colours');
-  panels.set([{ ...made, id: 'p', scripting: { ...made.scripting, modules: MODULES.map((m) => m.id) } }]);
+  panels.set([{ ...made, id: 'p', controls, scripting: { ...made.scripting, modules: MODULES.map((m) => m.id) } }]);
   activePanelId.set('p');
   clearScriptTrace();
   try { return fn(scriptApiForTesting('', 'panel-colours')); } finally { panels.set([]); }
@@ -130,5 +137,36 @@ test('ce.anim refuses one of the panel\'s colours as its path, and moves the pan
       assert.equal(api.get('panel.bgGradient.angle'), 180);
       assert.deepEqual(errors(), []);
     });
+  } finally { stopAllAnimations(); }
+});
+
+test('a control\'s gradient stops are stored as the gradient editors store them, and ce.anim refuses one', () => {
+  stopAllAnimations();
+  tickAnimations(0);
+  try {
+    withPanel((api) => {
+      api.set('b.Background.Fill.gradient', {
+        type: 'linear', angle: 90, stops: [{ color: 'red', position: 0 }, { color: '#5b9bd5', position: 50 }, { color: 'FF000080', position: 100 }],
+      });
+      api.set('b.Background.Border.top.gradient', { type: 'linear', stops: [{ color: 'hsl(120, 100%, 50%)', position: 0 }, { color: 'white', position: 100 }] });
+      assert.deepEqual(errors(), []);
+      const background = storeGet(panels)[0].controls[0]._children.Background._children;
+      const stops = background.Fill.gradient.stops;
+      assert.deepEqual(stops.map((stop) => stop.color), ['FF0000', '5B9BD5', '000080']);
+      for (const stop of stops) assert.equal(normalizeStopColour(stop.color), stop.color, 'what the chooser would store');
+      assert.equal(stopsColourAt(stops, 0), '#FF0000', 'and what a border\'s stop reader reads');
+      assert.equal(gradientToCSS(background.Fill.gradient), gradientToCSS({ ...background.Fill.gradient, stops: [
+        { color: 'FF0000', position: 0 }, { color: '5B9BD5', position: 50 }, { color: '000080', position: 100 }] }));
+      assert.deepEqual(background.Border.top.gradient.stops.map((stop) => stop.color), ['00FF00', 'FFFFFF']);
+
+      assert.equal(api.animateTo('b.Background.Fill.gradient.stops.0.color', 1, { duration: 10 }), false);
+      assert.equal(api.animateSpring(['b.Transform.x', 'b.background.border.TOP.gradient.stops.1.color'], 1, { duration: 10 }), false);
+      assert.deepEqual(errors(), [
+        'ce.anim.to: "b.Background.Fill.gradient.stops.0.color" is a colour, and ce.anim moves numbers, so nothing was started.',
+        'ce.anim.spring: "b.background.border.TOP.gradient.stops.1.color" is a colour, and ce.anim moves numbers, so nothing was started.',
+      ]);
+      tickAnimations(1000);
+      assert.equal(api.get('b.Background.Fill.gradient.stops.0.color'), 'FF0000');
+    }, [createControl('Button', { name: 'b' })]);
   } finally { stopAllAnimations(); }
 });

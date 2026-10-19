@@ -572,7 +572,8 @@ int main()
         auto fieldOf = [&cases] (const juce::var& kind)
         {
             const auto f = cases.getProperty ("fields", {}).getProperty (juce::Identifier (kind.toString()), {});
-            return colours::Field { (bool) f.getProperty ("empty", false), (bool) f.getProperty ("tokens", false) };
+            return colours::Field { (bool) f.getProperty ("empty", false), (bool) f.getProperty ("tokens", false),
+                                    (bool) f.getProperty ("stop", false) };
         };
         auto shown = [] (const juce::var& v) { return v.isVoid() ? juce::String ("null") : juce::JSON::toString (v, true); };
 
@@ -607,11 +608,13 @@ int main()
                 const auto want = c.getProperty ("field", {});
                 const bool agrees = want.isObject()
                     ? found && found->empty == (bool) want.getProperty ("empty", false) && found->tokens == (bool) want.getProperty ("tokens", false)
+                          && found->stop == (bool) want.getProperty ("stop", false)
                     : ! found.has_value();
                 if (agrees) continue;
                 ++wrong;
                 check (false, "colours: " + c.getProperty ("case", {}).toString() + ": got "
-                                  + (found ? juce::String (found->empty ? "empty " : "") + (found->tokens ? "tokens" : "colour") : juce::String ("not a colour")));
+                                  + (found ? juce::String (found->empty ? "empty " : "") + (found->stop ? "stop " : "") + (found->tokens ? "tokens" : "colour")
+                                          : juce::String ("not a colour")));
             }
         check (count > 20 && wrong == 0, "colours: all " + juce::String (count) + " field cases typed as the editor types them");
 
@@ -642,6 +645,7 @@ int main()
                 const auto want = c.getProperty ("field", {});
                 bool agrees = want.isObject()
                     ? found && found->empty == (bool) want.getProperty ("empty", false) && found->tokens == (bool) want.getProperty ("tokens", false)
+                          && found->stop == (bool) want.getProperty ("stop", false)
                     : ! found.has_value();
                 // ce.anim's question asks it the same way, for the script's path.
                 ceditor::PanelValueModel asked;
@@ -650,7 +654,8 @@ int main()
                 if (agrees) continue;
                 ++wrong;
                 check (false, "colours: " + c.getProperty ("case", {}).toString() + ": got "
-                                  + (found ? juce::String (found->empty ? "empty " : "") + (found->tokens ? "tokens" : "colour") : juce::String ("not a colour")));
+                                  + (found ? juce::String (found->empty ? "empty " : "") + (found->stop ? "stop " : "") + (found->tokens ? "tokens" : "colour")
+                                          : juce::String ("not a colour")));
             }
         check (count > 10 && wrong == 0, "colours: all " + juce::String (count) + " panel field cases typed as the editor types them");
 
@@ -783,6 +788,10 @@ int main()
         check (colourModel.isColourProperty ("panel.bgColour") && colourModel.isColourProperty ("PANEL.gridSubColour")
                    && colourModel.isColourProperty ("panel.bgGradient.stops.3.color"),
                "colours: the panel's own colours are colour properties too");
+        check (colourModel.isColourProperty ("lbl.background.fill.gradient.stops.0.color")
+                   && colourModel.isColourProperty ("bare.Background.Border.top.gradient.stops.2.color")
+                   && ! colourModel.isColourProperty ("lbl.background.fill.gradient.stops.0.position"),
+               "colours: a control's gradient stop is one, on a control that has no gradient yet");
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

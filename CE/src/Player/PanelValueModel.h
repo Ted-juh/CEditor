@@ -587,12 +587,23 @@ public:
     }
 
     // Walk a node case-insensitively through _children first, then plain keys (excluding
-    // _children/_type); returns the real-case dotted path, or empty if any segment is missing.
+    // _children/_type); returns the real-case dotted path, or empty if any segment is missing. A list
+    // is stepped into by position, as the editor's walk finds a position among a list's own keys, so
+    // a control's gradient stop or Meter zone is found by its path in any capitals, as it is there;
+    // the path used to be written as the script spelled it, and only the document's capitals landed.
     static juce::String walkCaseInsensitive (juce::var node, const juce::StringArray& segments)
     {
         juce::StringArray out;
         for (const auto& seg : segments)
         {
+            if (auto* list = node.getArray())
+            {
+                const int at = listPosition (*list, seg);
+                if (at < 0) return {};
+                out.add (seg);
+                node = (*list)[at];
+                continue;
+            }
             const auto low = seg.toLowerCase();
             juce::String foundKey;
 

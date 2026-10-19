@@ -4,8 +4,9 @@
  */
 
 /**
- * A stop's colour as CSS. The editor writes stops as RRGGBB, which gains its "#". A script's set()
- * may store the panel's other forms (scripting/scriptColours.js: "#RRGGBB" for "red", and
+ * A stop's colour as CSS. The editor writes stops as RRGGBB, which gains its "#", and so does a
+ * script's set() (scripting/scriptColours.js stores "red" in a stop as "FF0000"). A stop written
+ * another way, by an earlier set() or by hand, may carry the panel's other forms ("#RRGGBB", and
  * AARRGGBB), so one leading "#" is not doubled, and eight digits are the panel's AARRGGBB, written
  * as CSS's #RRGGBBAA rather than read by CSS as RRGGBBAA. Anything else is written as it always was.
  */

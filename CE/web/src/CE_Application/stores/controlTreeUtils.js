@@ -78,6 +78,10 @@ function resolveWriteTarget(control, path, create) {
 
   for (let index = 1; index < parts.length - 1; index += 1) {
     const key = parts[index];
+    // A step onto a value that holds nothing leads nowhere: a gradient a control has not been given
+    // is null, and a path to one of its stops threw "Cannot read properties of null" from set() and
+    // get() rather than saying the path leads nowhere.
+    if (current === null || typeof current !== 'object') return null;
 
     if (Array.isArray(current) && isArrayIndexSegment(key)) {
       const nextIndex = Number(key);
