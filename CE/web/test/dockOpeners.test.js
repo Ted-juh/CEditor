@@ -121,9 +121,10 @@ test('the button does both halves of the handoff, the way the colour swatch does
   assert.match(button, /activateEditorTarget\(opener\.kind, controlId, domain\)/);
   assert.match(button, /displayTabRequest\.set\(\{ tab: opener\.tab \}\)/);
 
-  // And the dock un-hides itself on a tab request, which is why the button need not.
+  // And the dock un-hides itself on a tab request, which is why the button need not. 'display' is the
+  // switch of the workspace in front (stores/panelVisibility.js): the script editor has its own.
   const app = readFileSync(new URL('../src/App.svelte', import.meta.url), 'utf8');
-  assert.match(app, /\$displayTabRequest\)\s*\{\s*\n\s*showDisplayPanel\.set\(true\)/);
+  assert.match(app, /\$displayTabRequest\)\s*\{\s*\n\s*setPanelVisibility\('display', true\)/);
 });
 
 

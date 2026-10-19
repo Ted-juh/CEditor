@@ -136,7 +136,7 @@ test('the component workspace keeps the rail but disarms insertion', () => {
 test('the script workspace shows the display panel, and only it, when it is asked for', () => {
   const shown = resolveWorkspaceChrome({
     activeTab: { type: 'script' }, viewportWidth: 1440,
-    showTreePanel: true, showDisplayPanel: true, showPropertiesPanel: true,
+    showTreePanel: true, showDisplayPanel: false, showDisplayPanelInScript: true, showPropertiesPanel: true,
   });
   assert.equal(shown.workspaceKind, 'script');
   assert.equal(shown.ownsChrome, true, 'it still owns its layout');
@@ -145,11 +145,21 @@ test('the script workspace shows the display panel, and only it, when it is aske
   assert.equal(shown.railTogglesEnabled, false, 'the tree and properties toggles stay off');
   assert.equal(shown.railInsertEnabled, false);
 
-  const hidden = resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 1440, showDisplayPanel: false });
+  const hidden = resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 1440, showDisplayPanelInScript: false });
   assert.equal(hidden.showDisplayPanel, false, 'hidden when the viewer has it hidden');
   // A narrow window changes nothing there: compact is the panel editor's.
-  const narrow = resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 600, showDisplayPanel: true });
+  const narrow = resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 600, showDisplayPanelInScript: true });
   assert.deepEqual([narrow.compactPanel, narrow.showDisplayPanel], [false, true]);
+});
+
+test('the script workspace has a display switch of its own: the panel editor\'s does not reach it', () => {
+  const panelOpen = { showDisplayPanel: true, showDisplayPanelInScript: false };
+  assert.equal(resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 1440, ...panelOpen }).showDisplayPanel, false,
+    'a dock left open in the panel editor stays out of the script editor');
+  assert.equal(resolveWorkspaceChrome({ activeTab: { type: 'panel' }, viewportWidth: 1440, ...panelOpen }).showDisplayPanel, true);
+  const scriptOpen = { showDisplayPanel: false, showDisplayPanelInScript: true };
+  assert.equal(resolveWorkspaceChrome({ activeTab: { type: 'panel' }, viewportWidth: 1440, ...scriptOpen }).showDisplayPanel, false,
+    'and one opened for a script colour does not follow the viewer back');
 });
 
 test('every other workspace keeps the display panel exactly as before', () => {

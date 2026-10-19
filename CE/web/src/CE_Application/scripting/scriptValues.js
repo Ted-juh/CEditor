@@ -33,7 +33,7 @@ import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
   unknownOptionsMessage,
 } from './panelApi.js';
-import { colourFieldAt, panelColourFieldAt } from './scriptColours.js';
+import { colourFieldAt, panelColourFieldAt, realNumber } from './scriptColours.js';
 import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/controlSets.js';
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
@@ -360,6 +360,7 @@ function buildCall(raw, env) {
   const path = member ? memberPath(member.id) : raw.callee;
   const site = { env, member, memberId: member?.id ?? null, path, resolved, args, nodes, raw };
   args.forEach((arg, i) => classify(arg, nodes[i], arg.param, site, i));
+  animRefusals(site);
   const children = [];
   for (const nested of raw.calls) {
     // Python's dict(k=v) written as an argument is that argument's table, not a call of its own.
@@ -392,6 +393,33 @@ function buildCall(raw, env) {
   if (member) return call;
   if (args.some((a) => KEPT_KINDS(a.kind) || (a.options ?? []).some((o) => KEPT_KINDS(o.kind)))) return call;
   return children;
+}
+
+/* ------------------------------------------------------------------------- ce.anim's refusals */
+// ce.anim.to, spring and envelope move numbers. panelRuntime's animationTarget refuses a target
+// that is not one (text that is one is read as one), and its animatesColour a colour property as the
+// path, a control's or the panel's own; either way nothing starts. Said here in those words.
+
+const ANIM_VERBS = { animateTo: 'ce.anim.to', animateSpring: 'ce.anim.spring', animateEnvelope: 'ce.anim.envelope' };
+
+function animRefusals(site) {
+  const verb = ANIM_VERBS[site.memberId];
+  if (!verb) return;
+  const target = site.args.find((a) => a.param?.name === 'target');
+  if (verb !== 'ce.anim.envelope' && target?.literal && !target.problem && realNumber(target.value) === undefined) {
+    const why = target.value === undefined || target.value === null ? 'no number to move to was given'
+      : typeof target.value === 'string' ? `"${target.value}" is not a number` : 'the target given is not a number';
+    target.problem = { severity: 'error', message: `${verb}: ${why}, so nothing was started.` };
+  }
+  const path = site.args.find((a) => a.param?.name === 'path');
+  // A colour refused outweighs a path reported only as not found: the runtime refuses it either way.
+  if (!path?.literal || typeof path.value !== 'string' || path.problem?.severity === 'error') return;
+  const [name, ...segs] = path.value.split('.').filter((s) => s !== '');
+  if (!segs.length) return;
+  const control = String(name).toLowerCase() === 'panel' ? null : controlNamed(site.env.ctx.controls, name);
+  const colour = String(name).toLowerCase() === 'panel' ? panelColourFieldAt(segs.join('.'))
+    : control ? colourFieldAt(control, segs.join('.')) : null;
+  if (colour) path.problem = { severity: 'error', message: `${verb}: "${path.value}" is a colour, and ce.anim moves numbers, so nothing was started.` };
 }
 
 /** An Arg for stream[a..b), not yet classified. */
@@ -468,7 +496,7 @@ function classify(arg, node, param, site, index) {
     case 'curve': return setRead(arg, 'curve', readCurve(value), 'curve');
     case 'division':
       if (typeof value === 'number') {
-        return setRead(arg, 'number', readNumber(value, { ...param, unit: 'beats' }, { tempo: site.env.ctx.tempo, site: { path: site.path } }), 'number');
+        return setRead(arg, 'number', readNumber(value, { ...param, unit: 'beats' }, { tempo: site.env.ctx.tempo, site: { path: site.path, time: timeSpec(site, param) } }), 'number');
       }
       return setRead(arg, 'division', readDivision(value, { verb: divisionVerb(site), words: param?.type === 'number or division' || site.memberId === 'afterBeats' ? 'beats' : 'division' }), 'choice');
     case 'scale': case 'chord': {
@@ -565,6 +593,23 @@ function colourSiteFor(site, param) {
 }
 
 /** The words a division is refused in: ce.time.step's own, or the timer that reads one as beats. */
+/** How panelRuntime's timeRefused is called for this argument, or undefined: a timer's interval,
+ *  after's delay, and syncTimer's and afterBeats' beats given as a number. */
+function timeSpec(site, param) {
+  const name = param?.name;
+  if (site.memberId === 'after' && name === 'ms') {
+    return { call: 'ce.time.after', unit: 'milliseconds', what: 'delay', positive: false, outcome: 'nothing was scheduled' };
+  }
+  if (site.memberId === 'startTimer' && name === 'ms') {
+    return { call: `ce.time.startTimer("${sibling(site, 'id') ?? ''}")`, unit: 'milliseconds', what: 'interval', positive: true, outcome: 'no timer was started' };
+  }
+  if ((site.memberId === 'syncTimer' || site.memberId === 'afterBeats') && name === 'beats') {
+    const sync = site.memberId === 'syncTimer';
+    return { call: divisionVerb(site), unit: 'beats', what: 'number of beats', positive: sync, outcome: sync ? 'no timer was started' : 'nothing was scheduled' };
+  }
+  return undefined;
+}
+
 function divisionVerb(site) {
   if (site.memberId === 'syncTimer' || site.memberId === 'afterBeats') {
     const id = sibling(site, 'id');
@@ -583,6 +628,11 @@ function numberSite(site, param) {
   }
   if (module === 'ce.midi') out.midi = midiArgOf(site.memberId, param.name);
   if (site.memberId && module === 'ce.midi') out.path = site.memberId;
+  out.time = timeSpec(site, param);
+  if (site.memberId === 'sendNote' && param.name === 'ms') out.noteLength = 'sendNote';
+  // ce.anim reads a duration as Math.max(1, Number(duration)), the default when it is not a number
+  // (panelRuntime's startAnimationImpl): said as what happens, since the runtime says nothing.
+  if (module === 'ce.anim' && param.name === 'duration') out.animDuration = Number(param.default ?? 300);
   if (site.option === 'opacity' && OPACITY_SCALE_WARNINGS[site.memberId]) {
     out.scaleWarning = OPACITY_SCALE_WARNINGS[site.memberId](sibling(site, 'target') ?? '');
   }

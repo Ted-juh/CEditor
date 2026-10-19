@@ -625,6 +625,9 @@ test('a refusal is said in the words the runtime says it in', () => {
     ['ce.midi.sendNote(1, "C10", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'C10', 100)],
     ['ce.midi.sendCC(1, 200, 64)', 'ce.', (c) => argOf(c, 'cc'), (api) => api.ce.midi.sendCC(1, 200, 64)],
     ['ce.midi.sendCC(17, 74, 64)', 'ce.', (c) => argOf(c, 'channel'), (api) => api.ce.midi.sendCC(17, 74, 64)],
+    // A note name where the channel goes: sendNote's channel comes first.
+    ['ce.midi.sendNote("C4", 100, 1)', 'ce.', (c) => argOf(c, 'channel'), (api) => api.ce.midi.sendNote('C4', 100, 1)],
+    ['ce.midi.sendCC(1, "Cutoff", 64)', 'ce.', (c) => argOf(c, 'cc'), (api) => api.ce.midi.sendCC(1, 'Cutoff', 64)],
     ['ce.music.scale("c4")', 'ce.', (c) => argOf(c, 'root'), (api) => api.ce.music.scale('c4')],
     ['ce.music.scale("C3", "harmonicMinr")', 'ce.', (c) => argOf(c, 'scale'), (api) => api.ce.music.scale('C3', 'harmonicMinr')],
     ['ce.music.chord("C3", "maj8")', 'ce.', (c) => argOf(c, 'type'), (api) => api.ce.music.chord('C3', 'maj8')],
@@ -645,6 +648,21 @@ test('a refusal is said in the words the runtime says it in', () => {
     ['set("X.Background.Fill.colour", "#0008")', 'set', (c) => argOf(c, 'value'), (api) => api.set('X.Background.Fill.colour', '#0008')],
     ['ce.anim.play("X", "Pluse")', 'ce.', (c) => argOf(c, 'animation'), (api) => api.ce.anim.play('X', 'Pluse')],
     ['ce.anim.to("X", 1, { easing = "outBack" })', 'ce.', (c) => optOf(argOf(c, 'opts'), 'easing'), (api) => api.ce.anim.to('X', 1, { easing: 'outBack' })],
+    // The time arguments, as panelRuntime's timeRefused and noteLength say them.
+    ['ce.time.after(-5, f)', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.time.after(-5, () => {})],
+    ['ce.time.after("250", f)', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.time.after('250', () => {})],
+    ['ce.time.startTimer("t", 0)', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.time.startTimer('t', 0)],
+    ['ce.time.syncTimer("t", -1)', 'ce.', (c) => argOf(c, 'beats'), (api) => api.ce.time.syncTimer('t', -1)],
+    ['ce.time.afterBeats(-0.5, f)', 'ce.', (c) => argOf(c, 'beats'), (api) => api.ce.time.afterBeats(-0.5, () => {})],
+    ['ce.midi.sendNote(1, 60, 100, -5)', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.midi.sendNote(1, 60, 100, -5)],
+    ['ce.midi.sendNote(1, 60, 100, "long")', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.midi.sendNote(1, 60, 100, 'long')],
+    // ce.anim moves numbers: a target that is not one, and a colour property as the path.
+    ['ce.anim.to("X.value", "Tomato")', 'ce.', (c) => argOf(c, 'target'), (api) => api.ce.anim.to('X.value', 'Tomato')],
+    ['ce.anim.spring("X.value", true)', 'ce.', (c) => argOf(c, 'target'), (api) => api.ce.anim.spring('X.value', true)],
+    ['ce.anim.to("X.Background.Fill.colour", 1)', 'ce.', (c) => argOf(c, 'path'), (api) => api.ce.anim.to('X.Background.Fill.colour', 1)],
+    ['ce.anim.to("panel.bgColour", 1)', 'ce.', (c) => argOf(c, 'path'), (api) => api.ce.anim.to('panel.bgColour', 1)],
+    ['ce.anim.envelope("X.Background.Fill.colour", { { x = 0, y = 0 }, { x = 1, y = 1 } })', 'ce.', (c) => argOf(c, 'path'),
+      (api) => api.ce.anim.envelope('X.Background.Fill.colour', [{ x: 0, y: 0 }, { x: 1, y: 1 }])],
   ];
   for (const [src, needle, rowOf, run] of cases) {
     const st = readStatement(src, 'lua', at(src, needle, 1), { panel: { controls: [knob] } });
@@ -654,6 +672,39 @@ test('a refusal is said in the words the runtime says it in', () => {
     assert.ok(lines.length, `${src}: the runtime said nothing`);
     const said = lines[0].replace(/ This is said only the first time\.$/, '');
     assert.ok(row.problem.message.startsWith(said), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${said}`);
+  }
+});
+
+test('ce.anim\'s duration is said as the runtime reads it: under 1 ms is 1 ms, and text is the default', () => {
+  const durationOf = (src) => optOf(argOf(callOf(readStatement(src, 'lua', 3, {})), 'opts'), 'duration');
+  assert.equal(durationOf('ce.anim.to("X.value", 1, { duration = -5 })').problem.message,
+    'ce.anim.to: a duration of -5 is under 1 ms, so the move takes 1 ms: it jumps.');
+  assert.equal(durationOf('ce.anim.to("X.value", 1, { duration = "1/4" })').problem.message,
+    'ce.anim.to: "1/4" is not a number of milliseconds, so the move takes 300 ms, as it does when no duration is given. For a length in beats, give beats instead.');
+  assert.match(durationOf('ce.anim.spring("X.value", 1, { duration = "long" })').problem.message, /takes 600 ms, as it does when no duration is given\.$/);
+  for (const ok of ['1', '250', '"250"']) assert.equal(durationOf(`ce.anim.to("X.value", 1, { duration = ${ok} })`).problem, null, ok);
+  // What the runtime does with them, which the words above say.
+  const knob = createControl('Knob', { name: 'X' });
+  assert.deepEqual(withPanel([knob], (api) => runtimeLines(() => {
+    api.ce.anim.to('X.value', 1, { duration: -5 });
+    api.ce.anim.to('X.value', 1, { duration: '1/4' });
+  })), [], 'the runtime itself says nothing of either');
+});
+
+test('a time the runtime takes is not reported: 0 delays, text sendNote reads, a message kept up', () => {
+  const problems = (src) => callOf(readStatement(src, 'lua', 3, {})).args.flatMap((a) => [a.problem, ...(a.options ?? []).map((o) => o.problem)]).filter(Boolean);
+  for (const src of ['ce.time.after(0, f)', 'ce.time.startTimer("t", 16)', 'ce.time.syncTimer("t", 0.25)', 'ce.time.afterBeats(0, f)',
+    'ce.midi.sendNote(1, 60, 100, "500")', 'ce.midi.sendNote(1, 60, 100)', 'ce.ui.notify("Saved", { duration = -1 })', 'ce.ui.notify("Saved", { duration = 0 })']) {
+    assert.deepEqual(problems(src), [], src);
+  }
+});
+
+test('ce.anim takes text that is a number as its target, and a number property as its path', () => {
+  const knob = createControl('Knob', { name: 'X' });
+  for (const src of ['ce.anim.to("X.value", "50")', 'ce.anim.to("X.value", 0.5)', 'ce.anim.spring("X.Transform.x", 40)', 'ce.anim.to("Nowhere.colour", 1)']) {
+    const call = callOf(readStatement(src, 'lua', 3, { panel: { controls: [knob] } }));
+    // (A path to no control is still said to lead nowhere; ce.anim itself refuses none of these.)
+    assert.deepEqual(call.args.slice(0, 2).map((a) => /ce\.anim/.test(a.problem?.message ?? '')), [false, false], src);
   }
 });
 

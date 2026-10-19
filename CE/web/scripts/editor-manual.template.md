@@ -669,9 +669,10 @@ The dock on the right of the code has four tabs, and opens on the one you used l
 caret is in, with what each means and any problem with it, and the code shows which: a faint band
 over the statement, a light box around the value under the pointer, an outlined box around the one
 you are editing. A colour's swatch opens the display panel's **Colors** tab, which shows in the
-script workspace for this (and from the **Dock** button on the left); the colour is written into the
-code when you let go, as one step of the editor's undo, and **Cancel** puts back exactly what was
-there before. A gradient opens the **Gradient** tab the same way, a list of choices is a dropdown in the
+script workspace for this (and from the **Dock** button on the left, which has a setting of its own
+here: a dock left open in the panel editor stays there, and one the swatch opened closes again when
+you finish); the colour is written into the code when you let go, as one step of the editor's undo,
+and **Cancel** puts back exactly what was there before. A gradient opens the **Gradient** tab the same way, a list of choices is a dropdown in the
 row, and a number with a unit a field.
 
 Two things to know from the editor's side:

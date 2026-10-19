@@ -1,8 +1,10 @@
 # Editing values in place in the script editor
 
-Status: **proposal, nothing built.** 2026-10-18. The silent failures it found, and four more found
-on the way, were then fixed in the script runtimes; [Fixed since, and still open](#fixed-since-and-still-open)
-lists them. The edit surface was decided on 2026-10-19: a Values sidebar
+Status: **the Values sidebar is built**, 2026-10-19: steps 0 to 7 of the order of work, in the
+script editor and the panel file view ([Built](#built), with what is still open). The record was a
+proposal on 2026-10-18. The silent failures it found, and four more found on the way, were then
+fixed in the script runtimes; [Fixed since, and still open](#fixed-since-and-still-open) lists them.
+The edit surface was decided on 2026-10-19: a Values sidebar
 ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).
 
 It started as a question about colour. A script's colours are typed out as hex, so why is there no
@@ -46,10 +48,11 @@ column has to change to make room for it. Three decisions shape it:
    `stores/colorTarget.js` stands: one place to edit colour, everywhere. The row shows the swatch,
    and a click opens the display panel's Colors or Gradient tab on that value through a callback
    target, with its label, Done and Cancel. It is the app's shared display panel, the one the panel
-   editor docks, not a second copy: the owner chose it on 2026-10-19. The script workspace hides it
-   today, because `utils/workspaceChrome.js` counts `'script'` among the workspaces that own their
-   layout (constraint 2), so that rule changes to let the display panel, and only it, show in the
-   script workspace. No colour chooser opens in the sidebar.
+   editor docks, not a second copy: the owner chose it on 2026-10-19. The script workspace hid it,
+   because `utils/workspaceChrome.js` counts `'script'` among the workspaces that own their layout
+   (constraint 2), so that rule changed to let the display panel, and only it, show in the script
+   workspace. It shows there by a switch of its own, off until the viewer or a swatch turns it on
+   ([Built](#built)). No colour chooser opens in the sidebar.
 3. **It covers the whole statement, not the line.** A call often runs over several lines: a
    gradient's stops, or an options table with one key per line. So the sidebar shows every call in
    the statement the caret is in, and when a line holds several statements, all of them. A call
@@ -946,6 +949,81 @@ Still open, for the owner:
 
 Each step after the first works in the panel file view too, wherever a property name gives the
 context.
+
+## Built
+
+*2026-10-19: steps 0 to 7 of the order of work, in the script editor and the panel file view.*
+
+- **The core** (`scripting/scriptValues.js`, over `scriptValueScan.js`, `scriptValueKinds.js` and
+  `scriptValueWrite.js`). `readStatement(source, language, caret, context)` gives the statement the
+  caret is in, its calls, and for each argument and option what kind of value it is, what it means,
+  and what the runtime would refuse, in the runtime's words. `readJsonValues` does the same for the
+  panel file view's object, and `writeValue` gives the characters for a new value, spelled as the
+  language spells it. 94 parameters in `panelApi.js` carry a `kind` (step zero). For each refusal,
+  `test/scriptValues.test.js` calls the runtime and compares what it writes to the console.
+- **The tab** (`editor/ValuesSidebar.svelte`, rows laid out by `editor/valueRows.js`). The dock's
+  fourth tab, loaded the first time it is shown. A header names the lines, the call as written and
+  its summary. Rows follow the call's order, an options table's keys sit under `opts`, and a call
+  inside another is indented under it. Each row shows the value in the editor's colours, what it
+  means, its problem, and its editor. While an edit is open the tab stays on that statement rather
+  than following the caret.
+- **The highlights** (`editor/codeMarks.js`, CodeEditor's `marks`): the statement band with its bar
+  at the left, a box round the value under the pointer, and an outlined box round the value being
+  edited, which follows the value as its length changes.
+- **The editors.** A colour opens the shared display panel's Colors tab, and a gradient its Gradient
+  tab, through callback targets labelled with the script and the line ("Script · Title text colour,
+  line 3"). A choice is a dropdown, a curve's with its picture, and a number with a unit is a field.
+  Fonts, images, paths, controls, notes, bytes and computed values are shown, not edited.
+- **The session rules** (`editor/valueEditSession.js`) keep rules 2 to 7. A value is written when
+  the gesture settles (350 ms with no pointer held, or Done). Each write is one `replaceRange`
+  through the editor, so one undo step. Cancel, through a target's own `cancel`, puts back the
+  characters there were, not a colour re-formed from them. Any text the session did not write
+  (typing, an undo, a fold, another script) ends it.
+- **The display panel in the script workspace** has a switch of its own (`stores/panelVisibility.js`,
+  `ce.ui.showDisplayPanel.script`), off until the viewer turns it on or a swatch opens it. A panel
+  the swatch opened is hidden again when the edit ends. As first built it shared the panel
+  editor's switch, so a dock left open there took a third of the script editor's height.
+- **The dock remembers its tab** per viewer (`editor/dockTabMemory.js`, `ce-script-dock-tab`).
+- **In the panel file view** the dock has the Values tab alone. A control's colour row edits the
+  item's text as typing would, and Apply puts it on the control. Every field and the whole file are
+  shown to read.
+- **Checked by** `test/valuesSidebar.test.js`, and by `browser-checks/valuesSidebar.mjs` in
+  `runAll.mjs`, which drives the tab in Lua and JavaScript and in the panel file view as a person
+  would, and measures the highlights against the text under them.
+
+Driving it in all seven languages showed the rows, the colour swatch, the dropdowns and the fields
+work in each, written back in each language's spelling. It also found things the core did not yet
+say. Each is now said, in the runtime's words where the runtime has them:
+
+- **A value that is not a number where a MIDI number goes**: `sendNote("C4", 100, 1)` sends nothing,
+  because the channel comes first.
+- **`ce.anim`'s target and path.** `ce.anim.to` and `ce.anim.spring` refuse a target that is not a
+  number. They, and `ce.anim.envelope`, also refuse a colour property as the path.
+- **`ce.anim`'s duration.** The runtime runs a duration under 1 ms as 1 ms and a duration written as
+  text as its default, and says nothing about either. The row says what happens.
+- **The time arguments.** `ce.time.after`'s delay, `startTimer`'s interval, the beats `syncTimer`
+  and `afterBeats` take as a number, and `sendNote`'s length are now refused in the runtime's words
+  (its `timeRefused` and `noteLength`). The core had a generic range of its own for them, "the ms is
+  at least 0, and -5 is not", which no runtime says. It also called `ce.ui.notify`'s
+  `duration = -1` out of range, though 0 or less is how a message is kept up. That field now says
+  `min: null` in the contract.
+- **How rows are shown.** A call is headed by its name as written (`ce.core.set`, `ctx.SendCC`), not
+  by the contract's id for it. A property holding a control set's token says "now {text.primary}
+  from the control set", where it showed the token as a quoted string. A see-through drawn colour
+  reads "#FFAA00 at 50% opacity", not as `rgba(…)`.
+
+Still open:
+
+- **The Gradient tab's radial controls.** The tab shows them for a script's gradient, though a
+  drawing cannot take a radial gradient. The label says "(linear only)", and a radial choice is
+  written as linear.
+- **Editors not built yet.** Fonts, images and hand-drawn curves have none. Completion does not yet
+  reopen over a value that is already there.
+- **A call the runtime does not have** (`ce.panel.on`, or Python's `send_note` for `sendNote`) gets
+  no rows: the statement reads as having nothing in it. The editor's own check reads `ce.panel.on`
+  as `on`.
+- **`ce.anim`'s duration in the runtimes.** Every runtime takes a duration under 1 ms, or written as
+  text, without a message. The clamp-and-warn rule says they should warn, as the row now does.
 
 ## Open questions for the owner
 

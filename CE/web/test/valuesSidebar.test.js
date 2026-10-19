@@ -381,6 +381,17 @@ test('the display panel names what it edits from the call and the argument', () 
     ['Cutoff background highlight colour', 'panel bg colour', 'Knob', 'Knob value']);
 });
 
+test('a path whose property holds a control set\'s token names the token, not a quoted string', () => {
+  const title = createControl('Label', { name: 'Title' });
+  title._children.Text._children.Fill.colour = '{text.primary}';
+  const src = 'ce.core.set("Title.Text.Fill.colour", "red")';
+  const [path] = readStatement(src, 'lua', 2, { panel: { controls: [title] } }).calls[0].args;
+  assert.equal(meaningLine(path), 'Title · Label › Text › Fill › colour · now {text.primary} from the control set');
+  title._children.Text._children.Fill.colour = 'FF102030';
+  const [plain] = readStatement(src, 'lua', 2, { panel: { controls: [title] } }).calls[0].args;
+  assert.equal(meaningLine(plain), 'Title · Label › Text › Fill › colour · now "FF102030"');
+});
+
 test('the line under a value is the core\'s meaning, put into words', () => {
   const opts = readStatement(NESTED, 'lua', NESTED.indexOf('duration'), { tempo: 120 });
   const [path, , , duration, curve, easing] = everyArg(opts);
@@ -394,6 +405,8 @@ test('the line under a value is the core\'s meaning, put into words', () => {
   const stops = nested.calls[0].children[0].args[0];
   assert.equal(meaningLine(stops), '2 stops · linear, 135°');
   assert.equal(meaningLine(stops.options[0]), 'drawn as #2A6BD4');
+  const seeThrough = readStatement('ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "80FFAA00" }))', 'lua', 2, {}).calls[0].children[0].args[0];
+  assert.equal(meaningLine(seeThrough.options[1]), 'drawn as #FFAA00 at 50% opacity');
   const noAngle = readStatement('ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "#0A1830" }))', 'lua', 2, {}).calls[0].children[0].args[0];
   assert.equal(meaningLine(noAngle), '2 stops · linear, 180°, as it is when no angle is written');
   const notes = readStatement('ce.midi.sendNote(1, "C4", 100)\nce.midi.sendSysex("F0 41 10 42 F7")\nlocal s = ce.time.step(b, "1/8t")', 'lua', 3, {});

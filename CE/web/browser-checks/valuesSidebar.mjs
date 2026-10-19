@@ -17,6 +17,8 @@
  *              its new length; Done keeps it; Ctrl+Z takes it back in one step; Cancel puts the
  *              original characters back exactly; the panel is hidden again if it was hidden, and
  *              stays if it was showing (the rail's Dock toggle works in the script workspace)
+ *   own dock   the script workspace has a display switch of its own: a dock left open in the panel
+ *              editor does not show in the script editor
  *   choice     a curve's dropdown writes at once, with the curve's picture beside it
  *   number     a field written on Enter, put back on Escape, a value out of range shown as a problem
  *   nested     a call inside another has its own rows, indented under it
@@ -195,8 +197,20 @@ try {
   // TAB — the fourth tab, remembered across a reload.
   // ===============================================================================================
   let cutoff = await makeControls();
+  await page.locator('.icon-panel-area button.rail-toggle', { hasText: 'Dock' }).click();
+  await kit.settle(300);
+  const panelDock = await displayShown();
   await openScriptEditor(cutoff);
   await newScript();
+  led.check(S, 'a display switch of its own', 'the display panel opened with the rail\'s Dock toggle in the panel editor does not show in the script editor, whose switch is off until asked for',
+    { panelEditor: true, scriptEditor: false, stored: [true, false] },
+    { panelEditor: panelDock, scriptEditor: await displayShown(),
+      stored: await page.evaluate(() => ['ce.ui.showDisplayPanel', 'ce.ui.showDisplayPanel.script'].map((k) => localStorage.getItem(k) === 'true')) });
+  // Put the panel editor's back, so the reload below lays the panel editor out as it was.
+  await page.evaluate(async () => {
+    const { showDisplayPanel } = await import('/src/CE_Application/stores/panelVisibility.js');
+    showDisplayPanel.set(false);
+  });
   const tabs = await page.evaluate(() => [...document.querySelectorAll('[data-testid="script-dock"] .dtab')].map((b) => b.textContent.trim().split(' ')[0]));
   const firstTab = await page.evaluate(() => document.querySelector('[data-testid="script-dock"] .dtab.active')?.textContent.trim());
   await page.locator('[data-testid="script-dock"] .dtab', { hasText: 'Values' }).click();
@@ -306,8 +320,8 @@ try {
   await page.keyboard.press('Enter');
   await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('duration = -5'));
   await until(() => (document.querySelector('.vrow[data-name="duration"] .vproblem')?.textContent ?? '').length > 0);
-  led.check(S, 'a number out of range', 'a duration below 0 is written as typed, and the row shows the problem in the core\'s words',
-    'ce.anim.to: the duration is at least 0, and -5 is not.', (await rows()).find((r) => r.name === 'duration').problem);
+  led.check(S, 'a number out of range', 'a duration below 1 ms is written as typed, and the row says what the runtime makes of it',
+    'ce.anim.to: a duration of -5 is under 1 ms, so the move takes 1 ms: it jumps.', (await rows()).find((r) => r.name === 'duration').problem);
   await page.locator(`${SCRIPT} textarea.ce-ta`).focus();
   await page.keyboard.press('Control+z');
   await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('duration = 400'));

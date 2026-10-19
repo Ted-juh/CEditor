@@ -24,6 +24,7 @@ export function resolveWorkspaceChrome({
   viewportWidth = Number.POSITIVE_INFINITY,
   showTreePanel = true,
   showDisplayPanel = false,
+  showDisplayPanelInScript = false,
   showPropertiesPanel = true,
 } = {}) {
   const workspaceKind = classifyWorkspace({ activeTab, componentWorkspaceMode });
@@ -45,8 +46,9 @@ export function resolveWorkspaceChrome({
   // The script workspace is the exception for the display panel, and only for it (decided by the
   // owner on 2026-10-19, docs/design/script-editor-value-editors.md): a colour or a gradient in a
   // script is edited in the shared display panel's Colors and Gradient tabs, opened from the
-  // script editor's Values tab, so the panel may show there and its rail toggle works there. The
-  // tree and the properties panel stay hidden; they are panel-editor chrome.
+  // script editor's Values tab, so the panel may show there and its rail toggle works there. It has
+  // a switch of its own there (stores/panelVisibility.js), off until the viewer or a swatch turns it
+  // on. The tree and the properties panel stay hidden; they are panel-editor chrome.
   const scriptDisplay = workspaceKind === 'script';
   return {
     workspaceKind,
@@ -54,7 +56,7 @@ export function resolveWorkspaceChrome({
     compactPanel,
     chromeWorkspaceActive: ownsChrome,
     showTreePanel: !ownsChrome && !compactPanel && showTreePanel,
-    showDisplayPanel: scriptDisplay ? showDisplayPanel : (!ownsChrome && !compactPanel && showDisplayPanel),
+    showDisplayPanel: scriptDisplay ? showDisplayPanelInScript : (!ownsChrome && !compactPanel && showDisplayPanel),
     showPropertiesPanel: workspaceKind === 'component'
       ? true
       : (!ownsChrome && !compactPanel && showPropertiesPanel),

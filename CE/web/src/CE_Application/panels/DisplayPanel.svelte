@@ -43,7 +43,7 @@
   import { colorTarget, applyColorToTarget, clearColorTarget, colorTargetRestoreValue } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
-  import { showDisplayPanel } from '../stores/panelVisibility.js';
+  import { setPanelVisibility } from '../stores/panelVisibility.js';
   import { editorTarget, tabForEditorTarget } from '../stores/editorTarget.js';
   import { deepClone } from '../utils/deepClone.js';
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
@@ -271,7 +271,7 @@
     if (req) {
       // Consume visibility and tab together: clearing the request here can run
       // before App's effect has observed it and leave the requested tab hidden.
-      showDisplayPanel.set(true);
+      setPanelVisibility('display', true);
       const wanted = impliedDockTab({ tabRequest: req, lastTab: activeTab });
       // A tool already open beside is already showing: it stays where the user put it.
       if (wanted !== besideTab) handleTabClick(wanted);

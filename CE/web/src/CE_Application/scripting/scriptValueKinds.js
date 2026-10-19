@@ -463,6 +463,22 @@ export function beatsText(beats) {
 }
 
 /**
+ * panelRuntime's timeRefused, word for word: ce.time.after's delay, startTimer's interval, and the
+ * beats syncTimer and afterBeats are given as a number. `spec` is { call, unit, what, positive,
+ * outcome } as the runtime passes them. Text is refused even when it is a number: these read none.
+ */
+export function timeRefusal(value, { call, unit, what, positive, outcome }) {
+  let why = null;
+  if (value === undefined || value === null) why = `no ${what} was given`;
+  else if (typeof value === 'string') why = `"${value}" is not a number of ${unit}`;
+  else if (typeof value !== 'number') why = `the ${what} is not a number of ${unit}`;
+  else if (!Number.isFinite(value)) why = `the ${what} is not a finite number of ${unit}`;
+  else if (positive && value <= 0) why = `${value} is not more than 0 ${unit}`;
+  else if (!positive && value < 0) why = `${value} is less than 0 ${unit}`;
+  return why === null ? null : `${call}: ${why}, so ${outcome}.`;
+}
+
+/**
  * A number with a unit or a range. `param` is the contract's descriptor; `tempo` the BPM the
  * milliseconds are counted in. The two opacity scales (record example 12) warn in the words the
  * runtime warns in, given `site.scaleWarning`.
@@ -470,12 +486,40 @@ export function beatsText(beats) {
 export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
   const unit = param.unit ?? null;
   const range = rangeOfUnit(unit);
-  const min = Number.isFinite(param.min) ? param.min : range.min;
+  // `min: null` in the contract: a unit with no floor (ce.ui.notify's 0 or less keeps a message up).
+  const min = param.min === null ? null : Number.isFinite(param.min) ? param.min : range.min;
   const max = Number.isFinite(param.max) ? param.max : range.max;
   const meaning = { unit, min, max, hint: param.hint ?? null,
     integer: /^\d+ to (?:16|127|255|16383)$/.test(String(unit ?? '')) || param.integer === true };
+  if (site.time) {
+    const refused = timeRefusal(value, site.time);
+    if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  }
   const n = typeof value === 'number' ? value : realNumber(value);
-  if (n === undefined || !Number.isFinite(n)) return { meaning, problem: null };
+  // sendNote's length (panelRuntime's noteLength): text that is a number is read, and it must be
+  // above 0, or the note is not sent at all.
+  if (site.noteLength && value !== undefined && value !== null && (n === undefined || !(n > 0))) {
+    return { meaning, problem: { severity: 'error', message: `${site.noteLength}: ${shownValue(value)} is not a length in milliseconds, so nothing was sent. `
+      + 'Give a number above 0, or leave it out to send the note off yourself.' } };
+  }
+  if (site.animDuration !== undefined) {
+    if (n === undefined && typeof value === 'string') {
+      const beats = /^\d+\s*\/\s*\d+[a-z]*$/i.test(value.trim()) ? ' For a length in beats, give beats instead.' : '';
+      return { meaning, problem: { severity: 'warning', message: `${site.path}: "${value}" is not a number of milliseconds, so the move takes ${site.animDuration} ms, as it does when no duration is given.${beats}` } };
+    }
+    if (Number.isFinite(n) && n < 1) {
+      return { meaning, problem: { severity: 'warning', message: `${site.path}: a duration of ${n} is under 1 ms, so the move takes 1 ms: it jumps.` } };
+    }
+  }
+  if (n === undefined || !Number.isFinite(n)) {
+    // panelRuntime's midiArg refuses anything it cannot read as a number, a name included: "C4"
+    // written where the channel goes (sendNote's channel comes first) sends nothing.
+    if (site.midi && MIDI_ARGS[site.midi] && value !== undefined && value !== null) {
+      const [, aNoun, , , , hint] = MIDI_ARGS[site.midi];
+      return { meaning, problem: { severity: 'error', message: `${site.path}: ${shownValue(value)} is not ${aNoun}, so nothing was sent. ${hint}` } };
+    }
+    return { meaning, problem: null };
+  }
   if (unit === 'milliseconds') meaning.hint = `${n} ms is ${beatsText((n * tempo) / 60000)} at ${tempo} BPM`;
   if (unit === 'beats') meaning.hint = `${beatsText(n)}, ${Number(((n * 60000) / tempo).toFixed(1))} ms at ${tempo} BPM`;
   if (site.scaleWarning) {

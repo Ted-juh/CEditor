@@ -1187,7 +1187,7 @@ export const COMMANDS = [
       { name: 'message', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'uiKind',
-        { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds',
+        { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds', min: null,
           summary: 'How long the message stays up. 0 or less keeps it visible until something '
             + 'dismisses it.' },
       ]) },

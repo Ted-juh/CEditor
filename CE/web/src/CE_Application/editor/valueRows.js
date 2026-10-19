@@ -145,6 +145,14 @@ export function gradientStrip(meaning) {
   return `linear-gradient(90deg, ${parts.join(', ')})`;
 }
 
+/** "rgba(255, 170, 0, 0.502)" as the stored colours are said: "#FFAA00 at 50% opacity". */
+function seeThrough(css) {
+  const m = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(String(css ?? ''));
+  if (!m) return null;
+  const hex = m.slice(1, 4).map((c) => Number(c).toString(16).toUpperCase().padStart(2, '0')).join('');
+  return `#${hex} at ${Math.round(Number(m[4]) * 100)}% opacity`;
+}
+
 /** The line under a value: what its reader makes of it, from the core's `meaning`. '' for nothing. */
 export function meaningLine(arg, { madeBelow = false } = {}) {
   const m = arg?.meaning ?? {};
@@ -155,7 +163,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       const form = m.claimedBy === 'form' ? ' · a colour by its form alone' : '';
       if (m.token) return `{${m.token}} from the control set${m.css ? `, now ${m.css}` : ''}`;
       if (!m.stored && !m.css) return '';
-      if (m.reader === 'drawing') return `drawn as ${m.css ?? m.stored}${form}`;
+      if (m.reader === 'drawing') return `drawn as ${seeThrough(m.css) ?? m.css ?? m.stored}${form}`;
       if (m.reader === 'math') return `read as ${m.stored}${opacity}`;
       return `stored as ${m.stored}${opacity}${form}`;
     }
@@ -195,7 +203,10 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (m.found === null || m.found === undefined) return '';
       if (!m.found) return '';
       const where = [m.control, m.type].filter(Boolean).join(' · ');
-      const now = m.value !== undefined && m.value !== null && typeof m.value !== 'object' ? ` · now ${shownValue(m.value)}` : '';
+      // A control set's token ("{text.primary}") is named as the colour rows name one.
+      const token = typeof m.value === 'string' && /^\{[^{}\s]+\}$/.test(m.value);
+      const now = token ? ` · now ${m.value} from the control set`
+        : m.value !== undefined && m.value !== null && typeof m.value !== 'object' ? ` · now ${shownValue(m.value)}` : '';
       const segs = m.segments?.length && !m.endsInValue ? ` › ${m.segments.join(' › ')}` : '';
       return `${where}${segs}${now}`;
     }

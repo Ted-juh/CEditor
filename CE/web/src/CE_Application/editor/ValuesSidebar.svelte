@@ -34,7 +34,9 @@
   import { colorTarget, activateColorTarget, clearColorTarget } from '../stores/colorTarget.js';
   import { gradientTarget, activateGradientTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
-  import { showDisplayPanel, setPanelVisibility } from '../stores/panelVisibility.js';
+  // The script workspace's own display switch, named rather than reached through 'display': an edit
+  // that ends because the viewer left for the panel editor must hide the script's panel, not theirs.
+  import { showDisplayPanelInScript as scriptDisplay } from '../stores/panelVisibility.js';
   import EasingCurve from '../components/animation/EasingCurve.svelte';
 
   let {
@@ -78,9 +80,11 @@
   let readPoint = $derived(anchor ?? caret);
 
   let readSource = null;              // the text `statement` was read from
+  let readText = $state.raw('');      // …for the markup: a call's name as written is read from it
   function readNow() {
     readTimer = null;
     readSource = source;
+    readText = source;
     statement = readAt(source, readPoint);
   }
 
@@ -199,13 +203,13 @@
     anchor = null;
     if (held?.store === 'colour' && get(colorTarget)?.apply === held.apply) clearColorTarget();
     if (held?.store === 'gradient' && get(gradientTarget)?.apply === held.apply) clearGradientTarget();
-    if (held?.store && !held.wasShowing && !handingOver) setPanelVisibility('display', false);
+    if (held?.store && !held.wasShowing && !handingOver) scriptDisplay.set(false);
   }
 
   /** Close the open edit (writing what it holds) so another can open; whether the panel was showing
    *  before the first of them. */
   function handOver() {
-    const was = link?.store ? link.wasShowing : get(showDisplayPanel);
+    const was = link?.store ? link.wasShowing : get(scriptDisplay);
     handingOver = true;
     try { session?.done(); } finally { handingOver = false; }
     return was;
@@ -227,14 +231,14 @@
   function openColour(row) {
     const { arg } = row;
     if (readOnly || arg.editable !== 'colour' || !arg.literal) return;
-    if (editingArg(arg) && link?.store === 'colour') { setPanelVisibility('display', true); displayTabRequest.set({ tab: 'colors' }); return; }
+    if (editingArg(arg) && link?.store === 'colour') { scriptDisplay.set(true); displayTabRequest.set({ tab: 'colors' }); return; }
     const wasShowing = handOver();
     const s = startSession(arg, 'colour');
     if (!s) return;
     revealArg(s.arg, { focus: false });
     const target = { type: 'callback', label: labelFor(row), apply: (hex) => s.preview(hex), cancel: () => s.cancel() };
     link = { store: 'colour', apply: target.apply, wasShowing };
-    setPanelVisibility('display', true);
+    scriptDisplay.set(true);
     displayTabRequest.set({ tab: 'colors' });
     activateColorTarget(target, swatchHex(s.arg.meaning) ?? 'FF333333');
   }
@@ -273,7 +277,7 @@
   function openGradient(row) {
     const { arg } = row;
     if (readOnly || arg.editable !== 'gradient') return;
-    if (editingArg(arg) && link?.store === 'gradient') { setPanelVisibility('display', true); displayTabRequest.set({ tab: 'gradient' }); return; }
+    if (editingArg(arg) && link?.store === 'gradient') { scriptDisplay.set(true); displayTabRequest.set({ tab: 'gradient' }); return; }
     const wasShowing = handOver();
     const s = startSession(arg, 'gradient');
     if (!s) return;
@@ -285,7 +289,7 @@
       cancel: () => s.cancel(),
     };
     link = { store: 'gradient', apply: target.apply, wasShowing };
-    setPanelVisibility('display', true);
+    scriptDisplay.set(true);
     displayTabRequest.set({ tab: 'gradient' });
     activateGradientTarget(target, gradientData(s.arg));
   }
@@ -418,6 +422,9 @@
   };
   const shownText = (arg) => highlight(oneLine(editingArg(arg) && session ? session.arg.text : arg.text), language);
 
+  // A call is headed by its name as written (ce.core.set, ctx.SendCC), not the contract's id for it.
+  const callName = (call) => readText.slice(call.nameRange?.start ?? 0, call.nameRange?.end ?? 0).replace(/\s+/g, '') || call.path;
+
   let headLines = $derived(statement?.lines
     ? (statement.lines.first === statement.lines.last ? `Line ${statement.lines.first}` : `Lines ${statement.lines.first}–${statement.lines.last}`)
     : '');
@@ -531,7 +538,7 @@
         <div class="vpath">{objectPath || (statement.item?.kind === 'panel' ? 'panel settings' : itemName)}</div>
         <div class="vsum">{statement.item?.kind === 'panel' ? 'The panel\'s own settings' : statement.item?.controlType ?? ''}</div>
       {:else if firstCall}
-        <div class="vpath">{firstCall.path}</div>
+        <div class="vpath">{callName(firstCall)}</div>
         {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
@@ -543,7 +550,7 @@
         {#if row.type === 'call'}
           {#if row.depth > 0 || row.call !== firstCall}
             <div class="vcall" style:--depth={row.depth}>
-              <div class="vpath">{row.call.path}</div>
+              <div class="vpath">{callName(row.call)}</div>
               {#if row.call.summary}<div class="vsum" title={plainSummary(row.call.summary)}>{plainSummary(row.call.summary)}</div>{/if}
             </div>
           {/if}

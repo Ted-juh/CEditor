@@ -40,6 +40,7 @@ test('it reads the keys App.svelte already used, so an upgrade keeps the layout'
     tree: 'ce.ui.showTreePanel',
     display: 'ce.ui.showDisplayPanel',
     properties: 'ce.ui.showPropertiesPanel',
+    displayScript: 'ce.ui.showDisplayPanel.script',
   });
   assert.equal(get(mod.showTreePanel), false);
   assert.equal(get(mod.showDisplayPanel), true);
@@ -96,4 +97,32 @@ test('the Window menu rows name all three toggles once each', async () => {
     assert.ok(mod.panelVisibilityStore(item.id), `${item.id} has a store behind it`);
     assert.ok(item.label.length > 0);
   }
+});
+
+// The script workspace has a display switch of its own (docs/design/script-editor-value-editors.md):
+// a dock left open in the panel editor must not take a third of the script editor's height.
+test('"display" names the switch of the workspace in front, and each persists on its own', async () => {
+  const { get } = await import('svelte/store');
+  const map = fakeStorage({ 'ce.ui.showDisplayPanel': 'true' });
+  resetStoredQuotaState();
+  const mod = await import(`../src/CE_Application/stores/panelVisibility.js?t=${Math.random()}`);
+  assert.equal(get(mod.showDisplayPanelInScript), false, 'off in the script workspace until asked for');
+  assert.equal(get(mod.displayPanelVisible), true, 'the panel editor is in front by default');
+
+  mod.displayPanelWorkspace.set('script');
+  assert.equal(get(mod.displayPanelVisible), false);
+  assert.equal(mod.isPanelVisible('display'), false);
+  mod.togglePanelVisibility('display');
+  assert.deepEqual([get(mod.showDisplayPanelInScript), get(mod.showDisplayPanel)], [true, true]);
+  assert.equal(map.get('ce.ui.showDisplayPanel.script'), 'true');
+  mod.setPanelVisibility('display', false);
+  assert.deepEqual([get(mod.showDisplayPanelInScript), get(mod.showDisplayPanel)], [false, true],
+    'the panel editor keeps its own');
+
+  mod.displayPanelWorkspace.set('panel');
+  mod.togglePanelVisibility('display');
+  assert.deepEqual([get(mod.showDisplayPanelInScript), get(mod.showDisplayPanel)], [false, false]);
+  assert.equal(map.get('ce.ui.showDisplayPanel'), 'false');
+  mod.setPanelVisibility('tree', false);
+  assert.equal(get(mod.showTreePanel), false, 'the other two are not per workspace');
 });
