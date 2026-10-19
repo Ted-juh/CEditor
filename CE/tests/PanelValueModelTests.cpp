@@ -644,7 +644,8 @@ int main()
         check (colourModel.loadFromJson (kColourPanel), "colours: loaded the colour panel");
         auto write = [&colourModel] (const juce::String& path, const juce::var& value, const juce::String& form = "value")
         { return colourModel.colourWrites ("set(\"" + path + "\")", path, value, form); };
-        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\"";
+        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", "
+                                   "a CSS colour name, rgb() or hsl()";
 
         const auto red = write ("lbl.background.fill.colour", "red");
         check (! red.refused && red.value.toString() == "#FF0000" && red.lines.isEmpty(),

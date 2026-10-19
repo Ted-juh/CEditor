@@ -847,7 +847,8 @@ int main()
         colourRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
         colourRuntime.loadScripts (gatherPanelScripts (colourModel.panel()));
 
-        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\"";
+        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", "
+                                   "a CSS colour name, rgb() or hsl()";
         colourRuntime.runAction ("onColoursLua", juce::var());
         check (colourLogs.joinIntoString (" | ") ==
                    "lua #FF0000 | "

@@ -162,7 +162,7 @@ export function headerText() {
 namespace ceditor::scripting::colours::generated
 {
 
-/** COLOUR_FORMS: the forms the panel reads, in the words every refusal uses. */
+/** COLOUR_FORMS: the forms a colour may be written in, in the words every refusal uses. */
 inline constexpr const char* kColourForms = ${cString(COLOUR_FORMS)};
 
 /** COLOUR_FIELDS: each colour field, by the type of the section it is in and its path below that

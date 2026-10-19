@@ -431,9 +431,10 @@ inline std::optional<Rgba> cssChannels (const juce::String& text)
         const auto unit = hsl->unit.isEmpty() ? juce::String ("deg") : hsl->unit;
         const double turn = unit == "grad" ? 0.9 : unit == "rad" ? 180.0 / juce::MathConstants<double>::pi
                           : unit == "turn" ? 360.0 : 1.0;
-        const double h = std::fmod (std::fmod (hsl->n[0] * turn, 360.0) + 360.0, 360.0);
-        // A hue too large to hold ("1e999") has no angle.
-        if (! std::isfinite (h)) return {};
+        // A hue too large to be a number ("1e400", "1e308turn") has no angle.
+        const double turned = hsl->n[0] * turn;
+        if (! std::isfinite (turned)) return {};
+        const double h = std::fmod (std::fmod (turned, 360.0) + 360.0, 360.0);
         const double sat = detail::clamp (hsl->n[1], 0.0, 100.0) / 100.0;
         const double light = detail::clamp (hsl->n[2], 0.0, 100.0) / 100.0;
         const double amp = sat * std::min (light, 1.0 - light);
@@ -471,12 +472,24 @@ inline juce::String longForm (const juce::var& value)
     return channels ? panelFormOf (*channels) : juce::String();
 }
 
-/** cssHint: for a refusal, what a CSS colour with space around it is in the panel's form, or empty. */
+/** cssHint: for a refusal, what a CSS colour with space around it is in the panel's form, or empty.
+    Text that is the panel's own form once the space is gone is that text: "#5B9BD580 " is AARRGGBB
+    here, as it is without the space, and not CSS's RRGGBBAA. */
 inline juce::String cssHint (const juce::var& value)
 {
     if (! value.isString() || isPanelColour (value)) return {};
-    const auto channels = cssChannels (value.toString());
+    const auto text = value.toString();
+    const auto trimmed = jsTrim (text);
+    if (trimmed != text && isPanelColour (trimmed)) return " Write \"" + trimmed + "\".";
+    const auto channels = cssChannels (text);
     return channels ? " Write \"" + panelFormOf (*channels) + "\"." : juce::String();
+}
+
+/** colourHint: the sentence that ends a colour refusal, after COLOUR_FORMS: hexHint, else cssHint. */
+inline juce::String colourHint (const juce::var& value)
+{
+    const auto hex = hexHint (value);
+    return hex.isNotEmpty() ? hex : cssHint (value);
 }
 
 /* ------------------------------------------------------------------------ control-set references */
@@ -605,8 +618,7 @@ inline Decision panelColour (const juce::var& value, Field field = {}, const Res
     else if (value.isString()) why = "\"" + value.toString() + "\" is not a colour the panel can read";
     else if (isNumber (value)) why = shownNumber (value) + " is not a colour the panel can read";
     else why = "the value given is not a colour";
-    auto hint = hexHint (value);
-    if (hint.isEmpty()) hint = cssHint (value);
+    auto hint = colourHint (value);
     if (reference)
         hint = field.tokens ? " The panel's control set has no colour called \"" + tokenNameOf (value) + "\"."
                             : juce::String (" A control-set colour is not read in this property.");
