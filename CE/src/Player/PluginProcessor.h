@@ -1703,6 +1703,12 @@ private:
         // exactly as it does in the panel view.
         cb.getValue = [this] (const juce::String& path, const juce::String& form) { return scriptValues.getValue (path, form); };
         cb.whyNoValue = [this] (const juce::String& path) { return scriptValues.whyNoAnswer (path); };
+        // A colour is read by the editor's rule before it is written, and ce.anim refuses a colour
+        // property as its path (Scripting/ScriptColours.h), in the editor's words, so "red" written
+        // here is stored as "#FF0000" and "redd" is refused, window shut as in the panel view.
+        cb.colourWrites = [this] (const juce::String& call, const juce::String& path, const juce::var& value,
+                                  const juce::String& form) { return scriptValues.colourWrites (call, path, value, form); };
+        cb.isColourProperty = [this] (const juce::String& path) { return scriptValues.isColourProperty (path); };
         cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER

@@ -802,6 +802,119 @@ int main()
                "ce.anim: …and stopping it is done(false) (got " + animLogs.joinIntoString (" | ") + ")");
     }
 
+    // A colour written window shut is read by the editor's rule (Scripting/ScriptColours.h), whichever
+    // door it came through: a Lua and a JavaScript set(), Lua's self.set, a whole section, and ce.anim,
+    // which refuses a colour property as its path. Wired as PluginProcessor wires it: the model's
+    // colourWrites and isColourProperty behind BridgeScriptHost's callbacks, its setValue behind that.
+    {
+        const char* kColourPanel = R"JSON({
+          "name": "Colours",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "cl", "name": "cl", "language": "lua", "scope": "panel", "event": "onColoursLua", "target": "*", "enabled": true,
+              "source": "function onColoursLua()\n  set(\"lbl.background.fill.colour\", \"red\")\n  log(\"lua \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.fill.colour\", \"redd\")\n  set(\"lbl.background.fill.colour\", 16711680)\n  log(\"lua kept \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.border.top\", { style = \"solid\", thickness = 3, colour = \"#0008\" })\n  log(\"lua top \" .. tostring(get(\"lbl.background.border.top.thickness\")))\n  set(\"lbl.text.content\", \"red\")\n  log(\"lua text \" .. tostring(get(\"lbl.text.content\")))\nend\n" },
+            { "id": "cj", "name": "cj", "language": "javascript", "scope": "panel", "event": "onColoursJs", "target": "*", "enabled": true,
+              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour'], 50, { duration: 10 }); log('js moving ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }" },
+            { "id": "cs", "name": "cs", "language": "lua", "scope": "component", "event": "onColoursSelf", "target": "lbl", "enabled": true,
+              "source": "function onColoursSelf()\n  self.set(\"background.fill.colour\", \"#abc\")\n  log(\"self \" .. tostring(self.get(\"background.fill.colour\")))\n  self.set(\"background.fill.colour\", \"#abcd\")\nend\n" }
+          ],
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "l1", "name": "lbl", "controlType": "Label" },
+              "Transform": { "_type": "Transform", "x": 0, "y": 0, "width": 100, "height": 40 },
+              "Background": { "_type": "Background", "_children": {
+                "Fill": { "_type": "Fill", "colour": "FF112233" },
+                "Border": { "_type": "Border", "top": { "style": "solid", "thickness": 1, "colour": "FF000000" } } } },
+              "Text": { "_type": "Text", "content": "Hi", "_children": {
+                "Font": { "_type": "Font", "colour": "FFFFFFFF", "underlineColour": "FF00FF00" } } }
+            } }
+          ]
+        })JSON";
+
+        PanelValueModel colourModel;
+        check (colourModel.loadFromJson (kColourPanel), "loaded the colour panel");
+        juce::StringArray colourLogs;
+        BridgeScriptHost::Callbacks ccb;
+        ccb.getValue = [&] (const juce::String& path, const juce::String& form) { return colourModel.getValue (path, form); };
+        ccb.colourWrites = [&] (const juce::String& call, const juce::String& path, const juce::var& value, const juce::String& form)
+        { return colourModel.colourWrites (call, path, value, form); };
+        ccb.isColourProperty = [&] (const juce::String& path) { return colourModel.isColourProperty (path); };
+        ccb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { colourModel.setValue (path, v, form); };
+        ccb.log = [&] (const juce::String& m, const juce::var&) { colourLogs.add (m); };
+        BridgeScriptHost colourHost (std::move (ccb));
+        ScriptRuntime colourRuntime (colourHost);
+        colourHost.attachRuntime (&colourRuntime);
+        colourRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        colourRuntime.loadScripts (gatherPanelScripts (colourModel.panel()));
+
+        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\"";
+        colourRuntime.runAction ("onColoursLua", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "lua #FF0000 | "
+                   "set(\"lbl.background.fill.colour\"): \"redd\" is not a colour the panel can read, so nothing was set. " + forms + ". | "
+                   "set(\"lbl.background.fill.colour\"): 16711680 is not a colour the panel can read, so nothing was set. " + forms
+                       + ". As text, 16711680 is \"#FF0000\". | "
+                   "lua kept #FF0000 | "
+                   "set(\"lbl.background.border.top\"): at colour, \"#0008\" is not a colour the panel can read, so nothing was set. "
+                       + forms + ". Write \"88000000\". | "
+                   "lua top 1 | "
+                   "lua text red",
+               "Lua's set(): a name written out, the rest refused in the editor's words, a whole section with it, and text "
+               "left alone (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        colourLogs.clear();
+        colourRuntime.runAction ("onColoursJs", juce::var());
+        check (colourLogs.joinIntoString (" | ") == "js #0080FF | js underline [] | js top #008000 4",
+               "JavaScript's set(): rgb() written out, \"\" where the property has no colour of its own, and a section's "
+               "colour written out as it is stored (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        colourLogs.clear();
+        colourRuntime.runAction ("onColoursSelf", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "self #AABBCC | "
+                   "set(\"lbl.background.fill.colour\"): \"#abcd\" is not a colour the panel can read, so nothing was set. " + forms
+                       + ". Write \"DDAABBCC\".",
+               "Lua's self.set reads a colour as set() does (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        // A native handler's set() (NativeHandlerEngine's host_set, through the C ABI) and Python's are
+        // this same call on the host, with no prelude in front of it.
+        colourLogs.clear();
+        colourHost.setValue ("lbl.background.fill.colour", juce::var ("RebeccaPurple"), juce::var());
+        const auto purple = colourModel.getValue ("lbl.background.fill.colour").toString();
+        colourHost.setValue ("lbl.background.fill.colour", juce::var (1.5), juce::var());
+        check (purple == "#663399" && colourModel.getValue ("lbl.background.fill.colour").toString() == "#663399"
+                   && colourLogs.joinIntoString (" | ") == "set(\"lbl.background.fill.colour\"): 1.5 is not a colour the panel can "
+                                                           "read, so nothing was set. " + forms + ".",
+               "the host's own setValue, a native handler's door, reads a colour the same way (got "
+                   + colourLogs.joinIntoString (" | ") + ")");
+        colourHost.setValue ("lbl.background.fill.colour", juce::var ("#abc"), juce::var());
+
+        colourLogs.clear();
+        colourRuntime.tickAnimations (0.0);
+        colourRuntime.runAction ("onMovesJs", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.to: \"lbl.background.fill.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "ce.anim.spring: \"lbl.background.border.top.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "js moving false true false",
+               "ce.anim refuses a colour property as its path, in the editor's words, and moves the number beside it in the "
+               "same list (got " + colourLogs.joinIntoString (" | ") + ")");
+        // An envelope arrives at the same place from every prelude. Started there directly: the
+        // preludes' own envelope sampling is not what this is about.
+        colourLogs.clear();
+        auto* envelopeOpts = new juce::DynamicObject();
+        envelopeOpts->setProperty ("samples", juce::Array<juce::var> { 0.0, 1.0 });
+        colourHost.startAnimation ("envelope", juce::var ("lbl.background.fill.colour"), 1.0, juce::var (envelopeOpts));
+        check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.envelope: \"lbl.background.fill.colour\" is a colour, and ce.anim moves numbers, so nothing was started."
+                   && ! colourRuntime.animationRunning ("lbl.background.fill.colour"),
+               "ce.anim.envelope refuses a colour too (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourRuntime.tickAnimations (1000.0);
+        check (colourModel.getValue ("lbl.background.fill.colour").toString() == "#AABBCC"
+                   && colourModel.getValue ("lbl.background.border.top.colour").toString() == "#008000"
+                   && (double) colourModel.getValue ("lbl.transform.x") == 50.0,
+               "so no tick wrote a number into a colour, and the number moved");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

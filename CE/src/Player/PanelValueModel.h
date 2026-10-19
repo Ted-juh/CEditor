@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "Scripting/ScriptColours.h"
 
 namespace ceditor
 {
@@ -189,6 +190,55 @@ public:
             toWrite = juce::var (toWrite.toString().replaceCharacter ('.', '_'));
         if (writeCanMoveAName (modelPath)) forgetNames();
         return setAtPath (control, modelPath, toWrite);
+    }
+
+    /** What a script's write of `value` to `scriptPath` stores in the colour properties it reaches,
+        by the editor's rule (Scripting/ScriptColours.h; colourWrites in panelRuntime.js): what the
+        panel reads as written, CSS's short forms written out, and for each colour the panel cannot
+        read a refusal in the editor's words, in which case nothing is to be written. Each refusal
+        begins with `call`, set("<the path as the script wrote it>").
+
+        BridgeScriptHost asks this before every engine's set() is written. A write it cannot place (a
+        control that is not there, .normalizedValue on a control with no range) comes back as it was,
+        for setValue to report as it always has. `panel.*` is not read here, because the editor's
+        set() does not read it: the panel document has no section templates to say which of its
+        keys are colours. */
+    scripting::colours::Writes colourWrites (const juce::String& call, const juce::String& scriptPath,
+                                             const juce::var& value, const juce::String& form = "value") const
+    {
+        scripting::colours::Writes unchanged;
+        unchanged.value = value;
+        const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return unchanged;
+        const auto control = findControlByName (split.first);
+        if (! control.isObject()) return unchanged;
+
+        // A position is read as the number it stands for, as the editor reads it before asking, so a
+        // refusal names that number. Nothing else changes: a number is never a colour, and setValue
+        // maps the position itself.
+        juce::var written = value;
+        if (form == "normalizedValue")
+        {
+            double lo = 0.0, hi = 0.0;
+            if (! rangeOf (control, lo, hi)) return unchanged;
+            written = juce::var (lo + juce::jlimit (0.0, 1.0, (double) value) * (hi - lo));
+        }
+        auto out = scripting::colours::colourWrites (call, "nothing was set", control, resolveModelPath (control, split.second),
+                                                     written, [this] (const juce::String& name)
+                                                     { return scripting::colours::controlSetResolves (doc, name); });
+        if (form == "normalizedValue" && ! out.refused) out.value = value;
+        return out;
+    }
+
+    /** Whether `scriptPath` is a colour property of a control, for ce.anim to refuse it as a path
+        (animatesColour in panelRuntime.js): every tick of a move would write a number into it. */
+    bool isColourProperty (const juce::String& scriptPath) const
+    {
+        const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first) || split.second.isEmpty()) return false;
+        const auto control = findControlByName (split.first);
+        if (! control.isObject()) return false;
+        return scripting::colours::colourFieldAt (control, resolveModelPath (control, split.second)).has_value();
     }
 
     /** Every control's name, in document order, containers included — what ce.panel.snapshot walks.

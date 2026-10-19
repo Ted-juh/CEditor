@@ -13,6 +13,7 @@
 // THREADING: all calls happen on the message thread, inside a dispatch.
 
 #include "ScriptRuntime.h"
+#include "ScriptColours.h"
 #include <cmath>
 #include <map>
 #include <set>
@@ -140,6 +141,17 @@ public:
         // "normalizedValue". The app maps it, because only the app knows the control's range.
         std::function<void (const juce::String& path, const juce::var& value, bool transmit,
                             const juce::String& form)> setValue;
+        // What a write stores in the colour properties it reaches, by the editor's rule
+        // (ScriptColours.h; PanelValueModel::colourWrites): CSS's short forms written out, and a
+        // refusal line for each colour the panel cannot read, in which case nothing is written.
+        // `call` begins each line: set("<path as the script wrote it>"). Asked before setValue, for
+        // every engine's set(), Lua's self.set and a native handler's set alike. Unset: every value
+        // is written as it was given, which is all a host with no panel document can do.
+        std::function<colours::Writes (const juce::String& call, const juce::String& path,
+                                       const juce::var& value, const juce::String& form)> colourWrites;
+        // Whether a path is a colour property, which ce.anim refuses to move (isColourProperty).
+        // Unset: nothing is, as before.
+        std::function<bool (const juce::String& path)> isColourProperty;
         // Whether a transmitting write to `path` would reach the synth at all — the path is bound to
         // a device parameter. Only those writes spend the MIDI flood budget. Unset: every
         // transmitting write counts, which is how every set() was counted before this existed.
@@ -284,6 +296,23 @@ public:
             return;
         }
 
+        // A colour the panel cannot read used to be stored as written: "red", "#000", a number, a
+        // name ce.anim had swept into a number. Read as the editor's set() reads it, after any
+        // intercept() filter has answered (the engines run those first) and before anything is
+        // written or sent: the short forms are written out, and what has no one reading is refused,
+        // a line for each colour, in the editor's sentence, with nothing written.
+        juce::var toWrite = value;
+        if (callbacks.colourWrites)
+        {
+            const auto read = callbacks.colourWrites ("set(\"" + path + "\")", addressed.first, value, addressed.second);
+            if (read.refused)
+            {
+                for (const auto& line : read.lines) logAt ("error", line, juce::var());
+                return;
+            }
+            toWrite = read.value;
+        }
+
         bool transmit = runtime ? runtime->defaultTransmit() : true;
         if (auto* o = options.getDynamicObject())
             if (o->hasProperty ("transmit")) transmit = (bool) o->getProperty ("transmit");
@@ -294,7 +323,7 @@ public:
         const bool wouldSend = ! callbacks.transmitsTo || callbacks.transmitsTo (addressed.first);
         if (transmit && wouldSend && ! midiSendAllowed())
             transmit = false;
-        if (callbacks.setValue) callbacks.setValue (addressed.first, value, transmit, addressed.second);
+        if (callbacks.setValue) callbacks.setValue (addressed.first, toWrite, transmit, addressed.second);
     }
 
     // The Lua, JavaScript and Python preludes check a CC's numbers before they get here (__midiArg);
@@ -480,6 +509,8 @@ public:
     { if (runtime) runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime) runtime->stopAnimation (path); }
+    bool isColourProperty (const juce::String& path) override
+    { return callbacks.isColourProperty && callbacks.isColourProperty (path); }
     bool animationRunning (const juce::String& path) override
     { return runtime && runtime->animationRunning (path); }
     juce::var animationValue (const juce::String& path) override
