@@ -360,7 +360,20 @@ export function panelColour(value, field = {}, resolvesToken = () => false) {
       ? ` The panel's control set has no colour called "${tokenNameOf(value)}".`
       : ' A control-set colour is not read in this property.';
   }
+  if (field.stop) {
+    return { why, advice: `${COLOUR_FORMS}, and a gradient stop takes no alpha.${stopHint(hint)}` };
+  }
   return { why, advice: `${COLOUR_FORMS}${field.empty ? ', or "" for none' : ''}.${hint}` };
+}
+
+/**
+ * A refusal's hint as a gradient stop takes it. The hint for "#0008" is the AARRGGBB it reads as,
+ * "88000000", which a stop would refuse in turn for its alpha; a stop is told the colour without
+ * it, in the words its own alpha refusal uses. Any other hint is the one every colour gets.
+ */
+function stopHint(hint) {
+  const m = /^ Write "([0-9A-F]{2})([0-9A-F]{6})"\.$/.exec(hint);
+  return m && m[1] !== 'FF' ? ` Write "${m[2]}", the colour without its alpha.` : hint;
 }
 
 /**

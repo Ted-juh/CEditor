@@ -623,6 +623,19 @@ inline Decision stopColour (const juce::var& value, const juce::String& colour)
              "Write \"" + hex.substring (2) + "\", the colour without its alpha." };
 }
 
+/** stopHint: a refusal's hint as a gradient stop takes it. The hint for "#0008" is the AARRGGBB it
+    reads as, "88000000", which a stop would refuse in turn for its alpha; a stop is told the colour
+    without it, in its own alpha refusal's words. Any other hint is the one every colour gets. */
+inline juce::String stopHint (const juce::String& hint)
+{
+    const juce::String head (" Write \""), tail ("\".");
+    if (! hint.startsWith (head) || ! hint.endsWith (tail) || hint.length() != head.length() + 8 + tail.length())
+        return hint;
+    const auto hex = hint.substring (head.length(), head.length() + 8);
+    if (! hex.containsOnly ("0123456789ABCDEF") || hex.startsWith ("FF")) return hint;
+    return " Write \"" + hex.substring (2) + "\", the colour without its alpha.";
+}
+
 /** panelColour: the editor's decision for one colour property, in its words. */
 inline Decision panelColour (const juce::var& value, Field field = {}, const ResolvesToken& resolvesToken = {})
 {
@@ -641,6 +654,8 @@ inline Decision panelColour (const juce::var& value, Field field = {}, const Res
     if (reference)
         hint = field.tokens ? " The panel's control set has no colour called \"" + tokenNameOf (value) + "\"."
                             : juce::String (" A control-set colour is not read in this property.");
+    if (field.stop)
+        return { false, {}, why, colourForms() + ", and a gradient stop takes no alpha." + stopHint (hint) };
     return { false, {}, why, colourForms() + (field.empty ? ", or \"\" for none" : "") + "." + hint };
 }
 

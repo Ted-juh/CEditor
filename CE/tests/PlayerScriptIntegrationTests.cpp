@@ -990,7 +990,7 @@ int main()
         colourRuntime.runAction ("onPanelJs", juce::var());
         check (colourLogs.joinIntoString (" | ") ==
                    "set(\"panel.bgGradient\"): at stops.1.color, \"nope\" is not a colour the panel can read, so nothing was set. "
-                       + forms + ". | "
+                       + forms + ", and a gradient stop takes no alpha. | "
                    "js stop AABBCC | js stop 000080 | "
                    "set(\"lbl.background.fill.gradient\"): at stops.1.color, \"80FF0000\" has an alpha, and a gradient stop has "
                    "none: its opacity is the gradient layer's, so nothing was set. Write \"FF0000\", the colour without its alpha. | "
