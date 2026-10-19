@@ -673,7 +673,7 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". With the panel open, "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), which `get()` returns; a number, "#" with four digits and anything else are refused with a message, and nothing is written. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
+    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
@@ -1019,7 +1019,7 @@ export const COMMANDS = [
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
     refusal: 'false',
-    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. With the panel open, so is a colour property as `path`, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
+    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },

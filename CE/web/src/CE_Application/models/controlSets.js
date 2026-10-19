@@ -37,7 +37,8 @@ import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
-const MAX_ALIAS_DEPTH = 8;
+// Exported for gen-colour-fields.mjs: the plug-in's C++ follows a script's reference just as far.
+export const MAX_ALIAS_DEPTH = 8;
 
 /**
  * The roles a set has to name. Every built-in set defines every one of these (the test insists),

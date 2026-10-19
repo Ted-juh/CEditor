@@ -442,8 +442,20 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     const auto key = path.toString();
     if (key.isEmpty()) return;
 
+    // A colour property is not moved: every tick would write a number into it, and set() refuses
+    // each. Asked here, where every engine's ce.anim arrives once per path, and said in the words of
+    // the WebView runtime's animatesColour. Nothing starts, so nothing ends and no done is called,
+    // as there. The preludes have already refused a target that is not a number, which comes first.
+    const juce::String verb = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
+    if (host.isColourProperty (key))
+    {
+        host.logAt ("error", "ce.anim." + verb + ": \"" + key + "\" is a colour, and ce.anim moves numbers, so nothing "
+                             "was started.", juce::var());
+        return;
+    }
+
     Animation a;
-    a.kind = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
+    a.kind = verb;
     a.path = key;
     a.groupId = (o != nullptr && o->hasProperty ("__group")) ? (int) o->getProperty ("__group") : 0;
     if (o != nullptr) a.doneToken = o->getProperty ("__done").toString();

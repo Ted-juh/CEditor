@@ -220,6 +220,29 @@ const char* kEntriesPanel = R"JSON({
     }
   }
 })JSON";
+
+// The colour rule, window shut: a Label with a fill, a border and a font, a Meter with two zones, and
+// a control that has made none of its sections. The panel names a set it carries, as an export does.
+const char* kColourPanel = R"JSON({
+  "name": "Colours",
+  "bgColour": "FF000000",
+  "controlSet": { "id": "mine" },
+  "controlSets": [ { "id": "mine", "name": "Mine", "tokens": { "brand": "FF123456" } } ],
+  "controls": [
+    { "_type": "Control", "_children": {
+      "Core": { "_type": "Core", "id": "l1", "name": "lbl", "controlType": "Label" },
+      "Behavior": { "_type": "Behavior", "min": 0, "max": 255 },
+      "Background": { "_type": "Background", "_children": {
+        "Fill": { "_type": "Fill", "colour": "FF112233", "mode": "solid" },
+        "Border": { "_type": "Border", "top": { "style": "solid", "thickness": 1, "colour": "FF000000" } } } },
+      "Text": { "_type": "Text", "content": "Hi", "_children": {
+        "Font": { "_type": "Font", "colour": "FFFFFFFF", "underlineColour": "" } } } } },
+    { "_type": "Control", "_children": {
+      "Core": { "_type": "Core", "id": "m1", "name": "meter", "controlType": "Meter" },
+      "Meter": { "_type": "Meter", "zones": [ { "from": 0, "colour": "FF00FF00" }, { "from": 0.8, "colour": "FFFF0000" } ] } } },
+    { "_type": "Control", "_children": { "Core": { "_type": "Core", "id": "b1", "name": "bare" } } }
+  ]
+})JSON";
 }
 
 int main()
@@ -527,6 +550,173 @@ int main()
         check (ceditor::PanelValueModel::sharedForFile (file)->doc.getProperty ("name", {}).toString() == "Changed",
                "file: a file that changed is read again");
         file.deleteFile();
+    }
+
+    // --- colours: the editor's rule, case for case ---------------------------------------------------
+    // CE/web/test/fixtures/colourPropertyCases.json is what colourPropertyCases.test.js runs through
+    // the editor's scriptColours.js. Every case must be stored, written out or refused here exactly as
+    // there, in the same words; every field case typed the same; every reference resolved the same.
+    {
+        namespace colours = ceditor::scripting::colours;
+        const auto fixture = juce::File (__FILE__).getParentDirectory()   // CE/tests
+                                 .getParentDirectory()                     // CE
+                                 .getChildFile ("web/test/fixtures/colourPropertyCases.json");
+        const auto cases = juce::JSON::parse (fixture.loadFileAsString());
+        check (cases.isObject(), "colours: the shared cases are where colourPropertyCases.test.js reads them ("
+                                     + fixture.getFullPathName() + ")");
+
+        juce::StringArray names;
+        if (auto* list = cases.getProperty ("controlSetNames", {}).getArray())
+            for (const auto& n : *list) names.add (n.toString());
+        const colours::ResolvesToken resolves = [&names] (const juce::String& name) { return names.contains (name); };
+        auto fieldOf = [&cases] (const juce::var& kind)
+        {
+            const auto f = cases.getProperty ("fields", {}).getProperty (juce::Identifier (kind.toString()), {});
+            return colours::Field { (bool) f.getProperty ("empty", false), (bool) f.getProperty ("tokens", false) };
+        };
+        auto shown = [] (const juce::var& v) { return v.isVoid() ? juce::String ("null") : juce::JSON::toString (v, true); };
+
+        int count = 0, wrong = 0;
+        if (auto* list = cases.getProperty ("cases", {}).getArray())
+            for (const auto& c : *list)
+            {
+                ++count;
+                const auto value = c.getProperty ("value", {});
+                const auto read = colours::panelColour (value, fieldOf (c.getProperty ("field", {})), resolves);
+                const bool stored = c.getDynamicObject()->hasProperty ("stored");
+                const bool agrees = stored
+                    ? read.ok && read.colour.isString() && read.colour.toString() == c.getProperty ("stored", {}).toString()
+                    : ! read.ok && read.why == c.getProperty ("why", {}).toString() && read.advice == c.getProperty ("advice", {}).toString();
+                if (agrees) continue;
+                ++wrong;
+                check (false, "colours: " + c.getProperty ("case", {}).toString() + ", " + shown (value) + ": got "
+                                  + (read.ok ? "stored " + read.colour.toString() : read.why + " | " + read.advice));
+            }
+        check (count > 100 && wrong == 0, "colours: all " + juce::String (count)
+                                              + " property cases stored or refused as the editor does, in its words");
+
+        count = 0;
+        wrong = 0;
+        const auto roots = cases.getProperty ("roots", {});
+        if (auto* list = cases.getProperty ("fieldCases", {}).getArray())
+            for (const auto& c : *list)
+            {
+                ++count;
+                const auto root = roots.getProperty (juce::Identifier (c.getProperty ("root", {}).toString()), {});
+                const auto found = colours::colourFieldAt (root, c.getProperty ("path", {}).toString());
+                const auto want = c.getProperty ("field", {});
+                const bool agrees = want.isObject()
+                    ? found && found->empty == (bool) want.getProperty ("empty", false) && found->tokens == (bool) want.getProperty ("tokens", false)
+                    : ! found.has_value();
+                if (agrees) continue;
+                ++wrong;
+                check (false, "colours: " + c.getProperty ("case", {}).toString() + ": got "
+                                  + (found ? juce::String (found->empty ? "empty " : "") + (found->tokens ? "tokens" : "colour") : juce::String ("not a colour")));
+            }
+        check (count > 20 && wrong == 0, "colours: all " + juce::String (count) + " field cases typed as the editor types them");
+
+        count = 0;
+        wrong = 0;
+        if (auto* list = cases.getProperty ("controlSetCases", {}).getArray())
+            for (const auto& c : *list)
+            {
+                ++count;
+                const bool got = colours::controlSetResolves (c.getProperty ("panel", {}), c.getProperty ("name", {}).toString());
+                if (got == (bool) c.getProperty ("resolves", {})) continue;
+                ++wrong;
+                check (false, "colours: " + c.getProperty ("case", {}).toString() + ": got " + (got ? "resolves" : "does not resolve"));
+            }
+        check (count > 20 && wrong == 0, "colours: all " + juce::String (count)
+                                             + " references resolved on their panel as the editor resolves them");
+
+        // JavaScript's numbers, which the refusals print and the CSS forms are read and rounded by.
+        check (colours::jsNumber (0.30000000000000004) == "0.30000000000000004" && colours::jsNumber (-0.0) == "0"
+                   && colours::jsNumber (5e-324) == "5e-324" && colours::jsNumber (1e-6) == "0.000001"
+                   && colours::jsNumber (1.23e-18) == "1.23e-18" && colours::jsNumber (-1234.5) == "-1234.5"
+                   && colours::jsNumber (1e20) == "100000000000000000000" && colours::jsNumber (2.5e21) == "2.5e+21",
+               "colours: a number prints as String() prints it in JavaScript");
+        check (colours::jsRound (0.49999999999999994) == 0.0 && colours::jsRound (-0.5) == 0.0 && colours::jsRound (2.5) == 3.0
+                   && colours::jsRound (-2.5) == -2.0 && colours::jsRound (127.49999999999999) == 127.0,
+               "colours: a half rounds up, toward +infinity, as Math.round rounds it, and only a half");
+
+        // Through the window-shut model, as BridgeScriptHost asks it for every engine's set().
+        ceditor::PanelValueModel colourModel;
+        check (colourModel.loadFromJson (kColourPanel), "colours: loaded the colour panel");
+        auto write = [&colourModel] (const juce::String& path, const juce::var& value, const juce::String& form = "value")
+        { return colourModel.colourWrites ("set(\"" + path + "\")", path, value, form); };
+        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", "
+                                   "a CSS colour name, rgb() or hsl()";
+
+        const auto red = write ("lbl.background.fill.colour", "red");
+        check (! red.refused && red.value.toString() == "#FF0000" && red.lines.isEmpty(),
+               "colours: a name is written out, without a word");
+        check (write ("lbl.background.fill.colour", "FF5B9BD5").value.toString() == "FF5B9BD5"
+                   && write ("lbl.Background.Fill.colour", "#abc").value.toString() == "#AABBCC",
+               "colours: the panel's own form is stored as written, and \"#RGB\" written out");
+        const auto redd = write ("lbl.background.fill.colour", "redd");
+        check (redd.refused && redd.lines.size() == 1
+                   && redd.lines[0] == "set(\"lbl.background.fill.colour\"): \"redd\" is not a colour the panel can read, so "
+                                       "nothing was set. " + forms + ".",
+               "colours: what the panel cannot read is refused in set()'s sentence (got " + redd.lines.joinIntoString (" / ") + ")");
+        const auto number = write ("lbl.background.fill.colour", 16711680);
+        check (number.refused && number.lines[0].endsWith (" As text, 16711680 is \"#FF0000\"."),
+               "colours: a number is refused, with how it reads as text");
+
+        // A section or a list written whole: each colour field in it, and nothing written over one.
+        auto* topObject = new juce::DynamicObject();
+        topObject->setProperty ("style", "solid");
+        topObject->setProperty ("thickness", 3);
+        topObject->setProperty ("colour", "#0008");
+        const auto whole = write ("lbl.background.border.top", juce::var (topObject));
+        check (whole.refused && whole.lines.size() == 1
+                   && whole.lines[0] == "set(\"lbl.background.border.top\"): at colour, \"#0008\" is not a colour the panel can "
+                                        "read, so nothing was set. " + forms + ". Write \"88000000\".",
+               "colours: a section written whole names the field it refused (got " + whole.lines.joinIntoString (" / ") + ")");
+        const auto top = juce::JSON::parse (R"({ "style": "solid", "thickness": 3, "colour": "red" })");
+        const auto topWritten = write ("lbl.background.border.top", top);
+        check (! topWritten.refused && topWritten.value.getProperty ("colour", {}).toString() == "#FF0000"
+                   && (int) topWritten.value.getProperty ("thickness", {}) == 3
+                   && top.getProperty ("colour", {}).toString() == "red" && topWritten.value.getDynamicObject() != top.getDynamicObject(),
+               "colours: and one it can read is written out, in a copy, the script's own table as it wrote it");
+        const auto plain = juce::JSON::parse (R"({ "colour": "FF000000", "thickness": 2 })");
+        check (write ("lbl.background.border.top", plain).value.getDynamicObject() == plain.getDynamicObject(),
+               "colours: a section with nothing to write out is the very value given");
+        const auto zones = juce::JSON::parse (R"([ { "from": 0, "colour": "lime" }, { "from": 0.8, "colour": "FFFF0000" } ])");
+        const auto zonesWritten = write ("meter.meter.zones", zones);
+        check (! zonesWritten.refused && zonesWritten.value[0].getProperty ("colour", {}).toString() == "#00FF00"
+                   && zonesWritten.value[1].getDynamicObject() == zones[1].getDynamicObject()
+                   && zones[0].getProperty ("colour", {}).toString() == "lime",
+               "colours: a list, at every position, copied only where something changed");
+        check (write ("meter.meter.zones.3.colour", "notacolour").refused,
+               "colours: a fourth zone the document lacks is typed by the template's first");
+
+        check (! write ("lbl.text.font.underlineColour", "").refused && write ("lbl.background.fill.colour", "").refused,
+               "colours: \"\" only where the property has no colour of its own");
+        check (! write ("lbl.background.fill.colour", "{brand}").refused && ! write ("lbl.background.fill.colour", "{accent}").refused,
+               "colours: a reference to the panel's own set, and to the base set behind it");
+        const auto nosuch = write ("lbl.background.fill.colour", "{nosuch}");
+        check (nosuch.refused && nosuch.lines[0].endsWith (". The panel's control set has no colour called \"nosuch\"."),
+               "colours: a reference the panel's sets lack is refused, naming it");
+
+        check (write ("lbl.text.content", "red").value.toString() == "red" && ! write ("lbl.text.content", "red").refused,
+               "colours: a property that is not a colour is left alone, whatever it holds");
+        check (write ("panel.bgColour", "redd").value.toString() == "redd" && ! write ("panel.bgColour", "redd").refused,
+               "colours: the panel document is not read, as the editor's set() does not read it");
+        check (! write ("nosuch.background.fill.colour", "redd").refused,
+               "colours: a control that is not there is left for setValue to report");
+        check (write ("bare.background.fill.colour", "redd").refused && write ("bare.icon.tint", "{accent}").refused,
+               "colours: a section the control has not made yet is typed by its template");
+        const auto position = write ("lbl.background.fill.colour", 0.5, "normalizedValue");
+        check (position.refused && position.lines[0].startsWith ("set(\"lbl.background.fill.colour\"): 127.5 is not a colour"),
+               "colours: a position is refused as the number it stands for (got " + position.lines.joinIntoString (" / ") + ")");
+
+        check (colourModel.isColourProperty ("lbl.background.fill.colour") && colourModel.isColourProperty ("LBL.Background.Fill.COLOUR")
+                   && colourModel.isColourProperty ("bare.icon.tint") && colourModel.isColourProperty ("meter.meter.zones.5.colour"),
+               "colours: ce.anim's question, a colour property, found as set() finds it");
+        check (! colourModel.isColourProperty ("lbl.text.content") && ! colourModel.isColourProperty ("lbl.transform.x")
+                   && ! colourModel.isColourProperty ("panel.bgColour") && ! colourModel.isColourProperty ("nosuch.background.fill.colour")
+                   && ! colourModel.isColourProperty ("lbl"),
+               "colours: and not where it is not one, or not a control's");
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

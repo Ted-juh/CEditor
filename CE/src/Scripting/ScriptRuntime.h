@@ -192,6 +192,10 @@ public:
     virtual void startAnimation (const juce::String& kind, const juce::var& path,
                                  double target, const juce::var& opts)
     { juce::ignoreUnused (kind, path, target, opts); }
+    /** Whether `path` is a colour property of the host's panel (ScriptColours.h's colourFieldAt),
+        which ScriptRuntime::startAnimation refuses to move: every tick would write a number into it.
+        Default false: a host with no panel document cannot tell, and moves what it is asked to. */
+    virtual bool isColourProperty (const juce::String& path) { juce::ignoreUnused (path); return false; }
     virtual void stopAnimation (const juce::String& path) { juce::ignoreUnused (path); }
     virtual bool animationRunning (const juce::String& path) { juce::ignoreUnused (path); return false; }
     /** Where an animation IS, and everything running. running() answers whether; these answer how

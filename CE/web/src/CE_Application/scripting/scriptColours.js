@@ -19,8 +19,16 @@
 // JavaScript and Python preludes too, so COLOUR_FORMS, hexHint, unitProblem, realNumber and the
 // reading of CSS's forms (cssChannels, panelFormOf, longForm, cssHint) are written out again there,
 // word for word, and CSS_NAMED_COLOURS is generated into each by tools/scripts/gen-script-modules.mjs.
-// scriptPreludeAgreement.test.js holds them to it. The rest of this file (drawing colours, the
-// property schema) is panel-view only.
+// scriptPreludeAgreement.test.js holds them to it. Drawing colours are panel-view only.
+//
+// The property rule (panelColour, colourFieldAt, mapColourWrites) holds with the plug-in's window
+// shut as well, where a set() from any engine reaches the C++ panel model instead of this file.
+// CE/src/Scripting/ScriptColours.h is the same rule in C++, in the same words, and reads its tables
+// from ScriptColours.generated.h, which tools/scripts/gen-colour-fields.mjs writes from the exports
+// below (COLOUR_FORMS, COLOUR_FIELDS, EFFECT_TYPES, MADE_CHILDREN, CSS_NAMED_COLOURS) and the
+// section templates, so which properties are colours is said once. CE/web/test/fixtures/
+// colourPropertyCases.json is read by both sides' tests: a case that answers differently in one
+// fails there.
 
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { isColourKey, isTokenReference, tokenNameOf } from '../models/controlSets.js';
@@ -362,9 +370,19 @@ export function panelColour(value, field = {}, resolvesToken = () => false) {
 
 // Fill's optional effect targets materialise from the Effects template under their own names
 // (controlTreeUtils.getDefaultChildTemplate), so they share its fields.
-const EFFECT_TYPES = new Set(['SolidEffects', 'GradientEffects', 'ImageEffects', 'OverlayEffects']);
+export const EFFECT_TYPES = new Set(['SolidEffects', 'GradientEffects', 'ImageEffects', 'OverlayEffects']);
 
-const COLOUR_FIELDS = (() => {
+// The children set() makes that no template lists, by the section they are made under and the name
+// (lower case) they are written as, with the type each is made as: Background's and Border's
+// `effects`, and Fill's optional effect targets, each from the Effects template
+// (controlTreeUtils.getDefaultChildTemplate). templateChild reads it; so does the C++ walk.
+export const MADE_CHILDREN = Object.freeze({
+  Background: Object.freeze({ effects: 'Effects' }),
+  Border: Object.freeze({ effects: 'Effects' }),
+  Fill: Object.freeze(Object.fromEntries([...EFFECT_TYPES].map((name) => [name.toLowerCase(), name]))),
+});
+
+export const COLOUR_FIELDS = (() => {
   const fields = new Map();
   const add = (type, path, key, empty) => {
     if (!fields.has(type)) fields.set(type, new Map());
@@ -405,19 +423,18 @@ function keyed(object, segment) {
   return key === undefined ? undefined : object[key];
 }
 
-/** The template a missing child would be made from: what set() materialises on the way down. */
-function templateChild(type, segment, atRoot) {
+/**
+ * The template a missing child would be made from: what set() materialises on the way down.
+ * Exported for gen-colour-fields.mjs, which checks the template tree it writes for the C++ walk.
+ */
+export function templateChild(type, segment, atRoot) {
   if (atRoot) return keyed(SECTION_DEFAULTS, segment);
   const section = SECTION_DEFAULTS[type] ?? (EFFECT_TYPES.has(type) ? SECTION_DEFAULTS.Effects : undefined);
   const child = keyed(section?._children, segment);
   if (child !== undefined) return child;
+  const made = Object.hasOwn(MADE_CHILDREN, type) ? MADE_CHILDREN[type] : undefined;
   const lower = segment.toLowerCase();
-  if ((type === 'Background' || type === 'Border') && lower === 'effects') return { _type: 'Effects' };
-  if (type === 'Fill') {
-    const effect = [...EFFECT_TYPES].find((name) => name.toLowerCase() === lower);
-    if (effect) return { _type: effect };
-  }
-  return undefined;
+  return made && Object.hasOwn(made, lower) ? { _type: made[lower] } : undefined;
 }
 
 /**
