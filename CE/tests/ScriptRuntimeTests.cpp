@@ -731,12 +731,55 @@ int main()
                  "error:ce.math.lighten: the amount is a number from 0 to 1, and 40 is not, so there is no answer. "
                  "If you meant 40 out of 100, write 0.4.",
                  "error:ce.math.rgb: \"x5B9BD5\" is not a colour, so there is no answer. A colour is 6 hex digits "
-                 "(RRGGBB) or 8 (AARRGGBB), with or without \"#\".",
+                 "(RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl().",
                  "error:ce.anim.to: \"full\" is not a number, so nothing was started.",
                  "error:ce.math.alpha: the alpha is a number from 0 to 1, and 128 is not, so there is no answer.",
                  "error:ce.anim.spring: \"100px\" is not a number, so nothing was started." })
             check (host.levelled.contains (line), juce::String ("refused in the WebView runtime's words: ") + line);
         check (host.levelled.size() == 5, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
+    // 12d) ce.math reads CSS's short forms as a colour property stores them, through the real Lua
+    // and QuickJS engines: each prelude's own port of the WebView's reading, and the generated names
+    // table. "red" was refused here while set() took it. The rounding is JavaScript's (30% of 255 is
+    // 76.5, which is 77), the Kelvin sign is read as "k" as toLowerCase reads it, and what a property
+    // refuses is refused, with the property's hint.
+    {
+        juce::Array<juce::var> cssScripts;
+        cssScripts.add (makeScript ("csslua", "lua", "panel", "onCssLua", "*",
+            "function onCssLua()\n"
+            "  local rgb = ce.math.rgb('rgba(255, 0, 0, 0.5)')\n"
+            "  log('lua ' .. ce.math.lighten('Red', 0.2) .. ' ' .. ce.math.alpha('#abc', 0.5) .. ' '\n"
+            "      .. rgb.r .. ',' .. rgb.g .. ',' .. rgb.b .. ' ' .. ce.math.mix('hsl(0, 0%, 30%)', 'transparent', 0)\n"
+            "      .. ' ' .. ce.math.darken('rgb(2.5 300 -4)', 1) .. ' ' .. tostring(ce.math.rgb(' red '))\n"
+            "      .. ' ' .. tostring(ce.math.rgb('constructor')))\n"
+            "end\n"));
+        cssScripts.add (makeScript ("cssjs", "javascript", "panel", "onCssJs", "*",
+            "function onCssJs() {\n"
+            "  var rgb = ce.math.rgb('RGB(91 155 213 / 50%)');\n"
+            "  var hsl = ce.math.hsl('hsl(-0.25turn, 100%, 50%)');\n"
+            "  log('js ' + ce.math.lighten('SteelBlue', 0) + ' ' + ce.math.alpha('hsla(120, 100%, 50%, 0.25)', 1) + ' '\n"
+            "      + rgb.r + ',' + rgb.g + ',' + rgb.b + ' ' + Math.round(hsl.h) + ' ' + ce.math.darken('rgb(30%, 30%, 30%)', 1)\n"
+            "      + ' ' + ce.math.rgb('#abcd') + ' ' + ce.math.lighten('\\u212Ahaki', 0));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (cssScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onCssLua", "panel", juce::var());
+        runtime.dispatchEvent ("onCssJs", "panel", juce::var());
+        const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
+        check (host.logs.contains ("lua #FF3333 80AABBCC 255,0,0 #4D4D4D #03FF00 nil nil"),
+               "ce.math reads CSS's short forms in the Lua engine" + got);
+        check (host.logs.contains ("js #4682B4 FF00FF00 91,155,213 270 #4D4D4D undefined #F0E68C"),
+               "ce.math reads CSS's short forms in the JS engine" + got);
+        const juce::String forms ("A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", "
+                                  "or \"#RGB\", a CSS colour name, rgb() or hsl().");
+        for (const auto& line : {
+                 "error:ce.math.rgb: \" red \" is not a colour, so there is no answer. " + forms + " Write \"#FF0000\".",
+                 "error:ce.math.rgb: \"constructor\" is not a colour, so there is no answer. " + forms,
+                 "error:ce.math.rgb: \"#abcd\" is not a colour, so there is no answer. " + forms + " Write \"DDAABBCC\"." })
+            check (host.levelled.contains (line), "refused in the WebView runtime's words: " + line);
+        check (host.levelled.size() == 3, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
     }
 
     // 13) ce.storage ------------------------------------------------------------------------------

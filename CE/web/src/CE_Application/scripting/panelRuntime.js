@@ -33,8 +33,8 @@ import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
 import {
-  COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, drawColour, hexHint, isPanelColour, mapColourWrites,
-  panelColour, percentHint, percentTextHint, realNumber, shownNumber, unitProblem,
+  COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, colourHint, drawColour, mapColourWrites,
+  panelColour, percentHint, percentTextHint, realNumber, shownNumber, storedColour, unitProblem,
 } from './scriptColours.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -912,21 +912,20 @@ export function readWatch(path) {
 // One accepted input, three forms out, and the difference matters. The app STORES colours as
 // AARRGGBB (JUCE's order — '66FFFFFF' is a 40%-opaque white in every panel document). CSS and SVG
 // want #RRGGBB or #RRGGBBAA — the SAME four bytes in a DIFFERENT order, which is the trap this
-// pair of formats sets. So: everything takes "RRGGBB", "AARRGGBB" or "#RRGGBB", everything returns
+// pair of formats sets. So: everything takes what a colour property takes, everything returns
 // "#RRGGBB" which both CSS and a panel property accept, and ONE verb — alpha() — returns the
 // panel's AARRGGBB, because that is the only form a stored colour can carry an alpha in. Making a
 // DRAWING translucent is ce.draw.opacity(), which is a different question with a different answer.
 //
-// READING. A colour is read the way the panel reads a property (scriptColours.isPanelColour): 6 hex
-// digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. This used
-// to take the last six characters of whatever it was given, so text that is no colour at all
-// ("x5B9BD5", "#12#34#56", the number 0xFF0000) read as one and nothing said so. Anything else is
-// now refused, in the words of each prelude's __cchan. Eight digits are still AARRGGBB, so CSS's
-// "#5B9BD580" reads as 9BD580, which is the colour a property would paint for it.
-//
-// set() writes CSS's short forms ("#000", "red", rgb()) out before it stores them (colourWrites).
-// These readers do not, here or in the preludes: the decision to accept them was about properties,
-// and taking them here would mean the names table in every prelude.
+// READING. A colour is read as if what a property would store for it had been given
+// (scriptColours.storedColour): 6 hex digits are RRGGBB, 8 are AARRGGBB with the alpha set aside,
+// one leading "#" either way, and CSS's short forms are written out first as set() writes them out
+// ("#000" is "#000000", "red" is "#FF0000", rgba(255, 0, 0, 0.5) is "80FF0000"). This used to take
+// the last six characters of whatever it was given, so text that is no colour at all ("x5B9BD5",
+// "#12#34#56", the number 0xFF0000) read as one and nothing said so. Anything else is refused, in
+// the words of each prelude's __cchan, which reads the short forms with its own port of
+// scriptColours' CSS reading and the generated names table. Eight digits are still AARRGGBB, so
+// CSS's "#5B9BD580" reads as 9BD580, which is the colour a property would paint for it.
 //
 // AMOUNTS. lighten, darken and alpha take a number from 0 to 1. One outside it used to be used as
 // it was (lightening by 40 gave white) or clamped (an alpha of 128 gave solid). It is refused, with
@@ -934,10 +933,11 @@ export function readWatch(path) {
 
 const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
 
-/** A colour the panel can read -> [r, g, b], or null after saying why it cannot be read. */
+/** A colour a property could store -> [r, g, b], or null after saying why it cannot be read. */
 function colourChannels(verb, hex) {
-  if (isPanelColour(hex)) {
-    const h = hex.slice(-6);
+  const stored = storedColour(hex);
+  if (stored) {
+    const h = stored.slice(-6);
     return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
   }
   let why;
@@ -945,7 +945,7 @@ function colourChannels(verb, hex) {
   else if (typeof hex === 'string') why = `"${hex}" is not a colour`;
   else if (typeof hex === 'number' && Number.isFinite(hex)) why = `${shownNumber(hex)} is not a colour`;
   else why = 'the colour given is not text';
-  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer. ${COLOUR_FORMS}.${hexHint(hex)}`);
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer. ${COLOUR_FORMS}.${colourHint(hex)}`);
   return null;
 }
 

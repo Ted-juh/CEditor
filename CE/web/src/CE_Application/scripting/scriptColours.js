@@ -14,18 +14,21 @@
 // reading ("#RGB", the names, rgb() and hsl()) and stores them written out in the panel's form, by
 // the owner's decision; what has two readings, or none, is still refused (panelColour).
 //
-// The ce.math colour helpers read the panel's forms as well, and they exist in the exported
-// plug-in's Lua, JavaScript and Python preludes too. COLOUR_FORMS, hexHint, unitProblem and
-// realNumber are written out again there, word for word: scriptPreludeAgreement.test.js holds them
-// to it.
+// The ce.math colour helpers read a colour exactly as a property would store it (storedColour): the
+// panel's forms as written, CSS's short forms written out. They exist in the exported plug-in's Lua,
+// JavaScript and Python preludes too, so COLOUR_FORMS, hexHint, unitProblem, realNumber and the
+// reading of CSS's forms (cssChannels, panelFormOf, longForm, cssHint) are written out again there,
+// word for word, and CSS_NAMED_COLOURS is generated into each by tools/scripts/gen-script-modules.mjs.
+// scriptPreludeAgreement.test.js holds them to it. Drawing colours are panel-view only.
 //
 // The property rule (panelColour, colourFieldAt, mapColourWrites) holds with the plug-in's window
 // shut as well, where a set() from any engine reaches the C++ panel model instead of this file.
 // CE/src/Scripting/ScriptColours.h is the same rule in C++, in the same words, and reads its tables
 // from ScriptColours.generated.h, which tools/scripts/gen-colour-fields.mjs writes from the exports
-// below (COLOUR_FIELDS, EFFECT_TYPES, MADE_CHILDREN, CSS_NAMED_COLOURS) and the section templates,
-// so which properties are colours is said once. CE/web/test/fixtures/colourPropertyCases.json is
-// read by both sides' tests: a case that answers differently in one fails there.
+// below (COLOUR_FORMS, COLOUR_FIELDS, EFFECT_TYPES, MADE_CHILDREN, CSS_NAMED_COLOURS) and the
+// section templates, so which properties are colours is said once. CE/web/test/fixtures/
+// colourPropertyCases.json is read by both sides' tests: a case that answers differently in one
+// fails there.
 
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { isColourKey, isTokenReference, tokenNameOf } from '../models/controlSets.js';
@@ -39,8 +42,12 @@ export function isPanelColour(value) {
   return typeof value === 'string' && PANEL_HEX.test(value);
 }
 
-/** The forms the panel reads, in the words every refusal uses, here and in the preludes. */
-export const COLOUR_FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"';
+/**
+ * The forms a colour may be written in, in the words every refusal uses, here and in the preludes:
+ * the panel's own, and CSS's short forms, which a property writes out and ce.math reads (longForm).
+ */
+export const COLOUR_FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
+  + 'or "#RGB", a CSS colour name, rgb() or hsl()';
 
 /** A number as a message prints it. The preludes print the numbers a script writes the same way. */
 export const shownNumber = (n) => String(n);
@@ -174,13 +181,19 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const alphaOf = (value, percent) => (value === undefined
   ? 1 : clamp(Number(value) / (percent ? 100 : 1), 0, 1));
 
-/** A CSS colour as { r, g, b, a } (0-255, 0-1), or null when CSS would not read it. */
+/**
+ * A CSS colour as { r, g, b, a } (0-255, 0-1), or null when CSS would not read it.
+ *
+ * Each prelude has this by hand (__ccss), so every rounding and clamp here is one they repeat:
+ * Math.round takes a half up, toward +infinity, and `%` keeps the sign of what it divides.
+ */
 function cssChannels(text) {
   const s = String(text).trim();
   const lower = s.toLowerCase();
   if (lower === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
-  // Own names only: "constructor" and "__proto__" found the object's prototype here, and set() threw.
-  const named = Object.hasOwn(CSS_NAMED_COLOURS, lower) ? CSS_NAMED_COLOURS[lower] : undefined;
+  // An own name only: "constructor" and "__proto__" are on every object's prototype, and reading
+  // them as names threw from set() and ce.draw.fill.
+  const named = Object.prototype.hasOwnProperty.call(CSS_NAMED_COLOURS, lower) ? CSS_NAMED_COLOURS[lower] : '';
   if (named) return { r: parseInt(named.slice(0, 2), 16), g: parseInt(named.slice(2, 4), 16), b: parseInt(named.slice(4, 6), 16), a: 1 };
   let m = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(s);
   if (m) {
@@ -195,9 +208,11 @@ function cssChannels(text) {
   }
   m = HSL_LEGACY.exec(s) ?? HSL_MODERN.exec(s);
   if (m) {
-    const h = ((Number(m[1]) * TURN[(m[2] ?? 'deg').toLowerCase()]) % 360 + 360) % 360;
-    // A hue too large to hold ("1e999") has no angle, and was stored as "#NANNANNAN".
-    if (!Number.isFinite(h)) return null;
+    // A hue too large to be a number ("1e400", "1e308turn") has no angle; it was stored as
+    // "#NANNANNAN".
+    const turned = Number(m[1]) * TURN[(m[2] ?? 'deg').toLowerCase()];
+    if (!Number.isFinite(turned)) return null;
+    const h = (turned % 360 + 360) % 360;
     const sat = clamp(Number(m[3]), 0, 100) / 100;
     const light = clamp(Number(m[5]), 0, 100) / 100;
     const k = (n) => (n + h / 30) % 12;
@@ -232,11 +247,37 @@ function longForm(value) {
   return channels ? panelFormOf(channels) : '';
 }
 
-/** For a property refusal: what a CSS colour with space around it is in the panel's form, or ''. */
+/**
+ * What a colour property would store for `value`: the panel's own form exactly as written, CSS's
+ * short form written out (longForm), or '' when it is neither. The ce.math colour readers read
+ * through this, so "red" is "#FF0000" there and rgba(255, 0, 0, 0.5) is "80FF0000", read as that
+ * AARRGGBB is, with its alpha set aside.
+ */
+export function storedColour(value) {
+  return isPanelColour(value) ? value : longForm(value);
+}
+
+/**
+ * For a refusal: what a CSS colour with space around it is in the panel's form, or ''. Text that is
+ * the panel's own form once the space is gone is that text: "#5B9BD580 " is AARRGGBB here, as it
+ * is without the space, and not CSS's RRGGBBAA.
+ */
 function cssHint(value) {
   if (typeof value !== 'string' || isPanelColour(value)) return '';
+  const trimmed = value.trim();
+  if (trimmed !== value && isPanelColour(trimmed)) return ` Write "${trimmed}".`;
   const channels = cssChannels(value);
   return channels ? ` Write "${panelFormOf(channels)}".` : '';
+}
+
+/**
+ * The sentence that ends a colour refusal, after COLOUR_FORMS: the full form of hex shorthand that
+ * is refused ("#abcd", "abc") or of a number (hexHint), else what CSS text with space around it
+ * means (cssHint), or ''. A property and ce.math end their refusals with it, so the two say the
+ * same of one value.
+ */
+export function colourHint(value) {
+  return hexHint(value) || cssHint(value);
 }
 
 /* ------------------------------------------------------------------------ drawing colours */
@@ -304,7 +345,7 @@ export function panelColour(value, field = {}, resolvesToken = () => false) {
   else if (typeof value === 'string') why = `"${value}" is not a colour the panel can read`;
   else if (typeof value === 'number') why = `${shownNumber(value)} is not a colour the panel can read`;
   else why = 'the value given is not a colour';
-  let hint = hexHint(value) || cssHint(value);
+  let hint = colourHint(value);
   if (reference) {
     hint = field.tokens
       ? ` The panel's control set has no colour called "${tokenNameOf(value)}".`

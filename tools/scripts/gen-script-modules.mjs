@@ -45,6 +45,9 @@ const { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN, MIN_BPM, MAX_BPM }
 const easingPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'easingTables.js');
 const { EASING_BEZIERS } = await import(`file://${easingPath}`);
 
+const coloursPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'scriptColours.js');
+const { CSS_NAMED_COLOURS } = await import(`file://${coloursPath}`);
+
 // The envelope sample count is the WebView runtime's own constant rather than a second copy: the
 // two sides sampling a different number of points is exactly the divergence sampling exists to
 // avoid. Read from the source text, because importing panelRuntime.js pulls in the whole editor.
@@ -88,6 +91,13 @@ export const ANIM_END = 'END GENERATED animation tables';
 // by scriptPreludeAgreement.test.js.
 export const OPTIONS_BEGIN = 'BEGIN GENERATED option keys';
 export const OPTIONS_END = 'END GENERATED option keys';
+
+// CSS's 148 named colours, which a colour property writes out ("red" as "#FF0000") and the ce.math
+// colour helpers read the same way in every runtime. A mistyped digit here is a colour a shade off
+// in the export and right in the editor, with nothing failing, so the table is scriptColours.js's
+// own and not a copy.
+export const COLOURS_BEGIN = 'BEGIN GENERATED colour names';
+export const COLOURS_END = 'END GENERATED colour names';
 
 // A short name has to be a legal member name in EVERY language a prelude is generated for. Lua is
 // the strict one: `goto` is a keyword there, so both `{ goto = ... }` and `t.goto(...)` fail to
@@ -785,6 +795,65 @@ ${tableRows(EASING_TABLES, 'python').join('\n')}
 # ${MUSIC_END}`;
 }
 
+/* --------------------------------------------------------------------- CSS's colour names */
+// One table literal per prelude, several names to a line: one assignment per name, as the music
+// tables are written, would be three times the bytes for a table every panel with ce.math carries.
+// The names are plain lower-case words, so each is a bare key in Lua and JavaScript; a name that
+// were not would be refused here rather than written as a prelude that does not parse.
+
+/** The table's entries as lines of `key = "RRGGBB"` pairs, wrapped near 100 columns. */
+function colourLines(key, indent) {
+  const pairs = Object.entries(CSS_NAMED_COLOURS).map(([name, hex]) => {
+    if (!/^[a-z]+$/.test(name) || RESERVED.lua.has(name) || RESERVED.javascript.has(name)) {
+      throw new Error(`CSS_NAMED_COLOURS has "${name}", which is not a plain word every prelude can key by`);
+    }
+    if (!/^[0-9A-F]{6}$/.test(hex)) throw new Error(`CSS_NAMED_COLOURS.${name} is "${hex}", not RRGGBB`);
+    return key(name, hex);
+  });
+  const lines = [];
+  let line = '';
+  for (const pair of pairs) {
+    if (line && indent.length + line.length + pair.length + 2 > 100) { lines.push(`${indent}${line}`); line = ''; }
+    line += line ? ` ${pair},` : `${pair},`;
+  }
+  if (line) lines.push(`${indent}${line}`);
+  return lines.join('\n');
+}
+
+const COLOURS_INTRO = 'CSS\'s named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour\n'
+  + 'property writes "red" out as, and what the ce.math colour helpers read it as.';
+const colourIntro = (prefix) => COLOURS_INTRO.split('\n').map((l) => `${prefix} ${l}`).join('\n');
+
+export function luaColourBlock() {
+  return `-- ${COLOURS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- @module ce.math
+${colourIntro('--')}
+__CE_CSS_COLOURS = {
+${colourLines((name, hex) => `${name} = "${hex}"`, '  ')}
+}
+-- ${COLOURS_END}`;
+}
+
+export function jsColourBlock() {
+  return `// ${COLOURS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// @module ce.math
+${colourIntro('//')}
+var __CE_CSS_COLOURS = {
+${colourLines((name, hex) => `${name}: "${hex}"`, '  ')}
+};
+// ${COLOURS_END}`;
+}
+
+export function pythonColourBlock() {
+  return `# ${COLOURS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# @module ce.math
+${colourIntro('#')}
+__CE_CSS_COLOURS = {
+${colourLines((name, hex) => `"${name}": "${hex}"`, '    ')}
+}
+# ${COLOURS_END}`;
+}
+
 /* --------------------------------------------------------- ce.anim tables, for C++ CODE */
 
 export function cppAnimBlock() {
@@ -1117,6 +1186,13 @@ const OPTION_TARGETS = [
   { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonOptionBlock },
 ];
 
+// Marked by hand too: inside each prelude's ce.math region, before the colour readers use it.
+const COLOUR_TARGETS = [
+  { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaColourBlock },
+  { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsColourBlock },
+  { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonColourBlock },
+];
+
 /** Replace an existing generated block, or append one just before the prelude's closing delimiter. */
 function splice(source, block, endDelimiter, begin = BEGIN, end = END) {
   const beginAt = source.indexOf(begin);
@@ -1163,10 +1239,13 @@ function run() {
     const stubs = STUB_TARGETS.find((t) => t.file === target.file);
     const music = MUSIC_TARGETS.find((t) => t.file === target.file);
     const options = OPTION_TARGETS.find((t) => t.file === target.file);
+    const colours = COLOUR_TARGETS.find((t) => t.file === target.file);
     const next = splice(
       splice(
         splice(
-          splice(source, music.block(), null, MUSIC_BEGIN, MUSIC_END),
+          splice(
+            splice(source, colours.block(), null, COLOURS_BEGIN, COLOURS_END),
+            music.block(), null, MUSIC_BEGIN, MUSIC_END),
           stubs.block(), null, STUBS_BEGIN, STUBS_END),
         options.block(), null, OPTIONS_BEGIN, OPTIONS_END),
       target.block(), target.end);

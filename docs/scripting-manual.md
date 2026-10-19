@@ -2126,7 +2126,7 @@ Helper functions for working out values: scaling a value from one range to anoth
 
 #### `ce.math.lighten(colour [, amount]) -> string`
 
-Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#". One that cannot be read is refused with a message, and nothing is returned.
+Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is read as a colour property reads it: 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#", or a short form, "#RGB", a name such as "red", rgb(), rgba(), hsl() or hsla(), read as the colour a property would store for it ("red" is "#FF0000", and rgba(255, 0, 0, 0.5) is "80FF0000", its alpha set aside). A number, "#" with four digits, text with space around it and anything else that cannot be read are refused with a message, and nothing is returned.
 
 *Short name: `lighten`.*
 
@@ -2138,19 +2138,19 @@ Make a colour darker. `amount` is how much of the colour's brightness to keep: 1
 
 #### `ce.math.mix(a, b, t) -> string`
 
-Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. If either colour cannot be read, it is refused with a message and nothing is returned.
+Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Each colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and if either cannot be read, it is refused with a message and nothing is returned.
 
 *Short name: `mixColour`.*
 
 #### `ce.math.alpha(colour, a) -> string`
 
-Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. A colour that cannot be read is refused with a message, and nothing is returned.
+Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. The colour is read as `ce.math.lighten()` reads it, and any alpha it has is replaced; one it cannot read is refused with a message, and nothing is returned.
 
 *Short name: `colourAlpha`.*
 
 #### `ce.math.rgb(colour) -> table`
 
-Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Eight hex digits are read as AARRGGBB, and the alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.
+Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. The colour is read as `ce.math.lighten()` reads it: eight hex digits are AARRGGBB, short forms such as "#abc", "red" and rgb() are read too, and any alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.
 
 *Short name: `hexToRgb`.*
 
@@ -2162,7 +2162,7 @@ Build a colour from red, green and blue parts, each from 0 to 255, and return it
 
 #### `ce.math.hsl(colour) -> table`
 
-Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. A colour that cannot be read is refused with a message, and nothing is returned.
+Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. The colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and one that cannot be read is refused with a message, so nothing is returned.
 
 *Short name: `hexToHsl`.*
 

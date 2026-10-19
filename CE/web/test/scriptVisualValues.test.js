@@ -10,7 +10,9 @@
 //
 // A colour property, by the owner's later decision, also takes CSS's shorter forms where each has
 // one reading ("#RGB", the names, rgb(), hsl()) and stores them written out, without a word; what
-// has two readings (a number, "#" with four digits) or none is refused as before.
+// has two readings (a number, "#" with four digits) or none is refused as before. The ce.math colour
+// helpers read a colour as if that written-out form had been given, and refuse what a property
+// refuses, ending with the same hint.
 //
 // scriptPreludeAgreement.test.js holds the exported plug-in's preludes to the same words for the
 // ce.math helpers and ce.anim; this file is about the behaviour itself, in the panel view.
@@ -37,7 +39,8 @@ import { parseHexColor } from '../src/CE_Application/editor/canvasControlStyles.
 import ScriptDrawOverlay from '../src/CE_Application/editor/ScriptDrawOverlay.svelte';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
-const FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#".';
+const FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS '
+  + 'colour name, rgb() or hsl().';
 const DRAW_FORMS = 'A drawing colour is the panel\'s RRGGBB or AARRGGBB, as get() returns it, or a '
   + 'CSS colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue".';
 
@@ -74,6 +77,17 @@ const STILL_REFUSED = [
   ['#12345', ''],
   ['blurple', ''],
   ['nonsense', ''],
+  // Text that is the panel's own form once the space is gone is hinted as that text, and "#" with
+  // eight digits stays AARRGGBB in the hint as it is without the space, not CSS's RRGGBBAA.
+  [' #5B9BD580', ' Write "#5B9BD580".'],
+  ['5B9BD5\t', ' Write "5B9BD5".'],
+  [' rgb(1, 2, 3)', ' Write "#010203".'],
+  // On every object's prototype, and not names: reading them as names threw.
+  ['constructor', ''],
+  ['__proto__', ''],
+  // A hue too large to be a number has no angle: it was stored as "#NANNANNAN".
+  ['hsl(1e400, 50%, 50%)', ''],
+  ['hsl(1e308turn 50% 50%)', ''],
 ];
 
 /** An editor panel (the store, not a host) with a Label, a Knob and a Button, every module on. */
@@ -222,7 +236,7 @@ test('"" is a colour only where the property has none of its own', () => {
     api.set('L.Text.Font.underlineColour', 'none');
     assert.deepEqual(errors(), ['set("L.Text.Font.underlineColour"): "none" is not a colour the panel can '
       + 'read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
-      + 'or "" for none.']);
+      + 'or "#RGB", a CSS colour name, rgb() or hsl(), or "" for none.']);
     clearScriptTrace();
     api.set('L.Background.Fill.colour', '');
     assert.equal(errors().length, 1, 'a fill has a colour of its own, and "" painted it white');
@@ -582,6 +596,54 @@ test('ce.math reads a colour as a property does, and refuses what it cannot read
     assert.equal(api.lighten(0xFF0000), undefined);
     assert.deepEqual(errors(), [`ce.math.lighten: 16711680 is not a colour, so there is no answer. ${FORMS} `
       + 'As text, 16711680 is "#FF0000".']);
+  });
+});
+
+test('ce.math reads CSS\'s short forms as the long form a property stores for them, without a word', () => {
+  // set() took "red" and ce.math.lighten("red") refused it, in a message whose own forms left the
+  // names out. Each helper now reads the form as if what set() would store had been given.
+  withControls((api) => {
+    for (const [value, stored] of WRITTEN_OUT) {
+      clearScriptTrace();
+      for (const [call, verb] of [
+        [(c) => api.lighten(c, 0.2), 'lighten'], [(c) => api.darken(c, 0.5), 'darken'],
+        [(c) => api.colourAlpha(c, 0.5), 'alpha'], [(c) => api.hexToRgb(c), 'rgb'], [(c) => api.hexToHsl(c), 'hsl'],
+        [(c) => api.mixColour(c, '000000', 0.25), 'mix'], [(c) => api.mixColour('FFFFFF', c, 0.75), 'mix'],
+      ]) {
+        const got = call(value);
+        assert.notEqual(got, undefined, `ce.math.${verb} reads ${value}`);
+        assert.deepEqual(got, call(stored), `ce.math.${verb}: ${value} is ${stored}`);
+      }
+      assert.deepEqual(everything(), [], `${value} is read without a word`);
+    }
+    // The alpha is the long form's, set aside as an AARRGGBB's always was: rgba(…, 0.5) is 80FF0000.
+    assert.deepEqual(api.hexToRgb('rgba(255, 0, 0, 0.5)'), { r: 255, g: 0, b: 0 });
+    assert.equal(api.colourAlpha('hsla(120, 100%, 50%, 0.25)', 1), 'FF00FF00');
+    assert.equal(api.lighten('Transparent', 0), '#000000');
+    // Numbers go through JavaScript's Math.round, a half up: 30% is 76.5 and 2.5 is 3.
+    assert.deepEqual(api.hexToRgb('hsl(0, 0%, 30%)'), { r: 77, g: 77, b: 77 });
+    assert.deepEqual(api.hexToRgb('rgb(2.5 300 -4)'), { r: 3, g: 255, b: 0 });
+  });
+});
+
+test('ce.math refuses what a property refuses, in its own words and with the same hint', () => {
+  withControls((api) => {
+    const path = 'L.Background.Fill.colour';
+    for (const [value, hint] of STILL_REFUSED) {
+      clearScriptTrace();
+      api.set(path, value);
+      assert.equal(errors()[0], `set("${path}"): "${value}" is not a colour the panel can read, so nothing was `
+        + `set. ${FORMS}${hint}`);
+      clearScriptTrace();
+      assert.equal(api.lighten(value, 0.2), undefined, value);
+      assert.equal(api.hexToRgb(value), undefined, value);
+      assert.deepEqual(errors(), ['lighten', 'rgb'].map((verb) => `ce.math.${verb}: "${value}" is not a colour, so `
+        + `there is no answer. ${FORMS}${hint}`), value);
+    }
+    clearScriptTrace();
+    assert.equal(api.darken(' red ', 0.5), undefined);
+    assert.deepEqual(errors(), [`ce.math.darken: " red " is not a colour, so there is no answer. ${FORMS} `
+      + 'Write "#FF0000".']);
   });
 });
 

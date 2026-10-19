@@ -1739,17 +1739,68 @@ def randomChoice(values, weights=None):
 # reason every table here is: a script lightening a colour and the border renderer lightening the
 # same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 #
-# In takes "RRGGBB", "AARRGGBB" or "#RRGGBB", read the way the panel reads a colour property: 6 hex
-# digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. Out is
-# "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
-# returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round.
+# In takes what a colour property takes, read as if what the property would store had been given:
+# "RRGGBB", "AARRGGBB" or "#RRGGBB" as written (6 hex digits are RRGGBB, 8 are AARRGGBB with the
+# alpha set aside, one leading "#" either way), and CSS's short forms written out first, as the
+# WebView writes them out (scriptColours.js's storedColour): "#RGB", a name from the generated
+# table below, rgb(), rgba(), hsl() and hsla(), so "red" is "#FF0000" and rgba(255, 0, 0, 0.5) is
+# "80FF0000". Out is "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception
+# is alpha(), which returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way
+# round.
 #
 # Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
 # the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
 # (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
 # colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
 # checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
-__CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"'
+# BEGIN GENERATED colour names — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# @module ce.math
+# CSS's named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour
+# property writes "red" out as, and what the ce.math colour helpers read it as.
+__CE_CSS_COLOURS = {
+    "aliceblue": "F0F8FF", "antiquewhite": "FAEBD7", "aqua": "00FFFF", "aquamarine": "7FFFD4",
+    "azure": "F0FFFF", "beige": "F5F5DC", "bisque": "FFE4C4", "black": "000000",
+    "blanchedalmond": "FFEBCD", "blue": "0000FF", "blueviolet": "8A2BE2", "brown": "A52A2A",
+    "burlywood": "DEB887", "cadetblue": "5F9EA0", "chartreuse": "7FFF00", "chocolate": "D2691E",
+    "coral": "FF7F50", "cornflowerblue": "6495ED", "cornsilk": "FFF8DC", "crimson": "DC143C",
+    "cyan": "00FFFF", "darkblue": "00008B", "darkcyan": "008B8B", "darkgoldenrod": "B8860B",
+    "darkgray": "A9A9A9", "darkgreen": "006400", "darkgrey": "A9A9A9", "darkkhaki": "BDB76B",
+    "darkmagenta": "8B008B", "darkolivegreen": "556B2F", "darkorange": "FF8C00",
+    "darkorchid": "9932CC", "darkred": "8B0000", "darksalmon": "E9967A", "darkseagreen": "8FBC8F",
+    "darkslateblue": "483D8B", "darkslategray": "2F4F4F", "darkslategrey": "2F4F4F",
+    "darkturquoise": "00CED1", "darkviolet": "9400D3", "deeppink": "FF1493",
+    "deepskyblue": "00BFFF", "dimgray": "696969", "dimgrey": "696969", "dodgerblue": "1E90FF",
+    "firebrick": "B22222", "floralwhite": "FFFAF0", "forestgreen": "228B22", "fuchsia": "FF00FF",
+    "gainsboro": "DCDCDC", "ghostwhite": "F8F8FF", "gold": "FFD700", "goldenrod": "DAA520",
+    "gray": "808080", "green": "008000", "greenyellow": "ADFF2F", "grey": "808080",
+    "honeydew": "F0FFF0", "hotpink": "FF69B4", "indianred": "CD5C5C", "indigo": "4B0082",
+    "ivory": "FFFFF0", "khaki": "F0E68C", "lavender": "E6E6FA", "lavenderblush": "FFF0F5",
+    "lawngreen": "7CFC00", "lemonchiffon": "FFFACD", "lightblue": "ADD8E6", "lightcoral": "F08080",
+    "lightcyan": "E0FFFF", "lightgoldenrodyellow": "FAFAD2", "lightgray": "D3D3D3",
+    "lightgreen": "90EE90", "lightgrey": "D3D3D3", "lightpink": "FFB6C1", "lightsalmon": "FFA07A",
+    "lightseagreen": "20B2AA", "lightskyblue": "87CEFA", "lightslategray": "778899",
+    "lightslategrey": "778899", "lightsteelblue": "B0C4DE", "lightyellow": "FFFFE0",
+    "lime": "00FF00", "limegreen": "32CD32", "linen": "FAF0E6", "magenta": "FF00FF",
+    "maroon": "800000", "mediumaquamarine": "66CDAA", "mediumblue": "0000CD",
+    "mediumorchid": "BA55D3", "mediumpurple": "9370DB", "mediumseagreen": "3CB371",
+    "mediumslateblue": "7B68EE", "mediumspringgreen": "00FA9A", "mediumturquoise": "48D1CC",
+    "mediumvioletred": "C71585", "midnightblue": "191970", "mintcream": "F5FFFA",
+    "mistyrose": "FFE4E1", "moccasin": "FFE4B5", "navajowhite": "FFDEAD", "navy": "000080",
+    "oldlace": "FDF5E6", "olive": "808000", "olivedrab": "6B8E23", "orange": "FFA500",
+    "orangered": "FF4500", "orchid": "DA70D6", "palegoldenrod": "EEE8AA", "palegreen": "98FB98",
+    "paleturquoise": "AFEEEE", "palevioletred": "DB7093", "papayawhip": "FFEFD5",
+    "peachpuff": "FFDAB9", "peru": "CD853F", "pink": "FFC0CB", "plum": "DDA0DD",
+    "powderblue": "B0E0E6", "purple": "800080", "rebeccapurple": "663399", "red": "FF0000",
+    "rosybrown": "BC8F8F", "royalblue": "4169E1", "saddlebrown": "8B4513", "salmon": "FA8072",
+    "sandybrown": "F4A460", "seagreen": "2E8B57", "seashell": "FFF5EE", "sienna": "A0522D",
+    "silver": "C0C0C0", "skyblue": "87CEEB", "slateblue": "6A5ACD", "slategray": "708090",
+    "slategrey": "708090", "snow": "FFFAFA", "springgreen": "00FF7F", "steelblue": "4682B4",
+    "tan": "D2B48C", "teal": "008080", "thistle": "D8BFD8", "tomato": "FF6347",
+    "turquoise": "40E0D0", "violet": "EE82EE", "wheat": "F5DEB3", "white": "FFFFFF",
+    "whitesmoke": "F5F5F5", "yellow": "FFFF00", "yellowgreen": "9ACD32",
+}
+# END GENERATED colour names
+__CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS colour name, rgb() or hsl()'
 def __cshown(n):
     # A number as JavaScript prints it, for the numbers a script writes: whole ones without ".0".
     if isinstance(n, float) and n.is_integer() and abs(n) < 2 ** 53: return str(int(n))
@@ -1795,16 +1846,98 @@ def __cunit(verb, what, v, fallback=None):
         hint = " If you meant " + __cshown(n) + " out of 100, write " + __cfour(n / 100) + "."
     logError(verb + ": " + what + " is a number from 0 to 1, and " + shown + ", so there is no answer." + hint)
     return None
+# CSS's short forms, read as scriptColours.js reads them: its cssChannels, panelFormOf, longForm and
+# cssHint, with its four expressions. Two things in them read differently in Python and are written
+# out: JavaScript's white space (\s and strip() here take \x1c to \x1f and \x85 as well, and not
+# ﻿), and its case-blind matching, which is ASCII's only (here the long s would match "s"
+# without re.ASCII). Every number goes through what JavaScript does to it: Number(), Math.round,
+# whose half goes up where round() goes to even, and `%`, which keeps the sign of what it divides,
+# as math.fmod does and Python's % does not.
+import re as __css_re
+import math as __css_math
+__CSS_WS = " \t\n\v\f\r                 　﻿"
+def __css_pattern(p):
+    # One of scriptColours.js's expressions, its NUM written in and its \s made JavaScript's.
+    p = p.replace("NUM", r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+    return __css_re.compile(p.replace(r"\s", "[" + __CSS_WS + "]"), __css_re.IGNORECASE | __css_re.ASCII)
+__CSS_RGB_LEGACY = __css_pattern(r"rgba?\(\s*(NUM)(%?)\s*,\s*(NUM)(%?)\s*,\s*(NUM)(%?)\s*(?:,\s*(NUM)(%?)\s*)?\)")
+__CSS_RGB_MODERN = __css_pattern(r"rgba?\(\s*(NUM)(%?)\s+(NUM)(%?)\s+(NUM)(%?)\s*(?:/\s*(NUM)(%?)\s*)?\)")
+__CSS_HSL_LEGACY = __css_pattern(r"hsla?\(\s*(NUM)(deg|grad|rad|turn)?\s*,\s*(NUM)()%\s*,\s*(NUM)()%\s*(?:,\s*(NUM)(%?)\s*)?\)")
+__CSS_HSL_MODERN = __css_pattern(r"hsla?\(\s*(NUM)(deg|grad|rad|turn)?\s+(NUM)(%?)\s+(NUM)(%?)\s*(?:/\s*(NUM)(%?)\s*)?\)")
+__CSS_TURN = { "deg": 1, "grad": 0.9, "rad": 180 / __css_math.pi, "turn": 360 }
+def __cround(x):
+    # JavaScript's Math.round: a half goes up, so 2.5 is 3 and -2.5 is -2.
+    if not __css_math.isfinite(x): return x
+    r = __css_math.floor(x)
+    return r + 1 if x - r >= 0.5 else r
+def __cclamp(v, lo, hi):
+    return min(hi, max(lo, v))
+def __calpha(value, percent):
+    return 1 if value is None else __cclamp(float(value) / (100 if percent else 1), 0, 1)
+def __ccss(text):
+    # A CSS colour as (r, g, b, a), 0-255 and 0-1, or None.
+    s = text.strip(__CSS_WS)
+    lower = s.lower()
+    if lower == "transparent": return (0, 0, 0, 0)
+    named = __CE_CSS_COLOURS.get(lower)
+    if named is not None: return (int(named[0:2], 16), int(named[2:4], 16), int(named[4:6], 16), 1)
+    m = __css_re.fullmatch(r"#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", s)
+    if m:
+        d = m.group(1)
+        if len(d) <= 4: d = "".join(c + c for c in d)
+        return (int(d[0:2], 16), int(d[2:4], 16), int(d[4:6], 16), int(d[6:8], 16) / 255 if len(d) == 8 else 1)
+    m = __CSS_RGB_LEGACY.fullmatch(s) or __CSS_RGB_MODERN.fullmatch(s)
+    if m:
+        def channel(i): return __cclamp(__cround(float(m.group(i)) * (2.55 if m.group(i + 1) else 1)), 0, 255)
+        return (channel(1), channel(3), channel(5), __calpha(m.group(7), m.group(8)))
+    m = __CSS_HSL_LEGACY.fullmatch(s) or __CSS_HSL_MODERN.fullmatch(s)
+    if m:
+        # A hue too large to be a number has no angle, and is not a colour.
+        turned = float(m.group(1)) * __CSS_TURN[(m.group(2) or "deg").lower()]
+        if not __css_math.isfinite(turned): return None
+        h = __css_math.fmod(__css_math.fmod(turned, 360) + 360, 360)
+        sat = __cclamp(float(m.group(3)), 0, 100) / 100
+        light = __cclamp(float(m.group(5)), 0, 100) / 100
+        amp = sat * min(light, 1 - light)
+        def f(n):
+            k = __css_math.fmod(n + h / 30, 12)
+            return __cround(255 * (light - amp * max(-1, min(k - 3, 9 - k, 1))))
+        return (f(0), f(8), f(4), __calpha(m.group(7), m.group(8)))
+    return None
+def __cpanelForm(c):
+    # The same colour in the panel's form: #RRGGBB when solid, AARRGGBB when it is not.
+    rgb = "%02X%02X%02X" % (c[0], c[1], c[2])
+    return "#" + rgb if c[3] >= 1 else ("%02X" % __cround(c[3] * 255)) + rgb
+def __cpanelHex(v):
+    # Does the panel read this as a colour? 6 or 8 hex digits, with or without one "#".
+    return isinstance(v, str) and __css_re.fullmatch(r"#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", v) is not None
+def __clong(value):
+    # CSS's short forms written out, as a property stores them, or None: not text with space around
+    # it, "#" only with three digits ("#" with four is RGBA to CSS and ARGB here), and nothing CSS
+    # cannot read.
+    if not isinstance(value, str) or value.strip(__CSS_WS) != value: return None
+    if value.startswith("#") and not __css_re.fullmatch(r"#[0-9a-fA-F]{3}", value): return None
+    c = __ccss(value)
+    return None if c is None else __cpanelForm(c)
+def __ccssHint(value):
+    # For a refusal: what CSS text with space around it is in the panel's form, or "". Text that is
+    # the panel's own form once the space is gone is that text, read as the panel reads it.
+    if not isinstance(value, str) or __cpanelHex(value): return ""
+    trimmed = value.strip(__CSS_WS)
+    if trimmed != value and __cpanelHex(trimmed): return ' Write "' + trimmed + '".'
+    c = __ccss(value)
+    return "" if c is None else ' Write "' + __cpanelForm(c) + '".'
 def __cchan(verb, hex_):
-    import re as __re
-    if isinstance(hex_, str) and __re.fullmatch(r"#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", hex_):
-        h = hex_[-6:]
+    stored = None
+    if isinstance(hex_, str): stored = hex_ if __cpanelHex(hex_) else __clong(hex_)
+    if stored:
+        h = stored[-6:]
         return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
     if hex_ is None: why = "no colour was given"
     elif isinstance(hex_, str): why = '"' + hex_ + '" is not a colour'
     elif isinstance(hex_, (int, float)) and __realNumber(hex_) is not None: why = __cshown(hex_) + " is not a colour"
     else: why = "the colour given is not text"
-    logError(verb + ": " + why + ", so there is no answer. " + __CFORMS + "." + __chint(hex_))
+    logError(verb + ": " + why + ", so there is no answer. " + __CFORMS + "." + (__chint(hex_) or __ccssHint(hex_)))
     return None
 def __cbyte(v):
     import math

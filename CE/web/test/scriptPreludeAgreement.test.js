@@ -643,9 +643,10 @@ const REFUSAL_CASES = [
   ['getBits', [5]], ['bytesPut', [[1], 1]],
   ['beatsPerDivision', [null]], ['stepAt', [2.5]], ['stepAt', [2.5, 8]], ['swingOffset', [1, 0.5]],
   ['checksum', [null, [1, 2]]], ['checksum', [true, [1, 2]]], ['checksum', ['constructor', [1, 2]]],
-  // Colours are read as a property reads them: 6 or 8 hex digits, one "#" at most. Anything else
-  // is refused with the forms, and with the full form for CSS shorthand or a number. Eight digits
-  // are AARRGGBB, so "#5B9BD580" is accepted (as the panel's green), and must stay silent.
+  // Colours are read as a property stores them: 6 or 8 hex digits, one "#" at most, and CSS's short
+  // forms written out ("#000" and "red" must stay silent; COLOUR_FORM_INPUTS below has the rest).
+  // Anything else is refused with the forms, and with the full form for "#" with four digits or a
+  // number. Eight digits are AARRGGBB, so "#5B9BD580" is accepted (as the panel's green), silently.
   ['lighten', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToHsl', ['#000']], ['darken', ['#0008']],
   ['colourAlpha', [0xFF0000, 0.5]], ['lighten', [0xFF5B9BD5]], ['hexToRgb', [1.5]], ['hexToRgb', [true]],
   ['mixColour', ['000000', 'red', 0.5]], ['mixColour', ['nope', 'zz', 0.5]], ['lighten', [null]],
@@ -802,6 +803,157 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   const got = JSON.parse(run.stdout);
   REFUSAL_CASES.forEach(([fn, args], i) => {
     assert.deepEqual(got[i], want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
+  });
+});
+
+/* ------------------------------------------------- ce.math's colours, in CSS's short forms */
+
+// The ce.math colour helpers read a colour as if the long form a property stores for it had been
+// given (scriptColours.storedColour): "red" is "#FF0000", rgba(255, 0, 0, 0.5) is "80FF0000". The
+// WebView reads CSS with four regular expressions and JavaScript's numbers; each prelude has its own
+// port (Lua with a tokenizer, as its patterns have no alternation), so these are the places they could
+// part: the case of a name, a function or a unit; every syntax; a number Number() reads and another
+// language might not; Math.round's half, which goes up where Python's round() goes to even and Lua
+// has none; `%` on a negative hue; JavaScript's white space, which is neither Python's nor Lua's;
+// and every form that stays refused, with its hint. Each input goes through every colour helper,
+// and the answer and the console lines are compared with the WebView's.
+const COLOUR_FORM_INPUTS = [
+  // The panel's own forms, read as before.
+  '5B9BD5', '#5B9BD5', '805B9BD5', '#805b9bd5',
+  // Names, in any case, and "transparent". JavaScript's toLowerCase reads the Kelvin sign as "k".
+  'red', 'RED', 'Red', 'SteelBlue', 'rebeccapurple', 'LightGoldenRodYellow', 'darkSlateGrey', 'aqua',
+  'transparent', 'TRANSPARENT', 'Transparent', 'Khaki',
+  // "#" with three digits.
+  '#abc', '#ABC', '#000', '#fFf', '#a1B',
+  // rgb() and rgba() with commas, either name with or without an alpha, the name in any case.
+  'rgb(0, 0, 0)', 'rgb(91,155,213)', 'rgb( 91 , 155 , 213 )', 'rgba(255, 0, 0, 0.5)', 'rgba(255, 0, 0, 1)',
+  'rgb(255, 0, 0, 0.25)', 'rgba(1, 2, 3)', 'RGB(10, 20, 30)', 'Rgba(10, 20, 30, .5)',
+  // With spaces, and a slash before the alpha.
+  'rgb(91 155 213)', 'rgb(91 155 213 / 0.5)', 'rgb(91 155 213/50%)', 'rgba(255 0 0 / 0)', 'RGBA(1 2 3 / 1)',
+  // Percentages: channels (mixed with numbers, as the expressions allow), and alpha.
+  'rgb(100%, 50%, 0%)', 'rgb(30% 30% 30%)', 'rgb(50%, 10, 20)', 'rgb(0.5%, 100.5%, -1%)',
+  'rgba(0, 0, 0, 30%)', 'rgb(0 0 0 / 50%)', 'rgba(0, 0, 0, 150%)', 'rgba(0, 0, 0, -10%)',
+  // Alpha 0, above 1 and below 0.
+  'rgba(255, 0, 0, 0)', 'rgba(255, 0, 0, 1.5)', 'rgba(255, 0, 0, -1)', 'rgba(255, 0, 0, 0.002)',
+  // Channels past either end, the .5 edge of the rounding, and every way Number() reads a number.
+  'rgb(300, -5, 256)', 'rgb(1e3, -1e3, 255.4)', 'rgb(254.5, 0.5, 2.5)', 'rgb(-0.5, -0, +5)',
+  'rgb(1e400, 0, 0)', 'rgb(.5, 5., 1E1)', 'rgb(1e+2, 1e-2, 12.5e1)', 'rgb(-2.5, 3.5, 1.4999999999999999)',
+  // hsl() and hsla(): each unit, in any case; a negative hue, one past 360, and a fractional one.
+  'hsl(0, 100%, 50%)', 'hsl(120, 100%, 25%)', 'hsl(210deg 60% 60%)', 'HSL(210DEG 60% 60%)',
+  'hsl(200grad, 50%, 50%)', 'hsl(3.14159rad 50% 50%)', 'hsl(0.5turn 50% 50%)', 'hsl(0.5TURN, 50%, 50%)',
+  'hsl(-120, 100%, 50%)', 'hsl(-0.25turn, 100%, 50%)', 'hsl(480, 100%, 50%)', 'hsl(720.5 100% 50%)',
+  'hsl(-400grad 40% 60%)', 'hsl(-1rad, 80%, 30%)', 'hsl(359.99, 100%, 50%)', 'hsl(1e2, 50%, 50%)',
+  'hsla(120, 100%, 50%, 0.25)', 'hsla(120 100% 50% / 25%)', 'hsl(120 100 50)', 'hsl(120 100% 50% / 1.5)',
+  // Saturation and lightness past their ends, and lightness on the .5 edge of the rounding.
+  'hsl(0, 150%, -10%)', 'hsl(0, 0%, 30%)', 'hsl(0, 0%, 50%)', 'hsl(0 0% 10%)', 'hsl(30, 50%, 50%)',
+  'hsl(90, 33%, 47%)', 'hsl(17.5, 62.5%, 37.5%)',
+  // JavaScript's white space inside a function is a separator: a no-break space, an em space.
+  'rgb(1, 2,3)', 'rgb(1 2　3)', 'hsl(10  50% 50%)',
+  // …and around text is text with space around it, refused with what it means. U+0085 is not white
+  // space in JavaScript (Python's strip() takes it), and the long s is not an s (Python's re.I takes it).
+  ' red', 'red﻿', '\u0085red', 'rgb(1,\u00852,3)', 'hſl(0, 100%, 50%)',
+  // Still refused: what has two readings, or none.
+  0xFF0000, 1.5, true, null, '#abcd', '#ABCD', 'abc', 'currentColor', 'currentcolor', ' red ', 'red ',
+  '\tred', '', 'notacolour', 'constructor', '__proto__', 'toString', '#12345', '#1234567', 'x5B9BD5',
+  '#5B9BD5 ', ' #5B9BD580', ' 5B9BD5', ' #abcd', ' rgb(1, 2, 3) ', ' transparent', ' #ABC',
+  'rgb(1,2)', 'rgb(1, 2, 3,)', 'rgb(1 2 3 4)', 'rgb(1, 2 3)', 'rgba(1,2,3 / 0.5)', 'rgb (1,2,3)',
+  'rgb(1e, 2, 3)', 'rgb(1.2.3, 4, 5)', 'rgb(+-1, 2, 3)', 'rgb(10deg, 0, 0)', 'rgb(1, 2, 3)x',
+  'rgb(0,0,0))', 'rgb()', 'rgb(1 2 3 /)', 'rgb(1%%, 2, 3)', 'hsl(10, 50, 50)', 'hsl(10%, 50%, 50%)',
+  'hsl(10, 50%, 50)', 'hsl(10deg%, 50%, 50%)', 'hsl(10 deg, 50%, 50%)', 'hsl(1e400, 50%, 50%)',
+  'hsl(1e308turn 50% 50%)', 'hsv(0, 100%, 50%)',
+];
+const COLOUR_FORM_CASES = COLOUR_FORM_INPUTS.flatMap((x) => [
+  ['lighten', [x, 0.2]], ['darken', [x, 0.5]], ['colourAlpha', [x, 0.5]], ['hexToRgb', [x]], ['hexToHsl', [x]],
+  ['mixColour', [x, 'FFFFFF', 0.25]], ['mixColour', ['000000', x, 0.5]],
+]);
+
+test('the ce.math colour helpers read CSS\'s short forms as a property stores them, in every engine', async (t) => {
+  const want = COLOUR_FORM_CASES.map(([fn, args]) => {
+    clearScriptTrace();
+    const value = canonical(web[fn](...args));
+    return { value, errors: get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message) };
+  });
+  // Both outcomes, so neither "everything reads" nor "everything refuses" passes by accident.
+  assert.ok(want.filter((w) => w.errors.length === 0).length > 400, 'most short forms are read');
+  assert.ok(want.filter((w) => w.errors.length).length > 300, 'and what has no one reading is refused');
+  const label = (i) => `${COLOUR_FORM_CASES[i][0]}(${JSON.stringify(COLOUR_FORM_CASES[i][1])})`;
+
+  // JavaScript, under node:vm.
+  {
+    const errors = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error') errors.push(String(m)); } : () => undefined),
+    });
+    COLOUR_FORM_CASES.forEach(([fn, args], i) => {
+      errors.length = 0;
+      const value = canonical(sandbox[fn](...args));
+      assert.deepEqual({ value, errors: [...errors] }, want[i], `JS prelude ${label(i)}`);
+    });
+  }
+
+  // Lua, under wasmoon, in one crossing. A message may hold a newline (it quotes the colour), so the
+  // cases are parted by \3, and each case's answer from its lines by \2.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'sendCC', 'on', 'startTimer', 'stopTimer']) lua.global.set(name, () => {});
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      // Each case in a block of its own: a chunk may hold 200 locals, and there are more cases.
+      const calls = COLOUR_FORM_CASES.map(([fn, args]) => `do __errs = {}; local v = __ser(${fn}(`
+        + `${args.map(luaLiteral).join(', ')})); out[#out + 1] = v .. "\\2" .. table.concat(__errs, "\\1") end`);
+      const chunk = `${LUA_SERIALISER}\n__errs = {}\nlogError = function(m) __errs[#__errs + 1] = tostring(m) end\n`
+        + `local out = {}\n${calls.join('\n')}\nreturn table.concat(out, "\\3")`;
+      const got = String(await lua.doString(chunk)).split('\u0003');
+      assert.equal(got.length, COLOUR_FORM_CASES.length, 'one answer per case');
+      got.forEach((line, i) => {
+        const [value, lines] = line.split('\u0002');
+        assert.deepEqual({ value, errors: lines ? lines.split('\u0001') : [] }, want[i], `Lua prelude ${label(i)}`);
+      });
+    } finally {
+      lua.global.close();
+    }
+  }
+
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.diagnostic('Python 3 is not on this machine: its colour readers were not compared');
+    return;
+  }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+errors = []
+g["logError"] = lambda m, *rest: errors.append(str(m))
+out = []
+for fn, args in payload["cases"]:
+    del errors[:]
+    try: out.append({"value": g[fn](*args), "errors": list(errors)})
+    except Exception as err: out.append({"raised": type(err).__name__ + ": " + str(err)})
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: pyJson({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: COLOUR_FORM_CASES }),
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  JSON.parse(run.stdout).forEach((answer, i) => {
+    assert.equal(answer.raised, undefined, `Python prelude ${label(i)} raised ${answer.raised}`);
+    assert.deepEqual({ value: canonical(answer.value ?? null), errors: answer.errors }, want[i], `Python prelude ${label(i)}`);
   });
 });
 

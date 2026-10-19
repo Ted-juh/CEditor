@@ -327,12 +327,18 @@ int main()
 
     // ce.math's colours and amounts, and ce.anim's target, in the embedded interpreter. An alpha left
     // out raised TypeError here, a target of "100px" raised ValueError, and "#000" was refused with
-    // no word; scriptPreludeAgreement.test.js compares the words across engines.
+    // no word; scriptPreludeAgreement.test.js compares the words across engines. CSS's short forms
+    // are read as a colour property stores them ("#000" is "#000000" now, as it is for set()), by the
+    // prelude's own port with the generated names table: the rounding is JavaScript's half up (30% of
+    // 255 is 76.5, which is 77, where round() gives 76), and what a property refuses is refused.
     {
         juce::Array<juce::var> visualScripts;
         visualScripts.add (makeScript ("pyVisual", "onPanelReady", "*",
             "def onPanelReady(info):\n"
-            "    log('py ' + str(ce.math.hsl('#000')) + ' ' + ce.math.lighten('336699', '0.5') + ' ' + str(ce.math.alpha('336699')))\n"
+            "    log('py ' + str(ce.math.hsl('#0008')) + ' ' + ce.math.lighten('336699', '0.5') + ' ' + str(ce.math.alpha('336699')))\n"
+            "    log('py css ' + ce.math.lighten('Red', 0.2) + ' ' + ce.math.alpha('#abc', 0.5) + ' '\n"
+            "        + str(ce.math.rgb('rgba(255, 0, 0, 0.5)')['r']) + ' ' + ce.math.mix('hsl(0, 0%, 30%)', 'transparent', 0)\n"
+            "        + ' ' + ce.math.darken('rgb(2.5 300 -4)', 1) + ' ' + str(ce.math.hsl('#000')['l']) + ' ' + str(ce.math.rgb(' red ')))\n"
             "    ce.anim.to('cutoff', '100px')\n"
             "    log('py done')\n"));
         runtime.loadScripts (juce::var (visualScripts));
@@ -340,10 +346,14 @@ int main()
         runtime.onPanelReady (true);
         const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
         check (host.logs.contains ("py None #99B3CC None"), "Colours: ce.math refuses in Python, and reads text that is a number" + got);
+        check (host.logs.contains ("py css #FF3333 80AABBCC 255 #4D4D4D #03FF00 0.0 None"),
+               "Colours: ce.math reads CSS's short forms in Python" + got);
         check (host.logs.contains ("py done"), "Colours: a refusal is a message, not an exception" + got);
         for (const auto* line : {
-                 "ce.math.hsl: \"#000\" is not a colour, so there is no answer. A colour is 6 hex digits (RRGGBB) "
-                 "or 8 (AARRGGBB), with or without \"#\". Write \"#000000\".",
+                 "ce.math.hsl: \"#0008\" is not a colour, so there is no answer. A colour is 6 hex digits (RRGGBB) "
+                 "or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). Write \"88000000\".",
+                 "ce.math.rgb: \" red \" is not a colour, so there is no answer. A colour is 6 hex digits (RRGGBB) "
+                 "or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). Write \"#FF0000\".",
                  "ce.math.alpha: the alpha is a number from 0 to 1, and none was given, so there is no answer.",
                  "ce.anim.to: \"100px\" is not a number, so nothing was started." })
             check (host.logs.contains (line), juce::String ("Colours: refused in the WebView runtime's words: ") + line);
