@@ -18,3 +18,13 @@ export { DIVISIONS, DIVISION_LABELS, PPQN, MIN_BPM, MAX_BPM };
 
 /** Division ids in the order the table declares them — the order a picker shows. */
 export const DIVISION_NAMES = Object.keys(DIVISIONS);
+
+/**
+ * The table's own id for a division written in any case ("1/8t" is "1/8T"), or undefined. The
+ * names differ only by D and T, so nothing is ambiguous. ce.time reads a division by this, and the
+ * script editor's Values sidebar checks one by it.
+ */
+export function divisionIdOf(name) {
+  const wanted = typeof name === 'string' ? name.toLowerCase() : null;
+  return DIVISION_NAMES.find((d) => d.toLowerCase() === wanted);
+}

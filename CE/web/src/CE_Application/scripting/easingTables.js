@@ -39,3 +39,20 @@ export const CURVE_NAMES = ['linear', 'exp', 'log', 's'];
  * by hand is not a name; it is passed as four numbers (panelRuntime.js, drawnCurve).
  */
 export const ANIM_CURVE_NAMES = [...CURVE_NAMES, ...Object.keys(EASING_BEZIERS), 'spring'];
+
+/**
+ * A curve drawn by hand, as ce.anim takes it: x1, y1, x2, y2, the two control points of a
+ * cubic-bezier, as the Animation tab's custom easing stores them. Both x values stay in [0, 1] (time
+ * cannot run backwards); the y values may overshoot, within [-2, 3]. Anything else is null, not
+ * clamped, so a typo is "not a curve" and not quietly a different one. panelRuntime's drawnCurve
+ * reads a script's list or named table into four values and asks here, as does the script editor's
+ * Values sidebar; ScriptRuntime.cpp applies the same rules.
+ */
+export function bezierOf(list) {
+  if (!Array.isArray(list) || list.length !== 4
+    || !list.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+  const [x1, y1, x2, y2] = list;
+  if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) return null;
+  if (y1 < -2 || y1 > 3 || y2 < -2 || y2 > 3) return null;
+  return [x1, y1, x2, y2];
+}

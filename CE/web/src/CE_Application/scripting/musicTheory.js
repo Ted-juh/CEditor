@@ -67,3 +67,38 @@ export const CHORDS = {
 /** Scale and chord ids, in the order the tables declare them — the order pickers and enums show. */
 export const SCALE_NAMES = Object.keys(SCALES);
 export const CHORD_NAMES = Object.keys(CHORDS);
+
+/**
+ * A note's name and number, by the rule ce.music.name and ce.music.number answer by (the WebView
+ * runtime calls these), and the script editor's Values sidebar reads a note by, so the two cannot
+ * read one name two ways. NOTE_NAMES is ce.music's own plain spelling, # for a sharp, which every
+ * script compares against; NOTE_SHARP and NOTE_FLAT are the panel's.
+ */
+export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
+const mod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
+
+/**
+ * "C4" -> 60 (middle C is C4), or undefined for a name that cannot be read. All four spellings of an
+ * accidental are read (C#4, C♯4, Db4, D♭4); the letter must be a capital and the octave must be
+ * there. Undefined, not 0, because 0 is a real note (C-1).
+ */
+export function noteNumberOf(name) {
+  const m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).replace(/♯/g, '#').replace(/♭/g, 'b'));
+  if (!m) return undefined;
+  const pc = m[2] === 'b' ? FLAT_LETTER[m[1]] : NOTE_NAMES.indexOf(m[1] + m[2]);
+  if (pc < 0) return undefined;
+  // A flat lowers below the letter, so Cb3 is the B under C3 — one octave down, not up.
+  const oct = parseInt(m[3], 10) + (m[2] === 'b' && m[1] === 'C' ? 0 : 1);
+  return oct * 12 + pc;
+}
+
+/**
+ * 60 -> "C4". With `flats` left out, ce.music's plain spelling ("C#4"); given, the panel's: true for
+ * flats ("D♭4"), false for sharps ("C♯4").
+ */
+export function noteNameOf(n, flats) {
+  const whole = Math.floor(n);
+  const table = flats === undefined || flats === null ? NOTE_NAMES : (flats ? NOTE_FLAT : NOTE_SHARP);
+  return table[mod12(whole)] + (Math.floor(whole / 12) - 1);
+}

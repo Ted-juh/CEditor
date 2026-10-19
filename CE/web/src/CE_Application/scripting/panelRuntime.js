@@ -81,6 +81,7 @@ import {
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
   allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, optionChecks, memberPath,
+  andList, unknownOptionsMessage,
 } from './panelApi.js';
 // Each section type's template: what get() checks a path against, and create's `<section>` keys.
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -142,11 +143,11 @@ import { patchOf, isUnchanged } from '../utils/scriptPatchOutcome.js';
 import { typeOfControl, familiesForType } from './componentSchema.js';
 import {
   SCALES, CHORDS, SCALE_NAMES, CHORD_NAMES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
-  QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
+  QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES, noteNameOf, noteNumberOf,
 } from './musicTheory.js';
-import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
+import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN, divisionIdOf } from './timeTables.js';
 import { FONT_ADVANCE as PIXEL_ADVANCE, FONT_H as PIXEL_FONT_H } from '../utils/pixelFont.js';
-import { EASING_BEZIERS, ANIM_CURVE_NAMES } from './easingTables.js';
+import { EASING_BEZIERS, ANIM_CURVE_NAMES, bezierOf } from './easingTables.js';
 import { cubicBezierEase, springEase } from '../utils/easing.js';
 // ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
 // beat falls and the Transport drawing that beat have to agree, and one implementation is the only
@@ -1107,12 +1108,7 @@ function colourFromHsl(hue, sat, light) {
 }
 
 // @module ce.music
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
-// The panel writes accidentals as ♯ and ♭; a script types # and b. Both are the same note, so both
-// spellings are folded to the ASCII pair before anything tries to read a name.
-const musicAscii = (s) => String(s).replace(/\u266F/g, '#').replace(/\u266D/g, 'b');
-const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 
 // A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is. An unreadable
 // name used to be 0 here, because a nil root would have turned one bad string into an unexplained
@@ -1231,8 +1227,7 @@ const nowMsRead = () => (NOW_EPOCH === null ? performance.now() : Date.now() - N
 // read: "1/8t" is "1/8T", because the names differ only by D and T and nothing is ambiguous. The
 // table's own id comes back, because the transport's functions look the name up again.
 function divisionId(verb, name) {
-  const wanted = typeof name === 'string' ? name.toLowerCase() : null;
-  const id = DIVISION_NAMES.find((d) => d.toLowerCase() === wanted);
+  const id = divisionIdOf(name);
   if (id === undefined) {
     // A division left out is named as such: "undefined", "nil" and "None" were the same mistake
     // printed three ways.
@@ -2015,23 +2010,12 @@ const helpers = {
   // what noteNumber has always round-tripped. Given, you get the PANEL's names (C♯4 / E♭4): the
   // same table the Chord Pad, the Harmoniser and the Arpeggiator print from, so a script can label
   // a control with the spelling the component beside it is using.
-  noteName: (n, flats) => {
-    n = Math.floor(n);
-    const table = flats === undefined || flats === null ? NOTE_NAMES : (flats ? NOTE_FLAT : NOTE_SHARP);
-    return table[musicMod12(n)] + (Math.floor(n / 12) - 1);
-  },
+  // The rule is musicTheory's, which the script editor's Values sidebar reads a note by too.
+  noteName: (n, flats) => noteNameOf(n, flats),
   // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a
   // perfectly good MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in
   // silence rather than showing up.
-  noteNumber: (name) => {
-    const m = /^([A-G])([#b]?)(-?\d+)$/.exec(musicAscii(name));
-    if (!m) return undefined;
-    const pc = m[2] === 'b' ? FLAT_LETTER[m[1]] : NOTE_NAMES.indexOf(m[1] + m[2]);
-    if (pc < 0) return undefined;
-    // A flat lowers below the letter, so Cb3 is the B under C3 — one octave down, not up.
-    const oct = parseInt(m[3], 10) + (m[2] === 'b' && m[1] === 'C' ? 0 : 1);
-    return oct * 12 + pc;
-  },
+  noteNumber: (name) => noteNumberOf(name),
   // Does this key write its accidentals as flats? The Chord Pad's rule, exactly: judged by the
   // RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the answer straight to
   // noteName and a script's labels match the panel's without deciding anything itself.
@@ -4169,12 +4153,7 @@ const SPRING_DEFAULT_FREQUENCY = 12;
  */
 export function drawnCurve(values) {
   const named = values && typeof values === 'object' && !Array.isArray(values) && 'x1' in values;
-  const list = named ? [values.x1, values.y1, values.x2, values.y2] : toList(values);
-  if (list.length !== 4 || !list.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
-  const [x1, y1, x2, y2] = list;
-  if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) return null;
-  if (y1 < -2 || y1 > 3 || y2 < -2 || y2 > 3) return null;
-  return [x1, y1, x2, y2];
+  return bezierOf(named ? [values.x1, values.y1, values.x2, values.y2] : toList(values));
 }
 
 /** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
@@ -8111,10 +8090,6 @@ function isOptionsTable(value) {
 // "1", "2", …, and a list is not a table of options or filters, whatever argument it arrived in.
 const LIST_KEY = /^\d+$/;
 
-/** "a", "a and b", "a, b and c": several things named in one sentence. */
-const andList = (items) => (items.length < 2 ? items.join('')
-  : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
-
 /* ------------------------------------------------------- option keys a call does not take
  * An options table is the one argument where a mistake cannot show. `{ easing = "outBack" }` on
  * ce.anim.to moved in a straight line, `{ time = 800 }` took 300 ms, `{ onDone = fn }` never ran,
@@ -8169,22 +8144,6 @@ function unknownOptionKeys(opts, shape, parent = '', out = []) {
     }
   }
   return out;
-}
-
-/** `ce.anim.to: "easing" is not one of its options, so nothing was done. Its options are: …`, in
- *  the words the storage calls, the first to refuse an unknown key, already used in every runtime. */
-function unknownOptionsMessage(path, { parent, keys, shape }) {
-  const quoted = keys.map((key) => `"${parent ? `${parent}.` : ''}${key}"`);
-  const what = keys.length === 1
-    ? `${quoted[0]} is not one of its options, so nothing was done.`
-    : `${andList(quoted)} are not among its options, so nothing was done.`;
-  const names = shape.sections
-    ? [...shape.names, 'and the name of any section, such as Behavior']
-    : shape.names;
-  const listed = names.length === 1
-    ? `${parent ? `The only option of ${parent}` : 'Its only option'} is ${names[0]}.`
-    : `${parent ? `The options of ${parent}` : 'Its options'} are: ${names.join(', ')}.`;
-  return `${path}: ${what} ${listed}`;
 }
 
 /** What a refused call answers, by the kinds panelApi.js's REFUSAL_ANSWERS names. */
