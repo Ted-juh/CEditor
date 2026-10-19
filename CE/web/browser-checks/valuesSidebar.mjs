@@ -10,7 +10,8 @@
  *   rows       a call written over several lines, in Lua and in JavaScript: its arguments in order,
  *              its options under `opts`, an unknown option refused in the runtime's words
  *   marks      the statement band lies over the statement's lines and the hover box over the value's
- *              characters, measured against the text under them; the caret in a value selects its row
+ *              characters, measured against the text under them, and again once the text's face has
+ *              changed width (a web font arriving late); the caret in a value selects its row
  *   keyboard   a row's name is a button: Enter takes the caret to its value
  *   colour     a swatch opens the shared display panel on Colors, named "Script · … , line N"; a drag
  *              writes the script once, when it settles; the edit box is around the value and follows
@@ -274,6 +275,19 @@ try {
   led.check(S, 'the hover box', 'the pointer over the curve row draws a light box around exactly "outBack" in the text, and nothing moves a character',
     { line: 6, around: true },
     { line: hover.line, around: near(hover.left, curveText.left - 1) && near(hover.width, curveText.width + 2) && near(hover.top, curveText.top, 3) });
+  // The face is a web font, loaded when the editor first draws text, so the editor can measure the
+  // fallback's width before it arrives; on Windows that fallback is narrower, and the boxes ended
+  // short of their text (CI's first run of this check). Letter-spacing widens the text the way the
+  // font arriving does, without the network: the box follows the width the text has now.
+  const wider = await page.addStyleTag({ content: '.bd-app .ce-measure, .bd-app .ce-hl, .bd-app textarea.ce-ta { letter-spacing: 1.5px; }' });
+  await kit.settle(300);
+  const [hoverWide] = await markRects('hover');
+  const [curveWide] = await textRects(curveAt, curveAt + '"outBack"'.length);
+  led.check(S, 'the boxes follow the face', 'when the text\'s face changes width after the editor opened (a web font arriving), the hover box is still around exactly "outBack"',
+    { wider: true, around: true },
+    { wider: curveWide.width > curveText.width + 9, around: near(hoverWide.left, curveWide.left - 1) && near(hoverWide.width, curveWide.width + 2) });
+  await wider.evaluate((node) => node.remove());
+  await kit.settle(300);
   await page.mouse.move(5, 500);
 
   // ---- keyboard ----------------------------------------------------------------------------------

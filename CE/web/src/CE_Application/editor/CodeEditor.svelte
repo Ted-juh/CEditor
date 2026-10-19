@@ -321,6 +321,18 @@
     if (measureEl) charWidth = measureEl.getBoundingClientRect().width / 10 || charWidth;
     if (taEl) taClientH = taEl.clientHeight;
   });
+  // …and whenever the measured text changes width without the size changing. The face is a web font
+  // (JetBrains Mono), loaded the first time text needs it, so the first measure is the fallback's:
+  // on Windows that is Cascadia Code or Consolas, 7.0 px a character to JetBrains Mono's 7.8, and
+  // every box placed by column (occurrences, squiggles, the Values marks, the completion list) ended
+  // further from its text the further along the line it was.
+  $effect(() => {
+    const el = measureEl;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => { charWidth = el.getBoundingClientRect().width / 10 || charWidth; });
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
 
   // line/column (0-based) of a character offset.
   function posOf(index) {
