@@ -796,9 +796,17 @@ Still open, for the owner:
   nothing is written to the console when a form is expanded, and `get()` returns the stored form.
   Still refused, with the messages they had: a number (is `0xFF0000FF` AARRGGBB?), `"#"` with four
   digits (RGBA or ARGB?), three digits without the `"#"` (not CSS, and as likely a number),
-  `currentColor`, text with space around it, and anything unreadable. Still open: `#` with eight
-  digits means AARRGGBB in a property and in `ce.math`, and RRGGBBAA in a drawing, CSS's own
-  meaning, which was kept. The swatch proposed above is where that difference would show.
+  `currentColor`, text with space around it, and anything unreadable. `#` with eight digits
+  means AARRGGBB in a property and in `ce.math`, and RRGGBBAA in a drawing, CSS's own meaning,
+  which was kept. *Decided by the owner, 2026-10-19: a script says which it meant.*
+  `ce.math.fromARGB("#80123456")` and `ce.math.fromRGBA("#12345680")` take 8 hex digits or 4,
+  with or without `"#"`, read with the alpha first or last as they name, and answer in the form
+  every reader reads one way: `"#RRGGBB"` when solid, AARRGGBB when not, so the colour is the same
+  in a property, in `ce.math` and in a drawing. Anything else is refused in the `ce.math` words. In
+  the WebView and all three preludes (`scriptColours.orderedColour`, each prelude's `__corder`),
+  held to one answer by `scriptPreludeAgreement.test.js`. The Values tab reads their argument in
+  its order (its swatch, and an edit written back with the alpha where the call has it), and the
+  warning on a `#` with eight digits in a property or `ce.math` now ends by naming the two.
 - **The `ce.math` colour readers: decided with the properties, they read the short forms too.**
   `lighten`, `darken`, `mix`, `alpha`, `rgb` and `hsl` read a colour as if the long form a property
   would store for it had been given (`scriptColours.storedColour`), in the WebView and the three
@@ -999,8 +1007,9 @@ say. Each is now said, in the runtime's words where the runtime has them:
   because the channel comes first.
 - **`ce.anim`'s target and path.** `ce.anim.to` and `ce.anim.spring` refuse a target that is not a
   number. They, and `ce.anim.envelope`, also refuse a colour property as the path.
-- **`ce.anim`'s duration.** The runtime runs a duration under 1 ms as 1 ms and a duration written as
-  text as its default, and says nothing about either. The row says what happens.
+- **`ce.anim`'s duration.** The runtime ran a duration under 1 ms as 1 ms and a duration written as
+  text as its default, and said nothing about either. The row said what happens; both runtimes now
+  say it too (below).
 - **The time arguments.** `ce.time.after`'s delay, `startTimer`'s interval, the beats `syncTimer`
   and `afterBeats` take as a number, and `sendNote`'s length are now refused in the runtime's words
   (its `timeRefused` and `noteLength`). The core had a generic range of its own for them, "the ms is
@@ -1012,6 +1021,22 @@ say. Each is now said, in the runtime's words where the runtime has them:
   from the control set", where it showed the token as a quoted string. A see-through drawn colour
   reads "#FFAA00 at 50% opacity", not as `rgba(…)`.
 
+Then, on the owner's word the same day:
+
+- **`ce.anim`'s timing, in both runtimes.** A duration or a delay that is not a number (text that
+  is one is read as one), or is below 0, and beats that are not a number above 0, are said once per
+  command, in the same words in the WebView (`animTiming`, `animBeats`) and in the plug-in's
+  `ScriptRuntime`, and the move goes ahead as it always did: a duration in its default time, or
+  1 ms below 0; a delay of none; the length its duration gives. The plug-in had read `"1/4"` with
+  `String::getDoubleValue`, as 1 ms, where the WebView moved it in 300; both read it as text now.
+  The rows say what the runtime does, word for word, and `beats` is read as a number of beats.
+- **A call the module does not have**, `ce.<module>.<name>`, is an error in the editor's problems
+  list and on its call in the Values tab, with what was meant: the same name in the module that has
+  it (`ce.panel.on` is `ce.core.on`), the camelCase of a snake_case name (Python's `send_note`), or
+  the nearest spelling (`unknownCalls.js`). Every member the WebView runtime defines is in the
+  contract's map, so a call it has is never named (a test holds that). The problems list's check of
+  `on()` read `ce.panel.on` as `on()`; it reads `on`, `ce.core.on` and `ctx.on` alone now.
+
 Still open:
 
 - **The Gradient tab's radial controls.** The tab shows them for a script's gradient, though a
@@ -1019,11 +1044,8 @@ Still open:
   written as linear.
 - **Editors not built yet.** Fonts, images and hand-drawn curves have none. Completion does not yet
   reopen over a value that is already there.
-- **A call the runtime does not have** (`ce.panel.on`, or Python's `send_note` for `sendNote`) gets
-  no rows: the statement reads as having nothing in it. The editor's own check reads `ce.panel.on`
-  as `on`.
-- **`ce.anim`'s duration in the runtimes.** Every runtime takes a duration under 1 ms, or written as
-  text, without a message. The clamp-and-warn rule says they should warn, as the row now does.
+- **The rest of `ce.anim`'s options.** `stagger`, `damping` and `frequency` are still read with
+  `Number()`, so text that is not a number is 0 or the default without a word.
 
 ## Open questions for the owner
 

@@ -51,6 +51,8 @@ export const PURE = {
   rgbToHex: [[58,110,165], "#3A6EA5"],
   hexToHsl: [["3A6EA5"], {"h":210.8411214953271,"s":47.98206278026906,"l":43.72549019607843}],
   hslToHex: [[210,48,44], "#3A70A6"],
+  colourFromArgb: [["#803A6EA5"], "803A6EA5"],
+  colourFromRgba: [["#3A6EA580"], "803A6EA5"],
   toDegrees: [[1.5707963267948966], 90],
   toRadians: [[180], 3.141592653589793],
   distance: [[0,0,3,4], 5],

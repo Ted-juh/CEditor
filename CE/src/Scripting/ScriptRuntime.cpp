@@ -355,36 +355,63 @@ juce::var ScriptRuntime::animationDescribe (const Animation& a) const
     return juce::var (obj);
 }
 
-// How many times a move runs IN ALL, from its `repeat` option, as the WebView's startAnimationImpl
-// reads it: a number, or text that is one (realNumber's grammar: "3", " -1 ", "2e1"); anything else,
-// or no option, is the default single run. A plain (double) cast would read "abc", nothing and false
-// as 0, and 0 means until stopped.
-static double animationRuns (const juce::DynamicObject* o)
+// A number, or text that is one, as the WebView's realNumber reads it ("3", " -1 ", "2e1", ".5");
+// anything else, true and nothing included, is no number. A plain (double) cast reads "abc",
+// nothing and false as 0, and "1/4" as 1, which is how a duration of "1/4" became a 1 ms jump here
+// while the WebView moved it in its default 300.
+static bool animationNumber (const juce::var& v, double& out)
 {
-    if (o == nullptr || ! o->hasProperty ("repeat")) return 1.0;
-    const auto v = o->getProperty ("repeat");
     if (v.isInt() || v.isInt64() || v.isDouble())
     {
-        const double d = (double) v;
-        return std::isfinite (d) ? d : 1.0;
+        out = (double) v;
+        return std::isfinite (out);
     }
-    if (! v.isString()) return 1.0;
+    if (! v.isString()) return false;
     const auto t = v.toString().trim();
     int i = 0, digits = 0;
     if (t[i] == '+' || t[i] == '-') ++i;
     while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; }
     if (t[i] == '.') { ++i; while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; } }
-    if (digits == 0) return 1.0;
+    if (digits == 0) return false;
     if (t[i] == 'e' || t[i] == 'E')
     {
         ++i;
         if (t[i] == '+' || t[i] == '-') ++i;
-        if (! juce::CharacterFunctions::isDigit (t[i])) return 1.0;
+        if (! juce::CharacterFunctions::isDigit (t[i])) return false;
         while (juce::CharacterFunctions::isDigit (t[i])) ++i;
     }
-    if (i != t.length()) return 1.0;
-    const double d = t.getDoubleValue();
-    return std::isfinite (d) ? d : 1.0;
+    if (i != t.length()) return false;
+    out = t.getDoubleValue();
+    return std::isfinite (out);
+}
+
+// How many times a move runs IN ALL, from its `repeat` option, as the WebView's startAnimationImpl
+// reads it: a number, or text that is one; anything else, or no option, is the default single run.
+// A plain (double) cast would read "abc", nothing and false as 0, and 0 means until stopped.
+static double animationRuns (const juce::DynamicObject* o)
+{
+    if (o == nullptr || ! o->hasProperty ("repeat")) return 1.0;
+    double d = 0.0;
+    return animationNumber (o->getProperty ("repeat"), d) ? d : 1.0;
+}
+
+// A value in a warning, as the WebView's shownValue writes it.
+static juce::String animationShown (const juce::var& v)
+{
+    if (v.isVoid() || v.isUndefined()) return "nothing";
+    if (v.isBool()) return static_cast<bool> (v) ? "true" : "false";
+    if (v.isInt() || v.isInt64()) return juce::String (static_cast<juce::int64> (v));
+    if (v.isDouble())
+    {
+        const double d = v;
+        if (std::isnan (d)) return "NaN";
+        if (std::isinf (d)) return d > 0 ? "Infinity" : "-Infinity";
+        if (d == std::floor (d) && std::abs (d) < 9007199254740992.0) return juce::String (static_cast<juce::int64> (d));
+        return juce::String (d);
+    }
+    if (v.isString()) return "\"" + v.toString() + "\"";
+    if (v.isMethod()) return "a function";
+    return "a list";
 }
 
 ScriptRuntime::Animation* ScriptRuntime::animationFor (const juce::String& path)
@@ -412,6 +439,54 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     // each. Said in the words of the WebView runtime's animatesColour. The preludes have already
     // refused a target that is not a number, which comes first.
     const juce::String verb = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
+    const juce::String call = "ce.anim." + verb;
+
+    // A move's timing, as the WebView's animTiming and animBeats read it: a number, or text that is
+    // one. A duration or a delay that cannot be read, or is below 0, and beats that are not a number
+    // above 0, are said once per command, and the move goes ahead as it always did: a duration in
+    // its default time, or 1 ms below 0; a delay of none; the length its duration gives.
+    auto warnTiming = [this, &call] (const char* name, const juce::String& said)
+    {
+        if (animationTimingWarned.insert (call + " " + name).second)
+            host.logAt ("warn", call + ": " + said + " This is said only the first time.", juce::var());
+    };
+    auto timing = [o, &warnTiming] (const char* name, double fallback)
+    {
+        if (o == nullptr || ! o->hasProperty (name)) return fallback;
+        const auto v = o->getProperty (name);
+        if (v.isVoid() || v.isUndefined()) return fallback;
+        const bool duration = juce::String (name) == "duration";
+        double n = 0.0;
+        if (! animationNumber (v, n))
+        {
+            const bool beatsLike = duration && v.isString() && v.toString().containsChar ('/');
+            warnTiming (name, animationShown (v) + " is not a number of milliseconds, so the move "
+                                + (duration ? "takes " + juce::String (juce::roundToInt (fallback)) + " ms, as it does when no duration is given."
+                                            : juce::String ("starts at once, as it does when no delay is given."))
+                                + (beatsLike ? " For a length in beats, give beats, a number." : ""));
+            return fallback;
+        }
+        if (n < 0.0)
+        {
+            warnTiming (name, "a " + juce::String (name) + " of " + animationShown (juce::var (n)) + " is less than 0, so the move "
+                                + (duration ? "takes 1 ms: it jumps." : "starts at once."));
+            return duration ? 1.0 : 0.0;
+        }
+        return n;
+    };
+    auto beatsOf = [o, &warnTiming]() -> double
+    {
+        if (o == nullptr || ! o->hasProperty ("beats")) return 0.0;
+        const auto v = o->getProperty ("beats");
+        if (v.isVoid() || v.isUndefined()) return 0.0;
+        double n = 0.0;
+        if (! animationNumber (v, n))
+            warnTiming ("beats", animationShown (v) + " is not a number of beats, so the move's length is its duration.");
+        else if (n <= 0.0)
+            warnTiming ("beats", animationShown (juce::var (n)) + " beats is not more than 0, so the move's length is its duration.");
+        else return n;
+        return 0.0;
+    };
     auto refusesColour = [this, &verb] (const juce::String& key)
     {
         if (! host.isColourProperty (key)) return false;
@@ -436,7 +511,7 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         if (colour) return false;
 
         const double stagger = number ("stagger", 0.0);
-        const double baseDelay = number ("delay", 0.0);
+        const double baseDelay = juce::jmax (0.0, timing ("delay", 0.0));
         int groupId = 0;
         if (const auto token = o != nullptr ? o->getProperty ("__done").toString() : juce::String(); token.isNotEmpty())
         {
@@ -502,10 +577,10 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
             for (const auto& v : *pts) a.samples.push_back ((double) v);
 
     const double defaultMs = a.kind == "spring" ? 600.0 : 300.0;
-    a.duration = juce::jmax (1.0, number ("duration", defaultMs));
+    a.duration = juce::jmax (1.0, timing ("duration", defaultMs));
     a.damping = number ("damping", 6.0);
     a.frequency = number ("frequency", 12.0);
-    a.delay = juce::jmax (0.0, number ("delay", 0.0));
+    a.delay = juce::jmax (0.0, timing ("delay", 0.0));
     a.pingpong = flag ("pingpong");
     // `repeat` is how many times the move runs in all: 1 (the default) once, 3 three times, 0 or
     // less until it is stopped, rounded to a whole number. This read it as runs AFTER the first, so
@@ -519,7 +594,7 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     // derived from the transport's beat count, so the animation FREEZES when the transport stops
     // and stretches when the tempo drops, which is what every synced component in the panel does.
     a.sync = flag ("sync");
-    const double beats = number ("beats", 0.0);
+    const double beats = beatsOf();
     if (beats > 0.0)
     {
         a.syncBeats = beats;
@@ -769,6 +844,7 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     // A move the outgoing set started may still be running, and its done is about to go with the
     // set's preludes. See fireAnimationDone.
     animationScriptSet += 1;
+    animationTimingWarned.clear();
 
     scripts.clear();
     // Runtime device declarations belong to the script set that made them: a parameter declared by

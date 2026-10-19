@@ -1975,6 +1975,34 @@ def mixColour(a, b, t):
     f = 0.0 if f < 0 else (1.0 if f > 1 else f)
     return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f)
 # The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
+# A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+# reads one way: "#RRGGBB" when solid, AARRGGBB when not. scriptColours.orderedColour's reading,
+# in the WebView runtime's colourFromOrder words.
+__CORDER = {
+    "argb": 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+    "rgba": 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.',
+}
+def __corder(verb, order, value):
+    import re
+    if isinstance(value, str):
+        m = re.fullmatch(r"#?([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", value)
+        if m:
+            d = m.group(1)
+            if len(d) <= 4: d = "".join(c + c for c in d)
+            d = d.upper()
+            aa, rgb = "FF", d
+            if len(d) == 8:
+                aa, rgb = (d[0:2], d[2:]) if order == "argb" else (d[6:8], d[0:6])
+            return "#" + rgb if aa == "FF" else aa + rgb
+    if value is None: why = "no colour was given"
+    elif isinstance(value, str): why = '"' + value + '" is not a colour written ' + ("AARRGGBB" if order == "argb" else "RRGGBBAA")
+    elif isinstance(value, (int, float)) and not isinstance(value, bool) and __realNumber(value) is not None:
+        why = __cshown(value) + " is a number, not text"
+    else: why = "the colour given is not text"
+    logError(verb + ": " + why + ", so there is no answer. " + __CORDER[order])
+    return None
+def colourFromArgb(colour=None): return __corder("ce.math.fromARGB", "argb", colour)
+def colourFromRgba(colour=None): return __corder("ce.math.fromRGBA", "rgba", colour)
 def colourAlpha(hex_, a=None):
     import math
     c = __cchan("ce.math.alpha", hex_)
@@ -3743,7 +3771,7 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
-    "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },

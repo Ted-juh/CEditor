@@ -4,7 +4,8 @@
 //   • the script defines a handler matching the event/lifecycle it runs on,
 //   • scope-limited commands (e.g. sendSysex) aren't used in the wrong scope,
 //   • a component verb is aimed at a control whose type actually has that section,
-//   • on(target,"event",…) references a real event name.
+//   • on(target,"event",…) references a real event name,
+//   • a ce.<module>.<name>(…) call is one the module has (unknownCalls.js).
 //
 // Messages are GUIDANCE, not stack traces (spec: "a name should explain itself").
 // This is a lightweight scan, not a parser — it may miss matches inside comments/strings.
@@ -16,6 +17,7 @@ import {
 } from './panelApi.js';
 import { FAMILY_SECTIONS, memberAppliesToType, familiesForType, typeOfControl } from './componentSchema.js';
 import { flatControls } from '../utils/containment.js';
+import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
 
 const EVENT_FNS = new Set(ALL_EVENTS.map((e) => e.fn));
 const EVENT_IDS = new Set(ALL_EVENTS.map((e) => e.id));
@@ -178,11 +180,14 @@ export function validateScript(script, panel = null) {
     }
   }
 
-  // 6) on(target, "event", …) — flag unknown event names.
-  const onRe = /\bon\s*\(\s*[^,]+,\s*["']([^"']+)["']/g;
+  // 6) on(target, "event", …) — flag unknown event names. Only the on() there is: bare, ce.core.on,
+  //    or a native handler's ctx.on. `\bon` alone matched ce.panel.on, which is no call at all
+  //    (check 7 says so), and named its second argument an event.
+  //    (The character before is matched, not looked behind at, for a webview without lookbehind.)
+  const onRe = /(^|[^\w.$])(?:(?:ce\s*\.\s*core|ctx)\s*\.\s*)?on\s*\(\s*[^,]+,\s*["']([^"']+)["']/g;
   let mtch;
   while ((mtch = onRe.exec(src)) !== null) {
-    const ev = mtch[1];
+    const ev = mtch[2];
     if (!EVENT_IDS.has(ev) && !EVENT_FNS.has(ev) && !EVENT_BY_ID[ev]) {
       // Custom emitted events are allowed, so this is a hint, not an error.
       problems.push({
@@ -192,7 +197,31 @@ export function validateScript(script, panel = null) {
     }
   }
 
+  // 7) ce.<module>.<name>(…) that the module does not have: it fails the moment it runs, in every
+  //    language. Comments are blanked first, so a call written about in one is not named; a
+  //    string can still hide one, as everywhere in this scan.
+  const code = withoutComments(src, script.language);
+  const callRe = /(^|[^\w.$])ce\s*\.\s*([A-Za-z_]\w*)\s*[.:]\s*([A-Za-z_$][\w$]*)\s*\(/g;
+  const named = new Set();
+  while ((mtch = callRe.exec(code)) !== null) {
+    const callee = `ce.${mtch[2]}.${mtch[3]}`;
+    if (named.has(callee)) continue;
+    named.add(callee);
+    const found = unknownModuleCall(callee);
+    if (found) problems.push({ severity: 'error', message: unknownModuleCallMessage(callee, found) });
+  }
+
   return problems;
+}
+
+/** `src` with its comments blanked to spaces (line breaks kept): `--` and `--[[ ]]` in Lua, `#` in
+ *  Python, `//` and a block comment elsewhere. A marker inside a string is taken for a comment, so
+ *  this can hide a call on the rest of that line, never name one that is not there. */
+function withoutComments(src, language) {
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  if (language === 'lua') return src.replace(/--\[(=*)\[[\s\S]*?\]\1\]|--[^\n]*/g, blank);
+  if (language === 'python') return src.replace(/#[^\n]*/g, blank);
+  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, blank);
 }
 
 /** Rollup for a list of scripts — counts by severity. */

@@ -3186,6 +3186,64 @@ int main()
     }
 
     {
+        // A move's timing is read as the WebView's animTiming and animBeats read it: a number, or
+        // text that is one. What cannot be read is said once per command, in the WebView's words
+        // (scriptValues.test.js holds the editor's), and the move goes ahead as it always did.
+        // A duration of "1/4" was read here by String::getDoubleValue as 1, a 1 ms jump, where the
+        // WebView moved it in its default 300.
+        TestHost timingHost;
+        ScriptRuntime timing (timingHost);
+        timing.tickAnimations (0.0);
+        auto opts = [] (std::initializer_list<std::pair<const char*, juce::var>> pairs)
+        {
+            auto* o = new juce::DynamicObject();
+            for (const auto& p : pairs) o->setProperty (p.first, p.second);
+            return juce::var (o);
+        };
+        auto said = [&timingHost]
+        {
+            const auto out = timingHost.levelled.joinIntoString ("\n");
+            timingHost.levelled.clear();
+            return out;
+        };
+        const juce::String once = " This is said only the first time.";
+
+        timing.startAnimation ("to", juce::var ("a"), 100.0, opts ({ { "duration", "1/4" }, { "from", 0.0 } }));
+        check (said() == "warn:ce.anim.to: \"1/4\" is not a number of milliseconds, so the move takes 300 ms, as it does "
+                         "when no duration is given. For a length in beats, give beats, a number." + once,
+               "a duration that is not a number is said, with the beats it may have meant");
+        timing.tickAnimations (150.0);
+        const double halfway = (double) timingHost.values["a"];
+        check (halfway > 0.0 && halfway < 100.0, "…and the move takes its default 300 ms, not the 1 ms \"1/4\" read as");
+        timing.startAnimation ("to", juce::var ("b"), 100.0, opts ({ { "duration", -5.0 } }));
+        check (said().isEmpty(), "a second duration that cannot be used is not said again by the same command");
+        timing.startAnimation ("spring", juce::var ("c"), 100.0, opts ({ { "duration", -5.0 } }));
+        check (said() == "warn:ce.anim.spring: a duration of -5 is less than 0, so the move takes 1 ms: it jumps." + once,
+               "a duration below 0 is a jump, and said by spring for itself");
+        timing.startAnimation ("to", juce::var ("d"), 100.0, opts ({ { "delay", "soon" } }));
+        check (said() == "warn:ce.anim.to: \"soon\" is not a number of milliseconds, so the move starts at once, as it does "
+                         "when no delay is given." + once, "a delay that is not a number starts at once, and says so");
+        timing.startAnimation ("spring", juce::var ("e"), 100.0, opts ({ { "delay", -100.0 } }));
+        check (said() == "warn:ce.anim.spring: a delay of -100 is less than 0, so the move starts at once." + once,
+               "a delay below 0 starts at once, and says so");
+        timing.startAnimation ("to", juce::var ("f"), 100.0, opts ({ { "beats", "1/4" } }));
+        check (said() == "warn:ce.anim.to: \"1/4\" is not a number of beats, so the move's length is its duration." + once,
+               "beats that are not a number leave the length to the duration, and say so");
+        timing.startAnimation ("spring", juce::var ("g"), 100.0, opts ({ { "beats", 0.0 } }));
+        check (said() == "warn:ce.anim.spring: 0 beats is not more than 0, so the move's length is its duration." + once,
+               "beats of 0 or less do too");
+        timing.startAnimation ("to", juce::var ("h"), 100.0, opts ({ { "duration", "250" }, { "delay", "0" }, { "beats", "0.5" } }));
+        check (said().isEmpty(), "text that is a number is read as one, and nothing is said");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "i", "j" }), 100.0, opts ({ { "delay", true } }));
+        check (said().isEmpty(), "a list's delay is the same option: said already by this command, so quiet");
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("k"), 100.0, opts ({ { "duration", -1.0 } }));
+        check (said() == "warn:ce.anim.to: a duration of -1 is less than 0, so the move takes 1 ms: it jumps." + once,
+               "a script set loaded afresh is told again");
+    }
+
+    {
         TestHost animHost;
         ScriptRuntime anim (animHost);
         anim.tickAnimations (0.0);

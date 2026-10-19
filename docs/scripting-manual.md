@@ -2174,6 +2174,18 @@ Build a colour from red, green and blue parts, each from 0 to 255, and return it
 
 *Short name: `rgbToHex`.*
 
+#### `ce.math.fromARGB(colour) -> string`
+
+Read a colour written with its alpha first, `AARRGGBB`, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are AARRGGBB to a colour property and to the other colour commands, but the other way round to a drawing, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromRGBA()` reads the alpha last.
+
+*Short name: `colourFromArgb`.*
+
+#### `ce.math.fromRGBA(colour) -> string`
+
+Read a colour written with its alpha last, `RRGGBBAA`, the web's order, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are read this way by a drawing, but as AARRGGBB by a colour property and the other colour commands, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromARGB()` reads the alpha first.
+
+*Short name: `colourFromRgba`.*
+
 #### `ce.math.hsl(colour) -> table`
 
 Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. The colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and one that cannot be read is refused with a message, so nothing is returned.
@@ -2256,14 +2268,14 @@ Move a value smoothly to `target` over time instead of jumping straight there. `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 300 | How long the move takes. |
-| `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
+| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
+| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
 | `curve` | text or list | "linear" | The shape of the move. The first 4 names are the curves of `ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an animation that name the same curve move the same way. "spring" overshoots and settles like `ce.anim.spring()`, shaped by `damping` and `frequency`. Instead of a name you can give the four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an animation's `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name it does not know is reported, and the move runs in a straight line. One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it. |
 | `frequency` | number | 12 | With curve = "spring": how fast it wobbles, as ce.anim.spring reads it. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. |
+| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
 | `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
@@ -2288,13 +2300,13 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 600 | How long the move takes. |
+| `duration` | number (milliseconds) | 600 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
 | `damping` | number | 6 | How quickly the wobble dies away. Higher settles sooner; lower keeps bouncing. |
 | `frequency` | number | 12 | How fast it wobbles. Higher is a tighter, faster bounce. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
-| `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
+| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. |
+| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
 | `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
@@ -2351,10 +2363,10 @@ Move a value through a shape with several points — an attack and decay, say, o
 |---|---|---|---|
 | `from` | number | 0 | The value that y = 0 in the shape means. |
 | `to` | number | 1 | The value that y = 1 in the shape means. |
-| `duration` | number (milliseconds) | 300 | How long the move takes. |
-| `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
+| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
+| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. |
+| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
 | `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |

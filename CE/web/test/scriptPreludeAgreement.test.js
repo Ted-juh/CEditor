@@ -126,6 +126,16 @@ const CASES = [
   // Eight digits are AARRGGBB, as a property reads them, and an amount may be text that is a number.
   ['lighten', ['#5B9BD580', 0]], ['darken', ['FF336699', 0.5]], ['colourAlpha', ['80336699', '0.5']],
   ['lighten', ['336699', '0.25']], ['lighten', ['336699', null]], ['colourAlpha', ['336699', 1.5]],
+  // A colour written with its alpha in a stated place: the form every reader reads one way, or a
+  // refusal in the same words.
+  ['colourFromArgb', ['#80123456']], ['colourFromArgb', ['80123456']], ['colourFromArgb', ['FF5B9BD5']],
+  ['colourFromArgb', ['#8123']], ['colourFromArgb', ['#abc']], ['colourFromArgb', ['5b9bd5']],
+  ['colourFromRgba', ['#12345680']], ['colourFromRgba', ['12345680']], ['colourFromRgba', ['#5B9BD5FF']],
+  ['colourFromRgba', ['#1238']], ['colourFromRgba', ['#ABCDEF']], ['colourFromRgba', ['abc']],
+  ['colourFromArgb', ['#12345']], ['colourFromArgb', ['nope']], ['colourFromArgb', ['#80123456 ']],
+  ['colourFromRgba', ['red']], ['colourFromRgba', [0x12345680]], ['colourFromArgb', [1.5]],
+  ['colourFromArgb', [null]], ['colourFromRgba', [true]], ['colourFromArgb', ['##123456']],
+  ['colourFromRgba', ['#1234567g']], ['colourFromArgb', ['#80123456\n']],
   ['rgbToHex', [51, 102, 153]], ['rgbToHex', [0, 0, 0]], ['rgbToHex', [300, -5, 127.5]],
   ['hslToHex', [210, 50, 40]], ['hslToHex', [0, 0, 100]], ['hslToHex', [359, 100, 50]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],

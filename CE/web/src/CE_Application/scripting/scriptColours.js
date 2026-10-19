@@ -264,6 +264,31 @@ export function storedColour(value) {
 }
 
 /**
+ * A colour written with its alpha in a stated place, as ce.math.fromARGB and fromRGBA read it:
+ * one "#" or none, then 8 hex digits (AARRGGBB, or RRGGBBAA), 4 (ARGB or RGBA, each digit doubled)
+ * or 6 or 3 (no alpha). It is answered in the form every reader reads one way, the panel's
+ * (panelFormOf: "#RRGGBB" when solid, AARRGGBB when not), so the colour means the same in a
+ * property, in ce.math and in a drawing. "#" with 8 digits is AARRGGBB to the first two and
+ * RRGGBBAA to the third (record example 1); these two say which was meant. '' for anything else.
+ */
+export function orderedColour(value, order) {
+  if (typeof value !== 'string') return '';
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value);
+  if (!m) return '';
+  const d = (m[1].length <= 4 ? m[1].replace(/./g, (c) => c + c) : m[1]).toUpperCase();
+  const alphaFirst = order === 'argb';
+  const aa = d.length === 8 ? (alphaFirst ? d.slice(0, 2) : d.slice(6)) : 'FF';
+  const rgb = d.length === 8 ? (alphaFirst ? d.slice(2) : d.slice(0, 6)) : d;
+  return aa === 'FF' ? `#${rgb}` : `${aa}${rgb}`;
+}
+
+/** What ce.math.fromARGB's and fromRGBA's refusals say can be written. */
+export const ORDERED_FORMS = Object.freeze({
+  argb: 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+  rgba: 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.',
+});
+
+/**
  * For a refusal: what a CSS colour with space around it is in the panel's form, or ''. Text that is
  * the panel's own form once the space is gone is that text: "#5B9BD580 " is AARRGGBB here, as it
  * is without the space, and not CSS's RRGGBBAA.

@@ -334,8 +334,8 @@ try {
   await page.keyboard.press('Enter');
   await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('duration = -5'));
   await until(() => (document.querySelector('.vrow[data-name="duration"] .vproblem')?.textContent ?? '').length > 0);
-  led.check(S, 'a number out of range', 'a duration below 1 ms is written as typed, and the row says what the runtime makes of it',
-    'ce.anim.to: a duration of -5 is under 1 ms, so the move takes 1 ms: it jumps.', (await rows()).find((r) => r.name === 'duration').problem);
+  led.check(S, 'a number out of range', 'a duration below 0 is written as typed, and the row says what the runtime makes of it, in its words',
+    'ce.anim.to: a duration of -5 is less than 0, so the move takes 1 ms: it jumps.', (await rows()).find((r) => r.name === 'duration').problem);
   await page.locator(`${SCRIPT} textarea.ce-ta`).focus();
   await page.keyboard.press('Control+z');
   await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('duration = 400'));

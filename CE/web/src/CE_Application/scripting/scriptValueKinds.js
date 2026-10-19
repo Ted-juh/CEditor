@@ -12,7 +12,7 @@
 
 import {
   panelColour, drawColour, storedColour, CSS_NAMED_COLOURS, COLOUR_FORMS, DRAW_COLOUR_FORMS,
-  colourHint, unitProblem, realNumber, percentHint, percentTextHint,
+  colourHint, unitProblem, realNumber, percentHint, percentTextHint, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
 import {
   SCALES, CHORDS, SCALE_NAMES, CHORD_NAMES, NOTE_FLAT, NOTE_SHARP, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
@@ -24,56 +24,12 @@ import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { closest } from './closestWord.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
-/** Edit distance with a swap of two neighbours counted as one edit ("Pluse" is one from "Pulse"). */
-function distance(a, b) {
-  const m = a.length;
-  const n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
-  for (let j = 0; j <= n; j += 1) d[0][j] = j;
-  for (let i = 1; i <= m; i += 1) {
-    for (let j = 1; j <= n; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-    }
-  }
-  return d[m][n];
-}
-
-/** How many characters two words share at their start. */
-const sharedStart = (a, b) => {
-  let i = 0;
-  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
-  return i;
-};
-
-/**
- * The candidate closest to `word`, when it is close enough to be the one meant, else null: a word a
- * few edits away (a third of its length, three at most), or one sharing most of its start with it
- * ("rotation" for "rotate"). A word that differs only in capitals is its own correct spelling.
- */
-export function closest(word, candidates) {
-  const w = String(word ?? '').toLowerCase();
-  if (!w) return null;
-  let best = null;
-  let bestD = Infinity;
-  const limit = Math.min(3, Math.max(1, Math.floor(w.length / 3)));
-  for (const c of candidates) {
-    const lc = String(c).toLowerCase();
-    const shared = sharedStart(w, lc);
-    let d = distance(w, lc);
-    if (d > limit && shared >= Math.max(4, Math.ceil(0.6 * Math.min(w.length, lc.length)))) d = limit;
-    if (d < bestD) { best = c; bestD = d; }
-  }
-  if (best === null) return null;
-  if (bestD === 0) return best !== word ? best : null;
-  return bestD <= limit ? best : null;
-}
+// The reader is closestWord.js's, so the editor's checks can use it without this module.
+export { closest };
 
 /** " Did you mean "x"?" or ''. */
 export function didYouMean(word, candidates) {
@@ -140,7 +96,7 @@ export function colourForm(text) {
 
 /**
  * Where a colour is read, and what the runtime says when it cannot be:
- *   { reader: 'property' | 'stop' | 'drawing' | 'math', field, resolvesToken, resolve,
+ *   { reader: 'property' | 'stop' | 'drawing' | 'math' | 'argb' | 'rgba', field, resolvesToken, resolve,
  *     refusal(why, advice, hint) -> the sentence, claimedBy }
  * `field` is what colourFieldAt found for a property; `resolve(name)` the colour a control-set
  * reference stands for, when the context can say.
@@ -181,6 +137,21 @@ export function readColour(value, site) {
     }
     meaning.stored = stored;
     parts = panelParts(stored);
+  } else if (reader === 'argb' || reader === 'rgba') {
+    // ce.math.fromARGB and fromRGBA: the alpha where the call says it is.
+    const stored = orderedColour(value, reader);
+    if (!stored) {
+      // panelRuntime's colourFromOrder, word for word.
+      let why;
+      if (value === undefined || value === null) why = 'no colour was given';
+      else if (typeof value === 'string') why = `"${value}" is not a colour written ${reader === 'argb' ? 'AARRGGBB' : 'RRGGBBAA'}`;
+      else if (typeof value === 'number' && Number.isFinite(value)) why = `${value} is a number, not text`;
+      else why = 'the colour given is not text';
+      out.problem = { severity: 'error', message: site.refusal(why, ORDERED_FORMS[reader], '') };
+      return out;
+    }
+    meaning.stored = stored;
+    parts = panelParts(stored);
   } else {
     const field = reader === 'stop' ? { ...(site.field ?? {}), stop: true } : (site.field ?? {});
     const read = panelColour(value, field, site.resolvesToken ?? (() => false));
@@ -203,7 +174,8 @@ export function readColour(value, site) {
       out.problem = {
         severity: 'warning',
         message: `The panel reads "${value}" as AARRGGBB: the colour ${d.slice(2)} at alpha ${d.slice(0, 2)}. `
-          + `A drawing would read it as ${d.slice(0, 6)} at alpha ${d.slice(6)}; for that colour here, write "${d.slice(6)}${d.slice(0, 6)}".`,
+          + `A drawing would read it as ${d.slice(0, 6)} at alpha ${d.slice(6)}; for that colour here, write "${d.slice(6)}${d.slice(0, 6)}". `
+          + 'ce.math.fromARGB() and ce.math.fromRGBA() say which order is meant.',
       };
     }
   }
@@ -212,7 +184,7 @@ export function readColour(value, site) {
     out.problem = {
       severity: 'warning',
       message: `ce.math reads "${value}" as AARRGGBB, as a property does: the colour ${d.slice(2)}, its alpha ${d.slice(0, 2)} set aside. `
-        + `As CSS writes it, it would be ${d.slice(0, 6)}.`,
+        + `As CSS writes it, it would be ${d.slice(0, 6)}. ce.math.fromARGB() and ce.math.fromRGBA() say which order is meant.`,
     };
   }
   if (parts) {
@@ -502,13 +474,22 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     return { meaning, problem: { severity: 'error', message: `${site.noteLength}: ${shownValue(value)} is not a length in milliseconds, so nothing was sent. `
       + 'Give a number above 0, or leave it out to send the note off yourself.' } };
   }
-  if (site.animDuration !== undefined) {
-    if (n === undefined && typeof value === 'string') {
-      const beats = /^\d+\s*\/\s*\d+[a-z]*$/i.test(value.trim()) ? ' For a length in beats, give beats instead.' : '';
-      return { meaning, problem: { severity: 'warning', message: `${site.path}: "${value}" is not a number of milliseconds, so the move takes ${site.animDuration} ms, as it does when no duration is given.${beats}` } };
-    }
-    if (Number.isFinite(n) && n < 1) {
-      return { meaning, problem: { severity: 'warning', message: `${site.path}: a duration of ${n} is under 1 ms, so the move takes 1 ms: it jumps.` } };
+  // ce.anim's timing (panelRuntime's animTiming and animBeats, word for word, said once there).
+  if (site.animTiming && value !== undefined && value !== null) {
+    const { name, fallback } = site.animTiming;
+    const said = (text) => ({ meaning, problem: { severity: 'warning', message: `${site.path}: ${text}` } });
+    if (name === 'beats') {
+      if (n === undefined) return said(`${shownValue(value)} is not a number of beats, so the move's length is its duration.`);
+      if (n <= 0) return said(`${shownValue(n)} beats is not more than 0, so the move's length is its duration.`);
+    } else {
+      const duration = name === 'duration';
+      if (n === undefined) {
+        const beatsLike = duration && typeof value === 'string' && value.includes('/');
+        return said(`${shownValue(value)} is not a number of milliseconds, so the move `
+          + (duration ? `takes ${Math.round(fallback)} ms, as it does when no duration is given.` : 'starts at once, as it does when no delay is given.')
+          + (beatsLike ? ' For a length in beats, give beats, a number.' : ''));
+      }
+      if (n < 0) return said(`a ${name} of ${shownValue(n)} is less than 0, so the move ${duration ? 'takes 1 ms: it jumps.' : 'starts at once.'}`);
     }
   }
   if (n === undefined || !Number.isFinite(n)) {

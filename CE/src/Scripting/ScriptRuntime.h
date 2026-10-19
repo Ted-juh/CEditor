@@ -26,6 +26,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <vector>
 
 namespace ceditor::scripting
@@ -662,6 +663,9 @@ private:
     std::map<int, AnimationGroup> animationGroups;
     int animationGroupSeq = 0;
     int animationScriptSet = 0;   // counts loadScripts: a done token is only good within one set
+    // The commands that have said a move's timing could not be read ("ce.anim.to duration"): each
+    // is said once per script set, as the WebView's animTimingWarned, which resetScriptState clears.
+    std::set<juce::String> animationTimingWarned;
     /** Progress, value, and the completion emit — shared by the tick and by the four verbs that
         need to know where an animation is without advancing it. */
     double animationProgressOf (const Animation& a, double nowMs, double beats) const;

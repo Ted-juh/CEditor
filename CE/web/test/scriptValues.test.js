@@ -23,7 +23,7 @@ import { get } from 'svelte/store';
 import {
   readStatement, writeValue, readJsonValues, resolveCallee, clearValueCacheForTesting, VALUE_LANGUAGES,
 } from '../src/CE_Application/scripting/scriptValues.js';
-import { MEMBER_BY_ID, ALL_MEMBERS } from '../src/CE_Application/scripting/panelApi.js';
+import { MEMBER_BY_ID, ALL_MEMBERS, allModules, memberMapFor } from '../src/CE_Application/scripting/panelApi.js';
 import {
   resetScriptStateForTesting, scriptApiForTesting, setRuntimeHost, clearDeviceRuntimeDefinitions,
 } from '../src/CE_Application/scripting/panelRuntime.js';
@@ -656,6 +656,10 @@ test('a refusal is said in the words the runtime says it in', () => {
     ['ce.time.afterBeats(-0.5, f)', 'ce.', (c) => argOf(c, 'beats'), (api) => api.ce.time.afterBeats(-0.5, () => {})],
     ['ce.midi.sendNote(1, 60, 100, -5)', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.midi.sendNote(1, 60, 100, -5)],
     ['ce.midi.sendNote(1, 60, 100, "long")', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.midi.sendNote(1, 60, 100, 'long')],
+    // A colour written with its alpha in a stated place.
+    ['ce.math.fromARGB("nope")', 'ce.', (c) => argOf(c, 'colour'), (api) => api.ce.math.fromARGB('nope')],
+    ['ce.math.fromRGBA("#12345")', 'ce.', (c) => argOf(c, 'colour'), (api) => api.ce.math.fromRGBA('#12345')],
+    ['ce.math.fromRGBA(5)', 'ce.', (c) => argOf(c, 'colour'), (api) => api.ce.math.fromRGBA(5)],
     // ce.anim moves numbers: a target that is not one, and a colour property as the path.
     ['ce.anim.to("X.value", "Tomato")', 'ce.', (c) => argOf(c, 'target'), (api) => api.ce.anim.to('X.value', 'Tomato')],
     ['ce.anim.spring("X.value", true)', 'ce.', (c) => argOf(c, 'target'), (api) => api.ce.anim.spring('X.value', true)],
@@ -675,20 +679,39 @@ test('a refusal is said in the words the runtime says it in', () => {
   }
 });
 
-test('ce.anim\'s duration is said as the runtime reads it: under 1 ms is 1 ms, and text is the default', () => {
-  const durationOf = (src) => optOf(argOf(callOf(readStatement(src, 'lua', 3, {})), 'opts'), 'duration');
-  assert.equal(durationOf('ce.anim.to("X.value", 1, { duration = -5 })').problem.message,
-    'ce.anim.to: a duration of -5 is under 1 ms, so the move takes 1 ms: it jumps.');
-  assert.equal(durationOf('ce.anim.to("X.value", 1, { duration = "1/4" })').problem.message,
-    'ce.anim.to: "1/4" is not a number of milliseconds, so the move takes 300 ms, as it does when no duration is given. For a length in beats, give beats instead.');
-  assert.match(durationOf('ce.anim.spring("X.value", 1, { duration = "long" })').problem.message, /takes 600 ms, as it does when no duration is given\.$/);
-  for (const ok of ['1', '250', '"250"']) assert.equal(durationOf(`ce.anim.to("X.value", 1, { duration = ${ok} })`).problem, null, ok);
-  // What the runtime does with them, which the words above say.
+test('ce.anim\'s duration, delay and beats are said in the words the move says them in, once', () => {
   const knob = createControl('Knob', { name: 'X' });
-  assert.deepEqual(withPanel([knob], (api) => runtimeLines(() => {
-    api.ce.anim.to('X.value', 1, { duration: -5 });
-    api.ce.anim.to('X.value', 1, { duration: '1/4' });
-  })), [], 'the runtime itself says nothing of either');
+  const optionOf = (src, name) => optOf(argOf(callOf(readStatement(src, 'lua', 3, { panel: { controls: [knob] } })), 'opts'), name);
+  const cases = [
+    // [option written in Lua, the option, the runtime call]
+    ['duration = -5', 'duration', (api) => api.ce.anim.to('X.value', 1, { duration: -5 })],
+    ['duration = "1/4"', 'duration', (api) => api.ce.anim.to('X.value', 1, { duration: '1/4' })],
+    ['duration = "long"', 'duration', (api) => api.ce.anim.to('X.value', 1, { duration: 'long' })],
+    ['delay = "soon"', 'delay', (api) => api.ce.anim.to('X.value', 1, { delay: 'soon' })],
+    ['delay = -100', 'delay', (api) => api.ce.anim.to('X.value', 1, { delay: -100 })],
+    ['beats = "1/4"', 'beats', (api) => api.ce.anim.to('X.value', 1, { beats: '1/4' })],
+    ['beats = 0', 'beats', (api) => api.ce.anim.to('X.value', 1, { beats: 0 })],
+  ];
+  for (const [opt, name, run] of cases) {
+    const row = optionOf(`ce.anim.to("X.value", 1, { ${opt} })`, name);
+    resetScriptStateForTesting();
+    const lines = withPanel([knob], (api) => runtimeLines(() => run(api)));
+    assert.equal(lines.length, 1, `${opt}: the runtime says it once, ${JSON.stringify(lines)}`);
+    assert.equal(row.problem?.severity, 'warning', opt);
+    assert.equal(lines[0], `${row.problem.message} This is said only the first time.`, opt);
+  }
+  // spring's default is its own, and it is said once per command: a second time is quiet.
+  assert.match(optionOf('ce.anim.spring("X.value", 1, { duration = "long" })', 'duration').problem.message, /takes 600 ms, as it does when no duration is given\.$/);
+  resetScriptStateForTesting();
+  const twice = withPanel([knob], (api) => runtimeLines(() => { api.ce.anim.to('X.value', 1, { duration: -5 }); api.ce.anim.to('X.value', 1, { duration: -9 }); }));
+  assert.equal(twice.length, 1);
+  for (const ok of ['duration = 0', 'duration = 250', 'duration = "250"', 'delay = 0', 'beats = 2', 'beats = "0.5"']) {
+    const [field] = ok.split(' ');
+    assert.equal(optionOf(`ce.anim.to("X.value", 1, { ${ok} })`, field).problem, null, ok);
+    resetScriptStateForTesting();
+    assert.deepEqual(withPanel([knob], (api) => runtimeLines(() => api.ce.anim.to('X.value', 1, { [field]: JSON.parse(ok.split(' = ')[1]) }))), [], ok);
+  }
+  resetScriptStateForTesting();
 });
 
 test('a time the runtime takes is not reported: 0 delays, text sendNote reads, a message kept up', () => {
@@ -697,6 +720,29 @@ test('a time the runtime takes is not reported: 0 delays, text sendNote reads, a
     'ce.midi.sendNote(1, 60, 100, "500")', 'ce.midi.sendNote(1, 60, 100)', 'ce.ui.notify("Saved", { duration = -1 })', 'ce.ui.notify("Saved", { duration = 0 })']) {
     assert.deepEqual(problems(src), [], src);
   }
+});
+
+test('a ce.<module>.<name> the module does not have is said on its call, with the one meant', () => {
+  const callIn = (src, lang) => readStatement(src, lang, 3, {}).calls[0];
+  const on = callIn('ce.panel.on("Cutoff", "valueChanged", function() end)', 'lua');
+  assert.deepEqual([on.memberId, on.path, on.problem.severity], [null, 'ce.panel.on', 'error']);
+  assert.equal(on.problem.message, 'ce.panel.on is not a call ce.panel has, so the script stops with an error here when it runs. Did you mean ce.core.on?');
+  assert.equal(on.args.length, 3, 'its values are still listed');
+  assert.match(callIn('ce.midi.send_note(1, 60, 100)', 'python').problem.message, /Did you mean ce\.midi\.sendNote\?$/);
+  assert.equal(callIn('ce.core.set("A", 1)', 'lua').problem, null);
+  assert.deepEqual(readStatement('foo.bar(1)', 'lua', 2, {})?.calls ?? [], [], 'a call of the script\'s own is none of this');
+});
+
+test('every member the WebView runtime has under a module is in the contract\'s map, so none is named unknown', () => {
+  const api = withPanel([], (a) => a);
+  const extra = [];
+  for (const module of allModules().filter((m) => /^ce\.\w+$/.test(m.id))) {
+    const own = api.ce?.[module.id.slice(3)];
+    if (!own) continue;
+    const map = memberMapFor(module.id);
+    for (const key of Object.keys(own)) if (!Object.hasOwn(map, key)) extra.push(`${module.id}.${key}`);
+  }
+  assert.deepEqual(extra, []);
 });
 
 test('ce.anim takes text that is a number as its target, and a number property as its path', () => {
@@ -742,7 +788,8 @@ test('record example 1: one hex string, two readers', () => {
   const property = argOf(callOf(read(src, 'lua', 'ce.core')), 'value');
   assert.deepEqual([property.meaning.reader, property.meaning.swatch.rgb, Math.round(property.meaning.alpha * 255)], ['property', '9BD580', 0x5B]);
   assert.equal(property.problem.severity, 'warning');
-  assert.equal(property.problem.message, 'The panel reads "#5B9BD580" as AARRGGBB: the colour 9BD580 at alpha 5B. A drawing would read it as 5B9BD5 at alpha 80; for that colour here, write "805B9BD5".');
+  assert.equal(property.problem.message, 'The panel reads "#5B9BD580" as AARRGGBB: the colour 9BD580 at alpha 5B. A drawing would read it as 5B9BD5 at alpha 80; for that colour here, write "805B9BD5". '
+    + 'ce.math.fromARGB() and ce.math.fromRGBA() say which order is meant.');
   // Line 3 is written back as #RRGGBBAA, line 7 as AARRGGBB: the one edit that changes the form.
   assert.equal(writeValue(src, 'lua', drawing, '405B9BD5').text, '"#5B9BD540"');
   assert.equal(writeValue(src, 'lua', property, '805B9BD5').text, '"805B9BD5"');
@@ -879,6 +926,24 @@ function rewriteColour(src, lang, value, ctx) {
   return writeValue(src, lang, a, value).text;
 }
 
+test('ce.math.fromARGB and fromRGBA read the alpha where they say it is, and the warnings point at them', () => {
+  const colourOf = (src) => everyArg(readStatement(src, 'lua', 3, {})).find((a) => a.kind === 'colour');
+  const first = colourOf('ce.math.fromARGB("#80123456")');
+  const last = colourOf('ce.math.fromRGBA("#12345680")');
+  for (const a of [first, last]) {
+    assert.deepEqual([a.meaning.stored, a.meaning.swatch, a.problem, a.editable], ['80123456', { rgb: '123456', alpha: 128 / 255 }, null, 'colour']);
+  }
+  assert.deepEqual([first.meaning.reader, last.meaning.reader], ['argb', 'rgba']);
+  assert.equal(colourOf('ce.math.fromRGBA("#5B9BD5FF")').meaning.stored, '#5B9BD5', 'solid is "#RRGGBB"');
+  // What they answer is the panel's form, which every reader reads the same way.
+  const web = withPanel([], (api) => [api.ce.math.fromARGB('#80123456'), api.ce.math.fromRGBA('#12345680'), api.ce.math.fromRGBA('#1238')]);
+  assert.deepEqual(web, ['80123456', '80123456', '88112233']);
+  // The "#" with eight digits warnings name them.
+  for (const src of ['set("X.Background.Fill.colour", "#80123456")', 'ce.math.lighten("#80123456")']) {
+    assert.match(colourOf(src).problem.message, /ce\.math\.fromARGB\(\) and ce\.math\.fromRGBA\(\) say which order is meant\.$/, src);
+  }
+});
+
 test('a colour keeps its notation where it can carry the new one, and the reader\'s alpha form where not', () => {
   const cases = [
     // [script, new colour (the chooser's AARRGGBB), the argument written]
@@ -909,6 +974,14 @@ test('a colour keeps its notation where it can carry the new one, and the reader
     // A stored gradient's stop is written in a stop's own form; ce.draw.gradient's stops are drawings.
     ['set("A.Background.Fill.gradient.stops.0.color", "FFFFFF")', 'FFabcdef', '"ABCDEF"'],
     ['ce.draw.gradient({ "#2A6BD4", "#0A1830" })', '80123456', '"#12345680"'],
+    // ce.math.fromARGB / fromRGBA: the alpha where the call names it, the "#" and the digits as written.
+    ['ce.math.fromRGBA("#12345680")', '40AABBCC', '"#AABBCC40"'],
+    ['ce.math.fromARGB("80123456")', '40AABBCC', '"40AABBCC"'],
+    ['ce.math.fromRGBA("#12345680")', 'FFAABBCC', '"#AABBCCFF"'],
+    ['ce.math.fromRGBA("#1238")', 'FFAABBCC', '"#ABCF"'],
+    ['ce.math.fromARGB("#abc")', '88112233', '"#8123"'],
+    ['ce.math.fromARGB("#abc")', 'FF112233', '"#123"'],
+    ['ce.math.fromRGBA("5b9bd5")', '40aabbcc', '"aabbcc40"'],
   ];
   for (const [src, value, expected] of cases) assert.equal(rewriteColour(src, 'lua', value), expected, src);
   // Quotes as written: single, double, long brackets, a template, Python's raw, C#'s verbatim.

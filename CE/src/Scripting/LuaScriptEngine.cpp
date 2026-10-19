@@ -1003,6 +1003,39 @@ function colourAlpha(hex, a)
   if f == nil then return nil end
   return string.upper(string.format("%02x", math.floor(f * 255 + 0.5)) .. string.sub(rgbToHex(r, g, b), 2))
 end
+-- A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+-- reads one way: "#RRGGBB" when solid, AARRGGBB when not. scriptColours.orderedColour's reading,
+-- in the WebView runtime's colourFromOrder words.
+local __CORDER = {
+  argb = 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+  rgba = 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.',
+}
+local function __corder(verb, order, value)
+  if type(value) == "string" then
+    local d = string.match(value, "^#?(%x+)$")
+    if d ~= nil and (#d == 3 or #d == 4 or #d == 6 or #d == 8) then
+      if #d <= 4 then d = (string.gsub(d, "(%x)", "%1%1")) end
+      d = string.upper(d)
+      local aa, rgb = "FF", d
+      if #d == 8 then
+        if order == "argb" then aa, rgb = string.sub(d, 1, 2), string.sub(d, 3)
+        else aa, rgb = string.sub(d, 7, 8), string.sub(d, 1, 6) end
+      end
+      if aa == "FF" then return "#" .. rgb end
+      return aa .. rgb
+    end
+  end
+  local why
+  if value == nil then why = "no colour was given"
+  elseif type(value) == "string" then
+    why = '"' .. value .. '" is not a colour written ' .. (order == "argb" and "AARRGGBB" or "RRGGBBAA")
+  elseif type(value) == "number" and __realNumber(value) ~= nil then why = __cshown(value) .. " is a number, not text"
+  else why = "the colour given is not text" end
+  logError(verb .. ": " .. why .. ", so there is no answer. " .. __CORDER[order])
+  return nil
+end
+function colourFromArgb(colour) return __corder("ce.math.fromARGB", "argb", colour) end
+function colourFromRgba(colour) return __corder("ce.math.fromRGBA", "rgba", colour) end
 function hexToHsl(hex)
   local r, g, b = __cchan("ce.math.hsl", hex)
   if r == nil then return nil end
@@ -3432,7 +3465,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromHsl = "hslToHex", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromARGB = "colourFromArgb", fromHsl = "hslToHex", fromRGBA = "colourFromRgba", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", play = "animatePlay", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },

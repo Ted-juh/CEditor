@@ -542,7 +542,7 @@
         {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
-    {#if !rows.some((r) => r.type === 'arg')}
+    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem)}
       <p class="vempty">Nothing in this {isJson ? 'object' : 'statement'} that the editor can read.</p>
     {/if}
     <div class="vlist" bind:this={listEl}>

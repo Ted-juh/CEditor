@@ -1068,6 +1068,32 @@ function mixColour(a, b, t) {
   return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
 // The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
+// A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+// reads one way: "#RRGGBB" when solid, AARRGGBB when not. scriptColours.orderedColour's reading,
+// in the WebView runtime's colourFromOrder words.
+var __CORDER = {
+  argb: 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+  rgba: 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.'
+};
+function __corder(verb, order, value) {
+  if (typeof value === "string") {
+    var m = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(value);
+    if (m) {
+      var d = (m[1].length <= 4 ? m[1].replace(/[0-9a-fA-F]/g, function (c) { return c + c; }) : m[1]).toUpperCase();
+      var first = order === "argb";
+      var aa = d.length === 8 ? (first ? d.slice(0, 2) : d.slice(6)) : "FF";
+      var rgb = d.length === 8 ? (first ? d.slice(2) : d.slice(0, 6)) : d;
+      return aa === "FF" ? "#" + rgb : aa + rgb;
+    }
+  }
+  var why = value === undefined || value === null ? "no colour was given"
+    : (typeof value === "string" ? '"' + value + '" is not a colour written ' + (order === "argb" ? "AARRGGBB" : "RRGGBBAA")
+      : (typeof value === "number" && isFinite(value) ? String(value) + " is a number, not text" : "the colour given is not text"));
+  logError(verb + ": " + why + ", so there is no answer. " + __CORDER[order]);
+  return undefined;
+}
+function colourFromArgb(colour) { return __corder("ce.math.fromARGB", "argb", colour); }
+function colourFromRgba(colour) { return __corder("ce.math.fromRGBA", "rgba", colour); }
 function colourAlpha(hex, a) {
   var c = __cchan("ce.math.alpha", hex);
   if (c === null) return undefined;
@@ -3087,7 +3113,7 @@ var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
-  "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+  "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
   "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },

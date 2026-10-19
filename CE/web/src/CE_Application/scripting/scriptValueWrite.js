@@ -98,6 +98,17 @@ export function colourText(old, reader, colour) {
   const aa = hex2(colour.alphaByte);
   const opaque = colour.alphaByte >= 255;
   if (reader === 'stop') return rgb.toUpperCase();
+  // ce.math.fromARGB / fromRGBA: the alpha where the call names it, as many digits as were written
+  // (4 when they double, else 8; 6 or 3 while solid), with the "#" or without it, as it was.
+  if (reader === 'argb' || reader === 'rgba') {
+    const hash = typeof old === 'string' && old.startsWith('#') ? '#' : '';
+    const digits = typeof old === 'string' ? old.replace(/^#/, '').length : 8;
+    const eight = reader === 'argb' ? aa + rgb : rgb + aa;
+    if (opaque && digits === 3 && doubled(rgb)) return `${hash}${H(shortOf(rgb))}`;
+    if (opaque && (digits === 3 || digits === 6)) return `${hash}${H(rgb)}`;
+    if (digits <= 4 && doubled(eight)) return `${hash}${H(shortOf(eight))}`;
+    return `${hash}${H(eight)}`;
+  }
   const alphaForm = reader === 'drawing' ? `#${H(rgb + aa)}` : H(aa + rgb);
   const form = typeof old === 'string' ? colourForm(old) : 'other';
   switch (form) {

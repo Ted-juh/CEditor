@@ -287,11 +287,11 @@ const SHARED_OPTION_FIELDS = {
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
   duration: {
     name: 'duration', type: 'number', default: '300', unit: 'milliseconds',
-    summary: 'How long the move takes.',
+    summary: 'How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once.',
   },
   beats: {
-    name: 'beats', type: 'number', sample: '2',
-    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo.',
+    name: 'beats', type: 'number', sample: '2', unit: 'beats',
+    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move\'s length is its `duration`.',
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
@@ -300,7 +300,7 @@ const SHARED_OPTION_FIELDS = {
   },
   delay: {
     name: 'delay', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'Wait this long before starting.',
+    summary: 'Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once.',
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
@@ -996,6 +996,18 @@ export const COMMANDS = [
       { name: 'g', type: 'number', required: true },
       { name: 'b', type: 'number', required: true },
     ],
+    scopes: 'any',
+  },
+  {
+    id: 'colourFromArgb', category: 'Value / range', signature: 'colourFromArgb(colour) -> string',
+    summary: 'Read a colour written with its alpha first, `AARRGGBB`, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are AARRGGBB to a colour property and to the other colour commands, but the other way round to a drawing, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromRGBA()` reads the alpha last.',
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'argb' }],
+    scopes: 'any',
+  },
+  {
+    id: 'colourFromRgba', category: 'Value / range', signature: 'colourFromRgba(colour) -> string',
+    summary: 'Read a colour written with its alpha last, `RRGGBBAA`, the web\'s order, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are read this way by a drawing, but as AARRGGBB by a colour property and the other colour commands, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromARGB()` reads the alpha first.',
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'rgba' }],
     scopes: 'any',
   },
   {
@@ -4130,6 +4142,7 @@ const MODULE_MEMBERS = {
                // globals, so the flat spellings say what they convert.
                lighten: 'lighten', darken: 'darken', mix: 'mixColour', alpha: 'colourAlpha',
                rgb: 'hexToRgb', hex: 'rgbToHex', hsl: 'hexToHsl', fromHsl: 'hslToHex',
+               fromARGB: 'colourFromArgb', fromRGBA: 'colourFromRgba',
                degrees: 'toDegrees', radians: 'toRadians',
                distance: 'distance', angle: 'angleOf', polar: 'polar',
                // The panel's own transforms. `shape` is deliberately NOT `curve` — the two compute

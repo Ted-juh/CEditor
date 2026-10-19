@@ -34,6 +34,7 @@ import {
   unknownOptionsMessage,
 } from './panelApi.js';
 import { colourFieldAt, panelColourFieldAt, realNumber } from './scriptColours.js';
+import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
 import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/controlSets.js';
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
@@ -391,6 +392,13 @@ function buildCall(raw, env) {
   }
   if (resolved?.self) call.self = true;
   if (member) return call;
+  // A ce.<module>.<name> the module does not have fails the moment it runs: said on the call, with
+  // what was meant, in the words the editor's own check says it in (unknownCalls.js).
+  const unknown = unknownModuleCall(raw.callee);
+  if (unknown) {
+    call.problem = { severity: 'error', message: unknownModuleCallMessage(raw.callee, unknown) };
+    return call;
+  }
   if (args.some((a) => KEPT_KINDS(a.kind) || (a.options ?? []).some((o) => KEPT_KINDS(o.kind)))) return call;
   return children;
 }
@@ -584,7 +592,8 @@ function colourSiteFor(site, param) {
   if (module === 'ce.draw') {
     return { reader: 'drawing', refusal: colourRefusals.draw(site.path, `the ${site.path.split('.').pop()}`) };
   }
-  if (module === 'ce.math') return { reader: 'math', refusal: colourRefusals.math(site.path) };
+  // fromARGB and fromRGBA read in the order they name; the rest of ce.math as a property reads.
+  if (module === 'ce.math') return { reader: param?.order ?? 'math', refusal: colourRefusals.math(site.path) };
   if (site.option === 'tint' && (site.memberId === 'imageSet' || site.memberId === 'imageIcon')) {
     const target = sibling(site, 'target');
     return { reader: 'property', refusal: colourRefusals.tint(`${site.path}("${target ?? ''}")`), resolvesToken: ctx.resolvesToken, resolve: ctx.resolve };
@@ -592,7 +601,6 @@ function colourSiteFor(site, param) {
   return { reader: 'property', refusal: colourRefusals.plain(), resolvesToken: ctx.resolvesToken, resolve: ctx.resolve };
 }
 
-/** The words a division is refused in: ce.time.step's own, or the timer that reads one as beats. */
 /** How panelRuntime's timeRefused is called for this argument, or undefined: a timer's interval,
  *  after's delay, and syncTimer's and afterBeats' beats given as a number. */
 function timeSpec(site, param) {
@@ -610,6 +618,7 @@ function timeSpec(site, param) {
   return undefined;
 }
 
+/** The words a division is refused in: ce.time.step's own, or the timer that reads one as beats. */
 function divisionVerb(site) {
   if (site.memberId === 'syncTimer' || site.memberId === 'afterBeats') {
     const id = sibling(site, 'id');
@@ -630,9 +639,10 @@ function numberSite(site, param) {
   if (site.memberId && module === 'ce.midi') out.path = site.memberId;
   out.time = timeSpec(site, param);
   if (site.memberId === 'sendNote' && param.name === 'ms') out.noteLength = 'sendNote';
-  // ce.anim reads a duration as Math.max(1, Number(duration)), the default when it is not a number
-  // (panelRuntime's startAnimationImpl): said as what happens, since the runtime says nothing.
-  if (module === 'ce.anim' && param.name === 'duration') out.animDuration = Number(param.default ?? 300);
+  // ce.anim's duration, delay and beats, as the moves read them (panelRuntime's animTiming).
+  if (ANIM_VERBS[site.memberId] && ['duration', 'delay', 'beats'].includes(param.name)) {
+    out.animTiming = { name: param.name, fallback: param.name === 'duration' ? Number(param.default ?? 300) : 0 };
+  }
   if (site.option === 'opacity' && OPACITY_SCALE_WARNINGS[site.memberId]) {
     out.scaleWarning = OPACITY_SCALE_WARNINGS[site.memberId](sibling(site, 'target') ?? '');
   }

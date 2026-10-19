@@ -35,7 +35,7 @@ import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken 
 import {
   COLOUR_FORMS, DRAW_COLOUR_FORMS, MADE_CHILDREN, colourFieldAt, colourHint, drawColour, mapColourWrites,
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
-  shownNumber, storedColour, unitProblem,
+  shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -1079,6 +1079,20 @@ function colourWithAlpha(hex, a) {
   return (aa + colourFromRgb(rgb[0], rgb[1], rgb[2]).slice(1)).toUpperCase();
 }
 
+/** A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+ *  reads one way: "#RRGGBB" when solid, AARRGGBB when not. In each prelude's __corder words. */
+function colourFromOrder(verb, order, value) {
+  const colour = orderedColour(value, order);
+  if (colour) return colour;
+  let why;
+  if (value === undefined || value === null) why = 'no colour was given';
+  else if (typeof value === 'string') why = `"${value}" is not a colour written ${order === 'argb' ? 'AARRGGBB' : 'RRGGBBAA'}`;
+  else if (typeof value === 'number' && Number.isFinite(value)) why = `${shownNumber(value)} is a number, not text`;
+  else why = 'the colour given is not text';
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer. ${ORDERED_FORMS[order]}`);
+  return undefined;
+}
+
 /** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
 function colourToHsl(hex) {
   const rgb = colourChannels('ce.math.hsl', hex);
@@ -1970,6 +1984,8 @@ const helpers = {
   rgbToHex: (r, g, b) => colourFromRgb(r, g, b),
   hexToHsl: (hex) => colourToHsl(hex),
   hslToHex: (h, sat, l) => colourFromHsl(h, sat, l),
+  colourFromArgb: (colour) => colourFromOrder('ce.math.fromARGB', 'argb', colour),
+  colourFromRgba: (colour) => colourFromOrder('ce.math.fromRGBA', 'rgba', colour),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   // range and normalisation
   norm: (v, lo, hi) => normImpl(v, lo, hi),
@@ -4322,6 +4338,48 @@ function animatesColour(verb, path) {
   return true;
 }
 
+// A move's timing: a number, or text that is one (realNumber). A duration or a delay that cannot be
+// read, or is below 0, and beats that are not a number above 0, are said once per command, and the
+// move goes ahead as it always did: a duration in its default time, or 1 ms below 0; a delay of
+// none; the length its duration gives. They were all taken without a word, and Number() read
+// "1/4" as no duration here while the plug-in's ScriptRuntime read it as 1 ms; both read it as
+// this now, in these words. resetScriptState clears what has been said.
+const animTimingWarned = new Set();
+function warnAnimTiming(verb, name, said) {
+  const key = `${verb} ${name}`;
+  if (animTimingWarned.has(key)) return;
+  animTimingWarned.add(key);
+  addScriptTrace('warn', '', `${verb}: ${said} This is said only the first time.`);
+}
+function animTiming(verb, opts, name, fallback) {
+  const v = opts?.[name];
+  if (v === undefined || v === null) return fallback;
+  const duration = name === 'duration';
+  const n = realNumber(v);
+  if (n === undefined) {
+    const beatsLike = duration && typeof v === 'string' && v.includes('/');
+    warnAnimTiming(verb, name, `${shownValue(v)} is not a number of milliseconds, so the move `
+      + (duration ? `takes ${Math.round(fallback)} ms, as it does when no duration is given.` : 'starts at once, as it does when no delay is given.')
+      + (beatsLike ? ' For a length in beats, give beats, a number.' : ''));
+    return fallback;
+  }
+  if (n < 0) {
+    warnAnimTiming(verb, name, `a ${name} of ${shownValue(n)} is less than 0, so the move ${duration ? 'takes 1 ms: it jumps.' : 'starts at once.'}`);
+    return duration ? 1 : 0;
+  }
+  return n;
+}
+/** `beats` as a number above 0, or null: none given, or said why not. */
+function animBeats(verb, opts) {
+  const v = opts?.beats;
+  if (v === undefined || v === null) return null;
+  const n = realNumber(v);
+  if (n === undefined) warnAnimTiming(verb, 'beats', `${shownValue(v)} is not a number of beats, so the move's length is its duration.`);
+  else if (n <= 0) warnAnimTiming(verb, 'beats', `${shownValue(n)} beats is not more than 0, so the move's length is its duration.`);
+  else return n;
+  return null;
+}
+
 function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = null) {
   // to and spring move to a number, and only a number. An envelope's ends come from its own opts.
   if (kind !== 'envelope' && animationTarget(`ce.anim.${kind}`, target) === undefined) return false;
@@ -4337,6 +4395,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     const refused = paths.filter((p) => animatesColour(`ce.anim.${kind}`, p));
     if (refused.length) return false;
     const stagger = animNumber(opts, 'stagger', 0);
+    const baseDelay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
     const done = typeof opts?.done === 'function' ? opts.done : null;
     let groupId = null;
     if (done) {
@@ -4349,7 +4408,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     }
     let ok = true;
     paths.forEach((p, i) => {
-      const each = { ...opts, delay: animNumber(opts, 'delay', 0) + stagger * i, done: undefined };
+      const each = { ...opts, delay: baseDelay + stagger * i, done: undefined };
       if (!startAnimationImpl(scriptId, kind, p, target, each, groupId)) ok = false;
     });
     return ok;
@@ -4397,11 +4456,11 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // stretches when the tempo drops — which is what every synced component in the panel does and no
   // script could ask for.
   const sync = opts?.sync === true;
-  const beatsOpt = opts?.beats != null ? Number(opts.beats) : null;
+  const beatsOpt = animBeats(`ce.anim.${kind}`, opts);
   const defaultMs = spring ? 600 : 300;
-  let duration = Math.max(1, animNumber(opts, 'duration', defaultMs));
+  let duration = Math.max(1, animTiming(`ce.anim.${kind}`, opts, 'duration', defaultMs));
   let syncBeats = 0;
-  if (Number.isFinite(beatsOpt) && beatsOpt > 0) {
+  if (beatsOpt !== null) {
     syncBeats = beatsOpt;
     const ms = beatsToMsRead(beatsOpt);
     if (ms != null) duration = Math.max(1, ms);
@@ -4413,7 +4472,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     syncBeats = msToBeatsRead(duration) ?? 1;
   }
 
-  const delay = Math.max(0, animNumber(opts, 'delay', 0));
+  const delay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
   // `repeat` is how many times the move runs IN ALL: 1 (the default) once, 3 three times, and 0 or
   // less until it is stopped, as the contract always said. Every runtime used to read it as runs
   // AFTER the first, so repeat = 1 ran twice and repeat = 0 once. Rounded to a whole number. Text
@@ -9515,6 +9574,7 @@ export function destroyLoadedScripts() {
 function resetScriptState() {
   executionEpoch += 1;
   edgeWarned.clear();
+  animTimingWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});
