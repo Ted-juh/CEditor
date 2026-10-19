@@ -739,10 +739,53 @@ Still open, for the owner:
   `"FF111518"` now, fixed in the shared component it is generated from
   (`tools/scripts/gaia-panel/components.mjs`) and the panel regenerated
   (`tools/scripts/an1x-panel/make-an1x-panel.mjs`).
-- **Not checked yet:** colours in `ce.panel.create` and `clone`, colours written by component
-  verbs, and `panel.*` colours (such as `panel.bgColour`) in either runtime, since the panel
-  document has no section templates to say which of its keys are colours. A list given to `ce.anim`
-  with one colour path in it refuses that path and never calls its `done`, in both runtimes.
+- **The places the colour rule did not reach: all read by it now.** What this list used to name as
+  not checked, and what checking it turned up:
+  - *The panel's own colours, in both runtimes.* `bgColour`, `bgImageTint`, `bgTextureTint`,
+    `gridColour`, `gridSubColour` and the background gradient's stops took anything from `set()`, so
+    `"red"` was stored as `"red"` and the background painted nothing. They are read from the
+    document a new panel starts as (`models/panelDefaults.js`, which `createPanel` is now made from)
+    by the rule the section templates are read by, and `gen-colour-fields.mjs` carries the list to
+    the player. Three panel readers did not take the `"#"` that `set()` stores for `"red"` (the solid
+    background, the two tints, which also read an AARRGGBB's alpha as its red, and the gradient's
+    stops, which CSS read as RRGGBBAA); each drops one `"#"` and reads AARRGGBB now. No panel reader
+    resolves a control-set reference, so one is refused on the panel's colours.
+  - *`ce.panel.create`, `clone` and the component verbs.* A colour in create's or clone's props was
+    stored as written; the component verbs wrote through `set()`, which read their colours in its
+    own name while the verb logged the change and answered true. Create and clone now read their
+    props' sections as `set()` reads a section written whole, and refuse the whole call over a colour
+    they cannot read, naming it by its path (`ce.panel.create("Meter"): at "Meter.trackColour",
+    "redd" is not a colour the panel can read, so nothing was created.`). Every verb built from the
+    component spec writes through one function, `writeComponentFields`, which reads every colour
+    field in what it writes, typed by the templates rather than the verb, and refuses before writing
+    any of it (`ce.components.drumpads.colour("Kit"): in pad 3, …`, and false).
+    `ce.components.drumpads.colour`, the one verb whose value is a colour, was read by nothing, since
+    the Drum Pads' `pads` starts empty; `scriptColours.LIST_ITEMS` types it, for `set()` too.
+  - *A gradient's stops, the panel's and every control's: a stop's own form.* A stop is RRGGBB with
+    no `"#"` and no alpha, which is what the gradient editors store and most of its readers take, so a
+    script's stop is read by the colour rule and stored that way: `"red"` is `"FF0000"`. An alpha is
+    refused, since the gradient's opacity is its layer's, and the refusal says a stop takes none and
+    names the colour without it. A stop is known by where it sits, `color` in an item of `stops`; a
+    control's gradient, which its template gives as null, is typed by `scriptColours.GRADIENT`, and
+    the player's table carries a `stop` mark. A path into a gradient a control does not have yet
+    threw from `set()` in the editor, and the player's walk did not step into a list by a lower-case
+    path; both are fixed.
+  - *A section's child inside create's props.* `{ Background = { Fill = { colour = "red" } } }` was
+    stored beside Background's `_children`, where nothing reads it. A section's children are merged
+    into at every depth now, matched in any case as a path is, and a key the section does not have is
+    written with `set()`'s warning for a new property. A section the new control does not have
+    (`{ Meter = … }` on a Button), or one given as anything but a table, used to be passed over without
+    a word, and now refuses the call.
+  - *A list move with a colour in it.* `ce.anim.to({ "cutoff", "lbl.background.fill.colour" }, …)`
+    started the rest and waited for a `done` that never came. Such a list is refused whole in every
+    runtime: each colour is named in the words one path is refused in, nothing starts, `done` is not
+    called, and the call answers false. In the player the preludes now hand back the host's answer,
+    so `ce.anim.to` answers true or false there too, where it used to answer nothing.
+
+  `colourPropertyCases.json` holds the two runtimes to the same answers for all of it. Left as they
+  are: the five hand-written component families (split, phrase, recorder, harmony, setlist) write
+  through `set()` and are refused in its name, since none takes a colour from a script; and an object
+  given for a plain field of a section (Border's `top`) replaces it whole, as `set()` does.
 
 ## Rules every edit session follows
 
