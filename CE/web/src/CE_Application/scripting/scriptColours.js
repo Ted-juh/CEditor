@@ -320,7 +320,8 @@ export function drawColour(value) {
 /**
  * What writing `value` to a colour property stores: `{ colour }`, or `{ why, advice }` when the
  * panel cannot read it, for the caller to set in its own sentence: `set("…"): <why>, so nothing was
- * set. <advice>`. set(), ce.panel.patch and both image tints ask here, so all four agree.
+ * set. <advice>`. set(), ce.panel.patch, ce.panel.create and clone's props, the component verbs and
+ * both image tints ask here, so they all agree.
  *
  * What the panel reads is stored exactly as written. CSS's shorter forms are stored written out
  * (longForm), so get() afterwards answers "#FF0000" for "red". Nothing is said when that happens:
@@ -382,6 +383,16 @@ export const MADE_CHILDREN = Object.freeze({
   Fill: Object.freeze(Object.fromEntries([...EFFECT_TYPES].map((name) => [name.toLowerCase(), name]))),
 });
 
+// The items of a list a template starts empty, which no first item is there to type: the Drum Pads'
+// per-pad overrides, sparse and index-aligned with the grid, each of which may set a `colour` that
+// is "" for the section accent (utils/drumPadLayout.js resolveDrumPads, read by the renderer as 6 or
+// 8 hex digits). By section type and list name, with an item's colour fields at their defaults, read
+// below as a template's first item is read, so `pads.*.colour` is a colour field for set() and for
+// ce.components.drumpads.colour alike. The C++ reads it in the table COLOUR_FIELDS is written into.
+export const LIST_ITEMS = Object.freeze({
+  DrumPads: Object.freeze({ pads: Object.freeze({ colour: '' }) }),
+});
+
 export const COLOUR_FIELDS = (() => {
   const fields = new Map();
   const add = (type, path, key, empty) => {
@@ -410,6 +421,9 @@ export const COLOUR_FIELDS = (() => {
     }
   };
   visit(SECTION_DEFAULTS, '', []);
+  for (const [type, lists] of Object.entries(LIST_ITEMS)) {
+    for (const [name, item] of Object.entries(lists)) visit(item, type, [name, '*']);
+  }
   for (const type of EFFECT_TYPES) if (fields.has('Effects')) fields.set(type, fields.get('Effects'));
   return fields;
 })();

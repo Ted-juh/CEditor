@@ -79,7 +79,7 @@ import {
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
-  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, optionChecks,
+  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, optionChecks, memberPath,
 } from './panelApi.js';
 // Each section type's template: what get() checks a path against, and create's `<section>` keys.
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -644,10 +644,12 @@ function valueBindingFor(control) {
  * Which properties hold colours comes from the section templates (scriptColours.colourFieldAt), so
  * Icon.tint is one and Pixel.imageColour, a switch, is not. `root` is the control, or for a state's
  * part patch the part, and `path` is relative to it: set()'s model path, or a patch map's key. A
- * whole section or list written at once is looked into, field by field. `named` puts the path in
- * the message, for a call whose own arguments do not already say which property it was.
+ * whole section or list written at once is looked into, field by field. `place(at, path)` says
+ * where in the write a refused colour is, for the message: below `path` by default, as set() says
+ * it ("at colour"); `wholePath` for a call whose own arguments do not already say which property it
+ * was; componentPlace for a component verb, which counts list positions from 1.
  */
-function colourWrites(call, outcome, root, path, value, named = false) {
+function colourWrites(call, outcome, root, path, value, place = belowPath) {
   // Asked only of a control-set reference, so an ordinary write does not look the set up.
   const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
   let refused = false;
@@ -655,13 +657,20 @@ function colourWrites(call, outcome, root, path, value, named = false) {
     const read = panelColour(written, field, resolves);
     if (!read.why) return read.colour;
     refused = true;
-    let where = '';
-    if (named) where = `at "${at}", `;
-    else if (at !== path) where = `at ${at.slice(path.length + 1)}, `;
-    addScriptTrace('error', '', `${call}: ${where}${read.why}, so ${outcome}. ${read.advice}`);
+    addScriptTrace('error', '', `${call}: ${place(at, path)}${read.why}, so ${outcome}. ${read.advice}`);
     return written;
   });
   return refused ? null : { value: stored };
+}
+
+/** Where a refused colour is, below the path the call wrote: "at colour, ", or '' at the path. */
+function belowPath(at, path) {
+  return at === path ? '' : `at ${at.slice(path.length + 1)}, `;
+}
+
+/** …or by its whole path, for the calls that write several: 'at "Background.Fill.colour", '. */
+function wholePath(at) {
+  return `at "${at}", `;
 }
 
 // The third argument carries two different things, as the contract's own signature does:
@@ -713,7 +722,8 @@ function setValue(path, value, formOrOpts = '') {
   // a number). Read here, after the filters have had their say (so what a filter returns is read
   // too) and before anything is written: CSS's short forms are written out, so "red" is stored as
   // "#FF0000", and what has no one reading is refused with the form to write instead.
-  // ce.panel.patch asks the same question of its entries.
+  // ce.panel.patch asks the same question of its entries, ce.panel.create and clone of their props'
+  // sections (sectionOverrides), and the component verbs of what they write (writeComponentFields).
   const colours = colourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value);
   if (!colours) return;
   value = colours.value;
@@ -3247,6 +3257,49 @@ const harmoniserApi = {
 // be reused verbatim because these verbs take POSITIONAL arguments rather than a named action, so
 // this is its sibling: identical error text, identical no-op reporting, one extra hop to the spec.
 // @module ce.components
+
+/**
+ * Where a refused colour is in what a component verb writes, in the verbs' own terms: a list
+ * position counted from 1, as every verb here counts them ("in pad 3, "), the property below it if
+ * that is not the item's own colour, and nothing when the field written is the colour itself.
+ */
+function componentPlace(at, path) {
+  if (at === path) return '';
+  const below = at.slice(path.length + 1).split('.');
+  if (!/^\d+$/.test(below[0])) return `at ${below.join('.')}, `;
+  const item = path.slice(path.lastIndexOf('.') + 1).replace(/s$/, '');
+  const rest = below.slice(1).join('.');
+  return `in ${item} ${Number(below[0]) + 1}, ${rest && rest.toLowerCase() !== 'colour' ? `at ${rest}, ` : ''}`;
+}
+
+/**
+ * Write the fields a component verb changes in its section, every one or none. `patch` maps each
+ * field to its new value, a whole list for a verb that addresses one element of it.
+ *
+ * Every colour in it is read first, as set() reads one: a short form is written out ("red" is
+ * stored as "#FF0000"), and one the panel cannot read refuses the call before any field is written,
+ * in set()'s sentence with the verb's own name first. Which fields are colours comes from the
+ * section templates (colourFieldAt), not from the verb, so a verb added later that reaches a colour
+ * field is read the same way. Every verb built from componentVerbs.js writes through here.
+ *
+ * Returns whether it wrote; false is the verb's answer for a refusal, as for any other.
+ */
+function writeComponentFields(verb, path, patch) {
+  const control = findControlByName(path);
+  const call = `${memberPath(verb.id)}("${path}")`;
+  const written = [];
+  let refused = false;
+  for (const [field, value] of Object.entries(patch)) {
+    const at = `${verb.section}.${field}`;
+    const colours = colourWrites(call, 'nothing was set', control, at, value, componentPlace);
+    if (colours) written.push([field, colours.value]);
+    else refused = true;
+  }
+  if (refused) return false;
+  for (const [field, value] of written) setValue(`${path}.${verb.section}.${field}`, value);
+  return true;
+}
+
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
   const cfg = getValue(`${path}.${verb.section}`);
@@ -3271,7 +3324,7 @@ function componentVerbAction(verb, target, args) {
       + (verb.values ? `. One of: ${verb.values.join(', ')}.` : ''));
     return false;
   }
-  for (const key of keys) setValue(`${path}.${verb.section}.${key}`, patch[key]);
+  if (!writeComponentFields(verb, path, patch)) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
   return true;
 }
@@ -3520,7 +3573,7 @@ function componentFillAction(verb, path, args) {
     addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") — already that way`);
     return true;
   }
-  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${calls.length} value(s)`);
   return true;
 }
@@ -3539,7 +3592,7 @@ function componentInsertAction(verb, path, args) {
       `${verb.family}.insert("${spec.v}"): this component's ${spec.f} cannot be grown from a script.`);
     return false;
   }
-  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: insert("${spec.v}") → ${next.length}`);
   return true;
 }
@@ -3562,7 +3615,7 @@ function componentRemoveAction(verb, path, args) {
       + 'element, or this component needs it.');
     return false;
   }
-  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: remove("${spec.v}") → ${next.length}`);
   return true;
 }
@@ -3610,7 +3663,7 @@ function componentLinkAction(verb, path, args) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}() — already unlinked`);
       return true;
     }
-    setValue(`${path}.${verb.section}.${verb.f}`, '');
+    if (!writeComponentFields(verb, path, { [verb.f]: '' })) return false;
     addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}() → unlinked`);
     return true;
   }
@@ -3634,7 +3687,7 @@ function componentLinkAction(verb, path, args) {
     addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}("${wanted}") — already that way`);
     return true;
   }
-  setValue(`${path}.${verb.section}.${verb.f}`, id);
+  if (!writeComponentFields(verb, path, { [verb.f]: id })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → "${wanted}"`);
   return true;
 }
@@ -5674,8 +5727,27 @@ function uniqueControlName(base) {
   return `${root}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Apply the flat convenience props (name/x/y/width/height) plus any section overrides. */
-function applyControlProps(control, props = {}, scriptId = '') {
+/**
+ * The section overrides in `props` that `control` has a section for, [[section, values]], with
+ * every colour in them read as set() reads a section written whole: a short form written out ("red"
+ * is stored as "#FF0000"), and the script's own table left as it wrote it. Null when one of them is
+ * a colour the panel cannot read: each such colour has been reported by its path, after `call`, and
+ * nothing is to be made. A colour used to be stored as written and painted white.
+ */
+function sectionOverrides(control, props, call, outcome) {
+  const sections = [];
+  let refused = false;
+  for (const [section, values] of Object.entries(props ?? {})) {
+    if (!control._children[section] || typeof values !== 'object' || values == null) continue;
+    const colours = colourWrites(call, outcome, control, section, values, wholePath);
+    if (colours) sections.push([section, colours.value]);
+    else refused = true;
+  }
+  return refused ? null : sections;
+}
+
+/** Apply the flat convenience props (name/x/y/width/height) plus the section overrides. */
+function applyControlProps(control, props, sections, scriptId = '') {
   const core = control._children.Core;
   const transform = control._children.Transform;
   if (props.name != null) core.name = String(props.name);
@@ -5684,8 +5756,7 @@ function applyControlProps(control, props = {}, scriptId = '') {
   }
   // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
   // script setting one field does not wipe the rest of the section.
-  for (const [section, values] of Object.entries(props)) {
-    if (!control._children[section] || typeof values !== 'object' || values == null) continue;
+  for (const [section, values] of sections) {
     control._children[section] = { ...control._children[section], ...values };
   }
   core[GENERATED_KEY] = scriptId || 'script';
@@ -5703,7 +5774,11 @@ function panelCreateImpl(type, props, scriptId) {
   try { control = createControl(typeName); }
   catch (e) { addScriptTrace('error', '', `ce.panel.create("${typeName}"): ${e?.message ?? e}`); return null; }
 
-  applyControlProps(control, props ?? {}, scriptId);
+  // The new control's own sections type its props, so a colour in them is read before anything is
+  // made: one the panel cannot read means no control, and the panel is as it was.
+  const sections = sectionOverrides(control, props, `ce.panel.create("${typeName}")`, 'nothing was created');
+  if (!sections) return null;
+  applyControlProps(control, props ?? {}, sections, scriptId);
   control._children.Core.name = uniqueControlName(control._children.Core.name);
 
   const parentName = props?.parent ? String(props.parent) : null;
@@ -5727,7 +5802,10 @@ function panelCloneImpl(name, props, scriptId) {
   if (!source) { addScriptTrace('error', '', `ce.panel.clone: no control named "${name}".`); return null; }
 
   const copy = remintControlIds(source);
-  applyControlProps(copy, props ?? {}, scriptId);
+  // Only what the script passes is read: the source's own colours are stored already.
+  const sections = sectionOverrides(copy, props, `ce.panel.clone("${name}")`, 'nothing was copied');
+  if (!sections) return null;
+  applyControlProps(copy, props ?? {}, sections, scriptId);
   if (props?.name == null) copy._children.Core.name = `${source._children.Core.name}_copy`;
   copy._children.Core.name = uniqueControlName(copy._children.Core.name);
   // A clone lands beside its source by default: in the same container, not at the top level.
@@ -6524,7 +6602,7 @@ function panelPatchImpl(controlName, stateName, patch, part) {
   const written = [];
   for (const [path, value] of Object.entries(entries)) {
     const colours = colourWrites(`ce.panel.patch("${controlName}", "${stateName}")`, 'nothing was patched',
-      patchRoot, String(path), value, true);
+      patchRoot, String(path), value, wholePath);
     if (colours) written.push([path, colours.value]);
     else refusedColour = true;
   }

@@ -653,6 +653,12 @@ export const WRITTEN = {
     lua: `ce.components.setlist.read("Setlist", "wrap")`,
     js: `ce.components.setlist.read("Setlist", "wrap");`,
   },
+  /* ---------------------------------------------------------------- a spec-built verb that takes a colour
+   * The generator's example for an addressed verb writes 0.75, which a colour refuses. */
+  drumPadsColour: {
+    lua: `ce.components.drumpads.colour("DrumPads", 2, "#E0533D")   -- pad 2's own accent\nce.components.drumpads.colour("DrumPads", 2, "")          -- back to the section's`,
+    js: `ce.components.drumpads.colour("DrumPads", 2, "#E0533D");   // pad 2's own accent\nce.components.drumpads.colour("DrumPads", 2, "");          // back to the section's`,
+  },
   /* ---------------------------------------------------------------- ce.draw, phase §49 */
   drawBatch: {
     lua: `-- one publish for the whole lot instead of one per command\nce.draw.batch(function()\n  for i = 0, 63 do\n    ce.draw.line(i * 2, 32 - trace[i + 1] * 32, i * 2, 32)\n  end\nend)`,

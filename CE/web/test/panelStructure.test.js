@@ -18,10 +18,11 @@ import {
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
 import {
   WEBVIEW_ONLY_MEMBERS, LIFECYCLE_HOOKS, handlerNamesForRuntime, RUNTIME_PLAYER, RUNTIME_WEBVIEW,
-  memberPath,
+  memberPath, MEMBER_BY_ID, refusalOf,
 } from '../src/CE_Application/scripting/panelApi.js';
 
 // The panel declares ce.panel explicitly. On `auto` it would be derived from the panel's scripts,
@@ -113,6 +114,119 @@ test('clone copies a control the author designed, including its sections', () =>
     assert.equal(api.panelInfo('osc1').generated, true);
     assert.equal(api.panelInfo('template').generated, false, 'the source is still the author\'s');
   });
+});
+
+/* ---------------------------------------------------------------------- colours in the props */
+// A colour in create's or clone's props used to be stored as written, so "red" or "#000" painted
+// white. They are read as set() reads a section written whole: what the panel reads is stored as
+// written, CSS's short forms are written out, and one the panel cannot read refuses the whole call.
+
+const FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS '
+  + 'colour name, rgb() or hsl().';
+const errors = () => get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+const made = (panel, name) => flatControls(panel.controls).find((c) => c._children.Core.name === name);
+
+test('a colour in create\'s props is stored as set() stores it, in a section and in a list inside one', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    const zones = [{ from: 0, colour: 'lime' }, { from: 0.8, colour: 'FFFF0000' }];
+    const props = { name: 'm', Meter: { trackColour: '#abc', zones }, Core: { formFaceColour: 'teal' } };
+    assert.equal(api.panelCreate('Meter', props), 'm');
+    assert.equal(traced(), '', 'without a word, as set() writes a short form out');
+
+    const sections = made(panel, 'm')._children;
+    assert.equal(sections.Meter.trackColour, '#AABBCC');
+    assert.deepEqual(sections.Meter.zones, [{ from: 0, colour: '#00FF00' }, { from: 0.8, colour: 'FFFF0000' }]);
+    assert.equal(sections.Core.formFaceColour, '#008080');
+    assert.equal(sections.Meter.peakColour, SECTION_DEFAULTS.Meter.peakColour, 'the rest of the section is kept');
+    assert.equal(zones[0].colour, 'lime', 'and the script\'s own table is left as it wrote it');
+  });
+});
+
+test('a colour create cannot read refuses the whole call: each is named, and nothing is made', () => {
+  const panel = panelWith([createControl('Knob', { name: 'k' })]);
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    const props = {
+      name: 'm', x: 10, Meter: { trackColour: 'redd', label: 'Level', zones: [{ from: 0, colour: '#0008' }] },
+    };
+    const answer = api.panelCreate('Meter', props);
+    assert.equal(answer, null, 'what create answers for any other refusal');
+    assert.equal(refusalOf(MEMBER_BY_ID.panelCreate), 'nothing');
+    assert.deepEqual(errors(), [
+      `ce.panel.create("Meter"): at "Meter.trackColour", "redd" is not a colour the panel can read, so nothing `
+        + `was created. ${FORMS}`,
+      `ce.panel.create("Meter"): at "Meter.zones.0.colour", "#0008" is not a colour the panel can read, so `
+        + `nothing was created. ${FORMS} Write "88000000".`,
+    ]);
+    assert.deepEqual(names(panel), ['k'], 'the panel is as it was');
+
+    // A section's child given inside it is read where set() reads a section written whole.
+    clearScriptTrace();
+    assert.equal(api.panelCreate('Button', { name: 'b', Background: { Fill: { colour: 'redd' } } }), null);
+    assert.deepEqual(errors(), [`ce.panel.create("Button"): at "Background.Fill.colour", "redd" is not a colour `
+      + `the panel can read, so nothing was created. ${FORMS}`]);
+    assert.deepEqual(names(panel), ['k']);
+  });
+});
+
+test('create\'s props are sections of settings: a path as a key is refused as an option it does not take', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    assert.equal(api.panelCreate('Button', { name: 'b', 'Background.Fill.colour': 'red' }), undefined);
+    assert.deepEqual(errors(), ['ce.panel.create: "Background.Fill.colour" is not one of its options, so nothing '
+      + 'was done. Its options are: name, x, y, width, height, parent, and the name of any section, such as Behavior.']);
+    assert.deepEqual(names(panel), []);
+  });
+});
+
+test('clone reads the colours its props pass, and copies the source\'s own as they are stored', () => {
+  const template = createControl('Meter', { name: 'template' });
+  // Stored before the rule, and nothing the script passed: only what a script passes is read.
+  template._children.Meter.peakColour = 'redd';
+  const panel = panelWith([template]);
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    assert.equal(api.panelClone('template', { name: 'a', Meter: { trackColour: 'SteelBlue' } }), 'a');
+    assert.deepEqual(errors(), []);
+    assert.equal(made(panel, 'a')._children.Meter.trackColour, '#4682B4');
+    assert.equal(made(panel, 'a')._children.Meter.peakColour, 'redd');
+
+    clearScriptTrace();
+    assert.equal(api.panelClone('template', { name: 'b', y: 40, Meter: { trackColour: 0xFF0000 } }), null);
+    assert.equal(refusalOf(MEMBER_BY_ID.panelClone), 'nothing');
+    assert.deepEqual(errors(), [`ce.panel.clone("template"): at "Meter.trackColour", 16711680 is not a colour the `
+      + `panel can read, so nothing was copied. ${FORMS} As text, 16711680 is "#FF0000".`]);
+    assert.deepEqual(names(panel), ['template', 'a'], 'no copy was made');
+  });
+});
+
+test('a Lua table of props is read as wasmoon hands it over', async () => {
+  const { LuaFactory } = await import('wasmoon');
+  const lua = await new LuaFactory().createEngine();
+  const panel = panelWith();
+  setRuntimeHost({ panel });
+  try {
+    const api = scriptApiForTesting('', 'build-script');
+    // As the runtime binds a host function for Lua: wasmoon cannot take a bare null back.
+    lua.global.set('create', (...args) => api.panelCreate(...args) ?? undefined);
+    clearScriptTrace();
+    await lua.doString(`
+      made = create("Meter", { name = "m", Meter = { trackColour = "red" }, Core = { formFaceColour = "#000" } })
+      refused = create("Meter", { name = "n", Meter = { trackColour = "redd" } })`);
+    assert.equal(lua.global.get('made'), 'm');
+    assert.equal(lua.global.get('refused'), null, 'nil in Lua');
+    assert.equal(made(panel, 'm')._children.Meter.trackColour, '#FF0000');
+    assert.equal(made(panel, 'm')._children.Core.formFaceColour, '#000000');
+    assert.deepEqual(errors(), [`ce.panel.create("Meter"): at "Meter.trackColour", "redd" is not a colour the `
+      + `panel can read, so nothing was created. ${FORMS}`]);
+    assert.deepEqual(names(panel), ['m']);
+  } finally {
+    lua.global.close();
+    setRuntimeHost(null);
+  }
 });
 
 test('parent moves a control into a container and back out', () => {

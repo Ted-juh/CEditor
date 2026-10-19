@@ -26,6 +26,8 @@ import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 import { VERB_VALUES } from '../src/CE_Application/scripting/componentTables.js';
+import { MEMBER_BY_ID, refusalOf } from '../src/CE_Application/scripting/panelApi.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import {
   drumPads, drumPadCount, resolveDrumPads, padCell, strikeVelocity,
   PAD_ORIGINS, PAD_VELOCITY_SOURCES, GM_CHOKE,
@@ -49,7 +51,7 @@ function withKit(fn) {
     // The live control, re-read from the store each time: the verbs write through the panel store,
     // so a captured reference would be the version from before the write.
     const live = () => get(panels)[0].controls[0];
-    return fn(api.ce.components.drumpads, live);
+    return fn(api.ce.components.drumpads, live, api);
   } finally { panels.set([]); }
 }
 
@@ -215,6 +217,60 @@ test('the pad list is sized by rows and cols, so a script cannot grow it', () =>
     assert.equal(typeof d.insert, 'undefined');
     assert.equal(typeof d.remove, 'undefined');
     assert.deepEqual(Object.keys(d.size('Kit')).sort(), ['choke', 'colour', 'label', 'note', 'roll']);
+  });
+});
+
+/* ------------------------------------------------------------------------- a pad's colour */
+// The one verb here whose value is a colour. It stored what it was given, so "red" or "#000" tinted
+// nothing (the renderer reads 6 or 8 hex digits and falls back to the accent), and set() on the same
+// property did not read it either: `pads` starts empty, so no template item typed its colour.
+
+const PAD_FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", '
+  + 'a CSS colour name, rgb() or hsl(), or "" for none.';
+const console_ = () => get(scriptTrace).map((t) => `${t.kind}: ${t.message}`);
+
+test('a pad\'s colour is stored as set() stores one: the panel\'s forms as written, short forms written out', () => {
+  withKit((d, live) => {
+    clearScriptTrace();
+    assert.equal(d.colour('Kit', 3, 'red'), true);
+    assert.equal(live()._children.DrumPads.pads[2].colour, '#FF0000');
+    assert.equal(d.read('Kit', 'colour', 3), '#FF0000');
+    assert.equal(drumPads(live())[2].colour, '#FF0000', 'which the renderer reads, where "red" was the accent');
+    assert.equal(d.colour('Kit', 4, '80FF8000'), true);
+    assert.equal(d.read('Kit', 'colour', 4), '80FF8000');
+    // "" is the section accent, the one colour this property has of its own.
+    assert.equal(d.colour('Kit', 3, ''), true);
+    assert.equal(d.read('Kit', 'colour', 3), '');
+    assert.deepEqual(console_().filter((line) => !line.startsWith('log:')), [], 'without a word');
+  });
+});
+
+test('a pad colour the panel cannot read is refused, in set()\'s words with the verb\'s name, and nothing is written', () => {
+  withKit((d, live, api) => {
+    d.colour('Kit', 2, '#123456');
+    const before = structuredClone(live()._children.DrumPads.pads);
+    clearScriptTrace();
+    assert.equal(d.colour('Kit', 3, 'redd'), false, 'false, as the verb answers any refusal');
+    assert.equal(refusalOf(MEMBER_BY_ID.drumPadsColour), 'false');
+    assert.deepEqual(console_(), [`error: ce.components.drumpads.colour("Kit"): in pad 3, "redd" is not a colour `
+      + `the panel can read, so nothing was set. ${PAD_FORMS}`]);
+    assert.deepEqual(live()._children.DrumPads.pads, before);
+
+    // fill writes every pad at once, so one it cannot read refuses them all, and says which.
+    clearScriptTrace();
+    assert.equal(d.fill('Kit', 'colour', ['#abc', 'teal', '#0008']), false);
+    assert.deepEqual(console_(), [`error: ce.components.drumpads.fill("Kit"): in pad 3, "#0008" is not a colour `
+      + `the panel can read, so nothing was set. ${PAD_FORMS} Write "88000000".`]);
+    assert.deepEqual(live()._children.DrumPads.pads, before);
+    assert.equal(d.fill('Kit', 'colour', ['#abc', 'teal']), true);
+    assert.deepEqual(d.read('Kit', 'colour').slice(0, 3), ['#AABBCC', '#008080', '']);
+
+    // set() reads the same property by the same rule, now that the list's items are typed.
+    clearScriptTrace();
+    api.set('Kit.DrumPads.pads.0.colour', 'redd');
+    assert.deepEqual(console_(), [`error: set("Kit.DrumPads.pads.0.colour"): "redd" is not a colour the panel `
+      + `can read, so nothing was set. ${PAD_FORMS}`]);
+    assert.equal(d.read('Kit', 'colour', 1), '#AABBCC');
   });
 });
 

@@ -362,7 +362,8 @@ const SHARED_OPTION_FIELDS = {
   controlSection: {
     name: '<section>', type: 'object', group: 'any section',
     summary: 'Any section of the control, to set up as you make it — for example '
-      + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses.',
+      + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, and a '
+      + 'colour in one is stored as set() stores it.',
   },
 
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
@@ -1983,7 +1984,7 @@ export const COMMANDS = [
      from a script. */
   {
     id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
-    summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
+    summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'type', type: 'string', required: true },
@@ -2000,7 +2001,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
-    summary: 'Copy an existing control, with all its settings, and return the copy\'s name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it.',
+    summary: 'Copy an existing control, with all its settings, and return the copy\'s name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it, and a colour in them that `set()` would refuse means no copy is made.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'name', type: 'string', required: true },

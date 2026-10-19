@@ -131,6 +131,7 @@
     "knob": {"_type":"Control","_children":{"Core":{"_type":"Core","id":"k1","name":"knob","controlType":"Label"},"Background":{"_type":"Background","_children":{"Fill":{"_type":"Fill","colour":"FF112233","mode":"solid"},"Border":{"_type":"Border","top":{"colour":"FF000000","thickness":1}}}},"Text":{"_type":"Text","content":"Hi","_children":{"Font":{"_type":"Font","colour":"FFFFFFFF","underlineColour":""}}}}},
     "bare": {"_type":"Control","_children":{"Core":{"_type":"Core","id":"b1","name":"bare"}}},
     "meter": {"_type":"Control","_children":{"Core":{"_type":"Core","id":"m1","name":"meter","controlType":"Meter"},"Meter":{"_type":"Meter","zones":[{"from":0,"colour":"FF00FF00"},{"from":0.8,"colour":"FFFF0000"}]}}},
+    "drums": {"_type":"Control","_children":{"Core":{"_type":"Core","id":"d1","name":"drums","controlType":"DrumPads"},"DrumPads":{"_type":"DrumPads","rows":4,"cols":4,"pads":[{"note":40}]}}},
     "pixel": {"_type":"Control","_children":{"Core":{"_type":"Core","id":"p1","name":"pixel"},"Pixel":{"_type":"Pixel","imageColour":false,"glassTint":"FF000000"},"Icon":{"_type":"Icon","tint":"FFFFFFFF"}}},
     "untyped": {"_type":"Control","_children":{"Core":{"_type":"Core","id":"u1","name":"untyped"},"Background":{"_children":{"Fill":{"colour":"FF112233"}}}}}
   },
@@ -148,6 +149,10 @@
     {"case":"a Meter's fourth zone, typed by the template's first","root":"meter","path":"Meter.zones.3.colour","field":{"empty":false,"tokens":true}},
     {"case":"a Meter's second zone, in the document","root":"meter","path":"Meter.zones.1.colour","field":{"empty":false,"tokens":true}},
     {"case":"a zone's position is not a colour","root":"meter","path":"Meter.zones.0.from","field":null},
+    {"case":"a pad's colour, in a list the Drum Pads template starts empty","root":"drums","path":"DrumPads.pads.5.colour","field":{"empty":true,"tokens":true}},
+    {"case":"a pad stored in the document","root":"drums","path":"DrumPads.pads.0.colour","field":{"empty":true,"tokens":true}},
+    {"case":"a pad's note is not a colour","root":"drums","path":"DrumPads.pads.0.note","field":null},
+    {"case":"a pad's colour on a control with no Drum Pads section yet","root":"bare","path":"DrumPads.pads.0.colour","field":{"empty":true,"tokens":true}},
     {"case":"Pixel.imageColour is a switch, not a colour, despite its name","root":"pixel","path":"Pixel.imageColour","field":null},
     {"case":"Pixel.glassTint is a colour","root":"pixel","path":"Pixel.glassTint","field":{"empty":false,"tokens":false}},
     {"case":"Icon.tint, where the renderer resolves no reference","root":"pixel","path":"Icon.tint","field":{"empty":false,"tokens":false}},

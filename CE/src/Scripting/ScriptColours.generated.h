@@ -83,6 +83,7 @@ inline constexpr ColourField kColourFields[] = {
     { "DrumPads", "hitcolour", false, true },
     { "DrumPads", "labelcolour", false, true },
     { "DrumPads", "padcolour", false, true },
+    { "DrumPads", "pads.*.colour", true, true },
     { "Envelope", "fillcolour", false, true },
     { "Envelope", "gridcolour", false, true },
     { "Envelope", "linecolour", false, true },

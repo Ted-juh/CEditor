@@ -322,6 +322,35 @@ test('ce.panel.patch reads a colour as set() does, and refuses the whole patch o
   });
 });
 
+test('ce.panel.patch reads every colour in a whole patch map, and names each one it cannot read', () => {
+  withControls((api) => {
+    api.panelDefine('B', 'States', 'Hot', {});
+    clearScriptTrace();
+    assert.equal(api.panelPatch('B', 'Hot', {
+      'Background.Fill.colour': 'redd',
+      'Text.Fill.colour': '#0008',
+      'Background.Border.top.colour': 'red',
+      'Transform.opacity': 60,
+    }), 0);
+    assert.deepEqual(errors(), [
+      `ce.panel.patch("B", "Hot"): at "Background.Fill.colour", "redd" is not a colour the panel can read, so `
+        + `nothing was patched. ${FORMS}`,
+      `ce.panel.patch("B", "Hot"): at "Text.Fill.colour", "#0008" is not a colour the panel can read, so nothing `
+        + `was patched. ${FORMS} Write "88000000".`,
+    ]);
+    assert.deepEqual(api.panelEntry('B', 'States', 'Hot').patches?.component ?? {}, {});
+    // Several paths that are all colours it reads are written out together, as one patch.
+    clearScriptTrace();
+    assert.equal(api.panelPatch('B', 'Hot', {
+      'Background.Fill.colour': 'red', 'Text.Fill.colour': 'hsl(120, 100%, 50%)', 'Background.Border.top.colour': 'FF0000FF',
+    }), 3);
+    assert.deepEqual(errors(), []);
+    assert.deepEqual(api.panelEntry('B', 'States', 'Hot').patches.component, {
+      'Background.Fill.colour': '#FF0000', 'Text.Fill.colour': '#00FF00', 'Background.Border.top.colour': 'FF0000FF',
+    });
+  });
+});
+
 /* ===================================================================================== tints */
 
 test('ce.image.icon writes a short tint out, refuses one the panel cannot read, and applies the rest', () => {
