@@ -84,7 +84,7 @@ const mod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
  * there. Undefined, not 0, because 0 is a real note (C-1).
  */
 export function noteNumberOf(name) {
-  const m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).replace(/♯/g, '#').replace(/♭/g, 'b'));
+  const m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).replace(/\u266F/g, '#').replace(/\u266D/g, 'b'));
   if (!m) return undefined;
   const pc = m[2] === 'b' ? FLAT_LETTER[m[1]] : NOTE_NAMES.indexOf(m[1] + m[2]);
   if (pc < 0) return undefined;
