@@ -991,6 +991,19 @@ context.
   `ce.ui.showDisplayPanel.script`), off until the viewer turns it on or a swatch opens it. A panel
   the swatch opened is hidden again when the edit ends. As first built it shared the panel
   editor's switch, so a dock left open there took a third of the script editor's height.
+- **Completion over a value already written** (`scripting/valueCompletions.js`, CodeEditor's
+  `valueCompletions`). With the caret anywhere between the quotes of a value the core has
+  `meaning.choices` for (a curve, a division, a scale or a chord, one of the 16 `values` lists, an
+  event, a control's name, a keyframe animation, a font, an image), Ctrl+Space lists those choices
+  in their own order, the one written selected, and the one accepted replaces the whole value
+  between the quotes, as one edit. Typing in the value filters the list by the text before the
+  caret and opens it once something is typed, as word completion does; a value the runtime reads as
+  a choice but written another way (`"1/8t"`, an event by its id) is listed as written, so Enter
+  keeps it, and one it refuses only for its case has the choice selected, so Enter corrects it. A
+  value not written out gets none, and outside a known value completion is word completion as it
+  was. It reads with the same core as the tab, which BehaviorDesigner loads on its own once a script
+  is open, so it works whichever tab the dock shows. Checked by `test/valueCompletions.test.js` and
+  `browser-checks/valueCompletion.mjs`.
 - **The dock remembers its tab** per viewer (`editor/dockTabMemory.js`, `ce-script-dock-tab`).
 - **In the panel file view** the dock has the Values tab alone. A control's colour row edits the
   item's text as typing would, and Apply puts it on the control. Every field and the whole file are
@@ -1042,8 +1055,8 @@ Still open:
 - **The Gradient tab's radial controls.** The tab shows them for a script's gradient, though a
   drawing cannot take a radial gradient. The label says "(linear only)", and a radial choice is
   written as linear.
-- **Editors not built yet.** Fonts, images and hand-drawn curves have none. Completion does not yet
-  reopen over a value that is already there.
+- **Editors not built yet.** Fonts, images and hand-drawn curves have none, beyond completion over
+  a font's or an image's name.
 - **The rest of `ce.anim`'s options.** `stagger`, `damping` and `frequency` are still read with
   `Number()`, so text that is not a number is 0 or the default without a word.
 

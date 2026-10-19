@@ -20,6 +20,13 @@
   // the statement it lists, a light box around the value under the pointer in it, and an outlined box
   // around the value an edit is open on. replaceRange() is how the sidebar writes a value back: one
   // replacement through applyEdit, so it is one native undo step and reaches the parent as typing does.
+  //
+  // VALUE COMPLETION: with the caret inside a string that is a value the editor knows the choices for
+  // (a curve, a division, an event, a control's name…), completion lists those choices instead of
+  // words, and the one accepted replaces the whole value between the quotes, as one edit. What the
+  // choices are comes from the Values core, which is a chunk of its own and is handed in, once it has
+  // loaded, as `valueCompletions` (scripting/valueCompletions.js); until then, and outside such a
+  // value, completion is word completion as it always was.
   import { onDestroy, tick } from 'svelte';
   import { highlight, lineCommentToken, matchingBracket, identifierOccurrences, languageKey } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
@@ -50,6 +57,9 @@
     marks = [],
     // Told whether the view is folded, each time that changes: folding ends an open value edit.
     onfold = null,
+    // (source, language, caret, { force }) → { from, to, current, options, selected } | null: the
+    // choices for the value the caret is in (scripting/valueCompletions.js), or null to complete words.
+    valueCompletions = null,
   } = $props();
 
   let bpSet = $derived(new Set(breakpoints)); // 1-based line numbers
@@ -305,6 +315,10 @@
     const starts = text === displayText ? displayStarts : lineStartsOf(text);
     caretLine = lineAt(starts, pos);
     caretCol = pos - starts[caretLine];
+    // A value's list is about the characters between its quotes: the caret leaving them (an arrow
+    // key, typing over the closing quote) closes it, so that Enter out there is a new line again and
+    // not a rewrite of the value left behind.
+    if (acOpen && acValue && (pos < acFrom || pos > acTo || taEl.selectionEnd !== pos)) acOpen = false;
     // The third argument is the caret's offset into the full source; folded, the start of its line
     // in the full source plus its column, since the textarea then holds the folded text.
     const fullLine = fullLineOf(caretLine);
@@ -363,6 +377,10 @@
   let acIndex = $state(0);
   let acFrom = $state(0);
   let acTo = $state(0);
+  // The list is a value's choices, not words: accepting one replaces all of [acFrom, acTo), the text
+  // between the value's quotes, rather than the word before the caret.
+  let acValue = $state(false);
+  let acEl = $state(null);
   let acAnchor = $derived(acOpen ? posOf(acFrom) : { line: 0, col: 0 });
   // Viewport coords of the completion anchor (fixed-positioned so it escapes the editor's clip).
   let acScreen = $derived.by(() => {
@@ -393,6 +411,21 @@
     if (!taEl) return;
     const caret = taEl.selectionStart;
     if (caret !== taEl.selectionEnd) { acOpen = false; return; }
+    // In a value the editor knows the choices for, those are the list, and words are not asked for
+    // even when none of the choices fits what is typed: a function's name is no curve. The textarea's
+    // text, not `value`, since the range found is the one an accept replaces.
+    const choice = valueCompletions?.(taEl.value, language, caret, { force }) ?? null;
+    if (choice) {
+      // The same rule as for words: typing opens the list once there is something typed in the value.
+      if ((!force && caret === choice.from) || choice.options.length === 0) { acOpen = false; return; }
+      acOptions = choice.options;
+      acFrom = choice.from;
+      acTo = choice.to;
+      acIndex = Math.max(0, Math.min(choice.options.length - 1, choice.selected ?? 0));
+      acValue = true;
+      acOpen = true;
+      return;
+    }
     const { from, to, options } = getCompletions(value, language, caret, { controlType });
     const prefixLen = to - from;
     // Auto-open only once there's a prefix; Ctrl+Space (force) opens regardless.
@@ -402,17 +435,38 @@
     acFrom = from;
     acTo = to;
     acIndex = 0;
+    acValue = false;
     acOpen = true;
   }
 
   function acceptCompletion() {
     const opt = acOptions[acIndex];
     if (!opt) { acOpen = false; return; }
-    applyEdit(acFrom, taEl.selectionStart, opt.label, acFrom + opt.label.length);
+    if (acValue) {
+      // A value's choice replaces the whole value between its quotes, as one edit, and leaves the caret
+      // after it, inside them. The value as it is already written is no edit at all.
+      const text = opt.insert ?? opt.label;
+      if (taEl.value.slice(acFrom, acTo) === text) { taEl.setSelectionRange(acTo, acTo); syncCaret(); }
+      else applyEdit(acFrom, acTo, text, acFrom + text.length);
+    } else {
+      applyEdit(acFrom, taEl.selectionStart, opt.label, acFrom + opt.label.length);
+    }
     acOpen = false;
   }
 
-  const KIND_ICON = { function: 'ƒ', variable: 'x', parameter: 'p', property: '.', builtin: 'b', keyword: 'k' };
+  // A value's choices can run past the list's height, and it opens on the one written: the selected
+  // row is kept in view, by the list's own scroll, so nothing else on the page moves.
+  $effect(() => {
+    void acIndex; void acOptions;
+    const list = acEl;
+    if (!acOpen || !acValue || !list) return;
+    const row = list.querySelector('.ce-ac-row.sel');
+    if (!row) return;
+    if (row.offsetTop < list.scrollTop) list.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
+  });
+
+  const KIND_ICON = { function: 'ƒ', variable: 'x', parameter: 'p', property: '.', builtin: 'b', keyword: 'k', value: '"' };
   function kindIcon(kind) { return KIND_ICON[kind] ?? '•'; }
 
   // ----- hover -----
@@ -800,7 +854,7 @@
     { keys: 'Ctrl/⌘ + F', desc: 'Find' },
     { keys: 'Ctrl/⌘ + H', desc: 'Find & replace' },
     { keys: 'Ctrl/⌘ + /', desc: 'Toggle line comment' },
-    { keys: 'Ctrl/⌘ + Space', desc: 'Trigger autocomplete' },
+    { keys: 'Ctrl/⌘ + Space', desc: 'Trigger autocomplete; in a value, its choices' },
     { keys: 'F12 / Ctrl/⌘+Click', desc: 'Go to definition' },
     { keys: 'Shift + F12', desc: 'Next occurrence (references)' },
     { keys: 'Ctrl/⌘ + Shift + O', desc: 'Go to symbol' },
@@ -1132,7 +1186,7 @@
   {/if}
 
   {#if acOpen}
-    <div class="ce-ac" use:portal use:floating={{ anchor: { x: acScreen.x, y: acScreen.y - lineHeight, width: 0, height: lineHeight }, placement: 'bottom-start', offset: -2, fallbackPlacements: ['top-start'], track: false }}>
+    <div class="ce-ac" bind:this={acEl} data-list={acValue ? 'value' : 'words'} use:portal use:floating={{ anchor: { x: acScreen.x, y: acScreen.y - lineHeight, width: 0, height: lineHeight }, placement: 'bottom-start', offset: -2, fallbackPlacements: ['top-start'], track: false }}>
       {#each acOptions as o, i (o.kind + o.label)}
         <div class={['ce-ac-row', i === acIndex && 'sel']}
           role="option" aria-selected={i === acIndex} tabindex="-1"
@@ -1605,6 +1659,9 @@
   .ce-ac-kind.variable, .ce-ac-kind.parameter { color: var(--accent); }
   .ce-ac-kind.keyword { color: #c98be0; }
   .ce-ac-kind.property { color: var(--amber); }
+  /* a value's choice is a string, in the colour the editor's dark theme gives strings (the list is
+     outside .ce, so its --ce-str is not there to read) */
+  .ce-ac-kind.value { color: #9ed4a8; }
   .ce-ac-label { font-family: var(--mono); font-size: 12px; color: var(--txt); flex-shrink: 0; }
   .ce-ac-detail {
     font-size: 11px; color: var(--txt-faint); margin-left: auto;

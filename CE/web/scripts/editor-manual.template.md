@@ -673,7 +673,9 @@ script workspace for this (and from the **Dock** button on the left, which has a
 here: a dock left open in the panel editor stays there, and one the swatch opened closes again when
 you finish); the colour is written into the code when you let go, as one step of the editor's undo,
 and **Cancel** puts back exactly what was there before. A gradient opens the **Gradient** tab the same way, a list of choices is a dropdown in the
-row, and a number with a unit a field.
+row, and a number with a unit a field. The lists are in the code as well: with the caret inside a
+value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
+selected, and the one you choose replaces the whole value.
 
 Two things to know from the editor's side:
 

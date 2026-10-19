@@ -420,6 +420,19 @@
   // ceiling (test/bundleHygiene.test.js) that they would take it over.
   let valuesSidebar = null;
   const loadValuesSidebar = () => (valuesSidebar ??= import('./ValuesSidebar.svelte').then((m) => m.default));
+  // Completion over a value already written (scripting/valueCompletions.js) reads with the same core,
+  // and is wanted whichever tab the dock shows, so it loads on its own, in the background, once a
+  // script is open: the editor starts without waiting for it, and completes words until it is here.
+  let valueCompleter = $state.raw(null);
+  let valueCompleterLoad = null;
+  $effect(() => {
+    if (!selected || valueCompleterLoad) return;
+    valueCompleterLoad = import('../scripting/valueCompletions.js')
+      .then((m) => { if (!destroyed) valueCompleter = m.valueCompletions; })
+      .catch(() => { valueCompleterLoad = null; });
+  });
+  // The context is read when completion asks, so it is the panel, fonts and images as they are then.
+  const completeValue = (source, language, at, how) => valueCompleter?.(source, language, at, scriptValueContext, how) ?? null;
 
   // --- Live dispatch: scripts fire on their own (value change, preview interaction, lifecycle). ---
   // Dispatch is global/always-on; here we just push the in-edit scripts as a live override so
@@ -672,6 +685,7 @@
       {#key selectedId}
         <CodeEditor bind:this={codeEditor} minHeight={140} language={selected.language} value={selected.source}
           controlType={targetType}
+          valueCompletions={valueCompleter ? completeValue : null}
           oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
           oncaret={(line, col, offset) => { caret = { line, col }; caretOffset = offset ?? 0; }}
           marks={showDock && dockTab === 'values' ? editorMarks : []}

@@ -73,7 +73,10 @@ Three tools help you while you type:
   tab: the new colour is written into your code when you let go, and **Cancel**
   puts back exactly what you had written. A value chosen from a list has a dropdown,
   and a number with a unit has a field, written when you press Enter or leave it.
-  The dock opens on the tab you used last.
+  The dock opens on the tab you used last. The same lists are in the code too: with
+  the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
+  (or divisions, scales, events, your controls' names, fonts…) with yours selected,
+  and the one you pick replaces the whole value.
 - **The problems list** checks as you type. It warns about a handler that will
   never be called because it does not match **Runs on** — if the script runs on
   `onClick` but defines no `onClick(mouse)`, you are told it will not fire — and
