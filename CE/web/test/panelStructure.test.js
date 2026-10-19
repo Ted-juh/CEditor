@@ -337,6 +337,33 @@ test('a child and a field are matched in any case, as a set() path is, and a key
   });
 });
 
+test('a section the control does not have, or one not given as a table, refuses the call', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    // Meter is a section of some control, so the option check lets it through; a Button has none.
+    // It used to be passed over without a word, and the Button made without what was asked of it.
+    clearScriptTrace();
+    assert.equal(api.panelCreate('Button', { name: 'b', Meter: { trackColour: 'red' } }), null);
+    assert.deepEqual(errors(), ['ce.panel.create("Button"): "Meter" is not a section this control has, so nothing '
+      + 'was created. ce.panel.info() lists the sections a control has.']);
+    assert.deepEqual(names(panel), []);
+
+    clearScriptTrace();
+    assert.equal(api.panelCreate('Button', { name: 'b', Behavior: 5 }), null);
+    assert.deepEqual(errors(), ['ce.panel.create("Button"): "Behavior" takes a table of its settings, not 5, so '
+      + 'nothing was created.']);
+    assert.deepEqual(names(panel), []);
+
+    // clone says it in its own name, and copies nothing.
+    assert.equal(api.panelCreate('Button', { name: 'b' }), 'b');
+    clearScriptTrace();
+    assert.equal(api.panelClone('b', { name: 'c', Meter: {} }), null);
+    assert.deepEqual(errors(), ['ce.panel.clone("b"): "Meter" is not a section this control has, so nothing was '
+      + 'copied. ce.panel.info() lists the sections a control has.']);
+    assert.deepEqual(names(panel), ['b']);
+  });
+});
+
 test('clone merges a child given in its props into the copy\'s, and leaves the source alone', () => {
   const template = createControl('Button', { name: 'template' });
   template._children.Background._children.Fill.colour = 'FF112233';

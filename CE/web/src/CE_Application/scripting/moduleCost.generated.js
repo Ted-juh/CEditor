@@ -50,7 +50,7 @@ export const MODULE_COST = {
   "ce.math": { "javascript": 35383, "lua": 43082, "python": 36052, "webview": 41387 },
   "ce.midi": { "javascript": 31981, "lua": 30055, "python": 31066, "webview": 45829 },
   "ce.music": { "javascript": 17488, "lua": 17661, "python": 16703, "webview": 16083 },
-  "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 57839 },
+  "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 58819 },
   "ce.storage": { "javascript": 9304, "lua": 17028, "python": 12794, "webview": 22090 },
   "ce.text": { "javascript": 84, "lua": 84, "python": 84, "webview": 0 },
   "ce.time": { "javascript": 17784, "lua": 18160, "python": 17198, "webview": 19849 },

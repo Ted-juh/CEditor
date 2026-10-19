@@ -5768,14 +5768,31 @@ function uniqueControlName(base) {
  * The section overrides in `props` that `control` has a section for, [[section, values]], with
  * every colour in them read as set() reads a section written whole: a short form written out ("red"
  * is stored as "#FF0000"), and the script's own table left as it wrote it. Null when one of them is
- * a colour the panel cannot read: each such colour has been reported by its path, after `call`, and
- * nothing is to be made. A colour used to be stored as written and painted white.
+ * a colour the panel cannot read, or names a section `control` does not have, or is not a table:
+ * each has been reported, after `call`, and nothing is to be made. A colour used to be stored as
+ * written and painted white, and the other two were passed over without a word.
  */
 function sectionOverrides(control, props, call, outcome) {
   const sections = [];
   let refused = false;
   for (const [section, values] of Object.entries(props ?? {})) {
-    if (!control._children[section] || typeof values !== 'object' || values == null) continue;
+    // A section name the option check let through, as a section of some control, that this control
+    // does not have, or one given as anything but a table of its settings: it used to be passed over
+    // without a word, so the control was made without what the script asked of it. set() refuses a
+    // section a control lacks; create and clone refuse the call, as for an option they do not take.
+    if (SECTION_NAMES.has(section) && !control._children[section]) {
+      addScriptTrace('error', '', `${call}: "${section}" is not a section this control has, so ${outcome}. `
+        + 'ce.panel.info() lists the sections a control has.');
+      refused = true;
+      continue;
+    }
+    if (!control._children[section]) continue;
+    if (typeof values !== 'object' || values == null) {
+      addScriptTrace('error', '', `${call}: "${section}" takes a table of its settings, not ${shownValue(values)}, `
+        + `so ${outcome}.`);
+      refused = true;
+      continue;
+    }
     const colours = colourWrites(call, outcome, control, section, values, wholePath);
     if (colours) sections.push([section, colours.value]);
     else refused = true;
