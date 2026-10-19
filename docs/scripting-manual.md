@@ -295,8 +295,15 @@ sets it. Write it with a dot, not a colon, in Lua as well.
 Paths that start with `panel` reach the panel rather than a control: `get("panel.width")`,
 `set("panel.bgColour", "FF202020")`. Its name, size and background can be read and changed this
 way; the things that identify the panel, such as its file path, can only be read. Its colours
-(`bgColour`, `gridColour`, `gridSubColour`, the image and texture tints, and the colour of each
-of `bgGradient`'s stops) take what a control's colour properties take, and refuse the same.
+(`bgColour`, `gridColour`, `gridSubColour` and the image and texture tints) take what a
+control's colour properties take, and refuse the same.
+
+The colour of each of `bgGradient`'s stops is read the same way and stored as six digits,
+RRGGBB, with no "#": `set("panel.bgGradient.stops.0.color", "red")` stores "FF0000". A stop has
+no alpha of its own, because the gradient's opacity belongs to its layer (`bgGradientOpacity`),
+so a colour with one, such as "80FF0000" or rgba() below 1, is refused. A control's gradients take
+their stops the same way, `Background.Fill.gradient` and the rest, whether a stop is written by
+its path or the gradient is written whole.
 
 ## 5. Talking to your synth
 
@@ -891,7 +898,7 @@ The commands nearly every script uses: reading and changing values, deciding whe
 
 #### `set(path, value [, opts])`
 
-Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.
+Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A gradient stop is stored as RRGGBB and takes no alpha. The change is sent to the synth, except while your script reacts to MIDI from the synth, so it does not hear its own value echoed back.
 
 **`opts`** can contain:
 
@@ -2428,7 +2435,7 @@ Create a new control of the given `type`, such as "Knob", and return its name, o
 | `width` | number (pixels) | the type's own | How wide to make it. |
 | `height` | number (pixels) | the type's own | How tall to make it. |
 | `parent` | text | the panel itself | The name of a container to put it inside. |
-| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, and a colour in one is stored as set() stores it. |
+| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals and all (Behavior, not behavior), and so are the names of the parts inside one: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour in one is stored as set() stores it. |
 
 ```lua
 -- Lua
@@ -2455,7 +2462,7 @@ Copy an existing control, with all its settings, and return the copy's name, or 
 | `width` | number (pixels) | the type's own | How wide to make it. |
 | `height` | number (pixels) | the type's own | How tall to make it. |
 | `parent` | text | the original's container | The name of a container to put it inside. |
-| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, and a colour in one is stored as set() stores it. |
+| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals and all (Behavior, not behavior), and so are the names of the parts inside one: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour in one is stored as set() stores it. |
 
 ```lua
 -- Lua
