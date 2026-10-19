@@ -660,6 +660,9 @@ And the options, timers and panel commands:
 | `get()` of a control or property that is not there answered nil without a word | reports it in `set()`'s words | WebView runtime; every player engine |
 | `ce.panel.find` with an unknown key returned every control; `patch` counted keys it did not apply; `match` with a `to` not in the list used the first | each refuses or reports, and counts only what it did | WebView runtime |
 | the contract said `repeat` is the runs in all, 0 forever, and `done(completed)`; every runtime ran n as n more times (0 once, 1 twice) and passed `done` a table, which is always true | by the owner's decision, the runtimes do what the contract said: 1 runs once, 3 three times, 0 or less until stopped, and `done` gets one boolean, for one path and for a list | WebView runtime; `ScriptRuntime`; the three preludes |
+| `ce.midi.write`'s options were "the same as read's" in its summary and listed nowhere, so `{ bit = 8 }` was not looked at and 300 went to the synth as 02 2C, not 01 2C | read and write share one definition of `bits` and `order`, so write is checked like read: an unknown key refuses the call, and it answers nothing | WebView runtime; the three preludes, from the generated lists |
+| `ce.panel.define` checked a state's keys and no other section's: `{ durration = 400 }` made a 120 ms animation, and define answered true | every section refuses a key its entries do not have, in the unknown-option words with the call before them, defines nothing and answers false. What a section takes is read off the entry the app makes for it, plus what its readers read beyond that, listed with the reader; keys are matched with their capitals, as stored | WebView runtime (define is panel-window only) |
+| `get(path, form)` and `set(path, value, form)` dropped a form that is not one, so `get("cutoff", "normalisedValue")` answered the raw value; in the player set's text form never reached the host, right or wrong | text that is not a form refuses the call, names the three, and names the one meant when it is a form written another way ("Write normalizedValue."); a right text form now works in the player's set as in the editor's, and Lua's `self.set` passes its options on instead of dropping them; a table or a number is still not a form | WebView runtime; `BridgeScriptHost`, so every player engine and a native handler |
 
 Still open, for the owner:
 
@@ -679,9 +682,12 @@ Still open, for the owner:
   words and answers to the editor's. Every committed panel's scripts and every written example
   passed the check before it became a refusal. ce.text.style and ce.image.set read their own
   keys (image.set in any case) and refuse the whole call in the same words; they used to drop the
-  unknown option alone and apply the rest. Not checked, because
-  the contract lists no fields for them: `ce.midi.write`'s options (every runtime reads `bits` and
-  `order`) and `ce.panel.define`'s spec, which checks a state's keys itself.
+  unknown option alone and apply the rest. The two this first left unchecked, because the contract
+  listed no fields for them, are checked since (the table above): `ce.midi.write`'s options, which
+  now share `ce.midi.read`'s definition, and `ce.panel.define`'s spec in every section. Found on the
+  way: the `when` the define examples used, `valueGreaterThan`, is a key nothing evaluates, so the
+  state they made never applied. The examples use `{ pressed = true }` now, and a comparison on a
+  plain control's value is still something a state's `when` cannot say.
 - **A colour property: decided, accept.** The short forms with one reading are stored written out
   in the panel's form, the conversion the refusal used to print: `"#RGB"` as `"#RRGGBB"`, a CSS
   name in any case as its `"#RRGGBB"` (and `transparent` as `"00000000"`), and `rgb()`, `rgba()`,
@@ -690,17 +696,32 @@ Still open, for the owner:
   nothing is written to the console when a form is expanded, and `get()` returns the stored form.
   Still refused, with the messages they had: a number (is `0xFF0000FF` AARRGGBB?), `"#"` with four
   digits (RGBA or ARGB?), three digits without the `"#"` (not CSS, and as likely a number),
-  `currentColor`, text with space around it, and anything unreadable. The `ce.math` colour readers
-  stay strict in the WebView and the three preludes; taking the short forms there too would be a
-  separate change. Still open: `#` with eight digits means AARRGGBB in a property and in `ce.math`,
-  and RRGGBBAA in a drawing, CSS's own meaning, which was kept. The swatch proposed above is where
-  that difference would show.
-- **Decisions the device-definition fix made** that change what a definition means: a variable's
-  text is hex (`"10"` is 0x10, not 10), `$channel` follows the parameter's channel, `$deviceId`
-  defaults to 16 in the player as in the editor, a layout with no prefix is refused, and a text
-  parameter refuses writes.
-- **One stored value** in `Yamaha AN1x.cepanel` is unreadable: a shared drawing's border colour is
-  `"FF11151800"`, ten digits, so 34 sliders paint that border white. Probably `"FF111518"`.
+  `currentColor`, text with space around it, and anything unreadable. Still open: `#` with eight
+  digits means AARRGGBB in a property and in `ce.math`, and RRGGBBAA in a drawing, CSS's own
+  meaning, which was kept. The swatch proposed above is where that difference would show.
+- **The `ce.math` colour readers: decided with the properties, they read the short forms too.**
+  `lighten`, `darken`, `mix`, `alpha`, `rgb` and `hsl` read a colour as if the long form a property
+  would store for it had been given (`scriptColours.storedColour`), in the WebView and the three
+  preludes, and then do what they did with that long form: `"red"` is `"#FF0000"`, and
+  `rgba(255, 0, 0, 0.5)` is `"80FF0000"`, its alpha set aside as an AARRGGBB's always was. What a
+  property refuses they refuse, ending with the property's hint (`colourHint`), and the sentence
+  both end with now names the short forms: *A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with
+  or without "#", or "#RGB", a CSS colour name, rgb() or hsl().* The names table is generated into
+  each prelude from `CSS_NAMED_COLOURS` (`gen-script-modules.mjs`, "colour names"); the rest of the
+  reading is ported by hand, Lua's as a tokenizer, each rounding as `Math.round` does, and
+  `scriptPreludeAgreement.test.js` runs 140 inputs through every helper in all four runtimes. The
+  port found two faults in the property path, both fixed: `"constructor"` and `"__proto__"` threw,
+  and `hsl(1e400, …)` was stored as `"#NANNANNAN"`. The hint for `"#5B9BD580 "` now reads it as
+  AARRGGBB, as the property does, rather than as CSS's RRGGBBAA.
+- **Decisions the device-definition fix made** — decided: all kept. They change what a definition
+  means: a variable's text is hex (`"10"` is 0x10, not 10), `$channel` follows the parameter's
+  channel, `$deviceId` defaults to 16 in the player as in the editor, a layout with no prefix is
+  refused, and a text parameter refuses writes.
+- **One stored value** in `Yamaha AN1x.cepanel` — decided and fixed: a shared drawing's border
+  colour was `"FF11151800"`, ten digits, so 34 sliders painted that border white. It is
+  `"FF111518"` now, fixed in the shared component it is generated from
+  (`tools/scripts/gaia-panel/components.mjs`) and the panel regenerated
+  (`tools/scripts/an1x-panel/make-an1x-panel.mjs`).
 - **Not checked yet:** colours in `ce.panel.create` and `clone`, colours written by component
   verbs, and every colour with the plug-in's window closed (the player has no section templates);
   `get()` with a misspelled form, which still answers the raw value.
