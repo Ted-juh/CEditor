@@ -403,6 +403,7 @@
         showPropertiesPanel={$showPropertiesPanel}
         showTreePanel={$showTreePanel}
         togglesEnabled={workspaceChrome.railTogglesEnabled}
+        displayToggleEnabled={workspaceChrome.railDisplayToggleEnabled}
         insertEnabled={workspaceChrome.railInsertEnabled}
         previewEnabled={workspaceChrome.workspaceKind === 'panel'}
         onToggleDisplay={() => togglePanelVisibility('display')}

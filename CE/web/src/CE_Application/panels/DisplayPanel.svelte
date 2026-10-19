@@ -860,7 +860,11 @@
       // state editing and token-backed colours: an unconditional restore used
       // to create a Hover patch and replace `{surface}` with its resolved hex.
       const restoreValue = colorTargetRestoreValue(target, colorTargetDirty);
-      if (restoreValue != null) applyColorToTarget(restoreValue);
+      // A callback target that keeps what it began from is asked to put that back itself: the
+      // script editor's Values sidebar restores the original characters of a script, which a
+      // colour re-formed from them ("SteelBlue" as "#4682B4") is not.
+      if (target.type === 'callback' && typeof target.cancel === 'function') target.cancel();
+      else if (restoreValue != null) applyColorToTarget(restoreValue);
       colorTargetDirty = false;
       clearColorTarget();
       resetUserColor();
@@ -878,7 +882,8 @@
   function handleGradientCancel() {
     const target = $gradientTarget;
     if (!target) return;
-    if (gradientTargetDirty && target._initialGradient) {
+    if (target.type === 'callback' && typeof target.cancel === 'function') target.cancel();
+    else if (gradientTargetDirty && target._initialGradient) {
       currentGradient = deepClone(target._initialGradient);
       applyGradientToTarget(currentGradient);
     }

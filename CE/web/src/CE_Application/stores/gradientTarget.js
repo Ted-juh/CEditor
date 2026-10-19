@@ -13,6 +13,8 @@ import { stateEditScope } from './stateEditScope.js';
  * Target shape:
  *   { type: 'panel' }                                         — panel bgGradient (default)
  *   { type: 'control', controlId: 'x', path: 'Background.Border' } — control border gradient
+ *   { type: 'callback', apply(gradient), label?, cancel? }    — anything else; `cancel` as in
+ *                                                                colorTarget.js
  *   null                                                       — default panel behavior
  */
 export const gradientTarget = writable(null);

@@ -8,6 +8,10 @@
   import CodeEditor from './CodeEditor.svelte';
   import PanelFileView from './PanelFileView.svelte';
   import ScriptConsole from './ScriptConsole.svelte';
+  import { readDockTab, writeDockTab } from './dockTabMemory.js';
+  import { valueCatalogueStore } from './valuesContext.js';
+  import { transport } from '../stores/transport.js';
+  import { controlSetForPanel } from '../models/controlSets.js';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
   import { searchScripts } from '../scripting/scriptSearch.js';
@@ -36,11 +40,13 @@
          onEnableModule = null, onChange = null, onSave = null } = $props();
 
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
-  // Right-hand docked panel: one column with Insert / Library / History tabs (default open).
+  // Right-hand docked panel: one column with Insert / Library / History / Values tabs (default open).
+  // It opens on the tab last used, per viewer (dockTabMemory.js), and on Insert the first time.
   let showDock = $state(true);
-  let dockTab = $state('insert'); // 'insert' | 'library' | 'history'
+  let dockTab = $state(readDockTab()); // 'insert' | 'library' | 'history' | 'values'
   let narrow = $state(false);     // viewport too narrow to dock inline → float the dock as an overlay
-  function openDock(tab) { if (showDock && dockTab === tab) { showDock = false; } else { showDock = true; dockTab = tab; } }
+  function setDockTab(tab) { dockTab = tab; writeDockTab(tab); }
+  function openDock(tab) { if (showDock && dockTab === tab) { showDock = false; } else { showDock = true; setDockTab(tab); } }
   let showConsole = $state(false); // inline output console under the editor
   let historyTick = $state(0);     // bump to refresh the version list after a save
   let versions = $derived.by(() => { historyTick; return selectedId ? getVersions(selectedId) : []; });
@@ -388,8 +394,32 @@
     flushPendingSave();
   });
 
-  // Cursor position reported by the code editor, shown in the footer.
+  // Cursor position reported by the code editor, shown in the footer; its offset is the Values tab's.
   let caret = $state({ line: 1, col: 1 });
+  let caretOffset = $state(0);
+
+  // --- the Values tab (ValuesSidebar.svelte): what the core needs besides the text, and what it
+  // asks the editor to draw. The tempo is a number of its own so the transport's thirty updates a
+  // second while it runs do not each read the statement again.
+  let editorMarks = $state.raw([]);
+  let editorFolded = $state(false);
+  let tempo = $derived($transport.bpm);
+  let scriptValueContext = $derived({
+    panel,
+    controlSet: panel ? controlSetForPanel(panel) : null,
+    tempo,
+    selfControl: selected?.scope === 'component' && targetValue !== '*' ? targetValue : null,
+    fonts: $valueCatalogueStore.fonts,
+    images: $valueCatalogueStore.images,
+  });
+  // The panel file view's text, caret and editor, which it reports (PanelFileView's onvalues).
+  let fileValues = $state.raw(null);
+  let fileMarks = $state.raw([]);
+  // The tab, and the core it reads with (scripting/scriptValues.js and its parsers' work), load when
+  // it is first shown: no part of them is needed to start the editor, and the main chunk has a
+  // ceiling (test/bundleHygiene.test.js) that they would take it over.
+  let valuesSidebar = null;
+  const loadValuesSidebar = () => (valuesSidebar ??= import('./ValuesSidebar.svelte').then((m) => m.default));
 
   // --- Live dispatch: scripts fire on their own (value change, preview interaction, lifecycle). ---
   // Dispatch is global/always-on; here we just push the in-edit scripts as a live override so
@@ -643,7 +673,9 @@
         <CodeEditor bind:this={codeEditor} minHeight={140} language={selected.language} value={selected.source}
           controlType={targetType}
           oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
-          oncaret={(line, col) => caret = { line, col }}
+          oncaret={(line, col, offset) => { caret = { line, col }; caretOffset = offset ?? 0; }}
+          marks={showDock && dockTab === 'values' ? editorMarks : []}
+          onfold={(f) => editorFolded = f}
           ondiagnostics={(d) => liveDiagnostics = d}
           breakpoints={breakpointsByScript[selectedId] ?? []}
           onbreakpoints={(lines) => setBreakpoints(selectedId, lines)} />
@@ -844,7 +876,26 @@
 {/snippet}
 
 {#snippet dockBody()}
-  {#if dockTab === 'insert'}
+  {#if mainView === 'file'}
+    {#if fileValues}
+      {#await loadValuesSidebar() then ValuesSidebar}
+        <ValuesSidebar source={fileValues.source} language="json" caret={fileValues.caret} context={fileValues.context}
+          editor={fileValues.editor} readOnly={fileValues.readOnly} folded={fileValues.folded} docKey={fileValues.docKey}
+          labelPrefix="Panel file" itemName={fileValues.itemName} onreveal={fileValues.onreveal}
+          onmarks={(m) => fileMarks = m} />
+      {/await}
+    {:else}
+      <p class="sub" style="margin:12px">Open an item of the panel file: its values are listed here.</p>
+    {/if}
+  {:else if dockTab === 'values'}
+    {#await loadValuesSidebar() then ValuesSidebar}
+      {#key selectedId}
+        <ValuesSidebar source={selected.source} language={selected.language} caret={caretOffset} context={scriptValueContext}
+          editor={codeEditor} folded={editorFolded} docKey={`script:${selectedId}`} labelPrefix="Script"
+          onmarks={(m) => editorMarks = m} />
+      {/key}
+    {/await}
+  {:else if dockTab === 'insert'}
     <ScriptPicker language={selected.language} scope={selected.scope} target={targetValue}
                   {controls} {panel} {onEnableModule} onInsert={insertAtCursor} />
   {:else if dockTab === 'library'}
@@ -970,25 +1021,33 @@
         {#if mainView === 'test'}
           {@render testView()}
         {:else if mainView === 'file'}
-          <PanelFileView {panelId} />
+          <PanelFileView {panelId} marks={showDock ? fileMarks : []} onvalues={(v) => fileValues = v}
+            valuesOpen={showDock} ontogglevalues={() => showDock = !showDock} />
         {:else}
           {@render detailPanel()}
         {/if}
       </div>
 
-      <!-- Right dock: Insert / Library / History tabs. Docked column by default; floats over
-           the editor on narrow viewports so it never squeezes the code. -->
-      {#if showDock && selected && mainView === 'editor'}
-        <aside class={['dock', narrow && 'float']}>
+      <!-- Right dock: Insert / Library / History / Values tabs. Docked column by default; floats over
+           the editor on narrow viewports so it never squeezes the code. In the panel file view it has
+           the Values tab alone: Insert, Library and History are about a script, and the file is none. -->
+      {#if showDock && ((selected && mainView === 'editor') || mainView === 'file')}
+        <aside class={['dock', narrow && 'float']} data-testid="script-dock">
           <div class="pickerpane">
             <div class="pickerhead docktabs">
-              <span class="dtabs">
-                <button class={['dtab', dockTab === 'insert' && 'active']} onclick={() => dockTab = 'insert'}>Insert</button>
-                <button class={['dtab', dockTab === 'library' && 'active']} onclick={() => dockTab = 'library'}>Library <b>{$scriptLibrary.length}</b></button>
-                <button class={['dtab', dockTab === 'history' && 'active']} onclick={() => dockTab = 'history'}>History <b>{versions.length}</b></button>
+              <span class="dtabs" role="tablist" aria-label="Dock">
+                {#if mainView === 'file'}
+                  <button class="dtab active" role="tab" aria-selected="true" title="The values in the object the caret is in">Values</button>
+                {:else}
+                  <button class={['dtab', dockTab === 'insert' && 'active']} role="tab" aria-selected={dockTab === 'insert'} onclick={() => setDockTab('insert')}>Insert</button>
+                  <button class={['dtab', dockTab === 'library' && 'active']} role="tab" aria-selected={dockTab === 'library'} onclick={() => setDockTab('library')}>Library <b>{$scriptLibrary.length}</b></button>
+                  <button class={['dtab', dockTab === 'history' && 'active']} role="tab" aria-selected={dockTab === 'history'} onclick={() => setDockTab('history')}>History <b>{versions.length}</b></button>
+                  <button class={['dtab', dockTab === 'values' && 'active']} role="tab" aria-selected={dockTab === 'values'} onclick={() => setDockTab('values')}
+                    title="The values in the statement the caret is in, and what each means">Values</button>
+                {/if}
               </span>
               <span style="display:flex;gap:6px;flex-shrink:0">
-                {#if dockTab === 'history' && versions.length}
+                {#if mainView === 'editor' && dockTab === 'history' && versions.length}
                   <button class="btn ghost" onclick={() => { if (selectedId) { clearVersions(selectedId); historyTick++; } }} style="color:var(--red)" title="Forget this script's history">Clear</button>
                 {/if}
                 <button class="btn ghost" onclick={() => showDock = false} title="Hide this panel">⟩ Hide</button>

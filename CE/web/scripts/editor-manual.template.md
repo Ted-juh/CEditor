@@ -663,6 +663,17 @@ name of the patch, a light blinking on a timer — you can attach a script. Scri
 The [scripting manual](scripting-manual.md) explains scripting from the beginning; start with
 [Scripting: getting started](scripting-getting-started.md).
 
+The dock on the right of the code has four tabs, and opens on the one you used last: **Insert**
+(the commands and your controls, to insert), **Library** (scripts you saved to reuse), **History**
+(earlier versions of the script) and **Values**. **Values** lists the values in the statement the
+caret is in, with what each means and any problem with it, and the code shows which: a faint band
+over the statement, a light box around the value under the pointer, an outlined box around the one
+you are editing. A colour's swatch opens the display panel's **Colors** tab, which shows in the
+script workspace for this (and from the **Dock** button on the left); the colour is written into the
+code when you let go, as one step of the editor's undo, and **Cancel** puts back exactly what was
+there before. A gradient opens the **Gradient** tab the same way, a list of choices is a dropdown in the
+row, and a number with a unit a field.
+
 Two things to know from the editor's side:
 
 - **Scripts are paused until you approve them.** When a panel has scripts, a bar appears: "Scripts
@@ -773,6 +784,12 @@ on every save), and an embedded image, which shows as a short placeholder and is
 An applied edit is one step in the panel's undo history, named after what you edited, such as
 "Edit cutoff as text". Go back to the panel and press **Undo** to take it back. **Show on the
 panel** goes there with the control selected.
+
+**Values**, above the text, shows the script editor's dock with its **Values** tab alone: the colours,
+gradients and choices in the object the caret is in, a `Fill` say, read the way the panel reads them.
+A colour's swatch, or a gradient's strip, opens the display panel; what you choose there is written
+into the text as typing it would be, so it is an edit like any other, applied with **Apply**. In
+**Every field** and in the whole file the values are listed, to read, and nothing is edited.
 
 **Whole file**, at the top of the outline, shows the whole file instead, as **Save** would write it
 now, laid out to read. A large panel's file is long (the Roland GAIA's is about 71,000 lines), so the

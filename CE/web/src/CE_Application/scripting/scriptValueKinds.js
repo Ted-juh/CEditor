@@ -629,6 +629,9 @@ export function readControl(value, { panel, controls }) {
     meaning.found = true;
     meaning.type = control._children.Core.controlType ?? null;
     meaning.id = control._children.Core.id ?? null;
+    // Its value as the panel holds it now, for the row (the record's "its type and current value").
+    const value = controlValue(control);
+    if (value !== undefined && (typeof value !== 'object' || value === null)) meaning.value = value;
     return { meaning, problem: null };
   }
   meaning.found = false;

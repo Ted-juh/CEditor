@@ -14,6 +14,12 @@
   // drawn a window at a time because each of its tokens ends on the line it began on; a script's
   // block comment or template string does not, so scripts are drawn whole, as before. Positions are
   // found through an index of where each line starts (utils/lineIndex.js), not by counting newlines.
+  //
+  // MARKS: the Values sidebar's highlights (`marks`, editor/codeMarks.js) are boxes placed by line and
+  // column behind the textarea, as the occurrence marks are, so no character moves: a faint band over
+  // the statement it lists, a light box around the value under the pointer in it, and an outlined box
+  // around the value an edit is open on. replaceRange() is how the sidebar writes a value back: one
+  // replacement through applyEdit, so it is one native undo step and reaches the parent as typing does.
   import { onDestroy, tick } from 'svelte';
   import { highlight, lineCommentToken, matchingBracket, identifierOccurrences, languageKey } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
@@ -21,6 +27,7 @@
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
+  import { markBoxes } from './codeMarks.js';
 
   let {
     value = '',
@@ -38,6 +45,11 @@
     controlType = '',
     // Shown to read, not to edit: the panel file view's "every field" reference.
     readOnly = false,
+    // The Values sidebar's highlights: [{ start, end, kind: 'statement' | 'hover' | 'edit' }], offsets
+    // into `value`. None are drawn while the view is folded.
+    marks = [],
+    // Told whether the view is folded, each time that changes: folding ends an open value edit.
+    onfold = null,
   } = $props();
 
   let bpSet = $derived(new Set(breakpoints)); // 1-based line numbers
@@ -113,6 +125,7 @@
     if (pruned.size !== folded.size) folded = pruned;
   });
   let isFolded = $derived(folded.size > 0);
+  $effect(() => { onfold?.(isFolded); });
   let projection = $derived(isFolded ? projectFolds(value, folded, foldRegions) : null);
   let displayText = $derived(projection ? projection.text : value);
   function fullLineOf(displayIdx) { return projection ? (projection.displayToFull[displayIdx] ?? displayIdx + 1) : displayIdx + 1; }
@@ -190,6 +203,8 @@
     const found = occ.length >= 2 ? occ.slice(0, 200) : [];
     return windowStart ? found.map((o) => ({ start: o.start + windowStart, end: o.end + windowStart })) : found;
   });
+  // The Values sidebar's highlights, placed in the lines drawn (a long text draws a window of them).
+  let markList = $derived(markBoxes(marks, value, valueStarts, { first: firstRow, last: lastRow, folded: isFolded }));
   // A trailing newline collapses in <pre>; pad so the highlight layer matches the textarea height.
   let highlightedSafe = $derived(highlighted + (windowText.endsWith('\n') ? '\n' : ''));
 
@@ -290,7 +305,11 @@
     const starts = text === displayText ? displayStarts : lineStartsOf(text);
     caretLine = lineAt(starts, pos);
     caretCol = pos - starts[caretLine];
-    oncaret?.(fullLineOf(caretLine), caretCol + 1);
+    // The third argument is the caret's offset into the full source; folded, the start of its line
+    // in the full source plus its column, since the textarea then holds the folded text.
+    const fullLine = fullLineOf(caretLine);
+    const offset = projection ? (valueStarts[fullLine - 1] ?? 0) + caretCol : pos;
+    oncaret?.(fullLine, caretCol + 1, offset);
   }
 
   function countLines(s) { let n = 0; for (let i = 0; i < s.length; i++) if (s[i] === '\n') n++; return n; }
@@ -872,6 +891,48 @@
     taEl.focus();
   }
   export function focus() { taEl?.focus(); }
+
+  /**
+   * Replace [start, end) of the source with `text`, for the Values sidebar: through applyEdit, so it
+   * is one step of the textarea's own undo and fires the input path a keystroke does. The caret and
+   * selection keep their place, moved by the edit, and focus goes back to where it was (a field or
+   * the display panel), since the textarea has to hold it for the edit. Returns the whole text after
+   * the edit, or null when the view cannot be edited (folded, or read-only).
+   */
+  export function replaceRange(start, end, text) {
+    if (!taEl || isFolded || readOnly) return null;
+    const length = taEl.value.length;
+    const s = Math.max(0, Math.min(length, Math.floor(start)));
+    const e = Math.max(s, Math.min(length, Math.floor(end)));
+    const insert = String(text ?? '');
+    const back = typeof document !== 'undefined' ? document.activeElement : null;
+    const moved = (p) => (p <= s ? p : p >= e ? p + insert.length - (e - s) : s + insert.length);
+    applyEdit(s, e, insert, moved(taEl.selectionStart), moved(taEl.selectionEnd));
+    if (back && back !== taEl && back.isConnected && typeof back.focus === 'function') back.focus({ preventScroll: true });
+    return taEl.value;
+  }
+
+  /** Scroll [start, end) into view and put the caret at its start: a Values row was clicked. */
+  export async function reveal(start, end = start, { focus: take = true } = {}) {
+    if (!taEl) return;
+    if (isFolded) { unfoldAll(); await tick(); }
+    const at = Math.max(0, Math.min(value.length, Math.floor(start) || 0));
+    if (take) taEl.focus({ preventScroll: true });
+    taEl.setSelectionRange(at, at);
+    const p = posOf(at);
+    const last = posOf(Math.max(at, Math.min(value.length, Math.floor(end) || at)));
+    const top = p.line * lineHeight;
+    const bottom = (last.line + 1) * lineHeight;
+    if (top < taEl.scrollTop || bottom > taEl.scrollTop + taEl.clientHeight - lineHeight) {
+      taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 3);
+    }
+    const x = p.col * charWidth;
+    if (x < taEl.scrollLeft || x > taEl.scrollLeft + taEl.clientWidth - charWidth * 8) {
+      taEl.scrollLeft = Math.max(0, x - taEl.clientWidth / 3);
+    }
+    onScroll();
+    syncCaret();
+  }
   // Put the caret at a line and column (both from 1) and scroll it into the middle of the view: the
   // panel file view takes a reader to the mistake it reported.
   export async function revealLine(line, col = 1) {
@@ -926,6 +987,15 @@
 
   <div class="ce-area">
     <div class="ce-activeline" style="top:{PAD_TOP + caretLine * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+    {#each markList as b (b.key)}
+      {#if b.band}
+        <div class="ce-mark ce-mark-statement" data-mark="statement" data-line={b.line + 1}
+          style="top:{PAD_TOP + b.line * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+      {:else}
+        <div class={['ce-mark', `ce-mark-${b.kind}`]} data-mark={b.kind} data-line={b.line + 1}
+          style="left:{PAD_L + b.col * charWidth - scrollLeft - 1}px; top:{PAD_TOP + b.line * lineHeight - scrollTop}px; width:{b.width * charWidth + 2}px; height:{lineHeight}px"></div>
+      {/if}
+    {/each}
     {#each occurrences as o (o.start)}
       {@const p = posOf(o.start)}
       <div class="ce-occ"
@@ -1108,6 +1178,14 @@
     --ce-bic: #4dd6a0;
     --ce-match-bg: rgba(90, 155, 240, 0.28);
     --ce-match-ring: rgba(90, 155, 240, 0.55);
+    /* the Values sidebar's highlights: the statement it lists, the value under the pointer in it, and
+       the value an edit is open on — each its own, so all three read apart from --ce-occ and --ce-sel */
+    --ce-stmt: rgba(90, 155, 240, 0.055);
+    --ce-stmt-bar: rgba(90, 155, 240, 0.75);
+    --ce-hov: rgba(255, 255, 255, 0.075);
+    --ce-hov-ring: rgba(255, 255, 255, 0.24);
+    --ce-edit: rgba(90, 155, 240, 0.12);
+    --ce-edit-ring: #6aa8ff;
     position: relative;
     display: flex;
     width: 100%;
@@ -1135,6 +1213,12 @@
     --ce-bic: #1a8f6a;
     --ce-match-bg: rgba(42, 93, 176, 0.2);
     --ce-match-ring: rgba(42, 93, 176, 0.5);
+    --ce-stmt: rgba(42, 93, 176, 0.05);
+    --ce-stmt-bar: rgba(42, 93, 176, 0.6);
+    --ce-hov: rgba(0, 0, 0, 0.05);
+    --ce-hov-ring: rgba(0, 0, 0, 0.24);
+    --ce-edit: rgba(42, 93, 176, 0.09);
+    --ce-edit-ring: #2a5db0;
   }
 
   .ce-gutter {
@@ -1188,6 +1272,15 @@
     pointer-events: none;
     z-index: 0;
   }
+  .ce-mark {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    box-sizing: border-box;
+  }
+  .ce-mark-statement { left: 0; right: 0; background: var(--ce-stmt); box-shadow: inset 2px 0 0 var(--ce-stmt-bar); }
+  .ce-mark-hover { background: var(--ce-hov); box-shadow: 0 0 0 1px var(--ce-hov-ring); border-radius: 3px; }
+  .ce-mark-edit { background: var(--ce-edit); box-shadow: 0 0 0 1.5px var(--ce-edit-ring); border-radius: 3px; }
   .ce-mcaret {
     position: absolute;
     width: 2px;

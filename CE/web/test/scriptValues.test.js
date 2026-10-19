@@ -507,6 +507,9 @@ test('record example 14: a control, a path and an animation are checked against 
   const titel = argOf(callOf(read(src, 'lua', 'Titel', context)), 'target');
   assert.equal(titel.problem.message, 'No control named "Titel" on this panel. Did you mean "Title"?');
   assert.deepEqual(titel.meaning.choices, ['Cutoff', 'Title']);
+  // A control found on the panel is given with its type and its value now, for its row.
+  const cutoff = argOf(callOf(read(src, 'lua', 'play("Cutoff", "Pluse"', context)), 'control');
+  assert.deepEqual([cutoff.meaning.found, cutoff.meaning.type, cutoff.meaning.value], [true, 'Knob', 0.42]);
   // Without a panel nothing is said: the context cannot tell.
   assert.equal(argOf(callOf(read(src, 'lua', 'keep')), 'path').problem, null);
   assert.equal(argOf(callOf(read(src, 'lua', 'Pluse')), 'animation').problem, null);

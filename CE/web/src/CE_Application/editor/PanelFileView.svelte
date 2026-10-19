@@ -18,6 +18,12 @@
   // that item to edit; "Whole file" from an item goes to its lines. The text is written when the mode
   // is chosen, and again once the panel (or its device session, or its scripts) has stopped changing
   // for a moment.
+  //
+  // VALUES: the script editor's dock shows its Values tab beside this screen too (ValuesSidebar.svelte,
+  // over this JSON by readJsonValues). This screen owns the text, the caret and the editor, so it
+  // reports them through `onvalues`, and draws the highlights it is given in `marks`. A colour or a
+  // gradient edited from a row is written into the item's text as typing would be, and so becomes the
+  // item's draft, applied as any other. Every field and the whole file are to read: rows only.
   import { onMount, tick, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import CodeEditor from './CodeEditor.svelte';
@@ -31,8 +37,9 @@
   import { projectDeviceSession } from '../stores/projectDeviceSession.js';
   import { scriptDocuments } from '../stores/scriptWorkspace.js';
   import { findControlById } from '../utils/containment.js';
+  import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
 
-  let { panelId = null } = $props();
+  let { panelId = null, marks = [], onvalues = null, valuesOpen = false, ontogglevalues = null } = $props();
 
   let panel = $derived($panels.find((p) => p.id === panelId) ?? null);
   let outline = $derived(panel ? panelFileOutline(panel) : []);
@@ -88,6 +95,37 @@
   let text = $derived(draft?.text ?? current?.text ?? '');
   let dirty = $derived(Boolean(draft && current && draft.text !== current.text));
   let stale = $derived(Boolean(draft && current && draft.base !== current.text));
+
+  // --- what the Values tab reads (see VALUES above) ---
+  let itemCaret = $state(0);
+  let itemFolded = $state(false);
+  let wholeStarts = $derived(whole ? lineStartsOf(whole.text) : [0]);
+  // In the whole file there is no caret: the line being read stands for one, at its first character.
+  let wholeCaret = $derived.by(() => {
+    if (!whole) return 0;
+    const at = wholeStarts[Math.max(0, Math.min(wholeStarts.length - 1, wholeLine - 1))] ?? 0;
+    return at + (/^[ \t]*/.exec(whole.text.slice(at, at + 400))?.[0].length ?? 0);
+  });
+  let valuesContext = $derived(item
+    ? { itemKind: item.kind, control: item.kind === 'control' ? item.node : null, panel }
+    : { panel });
+  let itemName = $derived(!item ? '' : item.kind === 'panel' ? 'panel settings' : (item.node._children.Core.name || item.node._children.Core.id));
+  $effect(() => {
+    if (!onvalues) return;
+    if (mode === 'whole') {
+      onvalues(whole ? {
+        source: whole.text, caret: wholeCaret, context: { panel }, editor: null, readOnly: true, folded: false,
+        docKey: 'whole', itemName: '', onreveal: (start) => viewer?.revealLine(lineAt(wholeStarts, start) + 1),
+      } : null);
+      return;
+    }
+    if (!item || !current) { onvalues(null); return; }
+    onvalues({
+      source: showAll ? fullText : text, caret: itemCaret, context: valuesContext, editor, readOnly: showAll,
+      folded: itemFolded, docKey: `${selectedKey}:${showAll}`, itemName, onreveal: null,
+    });
+  });
+  $effect(() => () => onvalues?.(null));
 
   // Start on the control selected when the script tab opened, and follow the selection after.
   onMount(() => {
@@ -393,6 +431,10 @@
             <span class="lang">Whole file · {whole.lineCount.toLocaleString('en')} lines</span>
             <span class="pf-here" data-testid="panel-file-here">{wholeHere()}</span>
             <span class="pf-actions">
+              {#if ontogglevalues}
+                <button class={['btn', 'ghost', valuesOpen && 'primary']} onclick={ontogglevalues}
+                  title="The values in the object being read (docked right)">Values</button>
+              {/if}
               {#if wholeAt?.kind === 'control'}
                 <button class="btn ghost" onclick={() => { setActivePanel(panel.id); selectComponent(wholeAt.id); }}
                   title="Switch to the panel with this control selected">Show on the panel</button>
@@ -425,6 +467,10 @@
             <label class="pf-toggle" title="Show every field, defaults included, to read">
               <input type="checkbox" checked={showAll} onchange={(e) => showAll = e.target.checked} /> Every field
             </label>
+            {#if ontogglevalues}
+              <button class={['btn', 'ghost', valuesOpen && 'primary']} onclick={ontogglevalues}
+                title="The values in the object the caret is in, and what each means (docked right)">Values</button>
+            {/if}
             {#if item.kind === 'control'}
               <button class="btn ghost" onclick={showOnPanel} title="Switch to the panel with this control selected">Show on the panel</button>
             {/if}
@@ -447,6 +493,9 @@
             <CodeEditor bind:this={editor} language="json" minHeight={320}
               value={showAll ? fullText : text}
               readOnly={showAll}
+              {marks}
+              oncaret={(line, col, offset) => itemCaret = offset ?? 0}
+              onfold={(f) => itemFolded = f}
               oninput={onInput}
               onrun={apply} />
           {/key}

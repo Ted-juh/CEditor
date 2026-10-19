@@ -59,11 +59,21 @@ same script, named after another event, is never called. To react to another eve
 add another script, or listen for it with `on` — the manual's chapter "When a script
 runs" shows how.
 
-Two tools help you while you type:
+Three tools help you while you type:
 
 - **The picker** is the tree on the right. It lists every control, with its
   properties and events. It also lists every command. Click an entry and the
   call is inserted in your language. You never need to type a path from memory.
+- **The Values tab**, beside the picker, lists the values in the statement the
+  caret is in, a call over several lines included: each argument and option, what
+  it means (a colour's swatch, a duration in beats, the control a path names), and
+  any problem, in the words the script would report when it runs, such as an option
+  the command does not have. Click a row to go to its value. A colour's swatch opens
+  the **Colors** tab of the display panel, and a gradient's strip its **Gradient**
+  tab: the new colour is written into your code when you let go, and **Cancel**
+  puts back exactly what you had written. A value chosen from a list has a dropdown,
+  and a number with a unit has a field, written when you press Enter or leave it.
+  The dock opens on the tab you used last.
 - **The problems list** checks as you type. It warns about a handler that will
   never be called because it does not match **Runs on** — if the script runs on
   `onClick` but defines no `onClick(mouse)`, you are told it will not fire — and
