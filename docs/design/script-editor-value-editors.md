@@ -2,7 +2,8 @@
 
 Status: **proposal, nothing built.** 2026-10-18. The silent failures it found, and four more found
 on the way, were then fixed in the script runtimes; [Fixed since, and still open](#fixed-since-and-still-open)
-lists them.
+lists them. The edit surface was decided on 2026-10-19: a Values sidebar
+([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).
 
 It started as a question about colour. A script's colours are typed out as hex, so why is there no
 swatch beside them that opens the display panel's colour and gradient editors? Colour turned out to
@@ -21,14 +22,99 @@ gradients, easing curves, note divisions, scale names, font families, images, th
 and the paths of their properties. The script editor shows all of them as plain text. The proposal
 is that the editor recognises such a value and then:
 
-- **marks** it with a tint, an underline or a glyph in the gutter
-- **explains** it on hover
+- **shows** it in a sidebar, as a row with what it means, and highlights it in the text
+- **explains** it, in its row and on hover
 - **checks** it, through the editor's existing diagnostics
 - **edits** it, where the app already has an editor for that kind of value. The editor opens on the
   value and writes the result back into the script as text.
 
 The script stays the truth. The editor only ever changes characters in it, through the same edit
 path as typing.
+
+## Decided: a Values sidebar is where values are shown and edited
+
+*Decided by the owner, 2026-10-19.* The edit surface is a sidebar, not marks to click in the text.
+It lists the values in the statement the caret is in that the editor can read, and each row shows
+its value and opens its editor. The text itself stays plain. The gutter glyph this record first
+made the click target (constraint 1) is no longer needed for that, and nothing in the editor's own
+column has to change to make room for it. Three decisions shape it:
+
+1. **It is a tab of the script editor's own dock.** `BehaviorDesigner.svelte` already has a
+   right-hand dock with Insert, Library and History tabs; Values is a fourth. Hiding the dock hides
+   it, which makes it the least intrusive place for it: nothing appears unless it is open.
+2. **A colour's or a gradient's swatch opens the display panel.** The rule recorded in
+   `stores/colorTarget.js` stands: one place to edit colour, everywhere. The row shows the swatch,
+   and a click opens the display panel's Colors or Gradient tab on that value through a callback
+   target, with its label, Done and Cancel. The script editor gets a `DisplayPanel` of its own, as
+   the Custom Component Designer has (constraint 2). No colour chooser opens in the sidebar.
+3. **It covers the whole statement, not the line.** A call often runs over several lines: a
+   gradient's stops, or an options table with one key per line. So the sidebar shows every call in
+   the statement the caret is in, and when a line holds several statements, all of them. A call
+   inside another (`set(path, ce.math.lighten("red", 0.2))`) has rows of its own, indented under the
+   call it sits in. For JavaScript, TypeScript and Lua the statement comes from the parse
+   `languageService.analyze` already makes; for the other languages, from the caret's line widened
+   until its brackets balance.
+
+### A row
+
+Each row is one argument or one key of an options table, in the call's order:
+
+```
+Statement at line 14 · ce.anim.to
+  path       "Cutoff.value"     ● Cutoff (Knob), now 0.42
+  target     0.8                0 to 1
+  opts
+    duration 250                [ 250 ] ms
+    curve    "outBack"          [curve picture]  ▾
+  ⚠ easing   …                  not an option of ce.anim.to
+```
+
+- **The name** comes from the schema: the parameter's name, or the option's key.
+- **The value** is shown as it is written, and beside it what its reader will make of it: a swatch
+  painted as the reader paints it, a note's number for its name, a curve's picture, a control's
+  current value, a SysEx message's byte count and checksum.
+- **The edit**, by kind:
+  - a fixed list (divisions, scales, chords, blend modes, value forms, option keys): a dropdown in
+    the row;
+  - a colour or gradient: the swatch, which opens the display panel;
+  - a curve, a font, an image: a preview in the row, which opens the editor the app already has (the
+    Animation tab's curve editor, the Text tab's family list, the Assets tab);
+  - a number with a unit and a range: a field with the unit beside it, written on Enter or when the
+    field is left. Dragging numbers is not planned (see [What not to build](#what-not-to-build));
+  - none: a fact to read (a note's number, a CC's name, a device parameter's range).
+- **A value that is not written out** (a variable, a call, arithmetic) is listed as computed, with
+  the expression and no editor. That is honest, and it says why nothing can be changed there.
+- **A problem** is shown on its row, in the words the runtime would use: an unknown option, a
+  division that is not one, a colour the panel cannot read. These are the editor's diagnostics,
+  shown where the value is.
+
+With the caret on a statement that has nothing the editor can read, the tab says so. It follows the
+caret as it moves, except while an edit is open (below).
+
+### Highlighting in the text what the sidebar is about
+
+The text shows which characters the sidebar is talking about, without changing a single width. The
+editor already draws two such layers: the occurrence marks (`ce-occ`) and the active line
+(`ce-activeline`), boxes placed by line and column behind the transparent `<textarea>`
+(`CodeEditor.svelte`, the `ce-area` block). The sidebar adds three more, the same way:
+
+| When | What is marked | How |
+|---|---|---|
+| The Values tab is showing | the statement it lists | a faint band over the statement's lines, as the active line is drawn but over every line the statement covers |
+| The pointer is over a row | that value's characters | a light box around them, as an occurrence mark is drawn |
+| An edit is open from a row (the display panel is on that colour, a dropdown is open, a field is being typed in) | that value's characters | a stronger box with an outline in the accent colour, which stays while the edit is open, wherever the caret goes |
+
+- **A value that runs over several lines** (a stop list, a table) gets one box per line it covers.
+- **Clicking a row** scrolls its value into view and moves the caret to it. Clicking a marked value
+  in the text selects its row.
+- **The box follows the text.** A write-back can change the value's length (`"red"`, recoloured to
+  a blue with no name, is written as `"#4A7FB0"`), so the range is moved with the edit that changed
+  it, and the box with it.
+- **A long script** is drawn a window at a time; the boxes are placed through the same offset the
+  occurrence marks use (`windowStart`). **A folded view** draws none, and folding ends an open edit
+  (rule 5).
+- **Colour and contrast:** the box uses its own theme variable beside `--ce-occ` and `--ce-sel`, so
+  the edited value, an occurrence and the selection can be told apart when all three are on screen.
 
 ## The kinds at a glance
 
@@ -46,20 +132,20 @@ Grouped by how you would change each one. [The other kinds](#the-other-kinds) ha
   list, where each row is set in its own face.
 - **Images and icons** (`ce.image.asset`) get a thumbnail and open the Assets tab.
 
-**Values chosen from a fixed list, so they use the editor's own completion list**
+**Values chosen from a fixed list, so their row has a dropdown**
 
 - Note divisions, scales, chords, event names and a control's animation names.
 - The 16 parameters whose allowed values the API already lists, such as blend modes, line caps and
-  image fit.
+  image fit, and the keys of an options table, which the contract lists for every call.
 - Control names and property paths.
 
-The completion list (Ctrl+Space) reopens over a value that is already there and offers the
-alternatives. That adds no pop-up, which keeps the recorded rule that colour editing happens only in
-the display panel.
+The completion list (Ctrl+Space) also reopens over a value that is already there and offers the
+same alternatives, for someone who keeps their hands on the keyboard.
 
-**Numbers with a known unit and range, so you drag them**
+**Numbers with a known unit and range, so you type them in a field with the unit beside it**
 
-- Angles, milliseconds and opacity, by Alt-drag in place, with the drag code the app already has.
+- Angles, milliseconds and opacity, in the sidebar row, written on Enter. Dragging them in place,
+  first proposed here, is not planned (see [What not to build](#what-not-to-build)).
 
 **Values worth reading and checking but not editing**
 
@@ -151,11 +237,13 @@ What can be drawn:
   (`codeHighlight.js`), with the width unchanged. Only colours want this.
 - **An underline or box**, placed by line and column over the text, the way the diagnostic squiggles
   and the occurrence marks already are (`CodeEditor.svelte:929–966`).
-- **A glyph in the gutter** beside the line number, as JetBrains IDEs do for colours. This is the
-  click target, because a click on the text has to keep placing the caret. Ctrl/Cmd-click on a
-  marked value can open it as well. When a line holds several values, the glyph opens a short list
-  of them.
+- **A glyph in the gutter** beside the line number, as JetBrains IDEs do for colours. This was the
+  first plan for the click target, because a click on the text has to keep placing the caret. The
+  Values sidebar ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)) is the
+  click target now, so a glyph is optional.
 - **Hover text**, through the path `getHover` already uses.
+
+The sidebar's highlights are boxes of the second kind.
 
 ### 2. The display panel is not on screen while you script
 
@@ -186,7 +274,7 @@ Each kind is one entry in a registry:
 |---|---|
 | claim | Does this value, here, belong to this kind? |
 | read | The value the runtime will see, read by the runtime's own reader |
-| mark | Tint, underline or gutter glyph |
+| show | What its row in the Values sidebar shows (a swatch, a curve, a label) |
 | explain | The hover text |
 | check | A diagnostic, or nothing |
 | edit | Which surface edits it, or none |
@@ -195,16 +283,19 @@ Each kind is one entry in a registry:
 Everything except *edit* is a pure function from source text to answers, so it can be tested with
 `node --test` without a browser, the way `utils/midiMonitor.js` is.
 
-### Three edit surfaces, or none
+### Where an edit starts, and what it opens
+
+Every edit starts from a row of the Values sidebar. What the row opens depends on the kind:
 
 - **A dock tab**, when choosing the value needs a picture: colour, gradient, easing curve, font,
-  image. It goes through a callback target, with the dock's Done and Cancel.
-- **The completion list**, for a value chosen from a fixed list. This is the editor's own list, the
-  one Ctrl+Space opens, reopened over a value that is already there and showing the alternatives.
-  It adds no new surface and leaves the colour rule alone.
-- **A gesture in place.** Alt-drag on a number whose unit and range are known, using the scrub core
-  that already exists.
-- **None.** Some kinds are worth marking and checking but not editing: a SysEx message, a note
+  image. Colour and gradient open the display panel embedded in the script editor; the others open
+  the editor the app already has for them. Each goes through a callback target, with the dock's
+  Done and Cancel.
+- **A dropdown in the row**, for a value chosen from a fixed list. The editor's own completion list
+  (Ctrl+Space, reopened over a value that is already there and showing the alternatives) offers the
+  same choices to someone who keeps their hands on the keyboard.
+- **A field in the row**, for a number whose unit and range are known.
+- **None.** Some kinds are worth showing and checking but not editing: a SysEx message, a note
   number.
 
 ### Where context comes from, in the order it is tried
@@ -293,26 +384,26 @@ maps to `position` from 0 to 100. The gaps:
 
 One table, then notes on the kinds where there is something more to say.
 
-| Kind | In a script | Context | Mark | Edit surface | What the check catches |
+| Kind | In a script | Context | Shown in its row | What the row opens | What the check catches |
 |---|---|---|---|---|---|
-| Colour | `"#5B9BD5"`, `"FF5B9BD5"` | schema, path or key, `#` form | tint, gutter swatch | Colors tab | see above |
-| Gradient | `ce.draw.gradient({ "#2A6BD4", "#0A1830" }, 180)` | the call | gutter strip | Gradient tab, linear only | fewer than two usable colours |
-| Easing curve | `curve = "outBack"`, or four numbers | `ce.anim.to`'s `opts.curve`, `ANIM_CURVE_NAMES` | gutter curve (`EasingCurve`) | Animation tab's `BezierEditor`; names through completion | an unknown name, which the runtime reports before running a straight line |
-| Note division | `"1/8T"` | `division` parameters, `DIVISIONS` | underline | completion | an unknown division, which `stepAt` answers with nothing and no error |
-| Scale, chord | `"harmonicMinor"`, `"maj7"` | `scale` and `chord` parameters | underline; hover lists the notes | completion | an unknown name |
-| Note | `"C3"`, `60` | `note` and `root` (a number or a name) | hover shows the name for a number and the number for a name | completion | out of range |
-| Fixed list | `"multiply"`, `"round"`, `"cover"` | the 16 `values` lists | none, it is readable already | completion | a value not in the list |
-| Font family | `"Inter Tight"` | `textStyle`, `drawMeasure`, `textFont` | gutter "Aa" in that face | Text tab's `TypeFamilies` | a family that is not available, which `textStyle` refuses |
-| Image | `ce.image.asset("knob-cap")` | `imageAsset`, `imageSet`, `drawImage` | gutter thumbnail | Assets tab | a name not in the library; an asset's name passed as `src`, which draws nothing |
-| Control | `ce.anim.play("Cutoff", …)`, `on("Cutoff", …)` | `targetRef` and `control` parameters | underline | completion from the panel's tree; Ctrl/Cmd-click selects it on the canvas | no control of that name |
-| Property path | `"Cutoff.Background.Fill.colour"` | the 13 `path` parameters | underline; hover shows the current value | completion one segment at a time | a path that leads nowhere |
-| Animation | `ce.anim.play("Cutoff", "Pulse")` | that control's keyframe animations | underline | completion from that control | not one of its keyframe animations (the runtime returns false and logs the list) |
-| Event | `on(target, "valueChanged", fn)` | `eventName` parameters | none | completion | an unknown event |
-| Number with a unit | angle `180`, `ms` `250`, opacity `0.5` | the parameter's `unit` and range | hover | Alt-drag in place | out of range |
-| Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | gutter dashed line | none | negative lengths, which are clamped to 0 |
-| SysEx | `sendSysex("F0 41 10 42 F7")` | `bytes` parameters | hover: byte count, checksum | none | a wrong checksum (`computeChecksum`), a missing `F0` or `F7` |
-| Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `parameterId` | hover: range and CC | completion from the device profile | a parameter the profile does not have |
-| Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points` from 0 to 1 | gutter shape | a polyline editor like `EnvelopeDesigner`'s | points outside 0 to 1 |
+| Colour | `"#5B9BD5"`, `"FF5B9BD5"` | schema, path or key, `#` form | swatch | the display panel's Colors tab | see above |
+| Gradient | `ce.draw.gradient({ "#2A6BD4", "#0A1830" }, 180)` | the call | strip | the display panel's Gradient tab, linear only | fewer than two usable colours |
+| Easing curve | `curve = "outBack"`, or four numbers | `ce.anim.to`'s `opts.curve`, `ANIM_CURVE_NAMES` | curve picture (`EasingCurve`) | Animation tab's `BezierEditor`; names through a dropdown | an unknown name, which the runtime reports before running a straight line |
+| Note division | `"1/8T"` | `division` parameters, `DIVISIONS` | the label (*8th T*) | a dropdown | an unknown division, which `stepAt` answers with nothing and no error |
+| Scale, chord | `"harmonicMinor"`, `"maj7"` | `scale` and `chord` parameters | the notes | a dropdown | an unknown name |
+| Note | `"C3"`, `60` | `note` and `root` (a number or a name) | the name for a number and the number for a name | none | out of range |
+| Fixed list | `"multiply"`, `"round"`, `"cover"` | the 16 `values` lists | the value | a dropdown | a value not in the list |
+| Font family | `"Inter Tight"` | `textStyle`, `drawMeasure`, `textFont` | "Aa" in that face | Text tab's `TypeFamilies` | a family that is not available, which `textStyle` refuses |
+| Image | `ce.image.asset("knob-cap")` | `imageAsset`, `imageSet`, `drawImage` | thumbnail | Assets tab | a name not in the library; an asset's name passed as `src`, which draws nothing |
+| Control | `ce.anim.play("Cutoff", …)`, `on("Cutoff", …)` | `targetRef` and `control` parameters | its type and current value | a dropdown of the panel's controls; a click selects it on the canvas | no control of that name |
+| Property path | `"Cutoff.Background.Fill.colour"` | the 13 `path` parameters | the current value | completion one segment at a time | a path that leads nowhere |
+| Animation | `ce.anim.play("Cutoff", "Pulse")` | that control's keyframe animations | the value | a dropdown of that control's | not one of its keyframe animations (the runtime returns false and logs the list) |
+| Event | `on(target, "valueChanged", fn)` | `eventName` parameters | the value | a dropdown | an unknown event |
+| Number with a unit | angle `180`, `ms` `250`, opacity `0.5` | the parameter's `unit` and range | the unit and range | a field, written on Enter | out of range |
+| Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line | none | negative lengths, which are clamped to 0 |
+| SysEx | `sendSysex("F0 41 10 42 F7")` | `bytes` parameters | byte count, checksum | none | a wrong checksum (`computeChecksum`), a missing `F0` or `F7` |
+| Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `parameterId` | range and CC | a dropdown from the device profile | a parameter the profile does not have |
+| Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points` from 0 to 1 | the shape | a polyline editor like `EnvelopeDesigner`'s | points outside 0 to 1 |
 
 ### Notes
 
@@ -326,11 +417,12 @@ One table, then notes on the kinds where there is something more to say.
   in"*. The script and the tab already speak the same four numbers.
 - **Numbers are the most tempting and the most dangerous.** Dragging a number with Live on and
   watching the panel follow is the most immediate thing on this list. It is also the one that would
-  run the script most often, which is why the write-on-settle rule below matters most here. A number
-  with no unit and no range gets nothing: dragging it would be a guess.
+  run the script most often, which is why dragging is not planned: a number with a unit and range
+  gets a field in its row, written on Enter, so it runs the script once per change. A number with
+  no unit and no range gets nothing to edit it with: any step would be a guess.
 - **Control names and property paths are about keeping scripts correct.** The check is the point,
-  and the completion list is the edit. Ctrl/Cmd-click going to the control on the canvas or in the
-  properties panel is the natural extra.
+  and the row's dropdown or the completion list is the edit. A click going to the control on the
+  canvas or in the properties panel is the natural extra.
 - **SysEx is to read and check, not to edit.** A byte string with its checksum checked, and the
   algorithm named by the `checksum` call beside it, is worth more than any editor for it.
 
@@ -359,7 +451,7 @@ ce.core.set("Cutoff.Background.Fill.colour", "#5B9BD580")
   *"A panel colour reads the last six digits: 9BD580. A see-through property colour is AARRGGBB,
   "805B9BD5", which ce.math.alpha("#5B9BD5", 0.5) builds."* The same text is a warning in the
   diagnostics.
-- **Editing.** The gutter swatch opens the Colors tab. Line 3 is written back as `#RRGGBBAA`,
+- **Editing.** The row's swatch opens the Colors tab. Line 3 is written back as `#RRGGBBAA`,
   because CSS reads that alpha. Line 7 is written back as `AARRGGBB`. This is the one case where an
   edit changes the form, because the original form could not say what it meant.
 
@@ -393,7 +485,7 @@ ce.core.log("F0411000")
 
 There is no API call here, only keys. `colour` and the stops' `color` match `colou?r|tint`, the
 pattern `documentColours.js` uses, so all three values are tinted and each opens the Colors tab.
-The `gradient` key gives the whole object a gutter strip, which opens the Gradient tab with every
+The `gradient` key gives the whole object a strip in its row, which opens the Gradient tab with every
 control it has, because this is a stored gradient and not a `ce.draw` one.
 
 ### 4. A gradient with no angle
@@ -402,7 +494,7 @@ control it has, because this is a stored gradient and not a `ce.draw` one.
 ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "#0A1830" }))
 ```
 
-- **Mark.** A gutter strip running top to bottom, because the runtime's default angle is 180.
+- **Shown.** A strip in the row running top to bottom, because the runtime's default angle is 180.
 - **Editing.** The Gradient tab opens at 180, not at its own default of 90, and with the radial
   controls hidden. Turning it to 135 and adding a stop at 30% writes:
 
@@ -439,16 +531,16 @@ ce.draw.fill(ce.draw.gradient({ base, ce.math.darken(base) }, 180))
 ce.anim.to("cutoff", 127, { duration = 500, curve = "outBack" })
 ```
 
-- **`"outBack"`** gets a gutter curve (`EasingCurve`), overshoot included. Ctrl/Cmd-click opens
+- **`"outBack"`** gets a curve picture in its row (`EasingCurve`), overshoot included. A click opens
   the Animation tab's `BezierEditor` at outBack's numbers, `0.175, 0.885, 0.32, 1.275`
   (`utils/easing.js:38`). Dragging a handle writes four numbers, `curve = { 0.2, 0.9, 0.3, 1.4 }` in
   Lua and `curve: [0.2, 0.9, 0.3, 1.4]` in JavaScript, and writes a name back if the numbers land on
   a named curve. Through the completion list, the value can also be swapped for any other name in
-  `ANIM_CURVE_NAMES`.
+  `ANIM_CURVE_NAMES`, from the row's dropdown or the completion list.
 - **Typing `"outBak"`** gets a warning: *"Not a curve name. The move would run in a straight
   line."* The runtime reports the same thing, but only when the move starts.
 - **`500`** is a number in milliseconds (`duration` carries `unit: 'milliseconds'`). Hover: *"500 ms,
-  1 beat at the current 120 BPM"*, using `ce.time.msToBeats`. Alt-drag changes it in steps of 10 ms.
+  1 beat at the current 120 BPM"*, using `ce.time.msToBeats`. Its row has a field in milliseconds.
 
 ### 7. Note names: what was the silent C-1
 
@@ -501,11 +593,11 @@ equal.
 ce.text.style("Title", { family = "Inter Tigt", size = 18 })
 ```
 
-- **Mark.** A gutter "Aa", drawn in the family's own face, or in the fallback face with a warning
+- **Shown.** An "Aa" in its row, drawn in the family's own face, or in the fallback face with a warning
   when no such font is available: *"Not an available font. ce.text.style will refuse it."*
 - **Editing.** The "Aa" opens the Text tab's family list. Picking a family writes
   `family = "Inter Tight"`.
-- **`size = 18`** is in pixels (the option carries `unit: 'pixels'`) and can be Alt-dragged in
+- **`size = 18`** is in pixels (the option carries `unit: 'pixels'`), and its row has a field in
   whole pixels.
 
 ### 11. An image: a name or the data
@@ -519,7 +611,7 @@ local cap = ce.image.asset("knob-cap")
   the script runs, and when the name is an icon's it gives the call to use: *"ce.draw.image:
   "knob-cap" is an icon's name, not its image, so nothing was drawn. Pass
   ce.image.asset("knob-cap").dataUrl."* The check says the same thing as it is typed.
-- **Line 2** gets a gutter thumbnail when the library or the panel has an image of that name, and a
+- **Line 2** gets a thumbnail in its row when the library or the panel has an image of that name, and a
   warning when neither has. Clicking the thumbnail opens the Assets tab, and choosing another image
   writes its name.
 
@@ -534,8 +626,8 @@ ce.image.icon("Badge", "star", { opacity = 0.5 })
   warns: *"ce.image.set("Logo"): opacity runs from 0 to 100 here, so 0.5 is almost invisible. If
   you meant 0.5 out of 1, write 50."* The hover would say the same.
 - **Line 2** is on the 0 to 1 scale, so 0.5 is half. Writing 50 there now warns the other way.
-- **Alt-drag** reads each option's own `unit`, so the first moves in whole numbers up to 100 and the
-  second in hundredths up to 1. None of this works unless the unit is in the schema. Here it is.
+- **Each row's field** reads its option's own `unit`, so the first takes whole numbers up to 100 and
+  the second hundredths up to 1. None of this works unless the unit is in the schema. Here it is.
 
 ### 13. Angles the schema does not know are angles
 
@@ -545,8 +637,8 @@ ce.draw.arc(cx, cy, 40, -135, 135)
 
 `from` and `to` are degrees, with 0 at twelve o'clock and increasing clockwise. When this was
 written only the summary said so. The parameters carried no `unit`, so they were plain numbers and
-would get no drag. They carry `unit: 'degrees'` now, which was step zero for this kind: Alt-drag
-can move them in whole degrees, and hover can say where 0 is.
+would get no field. They carry `unit: 'degrees'` now, which was step zero for this kind: their rows
+take whole degrees, and can say where 0 is.
 
 ### 14. Controls, paths and animation names
 
@@ -790,7 +882,9 @@ Still open, for the owner:
 ## Rules every edit session follows
 
 1. **Keep the form.** The written text has the original's notation, quotes and case, and the
-   script's own syntax.
+   script's own syntax. Where the form cannot carry the new value, the nearest one that can is
+   written: a CSS colour name recoloured to something that has no name is written as `"#RRGGBB"`,
+   and `rgb()` and `hsl()` keep their function with new numbers.
 2. **Write when the gesture settles, not on every tick.** With Live on, every change to the source
    replaces the script set and resets script state (`setLiveScripts` → `resetScriptState`,
    `panelRuntime.js:8920`). A drag across a colour square writing on every tick would do that about
@@ -803,7 +897,11 @@ Still open, for the owner:
    that range, switching scripts, folding, or closing the editor ends it. This mirrors the way
    `colorTarget.js` clears a target when the selection or panel changes.
 6. **Only literal text is edited.** A computed value gets a mark at most, never an editor.
-7. **Structured kinds wait for a parser.** Kinds that are one string or one number work in all seven
+7. **The text shows what is being edited.** While an edit is open from a row, its value's
+   characters carry the strong box described under
+   [Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited), and the box moves with
+   the text when a write-back changes the value's length.
+8. **Structured kinds wait for a parser.** Kinds that are one string or one number work in all seven
    languages through the highlighter's tokens. Kinds that are a list or a table (gradients, bezier
    numbers, dash lists, envelope points, byte lists) need a parse, so JavaScript, TypeScript and Lua
    come first. One inherited caveat: `codeHighlight.languageKey` has no Python entry and tokenises
@@ -815,33 +913,45 @@ Still open, for the owner:
 - **Booleans.** Typing `true` is faster than any widget.
 - **Free text**, such as labels, messages and log lines. There is nothing to choose from.
 - **Numbers without a unit or a range.**
+- **Dragging numbers.** Proposed first (Alt-drag in place), and not planned: the owner is not sure
+  of it, and with Live on it runs the script at every release of a drag. A number with a unit gets
+  a field in its row instead, which runs the script once per change.
 - **Anything inside the text** (constraint 1).
-- **A pop-up editor per kind beside the text.** The colour rule stands, and the completion list
-  covers the lists of names.
+- **A pop-up editor per kind beside the text, or in the sidebar.** The colour rule stands: a row's
+  swatch opens the display panel, and no colour chooser opens anywhere else.
 
 ## Order of work
 
-0. **The registry, the context resolver and the gutter column, display only, with colour as the
-   first kind.** Pure functions with tests. Nothing is edited yet.
-1. **Colour editing through a `DisplayPanel` embedded in the script editor**, with the session
-   rules above.
-2. **Lists of names.** Type the parameters in `panelApi.js`, reopen completion over an existing
-   value, add the checks. Divisions, scales, chords, the 16 `values` lists, events, animation names.
-3. **Easing curves**, through the Animation tab's components.
-4. **Gradients**, for JavaScript, TypeScript and Lua.
-5. **Numbers with units**, by Alt-drag.
-6. **The rest:** font, image, control names and property paths, SysEx, notes, device parameters.
+0. **The registry and the context resolver**, with colour as the first kind. Pure functions with
+   tests: for a statement, its calls, their arguments and options, and what each value is.
+1. **The Values sidebar, display only.** The fourth dock tab, its rows for the statement the caret
+   is in, and the three highlights in the text. Nothing is edited yet, and every kind the registry
+   knows is already worth seeing.
+2. **Colour editing through a `DisplayPanel` embedded in the script editor**, opened from a row's
+   swatch, with the session rules above.
+3. **Lists of names.** Type the parameters in `panelApi.js`, add the row's dropdown and reopen
+   completion over an existing value, add the checks. Divisions, scales, chords, the 16 `values`
+   lists, events, animation names, and the option keys the contract already lists.
+4. **Easing curves**, through the Animation tab's components.
+5. **Gradients**, for JavaScript, TypeScript and Lua.
+6. **Numbers with units**, as a field in the row.
+7. **The rest:** font, image, control names and property paths, SysEx, notes, device parameters.
    Each is a small change once the registry exists.
 
 The panel file view gets each kind for free wherever a property name gives the context.
 
 ## Open questions for the owner
 
-- **A `DisplayPanel` embedded in the script editor, or the shared dock allowed in the script
-  workspace?** The first follows the Component Designer's precedent. The second changes what
-  `workspaceOwnsChrome` means.
-- **On by default, or a toggle?** The minimap is a per-viewer toggle in the same editor
-  (`ce-minimap` in local storage), and a "Value marks" toggle could sit beside it.
-- **Alt-drag on numbers with Live on.** It re-runs the script once per release. Is that welcome,
-  or should scrubbing pause Live while the drag is held?
-- **The panel file view in the same change, or after?**
+Decided on 2026-10-19: the edit surface is the Values sidebar, a row's swatch opens the display
+panel, and the sidebar covers the whole statement the caret is in
+([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)). Dragging numbers is
+not planned. Still open:
+
+- **The display panel embedded in the script editor, or the shared dock allowed in the script
+  workspace?** This record plans the first, which follows the Component Designer's precedent. The
+  second changes what `workspaceOwnsChrome` means.
+- **Which dock tab opens first?** The dock opens on Insert today. Values could be the first tab, or
+  the one the dock remembers per viewer, as the minimap's toggle is remembered (`ce-minimap` in
+  local storage).
+- **The panel file view in the same change, or after?** It has keys and no calls, so its rows would
+  come from property names alone.
