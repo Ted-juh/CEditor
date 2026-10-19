@@ -1033,14 +1033,16 @@ def clockTempo(intervalsMs):
 __animDone = {}
 __animSeq = [0]
 
-# An envelope's shape is SAMPLED here, with map() - ce.math's, which is the Envelope component's own
-# envValueAt - and the host interpolates the samples. That is what lets the host engine run an
-# envelope at all: map()'s per-point curves live in this prelude, not in C++.
+# An envelope's shape is SAMPLED here, with mapCurve() - ce.math.map, the Envelope component's
+# own envValueAt - and the host interpolates the samples. That is what lets the host engine run
+# an envelope at all: mapCurve()'s per-point curves live in this prelude, not in C++. This called
+# map(), which no prelude defines, so Lua and JavaScript stopped with an error and Python's own
+# map() made every sample 0.
 __ANIM_SAMPLES = 1024
 def __animSample(points):
     out = []
     for i in range(__ANIM_SAMPLES + 1):
-        try: y = float(map(i / __ANIM_SAMPLES, points))
+        try: y = float(mapCurve(i / __ANIM_SAMPLES, points))
         except (TypeError, ValueError): y = 0.0
         out.append(y)
     return out

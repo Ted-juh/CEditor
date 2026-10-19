@@ -1364,6 +1364,40 @@ int main()
                "stop() leaves the value where it got to");
         check (! runtime.animationRunning(), "…and nothing is running afterwards");
 
+        // An envelope through the Lua and JavaScript preludes: the shape is sampled there, with
+        // mapCurve(), and moved here. The samplers called map(), which no prelude defines, so both
+        // stopped with an error and the move never started (Python's case is in its own tests).
+        for (const auto& [language, source] : std::vector<std::pair<const char*, juce::String>> {
+                 { "lua", "function onEnvelope()\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff',\n"
+                          "    { { x = 0, y = 0 }, { x = 0.5, y = 1 }, { x = 1, y = 0 } },\n"
+                          "    { duration = 1000, from = 0, to = 100 })))\n"
+                          "end\n" },
+                 { "javascript", "function onEnvelope() {\n"
+                          "  log('started ' + ce.anim.envelope('cutoff',\n"
+                          "    [{ x: 0, y: 0 }, { x: 0.5, y: 1 }, { x: 1, y: 0 }],\n"
+                          "    { duration: 1000, from: 0, to: 100 }));\n"
+                          "}\n" } })
+        {
+            juce::Array<juce::var> envelopeScripts;
+            envelopeScripts.add (makeScript ("envelope", language, "panel", "onEnvelope", "*", source));
+            runtime.loadScripts (juce::var (envelopeScripts));
+            host.logs.clear();
+            host.values["cutoff"] = juce::var (0.0);
+            runtime.tickAnimations (10000.0);
+            runtime.runAction ("onEnvelope", juce::var());
+            check (host.logs.contains ("started true"),
+                   juce::String (language) + ": ce.anim.envelope starts a move (got " + host.logs.joinIntoString (" | ") + ")");
+            runtime.tickAnimations (10250.0);
+            check (std::abs ((double) host.values["cutoff"] - 50.0) < 0.5,
+                   juce::String (language) + ": the prelude samples the shape, so the value climbs: 50 a quarter of the way in");
+            runtime.tickAnimations (10500.0);
+            check (std::abs ((double) host.values["cutoff"] - 100.0) < 0.5, juce::String (language) + ": …peaks halfway");
+            runtime.tickAnimations (11000.0);
+            check (std::abs ((double) host.values["cutoff"]) < 0.5, juce::String (language) + ": …and comes back down to 0");
+            runtime.stopAnimation();
+        }
+
         // ce.ui is webview-only: window-closed the verbs must explain themselves.
         juce::Array<juce::var> uiScripts;
         uiScripts.add (makeScript ("ui", "lua", "panel", "onSay", "*",
@@ -3221,7 +3255,7 @@ int main()
         check (anim.animationRunning ("z"), "…and the last has not begun");
 
         // An envelope goes UP before it comes down — the thing `to` cannot express at all. The
-        // shape arrives pre-sampled, because map()'s per-point curves live in the preludes.
+        // shape arrives pre-sampled, because mapCurve()'s per-point curves live in the preludes.
         anim.stopAnimation();
         anim.tickAnimations (0.0);
         juce::Array<juce::var> samples;

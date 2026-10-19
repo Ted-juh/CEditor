@@ -2651,14 +2651,16 @@ end
 -- count keeps the tokens apart.
 local __animDone, __animSeq = {}, 0
 
--- An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
--- own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
--- envelope at all: map()'s per-point curves live in this prelude, not in C++.
+-- An envelope's shape is SAMPLED here, with mapCurve() — ce.math.map, the Envelope component's
+-- own envValueAt — and the host interpolates the samples. That is what lets the host engine run
+-- an envelope at all: mapCurve()'s per-point curves live in this prelude, not in C++. This called
+-- map(), which no prelude defines, so Lua and JavaScript stopped with an error and Python's own
+-- map() made every sample 0.
 local __ANIM_SAMPLES = 1024
 local function __animSample(points)
   local out = {}
   for i = 0, __ANIM_SAMPLES do
-    local y = tonumber(map(i / __ANIM_SAMPLES, points))
+    local y = tonumber(mapCurve(i / __ANIM_SAMPLES, points))
     out[i + 1] = y or 0
   end
   return out

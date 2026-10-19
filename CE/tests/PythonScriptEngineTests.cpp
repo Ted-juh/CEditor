@@ -501,6 +501,31 @@ int main()
         const auto two200 = steps();
         check (two200 == "B list True", "ce.anim: …and the other's ends its (got " + two200 + ")");
         check (animErrors.isEmpty(), "ce.anim: no script raised doing that either");
+
+        // An envelope's shape is sampled in the prelude with mapCurve(). The sampler called map(),
+        // which here is Python's own: float() of a map object raised, the guard read it as 0, and
+        // every sample was 0, so the value sat at `from` for the whole move without a word.
+        juce::Array<juce::var> envelopeScripts;
+        envelopeScripts.add (makeScript ("pyEnvelope", "onEnvelope", "*",
+            "def onEnvelope(value=None):\n"
+            "    ok = ce.anim.envelope('e', [{ 'x': 0, 'y': 0 }, { 'x': 0.5, 'y': 1 }, { 'x': 1, 'y': 0 }],\n"
+            "                          { 'duration': 1000, 'from': 0, 'to': 100 })\n"
+            "    log('started ' + str(ok))\n"));
+        anim.loadScripts (juce::var (envelopeScripts));
+        anim.tickAnimations (3000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onEnvelope", "panel", juce::var());
+        const auto envelopeStart = steps();
+        check (envelopeStart == "started True", "ce.anim.envelope starts a move (got " + envelopeStart + ")");
+        anim.tickAnimations (3250.0);
+        check (std::abs ((double) animHost.values["e"] - 50.0) < 0.5,
+               "ce.anim.envelope: the prelude samples the shape, so the value climbs: 50 a quarter of the way in (got "
+                   + animHost.values["e"].toString() + ")");
+        anim.tickAnimations (3500.0);
+        check (std::abs ((double) animHost.values["e"] - 100.0) < 0.5, "ce.anim.envelope: …peaks halfway");
+        anim.tickAnimations (4000.0);
+        check (std::abs ((double) animHost.values["e"]) < 0.5, "ce.anim.envelope: …and comes back down to 0");
+        check (animErrors.isEmpty(), "ce.anim.envelope: no script raised");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------
