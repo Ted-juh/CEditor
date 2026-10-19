@@ -363,9 +363,10 @@ const SHARED_OPTION_FIELDS = {
     name: '<section>', type: 'object', group: 'any section',
     summary: 'Any section of the control, to set up as you make it — for example '
       + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals '
-      + 'and all (Behavior, not behavior), and so are the names of the parts inside one: { Background '
-      + '= { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour in one '
-      + 'is stored as set() stores it.',
+      + 'and all (Behavior, not behavior). Inside one, names are read in any capitals, as a path is: '
+      + '{ Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A '
+      + 'colour is stored as set() stores it, and a setting the section does not have is written with '
+      + 'a warning, as set() writes one.',
   },
 
   /* --- dialogs and messages (ce.ui) -------------------------------------- */

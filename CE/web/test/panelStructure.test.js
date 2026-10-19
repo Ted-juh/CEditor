@@ -124,6 +124,7 @@ test('clone copies a control the author designed, including its sections', () =>
 const FORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS '
   + 'colour name, rgb() or hsl().';
 const errors = () => get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+const warnings = () => get(scriptTrace).filter((t) => t.kind === 'warn').map((t) => t.message);
 const made = (panel, name) => flatControls(panel.controls).find((c) => c._children.Core.name === name);
 
 test('a colour in create\'s props is stored as set() stores it, in a section and in a list inside one', () => {
@@ -308,18 +309,31 @@ test('a colour a nested child cannot read refuses the call, named by its whole p
   });
 });
 
-test('a child is matched by its exact name, as a section is, and a key that is neither is kept as a field', () => {
+test('a child and a field are matched in any case, as a set() path is, and a key that is neither is written with set()\'s warning', () => {
   const panel = panelWith();
   withPanel(panel, (api) => {
     clearScriptTrace();
-    // create matches a section's name exactly (a key in other capitals is not an option it takes),
-    // and a child's the same way: "fill" is a field of Background, read by nothing, as it always was.
-    assert.equal(api.panelCreate('Button', { name: 'b', Background: { fill: { colour: 'red' }, Fil: { colour: 'x' } } }), 'b');
+    // The colour check reads `fill` as the Fill, since a path is matched in any case, and the merge
+    // now does too. Matched exactly, `fill` was stored as a field beside Fill that nothing reads, its
+    // colour read and written out for nothing.
+    const props = { name: 'b', Background: { fill: { Colour: 'red' }, Mode: 'gradient', Fil: { colour: 'x' } } };
+    assert.equal(api.panelCreate('Button', props), 'b');
     const background = made(panel, 'b')._children.Background;
-    assert.deepEqual(background.fill, { colour: '#FF0000' });
+    assert.equal(background._children.Fill.colour, '#FF0000', 'fill is the Fill, and Colour its colour');
+    assert.equal(background.mode, 'gradient', 'a field is written under the document\'s own spelling');
+    assert.equal('fill' in background || 'Mode' in background || 'Colour' in background._children.Fill, false);
+    // A key that is neither a child nor a field of the section's template is written, as set()
+    // writes one, and said in set()'s words: nothing reads it.
     assert.deepEqual(background.Fil, { colour: 'x' });
-    assert.equal(background._children.Fill.colour, SECTION_DEFAULTS.Background._children.Fill.colour);
-    assert.equal(traced(), '');
+    assert.deepEqual(errors(), []);
+    assert.deepEqual(warnings(), ['ce.panel.create("Button"): "Background.Fil" is a new property on a section '
+      + 'with a fixed shape. It was written, but nothing reads it — check the spelling.']);
+
+    // Two deep, the path names where the new key is; clone says it in its own name.
+    clearScriptTrace();
+    assert.equal(api.panelClone('b', { name: 'c', Background: { Fill: { colur: 'red' } } }), 'c');
+    assert.deepEqual(warnings(), ['ce.panel.clone("b"): "Background.Fill.colur" is a new property on a section '
+      + 'with a fixed shape. It was written, but nothing reads it — check the spelling.']);
   });
 });
 

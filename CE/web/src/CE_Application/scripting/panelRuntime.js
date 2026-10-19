@@ -33,7 +33,7 @@ import { valueAtPath, probeNestedWrite, getDefaultChildTemplate } from '../store
 import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
 import {
-  COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, colourHint, drawColour, mapColourWrites,
+  COLOUR_FORMS, DRAW_COLOUR_FORMS, MADE_CHILDREN, colourFieldAt, colourHint, drawColour, mapColourWrites,
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
   shownNumber, storedColour, unitProblem,
 } from './scriptColours.js';
@@ -5783,8 +5783,9 @@ function sectionOverrides(control, props, call, outcome) {
   return refused ? null : sections;
 }
 
-/** Apply the flat convenience props (name/x/y/width/height) plus the section overrides. */
-function applyControlProps(control, props, sections, scriptId = '') {
+/** Apply the flat convenience props (name/x/y/width/height) plus the section overrides. `call`
+ *  begins the warning for a key no section of that shape has (mergeSettings). */
+function applyControlProps(control, props, sections, scriptId, call) {
   const core = control._children.Core;
   const transform = control._children.Transform;
   if (props.name != null) core.name = String(props.name);
@@ -5794,7 +5795,9 @@ function applyControlProps(control, props, sections, scriptId = '') {
   // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
   // script setting one field does not wipe the rest of the section.
   for (const [section, values] of sections) {
-    control._children[section] = mergeSettings(control._children[section], values);
+    control._children[section] = mergeSettings(control._children[section], values, (path) => addScriptTrace('warn', '',
+      `${call}: "${section}${path}" is a new property on a section with a fixed shape. `
+      + 'It was written, but nothing reads it — check the spelling.'));
   }
   core[GENERATED_KEY] = scriptId || 'script';
   return control;
@@ -5808,18 +5811,25 @@ function applyControlProps(control, props, sections, scriptId = '') {
  *
  * A child is one in `node`'s `_children`, or one set() would make there from a template on the way
  * down a path (the section's template's children, and the optional effect targets: controlTreeUtils
- * getDefaultChildTemplate), made from that template first. Its name is matched exactly, as create
- * and clone match a section's name (a key in another case is a plain field, as it always was). A
- * Fill given beside Background's `_children` was a field nothing reads, so its colour, read since
- * create began reading colours, had no effect. `_children` given whole is merged entry by entry for
- * the same reason, rather than replacing every child with the few it names.
+ * getDefaultChildTemplate), made from that template first. A Fill given beside Background's
+ * `_children` was a field nothing reads, so its colour, read since create began reading colours, had
+ * no effect. `_children` given whole is merged entry by entry for the same reason, rather than
+ * replacing every child with the few it names.
+ *
+ * Children and fields are matched without regard to case, as a set() path is and as the colour
+ * check before this reads them, and written under the document's own spelling: `fill` is Fill and
+ * `Colour` is colour. Matched exactly, a `fill` had its colour read and was then stored as a field
+ * beside Fill that nothing reads. A key that is neither a child nor a field `node` has is written,
+ * as set() writes one, and on a typed node (one with a `_type`, as every section and child the app
+ * makes is) `fresh(path)` is told, for set()'s warning by set()'s own test: nothing reads it. `at` is
+ * where `node` is below the section, for that path.
  */
-function mergeSettings(node, values) {
+function mergeSettings(node, values, fresh = () => {}, at = '') {
   const merged = { ...node };
-  const intoChild = (name, value) => {
-    const into = isPlainTable(value) ? childToMerge(merged, name) : undefined;
-    if (!into) return false;
-    merged._children = { ...merged._children, [name]: mergeSettings(into, value) };
+  const intoChild = (key, value) => {
+    const child = isPlainTable(value) ? childToMerge(merged, key) : undefined;
+    if (!child) return false;
+    merged._children = { ...merged._children, [child.name]: mergeSettings(child.node, value, fresh, `${at}.${child.name}`) };
     return true;
   };
   for (const [key, value] of Object.entries(values)) {
@@ -5828,19 +5838,32 @@ function mergeSettings(node, values) {
         if (!intoChild(name, child)) merged._children = { ...merged._children, [name]: child };
       }
     } else if (!intoChild(key, value)) {
-      merged[key] = value;
+      const field = key === '_type' ? key : sameKey(merged, key, (k) => k !== '_children' && k !== '_type');
+      if (field === undefined && typeof merged._type === 'string') fresh(`${at}.${key}`);
+      merged[field ?? key] = value;
     }
   }
   return merged;
 }
 
-/** The child of `node` called exactly `name`, or a copy of the template set() would make it from
- *  there (a Fill's effect targets are made with the `_children` they go in), or undefined. */
+/** `object`'s own key spelled like `name` in any case, among those `keep` accepts, or undefined. */
+function sameKey(object, name, keep = () => true) {
+  if (!isPlainTable(object)) return undefined;
+  const lower = String(name).toLowerCase();
+  return Object.keys(object).find((k) => keep(k) && k.toLowerCase() === lower);
+}
+
+/** The child of `node` called `name` in any case, as `{ name, node }` under its own spelling: the
+ *  one there, or a copy of the template set() would make it from (a Fill's effect targets are made
+ *  with the `_children` they go in); or undefined. */
 function childToMerge(node, name) {
   const children = node?._children;
-  if (isPlainTable(children) && Object.hasOwn(children, name)) return isPlainTable(children[name]) ? children[name] : undefined;
-  const template = getDefaultChildTemplate(node?._type, name);
-  return isPlainTable(template) ? deepClone(template) : undefined;
+  const own = sameKey(children, name);
+  if (own !== undefined) return isPlainTable(children[own]) ? { name: own, node: children[own] } : undefined;
+  const type = node?._type;
+  const made = sameKey(SECTION_DEFAULTS[type]?._children, name) ?? MADE_CHILDREN[type]?.[String(name).toLowerCase()];
+  const template = made !== undefined ? getDefaultChildTemplate(type, made) : undefined;
+  return isPlainTable(template) ? { name: made, node: deepClone(template) } : undefined;
 }
 
 const isPlainTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -5860,7 +5883,7 @@ function panelCreateImpl(type, props, scriptId) {
   // made: one the panel cannot read means no control, and the panel is as it was.
   const sections = sectionOverrides(control, props, `ce.panel.create("${typeName}")`, 'nothing was created');
   if (!sections) return null;
-  applyControlProps(control, props ?? {}, sections, scriptId);
+  applyControlProps(control, props ?? {}, sections, scriptId, `ce.panel.create("${typeName}")`);
   control._children.Core.name = uniqueControlName(control._children.Core.name);
 
   const parentName = props?.parent ? String(props.parent) : null;
@@ -5887,7 +5910,7 @@ function panelCloneImpl(name, props, scriptId) {
   // Only what the script passes is read: the source's own colours are stored already.
   const sections = sectionOverrides(copy, props, `ce.panel.clone("${name}")`, 'nothing was copied');
   if (!sections) return null;
-  applyControlProps(copy, props ?? {}, sections, scriptId);
+  applyControlProps(copy, props ?? {}, sections, scriptId, `ce.panel.clone("${name}")`);
   if (props?.name == null) copy._children.Core.name = `${source._children.Core.name}_copy`;
   copy._children.Core.name = uniqueControlName(copy._children.Core.name);
   // A clone lands beside its source by default: in the same container, not at the top level.
