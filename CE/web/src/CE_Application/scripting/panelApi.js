@@ -1020,7 +1020,7 @@ export const COMMANDS = [
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
     refusal: 'false',
-    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
+    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -1052,7 +1052,7 @@ export const COMMANDS = [
   {
     id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
     refusal: 'false',
-    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number is refused with a message, as it is there.',
+    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -1099,7 +1099,7 @@ export const COMMANDS = [
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
     refusal: 'false',
-    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console.',
+    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'points', type: 'list', required: true },

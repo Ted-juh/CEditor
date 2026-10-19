@@ -895,9 +895,9 @@ int main()
             { "id": "cl", "name": "cl", "language": "lua", "scope": "panel", "event": "onColoursLua", "target": "*", "enabled": true,
               "source": "function onColoursLua()\n  set(\"lbl.background.fill.colour\", \"red\")\n  log(\"lua \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.fill.colour\", \"redd\")\n  set(\"lbl.background.fill.colour\", 16711680)\n  log(\"lua kept \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.border.top\", { style = \"solid\", thickness = 3, colour = \"#0008\" })\n  log(\"lua top \" .. tostring(get(\"lbl.background.border.top.thickness\")))\n  set(\"lbl.text.content\", \"red\")\n  log(\"lua text \" .. tostring(get(\"lbl.text.content\")))\nend\n" },
             { "id": "cj", "name": "cj", "language": "javascript", "scope": "panel", "event": "onColoursJs", "target": "*", "enabled": true,
-              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour'], 50, { duration: 10 }); log('js moving ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }\nfunction onPanelJs(){ set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: 'nope', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: '0000FF', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); }" },
+              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ var a = ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); var b = ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour', 'panel.bgColour'], 50, { duration: 10, done: function (c) { log('js list done ' + c); } }); var c = ce.anim.to(['lbl.transform.x', 'lbl.transform.y'], 50, { duration: 10, done: function (c) { log('js done ' + c); } }); var d = ce.anim.to('lbl.transform.width', 'wide'); log('js moving ' + a + ' ' + b + ' ' + c + ' ' + d + ' ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }\nfunction onPanelJs(){ set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: 'nope', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: '0000FF', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); }" },
             { "id": "cm", "name": "cm", "language": "lua", "scope": "panel", "event": "onMovesLua", "target": "*", "enabled": true,
-              "source": "function onMovesLua()\n  ce.anim.to(\"panel.gridColour\", 1)\n  log(\"lua panel move \" .. tostring(ce.anim.running(\"panel.gridColour\")))\nend\nfunction onPanelLua()\n  set(\"panel.bgColour\", \"red\")\n  set(\"panel.gridColour\", \"{accent}\")\n  set(\"panel.bgGradient.stops.0.color\", \"#abc\")\n  log(\"lua panel \" .. tostring(get(\"panel.bgColour\")) .. \" \" .. tostring(get(\"panel.gridColour\")) .. \" \" .. tostring(get(\"panel.bgGradient.stops.0.color\")))\nend\n" },
+              "source": "function onMovesLua()\n  local r = ce.anim.envelope({ \"lbl.transform.width\", \"lbl.text.font.underlineColour\" }, { { x = 0, y = 0 }, { x = 1, y = 1 } }, { to = 10, duration = 10, done = function(c) log(\"lua list done \" .. tostring(c)) end })\n  log(\"lua envelope \" .. tostring(r) .. \" \" .. tostring(ce.anim.running(\"lbl.transform.width\")))\n  log(\"lua panel move \" .. tostring(ce.anim.to(\"panel.gridColour\", 1)))\nend\nfunction onPanelLua()\n  set(\"panel.bgColour\", \"red\")\n  set(\"panel.gridColour\", \"{accent}\")\n  set(\"panel.bgGradient.stops.0.color\", \"#abc\")\n  log(\"lua panel \" .. tostring(get(\"panel.bgColour\")) .. \" \" .. tostring(get(\"panel.gridColour\")) .. \" \" .. tostring(get(\"panel.bgGradient.stops.0.color\")))\nend\n" },
             { "id": "cs", "name": "cs", "language": "lua", "scope": "component", "event": "onColoursSelf", "target": "lbl", "enabled": true,
               "source": "function onColoursSelf()\n  self.set(\"background.fill.colour\", \"#abc\")\n  log(\"self \" .. tostring(self.get(\"background.fill.colour\")))\n  self.set(\"background.fill.colour\", \"#abcd\")\nend\n" }
           ],
@@ -993,21 +993,32 @@ int main()
                "JavaScript's set() reads a gradient written whole stop by stop, and writes none of it for one it cannot "
                "read (got " + colourLogs.joinIntoString (" | ") + ")");
 
+        // A list with a colour in it is refused whole: each colour named, nothing started, its done
+        // never called, and the call answers false, as a target that is not a number does.
         colourLogs.clear();
         colourRuntime.tickAnimations (0.0);
         colourRuntime.runAction ("onMovesJs", juce::var());
         check (colourLogs.joinIntoString (" | ") ==
                    "ce.anim.to: \"lbl.background.fill.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
                    "ce.anim.spring: \"lbl.background.border.top.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
-                   "js moving false true false",
-               "ce.anim refuses a colour property as its path, in the editor's words, and moves the number beside it in the "
-               "same list (got " + colourLogs.joinIntoString (" | ") + ")");
+                   "ce.anim.spring: \"panel.bgColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "ce.anim.to: \"wide\" is not a number, so nothing was started. | "
+                   "js moving false false true false false true false",
+               "ce.anim refuses a colour property as its path, in the editor's words, and a list with one in it whole, "
+               "naming each (got " + colourLogs.joinIntoString (" | ") + ")");
         colourLogs.clear();
         colourRuntime.runAction ("onMovesLua", juce::var());
         check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.envelope: \"lbl.text.font.underlineColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "lua envelope false false | "
                    "ce.anim.to: \"panel.gridColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
                    "lua panel move false",
-               "one of the panel's own colours is refused as a move's path too (got " + colourLogs.joinIntoString (" | ") + ")");
+               "Lua's envelope refuses a list with a colour in it the same way, and one of the panel's colours is refused "
+               "as a path (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourLogs.clear();
+        colourRuntime.tickAnimations (100.0);
+        check (colourLogs.joinIntoString (" | ") == "js done true",
+               "only the list that started calls its done (got " + colourLogs.joinIntoString (" | ") + ")");
         // An envelope arrives at the same place from every prelude. Started there directly: the
         // preludes' own envelope sampling is not what this is about.
         colourLogs.clear();
@@ -1021,9 +1032,12 @@ int main()
         colourRuntime.tickAnimations (1000.0);
         check (colourModel.getValue ("lbl.background.fill.colour").toString() == "#AABBCC"
                    && colourModel.getValue ("lbl.background.border.top.colour").toString() == "#008000"
-                   && colourModel.getValue ("panel.gridColour").toString() == "33FFFFFF"
-                   && (double) colourModel.getValue ("lbl.transform.x") == 50.0,
-               "so no tick wrote a number into a colour, and the number moved");
+                   && colourModel.getValue ("panel.bgColour").toString() == "#FF0000"
+                   && colourModel.getValue ("lbl.text.font.underlineColour").isString()
+                   && colourModel.getValue ("lbl.text.font.underlineColour").toString().isEmpty()
+                   && (double) colourModel.getValue ("lbl.transform.x") == 50.0
+                   && (double) colourModel.getValue ("lbl.transform.width") == 100.0,
+               "so no tick wrote a number into a colour, nothing in a refused list moved, and the list that started did");
     }
 
     std::cout << "--------------------------------------------\n"

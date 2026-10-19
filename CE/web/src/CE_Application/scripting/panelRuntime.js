@@ -4351,6 +4351,12 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   if (Array.isArray(path)) {
     const paths = path.map((p) => String(p ?? '')).filter(Boolean);
     if (!paths.length) return false;
+    // A colour among them refuses the whole call, each one named in the words a single path is
+    // refused in, and nothing starts. The colour alone was refused and the rest moved, and the
+    // list's done waited for a path that never started, so it was never called. The plug-in's
+    // ScriptRuntime::startAnimation checks a list the same way before it starts any of it.
+    const refused = paths.filter((p) => animatesColour(`ce.anim.${kind}`, p));
+    if (refused.length) return false;
     const stagger = animNumber(opts, 'stagger', 0);
     const done = typeof opts?.done === 'function' ? opts.done : null;
     let groupId = null;

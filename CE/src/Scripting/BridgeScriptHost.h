@@ -553,9 +553,9 @@ public:
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE
     // place or two hosts would each run their own copy of the same sweep.
-    void startAnimation (const juce::String& kind, const juce::var& path,
+    bool startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts) override
-    { if (runtime) runtime->startAnimation (kind, path, target, opts); }
+    { return runtime && runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime) runtime->stopAnimation (path); }
     bool isColourProperty (const juce::String& path) override

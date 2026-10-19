@@ -331,9 +331,9 @@ PyObject* api_animate (PyObject* self, PyObject* args)
     // as an object and pyToVar decides which it was.
     const char* kind = nullptr; PyObject* path = nullptr; double target = 0.0; PyObject* opts = nullptr;
     if (! PyArg_ParseTuple (args, "sOd|O", &kind, &path, &target, &opts)) return nullptr;
-    hostOf (self).startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
-                                  opts != nullptr ? pyToVar (opts) : juce::var());
-    Py_RETURN_NONE;
+    const bool started = hostOf (self).startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
+                                                       opts != nullptr ? pyToVar (opts) : juce::var());
+    return PyBool_FromLong (started ? 1 : 0);
 }
 PyObject* api_animateStop (PyObject* self, PyObject* args)
 {
@@ -1063,7 +1063,11 @@ def __animStart(kind, path, target, opts):
         token = "py:" + str(globals().get("__scriptId", "")) + ":" + str(__animSeq[0])
         __animDone[token] = fn
         o["__done"] = token
-    __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o)
+    # The host answers whether the move started: not when a colour property is the path or one of a
+    # list's paths, and then nothing in the list starts and its done is never called, so it is let go.
+    started = __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o) is True
+    if not started and "__done" in o: __animDone.pop(o["__done"], None)
+    return started
 
 # to and spring move to a number, and only a number. A target that is not one ("full", "100px",
 # "#FF0000") used to raise ValueError here, and moved the value to 0 everywhere else; text that is
@@ -1080,11 +1084,11 @@ def __animTarget(verb, target):
 
 def animateTo(path, target, opts=None):
     n = __animTarget("ce.anim.to", target)
-    if n is not None: __animStart("to", path, n, opts)
+    return False if n is None else __animStart("to", path, n, opts)
 
 def animateSpring(path, target, opts=None):
     n = __animTarget("ce.anim.spring", target)
-    if n is not None: __animStart("spring", path, n, opts)
+    return False if n is None else __animStart("spring", path, n, opts)
 
 # envelope(path, points, opts) - drive a value THROUGH a shape rather than between two numbers.
 # `to` has one destination; an envelope goes up before it comes down, which is the single most
@@ -1097,8 +1101,7 @@ def animateEnvelope(path, points, opts=None):
     o["samples"] = __animSample(points)
     o["from"] = float(o.get("from") or 0)
     to = o.pop("to", None)
-    __animStart("envelope", path, 1 if to is None else to, o)
-    return True
+    return __animStart("envelope", path, 1 if to is None else to, o)
 
 def animateStop(path=None):
     __api.animateStop("" if path is None else str(path))

@@ -245,9 +245,9 @@ public:
 
     // ce.anim routes to the runtime, the way BridgeScriptHost does — the animation list has to
     // live in ONE place, so a host forwards rather than keeping its own.
-    void startAnimation (const juce::String& kind, const juce::var& path,
+    bool startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts) override
-    { if (runtime != nullptr) runtime->startAnimation (kind, path, target, opts); }
+    { return runtime != nullptr && runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime != nullptr) runtime->stopAnimation (path); }
     bool animationRunning (const juce::String& path) override

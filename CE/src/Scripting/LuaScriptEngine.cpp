@@ -2687,7 +2687,11 @@ local function __animStart(kind, path, target, opts)
     __animDone[token] = opts.done
     o.__done = token
   end
-  __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o)
+  -- The host answers whether the move started: not when a colour property is the path or one of a
+  -- list's paths, and then nothing in the list starts and its done is never called, so it is let go.
+  local started = __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o) == true
+  if not started and o.__done ~= nil then __animDone[o.__done] = nil end
+  return started
 end
 
 -- to and spring move to a number, and only a number. A target that is not one ("full", "100px",
@@ -2705,11 +2709,13 @@ local function __animTarget(verb, target)
 end
 function animateTo(path, target, opts)
   local n = __animTarget("ce.anim.to", target)
-  if n ~= nil then __animStart("to", path, n, opts) end
+  if n == nil then return false end
+  return __animStart("to", path, n, opts)
 end
 function animateSpring(path, target, opts)
   local n = __animTarget("ce.anim.spring", target)
-  if n ~= nil then __animStart("spring", path, n, opts) end
+  if n == nil then return false end
+  return __animStart("spring", path, n, opts)
 end
 -- envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 -- `to` has one destination; an envelope goes up before it comes down, which is the single most
@@ -2725,8 +2731,7 @@ function animateEnvelope(path, points, opts)
   o.from = tonumber(o.from) or 0
   local to = tonumber(o.to) or 1
   o.to = nil
-  __animStart("envelope", path, to, o)
-  return true
+  return __animStart("envelope", path, to, o)
 end
 function animateStop(path) __animateStop(path == nil and "" or tostring(path)) end
 function animateRunning(path) return __animateRunning(path == nil and "" or tostring(path)) end
@@ -3660,8 +3665,8 @@ public:
         // `path` is a string OR a table of strings — one call, one shape, one completion — so the
         // binding takes an object and lets solToVar decide which it was.
         g.set_function ("__animate", [this] (std::string kind, sol::object path, double target, sol::optional<sol::table> opts)
-            { host->startAnimation (juce::String (kind), solToVar (path), target,
-                                    opts ? solToVar (*opts) : juce::var()); });
+            { return host->startAnimation (juce::String (kind), solToVar (path), target,
+                                           opts ? solToVar (*opts) : juce::var()); });
         g.set_function ("__animateStop", [this] (std::string path) { host->stopAnimation (juce::String (path)); });
         g.set_function ("__animateRunning", [this] (std::string path) { return host->animationRunning (juce::String (path)); });
         g.set_function ("__animateValue", [this] (std::string path) { return varToSol (lua, host->animationValue (juce::String (path))); });

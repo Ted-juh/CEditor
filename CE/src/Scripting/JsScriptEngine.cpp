@@ -2584,7 +2584,11 @@ function __animStart(kind, path, target, opts) {
     __animDone[token] = opts.done;
     o.__done = token;
   }
-  __api.animate(kind, list ? list : String(path), Number(target) || 0, o);
+  // The host answers whether the move started: not when a colour property is the path or one of a
+  // list's paths, and then nothing in the list starts and its done is never called, so it is let go.
+  var started = __api.animate(kind, list ? list : String(path), Number(target) || 0, o) === true;
+  if (!started && o.__done !== undefined) delete __animDone[o.__done];
+  return started;
 }
 
 // to and spring move to a number, and only a number. A target that is not one ("full", "100px",
@@ -2600,11 +2604,11 @@ function __animTarget(verb, target) {
 }
 function animateTo(path, target, opts) {
   var n = __animTarget("ce.anim.to", target);
-  if (n !== undefined) __animStart("to", path, n, opts);
+  return n === undefined ? false : __animStart("to", path, n, opts);
 }
 function animateSpring(path, target, opts) {
   var n = __animTarget("ce.anim.spring", target);
-  if (n !== undefined) __animStart("spring", path, n, opts);
+  return n === undefined ? false : __animStart("spring", path, n, opts);
 }
 // envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 // `to` has one destination; an envelope goes up before it comes down, which is the single most
@@ -2620,8 +2624,7 @@ function animateEnvelope(path, points, opts) {
   o.from = Number(o.from) || 0;
   var to = o.to === undefined || o.to === null ? 1 : Number(o.to);
   o.to = undefined;
-  __animStart("envelope", path, to, o);
-  return true;
+  return __animStart("envelope", path, to, o);
 }
 function animateStop(path) { __api.animateStop(path === undefined || path === null ? "" : String(path)); }
 function animateRunning(path) { return __api.animateRunning(path === undefined || path === null ? "" : String(path)); }
@@ -3284,7 +3287,7 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
     api->setMethod ("animate", [host, arg] (const Args& a) -> juce::var
-        { host->startAnimation (arg (a, 0).toString(), arg (a, 1), (double) arg (a, 2), arg (a, 3)); return {}; });
+        { return juce::var (host->startAnimation (arg (a, 0).toString(), arg (a, 1), (double) arg (a, 2), arg (a, 3))); });
     api->setMethod ("animateStop", [host, arg] (const Args& a) -> juce::var
         { host->stopAnimation (arg (a, 0).toString()); return {}; });
     api->setMethod ("animateRunning", [host, arg] (const Args& a) -> juce::var

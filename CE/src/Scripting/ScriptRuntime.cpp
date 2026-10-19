@@ -393,7 +393,7 @@ ScriptRuntime::Animation* ScriptRuntime::animationFor (const juce::String& path)
     return nullptr;
 }
 
-void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& path,
+bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& path,
                                     double target, const juce::var& opts)
 {
     assertMessageThread();
@@ -408,13 +408,32 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     auto flag = [o] (const char* key)
     { return o != nullptr && o->hasProperty (key) && (bool) o->getProperty (key); };
 
+    // A colour property is not moved: every tick would write a number into it, and set() refuses
+    // each. Said in the words of the WebView runtime's animatesColour. The preludes have already
+    // refused a target that is not a number, which comes first.
+    const juce::String verb = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
+    auto refusesColour = [this, &verb] (const juce::String& key)
+    {
+        if (! host.isColourProperty (key)) return false;
+        host.logAt ("error", "ce.anim." + verb + ": \"" + key + "\" is a colour, and ce.anim moves numbers, so nothing "
+                             "was started.", juce::var());
+        return true;
+    };
+
     // A LIST of paths is one call, one shape, one completion — and `stagger` is why the list is
     // worth having rather than a loop at the call site.
     if (auto* list = path.getArray())
     {
         juce::StringArray paths;
         for (const auto& p : *list) { const auto str = p.toString(); if (str.isNotEmpty()) paths.add (str); }
-        if (paths.isEmpty()) return;
+        if (paths.isEmpty()) return false;
+
+        // A colour among them refuses the whole call, each one named, and nothing starts, as the
+        // WebView's startAnimationImpl refuses it. The colour alone was refused and the rest moved,
+        // and the list's done waited for a path that never started, so it was never called.
+        bool colour = false;
+        for (const auto& p : paths) colour = refusesColour (p) || colour;
+        if (colour) return false;
 
         const double stagger = number ("stagger", 0.0);
         const double baseDelay = number ("delay", 0.0);
@@ -436,23 +455,15 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
             each->setProperty ("__group", groupId);
             startAnimation (kind, juce::var (paths[i]), target, juce::var (each));
         }
-        return;
+        return true;
     }
 
     const auto key = path.toString();
-    if (key.isEmpty()) return;
+    if (key.isEmpty()) return false;
 
-    // A colour property is not moved: every tick would write a number into it, and set() refuses
-    // each. Asked here, where every engine's ce.anim arrives once per path, and said in the words of
-    // the WebView runtime's animatesColour. Nothing starts, so nothing ends and no done is called,
-    // as there. The preludes have already refused a target that is not a number, which comes first.
-    const juce::String verb = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
-    if (host.isColourProperty (key))
-    {
-        host.logAt ("error", "ce.anim." + verb + ": \"" + key + "\" is a colour, and ce.anim moves numbers, so nothing "
-                             "was started.", juce::var());
-        return;
-    }
+    // Asked here, where every engine's ce.anim arrives, a list's paths after the list has been
+    // asked. Nothing starts, so nothing ends and no done is called, as in the WebView.
+    if (refusesColour (key)) return false;
 
     Animation a;
     a.kind = verb;
@@ -541,6 +552,7 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
 
     stopAnimation (key);   // a value has one destination, and the replaced one did not finish
     animations.push_back (a);
+    return true;
 }
 
 double ScriptRuntime::transportBpm()

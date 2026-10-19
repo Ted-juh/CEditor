@@ -2241,7 +2241,7 @@ Moving a value smoothly over time instead of jumping: to a target, with a spring
 
 #### `ce.anim.to(path, target [, opts])`
 
-Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` is called with false, because it was cancelled rather than finished.
+Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` is called with false, because it was cancelled rather than finished.
 
 *Short name: `animateTo`.*
 
@@ -2273,7 +2273,7 @@ ce.anim.to("cutoff", 127, { duration: 500, curve: "s" });
 
 #### `ce.anim.spring(path, target [, opts])`
 
-Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number is refused with a message, as it is there.
+Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.
 
 *Short name: `animateSpring`.*
 
@@ -2334,7 +2334,7 @@ if (!ce.anim.running("cutoff")) {  }
 
 #### `ce.anim.envelope(path, points [, opts])`
 
-Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console.
+Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.
 
 *Short name: `animateEnvelope`.*
 

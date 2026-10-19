@@ -69,13 +69,15 @@ class AnimHost : public TestHost
 {
 public:
     ScriptRuntime* runtime = nullptr;
-    void startAnimation (const juce::String& kind, const juce::var& path, double target, const juce::var& opts) override
-    { if (runtime != nullptr) runtime->startAnimation (kind, path, target, opts); }
+    bool startAnimation (const juce::String& kind, const juce::var& path, double target, const juce::var& opts) override
+    { return runtime != nullptr && runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override { if (runtime != nullptr) runtime->stopAnimation (path); }
     bool animationRunning (const juce::String& path) override { return runtime != nullptr && runtime->animationRunning (path); }
     bool animationFinish (const juce::String& path) override { return runtime != nullptr && runtime->animationFinish (path); }
     void emitEvent (const juce::String& name, const juce::var& data) override
     { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
+    // A stand-in for the panel model's question: here a path ending in ".colour" is a colour.
+    bool isColourProperty (const juce::String& path) override { return path.endsWithIgnoreCase (".colour"); }
 };
 
 static int failures = 0;
@@ -526,6 +528,37 @@ int main()
         anim.tickAnimations (4000.0);
         check (std::abs ((double) animHost.values["e"]) < 0.5, "ce.anim.envelope: …and comes back down to 0");
         check (animErrors.isEmpty(), "ce.anim.envelope: no script raised");
+
+        // A list with a colour property in it is refused whole, in every verb: each colour named in
+        // the words one path is refused in, nothing started, the list's done never called, and the
+        // call answers False, as it does for a target that is not a number. The colour alone was
+        // refused and the rest moved, and the list's done waited for a path that never started.
+        juce::Array<juce::var> listScripts;
+        listScripts.add (makeScript ("pyList", "onList", "*",
+            "def onList(value=None):\n"
+            "    a = ce.anim.to(['m', 'lbl.colour', 'n', 'top.colour'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('to done ' + str(c)) })\n"
+            "    b = ce.anim.spring(['m', 'lbl.colour'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('spring done ' + str(c)) })\n"
+            "    c = ce.anim.envelope(['m', 'lbl.colour'], [{ 'x': 0, 'y': 0 }, { 'x': 1, 'y': 1 }], { 'duration': 100, 'done': lambda c: log('envelope done ' + str(c)) })\n"
+            "    d = ce.anim.to('m', 'wide')\n"
+            "    e = ce.anim.to(['m', 'n'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('numbers done ' + str(c)) })\n"
+            "    log('answers ' + str(a) + ' ' + str(b) + ' ' + str(c) + ' ' + str(d) + ' ' + str(e))\n"));
+        anim.loadScripts (juce::var (listScripts));
+        anim.tickAnimations (5000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onList", "panel", juce::var());
+        const auto listStart = steps();
+        check (listStart == "ce.anim.to: \"lbl.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.to: \"top.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.spring: \"lbl.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.envelope: \"lbl.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.to: \"wide\" is not a number, so nothing was started. | "
+                            "answers False False False False True",
+               "ce.anim: a list with a colour in it is refused whole, each colour named, and answers False (got " + listStart + ")");
+        anim.tickAnimations (5100.0);
+        const auto listEnd = steps();
+        check (listEnd == "numbers done True",
+               "ce.anim: only the list that started calls its done (got " + listEnd + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised refusing a list");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------

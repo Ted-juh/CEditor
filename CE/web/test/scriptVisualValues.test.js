@@ -607,6 +607,45 @@ test('ce.anim refuses a colour property, where every tick would write a number i
   } finally { stopAllAnimations(); }
 });
 
+test('ce.anim refuses a whole list with a colour in it: nothing starts, each colour is named, done is not called', () => {
+  // The colour alone was refused and the paths beside it moved, and the list's done waited for a
+  // path that never started, so it was never called.
+  const colour = (path, verb) => `ce.anim.${verb}: "${path}" is a colour, and ce.anim moves numbers, so nothing was started.`;
+  const points = [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+  for (const [verb, start] of [
+    ['to', (api, paths, opts) => api.animateTo(paths, 2, opts)],
+    ['spring', (api, paths, opts) => api.animateSpring(paths, 2, opts)],
+    ['envelope', (api, paths, opts) => api.animateEnvelope(paths, points, { ...opts, to: 2 })],
+  ]) {
+    stopAllAnimations();
+    tickAnimations(0);
+    try {
+      withControls((api) => {
+        api.set('K.Transform.scale', 1);
+        api.set('L.Background.Fill.colour', 'FF112233');
+        clearScriptTrace();
+        const done = [];
+        const paths = ['K.Transform.scale', 'L.Background.Fill.colour', 'B.Transform.scale', 'panel.gridColour'];
+        assert.equal(start(api, paths, { duration: 10, stagger: 5, done: (c) => done.push(c) }), false, verb);
+        assert.deepEqual(errors(), [colour('L.Background.Fill.colour', verb), colour('panel.gridColour', verb)],
+          `${verb}: one line for each colour, in the words one path is refused in`);
+        assert.equal(api.animateRunning('K.Transform.scale'), false, `${verb}: the number beside it did not start`);
+        assert.deepEqual(api.animateList(), [], `${verb}: nothing started`);
+        tickAnimations(1000);
+        assert.equal(api.get('K.Transform.scale'), 1, `${verb}: nothing moved`);
+        assert.equal(api.get('L.Background.Fill.colour'), 'FF112233');
+        assert.deepEqual(done, [], `${verb}: done is not called for a move that never started`);
+        // The same list without the colours starts, and its done is called once.
+        clearScriptTrace();
+        assert.equal(start(api, ['K.Transform.scale', 'B.Transform.scale'], { duration: 10, from: 1, done: (c) => done.push(c) }), true);
+        tickAnimations(2000);
+        assert.deepEqual(done, [true], `${verb}: the list without them arrives and says so`);
+        assert.deepEqual(errors(), []);
+      });
+    } finally { stopAllAnimations(); }
+  }
+});
+
 /* ===================================================================== ce.math colour readers */
 
 test('ce.math reads a colour as a property does, and refuses what it cannot read in the same words', () => {

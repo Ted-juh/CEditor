@@ -188,10 +188,11 @@ public:
 
     /** ce.anim — start/stop/query. These route to ScriptRuntime, which owns the animation list;
         a host only forwards. `path` is a string OR a list of strings: one call, one shape, one
-        completion, which is what makes `stagger` worth having. */
-    virtual void startAnimation (const juce::String& kind, const juce::var& path,
+        completion, which is what makes `stagger` worth having. Returns whether it started, which
+        the preludes answer the script with (ScriptRuntime::startAnimation). */
+    virtual bool startAnimation (const juce::String& kind, const juce::var& path,
                                  double target, const juce::var& opts)
-    { juce::ignoreUnused (kind, path, target, opts); }
+    { juce::ignoreUnused (kind, path, target, opts); return false; }
     /** Whether `path` is a colour property of the host's panel (ScriptColours.h's colourFieldAt),
         which ScriptRuntime::startAnimation refuses to move: every tick would write a number into it.
         Default false: a host with no panel document cannot tell, and moves what it is asked to. */
@@ -500,8 +501,12 @@ public:
         The position is a pure function of elapsed time, never an accumulated step: two runtimes
         integrating independently drift apart, two runtimes evaluating the same formula at the same
         elapsed time cannot. animationValueAt() below is that formula, and it is the thing the
-        WebView runtime has to match. */
-    void startAnimation (const juce::String& kind, const juce::var& path,
+        WebView runtime has to match.
+
+        Returns whether it started: false, after saying why, for a colour property as the path or
+        in a list of paths, where nothing in the list starts, and for nothing to move. The preludes
+        hand this back as the call's answer, as the WebView's startAnimationImpl answers. */
+    bool startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts = {});
 
     /** Stop one animation, or every one when `path` is empty. The value stays where it got to, and
