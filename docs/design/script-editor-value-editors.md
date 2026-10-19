@@ -981,7 +981,13 @@ context.
 - **The editors.** A colour opens the shared display panel's Colors tab, and a gradient its Gradient
   tab, through callback targets labelled with the script and the line ("Script · Title text colour,
   line 3"). A choice is a dropdown, a curve's with its picture, and a number with a unit is a field.
-  Fonts, images, paths, controls, notes, bytes and computed values are shown, not edited.
+  A font family's dropdown lists the fonts the runtime checks against, an image's the library's
+  and the panel's images by name; `ce.draw.image` takes the picture itself, so its image has none.
+  A curve drawn as four numbers has the Animation tab's `BezierEditor` under its row, written once
+  a handle is let go or a number entered, in the form it was written in. A script's gradient opens
+  the Gradient tab told it is linear only (`gradientTarget.js`'s `linearOnly`), so the tab offers
+  the angle and the stops and no type, centre, radius, edge or presets. Paths, notes, bytes and
+  computed values are shown, not edited.
 - **The session rules** (`editor/valueEditSession.js`) keep rules 2 to 7. A value is written when
   the gesture settles (350 ms with no pointer held, or Done). Each write is one `replaceRange`
   through the editor, so one undo step. Cancel, through a target's own `cancel`, puts back the
@@ -1050,15 +1056,19 @@ Then, on the owner's word the same day:
   contract's map, so a call it has is never named (a test holds that). The problems list's check of
   `on()` read `ce.panel.on` as `on()`; it reads `on`, `ce.core.on` and `ctx.on` alone now.
 
-Still open:
+- **The rest of `ce.anim`'s options.** `stagger`, `damping` and `frequency` had been read with
+  `Number()`, so text that is not a number was 0 or the default without a word. They are read as
+  the timing is, and what is not a number is said once per command in both runtimes
+  (`animOption`); a number below 0 is used as it is, since a stagger below 0 runs a list back to
+  front behind a delay.
+- **A field's or a dropdown's edit ends when the caret leaves its statement**, as well as on blur.
+  Driving the new dropdowns found an edit that never ended: a pick writes, the row is drawn again,
+  and a focused element that is taken away gives no blur, so the tab stayed on that statement with
+  the caret long gone.
+- **The last editors** (fonts, images, drawn curves), the Gradient tab's linear-only mode and
+  completion over a value are in the Built list above.
 
-- **The Gradient tab's radial controls.** The tab shows them for a script's gradient, though a
-  drawing cannot take a radial gradient. The label says "(linear only)", and a radial choice is
-  written as linear.
-- **Editors not built yet.** Fonts, images and hand-drawn curves have none, beyond completion over
-  a font's or an image's name.
-- **The rest of `ce.anim`'s options.** `stagger`, `damping` and `frequency` are still read with
-  `Number()`, so text that is not a number is 0 or the default without a word.
+Still open: nothing from this record.
 
 ## Open questions for the owner
 

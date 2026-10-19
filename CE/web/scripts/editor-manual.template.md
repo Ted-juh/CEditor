@@ -672,8 +672,12 @@ you are editing. A colour's swatch opens the display panel's **Colors** tab, whi
 script workspace for this (and from the **Dock** button on the left, which has a setting of its own
 here: a dock left open in the panel editor stays there, and one the swatch opened closes again when
 you finish); the colour is written into the code when you let go, as one step of the editor's undo,
-and **Cancel** puts back exactly what was there before. A gradient opens the **Gradient** tab the same way, a list of choices is a dropdown in the
-row, and a number with a unit a field. The lists are in the code as well: with the caret inside a
+and **Cancel** puts back exactly what was there before. A gradient opens the **Gradient** tab the
+same way, with the angle and the stops alone, since a drawing's gradient is always linear. A list of
+choices is a dropdown in the row, a font family's of the fonts the panel can use and an image's of
+the library's and the panel's images; a number with a unit is a field; and a curve written as four
+numbers has the **Animation** tab's curve editor under its row, written when you let go of a handle.
+The lists are in the code as well: with the caret inside a
 value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
 selected, and the one you choose replaces the whole value.
 

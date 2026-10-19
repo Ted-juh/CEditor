@@ -71,8 +71,10 @@ Three tools help you while you type:
   the command does not have. Click a row to go to its value. A colour's swatch opens
   the **Colors** tab of the display panel, and a gradient's strip its **Gradient**
   tab: the new colour is written into your code when you let go, and **Cancel**
-  puts back exactly what you had written. A value chosen from a list has a dropdown,
-  and a number with a unit has a field, written when you press Enter or leave it.
+  puts back exactly what you had written. A value chosen from a list has a dropdown
+  (a curve, a division, a font, an image…), a number with a unit has a field, written
+  when you press Enter or leave it, and a curve drawn as four numbers has the curve
+  editor under its row.
   The dock opens on the tab you used last. The same lists are in the code too: with
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
   (or divisions, scales, events, your controls' names, fonts…) with yours selected,
