@@ -645,18 +645,66 @@ end
 -- reason every table here is: a script lightening a colour and the border renderer lightening the
 -- same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 --
--- In takes "RRGGBB", "AARRGGBB" or "#RRGGBB", read the way the panel reads a colour property: 6 hex
--- digits are RRGGBB, 8 are AARRGGBB with the alpha set aside, one leading "#" either way. Out is
--- "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
--- returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round, and that is
--- a trap worth one asymmetry to avoid.
+-- In takes what a colour property takes, read as if what the property would store had been given:
+-- "RRGGBB", "AARRGGBB" or "#RRGGBB" as written (6 hex digits are RRGGBB, 8 are AARRGGBB with the
+-- alpha set aside, one leading "#" either way), and CSS's short forms written out first, as the
+-- WebView writes them out (scriptColours.js's storedColour): "#RGB", a name from the generated
+-- table below, rgb(), rgba(), hsl() and hsla(), so "red" is "#FF0000" and rgba(255, 0, 0, 0.5) is
+-- "80FF0000". Out is "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception
+-- is alpha(), which returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way
+-- round, and that is a trap worth one asymmetry to avoid.
 --
 -- Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
 -- the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
 -- (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
 -- colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
 -- checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
-local __CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"'
+-- BEGIN GENERATED colour names — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- @module ce.math
+-- CSS's named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour
+-- property writes "red" out as, and what the ce.math colour helpers read it as.
+__CE_CSS_COLOURS = {
+  aliceblue = "F0F8FF", antiquewhite = "FAEBD7", aqua = "00FFFF", aquamarine = "7FFFD4",
+  azure = "F0FFFF", beige = "F5F5DC", bisque = "FFE4C4", black = "000000",
+  blanchedalmond = "FFEBCD", blue = "0000FF", blueviolet = "8A2BE2", brown = "A52A2A",
+  burlywood = "DEB887", cadetblue = "5F9EA0", chartreuse = "7FFF00", chocolate = "D2691E",
+  coral = "FF7F50", cornflowerblue = "6495ED", cornsilk = "FFF8DC", crimson = "DC143C",
+  cyan = "00FFFF", darkblue = "00008B", darkcyan = "008B8B", darkgoldenrod = "B8860B",
+  darkgray = "A9A9A9", darkgreen = "006400", darkgrey = "A9A9A9", darkkhaki = "BDB76B",
+  darkmagenta = "8B008B", darkolivegreen = "556B2F", darkorange = "FF8C00", darkorchid = "9932CC",
+  darkred = "8B0000", darksalmon = "E9967A", darkseagreen = "8FBC8F", darkslateblue = "483D8B",
+  darkslategray = "2F4F4F", darkslategrey = "2F4F4F", darkturquoise = "00CED1",
+  darkviolet = "9400D3", deeppink = "FF1493", deepskyblue = "00BFFF", dimgray = "696969",
+  dimgrey = "696969", dodgerblue = "1E90FF", firebrick = "B22222", floralwhite = "FFFAF0",
+  forestgreen = "228B22", fuchsia = "FF00FF", gainsboro = "DCDCDC", ghostwhite = "F8F8FF",
+  gold = "FFD700", goldenrod = "DAA520", gray = "808080", green = "008000", greenyellow = "ADFF2F",
+  grey = "808080", honeydew = "F0FFF0", hotpink = "FF69B4", indianred = "CD5C5C", indigo = "4B0082",
+  ivory = "FFFFF0", khaki = "F0E68C", lavender = "E6E6FA", lavenderblush = "FFF0F5",
+  lawngreen = "7CFC00", lemonchiffon = "FFFACD", lightblue = "ADD8E6", lightcoral = "F08080",
+  lightcyan = "E0FFFF", lightgoldenrodyellow = "FAFAD2", lightgray = "D3D3D3",
+  lightgreen = "90EE90", lightgrey = "D3D3D3", lightpink = "FFB6C1", lightsalmon = "FFA07A",
+  lightseagreen = "20B2AA", lightskyblue = "87CEFA", lightslategray = "778899",
+  lightslategrey = "778899", lightsteelblue = "B0C4DE", lightyellow = "FFFFE0", lime = "00FF00",
+  limegreen = "32CD32", linen = "FAF0E6", magenta = "FF00FF", maroon = "800000",
+  mediumaquamarine = "66CDAA", mediumblue = "0000CD", mediumorchid = "BA55D3",
+  mediumpurple = "9370DB", mediumseagreen = "3CB371", mediumslateblue = "7B68EE",
+  mediumspringgreen = "00FA9A", mediumturquoise = "48D1CC", mediumvioletred = "C71585",
+  midnightblue = "191970", mintcream = "F5FFFA", mistyrose = "FFE4E1", moccasin = "FFE4B5",
+  navajowhite = "FFDEAD", navy = "000080", oldlace = "FDF5E6", olive = "808000",
+  olivedrab = "6B8E23", orange = "FFA500", orangered = "FF4500", orchid = "DA70D6",
+  palegoldenrod = "EEE8AA", palegreen = "98FB98", paleturquoise = "AFEEEE",
+  palevioletred = "DB7093", papayawhip = "FFEFD5", peachpuff = "FFDAB9", peru = "CD853F",
+  pink = "FFC0CB", plum = "DDA0DD", powderblue = "B0E0E6", purple = "800080",
+  rebeccapurple = "663399", red = "FF0000", rosybrown = "BC8F8F", royalblue = "4169E1",
+  saddlebrown = "8B4513", salmon = "FA8072", sandybrown = "F4A460", seagreen = "2E8B57",
+  seashell = "FFF5EE", sienna = "A0522D", silver = "C0C0C0", skyblue = "87CEEB",
+  slateblue = "6A5ACD", slategray = "708090", slategrey = "708090", snow = "FFFAFA",
+  springgreen = "00FF7F", steelblue = "4682B4", tan = "D2B48C", teal = "008080", thistle = "D8BFD8",
+  tomato = "FF6347", turquoise = "40E0D0", violet = "EE82EE", wheat = "F5DEB3", white = "FFFFFF",
+  whitesmoke = "F5F5F5", yellow = "FFFF00", yellowgreen = "9ACD32",
+}
+-- END GENERATED colour names
+local __CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS colour name, rgb() or hsl()'
 -- A number as JavaScript prints it, for the numbers a script writes: whole ones without ".0".
 local function __cshown(n)
   if n == math.floor(n) and math.abs(n) < 2 ^ 53 then return string.format("%d", math.floor(n)) end
@@ -715,20 +763,185 @@ local function __cunit(verb, what, v, fallback)
   logError(verb .. ": " .. what .. " is a number from 0 to 1, and " .. shown .. ", so there is no answer." .. hint)
   return nil
 end
-local function __cchan(verb, hex)
-  if type(hex) == "string" then
-    local h = string.match(hex, "^#?(%x+)$")
-    if h ~= nil and (#h == 6 or #h == 8) then
-      h = string.sub(h, -6)
-      return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
+-- CSS's short forms, read as scriptColours.js reads them (cssChannels, panelFormOf, longForm and
+-- cssHint). It reads them with four regular expressions, which Lua patterns cannot write (they have
+-- no alternation and no optional groups), so this reads the same grammar a token at a time. Every
+-- number goes through what JavaScript does to it: Number(), Math.round (a half goes up, toward
+-- +infinity), and `%`, which keeps the sign of what it divides, as math.fmod does and Lua's % does not.
+--
+-- What JavaScript calls white space, for trim() and \s: the six ASCII ones and the Unicode spaces,
+-- as UTF-8. The length of the one that starts at i, or 0.
+local function __cwsAt(s, i)
+  local c, c2, c3 = string.byte(s, i, i + 2)
+  if c == nil then return 0 end
+  if c == 32 or (c >= 9 and c <= 13) then return 1 end
+  if c == 194 then if c2 == 160 then return 2 end return 0 end
+  if c3 == nil then return 0 end
+  if c == 226 and c2 == 128 and ((c3 >= 128 and c3 <= 138) or c3 == 168 or c3 == 169 or c3 == 175) then return 3 end
+  if (c == 226 and c2 == 129 and c3 == 159) or (c == 225 and c2 == 154 and c3 == 128)
+      or (c == 227 and c2 == 128 and c3 == 128) or (c == 239 and c2 == 187 and c3 == 191) then
+    return 3
+  end
+  return 0
+end
+local function __cskip(s, i)
+  local n = __cwsAt(s, i)
+  while n > 0 do i = i + n; n = __cwsAt(s, i) end
+  return i
+end
+-- JavaScript's trim().
+local function __ctrim(s)
+  local i, j = __cskip(s, 1), #s
+  while j >= i do
+    if __cwsAt(s, j) == 1 then j = j - 1
+    elseif j - 1 >= i and __cwsAt(s, j - 1) == 2 then j = j - 2
+    elseif j - 2 >= i and __cwsAt(s, j - 2) == 3 then j = j - 3
+    else break end
+  end
+  return string.sub(s, i, j)
+end
+-- JavaScript's Math.round, which Lua does not have: a half goes up, so 2.5 is 3 and -2.5 is -2.
+local function __cround(x)
+  local r = math.floor(x)
+  if x - r >= 0.5 then return r + 1 end
+  return r
+end
+local function __cclamp(v, lo, hi) return math.min(hi, math.max(lo, v)) end
+-- A number as the expressions write one, [+-] digits [. digits] [e [+-] digits], starting at i:
+-- its value as a float and where it ends, or nil. tonumber reads this grammar as Number() does.
+local function __cnumAt(s, i)
+  local _, e = string.find(s, "^[+-]?%d+%.?%d*", i)
+  if e == nil then _, e = string.find(s, "^[+-]?%.%d+", i) end
+  if e == nil then return nil end
+  local _, x = string.find(s, "^[eE][+-]?%d+", e + 1)
+  e = x or e
+  return tonumber(string.sub(s, i, e)) * 1.0, e + 1
+end
+-- rgb(), rgba(), hsl() or hsla(), with commas or with spaces and a slash before the alpha, as the
+-- four expressions read them: r, g, b, a, or nil. The function and a hue's unit in any case; three
+-- values, and a fourth after "," or "/"; "%" on any rgb value, and on both of hsl's with commas.
+local function __cfunction(s)
+  local l = string.lower(s)
+  local name = string.match(l, "^(%a+)%(")
+  local hsl = name == "hsl" or name == "hsla"
+  if not hsl and name ~= "rgb" and name ~= "rgba" then return nil end
+  local i = __cskip(l, #name + 2)
+  local v, p, unit, legacy = {}, {}, 1, false
+  for k = 1, 3 do
+    v[k], i = __cnumAt(l, i)
+    if v[k] == nil then return nil end
+    if hsl and k == 1 then
+      local u3, u4 = string.sub(l, i, i + 2), string.sub(l, i, i + 3)
+      if u3 == "deg" then unit = 1; i = i + 3
+      elseif u4 == "grad" then unit = 0.9; i = i + 4
+      elseif u3 == "rad" then unit = 180 / math.pi; i = i + 3
+      elseif u4 == "turn" then unit = 360; i = i + 4 end
+    elseif string.sub(l, i, i) == "%" then p[k] = true; i = i + 1
+    elseif hsl and legacy then return nil end
+    if k < 3 then
+      local j = __cskip(l, i)
+      if k == 1 then legacy = string.sub(l, j, j) == "," end
+      if legacy then
+        if string.sub(l, j, j) ~= "," then return nil end
+        i = __cskip(l, j + 1)
+      elseif j == i then return nil
+      else i = j end
     end
+  end
+  i = __cskip(l, i)
+  local a, ap = nil, false
+  if string.sub(l, i, i) == (legacy and "," or "/") then
+    a, i = __cnumAt(l, __cskip(l, i + 1))
+    if a == nil then return nil end
+    if string.sub(l, i, i) == "%" then ap = true; i = i + 1 end
+    i = __cskip(l, i)
+  end
+  if i ~= #l or string.sub(l, i, i) ~= ")" then return nil end
+  if a == nil then a = 1 else a = __cclamp(a / (ap and 100 or 1), 0, 1) end
+  if not hsl then
+    local function channel(k) return __cclamp(__cround(v[k] * (p[k] and 2.55 or 1)), 0, 255) end
+    return channel(1), channel(2), channel(3), a
+  end
+  -- A hue too large to be a number has no angle, and is not a colour.
+  local turned = v[1] * unit
+  if turned ~= turned or turned == math.huge or turned == -math.huge then return nil end
+  local h = math.fmod(math.fmod(turned, 360) + 360, 360)
+  local sat = __cclamp(v[2], 0, 100) / 100
+  local light = __cclamp(v[3], 0, 100) / 100
+  local amp = sat * math.min(light, 1 - light)
+  local function f(n)
+    local k = math.fmod(n + h / 30, 12)
+    return __cround(255 * (light - amp * math.max(-1, math.min(k - 3, 9 - k, 1))))
+  end
+  return f(0), f(8), f(4), a
+end
+-- A CSS colour as r, g, b (0-255) and a (0-1), or nil. A name in any case: JavaScript's
+-- toLowerCase turns the Kelvin sign into "k", and Lua's string.lower turns only ASCII.
+local function __ccss(text)
+  local s = __ctrim(text)
+  local lower = string.lower((string.gsub(s, "\226\132\170", "k")))
+  if lower == "transparent" then return 0, 0, 0, 0 end
+  local named = __CE_CSS_COLOURS[lower]
+  if named ~= nil then
+    return tonumber(string.sub(named, 1, 2), 16), tonumber(string.sub(named, 3, 4), 16), tonumber(string.sub(named, 5, 6), 16), 1
+  end
+  local d = string.match(s, "^#(%x+)$")
+  if d ~= nil and (#d == 3 or #d == 4 or #d == 6 or #d == 8) then
+    if #d <= 4 then d = string.gsub(d, ".", "%0%0") end
+    local function byte(i) return tonumber(string.sub(d, i, i + 1), 16) end
+    local a = 1
+    if #d == 8 then a = byte(7) / 255 end
+    return byte(1), byte(3), byte(5), a
+  end
+  return __cfunction(s)
+end
+-- The same colour in the panel's form: #RRGGBB when solid, AARRGGBB when it is not.
+local function __cpanelForm(r, g, b, a)
+  local rgb = string.format("%02X%02X%02X", r, g, b)
+  if a >= 1 then return "#" .. rgb end
+  return string.format("%02X", __cround(a * 255)) .. rgb
+end
+-- Does the panel read this text as a colour? 6 or 8 hex digits, with or without one "#".
+local function __cpanelHex(s)
+  local h = string.match(s, "^#?(%x+)$")
+  return h ~= nil and (#h == 6 or #h == 8)
+end
+-- CSS's short forms written out, as a property stores them, or nil: not text with space around it,
+-- "#" only with three digits ("#" with four is RGBA to CSS and ARGB here), and nothing CSS cannot read.
+local function __clong(value)
+  if type(value) ~= "string" or __ctrim(value) ~= value then return nil end
+  if string.sub(value, 1, 1) == "#" and string.match(value, "^#%x%x%x$") == nil then return nil end
+  local r, g, b, a = __ccss(value)
+  if r == nil then return nil end
+  return __cpanelForm(r, g, b, a)
+end
+-- For a refusal: what CSS text with space around it is in the panel's form, or "". Text that is the
+-- panel's own form once the space is gone is that text, read as the panel reads it.
+local function __ccssHint(value)
+  if type(value) ~= "string" or __cpanelHex(value) then return "" end
+  local trimmed = __ctrim(value)
+  if trimmed ~= value and __cpanelHex(trimmed) then return ' Write "' .. trimmed .. '".' end
+  local r, g, b, a = __ccss(value)
+  if r == nil then return "" end
+  return ' Write "' .. __cpanelForm(r, g, b, a) .. '".'
+end
+local function __cchan(verb, hex)
+  local stored
+  if type(hex) == "string" then
+    if __cpanelHex(hex) then stored = hex else stored = __clong(hex) end
+  end
+  if stored ~= nil then
+    local h = string.sub(stored, -6)
+    return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
   end
   local why
   if hex == nil then why = "no colour was given"
   elseif type(hex) == "string" then why = '"' .. hex .. '" is not a colour'
   elseif type(hex) == "number" and __realNumber(hex) ~= nil then why = __cshown(hex) .. " is not a colour"
   else why = "the colour given is not text" end
-  logError(verb .. ": " .. why .. ", so there is no answer. " .. __CFORMS .. "." .. __chint(hex))
+  local hint = __chint(hex)
+  if hint == "" then hint = __ccssHint(hex) end
+  logError(verb .. ": " .. why .. ", so there is no answer. " .. __CFORMS .. "." .. hint)
   return nil
 end
 local function __cbyte(v)
