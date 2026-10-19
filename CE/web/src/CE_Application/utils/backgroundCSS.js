@@ -5,6 +5,7 @@
  */
 
 import { gradientToCSS } from './gradientCSS.js';
+import { readStoredColour } from './colorMath.js';
 import { controlSetForPanel, resolveColourValue } from '../models/controlSets.js';
 
 // What panelModel gives a new panel (stores/panelModel.js `bgColour`), spelled the way it is
@@ -111,9 +112,14 @@ export function buildSolidStyle(panel) {
   // A control set may ask for a panel colour (a black tolex, a grey billet). It gets it only
   // while the panel still wears the colour it was created with — an author who picked a colour
   // keeps it, the same rule a set's family patch follows for a control.
+  //
+  // One leading "#" is dropped, as every colour reader in the panel drops it: a colour property
+  // takes 6 or 8 hex digits with or without one, and set("panel.bgColour", "red") stores
+  // "#FF0000". Kept, it made "background: ##FF0000", which paints nothing.
+  const bare = (colour) => String(colour).replace(/^#/, '').toUpperCase();
   const setColour = controlSetForPanel(panel)?.panel?.colour;
-  const authored = String(panel.bgColour || DEFAULT_PANEL_COLOUR).toUpperCase();
-  const hex = setColour && authored === DEFAULT_PANEL_COLOUR ? String(setColour).toUpperCase() : authored;
+  const authored = bare(panel.bgColour || DEFAULT_PANEL_COLOUR);
+  const hex = setColour && authored === DEFAULT_PANEL_COLOUR ? bare(setColour) : authored;
   if (hex.length === 8) {
     const a = parseInt(hex.slice(0, 2), 16) / 255;
     const rgb = hex.slice(2);
@@ -160,7 +166,7 @@ export function buildLayerStyle(panel, prefix, url) {
   const sat = panel[`bg${prefix}Saturation`] ?? 100;
   const bri = panel[`bg${prefix}Brightness`] ?? 100;
   const con = panel[`bg${prefix}Contrast`] ?? 100;
-  const tint = panel[`bg${prefix}Tint`] ?? 'FFFFFF';
+  const tint = tintShadow(panel[`bg${prefix}Tint`] ?? 'FFFFFF');
 
   let style = `background-image: url('${url}'); ${fit}`;
   style += ` opacity: ${opacity}; mix-blend-mode: ${blend};`;
@@ -171,11 +177,21 @@ export function buildLayerStyle(panel, prefix, url) {
   if (bri !== 100) filters.push(`brightness(${bri}%)`);
   if (con !== 100) filters.push(`contrast(${con}%)`);
   if (filters.length) style += ` filter: ${filters.join(' ')};`;
-  if (tint && tint !== 'FFFFFF') {
-    const r = parseInt(tint.slice(0, 2), 16);
-    const g = parseInt(tint.slice(2, 4), 16);
-    const b = parseInt(tint.slice(4, 6), 16);
-    style += ` box-shadow: inset 0 0 0 9999px rgba(${r},${g},${b},0.3);`;
-  }
+  if (tint) style += ` box-shadow: ${tint};`;
   return style;
+}
+
+/**
+ * The wash an image or texture tint lays over its layer, or '' for none: the tint's colour at 0.3,
+ * scaled by its own alpha. Read as the panel reads a colour (readStoredColour): RRGGBB or AARRGGBB,
+ * with or without "#". White, in any case, is no tint, and so is a colour fully transparent or one
+ * that cannot be read. The first two characters were read as red whatever followed, so "#FF0000"
+ * (what set() stores for "red") painted no tint, and an AARRGGBB tint took its alpha for its red.
+ */
+function tintShadow(value) {
+  const read = readStoredColour(value);
+  if (!read || read.color === 'FFFFFF' || read.alpha <= 0) return '';
+  const byte = (i) => parseInt(read.color.slice(i, i + 2), 16);
+  const alpha = read.alpha >= 1 ? 0.3 : Number((0.3 * read.alpha).toFixed(3));
+  return `inset 0 0 0 9999px rgba(${byte(0)},${byte(2)},${byte(4)},${alpha})`;
 }

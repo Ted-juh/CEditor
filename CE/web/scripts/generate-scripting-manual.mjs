@@ -596,7 +596,9 @@ sets it. Write it with a dot, not a colon, in Lua as well.
 
 Paths that start with \`panel\` reach the panel rather than a control: \`get("panel.width")\`,
 \`set("panel.bgColour", "FF202020")\`. Its name, size and background can be read and changed this
-way; the things that identify the panel, such as its file path, can only be read.
+way; the things that identify the panel, such as its file path, can only be read. Its colours
+(\`bgColour\`, \`gridColour\`, \`gridSubColour\`, the image and texture tints, and the colour of each
+of \`bgGradient\`'s stops) take what a control's colour properties take, and refuse the same.
 
 ## 5. Talking to your synth
 

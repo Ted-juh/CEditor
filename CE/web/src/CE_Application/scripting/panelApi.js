@@ -182,7 +182,7 @@ export const PANEL_PROPERTIES = [
   { id: 'locked', type: 'boolean', summary: 'Whether editing is locked.' },
   { id: 'resizable', type: 'boolean', summary: 'Whether the panel window can be resized.' },
   { id: 'panicShortcut', type: 'string', summary: 'The panel-wide emergency-stop key. Empty string switches it off.' },
-  { id: 'bgColour', type: 'string', summary: 'Background colour, AARRGGBB hex.' },
+  { id: 'bgColour', type: 'string', summary: 'Background colour: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". Read as every colour property is, so "red" is stored as "#FF0000" and what is not a colour is refused.' },
   { id: 'bgSolid', type: 'boolean', summary: 'Whether the solid background layer is drawn.' },
   { id: 'bgGradientEnabled', type: 'boolean', summary: 'Whether the gradient background layer is drawn.' },
   { id: 'bgImageEnabled', type: 'boolean', summary: 'Whether the image background layer is drawn.' },

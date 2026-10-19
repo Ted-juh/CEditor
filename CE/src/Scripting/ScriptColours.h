@@ -16,6 +16,8 @@
 // Which fields are colours is not written here. ScriptColours.generated.h carries the editor's own
 // tables, written from the section templates by tools/scripts/gen-colour-fields.mjs, and the walk
 // below is colourFieldAt's, step for step, over the player's panel object instead of the editor's.
+// The panel document's own colours (panel.bgColour and the rest) are a table of their own, written
+// from the panel's template, and panelColourFieldAt reads them by the path below the panel.
 // CE/web/test/fixtures/colourPropertyCases.json is run through the editor's panelColour and
 // colourFieldAt by colourPropertyCases.test.js and through these by PanelValueModelTests.cpp.
 //
@@ -741,6 +743,64 @@ inline std::optional<Field> colourFieldAt (const juce::var& root, const juce::St
 }
 
 /**
+ * panelColourFieldAt: is `path`, below the panel document ("bgColour", "bgGradient.stops.0.color"),
+ * one of the panel's own colours? The document is flat, with no sections and no `_type`, so the path
+ * alone says it: keys matched without regard to case, a list position as "*", looked up in the
+ * table generated from the editor's PANEL_COLOUR_FIELDS.
+ */
+inline std::optional<Field> panelColourFieldAt (const juce::String& path)
+{
+    juce::StringArray segments;
+    for (const auto& s : juce::StringArray::fromTokens (path, ".", ""))
+        if (s.isNotEmpty()) segments.add (isIndex (s) ? juce::String ("*") : s);
+    if (segments.isEmpty()) return {};
+    const auto key = segments.joinIntoString (".").toLowerCase();
+    for (const auto& f : generated::kPanelColourFields)
+        if (key == f.path) return Field { f.empty, f.tokens };
+    return {};
+}
+
+namespace detail
+{
+    /** mapColourWrites over any table of colour fields: `fieldAt (path)` says what is at a path. */
+    template <typename FieldAt, typename ColourFn>
+    juce::var mapWrites (const FieldAt& fieldAt, const juce::String& path, const juce::var& value,
+                         ColourFn&& colour, int depth)
+    {
+        if (const auto field = fieldAt (path)) return colour (path, value, *field);
+        if (depth > 12) return value;
+        if (auto* list = value.getArray())
+        {
+            std::optional<juce::Array<juce::var>> copy;
+            for (int i = 0; i < list->size(); ++i)
+            {
+                const auto& child = list->getReference (i);
+                auto stored = mapWrites (fieldAt, path + "." + juce::String (i), child, colour, depth + 1);
+                if (strictlyEqual (stored, child)) continue;
+                if (! copy) copy = *list;
+                copy->set (i, stored);
+            }
+            return copy ? juce::var (*copy) : value;
+        }
+        if (auto* object = value.getDynamicObject())
+        {
+            juce::DynamicObject::Ptr copy;
+            for (const auto& p : object->getProperties())
+            {
+                const auto key = p.name.toString();
+                if (key == "_type") continue;
+                auto stored = mapWrites (fieldAt, key == "_children" ? path : path + "." + key, p.value, colour, depth + 1);
+                if (strictlyEqual (stored, p.value)) continue;
+                if (copy == nullptr) copy = new juce::DynamicObject (*object);
+                copy->setProperty (p.name, stored);
+            }
+            return copy != nullptr ? juce::var (copy.get()) : value;
+        }
+        return value;
+    }
+} // namespace detail
+
+/**
  * mapColourWrites: `value` as it is to be written at `path` on `root`, with every colour property the
  * write would set passed through `colour (at, written, field)`, which returns what to store there:
  * the path itself, or, when `value` is a whole section or list, each colour field inside it. Only
@@ -750,36 +810,16 @@ template <typename ColourFn>
 juce::var mapColourWrites (const juce::var& root, const juce::String& path, const juce::var& value,
                            ColourFn&& colour, int depth = 0)
 {
-    if (const auto field = colourFieldAt (root, path)) return colour (path, value, *field);
-    if (depth > 12) return value;
-    if (auto* list = value.getArray())
-    {
-        std::optional<juce::Array<juce::var>> copy;
-        for (int i = 0; i < list->size(); ++i)
-        {
-            const auto& child = list->getReference (i);
-            auto stored = mapColourWrites (root, path + "." + juce::String (i), child, colour, depth + 1);
-            if (strictlyEqual (stored, child)) continue;
-            if (! copy) copy = *list;
-            copy->set (i, stored);
-        }
-        return copy ? juce::var (*copy) : value;
-    }
-    if (auto* object = value.getDynamicObject())
-    {
-        juce::DynamicObject::Ptr copy;
-        for (const auto& p : object->getProperties())
-        {
-            const auto key = p.name.toString();
-            if (key == "_type") continue;
-            auto stored = mapColourWrites (root, key == "_children" ? path : path + "." + key, p.value, colour, depth + 1);
-            if (strictlyEqual (stored, p.value)) continue;
-            if (copy == nullptr) copy = new juce::DynamicObject (*object);
-            copy->setProperty (p.name, stored);
-        }
-        return copy != nullptr ? juce::var (copy.get()) : value;
-    }
-    return value;
+    return detail::mapWrites ([&root] (const juce::String& at) { return colourFieldAt (root, at); },
+                              path, value, std::forward<ColourFn> (colour), depth);
+}
+
+/** mapPanelColourWrites: the same for a write to the panel document, `path` below the panel. */
+template <typename ColourFn>
+juce::var mapPanelColourWrites (const juce::String& path, const juce::var& value, ColourFn&& colour)
+{
+    return detail::mapWrites ([] (const juce::String& at) { return panelColourFieldAt (at); },
+                              path, value, std::forward<ColourFn> (colour), 0);
 }
 
 /** What a write stores in the colour properties it reaches. */
@@ -800,24 +840,47 @@ struct Writes
  * written whole; `named` puts the whole path in quotes instead, for a call whose arguments do not
  * already say which property it was.
  */
+namespace detail
+{
+    template <typename Map>
+    Writes readColours (const juce::String& call, const juce::String& outcome, const juce::String& path,
+                        const juce::var& value, const ResolvesToken& resolvesToken, bool named, Map&& map)
+    {
+        Writes out;
+        auto stored = map ([&] (const juce::String& at, const juce::var& written, Field field)
+        {
+            const auto read = panelColour (written, field, resolvesToken);
+            if (read.ok) return read.colour;
+            out.refused = true;
+            juce::String where;
+            if (named) where = "at \"" + at + "\", ";
+            else if (at != path) where = "at " + at.substring (path.length() + 1) + ", ";
+            out.lines.add (call + ": " + where + read.why + ", so " + outcome + ". " + read.advice);
+            return written;
+        });
+        out.value = out.refused ? value : stored;
+        return out;
+    }
+} // namespace detail
+
 inline Writes colourWrites (const juce::String& call, const juce::String& outcome, const juce::var& root,
                             const juce::String& path, const juce::var& value, const ResolvesToken& resolvesToken,
                             bool named = false)
 {
-    Writes out;
-    auto stored = mapColourWrites (root, path, value, [&] (const juce::String& at, const juce::var& written, Field field)
-    {
-        const auto read = panelColour (written, field, resolvesToken);
-        if (read.ok) return read.colour;
-        out.refused = true;
-        juce::String where;
-        if (named) where = "at \"" + at + "\", ";
-        else if (at != path) where = "at " + at.substring (path.length() + 1) + ", ";
-        out.lines.add (call + ": " + where + read.why + ", so " + outcome + ". " + read.advice);
-        return written;
-    });
-    out.value = out.refused ? value : stored;
-    return out;
+    return detail::readColours (call, outcome, path, value, resolvesToken, named, [&] (auto&& colour)
+                                { return mapColourWrites (root, path, value, colour); });
+}
+
+/**
+ * panelColourWrites (panelRuntime.js): the same for a write to the panel document itself, `path`
+ * below the panel ("bgColour", or "bgGradient" written whole with its stops), its colours the
+ * panel's own (panelColourFieldAt), refused in the same sentence.
+ */
+inline Writes panelColourWrites (const juce::String& call, const juce::String& outcome, const juce::String& path,
+                                 const juce::var& value, const ResolvesToken& resolvesToken)
+{
+    return detail::readColours (call, outcome, path, value, resolvesToken, false, [&] (auto&& colour)
+                                { return mapPanelColourWrites (path, value, colour); });
 }
 
 } // namespace ceditor::scripting::colours

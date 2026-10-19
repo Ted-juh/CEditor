@@ -13,7 +13,7 @@
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import ExternalLink from 'lucide-svelte/icons/external-link';
   import Crosshair from 'lucide-svelte/icons/crosshair';
-  import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { gradientStopCSS, gradientToCSS } from '../utils/gradientCSS.js';
   import { addStopInLargestGap, updateStopAt, deleteStopAt } from '../utils/gradientStops.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
   import { deriveProxyGeometry, proxyShapeKind } from '../utils/gradientProxyGeometry.js';
@@ -349,11 +349,11 @@
               <button
                 class="stop-color"
                 class:editing={editingStopIndex === stop.origIdx}
-                style="background: #{stop.color}"
+                style="background: {gradientStopCSS(stop.color)}"
                 onclick={() => openStopEditor(stop.origIdx)}
                 title="Edit this colour here"
               ></button>
-              <span class="stop-hex">#{stop.color}</span>
+              <span class="stop-hex">#{String(stop.color).replace(/^#/, '')}</span>
               <span class="stop-pos nc-wrap">
                 <NumberCell min={0} max={100} value={stop.position} onchange={(v) => updateStop(stop.origIdx, { position: parseInt(v) || 0 })} />
               </span>

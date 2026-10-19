@@ -895,10 +895,14 @@ int main()
             { "id": "cl", "name": "cl", "language": "lua", "scope": "panel", "event": "onColoursLua", "target": "*", "enabled": true,
               "source": "function onColoursLua()\n  set(\"lbl.background.fill.colour\", \"red\")\n  log(\"lua \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.fill.colour\", \"redd\")\n  set(\"lbl.background.fill.colour\", 16711680)\n  log(\"lua kept \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.border.top\", { style = \"solid\", thickness = 3, colour = \"#0008\" })\n  log(\"lua top \" .. tostring(get(\"lbl.background.border.top.thickness\")))\n  set(\"lbl.text.content\", \"red\")\n  log(\"lua text \" .. tostring(get(\"lbl.text.content\")))\nend\n" },
             { "id": "cj", "name": "cj", "language": "javascript", "scope": "panel", "event": "onColoursJs", "target": "*", "enabled": true,
-              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour'], 50, { duration: 10 }); log('js moving ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }" },
+              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour'], 50, { duration: 10 }); log('js moving ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }\nfunction onPanelJs(){ set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: 'nope', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: '0000FF', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); }" },
+            { "id": "cm", "name": "cm", "language": "lua", "scope": "panel", "event": "onMovesLua", "target": "*", "enabled": true,
+              "source": "function onMovesLua()\n  ce.anim.to(\"panel.gridColour\", 1)\n  log(\"lua panel move \" .. tostring(ce.anim.running(\"panel.gridColour\")))\nend\nfunction onPanelLua()\n  set(\"panel.bgColour\", \"red\")\n  set(\"panel.gridColour\", \"{accent}\")\n  set(\"panel.bgGradient.stops.0.color\", \"#abc\")\n  log(\"lua panel \" .. tostring(get(\"panel.bgColour\")) .. \" \" .. tostring(get(\"panel.gridColour\")) .. \" \" .. tostring(get(\"panel.bgGradient.stops.0.color\")))\nend\n" },
             { "id": "cs", "name": "cs", "language": "lua", "scope": "component", "event": "onColoursSelf", "target": "lbl", "enabled": true,
               "source": "function onColoursSelf()\n  self.set(\"background.fill.colour\", \"#abc\")\n  log(\"self \" .. tostring(self.get(\"background.fill.colour\")))\n  self.set(\"background.fill.colour\", \"#abcd\")\nend\n" }
           ],
+          "bgColour": "FF333333", "gridColour": "33FFFFFF",
+          "bgGradient": { "type": "linear", "angle": 90, "stops": [ { "color": "FF0000", "position": 0 }, { "color": "0000FF", "position": 100 } ] },
           "controls": [
             { "_type": "Control", "_children": {
               "Core": { "_type": "Core", "id": "l1", "name": "lbl", "controlType": "Label" },
@@ -971,6 +975,24 @@ int main()
                    + colourLogs.joinIntoString (" | ") + ")");
         colourHost.setValue ("lbl.background.fill.colour", juce::var ("#abc"), juce::var());
 
+        // The panel's own colours, through both engines' set() and get(): written out, refused in the
+        // editor's words, a gradient's stop by its path and the gradient written whole.
+        colourLogs.clear();
+        colourRuntime.runAction ("onPanelLua", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "set(\"panel.gridColour\"): \"{accent}\" is not a colour the panel can read, so nothing was set. " + forms
+                       + ". A control-set colour is not read in this property. | "
+                   "lua panel #FF0000 33FFFFFF #AABBCC",
+               "Lua's set() reads the panel's own colours by the editor's rule (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourLogs.clear();
+        colourRuntime.runAction ("onPanelJs", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "set(\"panel.bgGradient\"): at stops.1.color, \"nope\" is not a colour the panel can read, so nothing was set. "
+                       + forms + ". | "
+                   "js stop #AABBCC | js stop #000080",
+               "JavaScript's set() reads a gradient written whole stop by stop, and writes none of it for one it cannot "
+               "read (got " + colourLogs.joinIntoString (" | ") + ")");
+
         colourLogs.clear();
         colourRuntime.tickAnimations (0.0);
         colourRuntime.runAction ("onMovesJs", juce::var());
@@ -980,6 +1002,12 @@ int main()
                    "js moving false true false",
                "ce.anim refuses a colour property as its path, in the editor's words, and moves the number beside it in the "
                "same list (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourLogs.clear();
+        colourRuntime.runAction ("onMovesLua", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.to: \"panel.gridColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "lua panel move false",
+               "one of the panel's own colours is refused as a move's path too (got " + colourLogs.joinIntoString (" | ") + ")");
         // An envelope arrives at the same place from every prelude. Started there directly: the
         // preludes' own envelope sampling is not what this is about.
         colourLogs.clear();
@@ -993,6 +1021,7 @@ int main()
         colourRuntime.tickAnimations (1000.0);
         check (colourModel.getValue ("lbl.background.fill.colour").toString() == "#AABBCC"
                    && colourModel.getValue ("lbl.background.border.top.colour").toString() == "#008000"
+                   && colourModel.getValue ("panel.gridColour").toString() == "33FFFFFF"
                    && (double) colourModel.getValue ("lbl.transform.x") == 50.0,
                "so no tick wrote a number into a colour, and the number moved");
     }

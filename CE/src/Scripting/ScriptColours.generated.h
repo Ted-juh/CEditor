@@ -3,8 +3,8 @@
 // The editor's tables for what a script may write where the panel reads a colour, for the C++ that
 // reads a script's writes with the plug-in's window shut (ScriptColours.h). Each is written from the
 // module that defines it, so neither side can have a colour field, a CSS name or a word the other
-// lacks. Regenerate after changing the section templates (models/sectionDefaults.js),
-// scriptColours.js or the base control set:
+// lacks. Regenerate after changing the section templates (models/sectionDefaults.js), the panel's
+// (models/panelDefaults.js), scriptColours.js or the base control set:
 //
 //   node tools/scripts/gen-colour-fields.mjs --write
 //
@@ -249,6 +249,18 @@ inline constexpr ColourField kColourFields[] = {
     { "Turing", "fieldcolour", false, true },
     { "Turing", "headcolour", false, true },
     { "Turing", "labelcolour", false, true },
+};
+
+/** PANEL_COLOUR_FIELDS: the panel document's own colours, by their path below the panel, lower case,
+    a list position as "*", read from the document a new panel starts as by the rule above. */
+struct PanelColourField { const char* path; bool empty; bool tokens; };
+inline constexpr PanelColourField kPanelColourFields[] = {
+    { "bgcolour", false, false },
+    { "bggradient.stops.*.color", false, false },
+    { "bgimagetint", false, false },
+    { "bgtexturetint", false, false },
+    { "gridcolour", false, false },
+    { "gridsubcolour", false, false },
 };
 
 /** EFFECT_TYPES: Fill's optional effect targets, made from the Effects template under their own names. */

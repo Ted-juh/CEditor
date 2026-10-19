@@ -200,16 +200,19 @@ public:
 
         BridgeScriptHost asks this before every engine's set() is written. A write it cannot place (a
         control that is not there, .normalizedValue on a control with no range) comes back as it was,
-        for setValue to report as it always has. `panel.*` is not read here, because the editor's
-        set() does not read it: the panel document has no section templates to say which of its
-        keys are colours. */
+        for setValue to report as it always has. A `panel.*` path is read by the panel's own colours
+        (panelColourWrites in panelRuntime.js, panelColourFieldAt here), the form set aside as
+        setPanelValue sets it aside. */
     scripting::colours::Writes colourWrites (const juce::String& call, const juce::String& scriptPath,
                                              const juce::var& value, const juce::String& form = "value") const
     {
         scripting::colours::Writes unchanged;
         unchanged.value = value;
         const auto split = splitScriptPath (scriptPath);
-        if (isPanelTarget (split.first)) return unchanged;
+        const auto resolves = [this] (const juce::String& name) { return scripting::colours::controlSetResolves (doc, name); };
+        if (isPanelTarget (split.first))
+            return scripting::colours::panelColourWrites (call, "nothing was set", split.second.joinIntoString ("."),
+                                                          value, resolves);
         const auto control = findControlByName (split.first);
         if (! control.isObject()) return unchanged;
 
@@ -224,18 +227,20 @@ public:
             written = juce::var (lo + juce::jlimit (0.0, 1.0, (double) value) * (hi - lo));
         }
         auto out = scripting::colours::colourWrites (call, "nothing was set", control, resolveModelPath (control, split.second),
-                                                     written, [this] (const juce::String& name)
-                                                     { return scripting::colours::controlSetResolves (doc, name); });
+                                                     written, resolves);
         if (form == "normalizedValue" && ! out.refused) out.value = value;
         return out;
     }
 
-    /** Whether `scriptPath` is a colour property of a control, for ce.anim to refuse it as a path
-        (animatesColour in panelRuntime.js): every tick of a move would write a number into it. */
+    /** Whether `scriptPath` is a colour property, a control's or the panel's own (panel.bgColour),
+        for ce.anim to refuse it as a path (animatesColour in panelRuntime.js): every tick of a move
+        would write a number into it. */
     bool isColourProperty (const juce::String& scriptPath) const
     {
         const auto split = splitScriptPath (scriptPath);
-        if (isPanelTarget (split.first) || split.second.isEmpty()) return false;
+        if (split.second.isEmpty()) return false;
+        if (isPanelTarget (split.first))
+            return scripting::colours::panelColourFieldAt (split.second.joinIntoString (".")).has_value();
         const auto control = findControlByName (split.first);
         if (! control.isObject()) return false;
         return scripting::colours::colourFieldAt (control, resolveModelPath (control, split.second)).has_value();
@@ -330,12 +335,29 @@ public:
 private:
     juce::var doc;
 
-    // Case-insensitive walk over the panel document, which is flat (no _children sections).
+    // The position `segment` names in `list`, as the editor's walk finds it among the list's own
+    // keys ("0", "1", …, with no leading zeros), or -1.
+    static int listPosition (const juce::Array<juce::var>& list, const juce::String& segment)
+    {
+        for (int i = 0; i < list.size(); ++i)
+            if (segment == juce::String (i)) return i;
+        return -1;
+    }
+
+    // Case-insensitive walk over the panel document, which is flat (no _children sections). A list
+    // is stepped into by position, as the editor's walk steps into one (bgGradient.stops.0.color).
     static juce::var panelValueAt (const juce::var& node, const juce::StringArray& segs, int from = 0)
     {
         juce::var current = node;
         for (int i = from; i < segs.size(); ++i)
         {
+            if (auto* list = current.getArray())
+            {
+                const int at = listPosition (*list, segs[i]);
+                if (at < 0) return {};
+                current = (*list)[at];
+                continue;
+            }
             auto* obj = current.getDynamicObject();
             if (obj == nullptr) return {};
             juce::var next;
@@ -378,10 +400,18 @@ private:
         if (segs.isEmpty() || isPanelReadOnly (segs[0])) return false;
 
         // Walk to the leaf's parent, case-insensitively, making each node on the way this model's
-        // own, then assign with the document's real-case key.
+        // own, then assign with the document's real-case key. A list is stepped into by position,
+        // as the editor's walk steps into one, so a gradient's stop can be written by its path.
         juce::var node = doc;
         for (int i = 0; i < segs.size() - 1; ++i)
         {
+            if (auto* list = node.getArray())
+            {
+                const int at = listPosition (*list, segs[i]);
+                if (at < 0) return false;
+                node = ownedChild (node, juce::String (at));
+                continue;
+            }
             auto* parent = node.getDynamicObject();
             if (parent == nullptr) return false;
             juce::Identifier key;
@@ -390,10 +420,17 @@ private:
             if (key.isNull()) return false;
             node = ownProperty (*parent, key);
         }
+        const auto& leaf = segs[segs.size() - 1];
+        if (auto* list = node.getArray())
+        {
+            const int at = listPosition (*list, leaf);
+            if (at < 0) return false;
+            list->getReference (at) = value;
+            return true;
+        }
         auto* obj = node.getDynamicObject();
         if (obj == nullptr) return false;
 
-        const auto& leaf = segs[segs.size() - 1];
         for (const auto& p : obj->getProperties())
             if (p.name.toString().equalsIgnoreCase (leaf)) { obj->setProperty (p.name, value); return true; }
         obj->setProperty (juce::Identifier (leaf), value);

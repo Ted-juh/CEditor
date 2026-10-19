@@ -10,6 +10,9 @@
 //   - COLOUR_FIELDS, as scriptColours.js builds it: every colour field, by the section type it is
 //     in and its path below it, with whether "" is a value there (`empty`) and whether the renderer
 //     resolves a control-set reference in it (`tokens`);
+//   - PANEL_COLOUR_FIELDS, the panel document's own colours (bgColour, the tints, the grid's, the
+//     gradient's stops), read by the same rule from the document a new panel starts as
+//     (models/panelDefaults.js), by their path below the panel;
 //   - the section templates' shape (their objects, lists and `_type`s), which colourFieldAt walks
 //     where a control has not made a section yet, with EFFECT_TYPES and MADE_CHILDREN, the children
 //     set() makes that no template lists;
@@ -35,7 +38,7 @@ const app = (rel) => pathToFileURL(join(repo, 'CE', 'web', 'src', 'CE_Applicatio
 
 const { SECTION_DEFAULTS } = await import(app('models/sectionDefaults.js'));
 const { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, MAX_ALIAS_DEPTH, resolveToken } = await import(app('models/controlSets.js'));
-const { COLOUR_FIELDS, COLOUR_FORMS, CSS_NAMED_COLOURS, EFFECT_TYPES, MADE_CHILDREN, templateChild }
+const { COLOUR_FIELDS, COLOUR_FORMS, CSS_NAMED_COLOURS, EFFECT_TYPES, MADE_CHILDREN, PANEL_COLOUR_FIELDS, templateChild }
   = await import(app('scripting/scriptColours.js'));
 
 export const HEADER_FILE = 'CE/src/Scripting/ScriptColours.generated.h';
@@ -128,6 +131,11 @@ export function headerText() {
     }
   }
 
+  const panelRows = [...PANEL_COLOUR_FIELDS.keys()].sort().map((path) => {
+    const { empty, tokens } = PANEL_COLOUR_FIELDS.get(path);
+    return `    { ${cString(path)}, ${empty ? 'true' : 'false'}, ${tokens ? 'true' : 'false'} },`;
+  });
+
   const tree = templateShape();
   const treeRows = Object.entries(tree).map(([type, node], i, all) =>
     `    ${cString(`${JSON.stringify(type)}:${JSON.stringify(node)}${i < all.length - 1 ? ',' : ''}`)}`);
@@ -150,8 +158,8 @@ export function headerText() {
 // The editor's tables for what a script may write where the panel reads a colour, for the C++ that
 // reads a script's writes with the plug-in's window shut (ScriptColours.h). Each is written from the
 // module that defines it, so neither side can have a colour field, a CSS name or a word the other
-// lacks. Regenerate after changing the section templates (models/sectionDefaults.js),
-// scriptColours.js or the base control set:
+// lacks. Regenerate after changing the section templates (models/sectionDefaults.js), the panel's
+// (models/panelDefaults.js), scriptColours.js or the base control set:
 //
 //   node tools/scripts/gen-colour-fields.mjs --write
 //
@@ -171,6 +179,13 @@ inline constexpr const char* kColourForms = ${cString(COLOUR_FORMS)};
 struct ColourField { const char* type; const char* path; bool empty; bool tokens; };
 inline constexpr ColourField kColourFields[] = {
 ${fieldRows.join('\n')}
+};
+
+/** PANEL_COLOUR_FIELDS: the panel document's own colours, by their path below the panel, lower case,
+    a list position as "*", read from the document a new panel starts as by the rule above. */
+struct PanelColourField { const char* path; bool empty; bool tokens; };
+inline constexpr PanelColourField kPanelColourFields[] = {
+${panelRows.join('\n')}
 };
 
 /** EFFECT_TYPES: Fill's optional effect targets, made from the Effects template under their own names. */

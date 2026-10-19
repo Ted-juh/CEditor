@@ -25,12 +25,17 @@
 // shut as well, where a set() from any engine reaches the C++ panel model instead of this file.
 // CE/src/Scripting/ScriptColours.h is the same rule in C++, in the same words, and reads its tables
 // from ScriptColours.generated.h, which tools/scripts/gen-colour-fields.mjs writes from the exports
-// below (COLOUR_FORMS, COLOUR_FIELDS, EFFECT_TYPES, MADE_CHILDREN, CSS_NAMED_COLOURS) and the
-// section templates, so which properties are colours is said once. CE/web/test/fixtures/
-// colourPropertyCases.json is read by both sides' tests: a case that answers differently in one
-// fails there.
+// below (COLOUR_FORMS, COLOUR_FIELDS, PANEL_COLOUR_FIELDS, EFFECT_TYPES, MADE_CHILDREN,
+// CSS_NAMED_COLOURS) and the section templates, so which properties are colours is said once.
+// CE/web/test/fixtures/colourPropertyCases.json is read by both sides' tests: a case that answers
+// differently in one fails there.
+//
+// The panel document's own colours (set("panel.bgColour", …)) are read by the same rule, from the
+// document a new panel starts as (models/panelDefaults.js), as a control's are from the section
+// templates: see PANEL_COLOUR_FIELDS.
 
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { panelDefaults } from '../models/panelDefaults.js';
 import { isColourKey, isTokenReference, tokenNameOf } from '../models/controlSets.js';
 
 /* ----------------------------------------------------------------------- the panel's forms */
@@ -393,6 +398,17 @@ export const LIST_ITEMS = Object.freeze({
   DrumPads: Object.freeze({ pads: Object.freeze({ colour: '' }) }),
 });
 
+/**
+ * Is a template's `key: value` a colour field? `{ empty }` when it is (`empty`: its default is "",
+ * no colour of its own), or null. The one rule the section templates and the panel's are read by.
+ */
+function colourDefault(key, value) {
+  if (typeof value !== 'string') return null;
+  if (isPanelColour(value) || isTokenReference(value)) return { empty: false };
+  if (value === '' && isColourKey(key)) return { empty: true };
+  return null;
+}
+
 export const COLOUR_FIELDS = (() => {
   const fields = new Map();
   const add = (type, path, key, empty) => {
@@ -413,8 +429,8 @@ export const COLOUR_FIELDS = (() => {
         for (const [name, child] of Object.entries(value ?? {})) visit(child, t, [...r, name]);
       } else if (typeof value === 'string') {
         if (!t) continue;
-        if (isPanelColour(value) || isTokenReference(value)) add(t, [...r, key], key, false);
-        else if (value === '' && isColourKey(key)) add(t, [...r, key], key, true);
+        const field = colourDefault(key, value);
+        if (field) add(t, [...r, key], key, field.empty);
       } else if (value && typeof value === 'object') {
         visit(value, t, [...r, key]);
       }
@@ -427,6 +443,53 @@ export const COLOUR_FIELDS = (() => {
   for (const type of EFFECT_TYPES) if (fields.has('Effects')) fields.set(type, fields.get('Effects'));
   return fields;
 })();
+
+// THE PANEL'S OWN COLOURS, read from the document a new panel starts as (models/panelDefaults.js)
+// by the rule above: a key whose default is one of the panel's forms or a control-set reference, or
+// "" under a colour's name. Today that is bgColour, bgImageTint, bgTextureTint, gridColour,
+// gridSubColour and each of bgGradient's stops' `color`; a key added to the template with a colour
+// default is one without anything written here. The parts createPanel fills in from the user's
+// settings are given as nothing, so nothing is read from them: a control set's own token colours
+// are the set's, not the panel's.
+//
+// Keyed by the path below the panel, lower case, a list position as "*": "bggradient.stops.*.color".
+// The panel document is flat, with no sections and no `_type`, so the path alone says it.
+//
+// `tokens` is false for every one of them: no reader of the panel's colours resolves a control-set
+// reference against the panel's set. The solid background, both tints and the gradient's stops do
+// not resolve one at all, and the grid's colours only through hexToRgba's fallback to the base set,
+// so "{brand}" from the panel's own set would paint nothing there. A reference is refused, with the
+// words it is refused in for a control's Icon.tint.
+export const PANEL_COLOUR_FIELDS = (() => {
+  const fields = new Map();
+  const visit = (node, rel) => {
+    if (Array.isArray(node)) { for (const item of node) visit(item, [...rel, '*']); return; }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      const field = colourDefault(key, value);
+      if (field) {
+        const id = [...rel, key].join('.').toLowerCase();
+        fields.set(id, { empty: field.empty || fields.get(id)?.empty === true, tokens: false });
+      } else if (value && typeof value === 'object') {
+        visit(value, [...rel, key]);
+      }
+    }
+  };
+  visit(panelDefaults({ id: 0, panelGuid: '', gridSize: 0, snapToGrid: false, controlSet: {}, controlSets: [] }), []);
+  return fields;
+})();
+
+/**
+ * Is `path`, below the panel document ("bgColour", "bgGradient.stops.0.color"), one of the panel's
+ * colours? `{ empty, tokens }` as colourFieldAt answers, or null. Keys are matched without regard to
+ * case, as set() matches them, and a list position is "*".
+ */
+export function panelColourFieldAt(path) {
+  const segments = String(path ?? '').split('.').filter((s) => s !== '');
+  if (!segments.length) return null;
+  const key = segments.map((s) => (/^\d+$/.test(s) ? '*' : s)).join('.').toLowerCase();
+  return PANEL_COLOUR_FIELDS.get(key) ?? null;
+}
 
 /** An own key of `object`, matched without regard to case, as script paths are. */
 function keyed(object, segment) {
@@ -492,15 +555,27 @@ export function colourFieldAt(root, path) {
  * was given, and a script's own table is never changed under it.
  */
 export function mapColourWrites(root, path, value, colour, depth = 0) {
-  const field = colourFieldAt(root, path);
+  return mapWrites((at) => colourFieldAt(root, at), path, value, colour, depth);
+}
+
+/**
+ * The same for a write to the panel document: `path` is below the panel ("bgColour", or
+ * "bgGradient" written whole with its stops), and its colours are the panel's (panelColourFieldAt).
+ */
+export function mapPanelColourWrites(path, value, colour) {
+  return mapWrites(panelColourFieldAt, path, value, colour, 0);
+}
+
+/** mapColourWrites over any table of colour fields: `fieldAt(path)` says what is at a path. */
+function mapWrites(fieldAt, path, value, colour, depth) {
+  const field = fieldAt(path);
   if (field) return colour(path, value, field);
   // A typed array holds numbers only, and walking one written whole would visit every byte.
   if (!value || typeof value !== 'object' || ArrayBuffer.isView(value) || depth > 12) return value;
   let copy = null;
   for (const [key, child] of Object.entries(value)) {
     if (key === '_type') continue;
-    const stored = mapColourWrites(root, key === '_children' ? path : `${path}.${key}`, child, colour,
-      depth + 1);
+    const stored = mapWrites(fieldAt, key === '_children' ? path : `${path}.${key}`, child, colour, depth + 1);
     if (stored === child) continue;
     copy ??= Array.isArray(value) ? [...value] : { ...value };
     copy[key] = stored;

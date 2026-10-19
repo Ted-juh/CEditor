@@ -34,7 +34,8 @@ import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
 import {
   COLOUR_FORMS, DRAW_COLOUR_FORMS, colourFieldAt, colourHint, drawColour, mapColourWrites,
-  panelColour, percentHint, percentTextHint, realNumber, shownNumber, storedColour, unitProblem,
+  mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
+  shownNumber, storedColour, unitProblem,
 } from './scriptColours.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -507,7 +508,7 @@ function getPanelValue(segs) {
   return panelValueAt(panel, segs);
 }
 
-function setPanelValue(segs, value) {
+function setPanelValue(segs, value, path) {
   const panel = activePanel();
   if (!panel) return;
   warnIfControlNamedPanel();
@@ -521,22 +522,34 @@ function setPanelValue(segs, value) {
     return;
   }
 
+  // The panel's own colours are read as a control's are: "red" is stored as "#FF0000", what the
+  // panel cannot read is refused in set()'s words and nothing is written, and a gradient written
+  // whole has each of its stops read. They took anything, so "red" was stored as "red" and the
+  // background painted nothing. The plug-in's model asks the same question with its window shut.
+  const colours = panelColourWrites(`set("${path}")`, 'nothing was set', segs.join('.'), value);
+  if (!colours) return;
+  value = colours.value;
+
   // Walk to the leaf's parent, then assign with the document's real-case key.
   let node = panel;
+  let top = null;
   for (let i = 0; i < segs.length - 1; i++) {
     if (node == null || typeof node !== 'object') return;
     const key = Object.keys(node).find((k) => k.toLowerCase() === String(segs[i]).toLowerCase());
     if (key == null) { addScriptTrace('error', '', `set("panel.${segs.join('.')}", …): no such property`); return; }
+    top ??= key;
     node = node[key];
   }
   if (node == null || typeof node !== 'object') return;
   const last = Object.keys(node).find((k) => k.toLowerCase() === String(segs[segs.length - 1]).toLowerCase())
     ?? segs[segs.length - 1];
   node[last] = value;
+  top ??= last;
 
   // The editor holds panels in a store; the player holds one object. Poke the store so the canvas
-  // repaints, exactly as a control write does.
-  if (!host) panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, [last]: node === panel ? value : p[last] } : p)));
+  // repaints, exactly as a control write does. By the panel's own key: a write below one
+  // (bgGradient.stops.0.color) poked the leaf's name, and left `color: undefined` on the panel.
+  if (!host) panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, [top]: panel[top] } : p)));
 }
 
 /* ---------------------------------------------------------------- value representations (Q8) */
@@ -650,10 +663,23 @@ function valueBindingFor(control) {
  * was; componentPlace for a component verb, which counts list positions from 1.
  */
 function colourWrites(call, outcome, root, path, value, place = belowPath) {
+  return readColours(call, outcome, path, place,
+    (colour) => mapColourWrites(root, path, value, colour));
+}
+
+/** The same for a write to the panel document itself, `path` below the panel: the panel's own
+ *  colours (bgColour, the tints, the grid's, the gradient's stops) are read by the same rule
+ *  (scriptColours.panelColourFieldAt), in the same words. */
+function panelColourWrites(call, outcome, path, value) {
+  return readColours(call, outcome, path, belowPath,
+    (colour) => mapPanelColourWrites(path, value, colour));
+}
+
+function readColours(call, outcome, path, place, map) {
   // Asked only of a control-set reference, so an ordinary write does not look the set up.
   const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
   let refused = false;
-  const stored = mapColourWrites(root, path, value, (at, written, field) => {
+  const stored = map((at, written, field) => {
     const read = panelColour(written, field, resolves);
     if (!read.why) return read.colour;
     refused = true;
@@ -683,7 +709,7 @@ function setValue(path, value, formOrOpts = '') {
   if (notAForm) { addScriptTrace('error', '', notAForm); return; }
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
-  if (isPanelTarget(name)) { setPanelValue(segs, value); return; }
+  if (isPanelTarget(name)) { setPanelValue(segs, value, path); return; }
   const control = findControlByName(name);
   if (!control) { addScriptTrace('error', '', `set: control "${name}" not found on the active panel`); return; }
 
@@ -4300,14 +4326,19 @@ function animationTarget(verb, target) {
   return undefined;
 }
 
-/** True, after saying so, when `path` is a colour property: ce.anim moves numbers, and every tick
- *  would write one into the colour (set() refuses each, sixty times a second). */
+/** True, after saying so, when `path` is a colour property, a control's or the panel's own
+ *  (panel.bgColour): ce.anim moves numbers, and every tick would write one into the colour (set()
+ *  refuses each, sixty times a second). */
 function animatesColour(verb, path) {
   const { name, segs } = splitScriptPath(String(path));
-  if (isPanelTarget(name)) return false;
-  const control = findControlByName(name);
-  if (!control || !segs.length) return false;
-  if (!colourFieldAt(control, resolveModelPath(control, segs))) return false;
+  if (!segs.length) return false;
+  let colour;
+  if (isPanelTarget(name)) colour = panelColourFieldAt(segs.join('.'));
+  else {
+    const control = findControlByName(name);
+    colour = control ? colourFieldAt(control, resolveModelPath(control, segs)) : null;
+  }
+  if (!colour) return false;
   addScriptTrace('error', '', `${verb}: "${path}" is a colour, and ce.anim moves numbers, so nothing was started.`);
   return true;
 }

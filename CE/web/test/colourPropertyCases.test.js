@@ -11,12 +11,22 @@
 // ScriptColours.generated.h, which tools/scripts/gen-colour-fields.mjs writes from scriptColours.js
 // and the templates. The last test fails while that header is stale.
 
+//
+// The panel document's own colours (panel.bgColour, the tints, the grid's, the gradient's stops)
+// are cased too: panelFieldCases ask which paths below the panel are colours, and panelWriteCases
+// write to a copy of `panel` through the editor's own set() and read back with get(), as
+// PanelValueModelTests.cpp writes and reads through the player's model.
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { get as storeGet } from 'svelte/store';
 
-import { colourFieldAt, panelColour } from '../src/CE_Application/scripting/scriptColours.js';
+import { colourFieldAt, panelColour, panelColourFieldAt } from '../src/CE_Application/scripting/scriptColours.js';
 import { controlSetForPanel, resolveToken } from '../src/CE_Application/models/controlSets.js';
+import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 
 const FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/colourPropertyCases.json', import.meta.url), 'utf8'));
 const resolves = (name) => FIXTURE.controlSetNames.includes(name);
@@ -49,6 +59,31 @@ test('a reference resolves on a panel as the shared fixture says, against the re
   // The question set() asks of a reference before it stores one (panelRuntime.js colourWrites).
   for (const c of FIXTURE.controlSetCases) {
     assert.equal(resolveToken(c.name, controlSetForPanel(c.panel)) !== undefined, c.resolves, `${c.case}: ${c.name}`);
+  }
+});
+
+test('every panel field case is one of the panel\'s colours, or not one, as the shared fixture says', () => {
+  assert.ok(FIXTURE.panelFieldCases.some((c) => c.field) && FIXTURE.panelFieldCases.some((c) => !c.field));
+  for (const c of FIXTURE.panelFieldCases) {
+    assert.deepEqual(panelColourFieldAt(c.path), c.field, `${c.case}: ${c.path}`);
+  }
+});
+
+test('every panel write case is stored or refused by the editor\'s set(), and read back, as the fixture says', () => {
+  const api = scriptApiForTesting('', 'panel-colour-cases');
+  assert.ok(FIXTURE.panelWriteCases.some((c) => c.refused.length) && FIXTURE.panelWriteCases.some((c) => !c.refused.length));
+  try {
+    for (const c of FIXTURE.panelWriteCases) {
+      panels.set([{ id: 'p', ...structuredClone(FIXTURE.panel) }]);
+      activePanelId.set('p');
+      clearScriptTrace();
+      api.set(c.path, c.value);
+      const errors = storeGet(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+      assert.deepEqual(errors, c.refused, `${c.case}: set("${c.path}", ${JSON.stringify(c.value)})`);
+      for (const [path, value] of Object.entries(c.reads)) assert.deepEqual(api.get(path), value, `${c.case}: get("${path}")`);
+    }
+  } finally {
+    panels.set([]);
   }
 });
 

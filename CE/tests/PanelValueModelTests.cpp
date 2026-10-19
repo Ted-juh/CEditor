@@ -629,6 +629,63 @@ int main()
         check (count > 20 && wrong == 0, "colours: all " + juce::String (count)
                                              + " references resolved on their panel as the editor resolves them");
 
+        // The panel document's own colours: which paths below the panel are colours, and what the
+        // model stores, refuses and reads back for a write to a fresh copy of the fixture's panel.
+        count = 0;
+        wrong = 0;
+        if (auto* list = cases.getProperty ("panelFieldCases", {}).getArray())
+            for (const auto& c : *list)
+            {
+                ++count;
+                const auto path = c.getProperty ("path", {}).toString();
+                const auto found = colours::panelColourFieldAt (path);
+                const auto want = c.getProperty ("field", {});
+                bool agrees = want.isObject()
+                    ? found && found->empty == (bool) want.getProperty ("empty", false) && found->tokens == (bool) want.getProperty ("tokens", false)
+                    : ! found.has_value();
+                // ce.anim's question asks it the same way, for the script's path.
+                ceditor::PanelValueModel asked;
+                asked.loadFromJson (juce::JSON::toString (cases.getProperty ("panel", {})));
+                agrees = agrees && asked.isColourProperty ("panel." + path) == found.has_value();
+                if (agrees) continue;
+                ++wrong;
+                check (false, "colours: " + c.getProperty ("case", {}).toString() + ": got "
+                                  + (found ? juce::String (found->empty ? "empty " : "") + (found->tokens ? "tokens" : "colour") : juce::String ("not a colour")));
+            }
+        check (count > 10 && wrong == 0, "colours: all " + juce::String (count) + " panel field cases typed as the editor types them");
+
+        count = 0;
+        wrong = 0;
+        if (auto* list = cases.getProperty ("panelWriteCases", {}).getArray())
+            for (const auto& c : *list)
+            {
+                ++count;
+                ceditor::PanelValueModel panelModel;
+                panelModel.loadFromJson (juce::JSON::toString (cases.getProperty ("panel", {})));
+                const auto path = c.getProperty ("path", {}).toString();
+                const auto value = c.getProperty ("value", {});
+                const auto read = panelModel.colourWrites ("set(\"" + path + "\")", path, value);
+                juce::StringArray want;
+                if (auto* lines = c.getProperty ("refused", {}).getArray())
+                    for (const auto& line : *lines) want.add (line.toString());
+                bool agrees = read.refused == ! want.isEmpty() && read.lines == want;
+                if (! read.refused) agrees = panelModel.setValue (path, read.value) && agrees;
+                juce::String got = read.lines.joinIntoString (" / ");
+                if (auto* reads = c.getProperty ("reads", {}).getDynamicObject())
+                    for (const auto& r : reads->getProperties())
+                    {
+                        const auto now = panelModel.getValue (r.name.toString());
+                        if (juce::JSON::toString (now) == juce::JSON::toString (r.value)) continue;
+                        agrees = false;
+                        got += " | get(\"" + r.name.toString() + "\") = " + juce::JSON::toString (now);
+                    }
+                if (agrees) continue;
+                ++wrong;
+                check (false, "colours: " + c.getProperty ("case", {}).toString() + ": got " + got);
+            }
+        check (count > 10 && wrong == 0, "colours: all " + juce::String (count)
+                                             + " panel writes stored, refused and read back as the editor does, in its words");
+
         // JavaScript's numbers, which the refusals print and the CSS forms are read and rounded by.
         check (colours::jsNumber (0.30000000000000004) == "0.30000000000000004" && colours::jsNumber (-0.0) == "0"
                    && colours::jsNumber (5e-324) == "5e-324" && colours::jsNumber (1e-6) == "0.000001"
@@ -700,8 +757,14 @@ int main()
 
         check (write ("lbl.text.content", "red").value.toString() == "red" && ! write ("lbl.text.content", "red").refused,
                "colours: a property that is not a colour is left alone, whatever it holds");
-        check (write ("panel.bgColour", "redd").value.toString() == "redd" && ! write ("panel.bgColour", "redd").refused,
-               "colours: the panel document is not read, as the editor's set() does not read it");
+        const auto panelRedd = write ("panel.bgColour", "redd");
+        check (panelRedd.refused && panelRedd.lines.size() == 1
+                   && panelRedd.lines[0] == "set(\"panel.bgColour\"): \"redd\" is not a colour the panel can read, so nothing was set. "
+                                            + forms + "."
+                   && write ("panel.bgColour", "red").value.toString() == "#FF0000"
+                   && write ("panel.width", "red").value.toString() == "red" && ! write ("panel.width", "red").refused,
+               "colours: the panel's own colours are read by the same rule, and its other keys left alone (got "
+                   + panelRedd.lines.joinIntoString (" / ") + ")");
         check (! write ("nosuch.background.fill.colour", "redd").refused,
                "colours: a control that is not there is left for setValue to report");
         check (write ("bare.background.fill.colour", "redd").refused && write ("bare.icon.tint", "{accent}").refused,
@@ -714,9 +777,12 @@ int main()
                    && colourModel.isColourProperty ("bare.icon.tint") && colourModel.isColourProperty ("meter.meter.zones.5.colour"),
                "colours: ce.anim's question, a colour property, found as set() finds it");
         check (! colourModel.isColourProperty ("lbl.text.content") && ! colourModel.isColourProperty ("lbl.transform.x")
-                   && ! colourModel.isColourProperty ("panel.bgColour") && ! colourModel.isColourProperty ("nosuch.background.fill.colour")
-                   && ! colourModel.isColourProperty ("lbl"),
-               "colours: and not where it is not one, or not a control's");
+                   && ! colourModel.isColourProperty ("nosuch.background.fill.colour") && ! colourModel.isColourProperty ("lbl")
+                   && ! colourModel.isColourProperty ("panel.width") && ! colourModel.isColourProperty ("panel"),
+               "colours: and not where it is not one");
+        check (colourModel.isColourProperty ("panel.bgColour") && colourModel.isColourProperty ("PANEL.gridSubColour")
+                   && colourModel.isColourProperty ("panel.bgGradient.stops.3.color"),
+               "colours: the panel's own colours are colour properties too");
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

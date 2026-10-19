@@ -1,5 +1,5 @@
 {
-  "about": "What a script may write to a colour property, run by BOTH runtimes: colourPropertyCases.test.js through the editor's scriptColours.panelColour and colourFieldAt, and CE/tests/PanelValueModelTests.cpp through CE/src/Scripting/ScriptColours.h, which the plug-in reads a set() by with its window shut. Each case writes `value` to a field of kind `field` (see fields) on a panel whose control set has exactly the names in controlSetNames, and is either stored (what is stored) or refused (why and advice, the two halves of the sentence set() prints: set(\"<path>\"): <why>, so nothing was set. <advice>). Each fieldCase asks whether `path` on the control `root` is a colour property, and of which kind; null means it is not one. Each controlSetCase asks whether a panel with that `controlSet` and `controlSets` resolves the reference `name`, as the editor's resolveToken(name, controlSetForPanel(panel)) answers and the plug-in's controlSetResolves must, against the real built-in and base sets.",
+  "about": "What a script may write to a colour property, run by BOTH runtimes: colourPropertyCases.test.js through the editor's scriptColours.panelColour and colourFieldAt, and CE/tests/PanelValueModelTests.cpp through CE/src/Scripting/ScriptColours.h, which the plug-in reads a set() by with its window shut. Each case writes `value` to a field of kind `field` (see fields) on a panel whose control set has exactly the names in controlSetNames, and is either stored (what is stored) or refused (why and advice, the two halves of the sentence set() prints: set(\"<path>\"): <why>, so nothing was set. <advice>). Each fieldCase asks whether `path` on the control `root` is a colour property, and of which kind; null means it is not one. Each controlSetCase asks whether a panel with that `controlSet` and `controlSets` resolves the reference `name`, as the editor's resolveToken(name, controlSetForPanel(panel)) answers and the plug-in's controlSetResolves must, against the real built-in and base sets. `panel` is a panel document, for the panel's own colours (panel.bgColour and the rest): each panelFieldCase asks whether `path`, below the panel, is one of them, as panelColourFieldAt answers in both, and each panelWriteCase writes `value` at the script path `path` on a fresh copy of `panel`, through the editor's set() and the plug-in's PanelValueModel, with the lines set() prints when it refuses (`refused`, none when it stores) and what get() then reads at each path in `reads`.",
   "fields": {
     "plain": { "empty": false, "tokens": false },
     "empty": { "empty": true, "tokens": true },
@@ -186,5 +186,44 @@
     {"case":"a document set not named is not used","panel":{"controlSets":[{"id":"mine","name":"Mine","tokens":{"brand":"FF123456","brand.alias":"{brand}","brand.base":"{accent}","brand.broken":"{nowhere}","loop":"{loop}","surface.hover":"{brand}"}}]},"name":"brand","resolves":false},
     {"case":"a token that is not text resolves to nothing","panel":{"controlSet":{"id":"num"},"controlSets":[{"id":"num","name":"Num","tokens":{"brand":5}}]},"name":"brand","resolves":false},
     {"case":"an object's own key is not a token","panel":{"controlSet":{"id":"mine"},"controlSets":[{"id":"mine","name":"Mine","tokens":{"brand":"FF123456","brand.alias":"{brand}","brand.base":"{accent}","brand.broken":"{nowhere}","loop":"{loop}","surface.hover":"{brand}"}}]},"name":"constructor","resolves":false}
+  ],
+  "panel": {"name":"Colours","width":600,"bgColour":"FF333333","bgImageTint":"FFFFFF","bgTextureTint":"FFFFFF","gridColour":"33FFFFFF","gridSubColour":"55FFFFFF","bgGradient":{"type":"linear","angle":90,"stops":[{"color":"FF0000","position":0},{"color":"0000FF","position":100}]},"controls":[]},
+  "panelFieldCases": [
+    {"case":"the solid background","path":"bgColour","field":{"empty":false,"tokens":false}},
+    {"case":"the same, in other capitals","path":"BGCOLOUR","field":{"empty":false,"tokens":false}},
+    {"case":"the image tint, a colour by its default and not its name","path":"bgImageTint","field":{"empty":false,"tokens":false}},
+    {"case":"the texture tint","path":"bgTextureTint","field":{"empty":false,"tokens":false}},
+    {"case":"the grid","path":"gridColour","field":{"empty":false,"tokens":false}},
+    {"case":"the grid's subdivisions","path":"gridSubColour","field":{"empty":false,"tokens":false}},
+    {"case":"a gradient stop, at any position","path":"bgGradient.stops.7.color","field":{"empty":false,"tokens":false}},
+    {"case":"a stop in other capitals","path":"BgGradient.Stops.0.Color","field":{"empty":false,"tokens":false}},
+    {"case":"a stop's position is not a colour","path":"bgGradient.stops.0.position","field":null},
+    {"case":"the gradient whole is not a colour","path":"bgGradient","field":null},
+    {"case":"a gradient's name is not a colour","path":"bgGradientName","field":null},
+    {"case":"a size is not a colour","path":"width","field":null},
+    {"case":"a stop named by something that is not a position","path":"bgGradient.stops.first.color","field":null},
+    {"case":"a key below a colour is not one","path":"bgColour.value","field":null},
+    {"case":"the control set the panel names is not one of its colours","path":"controlSet.id","field":null},
+    {"case":"nothing at all","path":"","field":null}
+  ],
+  "panelWriteCases": [
+    {"case":"a name in the background, written out","path":"panel.bgColour","value":"red","refused":[],"reads":{"panel.bgColour":"#FF0000"}},
+    {"case":"the panel's own form with \"#\", as written","path":"panel.bgColour","value":"#5B9BD5","refused":[],"reads":{"panel.bgColour":"#5B9BD5"}},
+    {"case":"AARRGGBB in other capitals, as written","path":"panel.BGCOLOUR","value":"80ff0000","refused":[],"reads":{"panel.bgColour":"80ff0000"}},
+    {"case":"\"#RGB\" in the grid's colour","path":"panel.gridColour","value":"#abc","refused":[],"reads":{"panel.gridColour":"#AABBCC"}},
+    {"case":"rgba() in the subdivisions' colour","path":"panel.gridSubColour","value":"rgba(255, 255, 255, 0.5)","refused":[],"reads":{"panel.gridSubColour":"80FFFFFF"}},
+    {"case":"transparent as the image tint","path":"panel.bgImageTint","value":"transparent","refused":[],"reads":{"panel.bgImageTint":"00000000"}},
+    {"case":"hsl() as the texture tint","path":"panel.bgTextureTint","value":"hsl(0, 100%, 50%)","refused":[],"reads":{"panel.bgTextureTint":"#FF0000"}},
+    {"case":"what the panel cannot read is refused, and nothing is written","path":"panel.bgColour","value":"redd","refused":["set(\"panel.bgColour\"): \"redd\" is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl()."],"reads":{"panel.bgColour":"FF333333"}},
+    {"case":"a number is refused, with how it reads as text","path":"panel.bgImageTint","value":16777215,"refused":["set(\"panel.bgImageTint\"): 16777215 is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). As text, 16777215 is \"#FFFFFF\"."],"reads":{"panel.bgImageTint":"FFFFFF"}},
+    {"case":"\"\" is not a background","path":"panel.bgColour","value":"","refused":["set(\"panel.bgColour\"): \"\" is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl()."],"reads":{"panel.bgColour":"FF333333"}},
+    {"case":"a control-set colour is not read in the panel's colours","path":"panel.gridColour","value":"{accent}","refused":["set(\"panel.gridColour\"): \"{accent}\" is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). A control-set colour is not read in this property."],"reads":{"panel.gridColour":"33FFFFFF"}},
+    {"case":"\"#\" with four digits, with the form to write","path":"panel.gridColour","value":"#0008","refused":["set(\"panel.gridColour\"): \"#0008\" is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). Write \"88000000\"."],"reads":{"panel.gridColour":"33FFFFFF"}},
+    {"case":"a gradient stop by its path","path":"panel.bgGradient.stops.0.color","value":"lime","refused":[],"reads":{"panel.bgGradient.stops.0.color":"#00FF00"}},
+    {"case":"a stop the panel cannot read","path":"panel.bgGradient.stops.1.color","value":"blurple","refused":["set(\"panel.bgGradient.stops.1.color\"): \"blurple\" is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl()."],"reads":{"panel.bgGradient.stops.1.color":"0000FF"}},
+    {"case":"a gradient written whole, each stop read","path":"panel.bgGradient","value":{"type":"radial","angle":45,"stops":[{"color":"navy","position":0},{"color":"80FF0000","position":100}]},"refused":[],"reads":{"panel.bgGradient.type":"radial","panel.bgGradient.stops.0.color":"#000080","panel.bgGradient.stops.1.color":"80FF0000"}},
+    {"case":"a gradient written whole with a stop it cannot read is refused, naming the stop","path":"panel.bgGradient","value":{"type":"radial","stops":[{"color":"#12345","position":0},{"color":"red","position":100}]},"refused":["set(\"panel.bgGradient\"): at stops.0.color, \"#12345\" is not a colour the panel can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl()."],"reads":{"panel.bgGradient.type":"linear","panel.bgGradient.stops.0.color":"FF0000","panel.bgGradient.stops.1.color":"0000FF"}},
+    {"case":"a property that is not a colour is left alone","path":"panel.name","value":"red","refused":[],"reads":{"panel.name":"red"}},
+    {"case":"a number where the panel keeps one","path":"panel.bgGradient.angle","value":45,"refused":[],"reads":{"panel.bgGradient.angle":45}}
   ]
 }
