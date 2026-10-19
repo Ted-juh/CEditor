@@ -29,7 +29,7 @@ import {
 import { presetSlotInfo } from '../stores/deviceProfileLocalEngine.js';
 import { recallPreset as recallPresetAction } from '../stores/presetLibrarian.js';
 import { noteScriptTouchedControl, noteScriptTouchedControls } from '../stores/scriptTouchedControls.js';
-import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
+import { valueAtPath, probeNestedWrite, getDefaultChildTemplate } from '../stores/controlTreeUtils.js';
 import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
 import {
@@ -5794,11 +5794,56 @@ function applyControlProps(control, props, sections, scriptId = '') {
   // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
   // script setting one field does not wipe the rest of the section.
   for (const [section, values] of sections) {
-    control._children[section] = { ...control._children[section], ...values };
+    control._children[section] = mergeSettings(control._children[section], values);
   }
   core[GENERATED_KEY] = scriptId || 'script';
   return control;
 }
+
+/**
+ * `values` merged into `node`, a section or one of its children, as a new node: each key is a field
+ * written over the one there, except a key that names a child of `node` with a table as its value,
+ * which is merged into that child the same way, at every depth, keeping the child's other fields.
+ * { Background = { Fill = { colour = "red" } } } changes Background's Fill and nothing else of it.
+ *
+ * A child is one in `node`'s `_children`, or one set() would make there from a template on the way
+ * down a path (the section's template's children, and the optional effect targets: controlTreeUtils
+ * getDefaultChildTemplate), made from that template first. Its name is matched exactly, as create
+ * and clone match a section's name (a key in another case is a plain field, as it always was). A
+ * Fill given beside Background's `_children` was a field nothing reads, so its colour, read since
+ * create began reading colours, had no effect. `_children` given whole is merged entry by entry for
+ * the same reason, rather than replacing every child with the few it names.
+ */
+function mergeSettings(node, values) {
+  const merged = { ...node };
+  const intoChild = (name, value) => {
+    const into = isPlainTable(value) ? childToMerge(merged, name) : undefined;
+    if (!into) return false;
+    merged._children = { ...merged._children, [name]: mergeSettings(into, value) };
+    return true;
+  };
+  for (const [key, value] of Object.entries(values)) {
+    if (key === '_children' && isPlainTable(value)) {
+      for (const [name, child] of Object.entries(value)) {
+        if (!intoChild(name, child)) merged._children = { ...merged._children, [name]: child };
+      }
+    } else if (!intoChild(key, value)) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+/** The child of `node` called exactly `name`, or a copy of the template set() would make it from
+ *  there (a Fill's effect targets are made with the `_children` they go in), or undefined. */
+function childToMerge(node, name) {
+  const children = node?._children;
+  if (isPlainTable(children) && Object.hasOwn(children, name)) return isPlainTable(children[name]) ? children[name] : undefined;
+  const template = getDefaultChildTemplate(node?._type, name);
+  return isPlainTable(template) ? deepClone(template) : undefined;
+}
+
+const isPlainTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 function panelCreateImpl(type, props, scriptId) {
   const typeName = String(type ?? '');

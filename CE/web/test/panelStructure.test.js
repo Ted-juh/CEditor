@@ -215,18 +215,156 @@ test('a Lua table of props is read as wasmoon hands it over', async () => {
     clearScriptTrace();
     await lua.doString(`
       made = create("Meter", { name = "m", Meter = { trackColour = "red" }, Core = { formFaceColour = "#000" } })
-      refused = create("Meter", { name = "n", Meter = { trackColour = "redd" } })`);
+      refused = create("Meter", { name = "n", Meter = { trackColour = "redd" } })
+      nested = create("Button", { name = "b", Background = { Fill = { colour = "teal", gradient = {
+        type = "linear", stops = { { color = "navy", position = 0 }, { color = "FF5B9BD5", position = 100 } } } } } })`);
     assert.equal(lua.global.get('made'), 'm');
     assert.equal(lua.global.get('refused'), null, 'nil in Lua');
     assert.equal(made(panel, 'm')._children.Meter.trackColour, '#FF0000');
     assert.equal(made(panel, 'm')._children.Core.formFaceColour, '#000000');
     assert.deepEqual(errors(), [`ce.panel.create("Meter"): at "Meter.trackColour", "redd" is not a colour the `
       + `panel can read, so nothing was created. ${FORMS}`]);
-    assert.deepEqual(names(panel), ['m']);
+    assert.equal(lua.global.get('nested'), 'b');
+    const fill = made(panel, 'b')._children.Background._children.Fill;
+    assert.equal(fill.colour, '#008080', 'a child inside a section, from a Lua table');
+    assert.deepEqual(fill.gradient.stops, [{ color: '000080', position: 0 }, { color: '5B9BD5', position: 100 }]);
+    assert.deepEqual(names(panel), ['m', 'b']);
   } finally {
     lua.global.close();
     setRuntimeHost(null);
   }
+});
+
+/* ------------------------------------------------------------ a section's children in the props */
+// A table inside a section whose key names one of the section's children ({ Background = { Fill =
+// … } }) used to be stored beside the section's _children, where nothing reads it, so the colour in
+// it was read and then had no effect. It is merged into that child, at every depth, keeping the
+// child's other fields; a child the control has not made yet is made from its template first, as
+// set() makes one on the way down a path.
+
+test('a section\'s child given inside create\'s props lands where the renderer reads it', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    const props = { name: 'b', Background: { mode: 'gradient', Fill: { colour: '#FF0000' } }, Text: { Font: { size: 20 } } };
+    assert.equal(api.panelCreate('Button', props), 'b');
+    assert.equal(traced(), '');
+
+    const background = made(panel, 'b')._children.Background;
+    assert.equal(background._children.Fill.colour, '#FF0000', 'the colour is the Fill\'s, which the renderer reads');
+    assert.equal('Fill' in background, false, 'and nothing is left beside _children');
+    assert.equal(background.mode, 'gradient', 'a plain field of the section stays a plain field');
+    const fill = SECTION_DEFAULTS.Background._children.Fill;
+    assert.equal(background._children.Fill.solidEnabled, fill.solidEnabled, 'the Fill keeps its other fields');
+    assert.deepEqual(background._children.Fill.layerOrder, fill.layerOrder);
+    assert.deepEqual(Object.keys(background._children), ['Fill', 'Border', 'Corners'], 'and its siblings');
+    const text = made(panel, 'b')._children.Text;
+    assert.equal(text._children.Font.size, 20);
+    assert.equal(text._children.Font.family, SECTION_DEFAULTS.Text._children.Font.family);
+    assert.equal(props.Background.Fill.colour, '#FF0000', 'the script\'s table is left as it wrote it');
+  });
+});
+
+test('a child two deep is merged the same way, made from its template where the control has none yet', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    // Background's Effects is made only when edited, from the Effects template, as set() makes it.
+    const props = { name: 'b', Background: { Effects: { Bevel: { highlightColour: 'red', enabled: true } } } };
+    assert.equal(api.panelCreate('Button', props), 'b');
+    assert.equal(traced(), '');
+    const effects = made(panel, 'b')._children.Background._children.Effects;
+    assert.equal(effects._type, 'Effects');
+    assert.equal(effects._children.Bevel.highlightColour, '#FF0000', 'written out, as set() writes it');
+    assert.equal(effects._children.Bevel.enabled, true);
+    assert.equal(effects._children.Bevel.depth, SECTION_DEFAULTS.Effects._children.Bevel.depth, 'the rest of the Bevel kept');
+    assert.deepEqual(effects._children.Shadows, SECTION_DEFAULTS.Effects._children.Shadows, 'and the Effects\' other children');
+    assert.notEqual(effects._children.Shadows, SECTION_DEFAULTS.Effects._children.Shadows, 'copied, not the template itself');
+
+    // Fill's effect targets live in a _children the Fill does not have until one is made.
+    assert.equal(api.panelCreate('Button', { name: 'c', Background: { Fill: { SolidEffects: { Bevel: { shadowColour: 'navy' } } } } }), 'c');
+    const fill = made(panel, 'c')._children.Background._children.Fill;
+    assert.equal(fill._children.SolidEffects._type, 'SolidEffects');
+    assert.equal(fill._children.SolidEffects._children.Bevel.shadowColour, '#000080');
+    assert.equal(fill.colour, SECTION_DEFAULTS.Background._children.Fill.colour, 'the Fill keeps its own fields');
+
+    // Two sections, each with a child, in one call.
+    assert.equal(api.panelCreate('Button', { name: 'd', Background: { Border: { colour: 'teal' } }, Text: { Fill: { colour: 'lime' } } }), 'd');
+    assert.equal(made(panel, 'd')._children.Background._children.Border.colour, '#008080');
+    assert.equal(made(panel, 'd')._children.Text._children.Fill.colour, '#00FF00');
+    assert.equal(made(panel, 'd')._children.Background._children.Fill.colour, SECTION_DEFAULTS.Background._children.Fill.colour);
+  });
+});
+
+test('a colour a nested child cannot read refuses the call, named by its whole path', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    const props = { name: 'b', Background: { Fill: { colour: 'teal' }, Effects: { Bevel: { highlightColour: 'redd' } } } };
+    assert.equal(api.panelCreate('Button', props), null);
+    assert.deepEqual(errors(), [`ce.panel.create("Button"): at "Background.Effects.Bevel.highlightColour", "redd" is `
+      + `not a colour the panel can read, so nothing was created. ${FORMS}`]);
+    assert.deepEqual(names(panel), []);
+  });
+});
+
+test('a child is matched by its exact name, as a section is, and a key that is neither is kept as a field', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    // create matches a section's name exactly (a key in other capitals is not an option it takes),
+    // and a child's the same way: "fill" is a field of Background, read by nothing, as it always was.
+    assert.equal(api.panelCreate('Button', { name: 'b', Background: { fill: { colour: 'red' }, Fil: { colour: 'x' } } }), 'b');
+    const background = made(panel, 'b')._children.Background;
+    assert.deepEqual(background.fill, { colour: '#FF0000' });
+    assert.deepEqual(background.Fil, { colour: 'x' });
+    assert.equal(background._children.Fill.colour, SECTION_DEFAULTS.Background._children.Fill.colour);
+    assert.equal(traced(), '');
+  });
+});
+
+test('clone merges a child given in its props into the copy\'s, and leaves the source alone', () => {
+  const template = createControl('Button', { name: 'template' });
+  template._children.Background._children.Fill.colour = 'FF112233';
+  template._children.Background._children.Fill.solidBlend = 'multiply';
+  const panel = panelWith([template]);
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    assert.equal(api.panelClone('template', { name: 'a', Background: { Fill: { colour: 'SteelBlue' } } }), 'a');
+    assert.deepEqual(errors(), []);
+    const fill = made(panel, 'a')._children.Background._children.Fill;
+    assert.equal(fill.colour, '#4682B4');
+    assert.equal(fill.solidBlend, 'multiply', 'the copy keeps what the source\'s Fill had');
+    assert.equal(made(panel, 'template')._children.Background._children.Fill.colour, 'FF112233', 'the source is as it was');
+
+    clearScriptTrace();
+    assert.equal(api.panelClone('template', { name: 'b', Background: { Fill: { colour: 'redd' } } }), null);
+    assert.deepEqual(errors(), [`ce.panel.clone("template"): at "Background.Fill.colour", "redd" is not a colour the `
+      + `panel can read, so nothing was copied. ${FORMS}`]);
+    assert.deepEqual(names(panel), ['template', 'a']);
+  });
+});
+
+test('a gradient given in create\'s props has its stops stored in a stop\'s form, or refused by the stop', () => {
+  const panel = panelWith();
+  withPanel(panel, (api) => {
+    clearScriptTrace();
+    const gradient = { type: 'linear', angle: 90, stops: [{ color: 'red', position: 0 }, { color: '#5b9bd5', position: 100 }] };
+    assert.equal(api.panelCreate('Button', { name: 'b', Background: { Fill: { gradientEnabled: true, gradient } } }), 'b');
+    assert.equal(traced(), '');
+    const fill = made(panel, 'b')._children.Background._children.Fill;
+    assert.equal(fill.gradientEnabled, true);
+    assert.deepEqual(fill.gradient, { type: 'linear', angle: 90, stops: [{ color: 'FF0000', position: 0 }, { color: '5B9BD5', position: 100 }] });
+    assert.equal(gradient.stops[0].color, 'red', 'the script\'s table is left as it wrote it');
+
+    clearScriptTrace();
+    const seeThrough = { stops: [{ color: 'navy', position: 0 }, { color: 'rgba(0, 0, 255, 0.5)', position: 100 }] };
+    assert.equal(api.panelCreate('Button', { name: 'c', Background: { Fill: { gradient: seeThrough } } }), null);
+    assert.deepEqual(errors(), ['ce.panel.create("Button"): at "Background.Fill.gradient.stops.1.color", "rgba(0, 0, 255, '
+      + '0.5)" has an alpha, and a gradient stop has none: its opacity is the gradient layer\'s, so nothing was created. '
+      + 'Write "0000FF", the colour without its alpha.']);
+    assert.deepEqual(names(panel), ['b']);
+  });
 });
 
 test('parent moves a control into a container and back out', () => {
