@@ -29,7 +29,9 @@ import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
 import { LAYOUT_WORDS, layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
-import { DRAW_SHAPES, drawNumber, shapeOutline, outsideWords } from './drawShapes.js';
+import {
+  DRAW_SHAPES, drawNumber, shapeOutline, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
+} from './drawShapes.js';
 import {
   COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
   familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
@@ -1064,6 +1066,11 @@ export function readDrawShape(memberId, args, self) {
     nums[name] = drawNumber(memberId, name, a?.value).n;
   }
   let points = [];
+  // What a row says of its own argument, in the runtime's words: an item of a point list that is
+  // not a point, a radius, tension or scale not used as given, the characters with no glyph.
+  const said = {};
+  const opts = arg('opts');
+  const o = opts?.literal && opts.value && typeof opts.value === 'object' ? opts.value : {};
   if (memberId === 'drawPath') {
     const a = arg('points');
     if (!a?.literal || !Array.isArray(a.value)) return null;
@@ -1074,16 +1081,53 @@ export function readDrawShape(memberId, args, self) {
     }
     nums.closed = arg('closed')?.value === true;
   }
-  const opts = arg('opts');
+  let extra = {};
+  if (memberId === 'drawPoints' || memberId === 'drawCurve') {
+    const a = arg('points');
+    if (!a?.literal) return null;
+    const read = pointList(memberId, a.value);
+    points = read.points;
+    said.points = read.said;
+    if (memberId === 'drawPoints') {
+      const r = arg('radius');
+      if (r && !r.literal) return null;
+      const radius = pointRadius(r?.value);
+      said.radius = radius.said;
+      extra = { radius: radius.r };
+    } else {
+      // A curve's tension is in its options: not known until they are.
+      if (opts && !opts.literal) return null;
+      const tension = curveTension(o.tension);
+      said.tension = tension.said;
+      extra = { tension: tension.t, closed: o.closed === true };
+    }
+  }
+  if (memberId === 'drawPixelText') {
+    const text = arg('text');
+    const sc = arg('scale');
+    if (!text?.literal || typeof text.value !== 'string' || (sc && !sc.literal)) return null;
+    const scale = pixelScale(sc?.value);
+    said.scale = scale.said;
+    said.text = pixelGapWords(text.value);
+    extra = { text: text.value, scale: scale.scale };
+  }
+  // A clip given no x clears the clip; its width and height are at least 0, as the runtime holds them.
+  if (memberId === 'drawClip') {
+    if (!arg('x')) return null;
+    nums.w = Math.max(0, nums.w);
+    nums.h = Math.max(0, nums.h);
+  }
   const outline = shapeOutline(memberId, nums, {
-    points, sides: arg('sides')?.literal ? arg('sides').value : 3, rotation: opts?.literal ? opts.value?.rotation : 0,
+    points, sides: arg('sides')?.literal ? arg('sides').value : 3, rotation: o.rotation ?? 0, ...extra,
   });
-  if (!outline) return null;
+  if (!outline) return memberId === 'drawPoints' || memberId === 'drawCurve' ? { said } : null;
   const t = self?._children?.Transform;
   const box = t && Number(t.width) > 0 && Number(t.height) > 0 ? { w: Number(t.width), h: Number(t.height) } : null;
   // Half the stroke the drawing starts with, 1 wide, counts as inside: what the script set before
-  // this call is not read here.
-  return { ...outline, box, outside: outsideWords(memberId, outline.bounds, box, 1) };
+  // this call is not read here. A clip says what it leaves of the control, in its own words.
+  const outside = memberId === 'drawClip' ? clipWords({ x: nums.x, y: nums.y, w: nums.w, h: nums.h }, box)
+    : outsideWords(memberId, outline.bounds, box, 1);
+  return { ...outline, box, outside, said };
 }
 
 /* ------------------------------------------------------------------------ roles and dumps */
@@ -1446,6 +1490,28 @@ export function readImage(value, { images, wantsData, path }) {
   if (list && !meaning.found && !meaning.dataUrl) {
     return { meaning, problem: { severity: 'warning', message: `No image called "${value}" in the library or the panel.${didYouMean(value, meaning.choices)}` } };
   }
+  return { meaning, problem: null };
+}
+
+/* ------------------------------------------------------------------------ component types */
+
+/**
+ * ce.panel.create's type: the types there are, which ce.panel.types() lists, the size one is made
+ * at, and the runtime's refusal for one there is none of, with the nearest when it is a slip. The
+ * type is matched exactly, so "knob" is refused and "Knob" is one.
+ */
+export function readComponentType(value, { types = {} } = {}) {
+  const names = Object.keys(types);
+  const meaning = { choices: names };
+  if (typeof value !== 'string') return { meaning, problem: null };
+  const spec = types[value];
+  if (!spec) {
+    const near = closest(value, names);
+    if (near !== null) meaning.hint = `did you mean "${near}"?`;
+    return { meaning, problem: { severity: 'error', message: `ce.panel.create("${value}"): no such component type. ce.panel.types() lists them.` } };
+  }
+  const t = spec.defaultOverrides?.Transform;
+  if (Number(t?.width) > 0 && Number(t?.height) > 0) meaning.hint = `made ${t.width} × ${t.height} unless props say otherwise`;
   return { meaning, problem: null };
 }
 

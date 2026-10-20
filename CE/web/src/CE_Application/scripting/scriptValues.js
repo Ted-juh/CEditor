@@ -28,7 +28,7 @@ import {
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
-  readLcdLine,
+  readLcdLine, readComponentType,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -40,8 +40,9 @@ import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/control
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { TIME_NUMBERS } from './timeWords.js';
 import { octaveCount } from './noteLists.js';
-import { DRAW_SHAPES, drawNumber } from './drawShapes.js';
+import { DRAW_SHAPES, drawNumber, curveTension } from './drawShapes.js';
 import { readPresetSlot, programWords, bankWords } from './presetWords.js';
+import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { componentClampWarning } from './componentVerbs.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
@@ -411,9 +412,17 @@ function buildCall(raw, env) {
   // one that lies wholly outside it (drawShapes.js).
   if (member && DRAW_SHAPES[member.id]) {
     const shape = readDrawShape(member.id, args, env.ctx.self);
-    if (shape) {
+    if (shape?.d) {
       call.shape = shape;
       if (shape.outside && !call.problem) call.problem = { severity: 'warning', message: shape.outside };
+    }
+    // …and what it says of an argument it does not use as given, on that argument's row: a point
+    // list's item, a radius, a scale, the text's characters, or opts' tension.
+    for (const [name, message] of Object.entries(shape?.said ?? {})) {
+      if (!message) continue;
+      const at = name === 'tension' ? args.find((a) => a.param?.name === 'opts')?.options?.find((o) => o.name === 'tension')
+        : args.find((a) => a.param?.name === name);
+      if (at && !at.problem) at.problem = { severity: 'warning', message };
     }
   }
   if (member) return call;
@@ -566,6 +575,11 @@ function classify(arg, node, param, site, index) {
         if (said) read.meaning.hint = said;
       }
       return setRead(arg, 'number', read, typeof value === 'number' ? 'number' : null);
+    }
+    // A component type ce.panel.create makes, against the ones there are.
+    case 'componentType': {
+      const read = readComponentType(value, { types: COMPONENT_TYPES });
+      return setRead(arg, 'componentType', read, typeof value === 'string' ? 'choice' : null);
     }
     // A preset slot, read against the role's profile's banks, as recallPreset recalls one.
     case 'presetSlot': {
@@ -755,6 +769,8 @@ function numberSite(site, param) {
   if (site.memberId === 'expandOctaves' && param.name === 'octaves') out.numberSaid = (v) => octaveCount(v).said;
   // A drawing's coordinate, read as the runtime reads it (drawShapes.js).
   if (DRAW_SHAPES[site.memberId]?.nums.includes(param.name)) out.numberSaid = (v) => drawNumber(site.memberId, param.name, v).said;
+  // A curve's tension past 0 to 1 is drawn at its nearest end, and said: it is not refused.
+  if (site.memberId === 'drawCurve' && site.option === 'tension') out.numberSaid = (v) => curveTension(v).said;
   // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
   const bpm = (site.memberId === 'beatsToMs' || site.memberId === 'msToBeats') && param.name !== 'bpm' ? realNumber(sibling(site, 'bpm')) : undefined;
   if (bpm > 0) out.tempo = bpm;

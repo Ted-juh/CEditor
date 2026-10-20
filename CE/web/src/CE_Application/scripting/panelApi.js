@@ -2011,7 +2011,7 @@ export const COMMANDS = [
     summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'type', type: 'string', required: true },
+      { name: 'type', type: 'string', required: true, kind: 'componentType' },
       { name: 'props', type: 'object', required: false, fields: optionFields([
         'controlName', 'controlX', 'controlY', 'controlWidth', 'controlHeight', 'controlParent',
         'controlSection',

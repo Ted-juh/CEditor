@@ -16,7 +16,9 @@ import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scri
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { valueAtPath, setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { readStatement } from '../src/CE_Application/scripting/scriptValues.js';
-import { commandBounds, outsideWords, shapeOutline, polygonPoints } from '../src/CE_Application/scripting/drawShapes.js';
+import { commandBounds, outsideWords, shapeOutline, polygonPoints, curvePathData } from '../src/CE_Application/scripting/drawShapes.js';
+import { drawingFor } from '../src/CE_Application/stores/scriptDraw.js';
+import { meaningLine } from '../src/CE_Application/editor/valueRows.js';
 
 const ONCE = ' This is said only the first time.';
 
@@ -98,4 +100,84 @@ test('a drawing call\'s row draws the shape on the control\'s outline, and says 
   // A panel's script draws on no control the row knows: the shape, with no outline to put it on.
   const loose = callOf('ce.draw.rect(5000, 5000, 10, 10)', { panel: PANEL });
   assert.deepEqual([loose.shape.box, loose.problem], [null, null]);
+});
+
+test('points and a curve say an item that is not a point, a radius and a tension not used as given, once', () => {
+  let drawn;
+  const { panel, lines } = run((api) => {
+    api.drawPoints([[10, 10], ['x', 1], [20, 20]], -2);
+    api.drawPoints([[10, 10], ['x', 1]], -2);
+    api.drawCurve([[0, 0], [50, 50], [90, 10]], { tension: 'smooth' });
+    api.drawCurve([[0, 0], [50, 50]], { tension: 2 });
+    api.drawPoints([[5000, 5000]]);
+  });
+  drawn = drawingFor(panel.controls[0]._children.Core.id);
+  assert.deepEqual(lines, [
+    'ce.draw.points: a list at position 2 of points is not a point, so it was left out.' + ONCE,
+    'ce.draw.points: radius -2 is not above 0, so 1.5 was used.' + ONCE,
+    'ce.draw.curve: tension "smooth" is not a number, so 0.5 was used.' + ONCE,
+    'ce.draw.points: the shape at 4998.5, 4998.5, 3 × 3 lies wholly outside the control, which is 100 × 100, so none of it shows.' + ONCE,
+  ], 'a tension past 1 is its nearest end, said with the first tension said; the second is not said again');
+  // A tension that is not a number is 0.5: it was NaN, and the curve was not drawn.
+  const curve = drawn.find((c) => c.op === 'curve');
+  assert.equal(curve.tension, 0.5);
+  assert.doesNotMatch(curvePathData(curve.points, curve.tension, false), /NaN/);
+  assert.deepEqual(drawn.find((c) => c.op === 'dots').points, [[10, 10], [20, 20]]);
+});
+
+test('pixel text says a scale not used as given, a character with no glyph, and a coordinate that is not a number', () => {
+  const { lines } = run((api) => {
+    api.drawPixelText('A&B', 'fast', 0, 0.4);
+    api.drawPixelText('A&B', 0, 0, 2.5);
+    api.drawPixelText('OK', 0, 0);
+  });
+  assert.deepEqual(lines, [
+    'ce.draw.pixelText: scale 0.4 is below 1, so 1 was used.' + ONCE,
+    'ce.draw.pixelText: the pixel font has no glyph for "&", so nothing is drawn in its place.' + ONCE,
+    'ce.draw.pixelText: x is "fast", which is not a number, so 0 was used.' + ONCE,
+  ]);
+  assert.deepEqual(commandBounds({ op: 'pixelText', text: 'AB', x: 1, y: 2, scale: 2 }), { x: 1, y: 2, w: 22, h: 14 }, 'two glyphs of 5, one gap of 1, at scale 2');
+});
+
+test('a clip that leaves the control nothing to draw in is said once, and clearing it says nothing', () => {
+  assert.deepEqual(run((api) => { api.drawClip(0, 0, -20, 40); api.drawClip(0, 0, -20, 40); api.drawClip(); }).lines,
+    ['ce.draw.clip: the clip is 0 × 40, so nothing drawn after it shows until ce.draw.clip() clears it.' + ONCE]);
+  assert.deepEqual(run((api) => api.drawClip(500, 0, 40, 40)).lines,
+    ['ce.draw.clip: the clip at 500, 0, 40 × 40 lies wholly outside the control, which is 100 × 100, so nothing drawn after it shows until ce.draw.clip() clears it.' + ONCE]);
+  assert.deepEqual(run((api) => api.drawClip(10, 10, 40, 40)).lines, []);
+});
+
+test('the four new shapes are drawn under their call, and each argument says what the runtime says of it', () => {
+  const said = (fn) => run(fn).lines.map((l) => l.slice(0, -ONCE.length));
+  const pts = callOf('ce.draw.points({ {10, 10}, {"x", 1}, {20, 20} }, -2)');
+  assert.ok(pts.shape.d.startsWith('M 8.5 10'), 'circles at the radius the runtime draws');
+  const [itemSaid, radiusSaid] = said((api) => api.drawPoints([[10, 10], ['x', 1], [20, 20]], -2));
+  assert.equal(pts.args.find((a) => a.name === 'points').problem.message, itemSaid);
+  assert.equal(pts.args.find((a) => a.name === 'radius').problem.message, radiusSaid);
+
+  const curve = callOf('ce.draw.curve({ {0, 0}, {50, 50} }, { tension = 2 })');
+  assert.equal(curve.shape.d, curvePathData([[0, 0], [50, 50]], 1, false));
+  const tension = curve.args.find((a) => a.name === 'opts').options.find((o) => o.name === 'tension');
+  assert.deepEqual(tension.problem, { severity: 'warning', message: 'ce.draw.curve: tension 2 is outside 0 to 1, so 1 was used.' });
+
+  const text = callOf('ce.draw.pixelText("A&B", 10, 10, 2)');
+  assert.ok(text.shape.d.length > 0);
+  assert.equal(text.args.find((a) => a.name === 'text').problem.message, 'ce.draw.pixelText: the pixel font has no glyph for "&", so nothing is drawn in its place.');
+
+  const clip = callOf('ce.draw.clip(500, 0, 40, 40)');
+  assert.equal(clip.problem.message, said((api) => api.drawClip(500, 0, 40, 40))[0]);
+  assert.equal(callOf('ce.draw.clip()').shape, undefined, 'a clip cleared draws nothing');
+  // Built from parts, a curve's options are not known: no shape, nothing claimed.
+  assert.equal(callOf('ce.draw.curve({ {0, 0}, {50, 50} }, opts)').shape, undefined);
+});
+
+test('ce.panel.create\'s type is one of the types there are, refused in the runtime\'s words', () => {
+  const row = (src) => callOf(src).args.find((a) => a.name === 'type');
+  const knob = row('ce.panel.create("Knob", {})');
+  assert.deepEqual([knob.kind, knob.editable, knob.problem, meaningLine(knob)], ['componentType', 'choice', null, 'made 100 × 100 unless props say otherwise']);
+  assert.ok(knob.meaning.choices.includes('SplitZone'));
+  const slip = row('ce.panel.create("knob", {})');
+  const said = run((api) => api.ce.panel.create('knob', {})).lines[0];
+  assert.deepEqual(slip.problem, { severity: 'error', message: said });
+  assert.equal(meaningLine(slip), 'did you mean "Knob"?');
 });

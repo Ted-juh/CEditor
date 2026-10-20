@@ -42,7 +42,9 @@ import { timeNumber } from './timeWords.js';
 import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
-import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
+import {
+  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
+} from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
@@ -5234,42 +5236,35 @@ function drawLinesImpl(explicit, ownerName, value) {
   return pushCommand(explicit, ownerName, { op: 'segments', segments });
 }
 
+// An item that is not a point is left out, a radius not above 0 is 1.5 and a tension outside 0 to
+// 1 its nearest end, each said once (drawShapes.js): they were done without a word, and a tension
+// that is not a number was NaN, which drew no curve.
 function drawPointsImpl(explicit, ownerName, value, radius) {
-  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
-  const points = [];
-  for (const item of list) {
-    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
-    if (!pair) continue;
-    const [px, py] = pair.map((n) => Number(n));
-    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
-  }
+  const { points, said } = pointList('drawPoints', value);
+  drawSaid('drawPoints\u0000points', said);
   if (!points.length) {
     addScriptTrace('error', '', 'ce.draw.points: no points. Pass a list of [x, y].');
     return false;
   }
-  const r = Number(radius) > 0 ? Number(radius) : 1.5;
-  return pushCommand(explicit, ownerName, { op: 'dots', points, r });
+  const { r, said: radiusSaid } = pointRadius(radius);
+  drawSaid('drawPoints\u0000radius', radiusSaid);
+  return pushCommand(explicit, ownerName, { op: 'dots', points, r }, 'drawPoints');
 }
 
 function drawCurveImpl(explicit, ownerName, value, opts) {
-  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
-  const points = [];
-  for (const item of list) {
-    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
-    if (!pair) continue;
-    const [px, py] = pair.map((n) => Number(n));
-    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
-  }
+  const { points, said } = pointList('drawCurve', value);
+  drawSaid('drawCurve\u0000points', said);
   if (points.length < 2) {
     addScriptTrace('error', '', 'ce.draw.curve: needs at least two points.');
     return false;
   }
   // A curve was inexpressible before: you approximated it with straight segments, which meant a
   // loop, which was the expensive thing. `tension` 0 is a polyline and 1 is fully round.
-  const tension = Math.max(0, Math.min(1, Number(opts?.tension ?? 0.5)));
+  const { t: tension, said: tensionSaid } = curveTension(opts?.tension);
+  drawSaid('drawCurve\u0000tension', tensionSaid);
   return pushCommand(explicit, ownerName, {
     op: 'curve', points, tension, closed: opts?.closed === true,
-  });
+  }, 'drawCurve');
 }
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
@@ -8659,9 +8654,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
         rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
     // LCD component prints are then the same letters, which a second font would not be.
-    drawPixelText: (text, x, y, scale) => pushCommand(null, ownerName,
-      { op: 'pixelText', text: String(text ?? ''), x: Number(x) || 0, y: Number(y) || 0,
-        scale: Math.max(1, Math.round(Number(scale) || 1)) }),
+    // Its numbers are read as every shape's are, and a character it has no glyph for is said
+    // (drawShapes.js): each left a gap, without a word.
+    drawPixelText: (text, x, y, scale) => {
+      const written = String(text ?? '');
+      const { scale: s, said } = pixelScale(scale);
+      drawSaid('drawPixelText\u0000scale', said);
+      drawSaid(`drawPixelText\u0000gaps\u0000${written}`, pixelGapWords(written));
+      return pushCommand(null, ownerName,
+        { op: 'pixelText', text: written, x: drawNum('drawPixelText', 'x', x), y: drawNum('drawPixelText', 'y', y), scale: s }, 'drawPixelText');
+    },
     drawMeasure: (text, opts) => drawMeasureImpl(text, opts),
 
     /* ce.draw, phase §49 — the bulk primitives, a style stack, clipping and images. */
@@ -8699,12 +8701,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
     // fill and stroke do, and save()/restore() put them back.
+    // A clip that leaves the control nothing to draw in hid everything after it without a word; it
+    // is said, once (drawShapes.js), and its numbers are read as every shape's are.
     drawClip: (x, y, w, h) => {
       if (x === undefined || x === null) { drawState.clip = null; return true; }
       drawState.clip = {
-        x: Number(x) || 0, y: Number(y) || 0,
-        w: Math.max(0, Number(w) || 0), h: Math.max(0, Number(h) || 0),
+        x: drawNum('drawClip', 'x', x), y: drawNum('drawClip', 'y', y),
+        w: Math.max(0, drawNum('drawClip', 'w', w)), h: Math.max(0, drawNum('drawClip', 'h', h)),
       };
+      const t = drawState.transform ? null : drawTarget(null, ownerName)?._children?.Transform;
+      drawSaid('drawClip', clipWords(drawState.clip, t ? { w: Number(t.width), h: Number(t.height) } : null));
       return true;
     },
     drawBlend: (mode) => {
