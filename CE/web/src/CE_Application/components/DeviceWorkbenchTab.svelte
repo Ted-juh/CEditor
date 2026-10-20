@@ -18,7 +18,7 @@
    * MIDI learn chips), and a diagnostics surface that quietly edited a profile would be a trap.
    */
   import { get } from 'svelte/store';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { initDeviceProfileBridge, mapDeviceRole } from '../stores/deviceProfiles.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { activePanel } from '../stores/panels.js';
@@ -36,6 +36,7 @@
     requestMidiCiDiscovery,
   } from '../stores/deviceProfileStores.js';
   import { parseProfileDump } from '../stores/deviceMidiOps.js';
+  import { rawMidiDraft } from '../stores/rawMidiDraft.js';
   import { triggerRawMidiAction, listMidiDestinations, listMidiInputs, onRawMidiActionTriggered, isJuceAvailable } from '../bridge/bridge.js';
   import { parseRawMidiHexText } from '../stores/deviceProfileLocalEngine.js';
 
@@ -58,6 +59,20 @@
     return onRawMidiActionTriggered((result) => {
       if (result?.requestId !== sendRequestId) return;
       sendNote = result.error || result.status || 'Request completed; see MIDI monitor.';
+    });
+  });
+
+  // Bytes handed over to be sent from here (a script's sendMidi or sendSysex, from the Values tab):
+  // put in the box, the device they were written for chosen when it is one here, and sent only when
+  // Send is pressed, through the box's own checks.
+  $effect(() => {
+    const draft = $rawMidiDraft;
+    if (!draft) return;
+    untrack(() => {
+      rawHex = String(draft.hex ?? '');
+      if (draft.role && roles.some((row) => row.role === draft.role)) chosenRole = draft.role;
+      sendNote = draft.from ? `From ${draft.from}. Press Send to send it.` : '';
+      rawMidiDraft.set(null);
     });
   });
 

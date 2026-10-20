@@ -178,6 +178,7 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       parameter: null,
       label: midiControlParameterShape(descriptor).name,
       detail: `ch ${entry.channel}`,
+      channel: entry.channel,
       controller: null,
       numbered: descriptor,
       span: entry.max - entry.min,
@@ -199,6 +200,7 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       parameter,
       label: parameter?.name || raw,
       detail: parameter ? raw : `ch ${candidate.channel}`,
+      channel: candidate.channel,
       controller: candidate.kind === 'cc' ? candidate.cc : null,
       span: candidate.span,
       count: candidate.count,
@@ -246,6 +248,9 @@ export function chipDragPayload(chip, deviceRole) {
   return {
     kind: 'ceditor.midiControl',
     ...descriptor,
+    // The channel it moved on, which a script's sendCC writes (the Values tab's Learn); a binding
+    // takes its channel from the device's port and does not read it.
+    channel: chip?.channel ?? null,
     parameter: midiControlParameterShape(descriptor),
     deviceRole: role,
   };
