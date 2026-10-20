@@ -36,6 +36,13 @@ or follow the control's value like a scrubbed film. A track can be a part's tran
 colour, one of the control's value channels, or a filmstrip part's frame, so a filmstrip knob
 turns on the sequence too.
 
+**Scripts written for an earlier build: zones and phrase cells now count from 1.** The Zone
+Splitter's verbs (`ce.components.split.mute`, `channel`, `transpose` and `point`) and
+`ce.components.phrase.cell` count from 1, as the panel labels them and as every other component verb
+counts, so zone 1 is the one labelled "Zone 1". They counted from 0, so a script that names a zone, a
+step or a row by number now reaches the one before the one it meant: add 1 to each. Zone 0 and step
+0 are refused, and the console says the range. A zone named by its label works as it did.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

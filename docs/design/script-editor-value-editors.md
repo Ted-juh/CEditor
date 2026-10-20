@@ -1288,14 +1288,26 @@ in every runtime that does it:
   said (`drawShapes.js`). Checked in `test/drawShapes.test.js` and
   `browser-checks/valuesSidebar.mjs`.
 
-Still open: one question, below.
+Then the one question that change left open, decided by the owner: **zones and phrase cells count
+from 1.** `splitMute(target, 1, …)` muted the second zone, the one the panel labels "Zone 2", and
+`phraseCell`'s step and row counted from 0, where every other component index counts from 1. They
+count from 1 now, as the labels do: a script's zone or cell becomes the reducer's index in one
+place, `reducerArgs` in `handWrittenVerbs.js`, after the refusal has read it as the script wrote it,
+so the console line shows the number the script gave. A zone that is not a whole number is refused;
+it was taken as an index, so 1.5 changed no zone and was logged as set. The cost is that a script
+written for the old count reaches the zone or cell before the one it meant. Where it names the first
+one, zone 0 or step 0, it is refused, saying the range; elsewhere nothing can tell, so the release
+notes say it. `apiExamplesWritten.mjs` already counted from 1 ("zone 1 ends at C4"), and was wrong
+until now.
+
+Not built: a callback for a request answered by several dumps at once (a Roland bulk request).
+Scripts hear each dump under its own id, and the collection's id reaches neither runtime's scripts,
+so a `requestDump` callback would need a "collection complete" event in the editor, the plug-in
+and the three preludes. `requestDump`'s summary says to give the callback the dump wanted.
 
 ## Open questions for the owner
 
-- **Zones and phrase cells count from 0.** `splitMute(target, 1, …)` mutes the second zone, which the
-  panel labels "Zone 2", and `phraseCell`'s step and row count from 0, where every other component
-  index counts from 1. The rows, the refusals and the summaries say so. Counting from 1 would match
-  the labels and the other verbs, and would move every script that names a zone or a cell by number.
+None.
 
 Decided on 2026-10-19:
 

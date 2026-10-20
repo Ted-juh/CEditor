@@ -39,7 +39,7 @@ import {
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
-import { HAND_WRITTEN, handWrittenRefusal, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
+import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
@@ -3213,7 +3213,8 @@ function splitAction(path, action, args) {
     addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, refused.reason));
     return false;
   }
-  const next = applySplitScriptAction(current, action, args ?? {});
+  // A script counts zones from 1, as the panel labels them; the reducer indexes them from 0.
+  const next = applySplitScriptAction(current, action, reducerArgs('split', action, { zones: current }, args));
   setValue(zonesPath, next);
   addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
   return true;
@@ -3247,7 +3248,8 @@ function phraseAction(path, action, args) {
     addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, refused.reason));
     return false;
   }
-  const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
+  // A script counts steps and rows from 1; the reducer indexes them from 0.
+  const patch = phraseScriptPatch(cfg, action, reducerArgs('phrase', action, cfg, args), () => Math.random());
   const keys = Object.keys(patch);
   if (keys.length === 0) {
     // Not an error — an unknown seed or an out-of-grid cell is a no-op by
