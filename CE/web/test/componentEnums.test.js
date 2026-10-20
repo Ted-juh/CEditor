@@ -187,7 +187,8 @@ test('the hand-written families’ summaries name values their reducers accept',
   for (const [id, key] of [
     ['harmonyMode', 'harmony.mode'], ['harmonyVoicing', 'harmony.voicing'],
     ['harmonyOutOfKey', 'harmony.outOfKey'], ['harmonyVoiceLeading', 'harmony.voiceLeading'],
-    ['recorderSource', 'recorder.source'],
+    ['recorderSource', 'recorder.source'], ['splitPreset', 'split.preset'], ['phraseSeed', 'phrase.seed'],
+    ['phraseDirection', 'phrase.direction'], ['harmonyShape', 'harmony.shape'],
   ]) {
     const summary = MEMBER_BY_ID[id].summary;
     for (const value of HAND_WRITTEN_VALUES[key]) {

@@ -1133,9 +1133,11 @@ export function listNoun(verb) {
 }
 
 /** A list verb's index arguments, by position after the target: 'index', 'row' or 'col', or
- *  'name' for an element addressed by its name. Empty for every other verb. */
+ *  'name' for an element addressed by its name; and read's index into the list it names. Empty for
+ *  every other verb. */
 export function verbIndexArgs(verb) {
   switch (verb.k) {
+    case READ: return ['index'];
     case ITEM: case INDEXSET: return ['index'];
     case ELEM: return ['name'];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col'] : ['index']);
@@ -1242,6 +1244,60 @@ export function componentClampWarning(verb, path, args = []) {
     return `${verb.family} ${path}: ${verb.v}(${shown}) — the ${name} ${shownValue(n)} is ${span}, so ${n < lo ? lo : hi} was used.`;
   }
   return null;
+}
+
+// The five every family gets take the NAME of one of the family's verbs: read any of them, and size,
+// fill, insert and remove one of its lists. The names, and what each says of one it does not have,
+// for the runtime (panelRuntime's componentReadAction and its siblings) and the Values tab alike.
+const VERBS_BY_FAMILY = COMPONENT_VERBS.reduce((acc, verb) => {
+  (acc[verb.family] ??= {})[verb.v] = verb;
+  return acc;
+}, {});
+
+const EVERY_FAMILY = [READ, SIZE, FILL, INSERT, REMOVE];
+
+/** The verb names `read` (every verb that sets something) or `size`, `fill`, `insert` and `remove`
+ *  (the list verbs) of a family take, sorted as the refusal lists them. */
+export function familyVerbNames(family, forWhat) {
+  const specs = VERBS_BY_FAMILY[family] ?? {};
+  if (forWhat === 'read') return Object.entries(specs).filter(([, s]) => !EVERY_FAMILY.includes(s.k)).map(([k]) => k).sort();
+  return Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear).map(([k]) => k).sort();
+}
+
+/** What `read`, `size`, `fill`, `insert` or `remove` says of a name it has no verb by, or null. */
+export function familyVerbRefusal(family, forWhat, name) {
+  const spec = (VERBS_BY_FAMILY[family] ?? {})[String(name ?? '')];
+  if (forWhat === 'read') {
+    const names = familyVerbNames(family, 'read').join(', ');
+    if (!spec) return `${family}.read: "${name}" is not a verb of this component. One of: ${names}.`;
+    // read("fill") gave nothing back without a word, as though fill had set nothing yet.
+    return EVERY_FAMILY.includes(spec.k) ? `${family}.read: "${name}" sets nothing, so there is nothing to read back. One of: ${names}.` : null;
+  }
+  // size takes a list's clear verb as well; the rest do not.
+  const ok = spec && LIST_KINDS.includes(spec.k) && (forWhat === 'size' || !spec.clear);
+  return ok ? null : `${family}.${forWhat}: "${name}" does not address a list. One of: ${familyVerbNames(family, 'list').join(', ')}.`;
+}
+
+/**
+ * What read says of an index that addresses nothing in the list the verb it names writes, or null:
+ * read("step", 99) gave nothing back without a word. A grid takes a row and then a column.
+ */
+export function readIndexRefusal(named, cfg, index, index2) {
+  if (!LIST_KINDS.includes(named.k) || index === undefined || index === null) return null;
+  const range = componentIndexRange(named, cfg);
+  if (!range) return null;
+  const grid = named.k === CELL && named.grid;
+  const second = grid && index2 !== undefined && index2 !== null;
+  const head = `${named.family}.read("${named.v}", ${[index, ...(second ? [index2] : [])].map(shownValue).join(', ')})`;
+  const why = grid ? indexRefusal(index, range.rows, 'row') ?? (second ? indexRefusal(index2, range.cols, 'column') : null)
+    : indexRefusal(index, range.count ?? 0, listNoun(named));
+  return why ? `${head}: ${why}` : null;
+}
+
+/** The argument of a verb that names one of its family's verbs: 'name' for the five every family
+ *  gets, else none. */
+export function verbNameArgs(verb) {
+  return [READ, SIZE, FILL, INSERT, REMOVE].includes(verb.k) ? ['name'] : [];
 }
 
 /** The runtime's line for a refused call, in full: what the console says and a Values row says. */

@@ -27,12 +27,18 @@ import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
+import { LAYOUT_WORDS, layoutWord } from './layoutWords.js';
 import {
   COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
+  familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
 } from './componentVerbs.js';
-import { HAND_WRITTEN_INDEXES, handWrittenIndexRefusal, phraseGrid, sectionRefusalLine } from './componentIndexWords.js';
+import {
+  HAND_WRITTEN, READ_FIELDS, handWrittenRefusal, handWrittenWords, phraseGrid, sectionFieldRefusal, sectionFields, sectionRefusalLine,
+} from './handWrittenVerbs.js';
 import { MAX_SLOTS } from '../utils/noteRecorderLayout.js';
 import { zoneIndexOf } from '../utils/splitZoneLayout.js';
+import { setlistScenes } from '../utils/setlistLayout.js';
+import { SCALES as CHORD_PAD_SCALES } from '../utils/chordPadLayout.js';
 import { elementSites } from '../utils/pixelElements.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
@@ -676,6 +682,8 @@ export const ENUM_REFUSALS = {
   drawBlend: (value, list) => `ce.draw.blend("${value}"): not a blend mode. One of: ${list.join(', ')}.`,
   // Its two lists are cap's and join's; drawDash.js says both, as the runtime draws them.
   drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
+  // ce.panel's arrangement verbs, each in its own sentence (layoutWords.js).
+  ...Object.fromEntries(Object.keys(LAYOUT_WORDS).map((id) => [id, (value) => layoutWord(id, value).refused])),
 };
 
 /** An event's name: an id ("valueChanged") or a handler name ("onValueChanged"). */
@@ -1010,7 +1018,7 @@ const VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
  * The index a component verb addresses an element by (a pad, a lane, a grid cell, a named element;
  * a zone, a phrase cell, a recorder slot), read against the control the call names as the verb reads
  * it: what it addresses there now, how many there are, and the verb's own refusal when it addresses
- * nothing, in the console's words (componentVerbs.componentRefusalLine, componentIndexWords.js).
+ * nothing, in the console's words (componentVerbs.componentRefusalLine, handWrittenVerbs.js).
  *
  * `args` are the call's arguments after the control, as written (undefined where one is not written
  * out), and `at` which of them this is. The refusal is the whole line when every one is written out,
@@ -1020,6 +1028,8 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
   const meaning = { hint: null, min: null, max: null, integer: true };
   const literal = args.every((a) => a !== undefined);
   const verb = VERB_BY_ID.get(memberId);
+  if (verb && verbNameArgs(verb).length && at === 0) return readFamilyVerbName(value, verb, control);
+  if (verb?.k === 'read') return readFamilyIndex(value, verb, args, control);
   if (verb) {
     const cfg = control?._children?.[verb.section] ?? null;
     if (!cfg) return { meaning, problem: null };
@@ -1059,15 +1069,25 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     meaning.hint = `${noun} ${n} of ${count}${now}`;
     return { meaning, problem: null };
   }
-  const spec = HAND_WRITTEN_INDEXES[memberId];
+  if (READ_FIELDS[memberId]) return readSectionField(value, READ_FIELDS[memberId], control);
+  const spec = HAND_WRITTEN[memberId];
   if (!spec) return { meaning, problem: null };
   const cfg = control?._children?.[spec.section] ?? null;
+  const words = spec.kinds[at] === 'word' ? handWrittenWords(memberId) : null;
+  if (words) meaning.choices = words;
   if (!cfg) return { meaning, problem: null };
   const built = spec.args(...args);
-  const reason = handWrittenIndexRefusal(memberId, cfg, built);
-  // Only the index this row is: a phrase cell's row says nothing of its step.
-  const mine = spec.family === 'phrase' ? reason?.startsWith(`There is no ${at === 0 ? 'step' : 'row'} `) : Boolean(reason);
-  const problem = reason && mine ? { severity: 'error', message: literal ? sectionRefusalLine(spec.family, target, spec.action, built, reason) : reason } : null;
+  const refused = handWrittenRefusal(spec.family, spec.action, cfg, built);
+  // Only what this argument is: a phrase cell's row says nothing of its step.
+  const problem = refused && refused.at === at
+    ? { severity: 'error', message: literal ? sectionRefusalLine(spec.family, target, spec.action, built, refused.reason) : refused.reason } : null;
+  if (spec.kinds[at] === 'word') {
+    if (spec.action === 'key' && !problem && Number.isFinite(Number(value))) {
+      const pc = ((Math.round(Number(value)) % 12) + 12) % 12;
+      meaning.hint = `${PITCH_NAMES[pc]}${pc !== Number(value) ? `: ${shownValue(value)} wraps round to ${pc}` : ''}`;
+    }
+    return { meaning, problem };
+  }
   if (spec.family === 'split') {
     const zones = Array.isArray(cfg.zones) ? cfg.zones : [];
     const names = zones.map((z, i) => String(z?.label ?? `Zone ${i + 1}`));
@@ -1088,6 +1108,22 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     if (!problem && Number.isFinite(n)) meaning.hint = `${at === 0 ? 'step' : 'row'} ${n}: the ${at === 0 ? 'steps' : 'rows'} are 0 to ${count - 1}, counted from 0`;
     return { meaning, problem };
   }
+  if (spec.family === 'setlist') {
+    const scenes = setlistScenes({ _children: { Setlist: cfg } });
+    meaning.choices = scenes.map((sc) => sc.name);
+    Object.assign(meaning, { min: scenes.length ? 1 : null, max: scenes.length || null });
+    const n = typeof value === 'number' ? Math.round(value) - 1 : scenes.findIndex((sc) => sc.name === value || sc.id === value);
+    if (!problem && n >= 0 && n < scenes.length) {
+      meaning.hint = typeof value === 'number' ? `scene ${value} is "${scenes[n].name}"` : `scene ${n + 1} of ${scenes.length}`;
+    }
+    return { meaning, problem };
+  }
+  if (spec.family === 'harmoniser') {
+    const degrees = (CHORD_PAD_SCALES[String(cfg.scale ?? 'major')] ?? CHORD_PAD_SCALES.major).length;
+    Object.assign(meaning, { min: 1, max: degrees });
+    if (!problem && Number.isFinite(Number(value))) meaning.hint = `degree ${Math.round(Number(value))} of ${degrees}`;
+    return { meaning, problem };
+  }
   const held = Math.min(Array.isArray(cfg.slots) ? cfg.slots.length : 0, MAX_SLOTS);
   Object.assign(meaning, { min: 1, max: spec.action === 'store' ? MAX_SLOTS : (held || null) });
   const n = Math.round(Number(value));
@@ -1098,6 +1134,57 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
   return { meaning, problem };
 }
 
+/**
+ * The verb name read, size, fill, insert and remove take: one of the family's verbs (any of them for
+ * read, a list for the rest), what it names on the control the call names, and the runtime's own
+ * refusal of one the family has not.
+ */
+function readFamilyVerbName(value, verb, control) {
+  const meaning = { hint: null, choices: familyVerbNames(verb.family, verb.k === 'read' ? 'read' : 'list') };
+  const refused = typeof value === 'string' || typeof value === 'number' ? familyVerbRefusal(verb.family, verb.k, value) : null;
+  if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  const named = COMPONENT_VERBS.find((v) => v.family === verb.family && v.v === String(value));
+  const cfg = control?._children?.[verb.section] ?? null;
+  if (named && cfg) {
+    const range = componentIndexRange(named, cfg);
+    const noun = listNoun(named);
+    if (range?.rows !== undefined) meaning.hint = `${range.rows} rows of ${range.cols} columns`;
+    else if (range?.names) meaning.hint = range.names.length ? `the elements ${range.names.map((n) => `"${n}"`).join(', ')}` : 'no elements yet';
+    else if (Number.isFinite(range?.count)) meaning.hint = `${range.count} ${noun}${range.count === 1 ? '' : 's'}`;
+  }
+  return { meaning, problem: null };
+}
+
+/** read's index into the list the verb it names writes: which element, and what it is now. */
+function readFamilyIndex(value, verb, args, control) {
+  const meaning = { hint: null, min: null, max: null, integer: true };
+  const named = COMPONENT_VERBS.find((v) => v.family === verb.family && v.v === String(args[0]));
+  const cfg = control?._children?.[verb.section] ?? null;
+  if (!named || !cfg || !LIST_KINDS.includes(named.k)) return { meaning, problem: null };
+  const refused = readIndexRefusal(named, cfg, value, args[2]);
+  if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  const range = componentIndexRange(named, cfg);
+  const count = named.grid ? range.rows : range.count;
+  Object.assign(meaning, { min: count ? 1 : null, max: count || null });
+  const n = Math.round(Number(value));
+  if (Number.isFinite(n)) meaning.hint = `${named.grid ? 'row' : listNoun(named)} ${n} of ${count}`;
+  return { meaning, problem: null };
+}
+
+/** The field a hand-written family's read takes: one of its section's, in any case, and what it is now. */
+function readSectionField(value, { section, label }, control) {
+  const cfg = control?._children?.[section] ?? null;
+  const meaning = { hint: null, choices: cfg ? sectionFields(cfg) : null };
+  if (!cfg || value === undefined || value === null || value === '') return { meaning, problem: null };
+  const refused = sectionFieldRefusal(label, cfg, value);
+  if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  const key = Object.keys(cfg).find((k) => k.toLowerCase() === String(value).toLowerCase());
+  const now = cfg[key];
+  meaning.hint = `${key !== value ? `${key}, ` : ''}now ${Array.isArray(now) ? `a list of ${now.length}` : shownValue(now)}`;
+  return { meaning, problem: null };
+}
+
+const PITCH_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
 /* ------------------------------------------------------------------------ fonts and images */

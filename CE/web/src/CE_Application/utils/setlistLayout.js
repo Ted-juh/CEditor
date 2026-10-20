@@ -352,7 +352,8 @@ export function setlistScriptPatch(cfg, action, args = {}) {
         target = Math.round(n) - 1;                 // 1-based in, 0-based out
       }
       if (target < 0 || target >= scenes.length) return {};
-      return target === index ? {} : { index: target };
+      // Going to the scene already in front is already that way. It was refused, and answered false.
+      return target === index ? UNCHANGED : { index: target };
     }
     case 'enable': {
       // Skip a song tonight without editing the set.

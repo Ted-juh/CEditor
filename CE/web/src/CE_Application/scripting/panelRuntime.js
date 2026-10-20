@@ -39,7 +39,8 @@ import {
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
-import { splitZoneRefusal, phraseCellRefusal, recorderSlotRefusal, sectionRefusalLine, HAND_WRITTEN_INDEXES } from './componentIndexWords.js';
+import { HAND_WRITTEN, handWrittenRefusal, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
+import { layoutWord } from './layoutWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -136,7 +137,7 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, LIST_KINDS,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, readIndexRefusal, LIST_KINDS,
   itemListLength, LINK_KIND, ELEM_KIND,
 } from './componentVerbs.js';
 import {
@@ -3163,14 +3164,13 @@ function splitAction(path, action, args) {
     addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
     return;
   }
-  // A zone that is not one is refused, and says which there are (componentIndexWords.js). It was
-  // written and logged as though it had been set, and nothing changed.
-  if (action !== 'preset') {
-    const reason = splitZoneRefusal(current, args?.zone);
-    if (reason) {
-      addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, reason));
-      return false;
-    }
+  // A zone that is not one, or a preset there is none of, is refused, and says which there are
+  // (handWrittenVerbs.js). The zone was logged as though it had been set, and nothing changed; the
+  // preset replaced every zone with one whole-keyboard zone.
+  const refused = handWrittenRefusal('split', action, { zones: current }, args ?? {});
+  if (refused) {
+    addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, refused.reason));
+    return false;
   }
   const next = applySplitScriptAction(current, action, args ?? {});
   setValue(zonesPath, next);
@@ -3178,13 +3178,12 @@ function splitAction(path, action, args) {
   return true;
 }
 const splitApi = {
-  splitPreset: (target, preset, lowNote, highNote) =>
-    splitAction(target, 'preset', { preset, lowNote, highNote }),
-  // Their arguments are built where the Values tab builds them (componentIndexWords.js).
-  splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN_INDEXES.splitMute.args(zone, enabled)),
-  splitChannel: (target, zone, channel) => splitAction(target, 'channel', HAND_WRITTEN_INDEXES.splitChannel.args(zone, channel)),
-  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN_INDEXES.splitTranspose.args(zone, semitones)),
-  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN_INDEXES.splitPoint.args(zone, note)),
+  // Their arguments are built where the Values tab builds them (handWrittenVerbs.js).
+  splitPreset: (target, preset, lowNote, highNote) => splitAction(target, 'preset', HAND_WRITTEN.splitPreset.args(preset, lowNote, highNote)),
+  splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN.splitMute.args(zone, enabled)),
+  splitChannel: (target, zone, channel) => splitAction(target, 'channel', HAND_WRITTEN.splitChannel.args(zone, channel)),
+  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN.splitTranspose.args(zone, semitones)),
+  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN.splitPoint.args(zone, note)),
   splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
 };
 
@@ -3200,13 +3199,12 @@ function phraseAction(path, action, args) {
     addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
     return;
   }
-  // A cell off the grid is refused, and says how big the grid is. It said "nothing to change".
-  if (action === 'cell') {
-    const reason = phraseCellRefusal(cfg, args?.step, args?.row);
-    if (reason) {
-      addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, reason));
-      return false;
-    }
+  // A cell off the grid, a seed or a direction there is none of, and a key that is not a pitch
+  // class are refused, and say what there is (handWrittenVerbs.js). They said "nothing to change".
+  const refused = handWrittenRefusal('phrase', action, cfg, args ?? {});
+  if (refused) {
+    addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, refused.reason));
+    return false;
   }
   const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
   const keys = Object.keys(patch);
@@ -3220,14 +3218,14 @@ function phraseAction(path, action, args) {
   addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
 }
 const phraseApi = {
-  phraseSeed: (target, seed) => phraseAction(target, 'seed', { seed }),
+  phraseSeed: (target, seed) => phraseAction(target, 'seed', HAND_WRITTEN.phraseSeed.args(seed)),
   phraseClear: (target) => phraseAction(target, 'clear', {}),
-  phraseKey: (target, key) => phraseAction(target, 'key', { key }),
+  phraseKey: (target, key) => phraseAction(target, 'key', HAND_WRITTEN.phraseKey.args(key)),
   phraseScale: (target, scale) => phraseAction(target, 'scale', { scale }),
   phraseTranspose: (target, semitones) => phraseAction(target, 'transpose', { transpose: semitones }),
-  phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
+  phraseDirection: (target, direction) => phraseAction(target, 'direction', HAND_WRITTEN.phraseDirection.args(direction)),
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
-  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN_INDEXES.phraseCell.args(step, row, on)),
+  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN.phraseCell.args(step, row, on)),
   phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
 };
 
@@ -3246,7 +3244,7 @@ const phraseApi = {
  *
  * Every one of these used to return undefined for all three outcomes.
  */
-function sectionAction(path, section, reducer, action, args, explain = null) {
+function sectionAction(path, section, reducer, action, args) {
   const target = String(path ?? '');
   const cfg = getValue(`${target}.${section}`);
   if (!cfg || typeof cfg !== 'object') {
@@ -3263,16 +3261,16 @@ function sectionAction(path, section, reducer, action, args, explain = null) {
     }
     // Refused, and said so at error level: it reads exactly like a dead footswitch otherwise, and
     // a scene name that does not exist is a typo somebody needs to see.
-    // With why, where the section says (componentIndexWords.js): a slot that holds no take.
-    addScriptTrace('error', '', sectionRefusalLine(section.toLowerCase(), target, action, args, explain?.(cfg, action, args ?? {}) ?? null));
+    // With why (handWrittenVerbs.js): the words there are, a slot that holds no take, the scenes.
+    const family = section.toLowerCase();
+    addScriptTrace('error', '', sectionRefusalLine(family, target, action, args, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
     return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
   addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} → ${keys.join(', ')}`);
   return true;
 }
-const recorderRefusal = (cfg, action, args) => (action === 'store' || action === 'load' ? recorderSlotRefusal(cfg, action, args.slot) : null);
-const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g, recorderRefusal);
+const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
 const recorderApi = {
   recorderRecord: (target, on) => recAction(target, 'record', on === undefined ? {} : { on: on !== false }),
   recorderStop: (target) => recAction(target, 'stop', {}),
@@ -3283,31 +3281,31 @@ const recorderApi = {
     recAction(target, 'quantize', { grid, strength, scale, key }),
   recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
   recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
-  recorderSource: (target, source) => recAction(target, 'source', { source }),
+  recorderSource: (target, source) => recAction(target, 'source', HAND_WRITTEN.recorderSource.args(source)),
   recorderNudge: (target, by) => recAction(target, 'nudge', { by }),
   recorderShift: (target, semitones) => recAction(target, 'shift', { semitones }),
-  recorderStore: (target, slot, name) => recAction(target, 'store', HAND_WRITTEN_INDEXES.recorderStore.args(slot, name)),
-  recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN_INDEXES.recorderLoad.args(slot)),
+  recorderStore: (target, slot, name) => recAction(target, 'store', HAND_WRITTEN.recorderStore.args(slot, name)),
+  recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN.recorderLoad.args(slot)),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
   recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
 };
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
 const harmoniserApi = {
-  harmonyMode: (target, mode) => harmAction(target, 'mode', { mode }),
-  harmonyKey: (target, key) => harmAction(target, 'key', { key }),
+  harmonyMode: (target, mode) => harmAction(target, 'mode', HAND_WRITTEN.harmonyMode.args(mode)),
+  harmonyKey: (target, key) => harmAction(target, 'key', HAND_WRITTEN.harmonyKey.args(key)),
   harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
   harmonySize: (target, size) => harmAction(target, 'size', { size }),
-  harmonyShape: (target, shape) => harmAction(target, 'shape', { shape, preset: shape }),
-  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', { voicing }),
+  harmonyShape: (target, shape) => harmAction(target, 'shape', HAND_WRITTEN.harmonyShape.args(shape)),
+  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', HAND_WRITTEN.harmonyVoicing.args(voicing)),
   harmonyInversion: (target, inversion) => harmAction(target, 'inversion', { inversion }),
   harmonyOctave: (target, octave) => harmAction(target, 'octave', { octave }),
-  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', { outOfKey: mode }),
+  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', HAND_WRITTEN.harmonyOutOfKey.args(mode)),
   harmonyKeepPlayed: (target, keep) => harmAction(target, 'keepPlayed', keep === undefined ? {} : { keepPlayed: keep !== false }),
   harmonyChannel: (target, channel) => harmAction(target, 'channel', { channel }),
-  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', { voiceLeading: mode }),
+  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', HAND_WRITTEN.harmonyVoiceLeading.args(mode)),
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
-  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
+  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', HAND_WRITTEN.harmonyDegree.args(degree, chord)),
   harmonyRead: (target, field) => sectionRead(target, 'Harmoniser', 'harmony', field),
 };
 
@@ -3505,10 +3503,9 @@ function componentReadAction(verb, path, args) {
   }
 
   const spec = specs[String(name)];
-  if (!spec) {
-    addScriptTrace('error', '',
-      `${verb.family}.read: "${name}" is not a verb of this component. One of: `
-      + `${Object.keys(specs).filter((k) => k !== 'read').sort().join(', ')}.`);
+  const refusedName = familyVerbRefusal(verb.family, 'read', name);
+  if (refusedName) {
+    addScriptTrace('error', '', refusedName);
     return undefined;
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
@@ -3535,6 +3532,11 @@ function componentReadAction(verb, path, args) {
   if (index === undefined || index === null) return list;
 
   // 1-based, as everywhere else in this module — and for a grid the second index is the column.
+  const refusedIndex = readIndexRefusal(spec, cfg, index, index2);
+  if (refusedIndex) {
+    addScriptTrace('error', '', refusedIndex);
+    return undefined;
+  }
   const at = Math.round(Number(index)) - 1;
   if (!Number.isFinite(at) || at < 0 || at >= list.length) return undefined;
   const row = list[at];
@@ -3569,9 +3571,7 @@ function componentSizeAction(verb, path, args) {
   }
   const spec = specs[String(name)];
   if (!spec || !LIST_KINDS.includes(spec.k)) {
-    addScriptTrace('error', '',
-      `${verb.family}.size: "${name}" does not address a list. One of: `
-      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    addScriptTrace('error', '', familyVerbRefusal(verb.family, 'size', name));
     return undefined;
   }
   return sizeOf(spec);
@@ -3584,11 +3584,8 @@ function componentFillAction(verb, path, args) {
   const [name, values] = args;
   const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
   const spec = specs[String(name ?? '')];
-  const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
   if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
-    addScriptTrace('error', '',
-      `${verb.family}.fill: "${name}" does not address a list. One of: `
-      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    addScriptTrace('error', '', familyVerbRefusal(verb.family, 'fill', name));
     return false;
   }
   if (!Array.isArray(values)) {
@@ -3690,12 +3687,9 @@ function componentRemoveAction(verb, path, args) {
 /** The list-addressing verb a name refers to, having complained if it is not one. */
 function componentListSpec(verb, forWhat, name) {
   const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const lists = Object.entries(specs).filter(([, x]) => LIST_KINDS.includes(x.k) && !x.clear);
   const spec = specs[String(name ?? '')];
   if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
-  addScriptTrace('error', '',
-    `${verb.family}.${forWhat}: "${name}" does not address a list. One of: `
-    + `${lists.map(([k]) => k).sort().join(', ')}.`);
+  addScriptTrace('error', '', familyVerbRefusal(verb.family, forWhat, name));
   return null;
 }
 
@@ -3802,15 +3796,12 @@ function sectionRead(path, section, label, field) {
     // surface is in a sequence this frame, not something a script set or can set.
     return Object.fromEntries(Object.entries(cfg).filter(([k]) => !k.startsWith('_')));
   }
-  const name = String(field);
-  const key = Object.keys(cfg).find((k) => k.toLowerCase() === name.toLowerCase());
-  if (key === undefined || key.startsWith('_')) {
-    addScriptTrace('error', '',
-      `${label}.read: "${field}" is not a field of this component. One of: `
-      + `${Object.keys(cfg).filter((k) => !k.startsWith('_')).sort().join(', ')}.`);
+  const refused = sectionFieldRefusal(label, cfg, field);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return undefined;
   }
-  return cfg[key];
+  return cfg[Object.keys(cfg).find((k) => k.toLowerCase() === String(field).toLowerCase())];
 }
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
@@ -3819,8 +3810,8 @@ const setlistApi = {
   // scripted step and a footswitch step are the same event downstream.
   setlistNext: (target) => setAction(target, 'next', {}),
   setlistPrev: (target) => setAction(target, 'prev', {}),
-  setlistGoto: (target, scene) => setAction(target, 'goto', { scene }),
-  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
+  setlistGoto: (target, scene) => setAction(target, 'goto', HAND_WRITTEN.setlistGoto.args(scene)),
+  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', HAND_WRITTEN.setlistEnable.args(scene, enabled)),
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
   setlistRead: (target, field) => sectionRead(target, 'Setlist', 'setlist', field),
@@ -6280,13 +6271,12 @@ function panelApplyPatches(transforms, patches) {
   return updateControls((controls) => apply(controls)) ? resolved.size : 0;
 }
 
-const ALIGN_EDGES = ['left', 'hCenter', 'right', 'top', 'vCenter', 'bottom'];
-
+// The words each arrangement verb takes, and its sentence for one it does not, are layoutWords.js's,
+// which the Values tab reads too.
 function panelAlignImpl(names, edge, opts) {
-  const which = String(edge ?? '');
-  if (!ALIGN_EDGES.includes(which)) {
-    addScriptTrace('error', '',
-      `ce.panel.align: "${edge}" is not an edge. One of: ${ALIGN_EDGES.join(', ')}.`);
+  const { which, refused } = layoutWord('panelAlign', edge);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'align');
@@ -6310,14 +6300,10 @@ function panelAlignImpl(names, edge, opts) {
   return panelApplyPatches(transforms, patches);
 }
 
-const DISTRIBUTE_WHAT = ['leftEdges', 'hCenters', 'rightEdges', 'topEdges', 'vCenters',
-                         'bottomEdges', 'hSpacing', 'vSpacing'];
-
 function panelDistributeImpl(names, what, opts) {
-  const which = String(what ?? '');
-  if (!DISTRIBUTE_WHAT.includes(which)) {
-    addScriptTrace('error', '',
-      `ce.panel.distribute: "${what}" is not something to spread. One of: ${DISTRIBUTE_WHAT.join(', ')}.`);
+  const { which, refused } = layoutWord('panelDistribute', what);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'distribute');
@@ -6328,9 +6314,9 @@ function panelDistributeImpl(names, what, opts) {
 }
 
 function panelMatchImpl(names, what, opts) {
-  const which = String(what ?? 'both');
-  if (!['width', 'height', 'both'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.match: "${what}" is not width, height or both.`);
+  const { which, refused } = layoutWord('panelMatch', what);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'match');
@@ -6373,9 +6359,9 @@ function panelCircleImpl(names, opts) {
 }
 
 function panelFlipImpl(names, axis) {
-  const which = String(axis ?? 'horizontal');
-  if (!['horizontal', 'vertical'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.flip: "${axis}" is not horizontal or vertical.`);
+  const { which, refused } = layoutWord('panelFlip', axis);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'flip');
@@ -6409,9 +6395,9 @@ function panelRectImpl(names) {
  * moving something to the front of a container it is not in is not a thing.
  */
 function panelOrderImpl(names, where) {
-  const which = String(where ?? '');
-  if (!['front', 'forward', 'backward', 'back'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.order: "${where}" is not front, forward, backward or back.`);
+  const { which, refused } = layoutWord('panelOrder', where);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const wanted = new Set(panelTransforms(names, 'order').map((t) => t.id));

@@ -559,7 +559,7 @@ function classify(arg, node, param, site, index) {
     }
     // An element a component verb addresses (a pad, a cell, a zone, a slot), read against the
     // control the call names, with the verb's refusal when it addresses nothing.
-    case 'componentIndex': {
+    case 'componentIndex': case 'componentWord': {
       const target = sibling(site, 'target');
       const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
       const rest = site.args.filter((a) => a.param?.name !== 'target');
@@ -568,7 +568,7 @@ function classify(arg, node, param, site, index) {
         target: String(target ?? ''), control,
       });
       const editable = typeof value === 'number' ? 'number' : (typeof value === 'string' && read.meaning.choices?.length ? 'choice' : null);
-      return setRead(arg, 'componentIndex', read, editable);
+      return setRead(arg, kind, read, editable);
     }
     case 'deviceParameter': {
       // The device is the call's own: read's and parameter's second argument, write's third, bind's

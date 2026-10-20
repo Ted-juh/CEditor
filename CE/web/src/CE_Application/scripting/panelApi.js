@@ -28,9 +28,10 @@
 import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
-  verbArgKinds, verbArgOptional, verbIndexArgs,
+  verbArgKinds, verbArgOptional, verbIndexArgs, verbNameArgs,
 } from './componentVerbs.js';
 import { HAND_WRITTEN_VALUES } from './componentTables.js';
+import { LAYOUT_WORDS } from './layoutWords.js';
 // The legal values an option accepts come from the table its own implementation reads, for the
 // reason the component enums do: a documented list somebody retyped is a list that drifts. These
 // two supply the image-layer and typography vocabularies.
@@ -2124,7 +2125,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'edge', type: 'string', required: true },
+      { name: 'edge', type: 'string', required: true, values: LAYOUT_WORDS.panelAlign.values },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'to', type: 'text', default: 'the box the whole group occupies', sample: '"cutoff"',
           summary: 'Name one of the controls to line the others up on, instead of on the group as '
@@ -2144,7 +2145,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'what', type: 'string', required: true },
+      { name: 'what', type: 'string', required: true, values: LAYOUT_WORDS.panelDistribute.values },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'gap', type: 'number', default: 'worked out from the space available', sample: '12',
           unit: 'pixels',
@@ -2168,7 +2169,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'what', type: 'string', required: true },
+      { name: 'what', type: 'string', required: true, values: LAYOUT_WORDS.panelMatch.values },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'to', type: 'text', default: 'the first name you gave', sample: '"cutoff"',
           summary: 'Name the control whose size the others should copy. It is not resized itself.' },
@@ -2220,7 +2221,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'axis', type: 'string', required: true },
+      { name: 'axis', type: 'string', required: true, values: LAYOUT_WORDS.panelFlip.values },
     ],
     scopes: 'any',
   },
@@ -2237,7 +2238,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'where', type: 'string', required: true },
+      { name: 'where', type: 'string', required: true, values: LAYOUT_WORDS.panelOrder.values },
     ],
     scopes: 'any',
   },
@@ -3327,11 +3328,11 @@ const T = { name: 'target', type: 'targetRef', required: true };
 export const PANEL_COMMANDS = [
   // --- Zone Splitter ---
   panelVerb('splitPreset', 'splitPreset(target, preset [, lowNote, highNote])',
-    'Apply a split layout ("single"/"split"/"layer"/"three"…), optionally bounding the key range.',
-    [T, { name: 'preset', type: 'string', required: true },
+    `Apply a split layout — ${oneOf(HAND_WRITTEN_VALUES['split.preset'])} — optionally bounding the key range.`,
+    [T, { name: 'preset', type: 'string', required: true, kind: 'componentWord' },
      { name: 'lowNote', type: 'number', required: false, kind: 'note' }, { name: 'highNote', type: 'number', required: false, kind: 'note' }]),
   // A zone is its number counted from 0, or its label ("Bass"). The panel labels them from 1, so the
-  // Values tab says which zone a number reaches (componentIndexWords.js).
+  // Values tab says which zone a number reaches (handWrittenVerbs.js).
   panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone. A zone is its number counted from 0, or its name.',
     [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
   panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel. A zone is its number counted from 0, or its name.',
@@ -3342,17 +3343,18 @@ export const PANEL_COMMANDS = [
     [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
 
   // --- Phrase Sequencer ---
-  panelVerb('phraseSeed', 'phraseSeed(target, seed)', 'Fill the grid from a named seed pattern.',
-    [T, { name: 'seed', type: 'string', required: true }]),
+  panelVerb('phraseSeed', 'phraseSeed(target, seed)', `Fill the grid from a named seed pattern — ${oneOf(HAND_WRITTEN_VALUES['phrase.seed'])}.`,
+    [T, { name: 'seed', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('phraseClear', 'phraseClear(target)', 'Clear every step.', [T]),
-  panelVerb('phraseKey', 'phraseKey(target, key)', 'Change the key the degrees resolve against.',
-    [T, { name: 'key', type: 'string', required: true }]),
+  // A key is a pitch class, a number: "D" is refused, so it is not typed as text.
+  panelVerb('phraseKey', 'phraseKey(target, key)', 'Change the key the degrees resolve against: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.',
+    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord' }]),
   panelVerb('phraseScale', 'phraseScale(target, scale)', 'Change the scale ("major"/"minor"/"dorian"…).',
     [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
   panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose the phrase, leaving the pattern alone.',
     [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('phraseDirection', 'phraseDirection(target, direction)', 'Play direction ("forward"/"reverse"/"pingpong"/"random").',
-    [T, { name: 'direction', type: 'string', required: true }]),
+  panelVerb('phraseDirection', 'phraseDirection(target, direction)', `Play direction — ${oneOf(HAND_WRITTEN_VALUES['phrase.direction'])}.`,
+    [T, { name: 'direction', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('phraseRun', 'phraseRun(target, running)', 'Start or stop the sequencer.',
     [T, { name: 'running', type: 'boolean', required: true }]),
   panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off. Steps and rows are counted from 0.',
@@ -3377,7 +3379,7 @@ export const PANEL_COMMANDS = [
     [T, { name: 'bars', type: 'number', required: true }]),
   panelVerb('recorderSource', 'recorderSource(target, source)',
     `Choose what gets recorded — ${oneOf(HAND_WRITTEN_VALUES['recorder.source'])}.`,
-    [T, { name: 'source', type: 'string', required: true }]),
+    [T, { name: 'source', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Shift the take in time by `by` ticks.',
     [T, { name: 'by', type: 'number', required: true }]),
   panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Shift the take in pitch without re-quantising.',
@@ -3392,36 +3394,36 @@ export const PANEL_COMMANDS = [
   // --- Harmoniser ---
   panelVerb('harmonyMode', 'harmonyMode(target, mode)',
     `Harmoniser mode — ${oneOf(HAND_WRITTEN_VALUES['harmony.mode'])}.`,
-    [T, { name: 'mode', type: 'string', required: true }]),
-  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song.',
-    [T, { name: 'key', type: 'string', required: true }]),
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
+  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.',
+    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord' }]),
   panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Change the scale the harmony follows.',
     [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
   panelVerb('harmonySize', 'harmonySize(target, size)', 'How many voices to add.',
     [T, { name: 'size', type: 'number', required: true }]),
-  panelVerb('harmonyShape', 'harmonyShape(target, shape)', 'Apply a named chord shape / preset.',
-    [T, { name: 'shape', type: 'string', required: true }]),
+  panelVerb('harmonyShape', 'harmonyShape(target, shape)', `Apply a named chord shape — ${oneOf(HAND_WRITTEN_VALUES['harmony.shape'])} — or a list of intervals in semitones.`,
+    [T, { name: 'shape', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)',
     `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
-    [T, { name: 'voicing', type: 'string', required: true }]),
+    [T, { name: 'voicing', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
     [T, { name: 'inversion', type: 'number', required: true }]),
   panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Octave offset for the added voices.',
     [T, { name: 'octave', type: 'number', required: true }]),
   panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)',
     `What to do with out-of-key notes — ${oneOf(HAND_WRITTEN_VALUES['harmony.outOfKey'])}.`,
-    [T, { name: 'mode', type: 'string', required: true }]),
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Keep or drop the note actually played.',
     [T, { name: 'keep', type: 'boolean', required: false }]),
   panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'MIDI channel for the harmony voices.',
     [T, { name: 'channel', type: 'number', required: true }]),
   panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)',
     `Voice-leading strategy — ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
-    [T, { name: 'mode', type: 'string', required: true }]),
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the voices over `ms` milliseconds.',
     [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
   panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Override the chord used for one scale degree.',
-    [T, { name: 'degree', type: 'number', required: true }, { name: 'chord', type: 'string', required: true }]),
+    [T, { name: 'degree', type: 'number', required: true, kind: 'componentIndex' }, { name: 'chord', type: 'string', required: true, kind: 'componentWord' }]),
 
   // --- Setlist ---
   // These move the INDEX; the recall follows from the index changing, so a scripted step and a
@@ -3429,9 +3431,9 @@ export const PANEL_COMMANDS = [
   panelVerb('setlistNext', 'setlistNext(target)', 'Advance to the next enabled scene.', [T]),
   panelVerb('setlistPrev', 'setlistPrev(target)', 'Go back to the previous enabled scene.', [T]),
   panelVerb('setlistGoto', 'setlistGoto(target, scene)', 'Jump to a scene by index or name.',
-    [T, { name: 'scene', type: 'value', required: true }]),
+    [T, { name: 'scene', type: 'value', required: true, kind: 'componentIndex' }]),
   panelVerb('setlistEnable', 'setlistEnable(target, scene, enabled)', 'Include or skip a scene in the walk order.',
-    [T, { name: 'scene', type: 'value', required: true }, { name: 'enabled', type: 'boolean', required: true }]),
+    [T, { name: 'scene', type: 'value', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
   panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Wrap from the last scene back to the first.',
     [T, { name: 'wrap', type: 'boolean', required: false }]),
   panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
@@ -3446,21 +3448,21 @@ export const PANEL_COMMANDS = [
   panelVerb('splitRead', 'splitRead(target [, field])',
     'Read the Zone Splitter\'s settings — the whole section, or one field by name (`zones`, `preset`). '
     + 'Fields are addressed by model field name, not by verb name.',
-    [T, { name: 'field', type: 'string', required: false }]),
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
   panelVerb('phraseRead', 'phraseRead(target [, field])',
     'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
-    [T, { name: 'field', type: 'string', required: false }]),
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
   panelVerb('recorderRead', 'recorderRead(target [, field])',
     'Read the Phrase Recorder\'s state — the whole section, or one field by name. Includes '
     + 'recording status and the take contents.',
-    [T, { name: 'field', type: 'string', required: false }]),
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
   panelVerb('harmonyRead', 'harmonyRead(target [, field])',
     'Read the Harmoniser\'s settings — the whole section, or one field by name.',
-    [T, { name: 'field', type: 'string', required: false }]),
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
   panelVerb('setlistRead', 'setlistRead(target [, field])',
     'Read the Setlist — the whole section, or one field by name. `scenes` is the scene list; '
     + '`index` is the current position.',
-    [T, { name: 'field', type: 'string', required: false }]),
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
 
   // --- Panel values: snapshot / restore ---
   // The two members of ce.panel that are NOT panel-view only. Creating a control needs a renderer;
@@ -3510,6 +3512,8 @@ export const PANEL_COMMANDS = [
         // The index that addresses an element (a pad, a lane, a grid cell, a named element), which
         // the Values tab reads against the control the call names.
         ...(verbIndexArgs(verb).includes(name) ? { kind: 'componentIndex' } : {}),
+        // …and the name of one of the family's verbs, which read, size, fill, insert and remove take.
+        ...(verbNameArgs(verb).includes(name) ? { kind: 'componentWord' } : {}),
       }))]);
   }),
 ];
