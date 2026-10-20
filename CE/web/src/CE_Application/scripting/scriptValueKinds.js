@@ -27,6 +27,13 @@ import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
+import {
+  COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
+} from './componentVerbs.js';
+import { HAND_WRITTEN_INDEXES, handWrittenIndexRefusal, phraseGrid, sectionRefusalLine } from './componentIndexWords.js';
+import { MAX_SLOTS } from '../utils/noteRecorderLayout.js';
+import { zoneIndexOf } from '../utils/splitZoneLayout.js';
+import { elementSites } from '../utils/pixelElements.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
 import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
@@ -571,6 +578,15 @@ export function readNumber(value, param, { tempo: contextTempo = 120, site = {} 
   // ce.anim's timing has said above all the runtime says of it: a stagger below 0 is used as it is.
   // So have ce.time's helpers.
   if (site.animTiming || site.timeNumber) return { meaning, problem: null };
+  // A component verb's number past its range is used as the nearest end, in the verb's words.
+  if (site.componentClamp) {
+    const { verb, target, args } = site.componentClamp;
+    if ((min !== null && n < min) || (max !== null && n > max)) {
+      const said = args.every((a) => a !== undefined) ? componentClampWarning(verb, target, args) : null;
+      return { meaning, problem: { severity: 'warning', message: said ?? `the ${param.name} ${shownValue(n)} is outside ${min} to ${max}, so ${n < min ? min : max} was used.` } };
+    }
+    return { meaning, problem: null };
+  }
   if ((min !== null && n < min) || (max !== null && n > max)) {
     if (unit === '0 to 1' && site.unitWhat) {
       const p = unitProblem(site.unitWhat, value);
@@ -985,6 +1001,104 @@ function parameterSummary(p) {
     choices,
   };
 }
+
+/* ------------------------------------------------------------------------ component indexes */
+
+const VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
+
+/**
+ * The index a component verb addresses an element by (a pad, a lane, a grid cell, a named element;
+ * a zone, a phrase cell, a recorder slot), read against the control the call names as the verb reads
+ * it: what it addresses there now, how many there are, and the verb's own refusal when it addresses
+ * nothing, in the console's words (componentVerbs.componentRefusalLine, componentIndexWords.js).
+ *
+ * `args` are the call's arguments after the control, as written (undefined where one is not written
+ * out), and `at` which of them this is. The refusal is the whole line when every one is written out,
+ * as the console writes it; else only why.
+ */
+export function readComponentIndex(value, { memberId, at, args, target, control }) {
+  const meaning = { hint: null, min: null, max: null, integer: true };
+  const literal = args.every((a) => a !== undefined);
+  const verb = VERB_BY_ID.get(memberId);
+  if (verb) {
+    const cfg = control?._children?.[verb.section] ?? null;
+    if (!cfg) return { meaning, problem: null };
+    const range = componentIndexRange(verb, cfg);
+    const noun = verb.grid ? (at === 0 ? 'row' : 'column') : listNoun(verb);
+    const say = (reason) => ({ meaning, problem: reason ? { severity: 'error', message: literal ? componentRefusalLine(verb, target, args, cfg) : reason } : null });
+    if (verb.k === 'elem') {
+      meaning.choices = range?.names ?? [];
+      meaning.hint = elementSites(cfg, value).length ? `an element of ${target}` : null;
+      return say(typeof value === 'string' ? componentRefusalReason(verb, cfg, [value, args[1]]) : null);
+    }
+    if (verb.k === 'indexset') {
+      const n = Math.round(Number(value));
+      if (Number.isFinite(n) && n >= 1) {
+        const on = (Array.isArray(cfg[verb.f]) ? cfg[verb.f] : []).map(Number).includes(n - 1);
+        meaning.hint = `${noun} ${n}${on ? ' · muted now' : ''}`;
+      }
+      meaning.min = 1;
+      return say(componentRefusalReason(verb, cfg, [value]));
+    }
+    const count = verb.grid ? (at === 0 ? range.rows : range.cols) : range?.count ?? 0;
+    Object.assign(meaning, { min: count ? 1 : null, max: count || null });
+    const reason = indexRefusal(value, count, noun);
+    if (reason) return say(reason);
+    const n = Math.round(Number(value));
+    let now = '';
+    if (verb.k === 'item') {
+      const current = itemCurrent(verb, cfg, n - 1);
+      if (current !== undefined) now = ` · ${verb.item} now ${shownValue(current)}`;
+    } else if (verb.k === 'line') {
+      const line = cfg[verb.f]?.[n - 1];
+      if (typeof line === 'string') now = ` · now ${shownValue(line)}`;
+    } else if (!verb.grid) {
+      const cell = cfg[verb.f]?.[n - 1];
+      if (typeof cell === 'number') now = ` · now ${shownValue(cell)}`;
+    }
+    meaning.hint = `${noun} ${n} of ${count}${now}`;
+    return { meaning, problem: null };
+  }
+  const spec = HAND_WRITTEN_INDEXES[memberId];
+  if (!spec) return { meaning, problem: null };
+  const cfg = control?._children?.[spec.section] ?? null;
+  if (!cfg) return { meaning, problem: null };
+  const built = spec.args(...args);
+  const reason = handWrittenIndexRefusal(memberId, cfg, built);
+  // Only the index this row is: a phrase cell's row says nothing of its step.
+  const mine = spec.family === 'phrase' ? reason?.startsWith(`There is no ${at === 0 ? 'step' : 'row'} `) : Boolean(reason);
+  const problem = reason && mine ? { severity: 'error', message: literal ? sectionRefusalLine(spec.family, target, spec.action, built, reason) : reason } : null;
+  if (spec.family === 'split') {
+    const zones = Array.isArray(cfg.zones) ? cfg.zones : [];
+    const names = zones.map((z, i) => String(z?.label ?? `Zone ${i + 1}`));
+    meaning.choices = names;
+    Object.assign(meaning, { min: zones.length ? 0 : null, max: zones.length ? zones.length - 1 : null });
+    const i = zoneIndexOf(zones, value);
+    if (i >= 0) {
+      meaning.hint = typeof value === 'number' ? `zone ${value} is "${names[i]}", the ${ordinal(i + 1)} zone: a zone number counts from 0`
+        : `"${names[i]}" is zone ${i}, counted from 0`;
+    }
+    return { meaning, problem };
+  }
+  if (spec.family === 'phrase') {
+    const { steps, rows } = phraseGrid(cfg);
+    const count = at === 0 ? steps : rows;
+    Object.assign(meaning, { min: 0, max: count - 1 });
+    const n = Math.round(Number(value));
+    if (!problem && Number.isFinite(n)) meaning.hint = `${at === 0 ? 'step' : 'row'} ${n}: the ${at === 0 ? 'steps' : 'rows'} are 0 to ${count - 1}, counted from 0`;
+    return { meaning, problem };
+  }
+  const held = Math.min(Array.isArray(cfg.slots) ? cfg.slots.length : 0, MAX_SLOTS);
+  Object.assign(meaning, { min: 1, max: spec.action === 'store' ? MAX_SLOTS : (held || null) });
+  const n = Math.round(Number(value));
+  if (!problem && Number.isFinite(n)) {
+    const take = cfg.slots?.[n - 1];
+    meaning.hint = `slot ${n} of ${MAX_SLOTS}${take ? ` · holds ${shownValue(String(take.name ?? `Take ${n}`))}` : ' · empty'}`;
+  }
+  return { meaning, problem };
+}
+
+const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
 /* ------------------------------------------------------------------------ fonts and images */
 

@@ -39,6 +39,7 @@ import {
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
+import { splitZoneRefusal, phraseCellRefusal, recorderSlotRefusal, sectionRefusalLine, HAND_WRITTEN_INDEXES } from './componentIndexWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -135,7 +136,7 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, LIST_KINDS,
   itemListLength, LINK_KIND, ELEM_KIND,
 } from './componentVerbs.js';
 import {
@@ -3162,17 +3163,28 @@ function splitAction(path, action, args) {
     addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
     return;
   }
+  // A zone that is not one is refused, and says which there are (componentIndexWords.js). It was
+  // written and logged as though it had been set, and nothing changed.
+  if (action !== 'preset') {
+    const reason = splitZoneRefusal(current, args?.zone);
+    if (reason) {
+      addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, reason));
+      return false;
+    }
+  }
   const next = applySplitScriptAction(current, action, args ?? {});
   setValue(zonesPath, next);
   addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
+  return true;
 }
 const splitApi = {
   splitPreset: (target, preset, lowNote, highNote) =>
     splitAction(target, 'preset', { preset, lowNote, highNote }),
-  splitMute: (target, zone, enabled) => splitAction(target, 'mute', { zone, enabled: enabled !== false }),
-  splitChannel: (target, zone, channel) => splitAction(target, 'channel', { zone, channel }),
-  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', { zone, transpose: semitones }),
-  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
+  // Their arguments are built where the Values tab builds them (componentIndexWords.js).
+  splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN_INDEXES.splitMute.args(zone, enabled)),
+  splitChannel: (target, zone, channel) => splitAction(target, 'channel', HAND_WRITTEN_INDEXES.splitChannel.args(zone, channel)),
+  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN_INDEXES.splitTranspose.args(zone, semitones)),
+  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN_INDEXES.splitPoint.args(zone, note)),
   splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
 };
 
@@ -3187,6 +3199,14 @@ function phraseAction(path, action, args) {
   if (!cfg || typeof cfg !== 'object') {
     addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
     return;
+  }
+  // A cell off the grid is refused, and says how big the grid is. It said "nothing to change".
+  if (action === 'cell') {
+    const reason = phraseCellRefusal(cfg, args?.step, args?.row);
+    if (reason) {
+      addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, reason));
+      return false;
+    }
   }
   const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
   const keys = Object.keys(patch);
@@ -3207,7 +3227,7 @@ const phraseApi = {
   phraseTranspose: (target, semitones) => phraseAction(target, 'transpose', { transpose: semitones }),
   phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
-  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN_INDEXES.phraseCell.args(step, row, on)),
   phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
 };
 
@@ -3226,7 +3246,7 @@ const phraseApi = {
  *
  * Every one of these used to return undefined for all three outcomes.
  */
-function sectionAction(path, section, reducer, action, args) {
+function sectionAction(path, section, reducer, action, args, explain = null) {
   const target = String(path ?? '');
   const cfg = getValue(`${target}.${section}`);
   if (!cfg || typeof cfg !== 'object') {
@@ -3243,15 +3263,16 @@ function sectionAction(path, section, reducer, action, args) {
     }
     // Refused, and said so at error level: it reads exactly like a dead footswitch otherwise, and
     // a scene name that does not exist is a typo somebody needs to see.
-    addScriptTrace('error', '',
-      `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — refused, nothing changed`);
+    // With why, where the section says (componentIndexWords.js): a slot that holds no take.
+    addScriptTrace('error', '', sectionRefusalLine(section.toLowerCase(), target, action, args, explain?.(cfg, action, args ?? {}) ?? null));
     return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
   addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} → ${keys.join(', ')}`);
   return true;
 }
-const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
+const recorderRefusal = (cfg, action, args) => (action === 'store' || action === 'load' ? recorderSlotRefusal(cfg, action, args.slot) : null);
+const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g, recorderRefusal);
 const recorderApi = {
   recorderRecord: (target, on) => recAction(target, 'record', on === undefined ? {} : { on: on !== false }),
   recorderStop: (target) => recAction(target, 'stop', {}),
@@ -3265,8 +3286,8 @@ const recorderApi = {
   recorderSource: (target, source) => recAction(target, 'source', { source }),
   recorderNudge: (target, by) => recAction(target, 'nudge', { by }),
   recorderShift: (target, semitones) => recAction(target, 'shift', { semitones }),
-  recorderStore: (target, slot, name) => recAction(target, 'store', { slot, name }),
-  recorderLoad: (target, slot) => recAction(target, 'load', { slot }),
+  recorderStore: (target, slot, name) => recAction(target, 'store', HAND_WRITTEN_INDEXES.recorderStore.args(slot, name)),
+  recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN_INDEXES.recorderLoad.args(slot)),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
   recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
 };
@@ -3339,6 +3360,7 @@ function writeComponentFields(verb, path, patch) {
   return true;
 }
 
+const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
   const cfg = getValue(`${path}.${verb.section}`);
@@ -3349,6 +3371,12 @@ function componentVerbAction(verb, target, args) {
   const patch = componentScriptPatch(verb, cfg, args);
   const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  // A number past the verb's range is used as the nearest end, and said once per verb.
+  const clamped = componentClampWarning(verb, path, args);
+  if (clamped && !componentClampWarned.has(verb.id)) {
+    componentClampWarned.add(verb.id);
+    addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
+  }
   if (keys.length === 0) {
     // An empty patch is two different things here, and this reducer DOES compare against the
     // current value — so ask the spec whether the request was one the component could have
@@ -3358,9 +3386,9 @@ function componentVerbAction(verb, target, args) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
       return true;
     }
-    addScriptTrace('error', '',
-      `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed`
-      + (verb.values ? `. One of: ${verb.values.join(', ')}.` : ''));
+    // Said with why (componentVerbs.componentRefusalLine): the index that addresses nothing and
+    // the ones there are, or the value that is not one, which the Values tab's rows say too.
+    addScriptTrace('error', '', componentRefusalLine(verb, path, args, cfg));
     return false;
   }
   if (!writeComponentFields(verb, path, patch)) return false;
@@ -9660,6 +9688,7 @@ function resetScriptState() {
   animTimingWarned.clear();
   drawStrokeWarned.clear();
   timeNumberWarned.clear();
+  componentClampWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

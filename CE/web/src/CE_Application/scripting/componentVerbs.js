@@ -42,7 +42,8 @@ import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
   drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
 } from '../utils/drumPadLayout.js';
-import { elementSites, elementAt, elementsPatch } from '../utils/pixelElements.js';
+import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } from '../utils/pixelElements.js';
+import { shownValue } from './shownValue.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
@@ -1111,6 +1112,144 @@ export function componentRequestLegal(verb, cfg, args = []) {
     default:
       return false;
   }
+}
+
+/* ------------------------------------------------------- what an index addresses, and why not */
+
+// What each list verb's index addresses, by name. Every list here counts from 1, and a refusal
+// says which ones there are: an index past the end refused "nothing changed" and nothing more, so
+// `note(kit, 0, 36)` read exactly like a footswitch that did nothing.
+const LIST_NOUNS = {
+  'DrumPads.pads': 'pad', 'Turing.steps': 'step', 'Looper.lanes': 'lane', 'Orbit.nodes': 'node',
+  'Timbre.anchors': 'anchor', 'Router.destinations': 'destination', 'Router.curve': 'point',
+  'Macro.slots': 'slot', 'Constraint.members': 'member', 'Envelope.points': 'point',
+  'Joystick.cornerLabels': 'corner', 'Meter.zones': 'zone', 'Display.lines': 'line', 'Display.glyphs': 'glyph',
+  'Arp.mutes': 'step',
+};
+
+/** The name of what a list verb's index addresses: "pad", "lane", "point". */
+export function listNoun(verb) {
+  return LIST_NOUNS[`${verb.section}.${verb.f}`] ?? 'item';
+}
+
+/** A list verb's index arguments, by position after the target: 'index', 'row' or 'col', or
+ *  'name' for an element addressed by its name. Empty for every other verb. */
+export function verbIndexArgs(verb) {
+  switch (verb.k) {
+    case ITEM: case INDEXSET: return ['index'];
+    case ELEM: return ['name'];
+    case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col'] : ['index']);
+    case LINE: return verb.clear ? [] : ['row'];
+    default: return [];
+  }
+}
+
+/** How many there are for an index to address: `{ count }`, or `{ rows, cols }` for a grid, or
+ *  `{ names }` for named elements; null when the component has no such list. */
+export function componentIndexRange(verb, cfg) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  switch (verb.k) {
+    case ITEM: { const count = itemListLength(verb, c); return count === null ? null : { count }; }
+    case CELL:
+      if (verb.grid) return { rows: Array.isArray(c.rows) ? c.rows.length : 0, cols: Array.isArray(c.cols) ? c.cols.length : 0 };
+      return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
+    case LINE: return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
+    case ELEM: {
+      const names = [];
+      for (const { elements } of elementLists(c)) for (const el of elements) { const n = elementLabel(el); if (n && !names.includes(n)) names.push(n); }
+      return { names };
+    }
+    case INDEXSET: return { count: null };
+    default: return null;
+  }
+}
+
+/** Why one index addresses nothing ("There is no pad 99: the pads are 1 to 16."), or null. */
+export function indexRefusal(value, count, noun) {
+  if (indexOf(value, count) !== null) return null;
+  return count > 0 ? `There is no ${noun} ${shownValue(value)}: the ${noun}s are 1 to ${count}.` : `It has no ${noun}s.`;
+}
+
+/**
+ * Why a call `componentRequestLegal` refuses was refused, in a sentence, or null when the verb's
+ * values say it (an unknown word, which the refusal follows with "One of: …"). The index first, as
+ * the reducer reads it, then the value.
+ */
+export function componentRefusalReason(verb, cfg, args = []) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const [a, b] = args;
+  const noun = listNoun(verb);
+  const notNumber = (value) => (value === undefined || value === null ? 'No number was given.' : `${shownValue(value)} is not a number.`);
+  const valueOf = (kind, value) => ((kind === NUM || kind === INT) && clampNum(value, verb) === null ? notNumber(value) : null);
+  switch (verb.k) {
+    case NUM: case INT: return Number.isFinite(Number(a)) && a !== null && a !== undefined ? null : notNumber(a);
+    case ITEM: {
+      const range = componentIndexRange(verb, c);
+      if (!range) return `It has no ${noun}s.`;
+      return indexRefusal(a, range.count, noun) ?? valueOf(verb.kind, b);
+    }
+    case CELL: {
+      if (verb.clear) return null;
+      if (verb.grid) {
+        const { rows, cols } = componentIndexRange(verb, c);
+        return indexRefusal(a, rows, 'row') ?? indexRefusal(b, cols, 'column') ?? valueOf(NUM, args[2]);
+      }
+      const range = componentIndexRange(verb, c);
+      if (!range) return `It has no ${noun}s.`;
+      return indexRefusal(a, range.count, noun) ?? valueOf(NUM, b);
+    }
+    case LINE: {
+      if (verb.clear) return null;
+      const range = componentIndexRange(verb, c);
+      return range ? indexRefusal(a, range.count, noun) : `It has no ${noun}s.`;
+    }
+    case INDEXSET: {
+      const n = Number(a);
+      return Number.isFinite(n) && Math.round(n) >= 1 ? null : `${shownValue(a)} is not a ${noun}: the ${noun}s count from 1.`;
+    }
+    case ELEM: {
+      if (elementSites(c, a).length) return null;
+      const { names } = componentIndexRange(verb, c);
+      return `There is no element called ${shownValue(a)}.${names.length ? ` The elements are ${names.map((n) => `"${n}"`).join(', ')}.` : ' It has none yet.'}`;
+    }
+    default: return null;
+  }
+}
+
+/**
+ * The number a verb was given past its range, which it uses as the nearest end, said as the console
+ * says it (once per verb) and a Values row says it; null when there is none. A note of 200 was
+ * stored as 127 without a word, and the row said "the note is from 0 to 127, and 200 is not", as
+ * though the call had been refused.
+ */
+export function componentClampWarning(verb, path, args = []) {
+  const names = verbArgs(verb);
+  const given = [];
+  if (verb.k === NUM || verb.k === INT) given.push([names[0], args[0]]);
+  else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
+  else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
+  else if (verb.k === XY) given.push([names[0], args[0]], [names[1], args[1]]);
+  for (const [name, value] of given) {
+    if (value === undefined || value === null || typeof value === 'boolean') continue;
+    const n = Number(value);
+    if (!isFinite_(n)) continue;
+    const lo = isFinite_(verb.min) ? verb.min : -Infinity;
+    const hi = isFinite_(verb.max) ? verb.max : Infinity;
+    if (n >= lo && n <= hi) continue;
+    const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+    const span = isFinite_(verb.min) && isFinite_(verb.max) ? `outside ${verb.min} to ${verb.max}`
+      : n < lo ? `below ${verb.min}` : `above ${verb.max}`;
+    return `${verb.family} ${path}: ${verb.v}(${shown}) — the ${name} ${shownValue(n)} is ${span}, so ${n < lo ? lo : hi} was used.`;
+  }
+  return null;
+}
+
+/** The runtime's line for a refused call, in full: what the console says and a Values row says. */
+export function componentRefusalLine(verb, path, args, cfg) {
+  const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  const reason = componentRefusalReason(verb, cfg, args);
+  return `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed`
+    + (reason ? `. ${reason}` : verb.values ? `. One of: ${verb.values.join(', ')}.` : '');
 }
 
 /* ---------------------------------------------------------------------- signature text */

@@ -227,6 +227,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
+    case 'componentIndex': return m.hint ?? '';
     case 'deviceParameter': {
       if (m.noProfile) return `no profile is chosen for ${m.role}`;
       if (m.declared) return 'declared by this panel\'s scripts';

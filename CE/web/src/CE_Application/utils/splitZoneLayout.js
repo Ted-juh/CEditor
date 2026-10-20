@@ -562,7 +562,7 @@ export function scriptApplyPreset(zones, presetId, lowNote = 36, highNote = 96) 
 }
 // Patch one zone by INDEX or by label — a script written against "Bass" keeps
 // working when the zones are reordered, which an index does not.
-function zoneIndexOf(zones, which) {
+export function zoneIndexOf(zones, which) {
   const list = Array.isArray(zones) ? zones : [];
   if (typeof which === 'number') return which >= 0 && which < list.length ? which : -1;
   const name = String(which ?? '').toLowerCase();

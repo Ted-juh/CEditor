@@ -28,7 +28,7 @@
 import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
-  verbArgKinds, verbArgOptional,
+  verbArgKinds, verbArgOptional, verbIndexArgs,
 } from './componentVerbs.js';
 import { HAND_WRITTEN_VALUES } from './componentTables.js';
 // The legal values an option accepts come from the table its own implementation reads, for the
@@ -3330,14 +3330,16 @@ export const PANEL_COMMANDS = [
     'Apply a split layout ("single"/"split"/"layer"/"three"…), optionally bounding the key range.',
     [T, { name: 'preset', type: 'string', required: true },
      { name: 'lowNote', type: 'number', required: false, kind: 'note' }, { name: 'highNote', type: 'number', required: false, kind: 'note' }]),
-  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone.',
-    [T, { name: 'zone', type: 'number', required: true }, { name: 'enabled', type: 'boolean', required: true }]),
-  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel.',
-    [T, { name: 'zone', type: 'number', required: true }, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone.',
-    [T, { name: 'zone', type: 'number', required: true }, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the split point between two zones.',
-    [T, { name: 'zone', type: 'number', required: true }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
+  // A zone is its number counted from 0, or its label ("Bass"). The panel labels them from 1, so the
+  // Values tab says which zone a number reaches (componentIndexWords.js).
+  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone. A zone is its number counted from 0, or its name.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
+  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel. A zone is its number counted from 0, or its name.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'channel', type: 'number', required: true }]),
+  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone. A zone is its number counted from 0, or its name.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'semitones', type: 'number', required: true }]),
+  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the split point between two zones. A zone is its number counted from 0, or its name.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
 
   // --- Phrase Sequencer ---
   panelVerb('phraseSeed', 'phraseSeed(target, seed)', 'Fill the grid from a named seed pattern.',
@@ -3353,8 +3355,8 @@ export const PANEL_COMMANDS = [
     [T, { name: 'direction', type: 'string', required: true }]),
   panelVerb('phraseRun', 'phraseRun(target, running)', 'Start or stop the sequencer.',
     [T, { name: 'running', type: 'boolean', required: true }]),
-  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off.',
-    [T, { name: 'step', type: 'number', required: true }, { name: 'row', type: 'number', required: true },
+  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off. Steps and rows are counted from 0.',
+    [T, { name: 'step', type: 'number', required: true, kind: 'componentIndex' }, { name: 'row', type: 'number', required: true, kind: 'componentIndex' },
      { name: 'on', type: 'boolean', required: true }]),
 
   // --- Phrase Recorder ---
@@ -3380,10 +3382,10 @@ export const PANEL_COMMANDS = [
     [T, { name: 'by', type: 'number', required: true }]),
   panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Shift the take in pitch without re-quantising.',
     [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Save the take into a slot.',
-    [T, { name: 'slot', type: 'number', required: true }, { name: 'name', type: 'string', required: false }]),
-  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Load a take from a slot.',
-    [T, { name: 'slot', type: 'number', required: true }]),
+  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Save the take into a slot, 1 to 8.',
+    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex' }, { name: 'name', type: 'string', required: false }]),
+  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Load a take from a slot, counted from 1.',
+    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex' }]),
   panelVerb('recorderCountIn', 'recorderCountIn(target, bars)', 'Set the count-in length in bars (0 = none).',
     [T, { name: 'bars', type: 'number', required: true }]),
 
@@ -3505,6 +3507,9 @@ export const PANEL_COMMANDS = [
         // disagree, every optional argument being published as required.
         required: !optional[i],
         ...(i === args.length - 1 ? verbValueTyping(verb, kinds[i]) : {}),
+        // The index that addresses an element (a pad, a lane, a grid cell, a named element), which
+        // the Values tab reads against the control the call names.
+        ...(verbIndexArgs(verb).includes(name) ? { kind: 'componentIndex' } : {}),
       }))]);
   }),
 ];

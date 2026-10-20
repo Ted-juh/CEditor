@@ -14,18 +14,7 @@
 // is its default without a word.
 
 import { realNumber } from './scriptColours.js';
-
-/** A value as a message shows it, as panelRuntime's shownValue shows one. */
-function shown(value) {
-  if (value === undefined || value === null) return 'nothing';
-  if (typeof value === 'boolean') return String(value);
-  if (typeof value === 'number') {
-    if (Number.isNaN(value)) return 'NaN';
-    return Number.isFinite(value) ? String(value) : value > 0 ? 'Infinity' : '-Infinity';
-  }
-  if (typeof value === 'string') return `"${value}"`;
-  return typeof value === 'function' ? 'a function' : 'a list';
-}
+import { shownValue as shown } from './shownValue.js';
 
 // For each helper, the call as a script writes it and each number argument: what is used when it is
 // not a number (`fallback`), the least and the most it is read as, and whether it is rounded first.

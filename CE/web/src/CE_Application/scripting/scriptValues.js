@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, parameterSpecRefusal, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -38,6 +38,9 @@ import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
 import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/controlSets.js';
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { TIME_NUMBERS } from './timeWords.js';
+import { componentClampWarning } from './componentVerbs.js';
+
+const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
 
 export { writeValue, colourText, colourToWrite, numberText } from './scriptValueWrite.js';
@@ -554,6 +557,19 @@ function classify(arg, node, param, site, index) {
       const read = readAnimation(value, { ...site.env.ctx, controlName: sibling(site, 'control') });
       return setRead(arg, 'animation', read, read.meaning.choices ? 'choice' : null);
     }
+    // An element a component verb addresses (a pad, a cell, a zone, a slot), read against the
+    // control the call names, with the verb's refusal when it addresses nothing.
+    case 'componentIndex': {
+      const target = sibling(site, 'target');
+      const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
+      const rest = site.args.filter((a) => a.param?.name !== 'target');
+      const read = readComponentIndex(value, {
+        memberId: site.memberId, at: rest.indexOf(arg), args: rest.map((a) => (a.literal ? a.value : undefined)),
+        target: String(target ?? ''), control,
+      });
+      const editable = typeof value === 'number' ? 'number' : (typeof value === 'string' && read.meaning.choices?.length ? 'choice' : null);
+      return setRead(arg, 'componentIndex', read, editable);
+    }
     case 'deviceParameter': {
       // The device is the call's own: read's and parameter's second argument, write's third, bind's
       // opts.role, each the main synth when it is not given.
@@ -661,6 +677,13 @@ function numberSite(site, param) {
   if (site.memberId && module === 'ce.midi') out.path = site.memberId;
   out.time = timeSpec(site, param);
   if (site.memberId === 'sendNote' && param.name === 'ms') out.noteLength = 'sendNote';
+  // A component verb's number, which the verb uses as the nearest end of its range when it is past it.
+  if (COMPONENT_VERB_BY_ID.has(site.memberId)) {
+    const target = sibling(site, 'target');
+    const rest = site.args.filter((a) => a.param?.name !== 'target');
+    out.componentClamp = { verb: COMPONENT_VERB_BY_ID.get(site.memberId), target: String(target ?? ''),
+      args: rest.map((a) => (a.literal ? a.value : undefined)) };
+  }
   // ce.time's helpers, which read every number they are given (timeWords.js).
   if (TIME_NUMBERS[site.memberId]?.args?.[param.name]) out.timeNumber = { memberId: site.memberId, name: param.name };
   // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
