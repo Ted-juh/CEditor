@@ -968,8 +968,10 @@ context.
   caret is in, its calls, and for each argument and option what kind of value it is, what it means,
   and what the runtime would refuse, in the runtime's words. `readJsonValues` does the same for the
   panel file view's object, and `writeValue` gives the characters for a new value, spelled as the
-  language spells it. 94 parameters in `panelApi.js` carry a `kind` (step zero). For each refusal,
-  `test/scriptValues.test.js` calls the runtime and compares what it writes to the console.
+  language spells it. 94 parameters in `panelApi.js` carried a `kind` at step zero, and 106
+  parameters and options do now; `scriptValues.test.js` holds each to a reader the core has. For
+  each refusal, `test/scriptValues.test.js` calls the runtime and compares what it writes to the
+  console.
 - **The tab** (`editor/ValuesSidebar.svelte`, rows laid out by `editor/valueRows.js`). The dock's
   fourth tab, loaded the first time it is shown. A header names the lines, the call as written and
   its summary. Rows follow the call's order, an options table's keys sit under `opts`, and a call
