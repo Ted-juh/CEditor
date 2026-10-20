@@ -264,6 +264,19 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
   }
 }
 
+/**
+ * The id of the control a row can select on the panel: a control's name, or the control a property
+ * path names, when the panel has it. Null for anything else, for the panel itself and for `"*"`, any
+ * control, which no one selection is.
+ */
+export function controlToSelect(arg) {
+  if (arg?.kind !== 'control' && arg?.kind !== 'path') return null;
+  const m = arg.meaning ?? {};
+  if (m.any || m.panel || m.type === 'panel') return null;
+  if (arg.kind === 'control' && m.found !== true) return null;
+  return typeof m.id === 'string' && m.id ? m.id : null;
+}
+
 /** True when a computed argument is exactly a call listed under its own (it gets that call's rows). */
 export function madeByChild(call, arg) {
   return arg?.kind === 'computed'

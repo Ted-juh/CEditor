@@ -17,7 +17,7 @@ import { createEditSession, extentOf, SETTLE_MS } from '../src/CE_Application/ed
 import { readDockTab, writeDockTab, DOCK_TAB_KEY, DOCK_TABS } from '../src/CE_Application/editor/dockTabMemory.js';
 import {
   statementRows, everyArg, argAtOffset, findArg, editLabel, spokenPath, meaningLine, madeByChild, swatchHex, cssOfHex,
-  gradientStrip, unitLabel, plainSummary, shownNumber, hasRows,
+  gradientStrip, unitLabel, plainSummary, shownNumber, hasRows, controlToSelect,
 } from '../src/CE_Application/editor/valueRows.js';
 import { valueCatalogues } from '../src/CE_Application/editor/valuesContext.js';
 import {
@@ -394,6 +394,29 @@ test('a path whose property holds a control set\'s token names the token, not a 
   title._children.Text._children.Fill.colour = 'FF102030';
   const [plain] = readStatement(src, 'lua', 2, { panel: { controls: [title] } }).calls[0].args;
   assert.equal(meaningLine(plain), 'Title · Label › Text › Fill › colour · now "FF102030"');
+});
+
+test('a row that names a control on the panel can select it: a control\'s name, or the control a path names', () => {
+  const cutoff = createControl('Knob', { name: 'Cutoff' });
+  const title = createControl('Label', { name: 'Title' });
+  const panel = { controls: [cutoff, title] };
+  const cutoffId = cutoff._children.Core.id;
+  const titleId = title._children.Core.id;
+  const first = (src, ctx = { panel }) => readStatement(src, 'lua', 2, ctx).calls[0].args[0];
+  assert.equal(controlToSelect(first('ce.anim.play("Cutoff", "Pulse")')), cutoffId);
+  assert.equal(controlToSelect(first('ce.anim.play("cutoff", "Pulse")')), cutoffId, 'found as the runtime finds it, in any case');
+  assert.equal(controlToSelect(first('ce.core.set("Title.Text.Fill.colour", "red")')), titleId);
+  assert.equal(controlToSelect(first('ce.core.set("Title.Nowhere.atAll", 1)')), titleId, 'a path that leads nowhere still names its control');
+  assert.equal(controlToSelect(first('ce.anim.play("Cutof", "Pulse")')), null, 'no control of that name');
+  assert.equal(controlToSelect(first('ce.core.set("Nobody.value", 1)')), null);
+  assert.equal(controlToSelect(first('on("*", "valueChanged", f)')), null, 'any control is no one selection');
+  assert.equal(controlToSelect(first('ce.core.set("panel.bgColour", "red")')), null, 'the panel itself');
+  assert.equal(controlToSelect(first('ce.anim.play("Cutoff", "Pulse")', {})), null, 'with no panel nothing is looked up');
+  assert.equal(controlToSelect(first('ce.anim.play(name, "Pulse")')), null, 'a name worked out when the script runs');
+  // A component script's self.set names the control it is attached to.
+  const self = readStatement('self.set("Background.Fill.colour", "red")', 'lua', 2, { panel, selfControl: 'Title' }).calls[0].args[0];
+  assert.equal(controlToSelect(self), titleId);
+  assert.equal(controlToSelect({ kind: 'colour', meaning: { id: cutoffId } }), null, 'only a control or a path');
 });
 
 test('the line under a value is the core\'s meaning, put into words', () => {

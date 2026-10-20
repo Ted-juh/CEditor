@@ -30,6 +30,7 @@ import {
   restoreUnsavedWork,
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { findControlById } from '../utils/containment.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
 import { confirmDiscardUnsaved, confirmDestructive } from '../utils/confirmDiscard.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
@@ -984,6 +985,32 @@ export function closePanel(id) {
  */
 export const selectionBeforeScriptTab = writable(null);
 
+/**
+ * A control picked in a script tab to be its panel's selection: `{ panelId, id }`, or null. The
+ * script editor's Values tab picks one from a row that names a control (Select, beside it).
+ *
+ * A script tab shows no canvas, and every tab switch clears the selection, so the way back to the
+ * panel would clear a selection made there. Nor is the selection set while the script tab is in
+ * front: a change of selection lets go of the display panel's colour and gradient targets
+ * (colorTarget.js, gradientTarget.js), which would end an edit the Values tab has open in them. So
+ * the pick is held here, and the control is selected once its panel's tab is in front, whichever
+ * way it gets there (the tab bar, closing the script tab). A pick for another panel waits for that
+ * panel; a newer pick replaces it. The Panel file screen opens on it, as it opens on the control
+ * selected when the script tab took over.
+ */
+export const panelSelectionPick = writable(null);
+
+/** Select control `id` on panel `panelId` when that panel's tab is next in front. An `id` of null
+ *  takes back the pick made for that panel. */
+export function pickPanelSelection(panelId, id) {
+  if (panelId == null) return;
+  if (id == null || id === '') {
+    if (String(get(panelSelectionPick)?.panelId) === String(panelId)) panelSelectionPick.set(null);
+    return;
+  }
+  panelSelectionPick.set({ panelId, id });
+}
+
 /** Switch to a panel by id */
 export function setActivePanel(id) {
   const nextTab = { type: 'panel', id };
@@ -1334,6 +1361,17 @@ activePanelId.subscribe(() => {
 activeEditorTab.subscribe((tab) => {
   if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
   syncPanelSelection();
+});
+
+// A control picked in a script tab (panelSelectionPick) is selected when its panel's tab is in
+// front. By then setActivePanel has cleared the selection the tab switch clears, so this one stays.
+// A control the panel no longer has is not selected.
+activeEditorTab.subscribe((tab) => {
+  const pick = get(panelSelectionPick);
+  if (!pick || tab?.type !== 'panel' || tab.id == null || String(tab.id) !== String(pick.panelId)) return;
+  panelSelectionPick.set(null);
+  const panel = get(panels).find((p) => String(p.id) === String(pick.panelId));
+  if (panel && findControlById(panel.controls, pick.id)) selectComponent(pick.id);
 });
 
 // --- Bridge event listeners ---

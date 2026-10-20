@@ -8,7 +8,8 @@
   // have one.
   //
   // The selection is the editor's own, and every tab switch clears it. So the screen opens on the
-  // control selected when the script tab took over (selectionBeforeScriptTab); "Show on the panel"
+  // control selected when the script tab took over (selectionBeforeScriptTab), or on one the Values
+  // tab has picked since to be the panel's selection (panelSelectionPick); "Show on the panel"
   // goes back to the panel with the control selected; and while the panel is visible beside this
   // tab (a split), picking a control in either selects it in both.
   //
@@ -28,7 +29,9 @@
   import { get } from 'svelte/store';
   import CodeEditor from './CodeEditor.svelte';
   import FileViewer from './FileViewer.svelte';
-  import { panels, selectedComponentId, selectComponent, selectionBeforeScriptTab, serializePanelDocument, setActivePanel } from '../stores/panels.js';
+  import {
+    panels, panelSelectionPick, selectedComponentId, selectComponent, selectionBeforeScriptTab, serializePanelDocument, setActivePanel,
+  } from '../stores/panels.js';
   import {
     PANEL_SETTINGS_ITEM, panelFileOutline, controlFileText, controlFullText, panelSettingsFileText, panelSettingsFullText,
     wholeFileText, wholeFileItemAt,
@@ -127,9 +130,11 @@
   });
   $effect(() => () => onvalues?.(null));
 
-  // Start on the control selected when the script tab opened, and follow the selection after.
+  // Start on the control selected when the script tab opened, or the one picked since to be the
+  // panel's selection (the Values tab's Select), and follow the selection after.
   onMount(() => {
-    const remembered = get(selectionBeforeScriptTab);
+    const picked = get(panelSelectionPick);
+    const remembered = picked?.panelId === panelId ? picked : get(selectionBeforeScriptTab);
     if (remembered && remembered.panelId === panelId && rowsByKey.has(remembered.id)) openItem(remembered.id, { fromCanvas: true });
   });
   $effect(() => {

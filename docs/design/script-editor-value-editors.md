@@ -403,8 +403,8 @@ One table, then notes on the kinds where there is something more to say.
 | Fixed list | `"multiply"`, `"round"`, `"cover"` | the 16 `values` lists | the value | a dropdown | a value not in the list |
 | Font family | `"Inter Tight"` | `textStyle`, `drawMeasure`, `textFont` | "Aa" in that face | Text tab's `TypeFamilies` | a family that is not available, which `textStyle` refuses |
 | Image | `ce.image.asset("knob-cap")` | `imageAsset`, `imageSet`, `drawImage` | thumbnail | Assets tab | a name not in the library; an asset's name passed as `src`, which draws nothing |
-| Control | `ce.anim.play("Cutoff", …)`, `on("Cutoff", …)` | `targetRef` and `control` parameters | its type and current value | a dropdown of the panel's controls; a click selects it on the canvas | no control of that name |
-| Property path | `"Cutoff.Background.Fill.colour"` | the 13 `path` parameters | the current value | completion one segment at a time | a path that leads nowhere |
+| Control | `ce.anim.play("Cutoff", …)`, `on("Cutoff", …)` | `targetRef` and `control` parameters | its type and current value | a dropdown of the panel's controls; Select picks it to be the panel's selection, selected on the canvas once the panel is back in front | no control of that name |
+| Property path | `"Cutoff.Background.Fill.colour"` | the 13 `path` parameters | the current value | completion one segment at a time; Select, as for a control | a path that leads nowhere |
 | Animation | `ce.anim.play("Cutoff", "Pulse")` | that control's keyframe animations | the value | a dropdown of that control's | not one of its keyframe animations (the runtime returns false and logs the list) |
 | Event | `on(target, "valueChanged", fn)` | `eventName` parameters | the value | a dropdown | an unknown event |
 | Number with a unit | angle `180`, `ms` `250`, opacity `0.5` | the parameter's `unit` and range | the unit and range | a field, written on Enter | out of range |
@@ -1161,6 +1161,21 @@ Values tab's first version was merged:
   `test/scriptPreludeAgreement.test.js` (and the real ones by `ScriptRuntimeTests.cpp` and
   `PythonScriptEngineTests.cpp`), the row's words against the runtime's by
   `test/scriptValues.test.js`, and the editor driven by `browser-checks/valuesSidebar.mjs`.
+- **A control's row selects it on the panel.** The table promised that a click selects the control
+  on the canvas, but the script workspace shows no canvas: no preview of the panel sits beside the
+  script, and the display panel's own panel tabs read no panel while a script tab is in front.
+  Every tab switch clears the selection, too, so one made there was gone by the time the panel was
+  back. So a row whose value names a control the panel has, by its name (`ce.anim.play("Cutoff",
+  …)`, `on("Cutoff", …)`) or as the first part of a path, has **Select** beside it, which picks that
+  control to be the panel's selection (`stores/panels.js`, `panelSelectionPick`). It is selected,
+  on the canvas too, once the panel's tab is in front again, by the tab bar or by closing the
+  script tab, and the Panel file screen opens on it meanwhile. Nothing is selected while the script
+  tab is in front: a change of selection lets go of the display panel's colour and gradient
+  targets, and would end an edit the Values tab has open there. Select is a button of its own, so
+  the caret stays where it is and the text is not touched; a row's click still goes to its value,
+  and a second Select takes the pick back. Checked in `test/panelSelectionScope.test.js`,
+  `test/valuesSidebar.test.js` and `browser-checks/valuesSidebar.mjs`, which picks a control with a
+  colour open and finds it selected on the canvas.
 
 Still open: nothing from this record.
 

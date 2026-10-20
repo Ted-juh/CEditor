@@ -13,6 +13,7 @@
   import { deviceRoleMappings, deviceProfiles } from '../stores/deviceProfiles.js';
   import { profileParameterTables, requestParameterTable } from '../stores/deviceParameterTable.js';
   import { transport } from '../stores/transport.js';
+  import { panelSelectionPick, pickPanelSelection } from '../stores/panels.js';
   import { controlSetForPanel } from '../models/controlSets.js';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
@@ -429,6 +430,11 @@
       if (mapping?.profileId) untrack(() => requestParameterTable(mapping.profileId, role));
     }
   });
+  // A row that names a control picks it to be the panel's selection, selected once the panel's tab
+  // is in front again (stores/panels.js, panelSelectionPick). The debug route has no panel, so no pick.
+  let pickedControl = $derived($panelSelectionPick && panelId != null && String($panelSelectionPick.panelId) === String(panelId)
+    ? $panelSelectionPick.id : null);
+  const pickControl = (id) => pickPanelSelection(panelId, id);
   // The panel file view's text, caret and editor, which it reports (PanelFileView's onvalues).
   let fileValues = $state.raw(null);
   let fileMarks = $state.raw([]);
@@ -923,6 +929,7 @@
       {#key selectedId}
         <ValuesSidebar source={selected.source} language={selected.language} caret={caretOffset} context={scriptValueContext}
           editor={codeEditor} folded={editorFolded} docKey={`script:${selectedId}`} labelPrefix="Script"
+          {pickedControl} onpickcontrol={panelId != null ? pickControl : null}
           onmarks={(m) => editorMarks = m} />
       {/key}
     {/await}

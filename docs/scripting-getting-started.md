@@ -76,7 +76,8 @@ Three tools help you while you type:
   a number with a unit has a field, written
   when you press Enter or leave it, a curve drawn as four numbers has the curve
   editor under its row, and an envelope's points have its shape there, each point
-  to drag, written when you let go.
+  to drag, written when you let go. A row naming one of your controls has
+  **Select**, which selects that control on the panel for when you go back there.
   The dock opens on the tab you used last. The same lists are in the code too: with
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
   (or divisions, scales, events, your controls' names, your synth's parameters,

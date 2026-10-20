@@ -16,6 +16,13 @@
   // again when the edit ends, so a later drag in the chooser with no target cannot repaint the
   // panel's background, which is what the chooser does when nothing is targeted.
   //
+  // A row that names a control on the panel (a control's name, or the control a path names) has a
+  // Select beside it, which picks that control to be the panel's selection. The script workspace
+  // shows no canvas, so it is selected there when the panel's tab is next in front
+  // (stores/panels.js, panelSelectionPick). Select is a button of its own: it does not go to the
+  // value, so the caret stays, the text is not touched, and an edit open in the display panel stays
+  // open, since nothing about the selection changes while the script tab is in front.
+  //
   // The same component serves the panel file view, over its JSON (readJsonValues), where an edit
   // becomes the item's draft as typing would; read-only there (Every field, the whole file) the rows
   // are to read.
@@ -28,7 +35,7 @@
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import {
     statementRows, argAtOffset, findArg, editLabel, meaningLine, madeByChild, unitLabel, swatchHex, cssOfHex,
-    gradientStrip, shownNumber, plainSummary,
+    gradientStrip, shownNumber, plainSummary, controlToSelect,
   } from './valueRows.js';
   import { createEditSession, extentOf } from './valueEditSession.js';
   import { colorTarget, activateColorTarget, clearColorTarget } from '../stores/colorTarget.js';
@@ -54,6 +61,8 @@
     itemName = '',           // the panel file view's item, for that name
     onmarks = null,          // (marks) → the editor draws them
     onreveal = null,         // (start, end) → a view with no editor (the whole file) goes there
+    pickedControl = null,    // the id of the control picked to be the panel's selection, or null
+    onpickcontrol = null,    // (id) → pick it, (null) → take the pick back; null: no Select at all
   } = $props();
 
   const READ_EVERY_MS = 60;
@@ -161,6 +170,19 @@
     const choices = arg.meaning?.choices;
     return (arg.editable === 'choice' || (arg.editable === 'curve' && typeof arg.value === 'string'))
       && Array.isArray(choices) && choices.length > 0;
+  }
+
+  /* ------------------------------------------------------------- a control, on the panel */
+
+  /** The id of the control a row's Select picks, or null for a row with none. */
+  const selectable = (arg) => (onpickcontrol && !readOnly && !isJson ? controlToSelect(arg) : null);
+  /** The control's name as the script writes it: the name itself, or a path's first segment. */
+  const controlNameOf = (arg) => String((arg.kind === 'control' ? arg.value : arg.meaning?.control) ?? '');
+
+  /** Pick the row's control to be the panel's selection, or take back the pick it already is. */
+  function pickControl(arg) {
+    const id = selectable(arg);
+    if (id) onpickcontrol(pickedControl === id ? null : id);
   }
 
   /* -------------------------------------------------------------------------------- sessions */
@@ -512,6 +534,8 @@
       return `Done or Cancel in the display panel ends the edit. Cancel puts ${was.length > 48 ? 'what was written' : was} back exactly.`;
     }
     if (sessView?.kind === 'number') return 'Enter or leaving the field writes the number; Escape puts it back.';
+    const picked = pickedControl ? rows.find((r) => r.type === 'arg' && selectable(r.arg) === pickedControl) : null;
+    if (picked) return `${controlNameOf(picked.arg)} will be selected on the panel when you go back to it.`;
     if (nested) return 'A call inside another has rows of its own, under the call it sits in.';
     return 'Click a row to go to its value in the code.';
   });
@@ -582,6 +606,19 @@
   {/if}
 {/snippet}
 
+{#snippet selectControl(arg)}
+  {@const id = selectable(arg)}
+  {#if id}
+    {@const name = controlNameOf(arg)}
+    {@const on = pickedControl === id}
+    <!-- Its own button: the row's click goes to the value, and this must leave the caret where it is. -->
+    <button class={['vpick', on && 'on']} aria-pressed={on} aria-label={`Select ${name} on the panel`}
+      title={on ? `${name} will be selected on the panel when you go back to it. Click again to take that back.`
+        : `Select ${name} on the panel, to find it selected there when you go back. The code is not touched.`}
+      onclick={(e) => { e.stopPropagation(); pickControl(arg); }}>{on ? 'Selected' : 'Select'}</button>
+  {/if}
+{/snippet}
+
 <div class="values" data-testid="values-sidebar">
   {#if !statement}
     <p class="vempty">Put the caret in a statement: the values in it that the editor can read are listed here.</p>
@@ -638,6 +675,7 @@
                     <code class="vtext">{@html shownText(arg)}</code>
                   {/if}
                   {@render valueEdit(row)}
+                  {@render selectControl(arg)}
                 </div>
                 {#if line}<div class={['vmeaning', arg.kind === 'path' && arg.meaning?.found && 'found']}>{line}</div>{/if}
                 {#if arg.problem}<div class={['vproblem', arg.problem.severity]}>{arg.problem.message}</div>{/if}
@@ -759,5 +797,11 @@
     color: var(--txt); font-family: var(--mono); font-size: 12px;
   }
   .vselect:focus { border-color: #6aa8ff; outline: none; }
+  .vpick {
+    background: none; border: 1px solid var(--line-2); border-radius: 5px; padding: 2px 7px; cursor: pointer;
+    font-family: inherit; font-size: 11.5px; line-height: 1.3; color: var(--txt-dim); flex-shrink: 0;
+  }
+  .vpick:hover, .vpick:focus-visible { color: var(--txt); border-color: var(--txt-dim); outline: none; }
+  .vpick.on { color: var(--accent); border-color: var(--accent); }
   .vfoot { margin: 10px 2px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--txt-faint); line-height: 1.45; }
 </style>

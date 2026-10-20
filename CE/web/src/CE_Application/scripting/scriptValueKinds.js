@@ -738,7 +738,8 @@ function controlValue(control) {
 
 /**
  * A property path ("Cutoff.Background.Fill.colour", "panel.bgColour"), resolved on the panel the way
- * set() and get() resolve one. `self` is the control a self.set path is relative to.
+ * set() and get() resolve one. `self` is the control a self.set path is relative to. `meaning.id` is
+ * the id of the control it names, when the panel has it.
  */
 export function readPath(value, { panel, controls, self }) {
   const meaning = { control: null, type: null, segments: [], value: undefined, found: null };
@@ -768,6 +769,9 @@ export function readPath(value, { panel, controls, self }) {
     return { meaning, problem: { severity: 'warning', message: `No control named "${name}" on this panel.${didYouMean(name, names)}` } };
   }
   meaning.type = control._children.Core.controlType ?? null;
+  // The control's id, which its row selects on the panel by: the path names the control even when
+  // the rest of it leads nowhere.
+  meaning.id = control._children.Core.id ?? null;
   if (!segments.length || (segments.length === 1 && segments[0].toLowerCase() === 'value')) {
     meaning.found = true;
     meaning.value = controlValue(control);

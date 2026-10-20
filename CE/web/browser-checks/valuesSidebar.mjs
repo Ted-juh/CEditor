@@ -29,6 +29,10 @@
  *              call takes the picture itself), a drawn curve with the Animation tab's editor, and an
  *              envelope's points dragged, added and taken out under its row, each written once per
  *              drag, cell or click, in the form it was written in, and undone in one step
+ *   select     a row naming a control (a path's, a control's name) has Select: it picks the control
+ *              to be the panel's selection without moving the caret, touching the text or ending a
+ *              colour edit open in the display panel; the Panel file screen opens on it, and the
+ *              panel shows it selected on the canvas once its tab is in front again
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
  *              file are rows only, the whole file's at the line clicked
@@ -646,6 +650,93 @@ try {
     { added: true, edits: 2, back: true },
     { added: /^\[\{ x: 0, y: 0 \}, \{ x: 0\.25, y: 1 \}, \{ x: 0\.\d{1,3}, y: 0\.\d{1,3} \}, \{ x: 1, y: 0 \}\]$/.test(added),
       edits: await inputs(), back: (await editorText()) === more });
+
+  // ===============================================================================================
+  // SELECT — a row naming a control picks it to be the panel's selection.
+  // ===============================================================================================
+  const PICK = `function onValueChanged(value) {
+  ce.core.set("Title.Text.Fill.colour", "SteelBlue");
+  ce.anim.play("Cutoff", "Pulse");
+}
+`;
+  // The panel's tab by a name no other open tab has, to go back to it as a person does.
+  const where = await page.evaluate(async () => {
+    const { panels, scriptRuntimePanelId, updatePanel } = await import('/src/CE_Application/stores/panels.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    const id = get(scriptRuntimePanelId);
+    updatePanel(id, { name: 'Values select check' });
+    const panel = get(panels).find((p) => p.id === id);
+    const idOf = (name) => panel.controls.find((c) => c._children.Core.name === name)._children.Core.id;
+    return { panelId: id, cutoff: idOf('Cutoff'), title: idOf('Title') };
+  });
+  /** The tab in front, the selection, the pick held for the panel, and whether a colour target is armed. */
+  const picking = () => page.evaluate(async () => {
+    const { activeEditorTab, selectedComponentIds, panelSelectionPick } = await import('/src/CE_Application/stores/panels.js');
+    const { colorTarget } = await import('/src/CE_Application/stores/colorTarget.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    return { tab: get(activeEditorTab)?.type, selected: [...get(selectedComponentIds)], pick: get(panelSelectionPick)?.id ?? null,
+      target: !!get(colorTarget) };
+  });
+  const caretAt = () => page.evaluate(() => document.querySelector('.bd-app .detail textarea.ce-ta').selectionStart);
+  const pickButton = (name) => page.locator(`.vrow[data-name="${name}"] button.vpick`);
+
+  await typeScript(PICK);
+  await clickAt(PICK.indexOf('ce.core') + 2);
+  await waitHead('Line 2');
+  const offered = { path: await pickButton('path').count(), value: await pickButton('value').count(),
+    label: (await pickButton('path').textContent()).trim(), pressed: await pickButton('path').getAttribute('aria-pressed') };
+  // A colour open in the display panel, and then Select on the row of the control its path names.
+  await page.locator('.vrow[data-name="value"] button.vswatch').click();
+  await page.waitForSelector('.sv-square');
+  await kit.settle(300);
+  const caretBefore = await caretAt();
+  await pickButton('path').click();
+  await kit.settle(300);
+  const picked = await picking();
+  led.check(S, 'Select picks the control a path names', 'the path\'s row has Select (the colour beside it does not); with a colour open in the display panel it picks Title to be the panel\'s selection, and the caret, the text and the colour edit stay as they were, since nothing is selected while the script tab is in front',
+    { offered: { path: 1, value: 0, label: 'Select', pressed: 'false' }, pick: where.title, selected: [], target: true, editing: 'value',
+      caret: caretBefore, text: PICK, label: 'Selected', pressed: 'true' },
+    { offered, pick: picked.pick, selected: picked.selected, target: picked.target, editing: (await rows()).find((r) => r.editing)?.name,
+      caret: await caretAt(), text: await editorText(), label: (await pickButton('path').textContent()).trim(), pressed: await pickButton('path').getAttribute('aria-pressed') });
+  await page.locator('.context-cancel').first().click();
+  await until(() => getComputedStyle(document.querySelector('.display-panel-area')).display === 'none');
+
+  // The Panel file screen opens on the control picked, not the one selected when the tab opened.
+  await page.locator('.bd-app .tnode', { hasText: 'Panel file' }).click();
+  await page.waitForSelector('[data-testid="panel-file-view"]');
+  await until(() => (document.querySelector('.pf textarea.ce-ta')?.value ?? '').length > 0);
+  await kit.settle(300);
+  const fileOpens = JSON.parse(await editorText(FILE))?._children?.Core?.name ?? 'the panel settings';
+  await page.locator('.bd-app .titem').first().click();
+  await page.waitForSelector(`${SCRIPT} textarea.ce-ta`);
+  await kit.settle(500);
+
+  // A control's name, by the keyboard: Enter on its Select.
+  await clickAt(PICK.indexOf('"Cutoff"') + 2);
+  await waitHead('Line 3');
+  const caretOnName = await caretAt();
+  await pickButton('control').focus();
+  await page.keyboard.press('Enter');
+  await kit.settle(300);
+  const byKeys = await picking();
+  led.check(S, 'Select by the keyboard, and the Panel file screen', 'the Panel file screen opened on Title, the control picked; then Enter on Select in the row of ce.anim.play\'s "Cutoff" picks Cutoff instead, the caret where it was and the text untouched, and the foot says what will happen',
+    { fileOpens: 'Title', pick: where.cutoff, selected: [], caret: caretOnName, text: PICK, foot: 'Cutoff will be selected on the panel when you go back to it.' },
+    { fileOpens, pick: byKeys.pick, selected: byKeys.selected, caret: await caretAt(), text: await editorText(),
+      foot: (await page.locator('[data-testid="values-sidebar"] .vfoot').textContent()).trim() });
+
+  // ---- back on the panel -------------------------------------------------------------------------
+  await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();
+  await page.waitForSelector(`[data-control-id="${where.cutoff}"]`, { timeout: 30000 });
+  await kit.settle(600);
+  const onPanel = await picking();
+  led.check(S, 'the panel shows it selected', 'back on the panel by its tab, which clears the selection as every tab switch does, Cutoff is selected, on the canvas too, and the pick is used up',
+    { tab: 'panel', selected: [where.cutoff], canvas: true, pick: null },
+    { tab: onPanel.tab, selected: onPanel.selected,
+      canvas: await page.locator(`[data-control-id="${where.cutoff}"].selected`).count() === 1, pick: onPanel.pick });
+  // Back to the script editor, as a person goes there: the Look bar's Script Editor.
+  await page.locator('button.s-jump').click();
+  await page.waitForSelector('.bd-app', { timeout: 30000 });
+  await kit.settle(1200);
 
   // ===============================================================================================
   // FILE — the panel file view's Values tab.
