@@ -32,6 +32,7 @@ import {
 } from './componentVerbs.js';
 import { HAND_WRITTEN_VALUES } from './componentTables.js';
 import { LAYOUT_WORDS } from './layoutWords.js';
+import { VOICE_LEAD_MODES, ARP_ORDER_PATTERNS } from './noteLists.js';
 // The legal values an option accepts come from the table its own implementation reads, for the
 // reason the component enums do: a documented list somebody retyped is a list that drifts. These
 // two supply the image-layer and typography vocabularies.
@@ -3738,32 +3739,32 @@ export const HELPERS = [
   },
   {
     id: 'chordQuality', category: 'Music', signature: 'chordQuality(notes) -> string',
-    summary: 'Name a chord from its notes: [60, 63, 70] gives "min7". It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list.',
-    params: [{ name: 'notes', type: 'list', required: true }],
+    summary: 'Name a chord from its notes: [60, 63, 70] gives "min7". Each note is a MIDI number or a name, such as 60 or "C4"; a list with anything else in it is refused, and says where. It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list.',
+    params: [{ name: 'notes', type: 'list', required: true, kind: 'noteList' }],
   },
   {
     id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes, previous [, mode]) -> list',
-    summary: 'Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged.',
+    summary: 'Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Notes are MIDI numbers or names, and come back as numbers; a list with anything else in it is refused and gives an empty list. A mode there is none of is "closest", which is said the first time.',
     params: [
-      { name: 'notes', type: 'list', required: true },
-      { name: 'previous', type: 'list', required: true },
-      { name: 'mode', type: 'string', required: false },
+      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
+      { name: 'previous', type: 'list', required: true, kind: 'noteList' },
+      { name: 'mode', type: 'string', required: false, values: VOICE_LEAD_MODES },
     ],
   },
   {
     id: 'expandOctaves', category: 'Music', signature: 'expandOctaves(notes [, octaves]) -> list',
-    summary: 'Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1. Notes that would go above 127 are left out, not squeezed onto 127.',
+    summary: 'Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1; a number outside that, or not a whole one, is used as the nearest that is, which is said the first time. Notes that would go above 127 are left out, not squeezed onto 127. Notes are MIDI numbers or names, as chordQuality reads them.',
     params: [
-      { name: 'notes', type: 'list', required: true },
-      { name: 'octaves', type: 'number', required: false },
+      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
+      { name: 'octaves', type: 'number', required: false, kind: 'number' },
     ],
   },
   {
     id: 'arpOrder', category: 'Music', signature: 'arpOrder(notes, pattern) -> list',
-    summary: 'The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord. Notes are used in the order you give them, so sort them first for a rising run. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel\'s arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`.',
+    summary: 'The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord; any other, or none, is "up", said the first time. Notes are used in the order given, so sort them first for a rising run, and come back as MIDI numbers. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel\'s arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`.',
     params: [
-      { name: 'notes', type: 'list', required: true },
-      { name: 'pattern', type: 'string', required: true },
+      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
+      { name: 'pattern', type: 'string', required: true, values: ARP_ORDER_PATTERNS },
     ],
   },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)

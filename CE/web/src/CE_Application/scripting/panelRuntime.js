@@ -41,6 +41,7 @@ import { dashPattern, strokeEnd } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
 import { HAND_WRITTEN, handWrittenRefusal, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
+import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -1180,8 +1181,22 @@ const musicNotes = (verb, kind, root, name) => {
   return steps.map((x) => base + x);
 };
 // Sorted ascending, which is what every voicing rule below assumes.
-const musicSorted = (list) => (Array.isArray(list) ? list.slice() : []).map(Number)
-  .filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+// ce.music's lists of notes, read as noteLists.js reads them: a number, a note name or text that
+// is a number, and one that is neither refuses the call where it is. They were read as numbers, so
+// a chord written by name was an empty one, without a word. null for a list refused.
+function musicNoteList(memberId, name, list) {
+  const { notes, refused } = noteList(memberId, name, list);
+  if (refused) { addScriptTrace('error', '', refused); return null; }
+  return notes;
+}
+const musicSorted = (notes) => notes.slice().sort((a, b) => a - b);
+// A word or a count used as its default, said once (noteLists.js); resetScriptState clears it.
+const musicWarned = new Set();
+function musicSaid(said) {
+  if (!said || musicWarned.has(said)) return;
+  musicWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
 // A count argument that is not a finite number falls back to its default. Written out rather than
 // leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree
 // or a size differing by one between runtimes is a chord differing by a third.
@@ -2103,7 +2118,9 @@ const helpers = {
   // built by hand. The vocabulary is the panel's, so a chord this names and a chord the Chord Pad
   // labels agree.
   chordQuality: (notes) => {
-    const list = musicSorted(notes);
+    const read = musicNoteList('chordQuality', 'notes', notes);
+    if (!read) return undefined;
+    const list = musicSorted(read);
     if (!list.length) return undefined;
     const iv = list.map((x) => musicMod12(x - list[0]));
     const has = (a) => iv.includes(a);
@@ -2124,9 +2141,13 @@ const helpers = {
   // lets the inner voices jump; 'off' returns the chord in root position. With no previous chord
   // there is nothing to lead from, so the chord comes back untouched.
   voiceLead: (notes, previous, mode) => {
-    const chord = musicSorted(notes);
-    const prev = musicSorted(previous);
-    const how = mode == null ? 'closest' : String(mode);
+    const read = musicNoteList('voiceLead', 'notes', notes);
+    const before = read && musicNoteList('voiceLead', 'previous', previous);
+    if (!read || !before) return [];
+    const chord = musicSorted(read);
+    const prev = musicSorted(before);
+    const { how, said } = voiceLeadMode(mode);
+    musicSaid(said);
     if (!chord.length || !prev.length || how === 'off') return chord;
     let best = chord;
     let bestScore = Infinity;
@@ -2145,8 +2166,11 @@ const helpers = {
   // ascending and clamped into MIDI range; anything that would land above 127 is DROPPED rather
   // than clamped, because clamping stacks strays on one pitch and that sounds like a stuck key.
   expandOctaves: (notes, octaves) => {
-    const base = musicSorted(notes).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
-    const oc = Math.min(4, Math.max(1, musicCount(octaves, 1)));
+    const read = musicNoteList('expandOctaves', 'notes', notes);
+    if (!read) return [];
+    const base = musicSorted(read).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
+    const { n: oc, said } = octaveCount(octaves);
+    musicSaid(said);
     const out = [];
     for (let o = 0; o < oc; o += 1) for (const n of base) { const v = n + o * 12; if (v <= 127) out.push(v); }
     return out;
@@ -2160,9 +2184,12 @@ const helpers = {
   // step at play time rather than shuffling the walk. A script that wants a shuffled WALK has
   // ce.math.shuffle, which is seeded and therefore repeatable.
   arpOrder: (notes, pattern) => {
-    const asc = (Array.isArray(notes) ? notes : []).slice();
+    const asc = musicNoteList('arpOrder', 'notes', notes);
+    if (!asc) return [];
+    const { which, said } = arpOrderPattern(pattern);
+    musicSaid(said);
     if (!asc.length) return [];
-    switch (String(pattern)) {
+    switch (which) {
       case 'down': return asc.slice().reverse().map((n) => [n]);
       case 'updown': return [...asc, ...asc.slice(1, -1).reverse()].map((n) => [n]);
       case 'downup': {
@@ -9742,6 +9769,7 @@ function resetScriptState() {
   timeNumberWarned.clear();
   componentClampWarned.clear();
   deviceOverrideWarned.clear();
+  musicWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

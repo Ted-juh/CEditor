@@ -1339,14 +1339,62 @@ local function __count(v, fallback)
   if n == nil or n ~= n or n == math.huge or n == -math.huge then return fallback end
   return math.floor(n)
 end
+-- ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
+-- or text that is a number, and one that is neither refuses the call, saying where it is. They were
+-- read with tonumber, so a chord written by name was an empty one, without a word. nil for a list
+-- refused, and the same sentences in all four runtimes.
+local __NOTE_LISTS = {
+  chordQuality = { "ce.music.quality", "there is no answer" }, voiceLead = { "ce.music.lead", "the answer is an empty list" },
+  expandOctaves = { "ce.music.octaves", "the answer is an empty list" }, arpOrder = { "ce.music.arp", "the answer is an empty list" },
+}
+local function __noteListItem(v)
+  if type(v) == "number" then
+    if v == v and v ~= math.huge and v ~= -math.huge then return v end
+    return nil
+  end
+  if type(v) ~= "string" then return nil end
+  local n = noteNumber(v)
+  if n ~= nil then return n end
+  return __realNumber(v)
+end
+local function __noteList(fn, name, list, mayBeAbsent)
+  local spec = __NOTE_LISTS[fn]
+  local function say(why, more)
+    logError(spec[1] .. ": " .. why .. ", so " .. spec[2] .. "." .. (more or ""))
+    return nil
+  end
+  if list == nil then
+    if mayBeAbsent then return {} end
+    return say("no " .. name .. " were given")
+  end
+  if type(list) ~= "table" then return say(__shownValue(list) .. " is not a list of notes") end
+  local out = {}
+  for i = 1, #list do
+    local n = __noteListItem(list[i])
+    if n == nil then
+      local where = __shownValue(list[i]) .. " at position " .. i .. " of " .. name
+      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
+      return say(where .. " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
+    end
+    out[#out + 1] = n
+  end
+  return out
+end
 local function __sortedNotes(list)
   local out = {}
-  if type(list) == "table" then
-    for i = 1, #list do local v = tonumber(list[i]) if v then out[#out + 1] = v end end
-  end
+  for i = 1, #list do out[i] = list[i] end
   table.sort(out)
   return out
 end
+-- A word or a count used as its default, said once (noteLists.js).
+local __musicWarned = {}
+local function __musicSaid(text)
+  if text == nil or __musicWarned[text] then return end
+  __musicWarned[text] = true
+  logWarn(text .. " This is said only the first time.")
+end
+local __VOICE_LEAD_MODES = { closest = true, smooth = true, off = true }
+local __ARP_ORDER_PATTERNS = { up = true, down = true, updown = true, downup = true, asPlayed = true, random = true, chord = true }
 function noteSpelling(root, scale)
   local nm = (scale == nil) and "major" or tostring(scale)
   if __setOf("ce.music.spelling", "scale", scale) == nil then return nil end
@@ -1385,11 +1433,9 @@ end
 -- Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 -- chordNotes, in the vocabulary the Chord Pad labels with.
 function chordQuality(notes)
-  if type(notes) ~= "table" or #notes == 0 then return nil end
-  local list = {}
-  for i = 1, #notes do local v = tonumber(notes[i]) if v then list[#list + 1] = v end end
-  if #list == 0 then return nil end
-  table.sort(list)
+  local read = __noteList("chordQuality", "notes", notes)
+  if read == nil or #read == 0 then return nil end
+  local list = __sortedNotes(read)
   local iv = {}
   for i = 1, #list do iv[__m12(list[i] - list[1])] = true end
   local third = iv[3] and "min" or iv[4] and "maj" or iv[2] and "sus2" or iv[5] and "sus4" or ""
@@ -1471,8 +1517,15 @@ end
 -- voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
 -- melody still), "off" returns root position. No previous chord means nothing to lead from.
 function voiceLead(notes, previous, mode)
-  local chord, prev = __sortedNotes(notes), __sortedNotes(previous)
+  local read = __noteList("voiceLead", "notes", notes)
+  local before = read and __noteList("voiceLead", "previous", previous, true)
+  if read == nil or before == nil then return {} end
+  local chord, prev = __sortedNotes(read), __sortedNotes(before)
   local how = (mode == nil) and "closest" or tostring(mode)
+  if not __VOICE_LEAD_MODES[how] then
+    __musicSaid("ce.music.lead: " .. __shownValue(mode) .. ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
+    how = "closest"
+  end
   if #chord == 0 or #prev == 0 or how == "off" then return chord end
   local cands = { chord }
   local span = math.max(1, #chord - 1) * 2
@@ -1506,8 +1559,19 @@ end
 -- The Arpeggiator's octave expansion. Anything landing above 127 is DROPPED rather than clamped:
 -- clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
 function expandOctaves(notes, octaves)
-  local base = __sortedNotes(notes)
-  local oc = math.max(1, math.min(4, __count(octaves, 1)))
+  local read = __noteList("expandOctaves", "notes", notes)
+  if read == nil then return {} end
+  local base = __sortedNotes(read)
+  local oc = 1
+  if octaves ~= nil then
+    local function say(why, used) __musicSaid("ce.music.octaves: octaves is " .. __shownValue(octaves) .. ", which is " .. why .. ", so " .. used .. " was used.") return used end
+    local r = __realNumber(octaves)
+    if r == nil then oc = say("not a number", 1)
+    elseif math.floor(r) < 1 then oc = say("less than 1", 1)
+    elseif math.floor(r) > 4 then oc = say("more than 4", 4)
+    elseif math.floor(r) ~= r then oc = say("not a whole number", math.floor(r))
+    else oc = math.floor(r) end
+  end
   local out = {}
   for o = 0, oc - 1 do
     for i = 1, #base do
@@ -1524,11 +1588,18 @@ end
 -- which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 -- panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
 function arpOrder(notes, pattern)
-  local asc = {}
-  if type(notes) == "table" then for i = 1, #notes do asc[i] = notes[i] end end
+  local asc = __noteList("arpOrder", "notes", notes)
+  if asc == nil then return {} end
+  local p = pattern ~= nil and tostring(pattern) or nil
+  if p == nil then
+    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
+    p = "up"
+  elseif not __ARP_ORDER_PATTERNS[p] then
+    __musicSaid("ce.music.arp: " .. __shownValue(pattern) .. ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
+    p = "up"
+  end
   local n = #asc
   if n == 0 then return {} end
-  local p = tostring(pattern)
   if p == "chord" then return { asc } end
   local seq = {}
   if p == "down" then

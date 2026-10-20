@@ -2386,17 +2386,51 @@ def scaleDegree(note, root, scale=None):
     for i in range(len(s)):
         if __m12(base + s[i]) == pc: return i + 1
     return None
-def __sortedNotes(list_):
+# ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
+# or text that is a number, and one that is neither refuses the call, saying where it is. They were
+# read with float(), so a chord written by name was an empty one, and "inf" was a note. None for a
+# list refused, and the same sentences in all four runtimes.
+__NOTE_LISTS = {
+    "chordQuality": ("ce.music.quality", "there is no answer"), "voiceLead": ("ce.music.lead", "the answer is an empty list"),
+    "expandOctaves": ("ce.music.octaves", "the answer is an empty list"), "arpOrder": ("ce.music.arp", "the answer is an empty list"),
+}
+def __noteListItem(v):
+    import math
+    if isinstance(v, bool): return None
+    if isinstance(v, (int, float)):
+        return v if math.isfinite(v) else None     # ints stay ints, so a note reads 60 and not 60.0
+    if not isinstance(v, str): return None
+    n = noteNumber(v)
+    if n is not None: return n
+    r = __realNumber(v)
+    return int(r) if r is not None and r == int(r) else r
+def __noteList(fn, name, lst, mayBeAbsent=False):
+    verb, outcome = __NOTE_LISTS[fn]
+    def say(why, more=""):
+        logError(verb + ": " + why + ", so " + outcome + "." + more)
+        return None
+    if lst is None:
+        return [] if mayBeAbsent else say("no " + name + " were given")
+    if not isinstance(lst, (list, tuple)): return say(__shownValue(lst) + " is not a list of notes")
     out = []
-    if isinstance(list_, (list, tuple)):
-        for v in list_:
-            if isinstance(v, bool): continue
-            if isinstance(v, (int, float)):
-                out.append(v)                      # ints stay ints, so a note reads 60 and not 60.0
-            else:
-                try: out.append(float(v))
-                except (TypeError, ValueError): pass
-    return sorted(out)
+    for i, v in enumerate(lst):
+        n = __noteListItem(v)
+        if n is None:
+            where = __shownValue(v) + " at position " + str(i + 1) + " of " + name
+            if isinstance(v, str): return say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+            return say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
+        out.append(n)
+    return out
+def __sortedNotes(lst):
+    return sorted(lst)
+# A word or a count used as its default, said once (noteLists.js).
+__musicWarned = {}
+def __musicSaid(text):
+    if not text or text in __musicWarned: return
+    __musicWarned[text] = True
+    logWarn(text + " This is said only the first time.")
+__VOICE_LEAD_MODES = ["closest", "smooth", "off"]
+__ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"]
 # A count argument that is not a finite number falls back to its default. Written out rather than
 # leaning on falsiness, because `0 or 3` is 3 in Python and JavaScript and 0 in Lua.
 def __count(v, fallback):
@@ -2409,8 +2443,9 @@ def __count(v, fallback):
 # Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 # chordNotes, in the vocabulary the Chord Pad labels with.
 def chordQuality(notes):
-    lst = __sortedNotes(notes)
-    if not lst: return None
+    read = __noteList("chordQuality", "notes", notes)
+    if not read: return None
+    lst = __sortedNotes(read)
     iv = {}
     for x in lst:
         iv[__m12(x - lst[0])] = True
@@ -2477,9 +2512,15 @@ def __motion(a, b):
 # Re-voice a chord so it moves as little as possible from the one before it - the Harmoniser's
 # voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
 # melody still), "off" returns root position. No previous chord means nothing to lead from.
-def voiceLead(notes, previous, mode=None):
-    chord = __sortedNotes(notes); prev = __sortedNotes(previous)
+def voiceLead(notes, previous=None, mode=None):
+    read = __noteList("voiceLead", "notes", notes)
+    before = __noteList("voiceLead", "previous", previous, True) if read is not None else None
+    if read is None or before is None: return []
+    chord = __sortedNotes(read); prev = __sortedNotes(before)
     how = "closest" if mode is None else str(mode)
+    if how not in __VOICE_LEAD_MODES:
+        __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
+        how = "closest"
     if not chord or not prev or how == "off": return chord
     cands = [chord]; span = max(1, len(chord) - 1) * 2
     cur = chord
@@ -2500,8 +2541,20 @@ def voiceLead(notes, previous, mode=None):
 # clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
 def expandOctaves(notes, octaves=None):
     import math
-    base = __sortedNotes(notes)
-    oc = max(1, min(4, __count(octaves, 1)))
+    read = __noteList("expandOctaves", "notes", notes)
+    if read is None: return []
+    base = __sortedNotes(read)
+    oc = 1
+    if octaves is not None:
+        def say(why, used):
+            __musicSaid("ce.music.octaves: octaves is " + __shownValue(octaves) + ", which is " + why + ", so " + str(used) + " was used.")
+            return used
+        r = __realNumber(octaves)
+        if r is None: oc = say("not a number", 1)
+        elif math.floor(r) < 1: oc = say("less than 1", 1)
+        elif math.floor(r) > 4: oc = say("more than 4", 4)
+        elif math.floor(r) != r: oc = say("not a whole number", math.floor(r))
+        else: oc = math.floor(r)
     out = []
     for o in range(oc):
         for x in base:
@@ -2514,10 +2567,18 @@ def expandOctaves(notes, octaves=None):
 # step, everything at once) has the same shape as the rest. Notes are taken in the order given,
 # which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 # panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
-def arpOrder(notes, pattern):
-    asc = list(notes) if isinstance(notes, (list, tuple)) else []
+def arpOrder(notes, pattern=None):
+    asc = __noteList("arpOrder", "notes", notes)
+    if asc is None: return []
+    if pattern is None:
+        __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
+        p = "up"
+    elif str(pattern) not in __ARP_ORDER_PATTERNS:
+        __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
+        p = "up"
+    else:
+        p = str(pattern)
     if not asc: return []
-    p = str(pattern)
     if p == "chord": return [list(asc)]
     if p == "down":
         seq = list(reversed(asc))

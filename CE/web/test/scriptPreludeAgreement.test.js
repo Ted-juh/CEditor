@@ -216,6 +216,20 @@ const CASES = [
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
 // tables back to JS arrays.
+// ce.music's lists of notes and the words they take (noteLists.js): each call's answer, and what it
+// says, in every engine.
+const NOTE_CALLS = [
+  ['chordQuality', [['C4', 'Eb4', 'G4']]], ['chordQuality', [['60', '64', '67']]], ['chordQuality', [[60, 'X9']]],
+  ['chordQuality', [[60, true]]], ['chordQuality', [null]],
+  ['voiceLead', [['C4', 'E4', 'G4'], ['B3', 'D4', 'G4']]], ['voiceLead', [[60, 64, 67], [59, 'nope']]],
+  ['voiceLead', [[60, 64, 67], [59, 62, 67], 'loose']], ['voiceLead', [[60, 64, 67], [59, 62, 67], 'loose']],
+  ['voiceLead', ['C4', [60]]], ['voiceLead', [null, [60]]], ['voiceLead', [[60, 64]]],
+  ['expandOctaves', [['C4', 'E4'], 2]], ['expandOctaves', [[60], 7]], ['expandOctaves', [[60], 0]],
+  ['expandOctaves', [[60], 2.5]], ['expandOctaves', [[60], 'two']], ['expandOctaves', [[60, false]]],
+  ['arpOrder', [['C4', 'E4', 'G4'], 'down']], ['arpOrder', [[60, 64], 'sideways']], ['arpOrder', [[60, 64]]],
+  ['arpOrder', [[60, {}], 'up']],
+];
+
 const STRUCT_CASES = [
   ['to14bit', [16383]], ['to14bit', [128]],
   ['to7bit', [16383, 2, 'msb']], ['to7bit', [128, 2, 'lsb']], ['to7bit', [1, 4, 'msb']],
@@ -256,6 +270,9 @@ const STRUCT_CASES = [
   ['arpOrder', [[60, 64, 67], 'chord']], ['arpOrder', [[60, 64, 67], 'random']],
   ['arpOrder', [[60, 64, 67], 'asPlayed']], ['arpOrder', [[60, 64], 'updown']],
   ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
+  // Lists of notes by name, or with text that is a number, read as numbers; one with anything else
+  // in it refused. The words they take used as their defaults (noteLists.js).
+  ...NOTE_CALLS,
   ['divisionNames', []],
   ['hexToRgb', ['336699']], ['hexToRgb', ['#0A0B0C']], ['hexToRgb', ['bad']],
   ['hexToRgb', ['#5B9BD580']], ['hexToRgb', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToRgb', [0xFF0000]],
@@ -1808,4 +1825,81 @@ sys.stdout.write(json.dumps(heard))
   });
   assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
   assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
+test('the note lists and their words are read, refused and said alike in every engine', async (t) => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  const said = [];
+  for (const [fn, args] of NOTE_CALLS) {
+    clearScriptTrace();
+    web[fn](...args);
+    said.push(get(scriptTrace).filter((e) => e.kind === 'error' || e.kind === 'warn').map((e) => `${e.kind}: ${e.message}`));
+  }
+  resetScriptStateForTesting();
+  assert.deepEqual(said[0], [], 'a chord by name is read');
+  assert.deepEqual(said[2], ['error: ce.music.quality: "X9" at position 2 of notes is not a note name, so there is no answer. '
+    + 'A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
+  assert.deepEqual([said[7].length, said[8].length], [1, 0], 'a word used as its default is said once');
+  // JavaScript, under node:vm.
+  {
+    const lines = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error' || kind === 'warn') lines.push(`${kind}: ${m}`); } : () => undefined),
+    });
+    const got = NOTE_CALLS.map(([fn, args]) => { lines.length = 0; sandbox[fn](...args); return [...lines]; });
+    assert.deepEqual(got, said, 'JS prelude');
+  }
+  // Lua, under wasmoon.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) lua.global.set(name, () => {});
+      await lua.doString(`__lines = {}
+logError = function(m) __lines[#__lines + 1] = "error: " .. tostring(m) end
+logWarn = function(m) __lines[#__lines + 1] = "warn: " .. tostring(m) end`);
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = NOTE_CALLS.map(([fn, args]) => `__lines = {}\n${fn}(${args.map(luaLiteral).join(', ')})\n__out[#__out + 1] = table.concat(__lines, "\\u{1}")`).join('\n');
+      const out = String(await lua.doString(`__out = {}\n${calls}\nreturn table.concat(__out, "\\u{2}")`));
+      const got = out.split('\u0002').map((x) => (x ? x.split('\u0001') : []));
+      assert.deepEqual(got, said, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its words were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+lines = []
+g["logWarn"] = lambda m, *rest: lines.append("warn: " + str(m))
+g["logError"] = lambda m, *rest: lines.append("error: " + str(m))
+out = []
+for fn, args in payload["calls"]:
+    lines.clear()
+    g[fn](*args)
+    out.append(list(lines))
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: NOTE_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), said, 'Python prelude');
 });

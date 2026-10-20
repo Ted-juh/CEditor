@@ -1396,8 +1396,9 @@ function scaleDegree(note, root, scale) {
 // Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 // chordNotes, in the vocabulary the Chord Pad labels with.
 function chordQuality(notes) {
-  var list = __sortedNotes(notes);
-  if (!list.length) return undefined;
+  var read = __noteList("chordQuality", "notes", notes);
+  if (!read || !read.length) return undefined;
+  var list = __sortedNotes(read);
   var iv = {};
   for (var i = 0; i < list.length; i++) iv[__m12(list[i] - list[0])] = true;
   var has = function (a) { return iv[a] === true; };
@@ -1458,13 +1459,48 @@ function degreeChord(root, scale, degree, size) {
 // A count argument that is not a finite number falls back to its default. Written out rather than
 // leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
 function __count(v, fallback) { var n = Number(v); return isFinite(n) ? Math.floor(n) : fallback; }
-function __sortedNotes(list) {
-  var out = [];
-  if (list && list.length !== undefined) {
-    for (var i = 0; i < list.length; i++) { var v = Number(list[i]); if (isFinite(v)) out.push(v); }
-  }
-  return out.sort(function (a, b) { return a - b; });
+// ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
+// or text that is a number, and one that is neither refuses the call, saying where it is. They were
+// read with Number(), so a chord written by name was an empty one, and true was a note. null for a
+// list refused, and the same sentences in all four runtimes.
+var __NOTE_LISTS = {
+  chordQuality: ["ce.music.quality", "there is no answer"], voiceLead: ["ce.music.lead", "the answer is an empty list"],
+  expandOctaves: ["ce.music.octaves", "the answer is an empty list"], arpOrder: ["ce.music.arp", "the answer is an empty list"]
+};
+function __noteListItem(v) {
+  if (typeof v === "number") return isFinite(v) ? v : undefined;
+  if (typeof v !== "string") return undefined;
+  var n = noteNumber(v);
+  if (n !== undefined && n !== null) return n;
+  return __realNumber(v);
 }
+function __noteList(fn, name, list, mayBeAbsent) {
+  var spec = __NOTE_LISTS[fn];
+  function say(why, more) { logError(spec[0] + ": " + why + ", so " + spec[1] + "." + (more || "")); return null; }
+  if (list === undefined || list === null) return mayBeAbsent ? [] : say("no " + name + " were given");
+  if (!Array.isArray(list)) return say(__shownValue(list) + " is not a list of notes");
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var n = __noteListItem(list[i]);
+    if (n === undefined) {
+      var where = __shownValue(list[i]) + " at position " + (i + 1) + " of " + name;
+      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        : say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".');
+    }
+    out.push(n);
+  }
+  return out;
+}
+function __sortedNotes(list) { return list.slice().sort(function (a, b) { return a - b; }); }
+// A word or a count used as its default, said once (noteLists.js).
+var __musicWarned = {};
+function __musicSaid(text) {
+  if (!text || __musicWarned[text]) return;
+  __musicWarned[text] = true;
+  logWarn(text + " This is said only the first time.");
+}
+var __VOICE_LEAD_MODES = ["closest", "smooth", "off"];
+var __ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"];
 // Each voice to its NEAREST note in the other chord — voice counts differ (a triad following a
 // seventh), so pairing by index would compare nonsense.
 function __motion(a, b) {
@@ -1480,8 +1516,15 @@ function __motion(a, b) {
 // voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
 // melody still), "off" returns root position. No previous chord means nothing to lead from.
 function voiceLead(notes, previous, mode) {
-  var chord = __sortedNotes(notes), prev = __sortedNotes(previous);
+  var read = __noteList("voiceLead", "notes", notes);
+  var before = read && __noteList("voiceLead", "previous", previous, true);
+  if (!read || !before) return [];
+  var chord = __sortedNotes(read), prev = __sortedNotes(before);
   var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  if (__VOICE_LEAD_MODES.indexOf(how) < 0) {
+    __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.');
+    how = "closest";
+  }
   if (!chord.length || !prev.length || how === "off") return chord;
   var cands = [chord], span = Math.max(1, chord.length - 1) * 2, cur = chord, i, nx;
   for (i = 0; i < span; i++) {
@@ -1509,8 +1552,19 @@ function voiceLead(notes, previous, mode) {
 // The Arpeggiator's octave expansion. Anything landing above 127 is DROPPED rather than clamped:
 // clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
 function expandOctaves(notes, octaves) {
-  var base = __sortedNotes(notes);
-  var oc = Math.max(1, Math.min(4, __count(octaves, 1)));
+  var read = __noteList("expandOctaves", "notes", notes);
+  if (!read) return [];
+  var base = __sortedNotes(read);
+  var oc = 1;
+  if (octaves !== undefined && octaves !== null) {
+    var say = function (why, used) { __musicSaid("ce.music.octaves: octaves is " + __shownValue(octaves) + ", which is " + why + ", so " + used + " was used."); return used; };
+    var r = __realNumber(octaves);
+    if (r === undefined) oc = say("not a number", 1);
+    else if (Math.floor(r) < 1) oc = say("less than 1", 1);
+    else if (Math.floor(r) > 4) oc = say("more than 4", 4);
+    else if (Math.floor(r) !== r) oc = say("not a whole number", Math.floor(r));
+    else oc = Math.floor(r);
+  }
   var out = [];
   for (var o = 0; o < oc; o++) {
     for (var i = 0; i < base.length; i++) {
@@ -1527,9 +1581,17 @@ function expandOctaves(notes, octaves) {
 // which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 // panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
 function arpOrder(notes, pattern) {
-  var asc = (notes && notes.length !== undefined) ? Array.prototype.slice.call(notes) : [];
+  var asc = __noteList("arpOrder", "notes", notes);
+  if (!asc) return [];
+  var p, seq, i;
+  if (pattern === undefined || pattern === null) {
+    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
+    p = "up";
+  } else if (__ARP_ORDER_PATTERNS.indexOf(String(pattern)) < 0) {
+    __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
+    p = "up";
+  } else p = String(pattern);
   if (!asc.length) return [];
-  var p = String(pattern), seq, i;
   if (p === "chord") return [asc];
   if (p === "down") { seq = asc.slice().reverse(); }
   else if (p === "updown") { seq = asc.concat(asc.slice(1, -1).reverse()); }   // no repeated endpoints

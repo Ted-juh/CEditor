@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -38,6 +38,7 @@ import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
 import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/controlSets.js';
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { TIME_NUMBERS } from './timeWords.js';
+import { octaveCount } from './noteLists.js';
 import { componentClampWarning } from './componentVerbs.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
@@ -587,6 +588,8 @@ function classify(arg, node, param, site, index) {
       });
       return setRead(arg, 'sharedName', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
     }
+    // A list of notes, named, and refused where the runtime refuses it.
+    case 'noteList': return setRead(arg, 'noteList', readNoteList(value, { memberId: site.memberId, name: param.name }), null);
     case 'deviceRole': {
       const read = readDeviceRole(value, { devices: site.env.ctx.devices, memberId: site.memberId, controls: site.env.ctx.controls });
       return setRead(arg, 'deviceRole', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
@@ -711,6 +714,7 @@ function numberSite(site, param) {
   }
   // ce.time's helpers, which read every number they are given (timeWords.js).
   if (TIME_NUMBERS[site.memberId]?.args?.[param.name]) out.timeNumber = { memberId: site.memberId, name: param.name };
+  if (site.memberId === 'expandOctaves' && param.name === 'octaves') out.numberSaid = (v) => octaveCount(v).said;
   // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
   const bpm = (site.memberId === 'beatsToMs' || site.memberId === 'msToBeats') && param.name !== 'bpm' ? realNumber(sibling(site, 'bpm')) : undefined;
   if (bpm > 0) out.tempo = bpm;

@@ -28,6 +28,7 @@ import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
 import { LAYOUT_WORDS, layoutWord } from './layoutWords.js';
+import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import {
   COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
   familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
@@ -521,6 +522,11 @@ export function readNumber(value, param, { tempo: contextTempo = 120, site = {} 
   const n = typeof value === 'number' ? value : realNumber(value);
   // ce.time's helpers (timeWords.js): what the helper does with a number it cannot use as written,
   // in its words, and nothing of a range besides, since the helper reads its own.
+  // A count read as the nearest whole one in range, said once (expandOctaves' octaves).
+  if (site.numberSaid && value !== undefined && value !== null) {
+    const said = site.numberSaid(value);
+    if (said) return { meaning, problem: { severity: 'warning', message: said } };
+  }
   if (site.timeNumber && value !== undefined && value !== null) {
     const { said } = timeNumber(site.timeNumber.memberId, site.timeNumber.name, value);
     if (said) return { meaning, problem: { severity: 'warning', message: said } };
@@ -586,7 +592,7 @@ export function readNumber(value, param, { tempo: contextTempo = 120, site = {} 
   }
   // ce.anim's timing has said above all the runtime says of it: a stagger below 0 is used as it is.
   // So have ce.time's helpers.
-  if (site.animTiming || site.timeNumber) return { meaning, problem: null };
+  if (site.animTiming || site.timeNumber || site.numberSaid) return { meaning, problem: null };
   // A component verb's number past its range is used as the nearest end, in the verb's words.
   if (site.componentClamp) {
     const { verb, target, args } = site.componentClamp;
@@ -672,12 +678,14 @@ export function readEnum(value, values, { path, name, refusal } = {}) {
   if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };
   }
-  const message = refusal
+  const said = refusal
     ? refusal(value, values, name)
     : `${path ? `${path}: ` : ''}${typeof value === 'string' ? `"${value}"` : String(value)} is not one of the values ${name} takes. They are ${words(quoted(values))}.`;
+  // A refusal may say how bad it is ({ severity, message }): a word used as the default warns.
+  const { severity, message } = typeof said === 'object' && said ? said : { severity: 'error', message: said };
   // A refusal with nothing to say takes the value: ce.draw.stroke's `false` is no cap.
   if (!message) return { meaning, problem: null };
-  return { meaning, problem: { severity: 'error', message: `${message}${typeof value === 'string' ? didYouMean(value, values.map(String)) : ''}` } };
+  return { meaning, problem: { severity, message: `${message}${typeof value === 'string' ? didYouMean(value, values.map(String)) : ''}` } };
 }
 
 /** The runtime's own sentences for a value not in a list, where a member has one. */
@@ -687,7 +695,20 @@ export const ENUM_REFUSALS = {
   drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
   // ce.panel's arrangement verbs, each in its own sentence (layoutWords.js).
   ...Object.fromEntries(Object.keys(LAYOUT_WORDS).map((id) => [id, (value) => layoutWord(id, value).refused])),
+  // ce.music's two words are not refused: one there is none of is the default, said once.
+  voiceLead: (value) => ({ severity: 'warning', message: voiceLeadMode(value).said }),
+  arpOrder: (value) => ({ severity: 'warning', message: arpOrderPattern(value).said }),
 };
+
+/**
+ * A list of notes as ce.music's helpers read it (noteLists.js): the notes by name, and the call's
+ * refusal of a list with anything in it that is not a note, in the runtime's words.
+ */
+export function readNoteList(value, { memberId, name }) {
+  const { notes, refused } = noteList(memberId, name, value);
+  const meaning = { notes, names: notes.map((n) => noteNameOf(n)) };
+  return { meaning, problem: refused ? { severity: 'error', message: refused } : null };
+}
 
 /** An event's name: an id ("valueChanged") or a handler name ("onValueChanged"). */
 export function readEvent(value, { anyTarget, names = null }) {

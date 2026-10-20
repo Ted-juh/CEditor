@@ -228,6 +228,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
     case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': return m.hint ?? '';
+    case 'noteList': return m.names?.length ? m.names.join(' ') : '';
     case 'deviceParameter': {
       if (m.noProfile) return `no profile is chosen for ${m.role}`;
       if (m.declared) return 'declared by this panel\'s scripts';
