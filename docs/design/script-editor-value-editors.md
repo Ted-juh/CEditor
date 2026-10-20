@@ -1084,6 +1084,13 @@ And on the owner's word on 2026-10-20, the two things the review of the above le
   a list's choice, or a value no range holds, stays inexact, as before. `ce.panel.define`'s
   summary and example show it. Checked end to end in `test/animationPlayback.test.js`, which
   fails without the runtime's change.
+- **The code editor's lists follow the arrow keys.** A value's list kept its selected row in view;
+  the word list and Go to symbol's did not, so ArrowUp from the first word selected the last one
+  out of sight. All three now scroll to it. Driving that found the pointer taking the selection
+  back: a list the keys scroll moves rows under a resting pointer, the browser says each was
+  entered, and a row took the selection on mouseenter, so fifteen ArrowDowns moved seven rows. A
+  row now takes it on a move with a distance, which a scroll has none of. Checked in
+  `browser-checks/valueCompletion.mjs`.
 
 Still open: nothing from this record.
 

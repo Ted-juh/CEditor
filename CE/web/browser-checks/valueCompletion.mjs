@@ -17,6 +17,10 @@
  *              choices' order; nothing that fits closes it; Escape closes it as it does for words
  *   leaving    the caret leaving the value closes its list
  *   words      outside a value, completion completes words as before
+ *   scrolling  a word list longer than its box follows the arrow keys, ArrowUp from the first row
+ *              to the last included; the keys keep the selection with the pointer resting on the
+ *              list, and a pointer that moves still selects
+ *   symbols    Go to symbol's list follows the arrow keys the same way
  *   js         the same in JavaScript, a choice picked with the mouse
  *
  * Text goes in with keyboard.insertText, as valuesSidebar.mjs does; keys that complete go in as keys.
@@ -85,7 +89,9 @@ const list = () => page.evaluate(() => {
     labels: rows.map((r) => r.querySelector('.ce-ac-label').textContent),
     selected: sel?.querySelector('.ce-ac-label').textContent ?? null,
     detail: sel?.querySelector('.ce-ac-detail').textContent ?? null,
+    index: rows.indexOf(sel),
     inView: !!at && at.top >= box.top - 1 && at.bottom <= box.bottom + 1,
+    scrolls: el.scrollHeight > el.clientHeight + 1,
   };
 });
 
@@ -255,6 +261,72 @@ try {
   const words = await list();
   led.check(S, 'words outside a value', 'on a line of its own, typing "pri" opens the word list with print, as before',
     { kind: 'words', has: true }, { kind: words?.kind, has: !!words?.labels.includes('print') });
+  await page.keyboard.press('Escape');
+
+  // ===============================================================================================
+  // SCROLLING — a word list longer than its box follows the arrows, as a value's list does.
+  // ===============================================================================================
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press('Backspace');
+  await page.keyboard.press('Control+Space');
+  await kit.settle(250);
+  const all = await list();
+  await page.keyboard.press('ArrowUp');
+  await kit.settle(120);
+  const last = await list();
+  led.check(S, 'ArrowUp to the last word', 'Ctrl+Space on an empty line lists every word, more than the box shows; ArrowUp from the first goes to the last, and the list scrolls to show it',
+    { kind: 'words', scrolls: true, index: (all?.labels.length ?? 0) - 1, inView: true },
+    { kind: last?.kind, scrolls: last?.scrolls, index: last?.index, inView: last?.inView });
+  await page.keyboard.press('ArrowDown');
+  await kit.settle(120);
+  // The pointer rests on a row in the middle of the box, as a hand left on the mouse does, and the
+  // keys go on past the bottom: the list scrolls under the pointer, and the keys keep the selection.
+  const box = await page.locator('.ce-ac').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await kit.settle(150);
+  const hovered = (await list())?.index ?? -1;
+  for (let i = 0; i < 15; i += 1) await page.keyboard.press('ArrowDown');
+  await kit.settle(250);
+  const down = await list();
+  led.check(S, 'the keys keep the selection', 'with the pointer resting on a row in the middle, fifteen ArrowDowns move fifteen rows past it and the list scrolls to show the last, the pointer taking nothing back',
+    { moved: 15, inView: true }, { moved: hovered >= 0 && down ? down.index - hovered : null, inView: down?.inView });
+  // And the pointer still selects by moving: onto the row at the top of the box now.
+  const top = await page.evaluate(() => {
+    const el = document.querySelector('.ce-ac');
+    const box = el.getBoundingClientRect();
+    const row = [...el.querySelectorAll('.ce-ac-row')].find((r) => r.getBoundingClientRect().top >= box.top);
+    const at = row.getBoundingClientRect();
+    return { label: row.querySelector('.ce-ac-label').textContent, x: at.left + at.width / 2, y: at.top + at.height / 2 };
+  });
+  await page.mouse.move(top.x, top.y, { steps: 4 });
+  await kit.settle(150);
+  led.check(S, 'the pointer still selects', 'moving the pointer onto the row at the top of the box selects that row',
+    top.label, (await list())?.selected);
+  await page.keyboard.press('Escape');
+
+  // ===============================================================================================
+  // SYMBOLS — Go to symbol's list follows the arrows the same way.
+  // ===============================================================================================
+  const MANY = Array.from({ length: 60 }, (_, i) => `function step${String(i + 1).padStart(2, '0')}() end`).join('\n') + '\n';
+  await typeScript(MANY);
+  await page.locator(TA).first().click();
+  await page.keyboard.press('Control+Shift+O');
+  await page.waitForSelector('.ce-so .ce-so-row', { timeout: 5000 });
+  for (let i = 0; i < 40; i += 1) await page.keyboard.press('ArrowDown');
+  await kit.settle(200);
+  const symbols = await page.evaluate(() => {
+    const listEl = document.querySelector('.ce-so-list');
+    const rows = [...listEl.querySelectorAll('.ce-so-row')];
+    const sel = listEl.querySelector('.ce-so-row.sel');
+    const box = listEl.getBoundingClientRect();
+    const at = sel?.getBoundingClientRect();
+    return {
+      count: rows.length, scrolls: listEl.scrollHeight > listEl.clientHeight + 1,
+      selected: sel?.querySelector('.ce-so-name')?.textContent ?? null,
+      inView: !!at && at.top >= box.top - 1 && at.bottom <= box.bottom + 1,
+    };
+  });
+  led.check(S, 'Go to symbol follows the arrows', 'over sixty functions, more than the box shows, forty ArrowDowns select the forty-first, and the list scrolls to show it',
+    { count: 60, scrolls: true, selected: 'step41', inView: true }, symbols);
   await page.keyboard.press('Escape');
 
   // ===============================================================================================

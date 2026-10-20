@@ -454,17 +454,29 @@
     acOpen = false;
   }
 
-  // A value's choices can run past the list's height, and it opens on the one written: the selected
-  // row is kept in view, by the list's own scroll, so nothing else on the page moves.
+  // A list can run past its height (a value's choices, which open on the one written; the words;
+  // Go to symbol's symbols), and the arrow keys move through all of it, wrapping from the first row
+  // to the last: the selected row is kept in view, by the list's own scroll, so nothing else on the
+  // page moves. Measured on screen, since a symbol row's offset counts from the box above its list.
+  function keepSelectedInView(list, selector) {
+    const row = list?.querySelector(selector);
+    if (!row) return;
+    const box = list.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    const top = box.top + list.clientTop;
+    const bottom = top + list.clientHeight;
+    if (at.top < top) list.scrollTop -= top - at.top;
+    else if (at.bottom > bottom) list.scrollTop += at.bottom - bottom;
+  }
   $effect(() => {
     void acIndex; void acOptions;
-    const list = acEl;
-    if (!acOpen || !acValue || !list) return;
-    const row = list.querySelector('.ce-ac-row.sel');
-    if (!row) return;
-    if (row.offsetTop < list.scrollTop) list.scrollTop = row.offsetTop;
-    else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
+    if (acOpen) keepSelectedInView(acEl, '.ce-ac-row.sel');
   });
+  // The pointer selects the row it moves onto, and only when it moves: a list the keys scroll
+  // passes its rows under a resting pointer, and the browser tells each it was entered, so a row
+  // that took the selection on mouseenter took it back from the keys. A move has a distance; what
+  // the browser says of a scroll has none. A browser that gives no distance moves it as before.
+  const pointerMoved = (e) => e.movementX === undefined || e.movementX !== 0 || e.movementY !== 0;
 
   const KIND_ICON = { function: 'ƒ', variable: 'x', parameter: 'p', property: '.', builtin: 'b', keyword: 'k', value: '"' };
   function kindIcon(kind) { return KIND_ICON[kind] ?? '•'; }
@@ -508,6 +520,7 @@
   let soOpen = $state(false);
   let soQuery = $state('');
   let soIndex = $state(0);
+  let soListEl = $state(null);
   let soInputEl = $state(null);
   let soAll = $derived(
     analysis.symbols.filter((s) => s.kind === 'function' || s.kind === 'variable')
@@ -539,6 +552,10 @@
     else if (e.key === 'Enter') { e.preventDefault(); acceptSymbol(); }
     else if (e.key === 'Escape') { e.preventDefault(); soOpen = false; taEl?.focus(); }
   }
+  $effect(() => {
+    void soIndex; void soItems;
+    if (soOpen) keepSelectedInView(soListEl, '.ce-so-row.sel');
+  });
   async function onEditorClick(e) {
     // Click in the folded view → unfold and drop the caret on the clicked line of the full source.
     if (isFolded) {
@@ -1191,7 +1208,7 @@
         <div class={['ce-ac-row', i === acIndex && 'sel']}
           role="option" aria-selected={i === acIndex} tabindex="-1"
           onmousedown={(e) => { e.preventDefault(); acIndex = i; acceptCompletion(); }}
-          onmouseenter={() => acIndex = i}>
+          onmousemove={(e) => { if (acIndex !== i && pointerMoved(e)) acIndex = i; }}>
           <span class={['ce-ac-kind', o.kind]}>{kindIcon(o.kind)}</span>
           <span class="ce-ac-label">{o.label}</span>
           <span class="ce-ac-detail">{o.detail}</span>
@@ -1206,7 +1223,7 @@
       role="dialog" aria-label="Go to symbol" tabindex="-1" onmousedown={(e) => e.stopPropagation()}>
       <input class="ce-so-input" bind:this={soInputEl} bind:value={soQuery} placeholder="Go to symbol…"
         oninput={() => soIndex = 0} onkeydown={onSymbolKey} />
-      <div class="ce-so-list">
+      <div class="ce-so-list" bind:this={soListEl}>
         {#if soItems.length === 0}
           <div class="ce-so-empty">No symbols</div>
         {:else}
@@ -1214,7 +1231,7 @@
             <div class={['ce-so-row', i === soIndex && 'sel']}
               role="option" aria-selected={i === soIndex} tabindex="-1"
               onmousedown={(e) => { e.preventDefault(); soIndex = i; acceptSymbol(); }}
-              onmouseenter={() => soIndex = i}>
+              onmousemove={(e) => { if (soIndex !== i && pointerMoved(e)) soIndex = i; }}>
               <span class={['ce-ac-kind', s.kind]}>{kindIcon(s.kind)}</span>
               <span class="ce-so-name">{s.name}</span>
               <span class="ce-so-detail">{s.detail}</span>
