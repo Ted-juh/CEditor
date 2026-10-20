@@ -80,9 +80,11 @@ test('the plug-in says the overrides and the dump kinds in the same words', () =
     assert.ok(host.includes(`"${fragment}"`), `the value's words: ${fragment}`);
   }
   assert.ok(plugin.includes('" This is said only the first time."'), 'once per name, as the editor says it');
+  // buildDump's failure, as the editor's buildDump says it: the call, then the engine's error.
+  assert.ok(plugin.includes('"[script] buildDump(\\"" + kind + "\\"): " + built.error'), "a dump the engine cannot build is said, and nothing comes back");
   const [dumpLead] = dumpKindUnknownWords('\u0001', 'k', 'mainSynth', []).split('\u0001');
   assert.equal(dumpLead, '');
-  for (const fragment of [' profile has no dump called \\"', '\\", so nothing was sent.', ' It defines none.', ' One of: ']) {
+  for (const fragment of [' profile has no dump called \\"', '\\", so " + outcome + "."', 'outcome = "nothing was sent"', '"nothing was built"', ' It defines none.', ' One of: ']) {
     assert.ok(host.includes(fragment), `the dump kind's words: ${fragment}`);
   }
 });

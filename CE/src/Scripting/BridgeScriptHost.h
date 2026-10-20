@@ -498,7 +498,8 @@ public:
     // service, which refused it where no script could see. Refused here, in the editor's words
     // (deviceWords.js, dumpKindUnknownWords), while the profile's document is there to say so: the
     // host's "dumps" query is void when there is none.
-    bool unknownDumpKind (const juce::String& verb, const juce::String& kind, bool requests)
+    bool unknownDumpKind (const juce::String& verb, const juce::String& kind, bool requests,
+                          const juce::String& outcome = "nothing was sent")
     {
         if (kind.isEmpty() || ! callbacks.deviceQuery) return false;
         auto* q = new juce::DynamicObject();
@@ -518,12 +519,17 @@ public:
                     if (id.toString() == kind) return false;
         }
         logAt ("error", verb + "(\"" + kind + "\"): the " + defaultDeviceRole + " profile has no dump called \"" + kind
-                        + "\", so nothing was sent." + (ids.isEmpty() ? juce::String (" It defines none.")
+                        + "\", so " + outcome + "." + (ids.isEmpty() ? juce::String (" It defines none.")
                                                                       : " One of: " + ids.joinIntoString (", ") + "."),
                juce::var());
         return true;
     }
-    juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
+    juce::var buildDump (const juce::String& kind) override
+    {
+        if (runtime == nullptr || ! runtime->hasDeviceDump (defaultDeviceRole, kind))
+            if (unknownDumpKind ("buildDump", kind, false, "nothing was built")) return {};
+        return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var();
+    }
 
     /**
      * The reads, with the script's own declarations folded in.

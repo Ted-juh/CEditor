@@ -1681,15 +1681,6 @@ private:
     }
    #endif
 
-    /** The `{ ok: false, error }` shape a script-facing callback returns when it cannot answer. */
-    static juce::var errorVar (const juce::String& message)
-    {
-        auto* out = new juce::DynamicObject();
-        out->setProperty ("ok", false);
-        out->setProperty ("error", message);
-        return juce::var (out);
-    }
-
     void setupScripting (const std::shared_ptr<const ceditor::SharedPanelDocument>& panel)
     {
         // The document construction already parsed, shared with every other instance of the panel:
@@ -1858,11 +1849,19 @@ private:
         // is the value that parameter should carry. Parameters no control is bound to are simply not
         // supplied, and the engine leaves the definition's default bytes in place and says which
         // they were — the ordinary case for a panel that covers part of a dump.
+        //
+        // A dump it cannot build gives nothing back and says why, as the editor's runtime does: it
+        // gave back { ok = false, error }, which a script testing the result for truth took for a
+        // dump, and said nothing. A kind the profile has no dump by is refused before this, in
+        // BridgeScriptHost::buildDump.
         cb.buildDump = [this] (const juce::String& kind) -> juce::var
         {
             auto* engine = deviceService.engineForRole ({});
             if (engine == nullptr)
-                return errorVar ("No device profile is loaded");
+            {
+                scriptLogLine ("[script] buildDump(\"" + kind + "\"): no device profile is chosen for mainSynth, so nothing was built.");
+                return {};
+            }
 
             auto* values = new juce::DynamicObject();
             for (const auto& desc : panelParams)
@@ -1876,7 +1875,10 @@ private:
 
             const auto built = engine->buildDumpMessage (kind, juce::var (values));
             if (! built.ok)
-                return errorVar (built.error);
+            {
+                scriptLogLine ("[script] buildDump(\"" + kind + "\"): " + built.error);
+                return {};
+            }
 
             // The shape a script gets back: the bytes to send, plus what was and was not covered.
             // `unmapped` is the interesting field — it is how a script can tell it is about to send

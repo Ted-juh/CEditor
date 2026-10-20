@@ -1389,7 +1389,7 @@ Working with the synth through its device profile — the description of the syn
 
 #### `ce.device.requestDump(kind [, fn [, opts]])`
 
-Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, by its id, such as "system" or "tone1", and the request that asks for it is sent; or one declared with defineDump. The id of a request itself, such as "requestSystem", sends that request, and `fn` waits for the dump it answers with. A kind the profile has no dump or request by is refused and nothing is sent. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).
+Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request's own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.
 
 *Short name: `requestDump`.*
 

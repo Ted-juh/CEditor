@@ -574,6 +574,7 @@ int main()
         kcb.log = [&kindLogs] (const juce::String& m, const juce::var&) { kindLogs.add (m); };
         kcb.requestDump = [&asked] (const juce::String& kind) { asked.add (kind); };
         kcb.sendDump = [&sent] (const juce::String& kind) { sent.add (kind); };
+        kcb.buildDump = [] (const juce::String& kind) { return juce::var ("built " + kind); };
         kcb.deviceQuery = [] (const juce::String& kind, const juce::var&) -> juce::var
         {
             if (kind == "dumps") return juce::var (juce::Array<juce::var> { "system", "common" });
@@ -593,6 +594,12 @@ int main()
                    "requestDump(\"patch\"): the mainSynth profile has no dump called \"patch\", so nothing was sent. One of: system, common.",
                    "sendDump(\"requestSystem\"): the mainSynth profile has no dump called \"requestSystem\", so nothing was sent. One of: system, common." },
                "…and is said in the editor's words (got " + kindLogs.joinIntoString (" | ") + ")");
+        // buildDump too: it gave the engine's { ok = false, error } back, which reads as a dump.
+        kindLogs.clear();
+        check (kindHost.buildDump ("system").toString() == "built system", "buildDump of a dump the profile defines goes to the host");
+        check (kindHost.buildDump ("patch").isVoid()
+                   && kindLogs == juce::StringArray { "buildDump(\"patch\"): the mainSynth profile has no dump called \"patch\", so nothing was built. One of: system, common." },
+               "buildDump of a kind it has none of gives nothing back, in the editor's words (got " + kindLogs.joinIntoString (" | ") + ")");
     }
 
     // A set() that writes nothing has to be observable window-closed too (design doc §31).
