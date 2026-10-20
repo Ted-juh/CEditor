@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { placeSignatureHint, hintParts, hintLength, HINT } from '../src/CE_Application/editor/signatureHint.js';
+import { placeSignatureHint, hintParts, hintLength, visualColumn, HINT } from '../src/CE_Application/editor/signatureHint.js';
 
 // An editor 800 px wide and 400 tall at 100, 100; 13px code, 7.8 px a character, 20 px a line.
 const BOX = { left: 100, right: 900, top: 100, bottom: 500 };
@@ -56,4 +56,16 @@ test('a box wider than the editor folds the other parameters to "…"', () => {
   assert.deepEqual(hintParts(['a', 'b', 'c'], 0, true).map((q) => q.text), ['a', '…']);
   assert.deepEqual(hintParts(['a', 'b', 'c'], 2, true).map((q) => q.text), ['…', 'c']);
   assert.deepEqual(hintParts(['a', 'b'], 5, true).map((q) => q.text), ['…'], 'past the last parameter, all of them folded');
+});
+
+test('columns are counted as the editor draws them, a tab to its next stop of 2', () => {
+  assert.equal(visualColumn('abc', 3), 3);
+  assert.equal(visualColumn('\t\tx', 2), 4, 'two tabs at the start are four columns');
+  assert.equal(visualColumn('a\tb', 2), 2, 'a tab after one character goes to the stop at 2');
+  assert.equal(visualColumn('ab\tc', 3), 4, 'one after two goes on to 4');
+  // The browser check's line: three tabs at the start and one inside, drawn three columns wider
+  // than its 28 characters.
+  const line = '\t\t\tce.midi.sendCC(1,\t74, 64)';
+  assert.equal(visualColumn(line, line.length), line.length + 3);
+  assert.equal(visualColumn('ab', 5), 5, 'past the end, a column per character');
 });

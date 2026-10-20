@@ -34,7 +34,7 @@
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
   import { carryPopupTheme } from './popupTheme.js';
-  import { placeSignatureHint } from './signatureHint.js';
+  import { placeSignatureHint, visualColumn } from './signatureHint.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import { markBoxes } from './codeMarks.js';
 
@@ -409,11 +409,13 @@
     const starts = text === displayText ? displayStarts : lineStartsOf(text);
     const start = starts[caretLine] ?? 0;
     const end = caretLine + 1 < starts.length ? starts[caretLine + 1] - 1 : text.length;
-    const lineCols = Math.max(text.slice(start, end).trimEnd().length, caretCol);
+    const line = text.slice(start, end);
+    // In columns as drawn: a tab is drawn to its next stop, not one character wide.
+    const endCol = visualColumn(line, Math.max(line.trimEnd().length, caretCol));
     const x0 = r.left + PAD_L - scrollLeft;
     return placeSignatureHint({
       name: signature.name, params: signature.params, active: signature.activeParam,
-      lineEndX: x0 + lineCols * charWidth, caretX: x0 + caretCol * charWidth,
+      lineEndX: x0 + endCol * charWidth, caretX: x0 + visualColumn(line, caretCol) * charWidth,
       lineTop: r.top + PAD_TOP + caretLine * lineHeight - scrollTop, lineHeight, charWidth, fontSize,
       box: { left: r.left, right: r.left + taEl.clientWidth, top: r.top, bottom: r.top + taEl.clientHeight },
     });

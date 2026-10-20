@@ -28,6 +28,15 @@ export const HINT = Object.freeze({
   margin: 4,            // kept clear of the text area's edges
 });
 
+/** The column `index` (a character offset into `line`) is drawn at, a tab taking the code to its
+ *  next stop: the editor draws tabs `tabSize` wide (CodeEditor.svelte's tab-size). */
+export function visualColumn(line, index, tabSize = 2) {
+  let col = 0;
+  const text = String(line ?? '');
+  for (let i = 0; i < Math.min(index, text.length); i += 1) col = text[i] === '\t' ? col + tabSize - (col % tabSize) : col + 1;
+  return col + Math.max(0, index - text.length);
+}
+
 /** The parameters as the hint shows them: each { text, active }, or, folded, the active one alone
  *  with "…" for each run of the others. */
 export function hintParts(params, active, fold = false) {
@@ -51,7 +60,8 @@ export function hintLength(name, parts) {
  * caret's line is not in view.
  *
  *   lineEndX  where the caret line's last character ends (its trailing spaces not counted, unless
- *             the caret is among them)
+ *             the caret is among them), both it and caretX by the columns the editor draws
+ *             (visualColumn), not the characters
  *   caretX, lineTop, lineHeight
  *   charWidth, fontSize   the code's
  *   box       { left, right, top, bottom }: the text's visible area

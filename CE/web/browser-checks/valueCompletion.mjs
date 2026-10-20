@@ -373,9 +373,10 @@ try {
   // popups drawn as boxes, in the editor's colours, though they are moved to <body>.
   // ===============================================================================================
   const LONG = `-- ${'a long comment that runs past the edge of the editor '.repeat(3)}`;
+  // Line 3 has tabs, which the editor draws two columns wide: the hint is placed by columns as drawn.
   const HINTS = `ce.midi.sendCC(1, 74, 64) ${LONG}
 function onValueChanged(value)
-  ce.midi.sendCC(1, 74, 64)
+\t\t\tce.midi.sendCC(1,\t74, 64)
   ce.midi.sendCC(1, 74, 64) ${LONG}
 end
 `;
@@ -410,7 +411,7 @@ end
     await hintAt(4);
     await page.screenshot({ path: `${process.env.HINT_SHOT_DIR}/hint-above.png`, clip: { x: 340, y: 280, width: 900, height: 200 } });
   }
-  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC, the hint is on that line after its last character, in the code\'s own line, over no code, and drawn on a background of its own though it is moved to <body>',
+  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC written with tabs, the hint is on that line after its last character as drawn, in the code\'s own line, over no code, and drawn on a background of its own though it is moved to <body>',
     { mode: 'inline', parent: 'BODY', text: 'sendCC(channel, cc, value)', opaque: true, onLine: true, after: true, inside: true },
     { mode: inline.mode, parent: inline.parent, text: inline.text, opaque: inline.opaque, onLine: inline.onLine, after: inline.after, inside: inline.inside });
   led.check(S, 'no room after the line', 'on a line too long for it, the hint is a box above the line, clear of it, with a border and a background, inside the editor; on the top visible line, below it',
