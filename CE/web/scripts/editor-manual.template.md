@@ -619,7 +619,8 @@ have states. Edit them on the **States** tab of the properties panel (one contro
    changing the normal look.
 3. **When** says when the state is active: seven switches — **Hover**, **Pressed**, **Focused**,
    **Dragging**, **Disabled**, **Checked**, **Mixed** — and an optional **Rule** for anything more
-   specific.
+   specific. A rule can compare the control's value: `value > 64` is active above 64, and
+   `valueNormalized >= 0.5` in the top half of the range, whatever the range is.
 4. **Overrides** lists what the state changes, with buttons to clear them.
 
 Add your own state by typing a name in **New** and pressing **Add**. When several states are active

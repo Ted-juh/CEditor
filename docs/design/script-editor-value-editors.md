@@ -786,8 +786,9 @@ For the owner to decide, and each decided since:
   listed no fields for them, are checked since (the table above): `ce.midi.write`'s options, which
   now share `ce.midi.read`'s definition, and `ce.panel.define`'s spec in every section. Found on the
   way: the `when` the define examples used, `valueGreaterThan`, is a key nothing evaluates, so the
-  state they made never applied. The examples use `{ pressed = true }` now, and a comparison on a
-  plain control's value is still something a state's `when` cannot say.
+  state they made never applied. The examples use `{ pressed = true }` now. A comparison on a
+  plain control's value, which that key was reaching for, is a state's `rule` since:
+  `rule = "value > 64"` ([Built](#built)).
 - **A colour property: decided, accept.** The short forms with one reading are stored written out
   in the panel's form, the conversion the refusal used to print: `"#RGB"` as `"#RRGGBB"`, a CSS
   name in any case as its `"#RRGGBB"` (and `transparent` as `"00000000"`), and `rgb()`, `rgba()`,
@@ -1067,6 +1068,22 @@ Then, on the owner's word the same day:
   the caret long gone.
 - **The last editors** (fonts, images, drawn curves), the Gradient tab's linear-only mode and
   completion over a value are in the Built list above.
+
+And on the owner's word on 2026-10-20, the two things the review of the above left over:
+
+- **A state's rule reads the control's value.** `when` could ask for the value to be one number
+  (`{ value = 64 }`), and `rule` could compare (`level > 0.5`) but saw only custom channels and
+  flags, so on a plain knob `rule = "value > 64"` compared nothing and was never true, without a
+  word. A rule now reads `value`, `valueNormalized` and `valueEnum`, the names `when` reads them by
+  (`interactionRuntime.js`, `STATE_RULE_VALUE_NAMES`), with a channel of the same name kept over
+  them: 490 custom controls in the committed panels have a `value` channel, and to them `value`
+  means it, as it always did; no committed panel has a rule. The States tab's rule builder offers
+  the names after the channels. The Animation tab's preview of a state sets the value that makes
+  it true (`statePatch`): for `when` on the value, and for a rule, from the range's ends and
+  middle and each number the rule compares the value with, a hundredth of the range either side;
+  a list's choice, or a value no range holds, stays inexact, as before. `ce.panel.define`'s
+  summary and example show it. Checked end to end in `test/animationPlayback.test.js`, which
+  fails without the runtime's change.
 
 Still open: nothing from this record.
 

@@ -440,8 +440,8 @@ export const WRITTEN = {
     js: `const hover = ce.panel.entry("Cutoff", "States", "Hover");`,
   },
   panelDefine: {
-    lua: `ce.panel.define("Cutoff", "States", "Held", {\n  when = { pressed = true },\n  patches = { component = { ["Transform.opacity"] = 60 } },\n})`,
-    js: `ce.panel.define("Cutoff", "States", "Held", {\n  when: { pressed: true },\n  patches: { component: { "Transform.opacity": 60 } },\n});`,
+    lua: `ce.panel.define("Cutoff", "States", "Held", {\n  when = { pressed = true },\n  patches = { component = { ["Transform.opacity"] = 60 } },\n})\n-- a rule compares the control's value: lit in the top half of its range\nce.panel.define("Cutoff", "States", "Hot", { rule = "valueNormalized >= 0.5" })`,
+    js: `ce.panel.define("Cutoff", "States", "Held", {\n  when: { pressed: true },\n  patches: { component: { "Transform.opacity": 60 } },\n});\n// a rule compares the control's value: lit in the top half of its range\nce.panel.define("Cutoff", "States", "Hot", { rule: "valueNormalized >= 0.5" });`,
   },
   panelUndefine: { code: 'ce.panel.undefine("Cutoff", "States", "Warn")' },
   panelPatch: {

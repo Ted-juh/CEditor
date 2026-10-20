@@ -302,10 +302,20 @@ function stateSignalValue(key, signals) {
   }
 }
 
-// Flat name -> value map for state rules: bare channel names carry their raw
-// values, interaction flags come along so rules like `hover == true` work.
+// The control's own value, by the names `when` reads it by (stateSignalValue), so a rule can compare
+// it: `value > 64`, `valueNormalized >= 0.5`. A rule had no name for it, and one naming it compared
+// nothing and was never true. A channel of the same name keeps it: a custom control's `value`
+// channel is what such a rule has always meant there.
+export const STATE_RULE_VALUE_NAMES = ['value', 'valueNormalized', 'valueEnum'];
+
+// Flat name -> value map for state rules: the control's value, then bare channel names with their
+// raw values over it, and interaction flags so rules like `hover == true` work.
 function stateRuleValues(signals) {
-  const values = {};
+  const values = {
+    value: signals?.valueRaw,
+    valueNormalized: signals?.valueNormalized,
+    valueEnum: signals?.valueEnum,
+  };
   for (const [key, value] of Object.entries(signals?.customChannels ?? {})) {
     const match = /^channel\.([^.]+)\.raw$/.exec(key);
     if (match) values[match[1]] = value;

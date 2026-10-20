@@ -2291,7 +2291,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, as the Animation tab makes one, or with `kind = "keyframes"` one that plays all the time over the frames you give. A key the section\'s entries do not have, capitals included, is refused with a message listing the keys it takes, and nothing is defined: a misspelled `when` would make a state that always applies. Returns true if the entry was written.',
+    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, or with `kind = "keyframes"` one that plays all the time over the frames you give. A state applies while its `when` flags hold and its `rule` is true, and a rule can compare the control\'s value: `rule = "value > 64"`. A key the section\'s entries do not have, capitals included, is refused with the keys it takes, and nothing is defined. Returns true if the entry was written.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true, kind: 'control' },
