@@ -204,9 +204,11 @@
 
   // The learn under way: the row's key, what it writes, how to stop listening, and whether the
   // display panel was showing before it opened the MIDI tab. `learnNote` says what the last one
-  // wrote, until the caret moves.
+  // wrote, until the caret leaves the call it wrote into (`learnNoteIn`, that call's text as written):
+  // the write itself moves the caret, so any move would take the note away before it was read.
   let learning = $state.raw(null);
   let learnNote = $state('');
+  let learnNoteIn = null;
   let dropKey = $state(null);
   const DRAG_TYPE = 'application/x-ceditor-device-parameter';
 
@@ -235,6 +237,7 @@
     const spec = learnable(row);
     if (!spec) return;
     learnNote = '';
+    learnNoteIn = null;
     scriptDisplay.set(true);
     displayTabRequest.set({ tab: 'midi' });
     const stop = learnNext((chip) => learnTakes(spec, chip), (chip) => takeLearned(row, chip), { profileId: learnProfile(row.arg) });
@@ -249,8 +252,13 @@
     const spec = now ? learnable(now) : null;
     const edit = spec ? learnedEdit(source, spec, learned, (a, v) => writeValue(source, language, a, v).text) : null;
     stopLearn();
-    if (!edit) { learnNote = spec ? 'That is not what this row takes, so nothing was written.' : 'The call moved, so nothing was written.'; return; }
+    if (!edit) {
+      learnNoteIn = null;
+      learnNote = spec ? 'That is not what this row takes, so nothing was written.' : 'The call moved, so nothing was written.';
+      return;
+    }
     writeThrough(edit.start, edit.end, edit.text);
+    learnNoteIn = { start: now.call.range.start, end: now.call.range.end + edit.text.length - (edit.end - edit.start) };
     learnNote = learnWords(spec, learned);
   }
 
@@ -558,8 +566,14 @@
     });
   });
   $effect(() => { if (readOnly) untrack(() => { session?.end('left'); stopLearn(); }); });
-  // What the last learn wrote is said until the caret moves.
-  $effect(() => { void caret; untrack(() => { if (!learning) learnNote = ''; }); });
+  // What the last learn wrote is said until the caret leaves the call it wrote into.
+  $effect(() => {
+    const at = caret;
+    untrack(() => {
+      if (learning || !learnNote) return;
+      if (!learnNoteIn || at < learnNoteIn.start || at > learnNoteIn.end) { learnNote = ''; learnNoteIn = null; }
+    });
+  });
 
   onMount(() => {
     // Done, a tab switch, the dock closing: the target is no longer this session's.
