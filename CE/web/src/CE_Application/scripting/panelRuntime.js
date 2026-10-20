@@ -70,7 +70,7 @@ import {
 } from '../stores/deviceProfiles.js';
 import { profileSources } from '../stores/deviceProfileStores.js';
 import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
-import { deviceWriteUnknownWords, deviceBindUnknownWords } from './deviceWords.js';
+import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
@@ -7433,14 +7433,20 @@ function deviceValueWrite(id, value, role) {
   // (deviceWords.js). It was logged as written and answered true, and the host's "Not sent" went to
   // the MIDI preview, which no script reads; the plug-in answered false without a word. While the
   // table is on its way, the write goes to the host as it did, which drops what it cannot encode.
-  const profileId = roleMapping(role)?.profileId;
-  if (profileId) {
-    const table = parameterTable(profileId);
-    if (!table) requestParameterTable(profileId, role);
-    else if (!table.some((p) => String(p?.id ?? '') === key)) {
-      addScriptTrace('error', '', deviceWriteUnknownWords(key, role));
-      return false;
-    }
+  // With no profile chosen there is nothing to encode it, and that is said the same way. The role's
+  // OWN mapping: a send takes no other (deviceMidiOps resolveParameterSend, and the plug-in's
+  // service), so a role nothing is mapped to has no profile here, where a read takes the main
+  // synth's (roleMapping).
+  const profileId = get(deviceRoleMappings)?.[role]?.profileId;
+  if (!profileId) {
+    addScriptTrace('error', '', deviceWriteNoProfileWords(key, role));
+    return false;
+  }
+  const table = parameterTable(profileId);
+  if (!table) requestParameterTable(profileId, role);
+  else if (!table.some((p) => String(p?.id ?? '') === key)) {
+    addScriptTrace('error', '', deviceWriteUnknownWords(key, role));
+    return false;
   }
   if (!isJuceAvailable()) {
     addScriptTrace('error', '',

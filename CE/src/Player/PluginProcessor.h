@@ -1909,21 +1909,29 @@ private:
                                  const juce::String& roleIn) -> bool
         {
             if (parameterId.isEmpty()) return false;
+            const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
             auto* req = new juce::DynamicObject();
-            req->setProperty ("deviceRole", roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn);
+            req->setProperty ("deviceRole", role);
             req->setProperty ("parameterId", parameterId);
             req->setProperty ("value", value);
             req->setProperty ("dryRun", false);      // actually send it
             const auto result = deviceService.compileParameterMessage (juce::var (req), true);
             auto* obj = result.getDynamicObject();
             if (obj != nullptr && (bool) obj->getProperty ("ok")) return true;
-            // A parameter the profile does not have answered false without a word. It is said, in
-            // the words the editor's runtime says it in (CE/web/src/CE_Application/scripting/
-            // deviceWords.js; test/deviceParameterTable.test.js holds the two to one text).
-            if (obj != nullptr && obj->getProperty ("error").toString().startsWith ("Unknown parameter: "))
+            // A parameter the profile does not have, and a device no profile is chosen for, both
+            // answered false without a word. Each is said, in the words the editor's runtime says it
+            // in (CE/web/src/CE_Application/scripting/deviceWords.js;
+            // test/deviceParameterTable.test.js holds the two to one text). A parameter the script
+            // declared never comes here: BridgeScriptHost sends it without a profile.
+            const auto error = obj != nullptr ? obj->getProperty ("error").toString() : juce::String();
+            if (error.startsWith ("Unknown parameter: "))
                 scriptLogLine ("[script] ce.device.write: \"" + parameterId + "\" is not a parameter of the "
-                               + (roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn)
+                               + role
                                + " profile, so nothing was sent.");
+            else if (error.startsWith ("No device profile mapped for role: "))
+                scriptLogLine ("[script] ce.device.write: no device profile is chosen for " + role + ", so \""
+                               + parameterId
+                               + "\" was not sent. A parameter declared with ce.device.defineParameter is sent without one.");
             return false;
         };
 

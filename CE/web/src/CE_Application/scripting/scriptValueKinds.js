@@ -28,7 +28,7 @@ import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern } from './drawDash.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
-import { deviceWriteUnknownWords, deviceBindUnknownWords } from './deviceWords.js';
+import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
@@ -907,21 +907,26 @@ const DEVICE_UNKNOWN = {
  * (editor/BehaviorDesigner.svelte): `roles` gives each mapped role's profile and its whole table of
  * parameters (stores/deviceParameterTable.js), null while it loads; `declared` the ids the panel's
  * scripts declare with ce.device.defineParameter, which no profile needs to have. A role nothing is
- * mapped to reads the main synth's profile, as the runtime's roleMapping does.
+ * mapped to reads the main synth's profile, as the runtime's roleMapping does, except in a write,
+ * which is sent to its own role's profile or not at all.
  *
- * Nothing is said of an id before the whole table is in, or when no profile is chosen: part of a
- * table cannot say what is not in it, and a script may drive a synth with no profile at all.
+ * Nothing is said of an id before the whole table is in: part of a table cannot say what is not in
+ * it. With no profile chosen, write and bind say what they do, and a read or parameter() of one
+ * answers nothing, which is not wrong of a script that drives a synth with no profile at all.
  */
 export function readDeviceParameter(value, { devices, role, memberId, control }) {
   const wanted = typeof role === 'string' && role ? role : 'mainSynth';
-  const device = devices?.roles?.[wanted] ?? devices?.roles?.mainSynth ?? null;
+  // A write is sent to its role's own profile and no other, as the runtime's is.
+  const device = devices?.roles?.[wanted] ?? (memberId === 'deviceWrite' ? null : devices?.roles?.mainSynth) ?? null;
   const meaning = { id: value, role: wanted, profile: device?.profileName ?? null, parameter: null, found: null, loading: false, declared: false };
   if (typeof value !== 'string') return { meaning, problem: null };
   const declared = Array.isArray(devices?.declared) && devices.declared.includes(value);
   if (!device?.profileId) {
     meaning.noProfile = true;
-    // bind says so with no profile too: nothing then knows the id but a declaration.
-    if (memberId === 'deviceBind' && !declared && devices) return { meaning, problem: DEVICE_UNKNOWN.deviceBind(value, wanted, control ?? '') };
+    // bind says so with no profile too: nothing then knows the id but a declaration. write refuses,
+    // as the runtime and the plug-in do: nothing is there to encode it.
+    if (!declared && devices && memberId === 'deviceBind') return { meaning, problem: DEVICE_UNKNOWN.deviceBind(value, wanted, control ?? '') };
+    if (!declared && devices && memberId === 'deviceWrite') return { meaning, problem: { severity: 'error', message: deviceWriteNoProfileWords(value, wanted) } };
     return { meaning, problem: null };
   }
   const table = Array.isArray(device.parameters) ? device.parameters : null;

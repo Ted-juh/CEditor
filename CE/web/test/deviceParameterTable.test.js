@@ -23,7 +23,7 @@ import {
   deviceProfiles, deviceRoleMappings, profileParameters, profileParameterPages, latestMidiPreview,
 } from '../src/CE_Application/stores/deviceProfileStores.js';
 import { commitDeviceParameter } from '../src/CE_Application/stores/deviceMidiOps.js';
-import { deviceWriteUnknownWords, deviceBindUnknownWords } from '../src/CE_Application/scripting/deviceWords.js';
+import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from '../src/CE_Application/scripting/deviceWords.js';
 import {
   resetScriptStateForTesting, scriptApiForTesting, setRuntimeHost, clearDeviceRuntimeDefinitions,
 } from '../src/CE_Application/scripting/panelRuntime.js';
@@ -159,6 +159,7 @@ test('ce.device.write refuses an id the whole table lacks, and says so as the pl
     assert.deepEqual(lines, [deviceWriteUnknownWords('cutof', 'mainSynth')]);
     assert.equal(lines[0], 'ce.device.write: "cutof" is not a parameter of the mainSynth profile, so nothing was sent.');
     // A role of its own is named.
+    deviceRoleMappings.update((m) => ({ ...m, drums: { profileId: 'gaia' } }));
     assert.equal(runtimeLines(() => api.ce.device.write('cutof', 64, 'drums')).lines[0],
       'ce.device.write: "cutof" is not a parameter of the drums profile, so nothing was sent.');
     // An id the table has goes on to the host, which this test has not: that refusal is the old one.
@@ -178,6 +179,34 @@ test('ce.device.write refuses an id the whole table lacks, and says so as the pl
   });
 });
 
+test('ce.device.write with no profile chosen refuses, and says so as the plug-in does', () => {
+  withDevice(GAIA, (api) => {
+    deviceRoleMappings.set({});
+    const { result, lines } = runtimeLines(() => api.ce.device.write('cutoff', 64));
+    assert.equal(result, false);
+    assert.deepEqual(lines, [deviceWriteNoProfileWords('cutoff', 'mainSynth')]);
+    assert.equal(lines[0], 'ce.device.write: no device profile is chosen for mainSynth, so "cutoff" was not sent. '
+      + 'A parameter declared with ce.device.defineParameter is sent without one.');
+    assert.equal(get(latestMidiPreview), null, 'nothing went to the host to be refused there');
+  });
+  // A role nothing is mapped to: the send would take its own mapping and no other, so it is refused
+  // too, though a read of that role takes the main synth's profile.
+  withDevice(GAIA, (api) => {
+    const { result, lines } = runtimeLines(() => api.ce.device.write('cutoff', 64, 'drums'));
+    assert.equal(result, false);
+    assert.deepEqual(lines, [deviceWriteNoProfileWords('cutoff', 'drums')]);
+    assert.equal(api.ce.device.parameter('cutoff', 'drums')?.name, 'Cutoff');
+  });
+  // A declared parameter needs no profile.
+  withDevice(GAIA, (api) => {
+    deviceRoleMappings.set({});
+    api.ce.device.defineParameter('mine', { cc: 20 });
+    const { result, lines } = runtimeLines(() => api.ce.device.write('mine', 1));
+    assert.equal(result, true);
+    assert.deepEqual(lines, []);
+  });
+});
+
 test('the plug-in says the refusal in the same words', () => {
   const header = readText(fileURLToPath(new URL('../../src/Player/PluginProcessor.h', import.meta.url)));
   // Its sentence, with the id and the role where the editor's has them.
@@ -186,6 +215,14 @@ test('the plug-in says the refusal in the same words', () => {
   assert.ok(header.includes(`"[script] ${cpp(before)}" + parameterId + "${cpp(between)}"`), 'before the id, and between the id and the role');
   assert.ok(header.includes(`+ "${cpp(after)}");`), 'after the role');
   assert.ok(header.includes('startsWith ("Unknown parameter: ")'), 'said for the engine\'s unknown parameter, not for every failure');
+
+  // And with no profile: the role comes before the id there.
+  const [lead, middle, tail] = deviceWriteNoProfileWords('\u0001', '\u0002').split(/[\u0001\u0002]/);
+  assert.ok(header.includes(`"[script] ${cpp(lead)}" + role + "${cpp(middle)}"`), 'before the role, and between the role and the id');
+  assert.ok(header.includes(`+ parameterId\n                               + "${cpp(tail)}");`), 'after the id');
+  assert.ok(header.includes('startsWith ("No device profile mapped for role: ")'), 'said for the service\'s missing profile');
+  const service = readText(fileURLToPath(new URL('../../src/DeviceProfile/DeviceProfileServiceMessages.cpp', import.meta.url)));
+  assert.ok(service.includes('"No device profile mapped for role: " + deviceRole'), 'the error the plug-in listens for is still the one the service gives');
 });
 
 test('bind and parameters() read the whole table', () => {
@@ -254,8 +291,16 @@ test('nothing is said before the table is in, with no profile, or of an id the s
   const loading = rowOf('ce.device.write("cutof", 64)', 'lua', devicesWith(null));
   assert.deepEqual([loading.problem, loading.meaning.loading, loading.editable], [null, true, null]);
   assert.equal(meaningLine(loading), 'Roland GAIA SH-01: its parameters are loading');
-  const none = rowOf('ce.device.write("cutof", 64)', 'lua', deviceValueContext({}));
+  // With no profile, a read answers nothing and says nothing; a write is refused, as it runs.
+  const none = rowOf('ce.device.read("cutof")', 'lua', deviceValueContext({}));
   assert.deepEqual([none.problem, meaningLine(none)], [null, 'no profile is chosen for mainSynth']);
+  const unsent = rowOf('ce.device.write("cutof", 64)', 'lua', deviceValueContext({}));
+  assert.deepEqual([unsent.problem, meaningLine(unsent)],
+    [{ severity: 'error', message: deviceWriteNoProfileWords('cutof', 'mainSynth') }, 'no profile is chosen for mainSynth']);
+  // A write to a role nothing is mapped to is sent to no profile; a read of it reads the main synth's.
+  assert.deepEqual(rowOf('ce.device.write("cutoff", 1, "bass")', 'lua', devicesWith(GAIA)).problem,
+    { severity: 'error', message: deviceWriteNoProfileWords('cutoff', 'bass') });
+  assert.equal(rowOf('ce.device.write("mine", 1)', 'lua', deviceValueContext({ declared: ['mine'] })).problem, null);
   // bind says it with no profile too, as the runtime does: nothing but a declaration knows the id.
   assert.deepEqual(rowOf('ce.device.bind("Cutoff", "cutof")', 'lua', deviceValueContext({})).problem,
     { severity: 'warning', message: deviceBindUnknownWords('Cutoff', 'cutof') });
