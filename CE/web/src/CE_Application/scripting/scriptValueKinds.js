@@ -51,6 +51,7 @@ import {
 } from './deviceWords.js';
 import { countRolesInControls } from '../utils/deviceRoles.js';
 import { lcdLine, lcdLineWords } from './lcdLines.js';
+import { findFont, findAxis, axisWords, axisClampWords, axisRefusalWords } from './textStyle.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
@@ -1491,6 +1492,37 @@ export function readImage(value, { images, wantsData, path }) {
     return { meaning, problem: { severity: 'warning', message: `No image called "${value}" in the library or the panel.${didYouMean(value, meaning.choices)}` } };
   }
   return { meaning, problem: null };
+}
+
+/* --------------------------------------------------------------------------- font axes */
+
+/**
+ * ce.text.axis's tag (`at` 'tag') or value (`at` 'value'), read against the font of the control it
+ * names (`family`, from `faces`, valuesContext's catalogue of each family's axes): the axes the font
+ * has, and the runtime's words for a tag it has none of, a value that is not a number, and a value
+ * the axis does not reach, which it keeps within it.
+ */
+export function readFontAxis(value, { name = '', family, faces, at, tag } = {}) {
+  const meaning = {};
+  if (!family || !Array.isArray(faces)) return { meaning, problem: null };
+  const face = findFont(faces, family);
+  if (at === 'tag') {
+    const axes = face?.axes ?? [];
+    meaning.choices = axes.map((a) => a.tag);
+    meaning.choiceNames = Object.fromEntries(axes.map((a) => [a.tag, axisWords(a)]));
+    if (typeof value !== 'string') return { meaning, problem: null };
+    const axis = findAxis(face, value);
+    if (axis) { meaning.hint = axisWords(axis); return { meaning, problem: null }; }
+    const reason = face ? `"${face.family}" has no ${value} axis` : 'no font descriptor to check the axis against';
+    return { meaning, problem: { severity: 'error', message: axisRefusalWords(name, family, value, reason) } };
+  }
+  const axis = typeof tag === 'string' ? findAxis(face, tag) : null;
+  if (!axis) return { meaning, problem: null };
+  Object.assign(meaning, { min: axis.min, max: axis.max, hint: axisWords(axis) });
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { meaning, problem: { severity: 'error', message: axisRefusalWords(name, family, tag, `"${value}" is not a number`) } };
+  const used = Math.min(axis.max, Math.max(axis.min, n));
+  return { meaning, problem: used === n ? null : { severity: 'warning', message: axisClampWords(name, face.family, axis, n, used) } };
 }
 
 /* ------------------------------------------------------------------------ component types */

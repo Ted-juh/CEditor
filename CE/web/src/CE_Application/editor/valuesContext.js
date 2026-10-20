@@ -15,16 +15,19 @@ import { familyOf, literalOf, matchBrackets, scanCalls, tokenize } from '../scri
 
 /**
  * The fonts and images a script can name, as readStatement takes them: every family by its stored
- * value and by the name the user sees (the runtime's findFont takes either), and every image with
- * its id, name and picture.
+ * value and by the name the user sees (the runtime's findFont takes either), with its variation
+ * axes (`faces`), and every image with its id, name and picture.
  */
 export function valueCatalogues({ fonts = [], carriedFonts = [], icons = [], carriedIcons = [] } = {}) {
   const names = new Set();
-  for (const font of fontCatalogue(fonts, carriedFonts)) {
+  const catalogue = fontCatalogue(fonts, carriedFonts);
+  for (const font of catalogue) {
     if (font.family) names.add(font.family);
     if (font.label) names.add(font.label);
   }
-  return { fonts: [...names], images: assetCatalogue(icons, carriedIcons) };
+  // …and each family's variation axes, which ce.text.axis reads a tag and a value against.
+  const faces = catalogue.map((f) => ({ family: f.family, label: f.label, axes: f.axes }));
+  return { fonts: [...names], faces, images: assetCatalogue(icons, carriedIcons) };
 }
 
 /** The catalogues, kept current as fonts and icons are added. */

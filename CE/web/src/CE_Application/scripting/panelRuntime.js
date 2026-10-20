@@ -65,7 +65,7 @@ import { checksumNames, computeChecksum } from '../utils/checksums.js';
 // ce.text measures through the renderer's own layout rather than a second implementation of it.
 import { buildBlockTextLayout } from '../editor/canvasControlTextLayout.js';
 import {
-  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight,
+  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight, axisClampWords, axisRefusalWords,
 } from './textStyle.js';
 import {
   isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed,
@@ -5619,19 +5619,23 @@ function textStyleImpl(target, opts) {
   return all && refused.length === 0;
 }
 
+const textAxisWarned = new Set();   // the controls and axes that have said a number was kept within the axis; resetScriptState clears it
 function textAxisImpl(target, tag, value) {
   const name = String(target ?? '');
   const font = textFontNode(name);
   if (!font) return textNeedsTextSection('axis', name) ?? false;
 
   const descriptor = findFont(textCatalogue(), font.family);
-  const { writes, refused } = planAxis(descriptor, tag, value);
-  for (const problem of refused) {
-    addScriptTrace('error', '',
-      `ce.text.axis("${name}", "${problem.option}"): refused — ${problem.reason}. `
-      + `ce.text.font("${font.family}") reports the axes it has.`);
-  }
+  const { writes, refused, axis, given, used } = planAxis(descriptor, tag, value);
+  for (const problem of refused) addScriptTrace('error', '', axisRefusalWords(name, font.family, problem.option, problem.reason));
   if (!writes.length) return false;
+  // A number the axis does not reach is kept within it, and said once per control and axis: it was
+  // kept within it without a word (textStyle.js).
+  const key = `${name}\u0000${axis.tag}`;
+  if (given !== used && !textAxisWarned.has(key)) {
+    textAxisWarned.add(key);
+    addScriptTrace('warn', '', `${axisClampWords(name, descriptor.family, axis, given, used)} This is said only the first time.`);
+  }
   let all = true;
   for (const write of writes) if (!textApplyWrite(name, write)) all = false;
   return all;
@@ -9823,6 +9827,7 @@ function resetScriptState() {
   timeNumberWarned.clear();
   componentClampWarned.clear();
   lcdLineWarned.clear();
+  textAxisWarned.clear();
   deviceOverrideWarned.clear();
   musicWarned.clear();
   drawWarned.clear();

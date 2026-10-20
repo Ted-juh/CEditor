@@ -1920,8 +1920,8 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'tag', type: 'string', required: true },
-      { name: 'value', type: 'number', required: true },
+      { name: 'tag', type: 'string', required: true, kind: 'fontAxis' },
+      { name: 'value', type: 'number', required: true, kind: 'fontAxis' },
     ],
     scopes: 'any',
   },

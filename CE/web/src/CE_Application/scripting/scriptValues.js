@@ -28,7 +28,7 @@ import {
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
-  readLcdLine, readComponentType,
+  readLcdLine, readComponentType, readFontAxis,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -213,6 +213,8 @@ function contextOf(context = {}) {
     tempo: Number.isFinite(Number(context?.tempo)) && Number(context.tempo) > 0 ? Number(context.tempo) : 120,
     self: self && typeof self === 'object' ? self : null,
     fonts: context?.fonts ?? null,
+    // Each family's variation axes (valuesContext's faces), which ce.text.axis reads against.
+    fontFaces: context?.fontFaces ?? null,
     images: context?.images ?? null,
     // Each device role's profile and its whole parameter table (readDeviceParameter).
     devices: context?.devices ?? null,
@@ -575,6 +577,19 @@ function classify(arg, node, param, site, index) {
         if (said) read.meaning.hint = said;
       }
       return setRead(arg, 'number', read, typeof value === 'number' ? 'number' : null);
+    }
+    // A variable font's axis, and the number ce.text.axis sets it to, read against the font of the
+    // control it names, as the runtime reads them.
+    case 'fontAxis': {
+      const target = sibling(site, 'target');
+      const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
+      const read = readFontAxis(value, {
+        name: String(target ?? ''), family: control?._children?.Text?._children?.Font?.family, faces: site.env.ctx.fontFaces,
+        at: param.name, tag: param.name === 'tag' ? value : sibling(site, 'tag'),
+      });
+      const editable = param.name === 'tag' ? (typeof value === 'string' && read.meaning.choices?.length ? 'choice' : null)
+        : typeof value === 'number' ? 'number' : null;
+      return setRead(arg, 'fontAxis', read, editable);
     }
     // A component type ce.panel.create makes, against the ones there are.
     case 'componentType': {

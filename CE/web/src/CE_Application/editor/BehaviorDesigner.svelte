@@ -423,6 +423,7 @@
     names: JSON.parse(scriptNamesKey),
     scriptId: selected?.id ?? null,
     fonts: $valueCatalogueStore.fonts,
+    fontFaces: $valueCatalogueStore.faces,
     images: $valueCatalogueStore.images,
     devices: deviceValueContext({
       mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables, sources: $profileSources,
