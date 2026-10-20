@@ -261,8 +261,8 @@ static void JNICALL n_emitV(JNIEnv* e, jclass c, jlong host, jstring name, jint 
     ce_release_kind(e, s, utf);
     ce_unutf(e, name, nm);
 }
-/* sendSysex(int[]): a list of numbers to send_sysex_value, so the host clamps and frames it exactly as
- * it does for Lua and JS. A host older than that slot takes packed bytes, clamped here as it would. */
+/* sendSysex(int[]): a list of numbers to send_sysex_value, so the host reads and frames it exactly as
+ * it does for Lua and JS. A host older than that slot takes packed bytes, clamped here as it did. */
 static void JNICALL n_sysexList(JNIEnv* e, jclass c, jlong host, jintArray arr) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !arr) return;
     jsize n = (*e)->GetArrayLength(e, arr);

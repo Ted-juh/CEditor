@@ -330,7 +330,7 @@ export function gaiaFader({ width = 30, height = 108, ticks = 11, legacySkin = f
       slot: rect('slot', { x: slotX, y: 4, width: 8, height: height - 8 }, SLOT, { zIndex: 1, radius: 4, borderColour: '66000000', borderThickness: 1 }),
       fill: rect('fill', { x: slotX + 1, y: height - 8, width: 6, height: 4 }, FILL, { zIndex: 2, radius: 3 }),
       ...(legacySkin ? {
-        cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, 'FFE7ECF0', { zIndex: 6, radius: 2, borderColour: 'FF11151800', borderThickness: 1 }),
+        cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, 'FFE7ECF0', { zIndex: 6, radius: 2, borderColour: 'FF111518', borderThickness: 1 }),
         capLine: rect('capLine', { x: 5, y: travelBottom + 6, width: width - 10, height: 1 }, '55000000', { zIndex: 7 }),
       } : {
       cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, CAP, {

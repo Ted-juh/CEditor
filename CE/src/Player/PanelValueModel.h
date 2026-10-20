@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "Scripting/ScriptColours.h"
 
 namespace ceditor
 {
@@ -127,11 +128,37 @@ public:
         if (! control.isObject()) return {};
         const auto raw = valueAtPath (control, resolveModelPath (control, split.second));
         if (form != "normalizedValue") return raw;
+        // Nothing there is nothing as a position too, as the WebView runtime answers: (double) of
+        // nothing is 0, a plausible position that hid the missing path behind it.
+        if (raw.isVoid()) return {};
 
         double lo = 0.0, hi = 0.0;
         if (! rangeOf (control, lo, hi)) return {};
         const double n = (double) raw;
         return juce::var (juce::jlimit (0.0, 1.0, (n - lo) / (hi - lo)));
+    }
+
+    /** Why a read of `scriptPath` that found nothing found nothing, as the line to write, or empty
+        when the read was a fair question whose answer is nothing (a property not set yet).
+
+        set() always said when it could not find a control, and get() said nothing, so a misspelled
+        name read exactly like an unset value. This gives get() set()'s words, the same as the
+        WebView runtime's getValue: a control that is not there, and a path no reading of which
+        resolves (not a shorthand, not a section, not a property of any section). The WebView also
+        reports an explicit section path that names a property its section's type does not have; it
+        has the section templates to tell that from a default the document left out, and this model
+        does not, so it stays silent there rather than guess. `panel.*` is not checked here or there:
+        the panel document takes any key. */
+    juce::String whyNoAnswer (const juce::String& scriptPath) const
+    {
+        const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return {};
+        const auto control = findControlByName (split.first);
+        if (! control.isObject())
+            return "get: control \"" + split.first + "\" not found on the active panel, so there is no answer.";
+        if (! readsNothing (control, split.second)) return {};
+        return "get(\"" + scriptPath + "\"): \"" + split.second.joinIntoString (".") + "\" does not lead anywhere on \""
+             + split.first + "\", so there is no answer.";
     }
 
     /** Write a script path. Returns true if the control + path resolved and the write landed.
@@ -163,6 +190,60 @@ public:
             toWrite = juce::var (toWrite.toString().replaceCharacter ('.', '_'));
         if (writeCanMoveAName (modelPath)) forgetNames();
         return setAtPath (control, modelPath, toWrite);
+    }
+
+    /** What a script's write of `value` to `scriptPath` stores in the colour properties it reaches,
+        by the editor's rule (Scripting/ScriptColours.h; colourWrites in panelRuntime.js): what the
+        panel reads as written, CSS's short forms written out, and for each colour the panel cannot
+        read a refusal in the editor's words, in which case nothing is to be written. Each refusal
+        begins with `call`, set("<the path as the script wrote it>").
+
+        BridgeScriptHost asks this before every engine's set() is written. A write it cannot place (a
+        control that is not there, .normalizedValue on a control with no range) comes back as it was,
+        for setValue to report as it always has. A `panel.*` path is read by the panel's own colours
+        (panelColourWrites in panelRuntime.js, panelColourFieldAt here), the form set aside as
+        setPanelValue sets it aside. */
+    scripting::colours::Writes colourWrites (const juce::String& call, const juce::String& scriptPath,
+                                             const juce::var& value, const juce::String& form = "value") const
+    {
+        scripting::colours::Writes unchanged;
+        unchanged.value = value;
+        const auto split = splitScriptPath (scriptPath);
+        const auto resolves = [this] (const juce::String& name) { return scripting::colours::controlSetResolves (doc, name); };
+        if (isPanelTarget (split.first))
+            return scripting::colours::panelColourWrites (call, "nothing was set", split.second.joinIntoString ("."),
+                                                          value, resolves);
+        const auto control = findControlByName (split.first);
+        if (! control.isObject()) return unchanged;
+
+        // A position is read as the number it stands for, as the editor reads it before asking, so a
+        // refusal names that number. Nothing else changes: a number is never a colour, and setValue
+        // maps the position itself.
+        juce::var written = value;
+        if (form == "normalizedValue")
+        {
+            double lo = 0.0, hi = 0.0;
+            if (! rangeOf (control, lo, hi)) return unchanged;
+            written = juce::var (lo + juce::jlimit (0.0, 1.0, (double) value) * (hi - lo));
+        }
+        auto out = scripting::colours::colourWrites (call, "nothing was set", control, resolveModelPath (control, split.second),
+                                                     written, resolves);
+        if (form == "normalizedValue" && ! out.refused) out.value = value;
+        return out;
+    }
+
+    /** Whether `scriptPath` is a colour property, a control's or the panel's own (panel.bgColour),
+        for ce.anim to refuse it as a path (animatesColour in panelRuntime.js): every tick of a move
+        would write a number into it. */
+    bool isColourProperty (const juce::String& scriptPath) const
+    {
+        const auto split = splitScriptPath (scriptPath);
+        if (split.second.isEmpty()) return false;
+        if (isPanelTarget (split.first))
+            return scripting::colours::panelColourFieldAt (split.second.joinIntoString (".")).has_value();
+        const auto control = findControlByName (split.first);
+        if (! control.isObject()) return false;
+        return scripting::colours::colourFieldAt (control, resolveModelPath (control, split.second)).has_value();
     }
 
     /** Every control's name, in document order, containers included — what ce.panel.snapshot walks.
@@ -254,12 +335,29 @@ public:
 private:
     juce::var doc;
 
-    // Case-insensitive walk over the panel document, which is flat (no _children sections).
+    // The position `segment` names in `list`, as the editor's walk finds it among the list's own
+    // keys ("0", "1", …, with no leading zeros), or -1.
+    static int listPosition (const juce::Array<juce::var>& list, const juce::String& segment)
+    {
+        for (int i = 0; i < list.size(); ++i)
+            if (segment == juce::String (i)) return i;
+        return -1;
+    }
+
+    // Case-insensitive walk over the panel document, which is flat (no _children sections). A list
+    // is stepped into by position, as the editor's walk steps into one (bgGradient.stops.0.color).
     static juce::var panelValueAt (const juce::var& node, const juce::StringArray& segs, int from = 0)
     {
         juce::var current = node;
         for (int i = from; i < segs.size(); ++i)
         {
+            if (auto* list = current.getArray())
+            {
+                const int at = listPosition (*list, segs[i]);
+                if (at < 0) return {};
+                current = (*list)[at];
+                continue;
+            }
             auto* obj = current.getDynamicObject();
             if (obj == nullptr) return {};
             juce::var next;
@@ -302,10 +400,18 @@ private:
         if (segs.isEmpty() || isPanelReadOnly (segs[0])) return false;
 
         // Walk to the leaf's parent, case-insensitively, making each node on the way this model's
-        // own, then assign with the document's real-case key.
+        // own, then assign with the document's real-case key. A list is stepped into by position,
+        // as the editor's walk steps into one, so a gradient's stop can be written by its path.
         juce::var node = doc;
         for (int i = 0; i < segs.size() - 1; ++i)
         {
+            if (auto* list = node.getArray())
+            {
+                const int at = listPosition (*list, segs[i]);
+                if (at < 0) return false;
+                node = ownedChild (node, juce::String (at));
+                continue;
+            }
             auto* parent = node.getDynamicObject();
             if (parent == nullptr) return false;
             juce::Identifier key;
@@ -314,10 +420,17 @@ private:
             if (key.isNull()) return false;
             node = ownProperty (*parent, key);
         }
+        const auto& leaf = segs[segs.size() - 1];
+        if (auto* list = node.getArray())
+        {
+            const int at = listPosition (*list, leaf);
+            if (at < 0) return false;
+            list->getReference (at) = value;
+            return true;
+        }
         auto* obj = node.getDynamicObject();
         if (obj == nullptr) return false;
 
-        const auto& leaf = segs[segs.size() - 1];
         for (const auto& p : obj->getProperties())
             if (p.name.toString().equalsIgnoreCase (leaf)) { obj->setProperty (p.name, value); return true; }
         obj->setProperty (juce::Identifier (leaf), value);
@@ -474,12 +587,23 @@ public:
     }
 
     // Walk a node case-insensitively through _children first, then plain keys (excluding
-    // _children/_type); returns the real-case dotted path, or empty if any segment is missing.
+    // _children/_type); returns the real-case dotted path, or empty if any segment is missing. A list
+    // is stepped into by position, as the editor's walk finds a position among a list's own keys, so
+    // a control's gradient stop or Meter zone is found by its path in any capitals, as it is there;
+    // the path used to be written as the script spelled it, and only the document's capitals landed.
     static juce::String walkCaseInsensitive (juce::var node, const juce::StringArray& segments)
     {
         juce::StringArray out;
         for (const auto& seg : segments)
         {
+            if (auto* list = node.getArray())
+            {
+                const int at = listPosition (*list, seg);
+                if (at < 0) return {};
+                out.add (seg);
+                node = (*list)[at];
+                continue;
+            }
             const auto low = seg.toLowerCase();
             juce::String foundKey;
 
@@ -502,6 +626,20 @@ public:
             return {};
         }
         return out.joinIntoString (".");
+    }
+
+    // No reading of `segments` resolves: resolveModelPath would fall through every branch to the
+    // segments as written. Mirrors pathReadsNothing in panelRuntime.js.
+    static bool readsNothing (const juce::var& control, const juce::StringArray& segments)
+    {
+        if (segments.isEmpty()) return false;
+        const auto first = segments[0].toLowerCase();
+        if (shorthand (first).isNotEmpty() || firstSegmentIsSection (control, first)) return false;
+        if (auto* obj = control.getDynamicObject())
+            if (auto* children = obj->getProperty ("_children").getDynamicObject())
+                for (const auto& p : children->getProperties())
+                    if (walkCaseInsensitive (p.value, segments).isNotEmpty()) return false;
+        return true;
     }
 
     static bool firstSegmentIsSection (const juce::var& control, const juce::String& lowerFirst)

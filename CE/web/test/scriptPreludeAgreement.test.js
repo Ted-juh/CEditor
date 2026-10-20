@@ -19,8 +19,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { get } from 'svelte/store';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { resetScriptStateForTesting, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import {
+  MEMBER_BY_ID, memberRuntime, optionChecks, RUNTIME_WEBVIEW,
+} from '../src/CE_Application/scripting/panelApi.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import {
   JSON_CASES, JSON_DECODE_CASES, JSON_REJECTS, NATIVE_ENCODE_CASES,
 } from './fixtures/jsonCases.js';
@@ -58,6 +63,12 @@ const CASES = [
   ['scale', [64, 0, 127, 0, 1000]], ['scale', [5, 0, 0, 9, 10]],
   ['snap', [7, 5]], ['snap', [7, 0]],
   ['lerp', [0, 10, 0.25]],
+  // Helpers that read their numbers through the prelude's own __num. A second __num, defined for
+  // the byte helpers' messages, once replaced it in Python and made every one of these raise there.
+  ['norm', [5, 0, 10]], ['denorm', [0.5, 0, 10]], ['bipolar', [0.25]], ['unipolar', [-0.5]],
+  ['fold', [12, 0, 10]], ['roundTo', [3.14159, 2]], ['toDegrees', [Math.PI]], ['toRadians', [180]],
+  ['distance', [0, 0, 3, 4]], ['euclid', [8, 3]], ['almost', [0.1 + 0.2, 0.3]],
+  ['indexOfRange', [0.5, 4]], ['approach', [0, 10, 0.5]],
   ['curve', [0.5, 'exp']], ['curve', [0.25, 'log']], ['curve', [0.5, 's']], ['curve', [0.5, 'linear']],
   ['noteName', [60]], ['noteName', [61]], ['noteName', [0]],
   // The panel's spelling, selected by the second argument being PRESENT — so all three states
@@ -72,6 +83,7 @@ const CASES = [
   ['noteNumber', [60]],
   ['noteSpelling', [60, 'major']], ['noteSpelling', [60, 'minor']], ['noteSpelling', ['F4', 'major']],
   ['noteSpelling', ['A4', 'minor']], ['noteSpelling', [60]], ['noteSpelling', [60, 'bogus']],
+  ['noteSpelling', ['c4', 'major']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
   ['inScale', [62, 60, 'major']], ['inScale', [61, 60, 'major']], ['inScale', [61, 60]],
   ['inScale', [75, 60, 'minor']], ['inScale', [61, 60, 'bogus']],
   ['scaleDegree', [60, 60, 'major']], ['scaleDegree', [67, 60, 'major']],
@@ -90,6 +102,9 @@ const CASES = [
   ['beatsPerDivision', ['1/1']], ['beatsPerDivision', ['1/32']], ['beatsPerDivision', ['1/3']],
   ['stepAt', [2.5, '1/16']], ['stepAt', [0, '1/16']], ['stepAt', [-1, '1/16']],
   ['stepAt', [2.5, '1/8T']], ['stepAt', [2.5, 'nope']],
+  // Any case is the same division: the names differ only by D and T.
+  ['beatsPerDivision', ['1/8t']], ['beatsPerDivision', ['1/4d']], ['stepAt', [2.5, '1/16t']],
+  ['swingOffset', [1, 0.5, '1/8d']],
   ['swingOffset', [0, 0.5, '1/16']], ['swingOffset', [1, 0.5, '1/16']],
   ['swingOffset', [3, 1, '1/8']], ['swingOffset', [-1, 0.5, '1/16']],
   ['swingOffset', [1, 2, '1/16']], ['swingOffset', [1, 0.5, 'nope']],
@@ -108,6 +123,19 @@ const CASES = [
   ['mixColour', ['000000', 'FFFFFF', 5]], ['mixColour', ['000000', 'zz', 0.5]],
   ['colourAlpha', ['336699', 0.4]], ['colourAlpha', ['336699', 0]], ['colourAlpha', ['336699', 1]],
   ['colourAlpha', ['336699', 2]],
+  // Eight digits are AARRGGBB, as a property reads them, and an amount may be text that is a number.
+  ['lighten', ['#5B9BD580', 0]], ['darken', ['FF336699', 0.5]], ['colourAlpha', ['80336699', '0.5']],
+  ['lighten', ['336699', '0.25']], ['lighten', ['336699', null]], ['colourAlpha', ['336699', 1.5]],
+  // A colour written with its alpha in a stated place: the form every reader reads one way, or a
+  // refusal in the same words.
+  ['colourFromArgb', ['#80123456']], ['colourFromArgb', ['80123456']], ['colourFromArgb', ['FF5B9BD5']],
+  ['colourFromArgb', ['#8123']], ['colourFromArgb', ['#abc']], ['colourFromArgb', ['5b9bd5']],
+  ['colourFromRgba', ['#12345680']], ['colourFromRgba', ['12345680']], ['colourFromRgba', ['#5B9BD5FF']],
+  ['colourFromRgba', ['#1238']], ['colourFromRgba', ['#ABCDEF']], ['colourFromRgba', ['abc']],
+  ['colourFromArgb', ['#12345']], ['colourFromArgb', ['nope']], ['colourFromArgb', ['#80123456 ']],
+  ['colourFromRgba', ['red']], ['colourFromRgba', [0x12345680]], ['colourFromArgb', [1.5]],
+  ['colourFromArgb', [null]], ['colourFromRgba', [true]], ['colourFromArgb', ['##123456']],
+  ['colourFromRgba', ['#1234567g']], ['colourFromArgb', ['#80123456\n']],
   ['rgbToHex', [51, 102, 153]], ['rgbToHex', [0, 0, 0]], ['rgbToHex', [300, -5, 127.5]],
   ['hslToHex', [210, 50, 40]], ['hslToHex', [0, 0, 100]], ['hslToHex', [359, 100, 50]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
@@ -145,6 +173,27 @@ const CASES = [
   ['checksum', ['crc32', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
   // An unknown algorithm must come back as nothing in every runtime, not as a Roland checksum.
   ['checksum', ['crc17', [0x01, 0x02, 0x03]]],
+  // Byte lists (docs/design/script-bytes.md). Numbers here, lists in STRUCT_CASES. Negative
+  // numbers and full 32-bit fields are where Lua's 64-bit integers, JavaScript's doubles and
+  // Python's unbounded integers would part company if the arithmetic were not the same.
+  ['getBits', [180, 4, 3]], ['getBits', [[0, 180], 12, 3]], ['getBits', ['00 B4', 12, 3]],
+  ['getBits', [-1, 0, 8]], ['getBits', [-17, 4, 8]], ['getBits', [0xFFFFFFFF, 0, 32]],
+  ['getBits', [[0x34, 0x12], 0, 16]], ['getBits', [[1, 2, 3, 4], 4, 20]], ['getBits', [180.0, 2, 1]],
+  ['setBits', [180, 4, 3, 5]], ['setBits', [-1, 0, 8, 0]], ['setBits', [0, 28, 4, 15]],
+  ['bytesRead', [[240, 1, 16, 247], 1, 2]], ['bytesRead', ['34 12', 0, 2, { bits: 8, order: 'lsb' }]],
+  ['bytesRead', [[0x7F, 0x7F, 0x7F, 0x7F], 0, 4]], ['bytesRead', [[255, 255, 255, 255], 0, 4, { bits: 8 }]],
+  ['bytesRead', [[0x81], 0, 1]], ['bytesRead', [[1, 2], 0, 2, { order: 'lsb' }]],
+  ['bytesFind', ['F0 41 10 42 12 F7', '42 12']], ['bytesFind', [[1, 2, 1, 2], [1, 2], 1]],
+  ['bytesFind', [[1, 2, 3], [4]]], ['bytesFind', [[1, 2], [1, 2, 3]]], ['bytesFind', [[1, 2], [2], 5]],
+  ['bytesToHex', [[240, 65, 16, 247]]], ['bytesToHex', [[]]], ['bytesToHex', [[300, -1, 10.7]]],
+  ['bytesToHex', ['f0,41 0x10']],
+  ['bytesToBase64', [[240, 65, 16, 66]]], ['bytesToBase64', [[1]]], ['bytesToBase64', [[1, 2]]],
+  ['bytesToBase64', [[]]], ['bytesToBase64', ['F0 41']], ['bytesToBase64', [[255, 254, 253, 0, 1]]],
+  // Hex text, as the editor always took it and the preludes now do: spaced, with commas and 0x,
+  // one-digit bytes, and the one-argument form.
+  ['checksum', ['roland', '40 00 7F 00']], ['checksum', ['roland', '0x40,0x00 7f 0']],
+  ['checksum', ['40 00 7F 00']], ['checksum', ['xor-7bit', '01 02 03']],
+  ['checksum', ['roland', '40007F00']],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
@@ -159,6 +208,10 @@ const STRUCT_CASES = [
   ['nibblize', [[0xAB, 0xCD]]], ['denibblize', [[0xA, 0xB, 0xC, 0xD]]],
   ['toAscii', ['Hi', 4]],
   ['scaleNotes', [60, 'dorian']], ['scaleNotes', [60]], ['scaleNotes', [60, 'bogus']],
+  // An unreadable root is no answer in every runtime, not the scale on C-1.
+  ['scaleNotes', ['c4', 'major']], ['chordNotes', ['c4', 'major']], ['quantizeNote', ['c4', 60, 'major']],
+  ['degreeChord', ['c4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
+  ['scaleNotes', [null, 'major']], ['degreeChord', [null, 'major', 1]],
   ['chordNotes', ['C4', 'min7']], ['chordNotes', [60, 'bogus']],
   ['quantizeNote', [61, 60, 'major']], ['quantizeNote', [66, 60, 'major']], ['quantizeNote', [61, 60, 'bogus']],
   // degreeChord returns a whole record — name, roman numeral, spelling and notes — so every field
@@ -187,22 +240,60 @@ const STRUCT_CASES = [
   ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
   ['divisionNames', []],
   ['hexToRgb', ['336699']], ['hexToRgb', ['#0A0B0C']], ['hexToRgb', ['bad']],
+  ['hexToRgb', ['#5B9BD580']], ['hexToRgb', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToRgb', [0xFF0000]],
   ['hexToHsl', ['336699']], ['hexToHsl', ['808080']], ['hexToHsl', ['FF0000']],
   ['barBeatAt', [0]], ['barBeatAt', [4.5]], ['barBeatAt', [4.5, 3]], ['barBeatAt', [-1]],
   ['barBeatAt', [0.999]], ['barBeatAt', [12.25, 7]],
   ['stepsBetween', [0, 1, '1/16']], ['stepsBetween', [1, 1, '1/16']],
   ['stepsBetween', [0.9, 1.1, '1/4']], ['stepsBetween', [0, 100, '1/16']],
   ['stepsBetween', [0, 100, '1/16', 4]], ['stepsBetween', [0, 100, '1/16', 0]],
-  ['stepsBetween', [5, 1, '1/16']], ['stepsBetween', [0, 1, 'nope']],
+  ['stepsBetween', [5, 1, '1/16']], ['stepsBetween', [0, 1, 'nope']], ['stepsBetween', [0, 1, '1/16t']],
   ['cycleAt', [0, 1]], ['cycleAt', [6, 1]], ['cycleAt', [6, 1, 3]],
   ['cycleAt', [6, 0]], ['cycleAt', [6, 1000]], ['cycleAt', [-3, 2]],
   ['loopedBeats', [0, 4, 8]], ['loopedBeats', [4, 4, 8]], ['loopedBeats', [13, 4, 8]],
   ['loopedBeats', [20, 4, 8]], ['loopedBeats', [20, 4, 0]],
+  // Byte lists that come back as lists: a field written across a byte boundary, a write that grows
+  // the list, the empty slice, and base64 with and without padding and with whitespace in it.
+  ['setBits', [[0, 180], 12, 3, 5]], ['setBits', ['00 00', 7, 2, 3]], ['setBits', [[255], 0, 8, 0]],
+  ['bytesWrite', [[240, 0, 0, 247], 1, 2, 200]], ['bytesWrite', [[1, 2], 2, 2, 0x1234, { bits: 8, order: 'lsb' }]],
+  ['bytesWrite', [[], 0, 4, 268435455]], ['bytesWrite', [[9, 9, 9], 1, 1, 0]],
+  ['bytesSlice', [[240, 65, 16, 66, 247], 1, 3]], ['bytesSlice', ['F0 41 10', 1]], ['bytesSlice', [[1, 2, 3], 3]],
+  ['bytesSlice', [[1, 2, 3], 1, 0]],
+  ['bytesPut', [[1, 2, 3], 3, [4, 5]]], ['bytesPut', [[1, 2, 3], 1, 'FF']], ['bytesPut', [[1, 2, 3], 0, []]],
+  ['bytesPut', [[1, 2, 3], 2, [7, 8, 9]]],
+  ['bytesFromHex', ['F0 41 10 F7']], ['bytesFromHex', ['0xf0,0x41']], ['bytesFromHex', ['']],
+  ['bytesFromBase64', ['8EEQQg==']], ['bytesFromBase64', ['AQ==']], ['bytesFromBase64', ['AQI=']],
+  ['bytesFromBase64', ['8E EQ\nQg==']], ['bytesFromBase64', ['']], ['bytesFromBase64', ['//79AAE=']],
 ];
 
 const near = (a, b) => (typeof a === 'number' && typeof b === 'number'
   ? Math.abs(a - b) < 1e-9
   : JSON.stringify(a) === JSON.stringify(b));
+
+test('no prelude defines a top-level name twice', () => {
+  // Each prelude is one long file of helpers, and a second definition under a name already taken
+  // replaces the first without a word: in Python for every caller, since a global is looked up when
+  // the function runs; in Lua for every function written below it. The byte helpers' __num, a
+  // number for a message, once replaced ce.math's __num, which reads one, and 28 helpers raised in
+  // the exported plugin's Python while every test here passed.
+  const preludes = [
+    ['LuaScriptEngine.cpp', 'LUA', /^local function (\w+)|^local (\w+)\s*=/],
+    ['JsScriptEngine.cpp', 'JS', /^function (\w+)|^(?:var|let|const) (\w+)\s*=/],
+    ['PythonScriptEngine.cpp', 'PY', /^def (\w+)|^(\w+)\s*=/],
+  ];
+  for (const [file, tag, definition] of preludes) {
+    const seen = new Map();
+    const twice = [];
+    extractRawString(file, tag).split('\n').forEach((line, i) => {
+      const m = line.match(definition);
+      if (!m) return;
+      const name = m[1] ?? m[2];
+      if (seen.has(name)) twice.push(`${name} (prelude lines ${seen.get(name)} and ${i + 1})`);
+      else seen.set(name, i + 1);
+    });
+    assert.deepEqual(twice, [], `${tag} prelude defines a name twice`);
+  }
+});
 
 // A value built inside a vm context (or handed back by wasmoon) carries that realm's
 // Object.prototype, and deepStrictEqual compares prototypes — so a structurally identical result
@@ -370,11 +461,26 @@ test('panic expands to the same CC sequence in the Lua prelude as in the WebView
 
 /* --------------------------------------------------------------------------------- helpers */
 
+// A table key as Lua must write it: bare when it is a name, bracketed when it is a keyword such as
+// `repeat` or text such as "1", which bare would be a parse error or the number 1.
+const LUA_KEYWORDS = new Set(['and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function',
+  'goto', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while']);
+const luaKey = (k) => (/^[A-Za-z_]\w*$/.test(k) && !LUA_KEYWORDS.has(k) ? k : `[${JSON.stringify(k)}]`);
 function luaLiteral(v) {
+  if (v === FN) return 'function() end';
+  if (v === null || v === undefined) return 'nil';
   if (Array.isArray(v)) return `{${v.map(luaLiteral).join(', ')}}`;
+  if (typeof v === 'object') return `{${Object.entries(v).map(([k, x]) => `${luaKey(k)} = ${luaLiteral(x)}`).join(', ')}}`;
   if (typeof v === 'string') return JSON.stringify(v);
+  if (typeof v === 'number' && !Number.isFinite(v)) {
+    return Number.isNaN(v) ? '(0/0)' : v > 0 ? 'math.huge' : '(-math.huge)';
+  }
   return String(v);
 }
+// JSON for the Python driver, which cannot write NaN or Infinity: they go as marked strings that the
+// driver's _dec turns back into floats, so a case can pass them to every engine alike.
+const pyJson = (v) => JSON.stringify(v, (_k, x) => (typeof x === 'number' && !Number.isFinite(x)
+  ? `\u0000${Number.isNaN(x) ? 'nan' : x > 0 ? 'inf' : '-inf'}` : x));
 
 // The JS half of the serialiser above: same key ordering, same number formatting (Lua's "%.10g"
 // keeps ten significant digits, so scale()'s 503.937007874… must be cut the same way on both
@@ -459,6 +565,615 @@ test('the Python engine prelude computes what the WebView runtime computes', asy
     assert.equal(canonical(got[i].value ?? null), canonical(web[fn](...args) ?? null),
       `Python prelude ${fn}(${JSON.stringify(args)}) disagrees with the WebView runtime`);
   });
+});
+
+/* ------------------------------------------------------------- the refusals, word for word */
+
+// A mistake a helper refuses has to be refused in the same words everywhere, or the editor and the
+// exported plugin tell the author two different things about one line. Each case runs in all four
+// engines, and the error lines it raises are compared with the WebView runtime's exactly. A case
+// that must raise nothing (a division in another case, say) is here too, so "accepted" is pinned
+// as firmly as "refused". A null argument is a value left out (nil, undefined, None), and the
+// refusals for it print no value, because each language would print a different word. FN stands for
+// a function, which each engine is handed in its own language.
+const FN = { __function: true };
+const REFUSAL_CASES = [
+  // MIDI senders: an unreadable note name sends nothing.
+  ['sendNote', [1, 'c4', 100]], ['sendNoteOff', [1, 'c4']], ['sendAftertouch', [1, 90, 'c4']],
+  ['sendNote', [1, 'C4', 100]],
+  // Divisions: any case is read, and a name that is not a division says so.
+  ['beatsPerDivision', ['1/6']], ['stepAt', [2, 'nope']], ['stepsBetween', [0, 1, '1/3']],
+  ['swingOffset', [1, 0.5, 'quarter']],
+  ['beatsPerDivision', ['1/8t']], ['stepAt', [2.5, '1/16D']], ['swingOffset', [1, 0.5, '1/4d']],
+  // Music helpers: an unreadable note name, an unknown scale or chord, the scale checked first.
+  ['scaleNotes', ['c4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
+  ['chordNotes', ['Hb2', 'min7']], ['quantizeNote', [61, 'c4', 'major']], ['quantizeNote', ['x', 'y', 'nope']],
+  ['noteSpelling', ['c4', 'minor']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
+  ['degreeChord', ['c4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
+  ['scaleNotes', ['C-1', 'major']], ['degreeChord', [60, 'major', 5]],
+  // checksum reads hex text a byte at a time, and names the algorithms it knows.
+  ['checksum', ['roland', '40007F00']], ['checksum', ['roland', '40 00 zz 00']], ['checksum', ['40 0 7F 00']],
+  ['checksum', ['crc17', [1, 2, 3]]],
+  // A note left out altogether, which the numeric path used to make 0. Channel pressure is the one
+  // place a missing note is meant, and it must stay silent.
+  ['sendNote', [1, null, 100]], ['sendNoteOff', [1, null]], ['sendAftertouch', [1, 90, null]],
+  ['scaleNotes', [null, 'major']], ['quantizeNote', [61, null, 'major']], ['degreeChord', [null, 'major', 1]],
+  ['inScale', [null, 60, 'major']],
+  // Byte lists: every way each helper can refuse, and two that must not.
+  ['getBits', [180, -1, 3]], ['getBits', [180, 0, 33]], ['getBits', [180, 30, 4]], ['getBits', [180, 31, 2]],
+  ['getBits', [[1], 4, 8]], ['getBits', [[1], 8, 1]], ['getBits', ['F041', 0, 8]], ['getBits', [180, 4, 3]],
+  ['setBits', [0, 0, 3, 9]], ['setBits', [0, 0, 3, 2.5]], ['setBits', [0, 0, 1, 2]], ['setBits', [[1], 4, 8, 1]],
+  ['bytesRead', [[1, 2], 1, 2]], ['bytesRead', [[1, 2], 2, 1]], ['bytesRead', [[1, 2], -1, 1]],
+  ['bytesRead', [[1, 2], 0, 5]], ['bytesRead', [[1, 2], 0, 1, { bits: 6 }]], ['bytesRead', [[1, 2], 0, 1, { order: 'big' }]],
+  ['bytesRead', [[1], 0, 2]],
+  ['bytesWrite', [[1, 2], 3, 1, 0]], ['bytesWrite', [[1, 2], 0, 1, 128]], ['bytesWrite', [[1, 2], 0, 2, 70000, { bits: 8 }]],
+  ['bytesWrite', [[1, 2], 0, 1, -1]],
+  ['bytesSlice', [[1, 2, 3], 2, 2]], ['bytesSlice', [[1, 2, 3], 4]], ['bytesSlice', [[1, 2, 3], 5, 0]],
+  ['bytesSlice', [[1, 2, 3], 0, -1]], ['bytesSlice', [[1], 1, 1]],
+  ['bytesPut', [[1, 2], 3, [1]]], ['bytesPut', [[1, 2], 0, 'F0411']],
+  ['bytesFind', [[1, 2], []]], ['bytesFind', [[1, 2], [1], -1]], ['bytesFind', [[1, 2, 3], [9]]],
+  ['bytesFromHex', ['F04110']], ['bytesToHex', ['zz']],
+  ['bytesFromBase64', ['8EEQQg=']], ['bytesFromBase64', ['8E=Q']], ['bytesFromBase64', [42]],
+  ['bytesToBase64', [[1, 2, 3]]],
+  // Channel messages: an address outside its range, anything that is not a number, and a value left
+  // out are refused; a value past the end of its range is still clamped, so those must stay silent.
+  ['sendCC', [1, 200, 5]], ['sendCC', [1, 'cutoff', 5]], ['sendCC', [0, 7, 5]], ['sendCC', [17, 7, 5]],
+  ['sendCC', [null, 7, 5]], ['sendCC', [1, 7, null]], ['sendCC', [1, 7, 'loud']], ['sendCC', [1, 7, NaN]],
+  ['sendCC', [1, 7, 128]], ['sendCC', [1, 7.4, 64.5]], ['sendCC', [true, 7, 5]],
+  // Text that is a number is read as one, as it always was; text that is not, is not.
+  ['sendCC', ['1', ' 74 ', '64']], ['sendCC', [1, '0x10', 5]], ['sendNote', [1, 60, 100, '500']],
+  ['sendNote', [1, 60, '1e2']], ['sendPitchBend', [1, '8192']],
+  ['sendNote', [1, 'C10', 100]], ['sendNote', [1, 'C-2', 100]], ['sendNote', [1, 128, 100]],
+  ['sendNote', [1, -1, 100]], ['sendNote', [1, NaN, 100]], ['sendNote', [1, true, 100]],
+  ['sendNote', [1, [60], 100]], ['sendNote', [1, 60]], ['sendNote', [1, 60, 100, '500ms']],
+  ['sendNote', [1, 60, 100, -5]], ['sendNote', [1, 60, 100, 0]], ['sendNote', [1, 'G9', 100]],
+  ['sendNote', [1, 127.6, 100]], ['sendNote', [1, 60, 100, 250]],
+  ['sendNoteOff', [1, 'G#9']], ['sendNoteOff', [1, 60]], ['sendAftertouch', [1, null]], ['sendAftertouch', [1, 90, 200]],
+  ['sendProgramChange', [1, 128]], ['sendProgramChange', [1, 5, 200]], ['sendProgramChange', [1, null]],
+  ['sendPitchBend', [1, 'center']], ['sendPitchBend', [1, NaN]], ['sendPitchBend', [1]], ['sendPitchBend', [1, -1]],
+  ['sendNRPN', [1, 128, 0, 5]], ['sendNRPN', [1, 0, 0, null]], ['sendRPN', [1, 0, 'x', 5]], ['sendRPN', [1, 0, 0, 20000]],
+  ['sendSongPosition', [null]], ['sendSongPosition', ['start']],
+  ['sendTransport', ['pause']], ['sendTransport', [null]], ['sendTransport', ['STOP']], ['sendTransport', [3]],
+  ['panic', [{ channel: 'all' }]], ['panic', [{ channel: 17 }]], ['panic', [{ channel: 2 }]],
+  // The music helpers' numbers: NaN or true is not a note, where it used to root the answer at C-1.
+  ['scaleNotes', [NaN, 'major']], ['scaleNotes', [true, 'major']], ['quantizeNote', [NaN, 60, 'major']],
+  ['inScale', [Infinity, 60, 'major']], ['scaleDegree', [60, [60], 'major']], ['chordNotes', [127, 'major']],
+  // One byte rule: an item is a whole number from 0 to 255 or one hex byte, a list is a list, and the
+  // separators are the same everywhere (a form feed is one, a no-break space is not).
+  ['bytesToHex', [[300]]], ['bytesToHex', [['41', '0xF7']]], ['bytesToHex', [[1.5]]], ['bytesToHex', [[-1]]],
+  ['bytesToHex', [[true]]], ['bytesToHex', [[[1]]]], ['bytesToHex', [42]], ['bytesToHex', [null]],
+  ['bytesToHex', [[NaN]]], ['bytesToHex', [[1, Infinity]]], ['bytesToHex', [['G0']]],
+  ['bytesToHex', ['F0\f41']], ['bytesToHex', ['F0\u00A041']],
+  ['bytesPut', [[1, 2, 3], 1, 0x7F]], ['bytesFind', [[1, 2], 0xF7]], ['bytesFromHex', [42]],
+  ['bytesFromHex', [null]], ['bytesFromHex', [[1, 2]]], ['bytesFromBase64', [null]],
+  ['checksum', ['roland']], ['checksum', [null]], ['checksum', ['roland', [300]]], ['checksum', ['xor', ['41', 16]]],
+  // A value left out, or not a number, is named rather than printed as each language prints it.
+  ['setBits', [0, 0, 3]], ['bytesWrite', [[1], 0, 1]], ['bytesWrite', [[1], 0, 1, '5']],
+  ['getBits', [NaN, 0, 3]], ['setBits', [Infinity, 0, 3, 1]], ['getBits', [true, 0, 1]],
+  ['getBits', [5]], ['bytesPut', [[1], 1]],
+  ['beatsPerDivision', [null]], ['stepAt', [2.5]], ['stepAt', [2.5, 8]], ['swingOffset', [1, 0.5]],
+  ['checksum', [null, [1, 2]]], ['checksum', [true, [1, 2]]], ['checksum', ['constructor', [1, 2]]],
+  // Colours are read as a property stores them: 6 or 8 hex digits, one "#" at most, and CSS's short
+  // forms written out ("#000" and "red" must stay silent; COLOUR_FORM_INPUTS below has the rest).
+  // Anything else is refused with the forms, and with the full form for "#" with four digits or a
+  // number. Eight digits are AARRGGBB, so "#5B9BD580" is accepted (as the panel's green), silently.
+  ['lighten', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToHsl', ['#000']], ['darken', ['#0008']],
+  ['colourAlpha', [0xFF0000, 0.5]], ['lighten', [0xFF5B9BD5]], ['hexToRgb', [1.5]], ['hexToRgb', [true]],
+  ['mixColour', ['000000', 'red', 0.5]], ['mixColour', ['nope', 'zz', 0.5]], ['lighten', [null]],
+  ['hexToHsl', ['']], ['lighten', ['#5B9BD580']], ['hexToRgb', ['FF5B9BD5']],
+  // Amounts on a 0..1 scale: outside it is refused, with the number out of 100 when that lands
+  // inside, and the colour is checked first. Left out is the default, except for alpha's.
+  ['lighten', ['336699', 40]], ['darken', ['336699', 55]], ['colourAlpha', ['336699', 128]],
+  ['colourAlpha', ['336699', 1.5]], ['colourAlpha', ['336699', -0.5]], ['colourAlpha', ['336699', null]],
+  ['lighten', ['336699', 'lots']], ['lighten', ['336699', '40']], ['darken', ['336699', true]],
+  ['lighten', ['nope', 40]],
+  ['lighten', ['336699', '0.5']], ['darken', ['336699', 1]], ['colourAlpha', ['336699', 0]],
+  ['lighten', ['336699', null]],
+  // ce.anim's target is a number, or text that is one; anything else starts nothing.
+  ['animateTo', ['K.value', 'full']], ['animateSpring', ['K.value', '100px']],
+  ['animateTo', ['K.value', '#FF0000']], ['animateTo', [['K.value', 'R.value'], null]],
+  ['animateSpring', ['K.value', true]],
+  // Settings: an options table with any key but `scope` is refused, because a misspelled key used to
+  // mean the shared panel store. The keys are named sorted, whatever order the table keeps them in.
+  ['saveSetting', ['k', 1, { scop: 'script' }]], ['loadSetting', ['k', null, { scope: 'script', fallbak: 2 }]],
+  ['listSettings', [{ b: 1, a: 2 }]], ['allSettings', [{ scope: 'panel', z: 1, x: 2, y: 3 }]],
+  ['forgetSetting', ['k', { scop: 'local' }]], ['clearSettings', [{ scop: 'script' }]],
+  ['storageInfo', [{ scope: 'sript' }]], ['saveSetting', ['k', 1, { scope: 'bogus' }]],
+  // Timers: a repeating interval is a number above 0, a one-shot's delay a number from 0, and a
+  // musical length may be a division's name. Each used to become a 1 ms timer, or run at once.
+  ['startTimer', ['t', 'fast']], ['startTimer', ['t']], ['startTimer', ['t', -100]], ['startTimer', ['t', 0]],
+  ['startTimer', [5, -0.5]], ['startTimer', ['t', true]], ['startTimer', ['t', '250']],
+  ['startTimer', ['t', { ms: 5 }]], ['startTimer', ['t', 250]],
+  ['syncTimer', ['s', '1/6']], ['syncTimer', ['s', 0]], ['syncTimer', ['s', null]], ['syncTimer', ['s', -1]],
+  ['syncTimer', ['s', 'fast']], ['syncTimer', ['s', '1/16']], ['syncTimer', ['s', '1/8t']], ['syncTimer', ['s', 0.25]],
+  ['after', ['1s', FN]], ['after', [-5, FN]], ['after', [null, FN]], ['after', [false, FN]],
+  ['after', [0, FN]], ['after', [10, FN]],
+  ['afterBeats', ['1/6', FN]], ['afterBeats', [-1, FN]], ['afterBeats', [null, FN]], ['afterBeats', ['1/4', FN]],
+  ['afterBeats', [0, FN]],
+  // Options: a key the member does not take refuses the call, for every member the preludes
+  // implement whose options list fields, from the lists gen-script-modules.mjs writes into them.
+  // Several keys are named sorted; a misspelling inside an option with fields of its own is named
+  // with the option, after the call's own. Each is checked before anything else the call reads.
+  ['set', ['K.value', 1, { transmit: false, quiet: true }]],
+  ['requestDump', ['patch', FN, { timout: 50 }]], ['recallPreset', [0, { rol: 'mainSynth' }]],
+  ['animateTo', ['K.value', 1, { easing: 'outBack' }]],
+  ['animateTo', ['K.value', 1, { time: 800, ease: 'out', onDone: 1, repeat: 2 }]],
+  ['animateTo', ['K.value', 'full', { easing: 'outBack' }]],
+  ['animateSpring', ['K.value', 1, { curve: 'outBack' }]],
+  ['animateEnvelope', ['K.value', [{ x: 0, y: 0 }, { x: 1, y: 1 }], { damping: 3, frequency: 2 }]],
+  ['syncTimer', ['s', '1/16', { folow: false }]],
+  ['deviceParameters', [{ grp: 'Filter' }]], ['devicePorts', [{ dir: 'in' }]],
+  ['deviceDefineParameter', ['p', { nrpn: { mbs: 1, lsb: 2 } }]],
+  ['deviceDefineParameter', ['p', { nmae: 'Cutoff', cc: 7, nrpn: { msb: 1, lbs: 2 } }]],
+  ['deviceDefineDump', ['patch', { header: 'F0', match: { prefx: 'F0', suffix: 'F7' }, fields: [] }]],
+  ['checksum', ['roland', [1, 2], { ofset: 1 }]], ['checksum', ['roland', [1, 2], { offset: 0 }]],
+  ['panic', [{ channel: 2, reset: false }]], ['panic', [{ channel: 2, resetControllers: false }]],
+  ['encodeJson', [{ a: 1 }, { indnt: 2 }]], ['encodeJson', [{ a: 1 }, { indent: 2 }]],
+  ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesRead', [[1, 2], 0, 2, { bits: 8, Order: 'lsb', order: 'lsb' }]],
+  ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]], ['bytesWrite', [[1, 2], 0, 2, 300, { order: 'lsb', bitz: 8, Bits: 8 }]],
+  ['bytesWrite', [[1, 2], 0, 2, 300, { bits: 8, order: 'lsb' }]],
+  // Not options tables, so nothing to refuse: a list, numbered keys, and no table at all.
+  ['bytesRead', [[1, 2], 0, 2, [8]]], ['bytesRead', [[1, 2], 0, 2, { 1: 8 }]], ['bytesRead', [[1, 2], 0, 2, 'lsb']],
+  ['bytesWrite', [[1, 2], 0, 2, 300, [8]]], ['bytesWrite', [[1, 2], 0, 2, 300, { 1: 8 }]],
+];
+
+/** The case's arguments with FN made a function in this realm. */
+const withFunctions = (args) => args.map((a) => (a === FN ? () => {} : a));
+
+function webRefusals(fn, args) {
+  clearScriptTrace();
+  web[fn](...withFunctions(args));
+  return get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+}
+
+test('the engines refuse the same mistakes in the same words', async (t) => {
+  const want = REFUSAL_CASES.map(([fn, args]) => webRefusals(fn, args));
+  // The cases that are accepted started real timers in this process.
+  resetScriptStateForTesting();
+  assert.ok(want.some((lines) => lines.length), 'the cases must include some refusals');
+
+  // JavaScript, under node:vm.
+  {
+    const errors = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {},
+      logError: (m) => errors.push(String(m)) };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    // The prelude declares its own logError, forwarding to __api.logAt, so capture it there.
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error') errors.push(String(m)); } : () => undefined),
+    });
+    REFUSAL_CASES.forEach(([fn, args], i) => {
+      errors.length = 0;
+      sandbox[fn](...withFunctions(args));
+      assert.deepEqual([...errors], want[i], `JS prelude ${fn}(${JSON.stringify(args)})`);
+    });
+  }
+
+  // Lua, under wasmoon: one crossing for every case, for the reason LUA_SERIALISER gives.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      // __transportState answers nothing, as a host with no transport does, so a musical timer
+      // that is accepted stops at "no tempo" (a log line, not an error).
+      // `set` is a host binding in this engine, and has to exist before the prelude loads for the
+      // option check to wrap it, as the real engine binds it first.
+      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = REFUSAL_CASES.map(([fn, args]) =>
+        `__errs = {}; ${fn}(${args.map(luaLiteral).join(', ')}); out[#out + 1] = table.concat(__errs, "\\1")`);
+      const chunk = `__errs = {}\nlogError = function(m) __errs[#__errs + 1] = tostring(m) end\n`
+        + `local out = {}\n${calls.join('\n')}\nreturn table.concat(out, "\\n")`;
+      const got = String(await lua.doString(chunk)).split('\n');
+      REFUSAL_CASES.forEach(([fn, args], i) => {
+        assert.deepEqual(got[i] ? got[i].split('\u0001') : [], want[i], `Lua prelude ${fn}(${JSON.stringify(args)})`);
+      });
+    } finally {
+      lua.global.close();
+    }
+  }
+
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.diagnostic('Python 3 is not on this machine: its refusals were not compared');
+    return;
+  }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+errors = []
+g["logError"] = lambda m, *rest: errors.append(str(m))
+def _dec(v):
+    if isinstance(v, str) and v.startswith("\\u0000"): return float(v[1:])
+    if isinstance(v, list): return [_dec(x) for x in v]
+    if isinstance(v, dict): return {k: _dec(x) for k, x in v.items()}
+    return v
+out = []
+for fn, args in payload["cases"]:
+    del errors[:]
+    g[fn](*[(lambda *a: None) if isinstance(x, dict) and x.get("__function") else x for x in _dec(args)])
+    out.append(list(errors))
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: pyJson({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: REFUSAL_CASES }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  const got = JSON.parse(run.stdout);
+  REFUSAL_CASES.forEach(([fn, args], i) => {
+    assert.deepEqual(got[i], want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
+  });
+});
+
+/* ------------------------------------------------- ce.math's colours, in CSS's short forms */
+
+// The ce.math colour helpers read a colour as if the long form a property stores for it had been
+// given (scriptColours.storedColour): "red" is "#FF0000", rgba(255, 0, 0, 0.5) is "80FF0000". The
+// WebView reads CSS with four regular expressions and JavaScript's numbers; each prelude has its own
+// port (Lua with a tokenizer, as its patterns have no alternation), so these are the places they could
+// part: the case of a name, a function or a unit; every syntax; a number Number() reads and another
+// language might not; Math.round's half, which goes up where Python's round() goes to even and Lua
+// has none; `%` on a negative hue; JavaScript's white space, which is neither Python's nor Lua's;
+// and every form that stays refused, with its hint. Each input goes through every colour helper,
+// and the answer and the console lines are compared with the WebView's.
+const COLOUR_FORM_INPUTS = [
+  // The panel's own forms, read as before.
+  '5B9BD5', '#5B9BD5', '805B9BD5', '#805b9bd5',
+  // Names, in any case, and "transparent". JavaScript's toLowerCase reads the Kelvin sign as "k".
+  'red', 'RED', 'Red', 'SteelBlue', 'rebeccapurple', 'LightGoldenRodYellow', 'darkSlateGrey', 'aqua',
+  'transparent', 'TRANSPARENT', 'Transparent', 'Khaki',
+  // "#" with three digits.
+  '#abc', '#ABC', '#000', '#fFf', '#a1B',
+  // rgb() and rgba() with commas, either name with or without an alpha, the name in any case.
+  'rgb(0, 0, 0)', 'rgb(91,155,213)', 'rgb( 91 , 155 , 213 )', 'rgba(255, 0, 0, 0.5)', 'rgba(255, 0, 0, 1)',
+  'rgb(255, 0, 0, 0.25)', 'rgba(1, 2, 3)', 'RGB(10, 20, 30)', 'Rgba(10, 20, 30, .5)',
+  // With spaces, and a slash before the alpha.
+  'rgb(91 155 213)', 'rgb(91 155 213 / 0.5)', 'rgb(91 155 213/50%)', 'rgba(255 0 0 / 0)', 'RGBA(1 2 3 / 1)',
+  // Percentages: channels (mixed with numbers, as the expressions allow), and alpha.
+  'rgb(100%, 50%, 0%)', 'rgb(30% 30% 30%)', 'rgb(50%, 10, 20)', 'rgb(0.5%, 100.5%, -1%)',
+  'rgba(0, 0, 0, 30%)', 'rgb(0 0 0 / 50%)', 'rgba(0, 0, 0, 150%)', 'rgba(0, 0, 0, -10%)',
+  // Alpha 0, above 1 and below 0.
+  'rgba(255, 0, 0, 0)', 'rgba(255, 0, 0, 1.5)', 'rgba(255, 0, 0, -1)', 'rgba(255, 0, 0, 0.002)',
+  // Channels past either end, the .5 edge of the rounding, and every way Number() reads a number.
+  'rgb(300, -5, 256)', 'rgb(1e3, -1e3, 255.4)', 'rgb(254.5, 0.5, 2.5)', 'rgb(-0.5, -0, +5)',
+  'rgb(1e400, 0, 0)', 'rgb(.5, 5., 1E1)', 'rgb(1e+2, 1e-2, 12.5e1)', 'rgb(-2.5, 3.5, 1.4999999999999999)',
+  // hsl() and hsla(): each unit, in any case; a negative hue, one past 360, and a fractional one.
+  'hsl(0, 100%, 50%)', 'hsl(120, 100%, 25%)', 'hsl(210deg 60% 60%)', 'HSL(210DEG 60% 60%)',
+  'hsl(200grad, 50%, 50%)', 'hsl(3.14159rad 50% 50%)', 'hsl(0.5turn 50% 50%)', 'hsl(0.5TURN, 50%, 50%)',
+  'hsl(-120, 100%, 50%)', 'hsl(-0.25turn, 100%, 50%)', 'hsl(480, 100%, 50%)', 'hsl(720.5 100% 50%)',
+  'hsl(-400grad 40% 60%)', 'hsl(-1rad, 80%, 30%)', 'hsl(359.99, 100%, 50%)', 'hsl(1e2, 50%, 50%)',
+  'hsla(120, 100%, 50%, 0.25)', 'hsla(120 100% 50% / 25%)', 'hsl(120 100 50)', 'hsl(120 100% 50% / 1.5)',
+  // Saturation and lightness past their ends, and lightness on the .5 edge of the rounding.
+  'hsl(0, 150%, -10%)', 'hsl(0, 0%, 30%)', 'hsl(0, 0%, 50%)', 'hsl(0 0% 10%)', 'hsl(30, 50%, 50%)',
+  'hsl(90, 33%, 47%)', 'hsl(17.5, 62.5%, 37.5%)',
+  // JavaScript's white space inside a function is a separator: a no-break space, an em space.
+  'rgb(1, 2,3)', 'rgb(1 2　3)', 'hsl(10  50% 50%)',
+  // …and around text is text with space around it, refused with what it means. U+0085 is not white
+  // space in JavaScript (Python's strip() takes it), and the long s is not an s (Python's re.I takes it).
+  ' red', 'red﻿', '\u0085red', 'rgb(1,\u00852,3)', 'hſl(0, 100%, 50%)',
+  // Still refused: what has two readings, or none.
+  0xFF0000, 1.5, true, null, '#abcd', '#ABCD', 'abc', 'currentColor', 'currentcolor', ' red ', 'red ',
+  '\tred', '', 'notacolour', 'constructor', '__proto__', 'toString', '#12345', '#1234567', 'x5B9BD5',
+  '#5B9BD5 ', ' #5B9BD580', ' 5B9BD5', ' #abcd', ' rgb(1, 2, 3) ', ' transparent', ' #ABC',
+  'rgb(1,2)', 'rgb(1, 2, 3,)', 'rgb(1 2 3 4)', 'rgb(1, 2 3)', 'rgba(1,2,3 / 0.5)', 'rgb (1,2,3)',
+  'rgb(1e, 2, 3)', 'rgb(1.2.3, 4, 5)', 'rgb(+-1, 2, 3)', 'rgb(10deg, 0, 0)', 'rgb(1, 2, 3)x',
+  'rgb(0,0,0))', 'rgb()', 'rgb(1 2 3 /)', 'rgb(1%%, 2, 3)', 'hsl(10, 50, 50)', 'hsl(10%, 50%, 50%)',
+  'hsl(10, 50%, 50)', 'hsl(10deg%, 50%, 50%)', 'hsl(10 deg, 50%, 50%)', 'hsl(1e400, 50%, 50%)',
+  'hsl(1e308turn 50% 50%)', 'hsv(0, 100%, 50%)',
+];
+const COLOUR_FORM_CASES = COLOUR_FORM_INPUTS.flatMap((x) => [
+  ['lighten', [x, 0.2]], ['darken', [x, 0.5]], ['colourAlpha', [x, 0.5]], ['hexToRgb', [x]], ['hexToHsl', [x]],
+  ['mixColour', [x, 'FFFFFF', 0.25]], ['mixColour', ['000000', x, 0.5]],
+]);
+
+test('the ce.math colour helpers read CSS\'s short forms as a property stores them, in every engine', async (t) => {
+  const want = COLOUR_FORM_CASES.map(([fn, args]) => {
+    clearScriptTrace();
+    const value = canonical(web[fn](...args));
+    return { value, errors: get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message) };
+  });
+  // Both outcomes, so neither "everything reads" nor "everything refuses" passes by accident.
+  assert.ok(want.filter((w) => w.errors.length === 0).length > 400, 'most short forms are read');
+  assert.ok(want.filter((w) => w.errors.length).length > 300, 'and what has no one reading is refused');
+  const label = (i) => `${COLOUR_FORM_CASES[i][0]}(${JSON.stringify(COLOUR_FORM_CASES[i][1])})`;
+
+  // JavaScript, under node:vm.
+  {
+    const errors = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error') errors.push(String(m)); } : () => undefined),
+    });
+    COLOUR_FORM_CASES.forEach(([fn, args], i) => {
+      errors.length = 0;
+      const value = canonical(sandbox[fn](...args));
+      assert.deepEqual({ value, errors: [...errors] }, want[i], `JS prelude ${label(i)}`);
+    });
+  }
+
+  // Lua, under wasmoon, in one crossing. A message may hold a newline (it quotes the colour), so the
+  // cases are parted by \3, and each case's answer from its lines by \2.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'sendCC', 'on', 'startTimer', 'stopTimer']) lua.global.set(name, () => {});
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      // Each case in a block of its own: a chunk may hold 200 locals, and there are more cases.
+      const calls = COLOUR_FORM_CASES.map(([fn, args]) => `do __errs = {}; local v = __ser(${fn}(`
+        + `${args.map(luaLiteral).join(', ')})); out[#out + 1] = v .. "\\2" .. table.concat(__errs, "\\1") end`);
+      const chunk = `${LUA_SERIALISER}\n__errs = {}\nlogError = function(m) __errs[#__errs + 1] = tostring(m) end\n`
+        + `local out = {}\n${calls.join('\n')}\nreturn table.concat(out, "\\3")`;
+      const got = String(await lua.doString(chunk)).split('\u0003');
+      assert.equal(got.length, COLOUR_FORM_CASES.length, 'one answer per case');
+      got.forEach((line, i) => {
+        const [value, lines] = line.split('\u0002');
+        assert.deepEqual({ value, errors: lines ? lines.split('\u0001') : [] }, want[i], `Lua prelude ${label(i)}`);
+      });
+    } finally {
+      lua.global.close();
+    }
+  }
+
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.diagnostic('Python 3 is not on this machine: its colour readers were not compared');
+    return;
+  }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+errors = []
+g["logError"] = lambda m, *rest: errors.append(str(m))
+out = []
+for fn, args in payload["cases"]:
+    del errors[:]
+    try: out.append({"value": g[fn](*args), "errors": list(errors)})
+    except Exception as err: out.append({"raised": type(err).__name__ + ": " + str(err)})
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: pyJson({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: COLOUR_FORM_CASES }),
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  JSON.parse(run.stdout).forEach((answer, i) => {
+    assert.equal(answer.raised, undefined, `Python prelude ${label(i)} raised ${answer.raised}`);
+    assert.deepEqual({ value: canonical(answer.value ?? null), errors: answer.errors }, want[i], `Python prelude ${label(i)}`);
+  });
+});
+
+// The generated option check finds a member's options by position (and in Python by the parameter's
+// name too), from the contract's list of parameters. A prelude function taking them anywhere else
+// would be checked on the wrong argument, or not at all, and its refusals would stop agreeing with
+// the editor's only for the calls nobody thought to write a case for.
+test('each prelude takes the options it checks where the contract says', () => {
+  const checks = optionChecks().filter((c) => memberRuntime(MEMBER_BY_ID[c.id]) !== RUNTIME_WEBVIEW);
+  const preludes = [
+    ['Lua', extractRawString('LuaScriptEngine.cpp', 'LUA'), 'function'],
+    ['JS', extractRawString('JsScriptEngine.cpp', 'JS'), 'function'],
+    ['Python', extractRawString('PythonScriptEngine.cpp', 'PY'), 'def'],
+  ];
+  const notInSource = [];
+  for (const [language, source, keyword] of preludes) {
+    for (const { id, params: [{ index, name }] } of checks) {
+      const m = new RegExp(`^${keyword} ${id}\\(([^)]*)\\)`, 'm').exec(source);
+      if (!m) { notInSource.push(`${language} ${id}`); continue; }
+      const names = m[1].split(',').map((p) => p.split('=')[0].trim());
+      assert.equal(names[index], name, `${language} ${id}(${m[1]}): its options are argument ${index + 1}, ${name}`);
+    }
+  }
+  // Lua's set is a host binding rather than prelude source; the check wraps it all the same.
+  assert.deepEqual(notInSource, ['Lua set']);
+});
+
+// A refused call answers what its member answers for any other refusal (panelApi.js, refusalOf),
+// and that answer has to be the same everywhere too: a script testing `if not ce.device.ports(...)`
+// or reading `r.ok` from recallPreset must take the same branch in the editor and in the export.
+// One unknown key per member the preludes implement, so every kind of answer they give is here.
+const OPTION_ANSWER_CASES = [
+  ['set', ['K.value', 1, { quiet: true }]], ['requestDump', ['patch', null, { timout: 50 }]],
+  ['recallPreset', [0, { rol: 'mainSynth' }]], ['animateTo', ['K.value', 1, { easing: 'outBack' }]],
+  ['animateSpring', ['K.value', 1, { curve: 'outBack' }]],
+  ['animateEnvelope', ['K.value', [{ x: 0, y: 0 }, { x: 1, y: 1 }], { damping: 3 }]],
+  ['syncTimer', ['s', '1/16', { folow: false }]], ['deviceParameters', [{ grp: 'Filter' }]],
+  ['deviceDefineParameter', ['p', { cc: 7, nmae: 'Cutoff' }]], ['deviceDefineDump', ['d', { header: 'F0' }]],
+  ['devicePorts', [{ dir: 'in' }]], ['checksum', ['roland', [1, 2], { ofset: 1 }]],
+  ['panic', [{ reset: false }]], ['encodeJson', [{ a: 1 }, { indnt: 2 }]],
+  ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]],
+];
+
+test('a refused call answers the same in every engine', async (t) => {
+  const covered = new Set(OPTION_ANSWER_CASES.map(([fn]) => fn));
+  for (const c of optionChecks().filter((x) => memberRuntime(MEMBER_BY_ID[x.id]) !== RUNTIME_WEBVIEW)) {
+    assert.ok(covered.has(c.id), `${c.id} needs a case here`);
+  }
+  const want = OPTION_ANSWER_CASES.map(([fn, args]) => canonical(web[fn](...args)));
+  resetScriptStateForTesting();
+
+  {
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    OPTION_ANSWER_CASES.forEach(([fn, args], i) => {
+      assert.equal(canonical(sandbox[fn](...args)), want[i], `JS prelude ${fn}(${JSON.stringify(args)})`);
+    });
+  }
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'set', 'sendCC', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = OPTION_ANSWER_CASES.map(([fn, args]) => `__ser(${fn}(${args.map(luaLiteral).join(', ')}))`);
+      const got = String(await lua.doString(`${LUA_SERIALISER}\nreturn table.concat({${calls.join(',\n')}}, "\\n")`)).split('\n');
+      OPTION_ANSWER_CASES.forEach(([fn, args], i) => {
+        assert.equal(got[i], want[i], `Lua prelude ${fn}(${JSON.stringify(args)})`);
+      });
+    } finally {
+      lua.global.close();
+    }
+  }
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its answers were not compared'); return; }
+  const run = spawnSync(python, ['-c', PY_DRIVER], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: OPTION_ANSWER_CASES }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  const got = JSON.parse(run.stdout);
+  OPTION_ANSWER_CASES.forEach(([fn, args], i) => {
+    assert.equal(got[i].error, undefined, `Python prelude ${fn}(${JSON.stringify(args)}) raised ${got[i].error}`);
+    assert.equal(canonical(got[i].value ?? null), want[i], `Python prelude ${fn}(${JSON.stringify(args)})`);
+  });
+});
+
+/* ------------------------------------------------- a value past its end: sent, and said once */
+
+// A value one step past its range (a CC value of 128, a bend of -1) is sent as the nearest end, and
+// the first time for each command a warning says so. Two calls, one warning, the same words in every
+// engine; an address past its range is refused instead, and is in REFUSAL_CASES above.
+const EDGE_CALLS = [['sendCC', [1, 7, 200]], ['sendCC', [1, 7, 300]], ['sendNote', [1, 60, -5]],
+  ['sendPitchBend', [1, 20000]], ['sendNRPN', [1, 0, 0, -1]], ['sendAftertouch', [1, 128.4]]];
+
+test('a value past its end is sent as the nearest end and said once, in the same words everywhere', async (t) => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  for (const [fn, args] of EDGE_CALLS) web[fn](...args);
+  const want = get(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+  assert.deepEqual(want, [
+    'sendCC: the value 200 is outside 0 to 127, so 127 was sent. This is said only the first time.',
+    'sendNote: the velocity -5 is outside 0 to 127, so 0 was sent. This is said only the first time.',
+    'sendPitchBend: the bend 20000 is outside 0 to 16383, so 16383 was sent. This is said only the first time.',
+    'sendNRPN: the value -1 is outside 0 to 16383, so 0 was sent. This is said only the first time.',
+    'sendAftertouch: the pressure 128.4 is outside 0 to 127, so 127 was sent. This is said only the first time.',
+  ], 'the second sendCC says nothing');
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
+
+  // JavaScript, under node:vm.
+  {
+    const warns = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'warn') warns.push(String(m)); } : () => undefined),
+    });
+    for (const [fn, args] of EDGE_CALLS) sandbox[fn](...args);
+    assert.deepEqual(warns, want, 'JS prelude');
+  }
+  // Lua, under wasmoon.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = EDGE_CALLS.map(([fn, args]) => `${fn}(${args.map(luaLiteral).join(', ')})`).join('\n');
+      const got = String(await lua.doString(`local w = {}\nlogWarn = function(m) w[#w + 1] = tostring(m) end\n${calls}\nreturn table.concat(w, "\\n")`));
+      assert.deepEqual(got.split('\n'), want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its warnings were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+warns = []
+g["logWarn"] = lambda m, *rest: warns.append(str(m))
+for fn, args in payload["calls"]:
+    g[fn](*args)
+sys.stdout.write(json.dumps(warns, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: EDGE_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
+/* ---------------------------------------------- each language's own byte type, as a list */
+
+// The byte-list helpers take a list or hex text everywhere, and also the byte type each language
+// already has: a typed array in JavaScript, bytes or a bytearray in Python. (The WebView half is in
+// scriptBytes.test.js.) A list always comes back, so what a script does next is the same in every
+// language.
+test('the byte helpers read each language\'s own byte type as a list', async (t) => {
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+  vm.createContext(sandbox);
+  vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+  assert.equal(vm.runInContext('bytesToHex(new Uint8Array([0xF0, 0x41]))', sandbox), 'F0 41');
+  assert.equal(vm.runInContext('getBits(new Uint8Array([0, 0xB4]), 12, 3)', sandbox), 3);
+  assert.deepEqual(plain(vm.runInContext('bytesPut(new Uint8Array([1, 2]), 2, new Uint8Array([3]))', sandbox)), [1, 2, 3]);
+
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: bytes and bytearray were not checked'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(sys.stdin.read(), "prelude", "exec"), g)
+out = [g["bytesToHex"](b"\\xf0\\x41"), g["getBits"](bytearray([0, 0xB4]), 12, 3),
+       g["bytesPut"](bytearray([1, 2]), 2, b"\\x03"), g["bytesToBase64"](bytes([240, 65, 16, 66]))]
+sys.stdout.write(json.dumps(out))
+`;
+  const ran = spawnSync(python, ['-c', driver], {
+    input: extractRawString('PythonScriptEngine.cpp', 'PY'), encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.deepEqual(JSON.parse(ran.stdout), ['F0 41', 3, [1, 2, 3], '8EEQQg==']);
 });
 
 /* -------------------------------------------------------------- the generated ce.* namespace */

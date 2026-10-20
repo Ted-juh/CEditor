@@ -56,6 +56,20 @@ juce::var solToVar (const sol::object& o)
     }
 }
 
+/** set()'s third argument for the host: its options table, as { transmit }, or the value form as
+    text, which the host reads as the WebView runtime does (BridgeScriptHost::setValue). Taken as a
+    table only, text never reached the host, so set("cutoff", 0.5, "normalizedValue") wrote 0.5 as
+    it was, and a form that is not one was dropped without a word. */
+juce::var setOptionsOf (const sol::object& opts)
+{
+    if (opts.get_type() == sol::type::string) return juce::var (juce::String (opts.as<std::string>()));
+    if (opts.get_type() != sol::type::table) return {};
+    auto* o = new juce::DynamicObject();
+    sol::object t = opts.as<sol::table>()["transmit"];
+    if (t.valid() && t.get_type() == sol::type::boolean) o->setProperty ("transmit", t.as<bool>());
+    return juce::var (o);
+}
+
 sol::object varToSol (sol::state_view lua, const juce::var& v)
 {
     if (v.isVoid() || v.isUndefined()) return sol::make_object (lua, sol::nil);
@@ -96,6 +110,28 @@ sol::object varToSol (sol::state_view lua, const juce::var& v)
 const char* kPrelude = R"LUA(
 -- @module ce.math
 -- Pure-math helpers (no host). Keep in sync with the JS prelude + panelApi.js.
+-- A whole number prints as one ("9", not Lua's "9.0" for a float), as it does in the other runtimes.
+local function __shown(n)
+  if type(n) == "number" and n == math.floor(n) and math.abs(n) < 2 ^ 53 then return string.format("%d", math.floor(n)) end
+  return tostring(n)
+end
+-- How a refusal shows a value the script passed, in the same words in every runtime (the WebView
+-- runtime's shownValue): "nothing" for nil, NaN and Infinity as JavaScript writes them, a whole
+-- number without ".0", text in quotes, "a list" for a table.
+local function __shownValue(v)
+  if v == nil then return "nothing" end
+  local t = type(v)
+  if t == "boolean" then return tostring(v) end
+  if t == "number" then
+    if v ~= v then return "NaN" end
+    if v == math.huge then return "Infinity" end
+    if v == -math.huge then return "-Infinity" end
+    return __shown(v)
+  end
+  if t == "string" then return '"' .. v .. '"' end
+  if t == "function" then return "a function" end
+  return "a list"
+end
 function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi else return v end end
 function round(v) return math.floor(v + 0.5) end
 function scale(v, inLo, inHi, outLo, outHi)
@@ -623,15 +659,304 @@ end
 -- reason every table here is: a script lightening a colour and the border renderer lightening the
 -- same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 --
--- In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" - the last six characters are the colour. Out is
--- "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
--- returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round, and that is
--- a trap worth one asymmetry to avoid.
-local function __cchan(hex)
-  local h = string.gsub(tostring(hex == nil and "" or hex), "#", "")
-  h = string.sub(h, -6)
-  if #h ~= 6 or string.match(h, "^%x%x%x%x%x%x$") == nil then return nil end
-  return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
+-- In takes what a colour property takes, read as if what the property would store had been given:
+-- "RRGGBB", "AARRGGBB" or "#RRGGBB" as written (6 hex digits are RRGGBB, 8 are AARRGGBB with the
+-- alpha set aside, one leading "#" either way), and CSS's short forms written out first, as the
+-- WebView writes them out (scriptColours.js's storedColour): "#RGB", a name from the generated
+-- table below, rgb(), rgba(), hsl() and hsla(), so "red" is "#FF0000" and rgba(255, 0, 0, 0.5) is
+-- "80FF0000". Out is "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception
+-- is alpha(), which returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way
+-- round, and that is a trap worth one asymmetry to avoid.
+--
+-- Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
+-- the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
+-- (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
+-- colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
+-- checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
+-- BEGIN GENERATED colour names — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- @module ce.math
+-- CSS's named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour
+-- property writes "red" out as, and what the ce.math colour helpers read it as.
+__CE_CSS_COLOURS = {
+  aliceblue = "F0F8FF", antiquewhite = "FAEBD7", aqua = "00FFFF", aquamarine = "7FFFD4",
+  azure = "F0FFFF", beige = "F5F5DC", bisque = "FFE4C4", black = "000000",
+  blanchedalmond = "FFEBCD", blue = "0000FF", blueviolet = "8A2BE2", brown = "A52A2A",
+  burlywood = "DEB887", cadetblue = "5F9EA0", chartreuse = "7FFF00", chocolate = "D2691E",
+  coral = "FF7F50", cornflowerblue = "6495ED", cornsilk = "FFF8DC", crimson = "DC143C",
+  cyan = "00FFFF", darkblue = "00008B", darkcyan = "008B8B", darkgoldenrod = "B8860B",
+  darkgray = "A9A9A9", darkgreen = "006400", darkgrey = "A9A9A9", darkkhaki = "BDB76B",
+  darkmagenta = "8B008B", darkolivegreen = "556B2F", darkorange = "FF8C00", darkorchid = "9932CC",
+  darkred = "8B0000", darksalmon = "E9967A", darkseagreen = "8FBC8F", darkslateblue = "483D8B",
+  darkslategray = "2F4F4F", darkslategrey = "2F4F4F", darkturquoise = "00CED1",
+  darkviolet = "9400D3", deeppink = "FF1493", deepskyblue = "00BFFF", dimgray = "696969",
+  dimgrey = "696969", dodgerblue = "1E90FF", firebrick = "B22222", floralwhite = "FFFAF0",
+  forestgreen = "228B22", fuchsia = "FF00FF", gainsboro = "DCDCDC", ghostwhite = "F8F8FF",
+  gold = "FFD700", goldenrod = "DAA520", gray = "808080", green = "008000", greenyellow = "ADFF2F",
+  grey = "808080", honeydew = "F0FFF0", hotpink = "FF69B4", indianred = "CD5C5C", indigo = "4B0082",
+  ivory = "FFFFF0", khaki = "F0E68C", lavender = "E6E6FA", lavenderblush = "FFF0F5",
+  lawngreen = "7CFC00", lemonchiffon = "FFFACD", lightblue = "ADD8E6", lightcoral = "F08080",
+  lightcyan = "E0FFFF", lightgoldenrodyellow = "FAFAD2", lightgray = "D3D3D3",
+  lightgreen = "90EE90", lightgrey = "D3D3D3", lightpink = "FFB6C1", lightsalmon = "FFA07A",
+  lightseagreen = "20B2AA", lightskyblue = "87CEFA", lightslategray = "778899",
+  lightslategrey = "778899", lightsteelblue = "B0C4DE", lightyellow = "FFFFE0", lime = "00FF00",
+  limegreen = "32CD32", linen = "FAF0E6", magenta = "FF00FF", maroon = "800000",
+  mediumaquamarine = "66CDAA", mediumblue = "0000CD", mediumorchid = "BA55D3",
+  mediumpurple = "9370DB", mediumseagreen = "3CB371", mediumslateblue = "7B68EE",
+  mediumspringgreen = "00FA9A", mediumturquoise = "48D1CC", mediumvioletred = "C71585",
+  midnightblue = "191970", mintcream = "F5FFFA", mistyrose = "FFE4E1", moccasin = "FFE4B5",
+  navajowhite = "FFDEAD", navy = "000080", oldlace = "FDF5E6", olive = "808000",
+  olivedrab = "6B8E23", orange = "FFA500", orangered = "FF4500", orchid = "DA70D6",
+  palegoldenrod = "EEE8AA", palegreen = "98FB98", paleturquoise = "AFEEEE",
+  palevioletred = "DB7093", papayawhip = "FFEFD5", peachpuff = "FFDAB9", peru = "CD853F",
+  pink = "FFC0CB", plum = "DDA0DD", powderblue = "B0E0E6", purple = "800080",
+  rebeccapurple = "663399", red = "FF0000", rosybrown = "BC8F8F", royalblue = "4169E1",
+  saddlebrown = "8B4513", salmon = "FA8072", sandybrown = "F4A460", seagreen = "2E8B57",
+  seashell = "FFF5EE", sienna = "A0522D", silver = "C0C0C0", skyblue = "87CEEB",
+  slateblue = "6A5ACD", slategray = "708090", slategrey = "708090", snow = "FFFAFA",
+  springgreen = "00FF7F", steelblue = "4682B4", tan = "D2B48C", teal = "008080", thistle = "D8BFD8",
+  tomato = "FF6347", turquoise = "40E0D0", violet = "EE82EE", wheat = "F5DEB3", white = "FFFFFF",
+  whitesmoke = "F5F5F5", yellow = "FFFF00", yellowgreen = "9ACD32",
+}
+-- END GENERATED colour names
+local __CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS colour name, rgb() or hsl()'
+-- A number as JavaScript prints it, for the numbers a script writes: whole ones without ".0".
+local function __cshown(n)
+  if n == math.floor(n) and math.abs(n) < 2 ^ 53 then return string.format("%d", math.floor(n)) end
+  return tostring(n)
+end
+-- n / 100 to four places with the trailing zeros dropped, as Number(x.toFixed(4)) prints it.
+local function __cfour(x)
+  local s = string.format("%.4f", x)
+  s = string.gsub(s, "0+$", "")
+  s = string.gsub(s, "%.$", "")
+  return s
+end
+local function __chint(v)
+  if type(v) == "number" then
+    if v ~= v or v ~= math.floor(v) or v < 0 or v > 0xFFFFFFFF then return "" end
+    local text
+    if v <= 0xFFFFFF then text = string.format("#%06X", math.floor(v)) else text = string.format("%08X", math.floor(v)) end
+    return " As text, " .. __cshown(v) .. ' is "' .. text .. '".'
+  end
+  if type(v) ~= "string" then return "" end
+  local p, d = string.match(v, "^(#?)(%x+)$")
+  if d == nil or (#d ~= 3 and #d ~= 4) then return "" end
+  d = string.upper(d)
+  local function two(i) local c = string.sub(d, i, i) return c .. c end
+  if #d == 3 then return ' Write "' .. p .. two(1) .. two(2) .. two(3) .. '".' end
+  return ' Write "' .. two(4) .. two(1) .. two(2) .. two(3) .. '".'
+end
+local function __realNumber(v)
+  if type(v) == "number" then
+    if v ~= v or v == math.huge or v == -math.huge then return nil end
+    return v
+  end
+  if type(v) ~= "string" then return nil end
+  local t = string.match(v, "^%s*(.-)%s*$")
+  local mantissa = string.match(t, "^(.-)[eE][+-]?%d+$") or t
+  if string.match(mantissa, "^[+-]?%d+%.?%d*$") == nil and string.match(mantissa, "^[+-]?%.%d+$") == nil then
+    return nil
+  end
+  local n = tonumber(t)
+  if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
+  return n
+end
+local function __cunit(verb, what, v, fallback)
+  if v == nil and fallback ~= nil then return fallback end
+  local n = __realNumber(v)
+  if n ~= nil and n >= 0 and n <= 1 then return n end
+  local shown
+  if v == nil then shown = "none was given"
+  elseif type(v) == "string" then shown = '"' .. v .. '" is not'
+  elseif type(v) == "number" and __realNumber(v) ~= nil then shown = __cshown(v) .. " is not"
+  else shown = "the value given is not" end
+  local hint = ""
+  if n ~= nil and n / 100 >= 0 and n / 100 <= 1 then
+    hint = " If you meant " .. __cshown(n) .. " out of 100, write " .. __cfour(n / 100) .. "."
+  end
+  logError(verb .. ": " .. what .. " is a number from 0 to 1, and " .. shown .. ", so there is no answer." .. hint)
+  return nil
+end
+-- CSS's short forms, read as scriptColours.js reads them (cssChannels, panelFormOf, longForm and
+-- cssHint). It reads them with four regular expressions, which Lua patterns cannot write (they have
+-- no alternation and no optional groups), so this reads the same grammar a token at a time. Every
+-- number goes through what JavaScript does to it: Number(), Math.round (a half goes up, toward
+-- +infinity), and `%`, which keeps the sign of what it divides, as math.fmod does and Lua's % does not.
+--
+-- What JavaScript calls white space, for trim() and \s: the six ASCII ones and the Unicode spaces,
+-- as UTF-8. The length of the one that starts at i, or 0.
+local function __cwsAt(s, i)
+  local c, c2, c3 = string.byte(s, i, i + 2)
+  if c == nil then return 0 end
+  if c == 32 or (c >= 9 and c <= 13) then return 1 end
+  if c == 194 then if c2 == 160 then return 2 end return 0 end
+  if c3 == nil then return 0 end
+  if c == 226 and c2 == 128 and ((c3 >= 128 and c3 <= 138) or c3 == 168 or c3 == 169 or c3 == 175) then return 3 end
+  if (c == 226 and c2 == 129 and c3 == 159) or (c == 225 and c2 == 154 and c3 == 128)
+      or (c == 227 and c2 == 128 and c3 == 128) or (c == 239 and c2 == 187 and c3 == 191) then
+    return 3
+  end
+  return 0
+end
+local function __cskip(s, i)
+  local n = __cwsAt(s, i)
+  while n > 0 do i = i + n; n = __cwsAt(s, i) end
+  return i
+end
+-- JavaScript's trim().
+local function __ctrim(s)
+  local i, j = __cskip(s, 1), #s
+  while j >= i do
+    if __cwsAt(s, j) == 1 then j = j - 1
+    elseif j - 1 >= i and __cwsAt(s, j - 1) == 2 then j = j - 2
+    elseif j - 2 >= i and __cwsAt(s, j - 2) == 3 then j = j - 3
+    else break end
+  end
+  return string.sub(s, i, j)
+end
+-- JavaScript's Math.round, which Lua does not have: a half goes up, so 2.5 is 3 and -2.5 is -2.
+local function __cround(x)
+  local r = math.floor(x)
+  if x - r >= 0.5 then return r + 1 end
+  return r
+end
+local function __cclamp(v, lo, hi) return math.min(hi, math.max(lo, v)) end
+-- A number as the expressions write one, [+-] digits [. digits] [e [+-] digits], starting at i:
+-- its value as a float and where it ends, or nil. tonumber reads this grammar as Number() does.
+local function __cnumAt(s, i)
+  local _, e = string.find(s, "^[+-]?%d+%.?%d*", i)
+  if e == nil then _, e = string.find(s, "^[+-]?%.%d+", i) end
+  if e == nil then return nil end
+  local _, x = string.find(s, "^[eE][+-]?%d+", e + 1)
+  e = x or e
+  return tonumber(string.sub(s, i, e)) * 1.0, e + 1
+end
+-- rgb(), rgba(), hsl() or hsla(), with commas or with spaces and a slash before the alpha, as the
+-- four expressions read them: r, g, b, a, or nil. The function and a hue's unit in any case; three
+-- values, and a fourth after "," or "/"; "%" on any rgb value, and on both of hsl's with commas.
+local function __cfunction(s)
+  local l = string.lower(s)
+  local name = string.match(l, "^(%a+)%(")
+  local hsl = name == "hsl" or name == "hsla"
+  if not hsl and name ~= "rgb" and name ~= "rgba" then return nil end
+  local i = __cskip(l, #name + 2)
+  local v, p, unit, legacy = {}, {}, 1, false
+  for k = 1, 3 do
+    v[k], i = __cnumAt(l, i)
+    if v[k] == nil then return nil end
+    if hsl and k == 1 then
+      local u3, u4 = string.sub(l, i, i + 2), string.sub(l, i, i + 3)
+      if u3 == "deg" then unit = 1; i = i + 3
+      elseif u4 == "grad" then unit = 0.9; i = i + 4
+      elseif u3 == "rad" then unit = 180 / math.pi; i = i + 3
+      elseif u4 == "turn" then unit = 360; i = i + 4 end
+    elseif string.sub(l, i, i) == "%" then p[k] = true; i = i + 1
+    elseif hsl and legacy then return nil end
+    if k < 3 then
+      local j = __cskip(l, i)
+      if k == 1 then legacy = string.sub(l, j, j) == "," end
+      if legacy then
+        if string.sub(l, j, j) ~= "," then return nil end
+        i = __cskip(l, j + 1)
+      elseif j == i then return nil
+      else i = j end
+    end
+  end
+  i = __cskip(l, i)
+  local a, ap = nil, false
+  if string.sub(l, i, i) == (legacy and "," or "/") then
+    a, i = __cnumAt(l, __cskip(l, i + 1))
+    if a == nil then return nil end
+    if string.sub(l, i, i) == "%" then ap = true; i = i + 1 end
+    i = __cskip(l, i)
+  end
+  if i ~= #l or string.sub(l, i, i) ~= ")" then return nil end
+  if a == nil then a = 1 else a = __cclamp(a / (ap and 100 or 1), 0, 1) end
+  if not hsl then
+    local function channel(k) return __cclamp(__cround(v[k] * (p[k] and 2.55 or 1)), 0, 255) end
+    return channel(1), channel(2), channel(3), a
+  end
+  -- A hue too large to be a number has no angle, and is not a colour.
+  local turned = v[1] * unit
+  if turned ~= turned or turned == math.huge or turned == -math.huge then return nil end
+  local h = math.fmod(math.fmod(turned, 360) + 360, 360)
+  local sat = __cclamp(v[2], 0, 100) / 100
+  local light = __cclamp(v[3], 0, 100) / 100
+  local amp = sat * math.min(light, 1 - light)
+  local function f(n)
+    local k = math.fmod(n + h / 30, 12)
+    return __cround(255 * (light - amp * math.max(-1, math.min(k - 3, 9 - k, 1))))
+  end
+  return f(0), f(8), f(4), a
+end
+-- A CSS colour as r, g, b (0-255) and a (0-1), or nil. A name in any case: JavaScript's
+-- toLowerCase turns the Kelvin sign into "k", and Lua's string.lower turns only ASCII.
+local function __ccss(text)
+  local s = __ctrim(text)
+  local lower = string.lower((string.gsub(s, "\226\132\170", "k")))
+  if lower == "transparent" then return 0, 0, 0, 0 end
+  local named = __CE_CSS_COLOURS[lower]
+  if named ~= nil then
+    return tonumber(string.sub(named, 1, 2), 16), tonumber(string.sub(named, 3, 4), 16), tonumber(string.sub(named, 5, 6), 16), 1
+  end
+  local d = string.match(s, "^#(%x+)$")
+  if d ~= nil and (#d == 3 or #d == 4 or #d == 6 or #d == 8) then
+    if #d <= 4 then d = string.gsub(d, ".", "%0%0") end
+    local function byte(i) return tonumber(string.sub(d, i, i + 1), 16) end
+    local a = 1
+    if #d == 8 then a = byte(7) / 255 end
+    return byte(1), byte(3), byte(5), a
+  end
+  return __cfunction(s)
+end
+-- The same colour in the panel's form: #RRGGBB when solid, AARRGGBB when it is not.
+local function __cpanelForm(r, g, b, a)
+  local rgb = string.format("%02X%02X%02X", r, g, b)
+  if a >= 1 then return "#" .. rgb end
+  return string.format("%02X", __cround(a * 255)) .. rgb
+end
+-- Does the panel read this text as a colour? 6 or 8 hex digits, with or without one "#".
+local function __cpanelHex(s)
+  local h = string.match(s, "^#?(%x+)$")
+  return h ~= nil and (#h == 6 or #h == 8)
+end
+-- CSS's short forms written out, as a property stores them, or nil: not text with space around it,
+-- "#" only with three digits ("#" with four is RGBA to CSS and ARGB here), and nothing CSS cannot read.
+local function __clong(value)
+  if type(value) ~= "string" or __ctrim(value) ~= value then return nil end
+  if string.sub(value, 1, 1) == "#" and string.match(value, "^#%x%x%x$") == nil then return nil end
+  local r, g, b, a = __ccss(value)
+  if r == nil then return nil end
+  return __cpanelForm(r, g, b, a)
+end
+-- For a refusal: what CSS text with space around it is in the panel's form, or "". Text that is the
+-- panel's own form once the space is gone is that text, read as the panel reads it.
+local function __ccssHint(value)
+  if type(value) ~= "string" or __cpanelHex(value) then return "" end
+  local trimmed = __ctrim(value)
+  if trimmed ~= value and __cpanelHex(trimmed) then return ' Write "' .. trimmed .. '".' end
+  local r, g, b, a = __ccss(value)
+  if r == nil then return "" end
+  return ' Write "' .. __cpanelForm(r, g, b, a) .. '".'
+end
+local function __cchan(verb, hex)
+  local stored
+  if type(hex) == "string" then
+    if __cpanelHex(hex) then stored = hex else stored = __clong(hex) end
+  end
+  if stored ~= nil then
+    local h = string.sub(stored, -6)
+    return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
+  end
+  local why
+  if hex == nil then why = "no colour was given"
+  elseif type(hex) == "string" then why = '"' .. hex .. '" is not a colour'
+  elseif type(hex) == "number" and __realNumber(hex) ~= nil then why = __cshown(hex) .. " is not a colour"
+  else why = "the colour given is not text" end
+  local hint = __chint(hex)
+  if hint == "" then hint = __ccssHint(hex) end
+  logError(verb .. ": " .. why .. ", so there is no answer. " .. __CFORMS .. "." .. hint)
+  return nil
 end
 local function __cbyte(v)
   local n = math.floor((tonumber(v) or 0) + 0.5)
@@ -642,44 +967,77 @@ function rgbToHex(r, g, b)
   return string.upper(string.format("#%02x%02x%02x", __cbyte(r), __cbyte(g), __cbyte(b)))
 end
 function hexToRgb(hex)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.rgb", hex)
   if r == nil then return nil end
   return { r = r, g = g, b = b }
 end
 function lighten(hex, amount)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.lighten", hex)
   if r == nil then return nil end
-  local f = tonumber(amount)
-  if f == nil then f = 0.4 end
+  local f = __cunit("ce.math.lighten", "the amount", amount, 0.4)
+  if f == nil then return nil end
   return rgbToHex(r + (255 - r) * f, g + (255 - g) * f, b + (255 - b) * f)
 end
 function darken(hex, amount)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.darken", hex)
   if r == nil then return nil end
-  local f = tonumber(amount)
-  if f == nil then f = 0.55 end
+  local f = __cunit("ce.math.darken", "the amount", amount, 0.55)
+  if f == nil then return nil end
   return rgbToHex(r * f, g * f, b * f)
 end
 -- NOT an app algorithm, and said so: lerp() per channel in plain RGB.
 function mixColour(a, b, t)
-  local r1, g1, b1 = __cchan(a)
-  local r2, g2, b2 = __cchan(b)
-  if r1 == nil or r2 == nil then return nil end
+  local r1, g1, b1 = __cchan("ce.math.mix", a)
+  if r1 == nil then return nil end
+  local r2, g2, b2 = __cchan("ce.math.mix", b)
+  if r2 == nil then return nil end
   local f = tonumber(t) or 0
   if f < 0 then f = 0 elseif f > 1 then f = 1 end
   return rgbToHex(r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f)
 end
 -- The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
 function colourAlpha(hex, a)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.alpha", hex)
   if r == nil then return nil end
-  local f = tonumber(a)
-  if f == nil then f = 1 end
-  if f < 0 then f = 0 elseif f > 1 then f = 1 end
+  local f = __cunit("ce.math.alpha", "the alpha", a)
+  if f == nil then return nil end
   return string.upper(string.format("%02x", math.floor(f * 255 + 0.5)) .. string.sub(rgbToHex(r, g, b), 2))
 end
+-- A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+-- reads one way: "#RRGGBB" when solid, AARRGGBB when not. scriptColours.orderedColour's reading,
+-- in the WebView runtime's colourFromOrder words.
+local __CORDER = {
+  argb = 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+  rgba = 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.',
+}
+local function __corder(verb, order, value)
+  if type(value) == "string" then
+    local d = string.match(value, "^#?(%x+)$")
+    if d ~= nil and (#d == 3 or #d == 4 or #d == 6 or #d == 8) then
+      if #d <= 4 then d = (string.gsub(d, "(%x)", "%1%1")) end
+      d = string.upper(d)
+      local aa, rgb = "FF", d
+      if #d == 8 then
+        if order == "argb" then aa, rgb = string.sub(d, 1, 2), string.sub(d, 3)
+        else aa, rgb = string.sub(d, 7, 8), string.sub(d, 1, 6) end
+      end
+      if aa == "FF" then return "#" .. rgb end
+      return aa .. rgb
+    end
+  end
+  local why
+  if value == nil then why = "no colour was given"
+  elseif type(value) == "string" then
+    why = '"' .. value .. '" is not a colour written ' .. (order == "argb" and "AARRGGBB" or "RRGGBBAA")
+  elseif type(value) == "number" and __realNumber(value) ~= nil then why = __cshown(value) .. " is a number, not text"
+  else why = "the colour given is not text" end
+  logError(verb .. ": " .. why .. ", so there is no answer. " .. __CORDER[order])
+  return nil
+end
+function colourFromArgb(colour) return __corder("ce.math.fromARGB", "argb", colour) end
+function colourFromRgba(colour) return __corder("ce.math.fromRGBA", "rgba", colour) end
 function hexToHsl(hex)
-  local r, g, b = __cchan(hex)
+  local r, g, b = __cchan("ce.math.hsl", hex)
   if r == nil then return nil end
   r = r / 255; g = g / 255; b = b / 255
   local mx = math.max(r, g, b)
@@ -817,6 +1175,8 @@ __CE_MINOR_QUALITIES["m7b5"] = true
 __CE_MINOR_QUALITIES["min"] = true
 __CE_MINOR_QUALITIES["min7"] = true
 __CE_MINOR_QUALITIES["minMaj7"] = true
+__CE_SCALE_NAMES = {"major","minor","harmonicMinor","melodicMinor","dorian","phrygian","lydian","mixolydian","locrian","pentatonicMaj","pentatonicMin","blues"}
+__CE_CHORD_NAMES = {"major","minor","dim","aug","sus2","sus4","power","maj6","min6","dom7","maj7","min7","minMaj7","dim7","m7b5","aug7","add9","dom9","maj9","min9"}
 -- @module ce.time
 __CE_DIVISIONS = {}
 __CE_DIVISIONS["1/1"] = 4
@@ -870,31 +1230,70 @@ __CE_EASINGS["inOutBack"] = {0.68,-0.55,0.265,1.55}
 -- Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 -- or a name ("C4"), the way sendNote does. An unknown scale or chord name returns nil rather than
 -- guessing "major" — a script that asked for something this build does not know should find out.
--- noteNumber is nil for a name it cannot read; __pitch feeds scaleNotes and friends, where a nil
--- root would turn one bad string into an unexplained nil list. noteNumber itself stays honest.
-local function __pitch(v) if type(v) == "string" then return noteNumber(v) or 0 end return math.floor(tonumber(v) or 0) end
+-- It found out only by getting nil, and an unreadable note NAME was worse: __pitch made it 0, so
+-- scaleNotes("c4") answered with the scale on C-1. Both now answer nil and say why, through
+-- __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
+-- helper checks its scale or chord first, then its notes in argument order, and stops at the first.
+-- A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
+-- unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
+local function __pitch(v)
+  if type(v) == "string" then return noteNumber(v) end
+  if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then return math.floor(v) end
+  return nil
+end
 local function __steps(tbl, name, fallback)
   local s = tbl[name == nil and fallback or tostring(name)]
   return s
 end
+local function __pitchOf(verb, v)
+  -- A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
+  if v == nil then
+    logError(verb .. ': no note was given, so there is no answer. A note is a MIDI number or a name, such as 60 or "C4".')
+    return nil
+  end
+  local n = __pitch(v)
+  if n == nil then
+    if type(v) == "string" then
+      logError(verb .. ': "' .. v .. '" is not a note name, so there is no answer. A name is '
+        .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+    else
+      logError(verb .. ': ' .. __shownValue(v) .. ' is not a note, so there is no answer. A note is a MIDI '
+        .. 'number or a name, such as 60 or "C4".')
+    end
+  end
+  return n
+end
+local function __setOf(verb, kind, name)
+  local s = __steps(kind == "chord" and __CE_CHORDS or __CE_SCALES, name, "major")
+  if s == nil then
+    logError(verb .. ': "' .. tostring(name) .. '" is not a ' .. kind .. ', so there is no answer. The '
+      .. kind .. 's are ' .. table.concat(kind == "chord" and __CE_CHORD_NAMES or __CE_SCALE_NAMES, ", ") .. '.')
+  end
+  return s
+end
 function scaleNotes(root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.scale", "scale", scale)
   if s == nil then return nil end
-  local base, out = __pitch(root), {}
+  local base, out = __pitchOf("ce.music.scale", root), {}
+  if base == nil then return nil end
   for i = 1, #s do out[i] = base + s[i] end
   return out
 end
 function chordNotes(root, chordType)
-  local s = __steps(__CE_CHORDS, chordType, "major")
+  local s = __setOf("ce.music.chord", "chord", chordType)
   if s == nil then return nil end
-  local base, out = __pitch(root), {}
+  local base, out = __pitchOf("ce.music.chord", root), {}
+  if base == nil then return nil end
   for i = 1, #s do out[i] = base + s[i] end
   return out
 end
 function quantizeNote(note, root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.quantize", "scale", scale)
   if s == nil then return nil end
-  local n, base = __pitch(note), __pitch(root)
+  local n = __pitchOf("ce.music.quantize", note)
+  if n == nil then return nil end
+  local base = __pitchOf("ce.music.quantize", root)
+  if base == nil then return nil end
   local inKey = {}
   for i = 1, #s do inKey[(base + s[i]) % 12] = true end
   -- Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested before
@@ -927,16 +1326,22 @@ local function __sortedNotes(list)
 end
 function noteSpelling(root, scale)
   local nm = (scale == nil) and "major" or tostring(scale)
-  if __CE_SCALES[nm] == nil then return nil end
-  local pc = __m12(__pitch(root))
+  if __setOf("ce.music.spelling", "scale", scale) == nil then return nil end
+  local pitch = __pitchOf("ce.music.spelling", root)
+  if pitch == nil then return nil end
+  local pc = __m12(pitch)
   -- Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
   if __CE_MINOR_SCALES[nm] then pc = __m12(pc + 3) end
   return __CE_FLAT_KEYS[pc] == true
 end
 function inScale(note, root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.inScale", "scale", scale)
   if s == nil then return nil end
-  local base, pc = __m12(__pitch(root)), __m12(__pitch(note))
+  local n = __pitchOf("ce.music.inScale", note)
+  if n == nil then return nil end
+  local r = __pitchOf("ce.music.inScale", root)
+  if r == nil then return nil end
+  local base, pc = __m12(r), __m12(n)
   for i = 1, #s do if __m12(base + s[i]) == pc then return true end end
   return false
 end
@@ -944,9 +1349,13 @@ end
 -- than the nearest one — rounding here turns a wrong note into a plausible chord, and quantizeNote
 -- is the verb that rounds on purpose.
 function scaleDegree(note, root, scale)
-  local s = __steps(__CE_SCALES, scale, "major")
+  local s = __setOf("ce.music.degree", "scale", scale)
   if s == nil then return nil end
-  local base, pc = __m12(__pitch(root)), __m12(__pitch(note))
+  local n = __pitchOf("ce.music.degree", note)
+  if n == nil then return nil end
+  local r = __pitchOf("ce.music.degree", root)
+  if r == nil then return nil end
+  local base, pc = __m12(r), __m12(n)
   for i = 1, #s do if __m12(base + s[i]) == pc then return i end end
   return nil
 end
@@ -998,8 +1407,9 @@ end
 -- scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size)
   local nm = (scale == nil) and "major" or tostring(scale)
-  local s = __CE_SCALES[nm]
+  local s = __setOf("ce.music.degreeChord", "scale", scale)
   if s == nil or #s == 0 then return nil end
+  if __pitchOf("ce.music.degreeChord", root) == nil then return nil end
   local n = #s
   local d = __count(degree, 1) - 1
   local sz = math.max(2, __count(size, 3))
@@ -1186,11 +1596,77 @@ function __ce_crc_ref(bytes, poly, init, xorOut, bits)
   end
   return (crc ~ xorOut) & mask
 end
+-- One hex byte: one or two hex digits, with or without 0x. nil when the text is not one byte.
+local function __hexByte(token)
+  local digits = (token:gsub("^0[xX]", ""))
+  if #digits < 1 or #digits > 2 or digits:find("[^%x]") then return nil end
+  return tonumber(digits, 16)
+end
+-- A script's bytes, read the way every runtime reads them (the WebView runtime's scriptBytes,
+-- BridgeScriptHost's bytesFromScript). Hex text is split on spaces, tabs, line breaks, form and
+-- vertical tab (Lua's %s) and commas, and each token is one byte. A list's items are bytes: a whole
+-- number from 0 to 255, or text that is one hex byte. Anything else is refused, naming what and
+-- where, and nil comes back; nothing given is an empty list, for the caller to judge.
+local function __scriptBytes(verb, input, outcome)
+  if input == nil then return {} end
+  if type(input) == "string" then
+    local out = {}
+    for token in string.gmatch(input, "[^%s,]+") do
+      local b = __hexByte(token)
+      if b == nil then
+        local message = verb .. ': "' .. token .. '" is not one byte, so ' .. outcome .. '. '
+        if not token:find("[^%x]") and #token % 2 == 0 then
+          local pairs_ = {}
+          for i = 1, #token, 2 do pairs_[#pairs_ + 1] = token:sub(i, i + 1) end
+          message = message .. 'Put a space between the bytes: "' .. table.concat(pairs_, " ") .. '".'
+        else
+          message = message .. 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'
+        end
+        logError(message)
+        return nil
+      end
+      out[#out + 1] = b
+    end
+    return out
+  end
+  if type(input) ~= "table" then
+    logError(verb .. ": " .. __shownValue(input) .. " is not a list of bytes, so " .. outcome .. ".")
+    return nil
+  end
+  local out = {}
+  for i = 1, #input do
+    local v, b = input[i], nil
+    if type(v) == "number" and v >= 0 and v <= 255 and v == math.floor(v) then b = math.floor(v)
+    elseif type(v) == "string" then b = __hexByte(v) end
+    if b == nil then
+      logError(verb .. ": " .. __shownValue(v) .. " at position " .. (i - 1) .. " is not a byte, so " .. outcome
+        .. '. A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".')
+      return nil
+    end
+    out[i] = b
+  end
+  return out
+end
 function checksum(kind, bytes, opts)
-  if bytes == nil then bytes = kind; kind = "roland" end
-  local id = __CE_CKSUM_ALIAS[string.lower(tostring(kind or ""))]
+  local verb = "ce.midi.checksum"
+  if bytes == nil then
+    -- checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
+    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] ~= nil) then
+      logError(verb .. ": no bytes given, so there is no checksum.")
+      return nil
+    end
+    bytes = kind; kind = "roland"
+  end
+  bytes = __scriptBytes(verb, bytes, "there is no checksum")
+  if bytes == nil then return nil end
+  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] or nil
   if id == nil then
-    logError('ce.midi.checksum("' .. tostring(kind) .. '"): no such algorithm.')
+    -- The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
+    local names = {}
+    for name in pairs(__CE_CKSUM_ALIAS) do names[#names + 1] = name end
+    table.sort(names)
+    local which = kind == nil and ": no algorithm given" or ("(" .. __shownValue(kind) .. "): no such algorithm")
+    logError("ce.midi.checksum" .. which .. ". One of: " .. table.concat(names, ", ") .. ".")
     return nil
   end
   local sum7, sum8, x = 0, 0, 0
@@ -1217,6 +1693,273 @@ function checksum(kind, bytes, opts)
   return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32)
 end
 
+-- Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+-- (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
+-- and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
+-- count from 0 here too, as dump layouts do, though Lua's own lists start at 1. A list may be hex
+-- text, and a list's items are bytes (0 to 255, or one hex byte), both read by __scriptBytes; a
+-- mistake answers nil and says why; every list returned is new.
+local __BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32"
+local __WRITE_START = "Writing can run past the end, but not start beyond it."
+local __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local function __whole(n) return type(n) == "number" and n == math.floor(n) and n > -math.huge and n < math.huge end
+local function __plural(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
+local function __span(word, a, b)
+  if a == b then return word .. " " .. a .. " is past" end
+  return word .. "s " .. a .. " to " .. b .. " run past"
+end
+local function __refuse(verb, why, tail)
+  logError(verb .. ": " .. why .. ", so there is no answer." .. (tail and (" " .. tail) or ""))
+  return nil
+end
+local function __bytesIn(verb, input)
+  if input == nil then return __refuse(verb, "no bytes given") end
+  return __scriptBytes(verb, input, "there is no answer")
+end
+-- Why a value to write cannot be written in `bits` bits, or nil when it can.
+local function __doesNotFit(v, bits)
+  if v == nil then return "the value to write is missing" end
+  if not __whole(v) then return __shownValue(v) .. " is not a whole number" end
+  if v < 0 or v >= 2 ^ bits then return __shown(v) .. " does not fit in " .. __plural(bits, "bit") end
+  return nil
+end
+local function __shape(verb, opts)
+  local bits, order = 7, "msb"
+  if type(opts) == "table" then
+    if opts.bits ~= nil then bits = opts.bits end
+    if opts.order ~= nil then order = opts.order end
+  end
+  if bits ~= 7 and bits ~= 8 then return __refuse(verb, "bits must be 7 or 8") end
+  if order ~= "msb" and order ~= "lsb" then return __refuse(verb, 'order must be "msb" or "lsb"') end
+  return { bits = math.floor(bits), order = order }
+end
+function getBits(value, start, count)
+  local verb = "ce.midi.getBits"
+  if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32 then return __refuse(verb, __BIT_RANGE) end
+  start = math.floor(start); count = math.floor(count)
+  if type(value) == "number" then
+    if value ~= value or value == math.huge or value == -math.huge then return __refuse(verb, __shownValue(value) .. " is not a finite number") end
+    if start + count > 32 then
+      return __refuse(verb, __span("bit", start, start + count - 1) .. " the 32 bits a number holds here")
+    end
+    return (math.floor(value) >> start) & ((1 << count) - 1)
+  end
+  local bytes = __bytesIn(verb, value)
+  if bytes == nil then return nil end
+  if start + count > #bytes * 8 then
+    return __refuse(verb, __span("bit", start, start + count - 1) .. " the end of " .. __plural(#bytes, "byte"))
+  end
+  local out = 0
+  for k = 0, count - 1 do
+    local at = start + k
+    out = out | (((bytes[at // 8 + 1] >> (at % 8)) & 1) << k)
+  end
+  return out
+end
+function setBits(value, start, count, bits)
+  local verb = "ce.midi.setBits"
+  if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32 then return __refuse(verb, __BIT_RANGE) end
+  start = math.floor(start); count = math.floor(count)
+  local unfit = __doesNotFit(bits, count)
+  if unfit then return __refuse(verb, unfit) end
+  bits = math.floor(bits)
+  if type(value) == "number" then
+    if value ~= value or value == math.huge or value == -math.huge then return __refuse(verb, __shownValue(value) .. " is not a finite number") end
+    if start + count > 32 then
+      return __refuse(verb, __span("bit", start, start + count - 1) .. " the 32 bits a number holds here")
+    end
+    return (math.floor(value) & ~(((1 << count) - 1) << start)) | (bits << start)
+  end
+  local bytes = __bytesIn(verb, value)
+  if bytes == nil then return nil end
+  if start + count > #bytes * 8 then
+    return __refuse(verb, __span("bit", start, start + count - 1) .. " the end of " .. __plural(#bytes, "byte"))
+  end
+  for k = 0, count - 1 do
+    local at = start + k
+    local i, bit = at // 8 + 1, 1 << (at % 8)
+    if (bits >> k) & 1 == 1 then bytes[i] = bytes[i] | bit else bytes[i] = bytes[i] & ~bit end
+  end
+  return bytes
+end
+function bytesRead(bytes, offset, count, opts)
+  local verb = "ce.midi.read"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  if not __whole(count) or count < 1 or count > 4 then return __refuse(verb, "count must be a whole number from 1 to 4") end
+  offset = math.floor(offset); count = math.floor(count)
+  local shape = __shape(verb, opts)
+  if shape == nil then return nil end
+  if offset + count > #list then
+    return __refuse(verb, __span("byte", offset, offset + count - 1) .. " the end of " .. __plural(#list, "byte"))
+  end
+  local v, base = 0, 1 << shape.bits
+  for k = 0, count - 1 do
+    local i = (shape.order == "msb") and (offset + k + 1) or (offset + count - k)
+    v = v * base + (list[i] % base)
+  end
+  return v
+end
+function bytesWrite(bytes, offset, count, value, opts)
+  local verb = "ce.midi.write"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  if not __whole(count) or count < 1 or count > 4 then return __refuse(verb, "count must be a whole number from 1 to 4") end
+  offset = math.floor(offset); count = math.floor(count)
+  local shape = __shape(verb, opts)
+  if shape == nil then return nil end
+  local unfit = __doesNotFit(value, shape.bits * count)
+  if unfit then return __refuse(verb, unfit) end
+  if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte"), __WRITE_START) end
+  local v, base, digits = math.floor(value), 1 << shape.bits, {}
+  for k = 1, count do digits[k] = v % base; v = v // base end
+  for k = 1, count do list[offset + k] = (shape.order == "msb") and digits[count - k + 1] or digits[k] end
+  return list
+end
+function bytesSlice(bytes, offset, count)
+  local verb = "ce.midi.slice"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  offset = math.floor(offset)
+  local last
+  if count == nil then
+    if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte")) end
+    last = #list
+  else
+    if not __whole(count) or count < 0 then return __refuse(verb, "count must be a whole number from 0") end
+    count = math.floor(count)
+    if offset + count > #list then
+      if count == 0 then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte")) end
+      return __refuse(verb, __span("byte", offset, offset + count - 1) .. " the end of " .. __plural(#list, "byte"))
+    end
+    last = offset + count
+  end
+  local out = {}
+  for i = offset + 1, last do out[#out + 1] = list[i] end
+  return out
+end
+function bytesPut(bytes, offset, values)
+  local verb = "ce.midi.put"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  if not __whole(offset) or offset < 0 then return __refuse(verb, "offset must be a whole number from 0") end
+  offset = math.floor(offset)
+  local part = __bytesIn(verb, values)
+  if part == nil then return nil end
+  if offset > #list then return __refuse(verb, "offset " .. offset .. " is past the end of " .. __plural(#list, "byte"), __WRITE_START) end
+  for k = 1, #part do list[offset + k] = part[k] end
+  return list
+end
+function bytesFind(bytes, pattern, from)
+  local verb = "ce.midi.find"
+  local list = __bytesIn(verb, bytes)
+  if list == nil then return nil end
+  local wanted = __bytesIn(verb, pattern)
+  if wanted == nil then return nil end
+  if #wanted == 0 then return __refuse(verb, "the pattern is empty") end
+  local first = (from == nil) and 0 or from
+  if not __whole(first) or first < 0 then return __refuse(verb, "from must be a whole number from 0") end
+  -- Not found is an answer, not a mistake: nil comes back and nothing is said.
+  for i = math.floor(first), #list - #wanted do
+    local j = 1
+    while j <= #wanted and list[i + j] == wanted[j] do j = j + 1 end
+    if j > #wanted then return i end
+  end
+  return nil
+end
+function bytesToHex(bytes)
+  local list = __bytesIn("ce.midi.toHex", bytes)
+  if list == nil then return nil end
+  local parts = {}
+  for i = 1, #list do parts[i] = string.format("%02X", list[i]) end
+  return table.concat(parts, " ")
+end
+function bytesFromHex(text)
+  local verb = "ce.midi.fromHex"
+  if text == nil then return __refuse(verb, "no hex text given") end
+  if type(text) ~= "string" then return __refuse(verb, __shownValue(text) .. " is not hex text") end
+  return __bytesIn(verb, text)
+end
+function bytesToBase64(bytes)
+  local list = __bytesIn("ce.midi.toBase64", bytes)
+  if list == nil then return nil end
+  local out = {}
+  for i = 1, #list, 3 do
+    local a, b, c = list[i], list[i + 1], list[i + 2]
+    local n = a * 65536 + (b or 0) * 256 + (c or 0)
+    local function ch(k) return __B64:sub(k + 1, k + 1) end
+    out[#out + 1] = ch((n >> 18) & 63) .. ch((n >> 12) & 63)
+      .. (b == nil and "=" or ch((n >> 6) & 63)) .. (c == nil and "=" or ch(n & 63))
+  end
+  return table.concat(out)
+end
+function bytesFromBase64(text)
+  local verb = "ce.midi.fromBase64"
+  if text == nil then return __refuse(verb, "no base64 text given") end
+  local clean = (type(text) == "string") and (text:gsub("[ \t\r\n]", "")) or nil
+  if clean == nil or #clean % 4 ~= 0 or not clean:match("^[A-Za-z0-9+/]*=?=?$") then
+    return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.")
+  end
+  local out = {}
+  for i = 1, #clean, 4 do
+    local group, n, pad = clean:sub(i, i + 3), 0, 0
+    for j = 1, 4 do
+      local c = group:sub(j, j)
+      if c == "=" then pad = pad + 1; n = n * 64 else n = n * 64 + (__B64:find(c, 1, true) - 1) end
+    end
+    out[#out + 1] = (n >> 16) & 255
+    if pad < 2 then out[#out + 1] = (n >> 8) & 255 end
+    if pad < 1 then out[#out + 1] = n & 255 end
+  end
+  return out
+end
+
+-- The numbers a channel message carries, checked before anything is sent: the WebView runtime's
+-- MIDI_ARGS and midiArg, word for word. An address (channel, controller, program, bank, parameter
+-- number) outside its range is refused, since clamping it picks a different message; a value past
+-- the end of its range is clamped, as before; anything that is not a number, or is missing where
+-- there is no default, is refused. A fraction rounds half up (this floored it, the editor rounded).
+local __MIDI_ARGS = {
+  channel = { "channel", "a channel", 1, 16, true, "A channel is a whole number from 1 to 16." },
+  controller = { "controller number", "a controller number", 0, 127, true, "A controller number is a whole number from 0 to 127." },
+  program = { "program", "a program", 0, 127, true, "A program is a whole number from 0 to 127." },
+  bank = { "bank number", "a bank number", 0, 127, true, "A bank number is a whole number from 0 to 127." },
+  msb = { "MSB", "an MSB", 0, 127, true, "An MSB is a whole number from 0 to 127." },
+  lsb = { "LSB", "an LSB", 0, 127, true, "An LSB is a whole number from 0 to 127." },
+  value = { "value", "a value", 0, 127, false, "A value is a number from 0 to 127." },
+  velocity = { "velocity", "a velocity", 0, 127, false, "A velocity is a number from 0 to 127." },
+  pressure = { "pressure", "a pressure", 0, 127, false, "A pressure is a number from 0 to 127." },
+  value14 = { "value", "a value", 0, 16383, false, "A value is a number from 0 to 16383." },
+  bend = { "bend", "a bend", 0, 16383, false, "A bend is a number from 0 to 16383, and 8192 is the centre." },
+  position = { "song position", "a song position", 0, 16383, false, "A song position is a number of MIDI beats from 0 to 16383." },
+}
+local __edgeWarned = {}
+local function __midiArg(verb, kind, v)
+  local a = __MIDI_ARGS[kind]
+  if v == nil then
+    logError(verb .. ": no " .. a[1] .. " given, so nothing was sent.")
+    return nil
+  end
+  local r = __realNumber(v)   -- text that is a number ("64") is read as one, as it always was
+  local n = r ~= nil and math.floor(r + 0.5) or nil
+  if n == nil or (a[5] and (n < a[3] or n > a[4])) then
+    logError(verb .. ": " .. __shownValue(v) .. " is not " .. a[2] .. ", so nothing was sent. " .. a[6])
+    return nil
+  end
+  if n >= a[3] and n <= a[4] then return n end
+  -- A value past the end of its range is sent as the nearest end, and said once per command.
+  local sent = n < a[3] and a[3] or a[4]
+  if not __edgeWarned[verb] then
+    __edgeWarned[verb] = true
+    logWarn(verb .. ": the " .. a[1] .. " " .. __shownValue(v) .. " is outside " .. a[3] .. " to " .. a[4]
+      .. ", so " .. sent .. " was sent. This is said only the first time.")
+  end
+  return sent
+end
+
 -- panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 -- order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
 -- out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
@@ -1224,7 +1967,12 @@ function panic(opts)
   opts = opts or {}
   local reset = opts.resetControllers ~= false
   local first, last = 1, 16
-  if opts.channel then first = math.floor(opts.channel); last = first end
+  -- A channel that is not one ("all", 17) is refused; leaving it out is how every channel is named.
+  if opts.channel ~= nil then
+    first = __midiArg("panic", "channel", opts.channel)
+    if first == nil then return end
+    last = first
+  end
   for ch = first, last do
     sendCC(ch, 120, 0)
     sendCC(ch, 123, 0)
@@ -1424,56 +2172,144 @@ end
 -- which is what makes them work identically in every runtime and every exported language.
 -- `note` accepts a MIDI number or a name ("C3"), because a script that reads musically should be
 -- allowed to say so.
-local function __ch(c) c = math.floor(tonumber(c) or 1); if c < 1 then c = 1 elseif c > 16 then c = 16 end return c - 1 end
-local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 elseif v > 127 then v = 127 end return v end
--- noteNumber is nil for an unreadable name; a MIDI message still needs a BYTE, so it becomes 0
--- here rather than a nil slipping into a message.
-local function __note(n) if type(n) == "string" then return noteNumber(n) or 0 end return __7(n) end
+-- A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
+-- range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a
+-- name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
+-- table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
+local function __note(n)
+  local v = nil
+  if type(n) == "string" then v = noteNumber(n)
+  elseif type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge then v = math.floor(n + 0.5) end
+  if v ~= nil and v >= 0 and v <= 127 then return v end
+  return nil
+end
+local function __badNote(verb, note)
+  local range = "MIDI notes run from 0 to 127, which is C-1 to G9."
+  local why
+  if note == nil then
+    why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
+  elseif type(note) == "string" then
+    if noteNumber(note) == nil then
+      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+        .. 'has one, then the octave: "C4", "Eb3", "F#-1".'
+    else
+      why = '"' .. note .. '" is outside the MIDI notes, so nothing was sent. ' .. range
+    end
+  elseif type(note) == "number" and note == note and note ~= math.huge and note ~= -math.huge then
+    why = __shown(note) .. " is outside the MIDI notes, so nothing was sent. " .. range
+  else
+    why = __shownValue(note) .. ' is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
+  end
+  logError(verb .. ": " .. why)
+end
+-- sendNote's `ms`: left out (false here), the script sends the note off itself; given, it must be
+-- a length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+local function __noteLength(verb, ms)
+  if ms == nil then return false end
+  local length = __realNumber(ms)   -- "500" is what sendNote has always read
+  if length ~= nil and length > 0 then return length end
+  logError(verb .. ": " .. __shownValue(ms) .. " is not a length in milliseconds, so nothing was sent. "
+    .. "Give a number above 0, or leave it out to send the note off yourself.")
+  return nil
+end
+-- sendCC and sendNRPN are host bindings; what a script passes is checked here first, as the editor
+-- checks it, and only numbers that are a message reach the host.
+local __hostSendCC, __hostSendNRPN = sendCC, sendNRPN
+function sendCC(channel, cc, value)
+  local c = __midiArg("sendCC", "channel", channel); if c == nil then return end
+  local n = __midiArg("sendCC", "controller", cc); if n == nil then return end
+  local v = __midiArg("sendCC", "value", value); if v == nil then return end
+  __hostSendCC(c, n, v)
+end
+function sendNRPN(channel, msb, lsb, value)
+  local c = __midiArg("sendNRPN", "channel", channel); if c == nil then return end
+  local m = __midiArg("sendNRPN", "msb", msb); if m == nil then return end
+  local l = __midiArg("sendNRPN", "lsb", lsb); if l == nil then return end
+  local v = __midiArg("sendNRPN", "value14", value); if v == nil then return end
+  __hostSendNRPN(c, m, l, v)
+end
 
 -- A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
 -- timer for it, and getting that wrong means a hung voice — the one MIDI mistake you hear rather
 -- than read. A panel cannot play a note at all.
 function sendNote(channel, note, velocity, ms)
+  local c = __midiArg("sendNote", "channel", channel); if c == nil then return end
   local n = __note(note)
-  sendMidi({0x90 | __ch(channel), n, __7(velocity)})
-  if ms ~= nil and ms > 0 then
-    after(ms, function() sendMidi({0x80 | __ch(channel), n, 0}) end)
+  if n == nil then return __badNote("sendNote", note) end
+  local v = __midiArg("sendNote", "velocity", velocity); if v == nil then return end
+  local length = __noteLength("sendNote", ms); if length == nil then return end
+  sendMidi({0x90 | (c - 1), n, v})
+  if length then
+    __oneShot(length, function() sendMidi({0x80 | (c - 1), n, 0}) end)
   end
 end
 function sendRPN(channel, msb, lsb, value)
   -- RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
   -- fine tuning (0,1) and coarse tuning (0,2).
-  local s = 0xB0 | __ch(channel)
-  local v = math.floor(tonumber(value) or 0); if v < 0 then v = 0 elseif v > 16383 then v = 16383 end
-  sendMidi({s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F})
+  local c = __midiArg("sendRPN", "channel", channel); if c == nil then return end
+  local m = __midiArg("sendRPN", "msb", msb); if m == nil then return end
+  local l = __midiArg("sendRPN", "lsb", lsb); if l == nil then return end
+  local v = __midiArg("sendRPN", "value14", value); if v == nil then return end
+  local s = 0xB0 | (c - 1)
+  sendMidi({s, 0x65, m, s, 0x64, l, s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F})
 end
 -- Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
 function sendSongPosition(beats)
-  local b = math.floor(tonumber(beats) or 0); if b < 0 then b = 0 elseif b > 16383 then b = 16383 end
+  local b = __midiArg("sendSongPosition", "position", beats); if b == nil then return end
   sendMidi({0xF2, b & 0x7F, (b >> 7) & 0x7F})
 end
-function sendNoteOff(channel, note, velocity) sendMidi({0x80 | __ch(channel), __note(note), __7(velocity or 0)}) end
+function sendNoteOff(channel, note, velocity)
+  local c = __midiArg("sendNoteOff", "channel", channel); if c == nil then return end
+  local n = __note(note)
+  if n == nil then return __badNote("sendNoteOff", note) end
+  local v = __midiArg("sendNoteOff", "velocity", velocity == nil and 0 or velocity); if v == nil then return end
+  sendMidi({0x80 | (c - 1), n, v})
+end
 function sendProgramChange(channel, program, bankMsb, bankLsb)
+  local verb = "sendProgramChange"
+  local c = __midiArg(verb, "channel", channel); if c == nil then return end
+  local p = __midiArg(verb, "program", program); if p == nil then return end
+  local msb, lsb = false, false
+  if bankMsb ~= nil then msb = __midiArg(verb, "bank", bankMsb); if msb == nil then return end end
+  if bankLsb ~= nil then lsb = __midiArg(verb, "bank", bankLsb); if lsb == nil then return end end
   -- Bank select first: a device applies the bank that was in force when the program change lands.
-  if bankMsb ~= nil then sendCC(channel, 0, __7(bankMsb)) end
-  if bankLsb ~= nil then sendCC(channel, 32, __7(bankLsb)) end
-  sendMidi({0xC0 | __ch(channel), __7(program)})
+  if msb then sendCC(c, 0, msb) end
+  if lsb then sendCC(c, 32, lsb) end
+  sendMidi({0xC0 | (c - 1), p})
 end
 function sendPitchBend(channel, value)
-  local v = math.floor(tonumber(value) or 8192)
-  if v < 0 then v = 0 elseif v > 16383 then v = 16383 end
-  sendMidi({0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128})
+  local c = __midiArg("sendPitchBend", "channel", channel); if c == nil then return end
+  local v = __midiArg("sendPitchBend", "bend", value == nil and 8192 or value); if v == nil then return end
+  sendMidi({0xE0 | (c - 1), v % 128, (v // 128) % 128})
 end
 function sendAftertouch(channel, pressure, note)
-  if note ~= nil then sendMidi({0xA0 | __ch(channel), __note(note), __7(pressure)})
-  else sendMidi({0xD0 | __ch(channel), __7(pressure)}) end
+  local c = __midiArg("sendAftertouch", "channel", channel); if c == nil then return end
+  if note == nil then
+    local p = __midiArg("sendAftertouch", "pressure", pressure); if p == nil then return end
+    return sendMidi({0xD0 | (c - 1), p})
+  end
+  local n = __note(note)
+  if n == nil then return __badNote("sendAftertouch", note) end
+  local p = __midiArg("sendAftertouch", "pressure", pressure); if p == nil then return end
+  sendMidi({0xA0 | (c - 1), n, p})
 end
 function sendClock() sendMidi({0xF8}) end
+-- Any action but stop and continue used to send Start, so "pause" started the sequencer.
 function sendTransport(action)
-  action = string.lower(tostring(action or "start"))
-  if action == "stop" then sendMidi({0xFC})
-  elseif action == "continue" then sendMidi({0xFB})
-  else sendMidi({0xFA}) end
+  local actions = 'The actions are "start", "continue" and "stop".'
+  if action == nil then
+    logError("sendTransport: no action given, so nothing was sent. " .. actions)
+    return
+  end
+  local status = nil
+  if type(action) == "string" then
+    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action)]
+  end
+  if status == nil then
+    logError("sendTransport: " .. __shownValue(action) .. " is not a transport action, so nothing was sent. " .. actions)
+    return
+  end
+  sendMidi({status})
 end
 
 -- @module ce.time
@@ -1520,14 +2356,55 @@ end
 -- would call itself.
 local __hostStartTimer, __hostStopTimer = startTimer, stopTimer
 local __timerIds, __syncFollow = {}, {}
-function startTimer(id, ms)
-  local key = tostring(id == nil and "" or id)
-  if key == "" then return end
+-- An interval or a delay a script got wrong is refused, in the WebView runtime's words (timeRefused
+-- there). `tonumber(ms) or 0` made startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) a
+-- timer at the host's 5 ms floor, and after("1s", fn) ran at once. A repeating interval is a number
+-- above 0; a one-shot's delay a number from 0, where 0 is "as soon as the handler has returned".
+-- Text is refused, "250" included. Returns true when it refused.
+local function __timeRefused(call, value, unit, what, positive, outcome)
+  local why
+  if value == nil then why = "no " .. what .. " was given"
+  elseif type(value) == "string" then why = '"' .. value .. '" is not a number of ' .. unit
+  elseif type(value) ~= "number" then why = "the " .. what .. " is not a number of " .. unit
+  elseif value ~= value or value == math.huge or value == -math.huge then
+    why = "the " .. what .. " is not a finite number of " .. unit
+  elseif positive and value <= 0 then why = __shown(value) .. " is not more than 0 " .. unit
+  elseif not positive and value < 0 then why = __shown(value) .. " is less than 0 " .. unit end
+  if why == nil then return false end
+  logError(call .. ": " .. why .. ", so " .. outcome .. ".")
+  return true
+end
+-- A number of beats, or a division's name ("1/16" is a quarter of a beat), any case. nil when
+-- refused. The WebView runtime's beatsOf.
+local function __beatsOf(call, value, positive, outcome)
+  if type(value) == "string" then
+    local wanted = string.lower(value)
+    for i = 1, #__CE_DIVISION_NAMES do
+      local id = __CE_DIVISION_NAMES[i]
+      if string.lower(id) == wanted then return __CE_DIVISIONS[id] end
+    end
+    logError(call .. ': "' .. value .. '" is neither a number of beats nor a division, so ' .. outcome
+      .. ". The divisions are " .. table.concat(__CE_DIVISION_NAMES, ", ") .. ".")
+    return nil
+  end
+  if __timeRefused(call, value, "beats", "number of beats", positive, outcome) then return nil end
+  return value
+end
+-- Start or re-time a timer whose interval the caller checked or worked out itself.
+local function __armTimer(key, ms)
   -- An explicit millisecond interval REPLACES a musical one: this is a script asking for
   -- milliseconds, not beats.
   __syncFollow[key] = nil
   __timerIds[key] = true
   __hostStartTimer(key, math.floor((tonumber(ms) or 0) + 0.5))
+end
+function startTimer(id, ms)
+  local key = tostring(id == nil and "" or id)
+  if key == "" then return end
+  if __timeRefused('ce.time.startTimer("' .. key .. '")', ms, "milliseconds", "interval", true, "no timer was started") then
+    return
+  end
+  __armTimer(key, ms)
 end
 function stopTimer(id)
   local key = tostring(id == nil and "" or id)
@@ -1553,14 +2430,16 @@ end
 -- that is permanently at the wrong rate.
 function syncTimer(id, beats, opts)
   local key = tostring(id == nil and "" or id)
-  local ms = beatsToMs(beats)
+  local length = __beatsOf('ce.time.syncTimer("' .. key .. '")', beats, true, "no timer was started")
+  if length == nil then return end
+  local ms = beatsToMs(length)
   if ms == nil then
     log("syncTimer(\"" .. tostring(id) .. "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
     return
   end
-  startTimer(key, ms)                                     -- clears any previous follow…
+  __armTimer(key, ms)                                     -- clears any previous follow…
   if not (opts ~= nil and opts.follow == false) then
-    __syncFollow[key] = tonumber(beats) or 0              -- …and this puts it back on purpose
+    __syncFollow[key] = length                            -- …and this puts it back on purpose
   end
 end
 -- Re-time every following sync timer. Armed from the prelude's own onTransport listener below, so
@@ -1571,7 +2450,7 @@ local function __reArmSyncTimers()
   for key, beats in pairs(pending) do
     local ms = beatsToMs(beats)
     -- No tempo any more: leave it running at the last one rather than stopping the music.
-    if ms ~= nil then startTimer(key, ms) __syncFollow[key] = beats end
+    if ms ~= nil then __armTimer(key, ms) __syncFollow[key] = beats end
   end
 end
 local __lastSyncBpm = nil
@@ -1590,16 +2469,22 @@ end)
 -- removed and the timer stopped BEFORE fn runs, so a callback that throws cannot leave a one-shot
 -- repeating forever — which is precisely what the hand-rolled version does.
 local __after, __afterN = {}, 0
+-- The one-shot itself, unchecked: sendNote's duration works out its own delay. Global, because
+-- sendNote is written above this and a local declared here would not be visible to it.
+function __oneShot(ms, fn)
+  __afterN = __afterN + 1
+  local id = "__after:" .. tostring(__afterN)
+  __after[id] = fn
+  __armTimer(id, ms)
+  return id
+end
 function after(ms, fn)
   if type(fn) ~= "function" then
     log("after(ms, fn) needs a function to run — nothing was scheduled")
     return nil
   end
-  __afterN = __afterN + 1
-  local id = "__after:" .. tostring(__afterN)
-  __after[id] = fn
-  startTimer(id, ms)
-  return id
+  if __timeRefused("ce.time.after", ms, "milliseconds", "delay", false, "nothing was scheduled") then return nil end
+  return __oneShot(ms, fn)
 end
 -- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
 -- A one-shot is NOT a timer the panel declared, so it is swallowed here rather than surfacing as
@@ -1618,7 +2503,9 @@ end)
 -- had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 -- fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 function afterBeats(beats, fn)
-  local ms = beatsToMs(beats)
+  local length = __beatsOf("ce.time.afterBeats", beats, false, "nothing was scheduled")
+  if length == nil then return nil end
+  local ms = beatsToMs(length)
   if ms == nil then
     log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
     return nil
@@ -1645,7 +2532,22 @@ function nowMs() return __nowMs() end
 
 -- The panel's division vocabulary, in both directions. An unknown name returns nil rather than the
 -- component's 1/16 fallback: a component has to keep running, a script that mistyped should find out.
-function beatsPerDivision(name) return __CE_DIVISIONS[tostring(name)] end
+-- It found out only by getting nil, so __division says so as well, in the words of the WebView
+-- runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the names differ only by D and
+-- T and nothing is ambiguous.
+local function __division(verb, name)
+  if type(name) == "string" then
+    local wanted = string.lower(name)
+    for i = 1, #__CE_DIVISION_NAMES do
+      local id = __CE_DIVISION_NAMES[i]
+      if string.lower(id) == wanted then return __CE_DIVISIONS[id] end
+    end
+  end
+  logError(verb .. ": " .. (name == nil and "no division given" or (__shownValue(name) .. " is not a division"))
+    .. ", so there is no answer. The divisions are " .. table.concat(__CE_DIVISION_NAMES, ", ") .. ".")
+  return nil
+end
+function beatsPerDivision(name) return __division("ce.time.division", name) end
 function divisionNames()
   local out = {}
   for i = 1, #__CE_DIVISION_NAMES do
@@ -1668,7 +2570,7 @@ function barBeatAt(beats, beatsPerBar)
 end
 
 function stepAt(beats, division)
-  local per = __CE_DIVISIONS[tostring(division)]
+  local per = __division("ce.time.step", division)
   if per == nil then return nil end
   local b = __tnum(beats, 0); if b < 0 then b = 0 end
   return math.floor(b / per)
@@ -1679,7 +2581,7 @@ end
 -- returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
 -- an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
 function stepsBetween(fromBeats, toBeats, division, maxSteps)
-  local per = __CE_DIVISIONS[tostring(division)]
+  local per = __division("ce.time.steps", division)
   if per == nil then return nil end
   local from = __tnum(fromBeats, 0); if from < 0 then from = 0 end
   local to = __tnum(toBeats, 0); if to < 0 then to = 0 end
@@ -1698,7 +2600,7 @@ end
 -- The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
 -- same" swing are only the same swing if they compute it the same way.
 function swingOffset(step, amount, division)
-  local per = __CE_DIVISIONS[tostring(division)]
+  local per = __division("ce.time.swing", division)
   if per == nil then return nil end
   local s = __tclamp(amount, 0, 1)
   if math.abs(math.floor(__tnum(step, 0) + 0.5)) % 2 == 1 then return s * 0.5 * per end
@@ -1773,16 +2675,25 @@ end
 -- `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 -- this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
 -- a completion callback can be a plain argument in every language.
-local __animDone, __animGroup, __animGroupN = {}, {}, 0
+--
+-- Each move with a done gets a token of its own ("lua:3"), handed to the host as `__done` and
+-- emitted back with the result, and its function is stored under that. It was stored under the
+-- path, or for a list under a number the host counted separately, so replacing a move called the
+-- new move's done for the old one, and two lists from two scripts or engines crossed their dones
+-- (ScriptRuntime::fireAnimationDone says how). The prelude is shared by every Lua script, so one
+-- count keeps the tokens apart.
+local __animDone, __animSeq = {}, 0
 
--- An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
--- own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
--- envelope at all: map()'s per-point curves live in this prelude, not in C++.
+-- An envelope's shape is SAMPLED here, with mapCurve() — ce.math.map, the Envelope component's
+-- own envValueAt — and the host interpolates the samples. That is what lets the host engine run
+-- an envelope at all: mapCurve()'s per-point curves live in this prelude, not in C++. This called
+-- map(), which no prelude defines, so Lua and JavaScript stopped with an error and Python's own
+-- map() made every sample 0.
 local __ANIM_SAMPLES = 1024
 local function __animSample(points)
   local out = {}
   for i = 0, __ANIM_SAMPLES do
-    local y = tonumber(map(i / __ANIM_SAMPLES, points))
+    local y = tonumber(mapCurve(i / __ANIM_SAMPLES, points))
     out[i + 1] = y or 0
   end
   return out
@@ -1804,20 +2715,41 @@ local function __animStart(kind, path, target, opts)
   for k, v in pairs(opts) do o[k] = v end
   o.done = nil
   if type(opts.done) == "function" then
-    if list ~= nil then
-      __animGroupN = __animGroupN + 1
-      local gid = __animGroupN
-      __animGroup[gid] = opts.done
-      o.group = gid
-    else
-      __animDone[tostring(path)] = opts.done
-    end
+    __animSeq = __animSeq + 1
+    local token = "lua:" .. tostring(__animSeq)
+    __animDone[token] = opts.done
+    o.__done = token
   end
-  __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o)
+  -- The host answers whether the move started: not when a colour property is the path or one of a
+  -- list's paths, and then nothing in the list starts and its done is never called, so it is let go.
+  local started = __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o) == true
+  if not started and o.__done ~= nil then __animDone[o.__done] = nil end
+  return started
 end
 
-function animateTo(path, target, opts) __animStart("to", path, target, opts) end
-function animateSpring(path, target, opts) __animStart("spring", path, target, opts) end
+-- to and spring move to a number, and only a number. A target that is not one ("full", "100px",
+-- "#FF0000") used to move the value to 0; text that is a number ("100") is read as one, as it always
+-- was. In the words of the WebView runtime's animationTarget.
+local function __animTarget(verb, target)
+  local n = __realNumber(target)
+  if n ~= nil then return n end
+  local why
+  if target == nil then why = "no number to move to was given"
+  elseif type(target) == "string" then why = '"' .. target .. '" is not a number'
+  else why = "the target given is not a number" end
+  logError(verb .. ": " .. why .. ", so nothing was started.")
+  return nil
+end
+function animateTo(path, target, opts)
+  local n = __animTarget("ce.anim.to", target)
+  if n == nil then return false end
+  return __animStart("to", path, n, opts)
+end
+function animateSpring(path, target, opts)
+  local n = __animTarget("ce.anim.spring", target)
+  if n == nil then return false end
+  return __animStart("spring", path, n, opts)
+end
 -- envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 -- `to` has one destination; an envelope goes up before it comes down, which is the single most
 -- obvious thing a synth panel animates and the one thing `to` cannot express.
@@ -1832,8 +2764,7 @@ function animateEnvelope(path, points, opts)
   o.from = tonumber(o.from) or 0
   local to = tonumber(o.to) or 1
   o.to = nil
-  __animStart("envelope", path, to, o)
-  return true
+  return __animStart("envelope", path, to, o)
 end
 function animateStop(path) __animateStop(path == nil and "" or tostring(path)) end
 function animateRunning(path) return __animateRunning(path == nil and "" or tostring(path)) end
@@ -1845,18 +2776,14 @@ function animateReverse(path) return __animateReverse(path == nil and "" or tost
 function animateFinish(path) return __animateFinish(path == nil and "" or tostring(path)) end
 
 -- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+-- done(completed): one argument, true or false, for one path and for a list alike. It was handed a
+-- table, { path, completed } or { paths, completed }, and a table is always true, so
+-- `if completed then` read a cancelled move as a finished one.
 on("*", "__animDone", function(info)
-  if info == nil then return end
-  if info.group ~= nil then
-    local fn = __animGroup[info.group]
-    __animGroup[info.group] = nil
-    if fn ~= nil then fn({ paths = info.paths, completed = info.completed == true }) end
-    return
-  end
-  local key = tostring(info.path or "")
-  local fn = __animDone[key]
-  __animDone[key] = nil
-  if fn ~= nil then fn({ path = key, completed = info.completed == true }) end
+  if info == nil or info.token == nil then return end
+  local fn = __animDone[info.token]
+  __animDone[info.token] = nil
+  if fn ~= nil then fn(info.completed == true) end
 end)
 
 -- @module ce.device
@@ -2034,15 +2961,37 @@ local __CE_SCRIPT_PREFIX = "\001script:"
 
 -- The scope asked for, or nothing when it is not one this build knows. Refusing rather than falling
 -- back to "panel": storing a value in a scope the caller did not ask for is how a private setting
--- quietly becomes a shared one, and a typo in a scope name would be the way it happened.
-function __storageScope(opts)
+-- quietly becomes a shared one, and a typo in a scope name would be the way it happened. A typo in
+-- the KEY ({ scop = "script" }) is the same leak, so any key but `scope` is refused as well, sorted
+-- because pairs() has no order and every runtime must name them in one. A key that is a number is
+-- a list entry and is left alone. `verb` is the call's namespaced path; the WebView runtime's
+-- storageScopeOf says the same words.
+function __storageScope(opts, verb)
   local raw
   if type(opts) == "string" then raw = opts
-  elseif type(opts) == "table" then raw = opts.scope end
+  elseif type(opts) == "table" then
+    local unknown = {}
+    for k in pairs(opts) do
+      if type(k) == "string" and k ~= "scope" and not k:match("^%d+$") then unknown[#unknown + 1] = k end
+    end
+    if #unknown > 0 then
+      table.sort(unknown)
+      local quoted = {}
+      for i, k in ipairs(unknown) do quoted[i] = '"' .. k .. '"' end
+      local listed = quoted[1]
+      if #quoted > 1 then
+        listed = table.concat(quoted, ", ", 1, #quoted - 1) .. " and " .. quoted[#quoted]
+      end
+      logError(verb .. ": " .. listed .. (#unknown == 1 and " is not one of its options" or " are not among its options")
+        .. ", so nothing was done. Its only option is scope.")
+      return nil
+    end
+    raw = opts.scope
+  end
   if raw == nil or raw == "" then return "panel" end
   local scope = tostring(raw)
   for _, known in ipairs(__CE_SCOPES) do if known == scope then return scope end end
-  logError('ce.storage: "' .. scope .. '" is not a scope. One of: panel, script, local.')
+  logError(verb .. ': "' .. scope .. '" is not a scope, so nothing was done. One of: panel, script, local.')
   return nil
 end
 
@@ -2069,7 +3018,7 @@ function __storageKeyFrom(scope, stored)
 end
 
 function saveSetting(key, value, opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.saveSetting")
   if scope == nil then return false end
   local store = __storageStore(scope)
   if __settingsAvailable(store) ~= true then
@@ -2082,7 +3031,7 @@ function saveSetting(key, value, opts)
 end
 
 function loadSetting(key, fallback, opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.loadSetting")
   if scope == nil then return fallback end
   local v = __loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
   if v == nil then return fallback end
@@ -2091,7 +3040,7 @@ end
 
 -- settings() lists every saved key; forget() deletes one and says whether there was one.
 function listSettings(opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.settings")
   if scope == nil then return {} end
   local raw = __listSettings(__storageStore(scope)) or {}
   local out = {}
@@ -2103,7 +3052,7 @@ function listSettings(opts)
 end
 
 function forgetSetting(key, opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.forget")
   if scope == nil then return false end
   return __forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) == true
 end
@@ -2111,7 +3060,7 @@ end
 -- Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 -- one was the only way before.
 function allSettings(opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.all")
   if scope == nil then return {} end
   local out = {}
   for _, k in ipairs(listSettings(opts)) do out[k] = loadSetting(k, nil, opts) end
@@ -2121,6 +3070,8 @@ end
 -- Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
 -- keys alone: "clear my settings" must not mean "clear everybody's".
 function clearSettings(opts)
+  -- Checked here first, so a refusal names clear rather than the settings() it calls.
+  if __storageScope(opts, "ce.storage.clear") == nil then return 0 end
   local gone = 0
   for _, k in ipairs(listSettings(opts)) do if forgetSetting(k, opts) then gone = gone + 1 end end
   return gone
@@ -2129,7 +3080,7 @@ end
 -- Which store a scope is talking to, and what is in it. `available` is the honest field: false means
 -- writes in this scope will not stick, which is worth saying once rather than per key.
 function storageInfo(opts)
-  local scope = __storageScope(opts)
+  local scope = __storageScope(opts, "ce.storage.info")
   if scope == nil then return nil end
   local contents = allSettings(opts)
   local count = 0
@@ -2407,15 +3358,114 @@ function decodeJson(text)
 end
 
 -- @module -
+-- BEGIN GENERATED option keys — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- An options table holding a key its member does not take REFUSES the call: nothing is done, the
+-- console names the keys and the options the member has, and the call answers what the member
+-- answers for any other refusal. The WebView runtime does the same from the same lists in
+-- panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+-- list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+-- order a message could follow.
+local __CE_OPTIONS = {
+  ["set"] = { path = "set", at = 3, refusal = "nothing", names = { "transmit" } },
+  ["requestDump"] = { path = "ce.device.requestDump", at = 3, refusal = "false", names = { "timeout" } },
+  ["recallPreset"] = { path = "ce.device.recallPreset", at = 2, refusal = "result", names = { "role" } },
+  ["animateTo"] = { path = "ce.anim.to", at = 3, refusal = "false", names = { "duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["animateSpring"] = { path = "ce.anim.spring", at = 3, refusal = "false", names = { "duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["animateEnvelope"] = { path = "ce.anim.envelope", at = 3, refusal = "false", names = { "from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["syncTimer"] = { path = "ce.time.syncTimer", at = 3, refusal = "nothing", names = { "follow" } },
+  ["deviceParameters"] = { path = "ce.device.parameters", at = 1, refusal = "empty list", names = { "role", "query", "group", "type", "access", "limit" } },
+  ["deviceDefineParameter"] = { path = "ce.device.defineParameter", at = 2, refusal = "false", names = { "name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad" }, nested = { ["nrpn"] = { names = { "msb", "lsb" } } } },
+  ["deviceDefineDump"] = { path = "ce.device.defineDump", at = 2, refusal = "false", names = { "name", "request", "match", "prefix", "suffix", "offset", "size", "checksum", "fields" }, nested = { ["match"] = { names = { "prefix", "suffix" } } } },
+  ["devicePorts"] = { path = "ce.device.ports", at = 1, refusal = "empty list", names = { "direction" } },
+  ["checksum"] = { path = "ce.midi.checksum", at = 3, refusal = "nothing", names = { "offset" } },
+  ["panic"] = { path = "ce.midi.panic", at = 1, refusal = "nothing", names = { "channel", "resetControllers" } },
+  ["encodeJson"] = { path = "ce.storage.encode", at = 2, refusal = "nothing", names = { "indent" } },
+  ["bytesRead"] = { path = "ce.midi.read", at = 4, refusal = "nothing", names = { "bits", "order" } },
+  ["bytesWrite"] = { path = "ce.midi.write", at = 5, refusal = "nothing", names = { "bits", "order" } },
+}
+-- Byte order, which is what JavaScript's sort and Python's sorted() give these names. table.sort's
+-- own < compares with the C library's collation, which a locale can change.
+local function __ce_optionLess(a, b)
+  for i = 1, math.min(#a, #b) do
+    local x, y = string.byte(a, i), string.byte(b, i)
+    if x ~= y then return x < y end
+  end
+  return #a < #b
+end
+local function __ce_optionShape(shape)
+  shape.known = {}
+  for _, name in ipairs(shape.names) do shape.known[name] = true end
+  for _, inner in pairs(shape.nested or {}) do __ce_optionShape(inner) end
+end
+-- The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
+-- option that lists fields of its own, in the contract's order.
+local function __ce_unknownOptions(opts, shape, parent, out)
+  local unknown = {}
+  for k in pairs(opts) do
+    if type(k) == "string" and not shape.known[k] and not string.match(k, "^%d+$") then unknown[#unknown + 1] = k end
+  end
+  if #unknown > 0 then
+    table.sort(unknown, __ce_optionLess)
+    out[#out + 1] = { parent = parent, keys = unknown, shape = shape }
+  end
+  for _, name in ipairs(shape.names) do
+    local inner = shape.nested and shape.nested[name]
+    if inner ~= nil and type(opts[name]) == "table" then
+      __ce_unknownOptions(opts[name], inner, parent == "" and name or (parent .. "." .. name), out)
+    end
+  end
+  return out
+end
+local function __ce_optionsLine(path, group)
+  local p = group.parent
+  local quoted = {}
+  for i, k in ipairs(group.keys) do quoted[i] = '"' .. (p == "" and "" or (p .. ".")) .. k .. '"' end
+  local what
+  if #quoted == 1 then what = quoted[1] .. " is not one of its options, so nothing was done."
+  else what = table.concat(quoted, ", ", 1, #quoted - 1) .. " and " .. quoted[#quoted] .. " are not among its options, so nothing was done." end
+  local names, listed = group.shape.names, nil
+  if #names == 1 then listed = (p == "" and "Its only option" or ("The only option of " .. p)) .. " is " .. names[1] .. "."
+  else listed = (p == "" and "Its options" or ("The options of " .. p)) .. " are: " .. table.concat(names, ", ") .. "." end
+  return path .. ": " .. what .. " " .. listed
+end
+local function __ce_refused(refusal, lines)
+  if refusal == "false" then return false end
+  if refusal == "zero" then return 0 end
+  if refusal == "empty list" then return {} end
+  if refusal == "result" then return { ok = false, error = table.concat(lines, " ") } end
+  return nil
+end
+for __id, __spec in pairs(__CE_OPTIONS) do
+  local __fn = _G[__id]
+  if type(__fn) == "function" then
+    __ce_optionShape(__spec)
+    _G[__id] = function(...)
+      local __opts = (select(__spec.at, ...))
+      if type(__opts) == "table" then
+        local __groups = __ce_unknownOptions(__opts, __spec, "", {})
+        if #__groups > 0 then
+          local __lines = {}
+          for __i, __group in ipairs(__groups) do
+            __lines[__i] = __ce_optionsLine(__spec.path, __group)
+            logError(__lines[__i])
+          end
+          return __ce_refused(__spec.refusal, __lines)
+        end
+      end
+      return __fn(...)
+    end
+  end
+end
+-- END GENERATED option keys
 -- BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
-  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
+  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromHsl = "hslToHex", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromARGB = "colourFromArgb", fromHsl = "hslToHex", fromRGBA = "colourFromRgba", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", play = "animatePlay", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
@@ -2619,27 +3669,18 @@ public:
         host = &h;
         auto g = lua.globals();
 
-        // optionsFromOpts: turn a Lua opts table {transmit=...} into a juce::var for the host.
-        auto buildOptions = [this] (sol::optional<sol::table> opts) -> juce::var
-        {
-            if (! opts) return {};
-            auto* o = new juce::DynamicObject();
-            sol::object t = (*opts)["transmit"];
-            if (t.valid() && t.get_type() == sol::type::boolean) o->setProperty ("transmit", t.as<bool>());
-            return juce::var (o);
-        };
-
         // set() runs this script set's intercept() filters before the host sees the value, so a
         // rule like "this knob only takes even numbers" holds for every write instead of being
-        // re-checked at each call site.
-        g.set_function ("set", [this, buildOptions] (std::string path, sol::object value, sol::optional<sol::table> opts)
+        // re-checked at each call site. Its third argument is the options table or the value form
+        // (setOptionsOf).
+        g.set_function ("set", [this] (std::string path, sol::object value, sol::object opts)
         {
             auto v = solToVar (value);
             if (! runFilters (juce::String (path), v)) return;
-            host->setValue (juce::String (path), v, buildOptions (opts));
+            host->setValue (juce::String (path), v, setOptionsOf (opts));
         });
         g.set_function ("get", [this] (std::string path, sol::optional<std::string> form)
-            { return varToSol (lua, host->getValue (juce::String (path), form ? juce::String (*form) : juce::String ("value"))); });
+            { return varToSol (lua, scriptGet (juce::String (path), form ? juce::String (*form) : juce::String ("value"))); });
 
         g.set_function ("sendCC",   [this] (int ch, int cc, sol::object v) { host->sendCC (ch, cc, solToVar (v)); });
         g.set_function ("sendNRPN", [this] (int ch, int msb, int lsb, sol::object v) { host->sendNRPN (ch, msb, lsb, solToVar (v)); });
@@ -2657,8 +3698,8 @@ public:
         // `path` is a string OR a table of strings — one call, one shape, one completion — so the
         // binding takes an object and lets solToVar decide which it was.
         g.set_function ("__animate", [this] (std::string kind, sol::object path, double target, sol::optional<sol::table> opts)
-            { host->startAnimation (juce::String (kind), solToVar (path), target,
-                                    opts ? solToVar (*opts) : juce::var()); });
+            { return host->startAnimation (juce::String (kind), solToVar (path), target,
+                                           opts ? solToVar (*opts) : juce::var()); });
         g.set_function ("__animateStop", [this] (std::string path) { host->stopAnimation (juce::String (path)); });
         g.set_function ("__animateRunning", [this] (std::string path) { return host->animationRunning (juce::String (path)); });
         g.set_function ("__animateValue", [this] (std::string path) { return varToSol (lua, host->animationValue (juce::String (path))); });
@@ -2841,9 +3882,12 @@ public:
             return owner + "." + juce::String (p);
         };
         sol::table self = lua.create_table();
-        self.set_function ("set", [this, prefix] (std::string p, sol::object v) { host->setValue (prefix (p), solToVar (v), juce::var()); });
+        // self.set took no third argument at all, so its options and its form were both dropped;
+        // the WebView's self.set reads them as set() does.
+        self.set_function ("set", [this, prefix] (std::string p, sol::object v, sol::object opts)
+            { host->setValue (prefix (p), solToVar (v), setOptionsOf (opts)); });
         self.set_function ("get", [this, prefix] (std::string p, sol::optional<std::string> form)
-            { return varToSol (lua, host->getValue (prefix (p), form ? juce::String (*form) : juce::String ("value"))); });
+            { return varToSol (lua, scriptGet (prefix (p), form ? juce::String (*form) : juce::String ("value"))); });
         env["self"] = self;
 
         const Watchdog guard (*this); // top-level statements obey the instruction budget too
@@ -3055,6 +4099,18 @@ private:
         for (auto& r : list)
             if (r.scriptId == rule.scriptId && r.path == rule.path) { r = std::move (rule); return; }
         list.push_back (std::move (rule));
+    }
+
+    /** A script's own get(): the value, and when there is none because the control or the path is
+        not there, the host's line saying so (ScriptHostApi::whyNoValue). watch, compute and the
+        filters read through host->getValue and stay quiet, as the editor's do. */
+    juce::var scriptGet (const juce::String& path, const juce::String& form)
+    {
+        auto value = host->getValue (path, form);
+        if (value.isVoid())
+            if (const auto why = host->whyNoValue (path, form); why.isNotEmpty())
+                host->logAt ("error", why, juce::var());
+        return value;
     }
 
     /** Run every filter registered for `path`. False = a filter rejected the write outright;

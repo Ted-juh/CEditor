@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 import { readStoredBool, writeStoredJson } from '../utils/localStorageState.js';
 
 /**
@@ -25,10 +25,14 @@ export const PANEL_VISIBILITY_STORAGE_KEYS = {
   tree: 'ce.ui.showTreePanel',
   display: 'ce.ui.showDisplayPanel',
   properties: 'ce.ui.showPropertiesPanel',
+  // The display panel in the script workspace (docs/design/script-editor-value-editors.md): a
+  // switch of its own, so a dock left open in the panel editor does not take a third of the script
+  // editor's height, and one opened for a script's colour does not follow the viewer back.
+  displayScript: 'ce.ui.showDisplayPanel.script',
 };
 
 // Defaults match what App.svelte shipped: the tree and properties open, the display dock closed.
-const DEFAULTS = { tree: true, display: false, properties: true };
+const DEFAULTS = { tree: true, display: false, properties: true, displayScript: false };
 
 function persisted(which) {
   const key = PANEL_VISIBILITY_STORAGE_KEYS[which];
@@ -42,6 +46,18 @@ function persisted(which) {
 export const showTreePanel = persisted('tree');
 export const showDisplayPanel = persisted('display');
 export const showPropertiesPanel = persisted('properties');
+export const showDisplayPanelInScript = persisted('displayScript');
+
+/** Which display switch is live: 'script' while the script workspace is showing, else 'panel'.
+ *  App.svelte sets it from the workspace it lays out. */
+export const displayPanelWorkspace = writable('panel');
+
+/** Whether the display panel is showing in the workspace in front: what the rail and the Window
+ *  menu tick. */
+export const displayPanelVisible = derived(
+  [displayPanelWorkspace, showDisplayPanel, showDisplayPanelInScript],
+  ([workspace, panel, script]) => (workspace === 'script' ? script : panel),
+);
 
 const STORES = {
   tree: showTreePanel,
@@ -60,10 +76,22 @@ export function panelVisibilityStore(which) {
   return STORES[which] ?? null;
 }
 
+// 'display' names the switch of the workspace in front, so the rail, the menu, a colour swatch and
+// the script editor's Values tab all write the one the viewer is looking at.
+function liveStore(which) {
+  if (which === 'display' && get(displayPanelWorkspace) === 'script') return showDisplayPanelInScript;
+  return STORES[which] ?? null;
+}
+
+export function isPanelVisible(which) {
+  const store = liveStore(which);
+  return store ? get(store) === true : false;
+}
+
 export function setPanelVisibility(which, value) {
-  STORES[which]?.set(value === true);
+  liveStore(which)?.set(value === true);
 }
 
 export function togglePanelVisibility(which) {
-  STORES[which]?.update((value) => !value);
+  liveStore(which)?.update((value) => !value);
 }

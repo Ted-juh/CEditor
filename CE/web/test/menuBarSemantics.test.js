@@ -206,7 +206,8 @@ test('there is a Window menu, mirroring the three dock toggles with their checke
 test('the toggle state is read reactively, so a checkmark cannot go stale under the rail', () => {
   assert.match(script, /let treeVisible = \$derived\(\$showTreePanel\)/);
   assert.match(script, /let propertiesVisible = \$derived\(\$showPropertiesPanel\)/);
-  assert.match(script, /let displayVisible = \$derived\(\$showDisplayPanel\)/);
+  // The display panel's tick is the workspace in front's: the script editor has a switch of its own.
+  assert.match(script, /let displayVisible = \$derived\(\$displayPanelVisible\)/);
 });
 
 // --- D6: the component picker ---------------------------------------------------------------

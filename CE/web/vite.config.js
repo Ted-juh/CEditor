@@ -1,7 +1,7 @@
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { writeEmbeddedBundle } from './scripts/embed-web.mjs';
@@ -118,6 +118,11 @@ export function embedPlayerBundle({ web = fileURLToPath(new URL('.', import.meta
     },
     closeBundle() {
       if (outDir !== dist || failed) return;
+      // A build stopped by another plugin's error in generateBundle (oneByteChunks above) still
+      // reaches here, with renderError never called, and dist/ holds no pages. Writing the embed
+      // then threw "player.html is not in dist; run vite build first", which hid the error that
+      // stopped the build behind one that pointed at the wrong step.
+      if (!existsSync(path.join(dist, 'player.html'))) return;
       const { files, compressed } = writeEmbeddedBundle(dist, embed, { publicDir: path.join(web, 'public') });
       this.info?.(`dist-embed: ${files.length} files for the player and host pages, ${(compressed / 1048576).toFixed(1)} MB compressed`);
     },

@@ -444,14 +444,20 @@ test('a rotation with no centre turns about the origin, and says so by omission'
   });
 });
 
-test('opacity clamps, and a non-number clears it', () => {
+test('opacity outside 0..1, or not a number, is refused and leaves what is in force; nothing clears it', () => {
+  // It used to clamp (5 was fully solid) and clear on a non-number ("50%" switched it off), both in
+  // silence. scriptVisualValues.test.js has the words.
   withPanel(scopePanel(), 'screen', (api) => {
+    api.drawOpacity(0.5);
     api.drawOpacity(5);
     api.drawRect(0, 0, 1, 1);
-    assert.equal(drawCommandsFor('screen')[0].opacity, 1);
+    assert.equal(drawCommandsFor('screen')[0].opacity, 0.5);
     api.drawOpacity('nonsense');
     api.drawRect(0, 0, 1, 1);
-    assert.equal(drawCommandsFor('screen')[1].opacity, null);
+    assert.equal(drawCommandsFor('screen')[1].opacity, 0.5);
+    api.drawOpacity();
+    api.drawRect(0, 0, 1, 1);
+    assert.equal(drawCommandsFor('screen')[2].opacity, null, 'no number switches it off, as documented');
   });
 });
 

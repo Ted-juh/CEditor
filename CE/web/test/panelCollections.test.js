@@ -13,7 +13,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
-import { scriptApiForTesting, setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  scriptApiForTesting, setRuntimeHost, defineSpecFieldsForTesting,
+} from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { valueAtPath, setNestedValue, probeNestedWrite } from '../src/CE_Application/stores/controlTreeUtils.js';
@@ -22,6 +28,12 @@ import {
 } from '../src/CE_Application/scripting/panelApi.js';
 import { newAnimationShape } from '../src/CE_Application/utils/animationModel.js';
 import { readKeyframes } from '../src/CE_Application/utils/keyframeAnimation.js';
+import { ENTRY_BASELINES } from '../src/CE_Application/stores/documentEntries.js';
+import {
+  createPartNode, createValueChannel, createArrayChannel, createBehaviorModule, createHitZone,
+  createGenerator, createLink, createVariant, CUSTOM_COMPONENT_STARTERS, createCustomComponentStarterPatch,
+} from '../src/CE_Application/utils/customComponentFactory.js';
+import { readPanelDocument } from '../src/CE_Application/utils/panelFormat.js';
 
 // Mirrors playerScriptHost: a LIVE value moves through the preview session and needs no Value
 // section, so it always lands; anything else is a plain model write that reports whether it did.
@@ -211,16 +223,147 @@ test('a spec naming one nested field does not drop the rest of it', () => {
   });
 });
 
+// The words an unknown option key is refused in everywhere (scriptOptionKeys.test.js), with the call
+// as the prefix, since what a spec takes depends on its section.
+const STATE_FIELDS = 'name, group, description, enabled, when, patches, rule';
+const errorsOf = () => get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+
+test('define refuses a key a state does not have, rather than storing it as written', () => {
+  withControl('Knob', (api, control) => {
+    // `wen` was stored beside an empty `when`, and a state with no condition is one that always
+    // applies: the knob sat in its Warn look for good.
+    clearScriptTrace();
+    assert.equal(api.panelDefine('k', 'States', 'Warn', { wen: { valueGreaterThan: 0.9 } }), false);
+    assert.equal(api.panelDefine('k', 'States', 'Warn', { when: {}, patchs: {}, enable: true }), false);
+    assert.equal(api.panelDefine('k', 'States', 'Warn', { patches: { componet: {} } }), false);
+    // Matched exactly, capitals included: `When` would be stored beside an empty `when`.
+    assert.equal(api.panelDefine('k', 'States', 'Warn', { When: { hover: true } }), false);
+    assert.deepEqual(errorsOf(), [
+      `ce.panel.define("k", "States", "Warn"): "wen" is not one of its options, so nothing was done. Its options are: ${STATE_FIELDS}.`,
+      'ce.panel.define("k", "States", "Warn"): "enable" and "patchs" are not among its options, so nothing was done. '
+        + `Its options are: ${STATE_FIELDS}.`,
+      'ce.panel.define("k", "States", "Warn"): "patches.componet" is not one of its options, so nothing was done. '
+        + 'The options of patches are: component, parts.',
+      `ce.panel.define("k", "States", "Warn"): "When" is not one of its options, so nothing was done. Its options are: ${STATE_FIELDS}.`,
+    ]);
+    assert.ok(!kidsOf(control, 'States').includes('Warn'), 'nothing was defined');
+    // Every field a state does have is accepted, `rule` included, and `_type`, which says what it is.
+    assert.equal(api.panelDefine('k', 'States', 'Warn', {
+      _type: 'State', name: 'Warn', group: 'value', description: 'hot', enabled: true,
+      when: { hover: true }, rule: 'hover == true', patches: { component: {}, parts: {} },
+    }), true);
+  });
+});
+
 test('define works on the other collection sections too', () => {
   withControl('Knob', (api, control) => {
     // The ones a Knob actually carries. ValueChannels, Links and friends belong to custom
     // components, and asking for one on a Knob is the next test.
-    for (const section of ['Bindings', 'Animations', 'Parts']) {
-      assert.equal(api.panelDefine('k', section, 'mine', { note: section }), true, section);
+    for (const [section, field, value] of [
+      ['Bindings', 'target', 'Transform.opacity'], ['Animations', 'duration', 200], ['Parts', 'zIndex', 3],
+    ]) {
+      assert.equal(api.panelDefine('k', section, 'mine', { [field]: value }), true, section);
       assert.ok(kidsOf(control, section).includes('mine'), `${section} did not get the entry`);
-      assert.equal(api.panelEntry('k', section, 'mine').note, section);
+      assert.equal(api.panelEntry('k', section, 'mine')[field], value);
     }
   });
+});
+
+/* ------------------------------------------------- a key the section does not take, in each */
+// Only a state's keys were checked. Every other section stored a misspelled key as written, where
+// nothing read it: { durration = 400 } made a 120 ms animation, and a binding's { trget = … } bound
+// nothing. Each refuses it now, in the words an unknown option is refused in, and defines nothing.
+
+test('every section refuses a key its entries do not have, and defines nothing', () => {
+  withControl('CustomComponent', (api, control) => {
+    const fields = defineSpecFieldsForTesting();
+    for (const section of Object.keys(fields)) {
+      clearScriptTrace();
+      const before = kidsOf(control, section);
+      assert.equal(api.panelDefine('k', section, 'typo', { name: 'typo', colr: 'red' }), false, section);
+      assert.deepEqual(errorsOf(), [
+        `ce.panel.define("k", "${section}", "typo"): "colr" is not one of its options, so nothing was done. `
+          + `Its options are: ${fields[section].join(', ')}.`,
+      ], section);
+      assert.deepEqual(kidsOf(control, section), before, `${section}: nothing was defined`);
+    }
+    // The words, whole, for the one that started it. The section is named as the panel names it.
+    clearScriptTrace();
+    assert.equal(api.panelDefine('k', 'animations', 'glow', { durration: 400, kind: 'transition' }), false);
+    assert.deepEqual(errorsOf(), [
+      'ce.panel.define("k", "Animations", "glow"): "durration" is not one of its options, so nothing was done. Its '
+        + 'options are: name, enabled, kind, trigger, targets, duration, delay, easing, frames, iterations, direction, '
+        + 'loop, hold, bezier, spring.',
+    ]);
+    // A key that is a number is a Lua list's entry, not a key, as in every options table.
+    assert.equal(api.panelDefine('k', 'Variants', 'compact', { 1: 'x', label: 'Compact' }), true);
+  });
+});
+
+test('what a section takes is what the app makes for it, so a field added there is taken', () => {
+  const fields = defineSpecFieldsForTesting();
+  const makes = {
+    States: [{ name: '', group: '', description: '', enabled: true, when: {}, patches: {} }],
+    Animations: [newAnimationShape('')],
+    Bindings: [ENTRY_BASELINES.Bindings],
+    Parts: [createPartNode('')],
+    ValueChannels: [ENTRY_BASELINES.ValueChannels, createValueChannel(''), createArrayChannel('', { itemFields: {} })],
+    Behaviors: [ENTRY_BASELINES.Behaviors, createBehaviorModule('')],
+    HitZones: [ENTRY_BASELINES.HitZones, createHitZone('', { payload: {} })],
+    Generators: [createGenerator('')],
+    Links: [createLink('')],
+    Variants: [createVariant('')],
+  };
+  assert.deepEqual(Object.keys(fields).sort(), Object.keys(makes).sort());
+  for (const [section, entries] of Object.entries(makes)) {
+    for (const entry of entries) {
+      const left = Object.keys(entry).filter((key) => key !== '_type' && !fields[section].includes(key));
+      assert.deepEqual(left, [], `${section} does not take what the app makes it with`);
+    }
+    assert.ok(!fields[section].includes('_type'), `${section}: _type is taken, not listed`);
+  }
+});
+
+// The proof that the lists are not too short: every entry the app's own starters build, and every
+// entry the committed panels hold, defines without a refusal. Those are what the readers were
+// written against, so a key in them that define refused would be a key that works being refused.
+test('every key the starters and the committed panels give an entry is one define takes', () => {
+  const fields = defineSpecFieldsForTesting();
+  const refused = new Map();
+  const look = (where, sections) => {
+    for (const section of Object.keys(fields)) {
+      for (const [name, entry] of Object.entries(sections?.[section]?._children ?? {})) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;   // `_removed`
+        for (const key of Object.keys(entry)) {
+          if (key !== '_type' && !fields[section].includes(key)) refused.set(`${section}.${key}`, `${where} ${name}`);
+        }
+      }
+    }
+  };
+  for (const starter of CUSTOM_COMPONENT_STARTERS) look(starter.id, createCustomComponentStarterPatch(starter.id));
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../panels');
+  const files = [];
+  const walk = (dir) => {
+    for (const file of fs.readdirSync(dir)) {
+      const full = path.join(dir, file);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else if (file.endsWith('.cepanel')) files.push(full);
+    }
+  };
+  walk(root);
+  assert.ok(files.length > 10, 'the committed panels were found');
+  const visit = (where, control) => {
+    look(where, control?._children);
+    for (const child of Object.values(control?._children?.Children?._children ?? {})) {
+      if (child && typeof child === 'object') visit(where, child);
+    }
+  };
+  for (const file of files) {
+    const { doc } = readPanelDocument(fs.readFileSync(file, 'utf8'));
+    assert.ok(doc, `${path.basename(file)} reads`);
+    for (const control of doc.controls ?? []) visit(path.basename(file), control);
+  }
+  assert.deepEqual([...refused].map(([key, where]) => `${key} (${where})`), []);
 });
 
 test('a collection section this CONTROL does not have is refused, not invented', () => {
@@ -272,15 +415,18 @@ test('this is the part set() could not do at all', () => {
 
 /* --------------------------------------------------------------------------------- patch */
 
+// A Knob draws from its parts and has no Background section of its own, so "Background.Fill.colour"
+// on the Knob itself reaches nothing; these tests used it, and passed, until patch checked its keys.
+// The paths below are ones a Knob has: Transform on the control, Background.Fill on a part.
 test('patch merges keys into a state, rather than replacing the map', () => {
   withControl('Knob', (api) => {
     api.panelDefine('k', 'States', 'Warn', {});
-    assert.equal(api.panelPatch('k', 'Warn', { 'Background.Fill.colour': 'FFFF0000' }), 1);
+    assert.equal(api.panelPatch('k', 'Warn', { 'Transform.rotation': 15 }), 1);
     assert.equal(api.panelPatch('k', 'Warn', { 'Transform.opacity': 60 }), 1);
     // Both survive: "make this one thing red when hovered" must not require knowing everything
     // else the state already changes.
     assert.deepEqual(api.panelEntry('k', 'States', 'Warn').patches.component, {
-      'Background.Fill.colour': 'FFFF0000',
+      'Transform.rotation': 15,
       'Transform.opacity': 60,
     });
   });
@@ -289,10 +435,54 @@ test('patch merges keys into a state, rather than replacing the map', () => {
 test('patch reaches a part of a custom component', () => {
   withControl('Knob', (api) => {
     api.panelDefine('k', 'States', 'Warn', {});
-    assert.equal(api.panelPatch('k', 'Warn', { 'Background.Fill.colour': 'FF00FF00' }, 'cap'), 1);
+    assert.equal(api.panelPatch('k', 'Warn', { 'Background.Fill.colour': 'FF00FF00' }, 'bodyCap'), 1);
     const patches = api.panelEntry('k', 'States', 'Warn').patches;
-    assert.deepEqual(patches.parts.cap, { 'Background.Fill.colour': 'FF00FF00' });
+    assert.deepEqual(patches.parts.bodyCap, { 'Background.Fill.colour': 'FF00FF00' });
     assert.deepEqual(patches.component, {}, 'the component map is untouched by a part patch');
+  });
+});
+
+test('patch counts only what it applied, and says why the rest was not', () => {
+  withControl('Knob', (api) => {
+    api.panelDefine('k', 'States', 'Warn', {});
+    clearScriptTrace();
+    // A misspelled section, a property its section does not have, a nested table, and one that
+    // lands. The first three were stored as written and counted, so this answered 4.
+    assert.equal(api.panelPatch('k', 'Warn', {
+      'Transfrom.opacity': 10,
+      'Transform.opcity': 10,
+      Transform: { opacity: 10 },
+      'transform.OPACITY': 30,
+    }), 1);
+    assert.deepEqual(api.panelEntry('k', 'States', 'Warn').patches.component, { 'Transform.opacity': 30 },
+      'only the key that leads somewhere is stored, under the capitals the renderer looks up');
+    const lines = get(scriptTrace).map((t) => `${t.kind}:${t.message}`);
+    assert.ok(lines.includes('error:ce.panel.patch("k", "Warn"): "Transfrom.opacity" does not lead anywhere on "k", so it was not applied.'), lines.join('\n'));
+    assert.ok(lines.includes('error:ce.panel.patch("k", "Warn"): "Transform.opcity" is not a property of its section on "k", so it was not applied.'));
+    assert.ok(lines.includes('error:ce.panel.patch("k", "Warn"): "Transform" is a section, not one setting in it. Name each setting by its whole path, such as "Background.Fill.colour", so it was not applied.'));
+    assert.ok(lines.includes('log:ce.panel.patch k.Warn: 1 of 4 keys applied'));
+  });
+});
+
+test('patch refuses a part the control does not have, and a key that leads nowhere on the part', () => {
+  withControl('Knob', (api) => {
+    api.panelDefine('k', 'States', 'Warn', {});
+    clearScriptTrace();
+    assert.equal(api.panelPatch('k', 'Warn', { 'Background.Fill.colour': 'FF00FF00' }, 'cap'), 0);
+    assert.match(traced(), /"k" has no part called "cap", so nothing was applied\. Its parts are bodyTrackBase, /);
+    assert.deepEqual(api.panelEntry('k', 'States', 'Warn').patches.parts, {}, 'nothing stored for the part');
+    clearScriptTrace();
+    assert.equal(api.panelPatch('k', 'Warn', { 'Backgrnd.Fill.colour': 'FF00FF00' }, 'bodyCap'), 0);
+    assert.match(traced(), /"Backgrnd\.Fill\.colour" does not lead anywhere on part "bodyCap", so it was not applied\./);
+    // Nothing applied is nothing written, and nothing claimed.
+    assert.doesNotMatch(traced(), /^log:ce\.panel\.patch k\.Warn/m);
+  });
+  withControl('Button', (api) => {
+    api.panelDefine('k', 'States', 'Warn', {});
+    clearScriptTrace();
+    assert.equal(api.panelPatch('k', 'Warn', { 'Transform.opacity': 10 }, 'cap'), 0);
+    assert.match(traced(), /"k" has no part called "cap", so nothing was applied\. It has no parts\.$/m,
+      'a control without parts says so, rather than listing none');
   });
 });
 
@@ -309,9 +499,9 @@ test('the shipped Hover state can be patched without disturbing what it already 
   withControl('Knob', (api) => {
     const before = api.panelEntry('k', 'States', 'Hover').patches.parts;
     const keptKeys = Object.keys(before ?? {});
-    api.panelPatch('k', 'Hover', { 'Background.Fill.colour': 'FFFF0000' });
+    api.panelPatch('k', 'Hover', { 'Transform.opacity': 80 });
     const after = api.panelEntry('k', 'States', 'Hover').patches;
-    assert.deepEqual(after.component, { 'Background.Fill.colour': 'FFFF0000' });
+    assert.deepEqual(after.component, { 'Transform.opacity': 80 });
     assert.deepEqual(Object.keys(after.parts ?? {}), keptKeys);
   });
 });

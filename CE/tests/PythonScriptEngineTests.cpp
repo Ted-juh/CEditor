@@ -14,7 +14,9 @@
 // Requires the bundled/installed stdlib to be discoverable (env CEDITOR_PYTHONHOME or a dev install).
 
 #include "Scripting/ScriptRuntime.h"
+#include "Scripting/BridgeScriptHost.h"
 #include <juce_core/juce_core.h>
+#include <algorithm>
 #include <functional>
 #include <iostream>
 
@@ -32,7 +34,8 @@ public:
     { auto it = values.find (path); return it != values.end() ? it->second : juce::var(); }
     void setValue (const juce::String& path, const juce::var& value, const juce::var&) override
     { values[path] = value; if (onSet) onSet (path); }
-    void sendCC (int, int, const juce::var&) override {}
+    juce::StringArray ccSends;    // sendCC, as "1 7 65"
+    void sendCC (int ch, int cc, const juce::var& v) override { ccSends.add (juce::String (ch) + " " + juce::String (cc) + " " + v.toString()); }
     void sendNRPN (int, int, int, const juce::var&) override {}
     void sendSysex (const juce::var&) override {}
     void requestDump (const juce::String&) override {}
@@ -42,6 +45,39 @@ public:
     juce::var runAction (const juce::String&, const juce::var&) override { return {}; }
     void emitEvent (const juce::String&, const juce::var&) override {}
     void log (const juce::String& message, const juce::var&) override { logs.add (message); }
+
+    // A host that can say why a read found nothing, the way BridgeScriptHost asks the app.
+    juce::String whyNoValue (const juce::String& path, const juce::String&) override
+    { return path.startsWith ("ghost") ? "get: control \"ghost\" not found on the active panel, so there is no answer." : juce::String(); }
+
+    juce::StringArray timerStarts;
+    void startTimer (const juce::String& id, int) override { timerStarts.add (id); }
+
+    juce::StringArray rawSends;   // sendMidi, as "90 3C 64"
+    void sendMidi (const juce::var& bytes) override
+    {
+        juce::StringArray hex;
+        if (auto* arr = bytes.getArray())
+            for (const auto& b : *arr) hex.add (juce::String::toHexString ((int) b).paddedLeft ('0', 2).toUpperCase());
+        rawSends.add (hex.joinIntoString (" "));
+    }
+};
+
+// ce.anim through the Python prelude: the host forwards to the runtime, the way BridgeScriptHost
+// does, and an emitted event comes back into it, so a move's done() reaches the script.
+class AnimHost : public TestHost
+{
+public:
+    ScriptRuntime* runtime = nullptr;
+    bool startAnimation (const juce::String& kind, const juce::var& path, double target, const juce::var& opts) override
+    { return runtime != nullptr && runtime->startAnimation (kind, path, target, opts); }
+    void stopAnimation (const juce::String& path) override { if (runtime != nullptr) runtime->stopAnimation (path); }
+    bool animationRunning (const juce::String& path) override { return runtime != nullptr && runtime->animationRunning (path); }
+    bool animationFinish (const juce::String& path) override { return runtime != nullptr && runtime->animationFinish (path); }
+    void emitEvent (const juce::String& name, const juce::var& data) override
+    { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
+    // A stand-in for the panel model's question: here a path ending in ".colour" is a colour.
+    bool isColourProperty (const juce::String& path) override { return path.endsWithIgnoreCase (".colour"); }
 };
 
 static int failures = 0;
@@ -131,6 +167,399 @@ int main()
     host.logs.clear();
     runtime.dispatchEvent ("onAfter", "panel", juce::var());
     check (host.logs.contains ("after ok"), "Guard: next dispatch runs clean after a watchdog trip");
+
+    // A note name the senders cannot read is refused, not sent as note 0 (C-1). The Lua and JS
+    // preludes and the WebView runtime refuse it in the same words.
+    {
+        juce::Array<juce::var> noteScripts;
+        noteScripts.add (makeScript ("pyNotes", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    sendNote(1, 'c4', 100)\n"
+            "    sendNoteOff(1, 'c4')\n"
+            "    sendAftertouch(1, 90, 'c4')\n"
+            "    sendNote(1, 'C-1', 100)\n"));
+        runtime.loadScripts (juce::var (noteScripts));
+        host.rawSends.clear();
+        host.logs.clear();
+        runtime.onPanelReady (true);
+        check (host.rawSends.size() == 1 && host.rawSends[0] == "90 00 64",
+               "Notes: an unreadable name sends nothing; C-1 by name still plays (got "
+                   + host.rawSends.joinIntoString (" | ") + ")");
+        for (const auto* verb : { "sendNote", "sendNoteOff", "sendAftertouch" })
+            check (host.logs.contains (juce::String (verb) + ": \"c4\" is not a note name, so nothing was sent. "
+                                       "A name is a capital letter, then # or b if it has one, then the octave: "
+                                       "\"C4\", \"Eb3\", \"F#-1\"."),
+                   juce::String ("Notes: ") + verb + " names the note it refused");
+    }
+
+    // self.set and self.get, a script's own get() of something that is not there, and the intervals
+    // and storage option keys a script got wrong.
+    //  - self's methods called out through `__api`, which a class body MANGLES to `_Self__api`, so
+    //    both raised NameError on every call in the exported plug-in.
+    //  - get() asks the host why it found nothing, as every engine's does; watch() does not.
+    //  - startTimer(id, "fast") reached the host as 0 ms, and saveSetting(k, v, {"scop": "script"})
+    //    saved into the shared store. Both are refused in the words the other engines use.
+    {
+        juce::Array<juce::var> mistakeScripts;
+        mistakeScripts.add (makeScript ("pyMistakes", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    self.set('selfPath', 5)\n"
+            "    log('self ' + str(self.get('selfPath')))\n"
+            "    watch('ghost.value', lambda v, p: None)\n"
+            "    log('ghost ' + str(get('ghost.value')))\n"
+            "    startTimer('t', 'fast')\n"
+            "    startTimer('t', True)\n"
+            "    saveSetting('k', 1, {'scop': 'script'})\n"
+            "    after(-5, lambda: None)\n"
+            "    startTimer('ok', 250)\n"));
+        runtime.loadScripts (juce::var (mistakeScripts));
+        host.logs.clear();
+        host.timerStarts.clear();
+        runtime.onPanelReady (true);
+        const auto logged = host.logs.joinIntoString (" | ");
+        check (host.logs.contains ("self 5"), "self.set and self.get work (they raised NameError before; got " + logged + ")");
+        check (host.logs.contains ("ghost None")
+                   && host.logs.indexOf ("get: control \"ghost\" not found on the active panel, so there is no answer.")
+                          == host.logs.indexOf ("ghost None") - 1,
+               "get() of a missing control says so once, and the watch on it says nothing (got " + logged + ")");
+        check (host.timerStarts.size() == 1 && host.timerStarts[0] == "ok",
+               "only the 250 ms timer reaches the host (got " + host.timerStarts.joinIntoString (", ") + ")");
+        for (const auto* line : {
+                 "ce.time.startTimer(\"t\"): \"fast\" is not a number of milliseconds, so no timer was started.",
+                 "ce.time.startTimer(\"t\"): the interval is not a number of milliseconds, so no timer was started.",
+                 "ce.storage.saveSetting: \"scop\" is not one of its options, so nothing was done. Its only option is scope.",
+                 "ce.time.after: -5 is less than 0 milliseconds, so nothing was scheduled." })
+            check (host.logs.contains (line), juce::String ("refused in Python: ") + line);
+    }
+
+    // An option key a call does not take refuses it, before the host sees anything, by the check
+    // gen-script-modules.mjs writes into the prelude, in the words of the other engines; the call
+    // answers what the member answers for any other refusal. In Python the options can be passed by
+    // the parameter's name too, and are checked there as well.
+    {
+        juce::Array<juce::var> optionScripts;
+        optionScripts.add (makeScript ("pyOptions", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    set('refused', 5, {'transmit': False, 'quiet': True})\n"
+            "    set('byName', 6, opts={'quiet': True})\n"
+            "    syncTimer('s', 1, {'folow': False})\n"
+            "    log('to ' + str(ce.anim.to('K.value', 1, {'easing': 'outBack'})))\n"
+            "    log('define ' + str(ce.device.defineParameter('cut', {'cc': 74, 'nrpn': {'mbs': 1}})))\n"
+            "    log('recall ' + str(recallPreset(0, {'rol': 'mainSynth'})['ok']))\n"
+            "    log('params ' + str(ce.device.parameters({'grp': 'Filter'})))\n"
+            "    log('read ' + str(ce.midi.read([1, 2], 0, 2, {'ordr': 'lsb', 1: 'a list entry'})))\n"
+            "    log('goodRead ' + str(ce.midi.read([1, 2], 0, 2, {'order': 'lsb'})))\n"
+            "    log('write ' + str(ce.midi.write([1, 2], 0, 2, 300, {'bit': 8})))\n"
+            "    log('byName ' + str(ce.midi.write([1, 2], 0, 2, 300, opts={'bit': 8})))\n"
+            "    log('goodWrite ' + str(ce.midi.write([0, 0], 0, 2, 300, {'bits': 8})))\n"
+            "    set('good', 7, {'transmit': False})\n"));
+        runtime.loadScripts (juce::var (optionScripts));
+        host.logs.clear();
+        host.timerStarts.clear();
+        runtime.onPanelReady (true);
+        const auto logged = host.logs.joinIntoString (" | ");
+        check (host.values.find ("refused") == host.values.end() && host.values.find ("byName") == host.values.end()
+                   && (int) host.values["good"] == 7,
+               "Options: a refused set() writes nothing, by position or by name, and the right one writes");
+        check (! host.timerStarts.contains ("s"), "Options: the refused sync timer is not started");
+        for (const auto* line : { "to False", "define False", "recall False", "params []", "read None", "goodRead 257",
+                                  "write None", "byName None", "goodWrite [1, 44]" })
+            check (host.logs.contains (line), juce::String ("Options: logs ") + line + " (got " + logged + ")");
+        for (const auto* line : {
+                 "set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit.",
+                 "ce.time.syncTimer: \"folow\" is not one of its options, so nothing was done. Its only option is follow.",
+                 "ce.anim.to: \"easing\" is not one of its options, so nothing was done. Its options are: duration, beats, "
+                     "sync, curve, damping, frequency, from, delay, stagger, repeat, pingpong, done.",
+                 "ce.device.defineParameter: \"nrpn.mbs\" is not one of its options, so nothing was done. The options of "
+                     "nrpn are: msb, lsb.",
+                 "ce.device.recallPreset: \"rol\" is not one of its options, so nothing was done. Its only option is role.",
+                 "ce.device.parameters: \"grp\" is not one of its options, so nothing was done. Its options are: role, "
+                     "query, group, type, access, limit.",
+                 "ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order.",
+                 "ce.midi.write: \"bit\" is not one of its options, so nothing was done. Its options are: bits, order." })
+            check (host.logs.contains (line), juce::String ("Options, refused in Python: ") + line);
+        const auto writeRefusals = std::count (host.logs.begin(), host.logs.end(),
+            juce::String ("ce.midi.write: \"bit\" is not one of its options, so nothing was done. Its options are: bits, order."));
+        check (writeRefusals == 2, "Options: ce.midi.write by the parameter's name is refused as well (got " + logged + ")");
+        const auto setRefusals = std::count (host.logs.begin(), host.logs.end(),
+            juce::String ("set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit."));
+        check (setRefusals == 2, "Options: set() by the parameter's name is refused as well (got " + logged + ")");
+    }
+
+    // get(path, form) and set(path, value, form) through BridgeScriptHost, the exported plug-in's
+    // host: a form that is not one refuses the call in the WebView runtime's words
+    // (scriptGetReports.test.js), naming the form meant, and nothing reaches the app; a right one
+    // reaches it with its form. Python's set always handed text on; it is the host that now reads it.
+    {
+        juce::StringArray formLogs, reached;
+        BridgeScriptHost::Callbacks fcb;
+        fcb.getValue = [&] (const juce::String& path, const juce::String& form)
+            { reached.add ("get " + path + " " + form); return juce::var (0.5); };
+        fcb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form)
+            { reached.add ("set " + path + " " + v.toString() + " " + form); };
+        fcb.log = [&] (const juce::String& m, const juce::var&) { formLogs.add (m); };
+        BridgeScriptHost formHost (std::move (fcb));
+        ScriptRuntime formRuntime (formHost);
+        formHost.attachRuntime (&formRuntime);
+        formRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        auto formScript = makeScript ("pyForms", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    log('a ' + str(get('cutoff', 'normalisedValue')))\n"
+            "    set('cutoff', 0.5, 'normalisedValue')\n"
+            "    self.set('value', 1, 'Normalized')\n"
+            "    log('b ' + str(self.get('value', '.normalizedValue')))\n"
+            "    log('c ' + str(get('cutoff', 'normalizedValue')))\n"
+            "    set('cutoff', 0.25, 'normalizedValue')\n"
+            "    set('cutoff', 120, {'transmit': False})\n");
+        formScript.getDynamicObject()->setProperty ("owner", "cutoff");   // self is the control
+        juce::Array<juce::var> formScripts;
+        formScripts.add (formScript);
+        formRuntime.loadScripts (juce::var (formScripts));
+        formRuntime.onPanelReady (true);
+
+        const juce::String forms = " The forms are value, normalizedValue and midiValue.";
+        const juce::StringArray expectedLogs {
+            "get(\"cutoff\"): \"normalisedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "a None",
+            "set(\"cutoff\"): \"normalisedValue\" is not a value form, so nothing was set." + forms + " Write normalizedValue.",
+            "set(\"cutoff.value\"): \"Normalized\" is not a value form, so nothing was set." + forms,
+            "get(\"cutoff.value\"): \".normalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "b None",
+            "c 0.5",
+        };
+        check (formLogs == expectedLogs,
+               "Forms: a form that is not one refuses get and set in Python, in the WebView's words (got "
+                   + formLogs.joinIntoString (" | ") + ")");
+        check (reached == juce::StringArray { "get cutoff normalizedValue", "set cutoff 0.25 normalizedValue", "set cutoff 120 value" },
+               "Forms: nothing refused reaches the app, and a right form, or set's options, does (got "
+                   + reached.joinIntoString (" | ") + ")");
+    }
+
+    // ce.midi byte lists in the embedded interpreter, with Python's own bytes and bytearray read as
+    // lists (scriptPreludeAgreement.test.js compares the arithmetic across engines).
+    {
+        juce::Array<juce::var> byteScripts;
+        byteScripts.add (makeScript ("pyBytes", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    msg = ce.midi.write(bytearray([0xF0, 0, 0, 0xF7]), 1, 2, 200)\n"
+            "    log('py ' + ce.midi.toHex(msg) + ' ' + str(ce.midi.getBits(b'\\x00\\xb4', 12, 3)) + ' ' + ce.midi.toBase64(b'\\xf0\\x41\\x10\\x42'))\n"));
+        runtime.loadScripts (juce::var (byteScripts));
+        host.logs.clear();
+        runtime.onPanelReady (true);
+        check (host.logs.contains ("py F0 01 48 F7 3 8EEQQg=="), "Bytes: ce.midi byte helpers answer in Python, reading bytes and bytearray (got "
+                   + host.logs.joinIntoString (" | ") + ")");
+    }
+
+    // Channel messages are checked in the prelude before they reach the host: an address outside its
+    // range is refused (CC 200 used to be CC 127), a fraction rounds half up as in the editor (this
+    // floored it), and a left-out argument is refused where Python raised a TypeError.
+    {
+        juce::Array<juce::var> sendScripts;
+        sendScripts.add (makeScript ("pySends", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    sendCC(1, 200, 5)\n"
+            "    sendCC(1, 7, 64.5)\n"
+            "    sendNote(1, 60)\n"
+            "    sendNote(1)\n"
+            "    sendTransport('pause')\n"
+            "    ce.midi.put([1, 2], 1)\n"
+            "    log('py ' + str(ce.midi.toHex([300])))\n"));
+        runtime.loadScripts (juce::var (sendScripts));
+        host.logs.clear();
+        host.ccSends.clear();
+        host.rawSends.clear();
+        runtime.onPanelReady (true);
+        check (host.ccSends.joinIntoString (" | ") == "1 7 65" && host.rawSends.isEmpty(),
+               "Sends: only the valid CC reaches the host, rounded half up (got " + host.ccSends.joinIntoString (" | ")
+                   + " / " + host.rawSends.joinIntoString (" | ") + ")");
+        check (host.logs.joinIntoString (" | ") ==
+                   "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
+                   "sendNote: no velocity given, so nothing was sent. | "
+                   "sendNote: no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or \"C4\". | "
+                   "sendTransport: \"pause\" is not a transport action, so nothing was sent. The actions are \"start\", \"continue\" and \"stop\". | "
+                   "ce.midi.put: no bytes given, so there is no answer. | "
+                   "ce.midi.toHex: 300 at position 0 is not a byte, so there is no answer. A byte is a whole number from 0 to 255, "
+                   "or one or two hex digits such as \"F7\". | "
+                   "py None",
+               "Sends: the rest are refused in the WebView runtime's words, a left-out argument included (got "
+                   + host.logs.joinIntoString (" | ") + ")");
+    }
+
+    // ce.math's colours and amounts, and ce.anim's target, in the embedded interpreter. An alpha left
+    // out raised TypeError here, a target of "100px" raised ValueError, and "#000" was refused with
+    // no word; scriptPreludeAgreement.test.js compares the words across engines. CSS's short forms
+    // are read as a colour property stores them ("#000" is "#000000" now, as it is for set()), by the
+    // prelude's own port with the generated names table: the rounding is JavaScript's half up (30% of
+    // 255 is 76.5, which is 77, where round() gives 76), and what a property refuses is refused.
+    {
+        juce::Array<juce::var> visualScripts;
+        visualScripts.add (makeScript ("pyVisual", "onPanelReady", "*",
+            "def onPanelReady(info):\n"
+            "    log('py ' + str(ce.math.hsl('#0008')) + ' ' + ce.math.lighten('336699', '0.5') + ' ' + str(ce.math.alpha('336699')))\n"
+            "    log('py css ' + ce.math.lighten('Red', 0.2) + ' ' + ce.math.alpha('#abc', 0.5) + ' '\n"
+            "        + str(ce.math.rgb('rgba(255, 0, 0, 0.5)')['r']) + ' ' + ce.math.mix('hsl(0, 0%, 30%)', 'transparent', 0)\n"
+            "        + ' ' + ce.math.darken('rgb(2.5 300 -4)', 1) + ' ' + str(ce.math.hsl('#000')['l']) + ' ' + str(ce.math.rgb(' red ')))\n"
+            "    ce.anim.to('cutoff', '100px')\n"
+            "    log('py done')\n"));
+        runtime.loadScripts (juce::var (visualScripts));
+        host.logs.clear();
+        runtime.onPanelReady (true);
+        const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
+        check (host.logs.contains ("py None #99B3CC None"), "Colours: ce.math refuses in Python, and reads text that is a number" + got);
+        check (host.logs.contains ("py css #FF3333 80AABBCC 255 #4D4D4D #03FF00 0.0 None"),
+               "Colours: ce.math reads CSS's short forms in Python" + got);
+        check (host.logs.contains ("py done"), "Colours: a refusal is a message, not an exception" + got);
+        for (const auto* line : {
+                 "ce.math.hsl: \"#0008\" is not a colour, so there is no answer. A colour is 6 hex digits (RRGGBB) "
+                 "or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). Write \"88000000\".",
+                 "ce.math.rgb: \" red \" is not a colour, so there is no answer. A colour is 6 hex digits (RRGGBB) "
+                 "or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl(). Write \"#FF0000\".",
+                 "ce.math.alpha: the alpha is a number from 0 to 1, and none was given, so there is no answer.",
+                 "ce.anim.to: \"100px\" is not a number, so nothing was started." })
+            check (host.logs.contains (line), juce::String ("Colours: refused in the WebView runtime's words: ") + line);
+    }
+
+    // ce.anim's `repeat` is the runs in all, and done(completed) gets one argument, True or False:
+    // the same moves as ScriptRuntimeTests.cpp §39b runs through the Lua and JavaScript preludes.
+    // done was handed a dict, { "path", "completed" } or { "paths", "completed" }, and a dict that is
+    // not empty is always true, so `if completed:` read a cancelled move as a finished one.
+    {
+        AnimHost animHost;
+        ScriptRuntime anim (animHost);
+        animHost.runtime = &anim;
+        juce::StringArray animErrors;
+        anim.setErrorLogger ([&animErrors] (const juce::String& line)
+            { animErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+        juce::Array<juce::var> animScripts;
+        animScripts.add (makeScript ("pyDone", "onDone", "*",
+            "def say(name):\n"
+            "    def done(*args):\n"
+            "        log(name + ' ' + str(len(args)) + ' ' + type(args[0]).__name__ + ' ' + str(args[0]))\n"
+            "    return done\n"
+            "def onDone(value=None):\n"
+            "    ce.anim.to('a', 1, { 'duration': 100, 'from': 0, 'done': say('a') })\n"
+            "    ce.anim.to('b', 1, { 'duration': 100, 'from': 0, 'done': say('b') })\n"
+            "    ce.anim.to('c', 1, { 'duration': 100, 'from': 0, 'done': say('c') })\n"
+            "    ce.anim.to(['d', 'e'], 1, { 'duration': 100, 'from': 0, 'stagger': 50, 'repeat': 2, 'done': say('d,e') })\n"
+            "    ce.anim.to(['f', 'g'], 1, { 'duration': 100, 'from': 0, 'done': say('f,g') })\n"
+            "    ce.anim.to('h', 1, { 'duration': 100, 'from': 0, 'repeat': 3, 'done': say('h') })\n"
+            "    ce.anim.to('i', 1, { 'duration': 100, 'from': 0, 'repeat': 0, 'done': say('i') })\n"
+            "    ce.anim.to('j', 1, { 'duration': 100, 'from': 0, 'done': say('j') })\n"
+            "    ce.anim.stop('b')\n"
+            "    ce.anim.finish('c')\n"
+            "    ce.anim.stop('f')\n"
+            "    ce.anim.to('j', 5, { 'duration': 100 })\n"));
+        anim.loadScripts (juce::var (animScripts));
+        auto steps = [&animHost] { const auto line = animHost.logs.joinIntoString (" | "); animHost.logs.clear(); return line; };
+        anim.tickAnimations (0.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onDone", "panel", juce::var());
+        const auto atStart = steps();
+        check (atStart == "b 1 bool False | c 1 bool True | j 1 bool False",
+               "ce.anim: stopped is done(False), finished done(True), replaced done(False), one argument each (got " + atStart + ")");
+        anim.tickAnimations (100.0);
+        const auto at100 = steps();
+        check (at100 == "a 1 bool True | f,g 1 bool False",
+               "ce.anim: arrived is done(True); a list with one stopped is done(False) once, after the last (got " + at100 + ")");
+        anim.tickAnimations (150.0);
+        anim.tickAnimations (200.0);
+        const auto at200 = steps();
+        check (at200.isEmpty() && ! anim.animationRunning ("d") && anim.animationRunning ("e") && anim.animationRunning ("h"),
+               "ce.anim: repeat = 2 is two runs; the staggered one is still on its second, so no done yet (got " + at200 + ")");
+        anim.tickAnimations (250.0);
+        anim.tickAnimations (300.0);
+        const auto at300 = steps();
+        check (at300 == "d,e 1 bool True | h 1 bool True",
+               "ce.anim: the list's done comes once; repeat = 3 ends on the third (got " + at300 + ")");
+        anim.tickAnimations (1300.0);
+        check (anim.animationRunning ("i"), "ce.anim: repeat = 0 runs until it is stopped");
+        anim.stopAnimation();
+        const auto atStop = steps();
+        check (atStop == "i 1 bool False", "ce.anim: ...and stopping it is done(False) (got " + atStop + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised doing any of it");
+
+        // Two Python scripts each run this prelude in a namespace of their own, so each counted its
+        // lists from 1 and the host counted its own: the first list's end called both dones, and the
+        // second's called none. And a path replaced by a move with its own done called the new one.
+        juce::Array<juce::var> twoScripts;
+        twoScripts.add (makeScript ("pyA", "onGo", "*",
+            "def onGo(value=None):\n"
+            "    ce.anim.to(['p', 'q'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('A list ' + str(c)) })\n"
+            "    ce.anim.to('x', 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('A x ' + str(c)) })\n"));
+        twoScripts.add (makeScript ("pyB", "onGo", "*",
+            "def onGo(value=None):\n"
+            "    ce.anim.to(['r', 's'], 1, { 'duration': 200, 'from': 0, 'done': lambda c: log('B list ' + str(c)) })\n"
+            "    ce.anim.to('x', 2, { 'duration': 100, 'from': 0, 'done': lambda c: log('B x ' + str(c)) })\n"));
+        anim.loadScripts (juce::var (twoScripts));
+        anim.tickAnimations (2000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onGo", "panel", juce::var());
+        const auto twoStart = steps();
+        check (twoStart == "A x False", "ce.anim: the replaced move's own done gets False (got " + twoStart + ")");
+        anim.tickAnimations (2100.0);
+        const auto two100 = steps();
+        check (two100 == "A list True | B x True", "ce.anim: one script's list ends its own done only (got " + two100 + ")");
+        anim.tickAnimations (2200.0);
+        const auto two200 = steps();
+        check (two200 == "B list True", "ce.anim: …and the other's ends its (got " + two200 + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised doing that either");
+
+        // An envelope's shape is sampled in the prelude with mapCurve(). The sampler called map(),
+        // which here is Python's own: float() of a map object raised, the guard read it as 0, and
+        // every sample was 0, so the value sat at `from` for the whole move without a word.
+        juce::Array<juce::var> envelopeScripts;
+        envelopeScripts.add (makeScript ("pyEnvelope", "onEnvelope", "*",
+            "def onEnvelope(value=None):\n"
+            "    ok = ce.anim.envelope('e', [{ 'x': 0, 'y': 0 }, { 'x': 0.5, 'y': 1 }, { 'x': 1, 'y': 0 }],\n"
+            "                          { 'duration': 1000, 'from': 0, 'to': 100 })\n"
+            "    log('started ' + str(ok))\n"));
+        anim.loadScripts (juce::var (envelopeScripts));
+        anim.tickAnimations (3000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onEnvelope", "panel", juce::var());
+        const auto envelopeStart = steps();
+        check (envelopeStart == "started True", "ce.anim.envelope starts a move (got " + envelopeStart + ")");
+        anim.tickAnimations (3250.0);
+        check (std::abs ((double) animHost.values["e"] - 50.0) < 0.5,
+               "ce.anim.envelope: the prelude samples the shape, so the value climbs: 50 a quarter of the way in (got "
+                   + animHost.values["e"].toString() + ")");
+        anim.tickAnimations (3500.0);
+        check (std::abs ((double) animHost.values["e"] - 100.0) < 0.5, "ce.anim.envelope: …peaks halfway");
+        anim.tickAnimations (4000.0);
+        check (std::abs ((double) animHost.values["e"]) < 0.5, "ce.anim.envelope: …and comes back down to 0");
+        check (animErrors.isEmpty(), "ce.anim.envelope: no script raised");
+
+        // A list with a colour property in it is refused whole, in every verb: each colour named in
+        // the words one path is refused in, nothing started, the list's done never called, and the
+        // call answers False, as it does for a target that is not a number. The colour alone was
+        // refused and the rest moved, and the list's done waited for a path that never started.
+        juce::Array<juce::var> listScripts;
+        listScripts.add (makeScript ("pyList", "onList", "*",
+            "def onList(value=None):\n"
+            "    a = ce.anim.to(['m', 'lbl.colour', 'n', 'top.colour'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('to done ' + str(c)) })\n"
+            "    b = ce.anim.spring(['m', 'lbl.colour'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('spring done ' + str(c)) })\n"
+            "    c = ce.anim.envelope(['m', 'lbl.colour'], [{ 'x': 0, 'y': 0 }, { 'x': 1, 'y': 1 }], { 'duration': 100, 'done': lambda c: log('envelope done ' + str(c)) })\n"
+            "    d = ce.anim.to('m', 'wide')\n"
+            "    e = ce.anim.to(['m', 'n'], 1, { 'duration': 100, 'from': 0, 'done': lambda c: log('numbers done ' + str(c)) })\n"
+            "    log('answers ' + str(a) + ' ' + str(b) + ' ' + str(c) + ' ' + str(d) + ' ' + str(e))\n"));
+        anim.loadScripts (juce::var (listScripts));
+        anim.tickAnimations (5000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onList", "panel", juce::var());
+        const auto listStart = steps();
+        check (listStart == "ce.anim.to: \"lbl.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.to: \"top.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.spring: \"lbl.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.envelope: \"lbl.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                            "ce.anim.to: \"wide\" is not a number, so nothing was started. | "
+                            "answers False False False False True",
+               "ce.anim: a list with a colour in it is refused whole, each colour named, and answers False (got " + listStart + ")");
+        anim.tickAnimations (5100.0);
+        const auto listEnd = steps();
+        check (listEnd == "numbers done True",
+               "ce.anim: only the list that started calls its done (got " + listEnd + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised refusing a list");
+    }
 
     // ---- Two instances in one process ------------------------------------------------------------
     // What the user asked for: every instance of a panel is on its own, even two copies of the same

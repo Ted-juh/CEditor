@@ -9299,7 +9299,7 @@
         "Core": {"name":"scPegDecay","id":"an1x_scPegDecay_118","description":"PEG Decay (-64..+63) — 10 10 03","controlType":"CustomComponent"},
         "Transform": {"x":32,"y":504,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -9325,7 +9325,7 @@
         "Core": {"name":"scPegDepth","id":"an1x_scPegDepth_120","description":"PEG Depth (-64..+63 semitones) — 10 10 04","controlType":"CustomComponent"},
         "Transform": {"x":78,"y":504,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10338,7 +10338,7 @@
         "Core": {"name":"scMixVco1","id":"an1x_scMixVco1_201","description":"Mixer VCO1 Level — 10 10 29","controlType":"CustomComponent"},
         "Transform": {"x":1430,"y":430,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10364,7 +10364,7 @@
         "Core": {"name":"scMixVco2","id":"an1x_scMixVco2_203","description":"Mixer VCO2 Level — 10 10 2A","controlType":"CustomComponent"},
         "Transform": {"x":1476,"y":430,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10390,7 +10390,7 @@
         "Core": {"name":"scMixRing","id":"an1x_scMixRing_205","description":"Mixer Ring Mod Level — 10 10 2B","controlType":"CustomComponent"},
         "Transform": {"x":1522,"y":430,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10416,7 +10416,7 @@
         "Core": {"name":"scMixNoise","id":"an1x_scMixNoise_207","description":"Mixer Noise Level — 10 10 2C","controlType":"CustomComponent"},
         "Transform": {"x":1568,"y":430,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10604,7 +10604,7 @@
         "Core": {"name":"scFegAttack","id":"an1x_scFegAttack_222","description":"Filter EG Attack Time — 10 10 2D","controlType":"CustomComponent"},
         "Transform": {"x":1636,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10630,7 +10630,7 @@
         "Core": {"name":"scFegDecay","id":"an1x_scFegDecay_224","description":"Filter EG Decay Time — 10 10 2E","controlType":"CustomComponent"},
         "Transform": {"x":1682,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10656,7 +10656,7 @@
         "Core": {"name":"scFegSustain","id":"an1x_scFegSustain_226","description":"Filter EG Sustain Level — 10 10 2F","controlType":"CustomComponent"},
         "Transform": {"x":1728,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10682,7 +10682,7 @@
         "Core": {"name":"scFegRelease","id":"an1x_scFegRelease_228","description":"Filter EG Release Time — 10 10 30","controlType":"CustomComponent"},
         "Transform": {"x":1774,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10708,7 +10708,7 @@
         "Core": {"name":"scFegDepth","id":"an1x_scFegDepth_230","description":"Filter EG Depth (-128..+127) — 10 10 35","controlType":"CustomComponent"},
         "Transform": {"x":1836,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":255,"step":1,"defaultValue":148,"currentValue":148},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10734,7 +10734,7 @@
         "Core": {"name":"scFegVelocity","id":"an1x_scFegVelocity_232","description":"Filter EG Velocity Sens (-64..+63) — 10 10 37","controlType":"CustomComponent"},
         "Transform": {"x":1882,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10870,7 +10870,7 @@
         "Core": {"name":"scAegAttack","id":"an1x_scAegAttack_243","description":"Amp EG Attack Time — 10 10 3A","controlType":"CustomComponent"},
         "Transform": {"x":2046,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10896,7 +10896,7 @@
         "Core": {"name":"scAegDecay","id":"an1x_scAegDecay_245","description":"Amp EG Decay Time — 10 10 3B","controlType":"CustomComponent"},
         "Transform": {"x":2092,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10922,7 +10922,7 @@
         "Core": {"name":"scAegSustain","id":"an1x_scAegSustain_247","description":"Amp EG Sustain Level — 10 10 3C","controlType":"CustomComponent"},
         "Transform": {"x":2138,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10948,7 +10948,7 @@
         "Core": {"name":"scAegRelease","id":"an1x_scAegRelease_249","description":"Amp EG Release Time — 10 10 3D","controlType":"CustomComponent"},
         "Transform": {"x":2184,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -10974,7 +10974,7 @@
         "Core": {"name":"scVariDryWet","id":"an1x_scVariDryWet_251","description":"Variation Dry:Wet (D63>W..D<W63) — 10 10 42","controlType":"CustomComponent"},
         "Transform": {"x":2254,"y":580,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","min":1,"max":127,"step":1,"defaultValue":1,"currentValue":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -12036,7 +12036,7 @@
         "Core": {"name":"scene2_scPegDecay","id":"an1x_scene2_scPegDecay_333","description":"PEG Decay (-64..+63) (Scene 2) — 10 11 03","controlType":"CustomComponent"},
         "Transform": {"x":32,"y":902,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -12062,7 +12062,7 @@
         "Core": {"name":"scene2_scPegDepth","id":"an1x_scene2_scPegDepth_335","description":"PEG Depth (-64..+63 semitones) (Scene 2) — 10 11 04","controlType":"CustomComponent"},
         "Transform": {"x":78,"y":902,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13075,7 +13075,7 @@
         "Core": {"name":"scene2_scMixVco1","id":"an1x_scene2_scMixVco1_416","description":"Mixer VCO1 Level (Scene 2) — 10 11 29","controlType":"CustomComponent"},
         "Transform": {"x":1430,"y":828,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13101,7 +13101,7 @@
         "Core": {"name":"scene2_scMixVco2","id":"an1x_scene2_scMixVco2_418","description":"Mixer VCO2 Level (Scene 2) — 10 11 2A","controlType":"CustomComponent"},
         "Transform": {"x":1476,"y":828,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13127,7 +13127,7 @@
         "Core": {"name":"scene2_scMixRing","id":"an1x_scene2_scMixRing_420","description":"Mixer Ring Mod Level (Scene 2) — 10 11 2B","controlType":"CustomComponent"},
         "Transform": {"x":1522,"y":828,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13153,7 +13153,7 @@
         "Core": {"name":"scene2_scMixNoise","id":"an1x_scene2_scMixNoise_422","description":"Mixer Noise Level (Scene 2) — 10 11 2C","controlType":"CustomComponent"},
         "Transform": {"x":1568,"y":828,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13341,7 +13341,7 @@
         "Core": {"name":"scene2_scFegAttack","id":"an1x_scene2_scFegAttack_437","description":"Filter EG Attack Time (Scene 2) — 10 11 2D","controlType":"CustomComponent"},
         "Transform": {"x":1636,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13367,7 +13367,7 @@
         "Core": {"name":"scene2_scFegDecay","id":"an1x_scene2_scFegDecay_439","description":"Filter EG Decay Time (Scene 2) — 10 11 2E","controlType":"CustomComponent"},
         "Transform": {"x":1682,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13393,7 +13393,7 @@
         "Core": {"name":"scene2_scFegSustain","id":"an1x_scene2_scFegSustain_441","description":"Filter EG Sustain Level (Scene 2) — 10 11 2F","controlType":"CustomComponent"},
         "Transform": {"x":1728,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13419,7 +13419,7 @@
         "Core": {"name":"scene2_scFegRelease","id":"an1x_scene2_scFegRelease_443","description":"Filter EG Release Time (Scene 2) — 10 11 30","controlType":"CustomComponent"},
         "Transform": {"x":1774,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13445,7 +13445,7 @@
         "Core": {"name":"scene2_scFegDepth","id":"an1x_scene2_scFegDepth_445","description":"Filter EG Depth (-128..+127) (Scene 2) — 10 11 35","controlType":"CustomComponent"},
         "Transform": {"x":1836,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":255,"step":1,"defaultValue":148,"currentValue":148},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13471,7 +13471,7 @@
         "Core": {"name":"scene2_scFegVelocity","id":"an1x_scene2_scFegVelocity_447","description":"Filter EG Velocity Sens (-64..+63) (Scene 2) — 10 11 37","controlType":"CustomComponent"},
         "Transform": {"x":1882,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13607,7 +13607,7 @@
         "Core": {"name":"scene2_scAegAttack","id":"an1x_scene2_scAegAttack_458","description":"Amp EG Attack Time (Scene 2) — 10 11 3A","controlType":"CustomComponent"},
         "Transform": {"x":2046,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13633,7 +13633,7 @@
         "Core": {"name":"scene2_scAegDecay","id":"an1x_scene2_scAegDecay_460","description":"Amp EG Decay Time (Scene 2) — 10 11 3B","controlType":"CustomComponent"},
         "Transform": {"x":2092,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13659,7 +13659,7 @@
         "Core": {"name":"scene2_scAegSustain","id":"an1x_scene2_scAegSustain_462","description":"Amp EG Sustain Level (Scene 2) — 10 11 3C","controlType":"CustomComponent"},
         "Transform": {"x":2138,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":127,"currentValue":127},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13685,7 +13685,7 @@
         "Core": {"name":"scene2_scAegRelease","id":"an1x_scene2_scAegRelease_464","description":"Amp EG Release Time (Scene 2) — 10 11 3D","controlType":"CustomComponent"},
         "Transform": {"x":2184,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -13711,7 +13711,7 @@
         "Core": {"name":"scene2_scVariDryWet","id":"an1x_scene2_scVariDryWet_466","description":"Variation Dry:Wet (D63>W..D<W63) (Scene 2) — 10 11 42","controlType":"CustomComponent"},
         "Transform": {"x":2254,"y":978,"width":30,"height":104},
         "Parts": {
-          "_drawing": "a28d0287"
+          "_drawing": "435dfd9f"
         },
         "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","min":1,"max":127,"step":1,"defaultValue":1,"currentValue":1},"_removed":["mainValue","mode"]}},
         "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"slider","valueChannel":"value","valueChannels":["value"],"dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
@@ -17924,7 +17924,7 @@
         "name2": {"name":"name2","zIndex":8,"_children":{"Layout":{"x":22,"y":35,"width":84,"height":13,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Text":{"content":"Both","_children":{"Fill":{"colour":"FFC3CDD6"},"Font":{"weight":"SemiBold","weightValue":600,"size":9},"Position":{"justification":"centredLeft"}},"_type":"Text"}},"_type":"Part"}
       }
     },
-    "a28d0287": {
+    "435dfd9f": {
       "_children": {
         "tick0": {"name":"tick0","_children":{"Layout":{"x":4,"y":8.5,"width":5,"height":1,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FF9AA6B0"},"Border":{"enabled":false,"thickness":0,"colour":"00000000"},"Corners":{"linked":true}},"_type":"Background"}},"_type":"Part"},
         "tickR0": {"name":"tickR0","_children":{"Layout":{"x":21,"y":8.5,"width":5,"height":1,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FF9AA6B0"},"Border":{"enabled":false,"thickness":0,"colour":"00000000"},"Corners":{"linked":true}},"_type":"Background"}},"_type":"Part"},
@@ -17950,7 +17950,7 @@
         "tickR10": {"name":"tickR10","_children":{"Layout":{"x":21,"y":95.5,"width":5,"height":1,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FF9AA6B0"},"Border":{"enabled":false,"thickness":0,"colour":"00000000"},"Corners":{"linked":true}},"_type":"Background"}},"_type":"Part"},
         "slot": {"name":"slot","zIndex":1,"_children":{"Layout":{"x":11,"y":4,"width":8,"height":96,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FF0C0F11"},"Border":{"thickness":1,"colour":"66000000"},"Corners":{"linked":true,"radius":4}},"_type":"Background"}},"_type":"Part"},
         "fill": {"name":"fill","zIndex":2,"_children":{"Layout":{"x":12,"y":96,"width":6,"height":4,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FF3D4C57"},"Border":{"enabled":false,"thickness":0,"colour":"00000000"},"Corners":{"linked":true,"radius":3}},"_type":"Background"}},"_type":"Part"},
-        "cap": {"name":"cap","zIndex":6,"_children":{"Layout":{"x":2,"y":89,"width":26,"height":13,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FFE7ECF0"},"Border":{"thickness":1,"colour":"FF11151800"},"Corners":{"linked":true,"radius":2}},"_type":"Background"}},"_type":"Part"},
+        "cap": {"name":"cap","zIndex":6,"_children":{"Layout":{"x":2,"y":89,"width":26,"height":13,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FFE7ECF0"},"Border":{"thickness":1,"colour":"FF111518"},"Corners":{"linked":true,"radius":2}},"_type":"Background"}},"_type":"Part"},
         "capLine": {"name":"capLine","zIndex":7,"_children":{"Layout":{"x":5,"y":95,"width":20,"height":1,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"55000000"},"Border":{"enabled":false,"thickness":0,"colour":"00000000"},"Corners":{"linked":true}},"_type":"Background"}},"_type":"Part"}
       }
     },

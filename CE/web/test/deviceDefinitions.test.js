@@ -6,13 +6,19 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   defineParameter, defineDump, definedParameters, definedParameter, encodeParameter,
-  dumpRequestBytes, decodeDump, clearDeviceDefinitions, deviceDefinitionCounts, hasDefinedDump,
+  dumpRequestBytes, decodeDump, buildDump, clearDeviceDefinitions, deviceDefinitionCounts, hasDefinedDump,
 } from '../src/CE_Application/scripting/deviceDefinitions.js';
+import { checksumNames } from '../src/CE_Application/utils/checksums.js';
 
 const ROLE = 'mainSynth';
+
+/** The cases CE/tests/ScriptRuntimeTests.cpp runs through the player's codec as well. */
+const CASES = JSON.parse(readFileSync(new URL('./fixtures/deviceCodecCases.json', import.meta.url), 'utf8'));
+const hexOf = (bytes) => bytes.map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 
 test.beforeEach(() => clearDeviceDefinitions());
 
@@ -101,6 +107,38 @@ test('$checksumStart is what makes a Roland checksum right rather than nearly ri
   ]);
 });
 
+test('a Roland template without $checksumStart is defined, with a warning that says why it will fail', () => {
+  // The marker is documented rather than inferred, so the definition stands; but without it the
+  // checksum covers the header too, and the synth ignores every message. This says so up front.
+  const warning = 'defineParameter("lvl"): this is a Roland template (41 after F0) with $checksum and no '
+    + '$checksumStart, so the checksum includes the header, and a Roland synth ignores the message. '
+    + 'Put $checksumStart where the address begins.';
+  const missing = defineParameter(ROLE, 'lvl', {
+    sysex: ['F0', '41', '10', '42', '12', '40', '01', '33', '$value', '$checksum', 'F7'], min: 0, max: 127,
+  });
+  assert.equal(missing.ok, true);
+  assert.equal(missing.warning, warning);
+  // The bytes it will send, to show the warning is about something real: 27 where 4C is right.
+  assert.deepEqual(encodeParameter(ROLE, 'lvl', 64).bytes.slice(-2), [0x27, 0xf7]);
+
+  // With F0 left off, 41 is still the first byte.
+  assert.equal(defineParameter(ROLE, 'lvl', { sysex: ['41', '10', '42', '12', '$value', '$checksum'] }).warning, warning);
+
+  const marked = defineParameter(ROLE, 'lvl', {
+    sysex: ['F0', '41', '10', '42', '12', '$checksumStart', '40', '01', '33', '$value', '$checksum', 'F7'],
+    min: 0, max: 127,
+  });
+  assert.equal(marked.warning, undefined, 'with the marker there is nothing to say');
+  assert.deepEqual(encodeParameter(ROLE, 'lvl', 64).bytes.slice(-2), [0x4c, 0xf7]);
+
+  for (const quiet of [
+    { sysex: ['F0', '43', '10', '$value', '$checksum', 'F7'] },   // not Roland
+    { sysex: ['F0', '41', '10', '42', '12', '$value', 'F7'] },    // no checksum asked for
+  ]) {
+    assert.equal(defineParameter(ROLE, 'q', quiet).warning, undefined, JSON.stringify(quiet.sysex));
+  }
+});
+
 test('a u14 value occupies two template bytes', () => {
   defineParameter(ROLE, 'p', { sysex: ['7d', '$value'], encoding: 'u14', min: 0, max: 16383 });
   assert.deepEqual(encodeParameter(ROLE, 'p', 300).bytes, [0xf0, 0x7d, 2, 44, 0xf7]);
@@ -185,6 +223,125 @@ test('a text field decodes as text, through the codec the local engine already h
   const decoded = decodeDump(ROLE, 'F0 7D 4C 65 61 64 F7');
   assert.equal(decoded.ok, true);
   assert.equal(decoded.values.name, 'Lead');
+});
+
+/* ----------------------------------------------- the cases the player runs too, word for word */
+// fixtures/deviceCodecCases.json is read by ScriptRuntimeTests.cpp as well, so every case below
+// is a promise that the exported plug-in defines, sends, refuses and decodes exactly the same.
+
+test('the shared cases list the checksums ce.midi.checksum does', () => {
+  assert.equal(CASES.checksumNames, checksumNames().join(', '));
+});
+
+for (const c of CASES.parameters) {
+  test(`parameter, in both runtimes: ${c.case}`, () => {
+    const r = defineParameter(ROLE, 'p', c.spec);
+    if (c.error) {
+      assert.equal(r.ok, false, 'it was defined');
+      assert.equal(r.error, c.error);
+      assert.equal(deviceDefinitionCounts(ROLE).parameters, 0, 'refused means not registered');
+      return;
+    }
+    assert.equal(r.ok, true, r.error);
+    assert.equal(r.warning, c.warning);
+    if (c.max !== undefined) assert.equal(r.parameter.max, c.max);
+    for (const w of c.writes ?? []) {
+      const encoded = encodeParameter(ROLE, 'p', w.value);
+      if (w.error) {
+        assert.equal(encoded.ok, false, `${JSON.stringify(w.value)} was sent`);
+        // deviceValueWrite in panelRuntime.js puts the call in front, as the player does.
+        assert.equal(`deviceWrite("p"): ${encoded.error}`, w.error);
+      } else {
+        assert.equal(encoded.ok, true, encoded.error);
+        assert.equal(hexOf(encoded.bytes), w.bytes, `writing ${JSON.stringify(w.value)}`);
+      }
+    }
+  });
+}
+
+for (const c of CASES.dumps) {
+  test(`dump, in both runtimes: ${c.case}`, () => {
+    for (const [id, spec] of Object.entries(c.parameters ?? { cutoff: { cc: 74 } })) {
+      assert.equal(defineParameter(ROLE, id, spec).ok, true);
+    }
+    const r = defineDump(ROLE, 'd', c.spec);
+    if (c.error) {
+      assert.equal(r.ok, false, 'it was defined');
+      assert.equal(r.error, c.error);
+      assert.equal(hasDefinedDump(ROLE, 'd'), false, 'refused means not registered');
+      return;
+    }
+    assert.equal(r.ok, true, r.error);
+    if (c.request) assert.equal(hexOf(dumpRequestBytes(ROLE, 'd')), c.request);
+    for (const d of c.decodes ?? []) {
+      const decoded = decodeDump(ROLE, d.hex);
+      if (d.values === null) {
+        assert.equal(decoded.ok, false, `${d.hex} decoded to ${JSON.stringify(decoded.values)}`);
+      } else {
+        assert.equal(decoded.ok, true, `${d.hex}: ${decoded.error}`);
+        assert.deepEqual(decoded.values, d.values);
+      }
+    }
+  });
+}
+
+/* ----------------------------------------------------------- what a JSON fixture cannot say */
+
+test('a Lua table with a hole is read the way the player reads it', () => {
+  // wasmoon hands { 0xF0, nil, 0x41 } over as { 1: 240, 3: 65 }. The player's Lua bridge counts two
+  // keys and reads t[1] and t[2], so it sees F0 and nothing, and refuses at position 1.
+  const r = defineParameter(ROLE, 'p', { sysex: { 1: 0xf0, 3: 0x41 } });
+  assert.equal(r.error, 'defineParameter("p"): in the sysex template, nothing at position 1 is not a byte, '
+    + 'so the parameter was not defined.');
+  // A whole sequence that arrived as an object is read in order.
+  assert.equal(defineParameter(ROLE, 'q', { sysex: { 1: 0x7d, 2: '$value' } }).ok, true);
+  assert.deepEqual(encodeParameter(ROLE, 'q', 3).bytes, [0xf0, 0x7d, 3, 0xf7]);
+});
+
+test('a typed array is a list of bytes', () => {
+  assert.equal(defineParameter(ROLE, 'p', { cc: 1 }).ok, true);
+  const r = defineDump(ROLE, 'd', {
+    request: new Uint8Array([0xf0, 0x7d, 0x00, 0xf7]),
+    match: { prefix: ['f0', '7d'] },
+    fields: [{ parameter: 'p', offset: 2 }],
+  });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(dumpRequestBytes(ROLE, 'd'), [0xf0, 0x7d, 0x00, 0xf7]);
+});
+
+test('buildDump puts a checksum named as text where decoding looks for it', () => {
+  // The name alone used to be dropped, so buildDump sent a dump with no checksum at all.
+  defineParameter(ROLE, 'a', { cc: 1 });
+  defineParameter(ROLE, 'b', { cc: 2 });
+  assert.equal(defineDump(ROLE, 'd', {
+    match: { prefix: ['F0', '7D', '12'], suffix: ['F7'] },
+    offset: 3, size: 2, checksum: 'roland-7bit',
+    fields: [{ parameter: 'a', offset: 0 }, { parameter: 'b', offset: 1 }],
+  }).ok, true);
+  const built = buildDump(ROLE, 'd', { a: 0x10, b: 0x40 });
+  assert.equal(built.ok, true, built.error);
+  assert.equal(built.hex, 'F0 7D 12 10 40 30 F7');      // (128 - 0x50) % 128 = 0x30
+  assert.equal(built.checksumStatus, 'ok');
+  assert.deepEqual(decodeDump(ROLE, built.hex).values, { a: 0x10, b: 0x40 });
+
+  // …and one wider than a byte takes its full width there too.
+  clearDeviceDefinitions();
+  defineParameter(ROLE, 'a', { cc: 1 });
+  defineDump(ROLE, 'd', {
+    match: { prefix: ['F0', '7D', '12'], suffix: ['F7'] }, offset: 3, size: 5, checksum: 'crc16',
+    fields: [{ parameter: 'a', offset: 0 }],
+  });
+  const wide = buildDump(ROLE, 'd', { a: 0x40 });
+  assert.equal(wide.hex, 'F0 7D 12 40 00 00 00 00 00 00 64 F7');   // crc16 of 40 00 00 00 00, in three bytes
+  assert.equal(decodeDump(ROLE, wide.hex).ok, true, wide.hex);
+});
+
+test('a definition made with text choices reports the range it really has', () => {
+  const r = defineParameter(ROLE, 'f', { type: 'choice', cc: 70, choices: ['LP', 'HP', 'BP'] });
+  assert.equal(r.parameter.min, 0);
+  assert.equal(r.parameter.max, 2);
+  // With a max given, that max is kept.
+  assert.equal(defineParameter(ROLE, 'g', { type: 'choice', cc: 70, max: 10, choices: ['LP', 'HP'] }).parameter.max, 10);
 });
 
 /* ------------------------------------------------------------------------- roles and clearing */

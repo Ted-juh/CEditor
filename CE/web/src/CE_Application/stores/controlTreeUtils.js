@@ -39,10 +39,18 @@ export function valueAtPath(control, path) {
   return current;
 }
 
-function getDefaultChildTemplate(typeName, childName) {
+/**
+ * The template a missing child `childName` of a node of type `typeName` is made from, by its exact
+ * name, or undefined: a child its section's template lists, or one of the optional effect targets,
+ * which materialise only when edited. The template itself, not a copy: deepClone it before use.
+ * set() makes a child from it on the way down a path, and ce.panel.create and clone when their props
+ * give one inside a section.
+ */
+export function getDefaultChildTemplate(typeName, childName) {
   if (!typeName || !childName) return undefined;
-  const sectionDefaults = SECTION_DEFAULTS[typeName];
-  const child = sectionDefaults?._children?.[childName];
+  const children = SECTION_DEFAULTS[typeName]?._children;
+  // An own key only: "__proto__" and "constructor" are on every object's prototype.
+  const child = children && Object.hasOwn(children, childName) ? children[childName] : undefined;
   if (child !== undefined) return child;
   // Optional effect targets materialise only when edited; ordinary backgrounds stay small.
   if (((typeName === 'Background' || typeName === 'Border') && childName === 'Effects')
@@ -78,6 +86,10 @@ function resolveWriteTarget(control, path, create) {
 
   for (let index = 1; index < parts.length - 1; index += 1) {
     const key = parts[index];
+    // A step onto a value that holds nothing leads nowhere: a gradient a control has not been given
+    // is null, and a path to one of its stops threw "Cannot read properties of null" from set() and
+    // get() rather than saying the path leads nowhere.
+    if (current === null || typeof current !== 'object') return null;
 
     if (Array.isArray(current) && isArrayIndexSegment(key)) {
       const nextIndex = Number(key);

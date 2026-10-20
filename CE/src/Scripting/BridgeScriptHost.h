@@ -13,10 +13,118 @@
 // THREADING: all calls happen on the message thread, inside a dispatch.
 
 #include "ScriptRuntime.h"
+#include "ScriptColours.h"
+#include <cmath>
 #include <map>
+#include <set>
 
 namespace ceditor::scripting
 {
+
+// Hex text is read a token at a time, and a token is one byte: one or two hex digits, with or
+// without 0x. A longer token was read as ONE number and the low byte kept, so "F0411000" went out
+// as F0 00 F7 (the WebView runtime clamped it and sent F0 FF F7), and neither said anything. These
+// find the token that is not one byte and say so, in the same words as scriptBytes in the WebView
+// runtime (panelRuntime.js). Splits on the same separators in every runtime: space, tab, the line
+// breaks, form feed, vertical tab and the comma (Lua's %s, and not JavaScript's \s, which would also
+// take a no-break space).
+inline juce::StringArray hexTextTokens (const juce::String& text)
+{
+    auto tokens = juce::StringArray::fromTokens (text, " ,\t\r\n\f\v", "");
+    tokens.removeEmptyStrings();
+    return tokens;
+}
+
+/** One hex byte's value, or -1 when the text is not one byte. */
+inline int hexTextByte (const juce::String& token)
+{
+    const auto digits = token.startsWithIgnoreCase ("0x") ? token.substring (2) : token;
+    if (digits.isEmpty() || digits.length() > 2 || ! digits.containsOnly ("0123456789abcdefABCDEF")) return -1;
+    return digits.getHexValue32();
+}
+
+/** The first token of `bytes`' hex text that is not one byte, or empty when it is all bytes (or not
+ *  text at all: a list of numbers is never refused here). */
+inline juce::String firstTokenNotOneByte (const juce::var& bytes)
+{
+    if (! bytes.isString()) return {};
+    for (const auto& token : hexTextTokens (bytes.toString()))
+        if (hexTextByte (token) < 0) return token;
+    return {};
+}
+
+/** How a refusal shows a value a script passed, in the same words as the WebView runtime's
+ *  shownValue and the preludes' __shownValue, whichever engine it came from: "nothing", NaN and
+ *  Infinity as JavaScript writes them, a whole number without ".0", text in quotes, "a list". */
+inline juce::String shownScriptValue (const juce::var& v)
+{
+    if (v.isVoid() || v.isUndefined()) return "nothing";
+    if (v.isBool()) return static_cast<bool> (v) ? "true" : "false";
+    if (v.isInt() || v.isInt64()) return juce::String (static_cast<juce::int64> (v));
+    if (v.isDouble())
+    {
+        const double d = v;
+        if (std::isnan (d)) return "NaN";
+        if (std::isinf (d)) return d > 0 ? "Infinity" : "-Infinity";
+        if (d == std::floor (d) && std::abs (d) < 9007199254740992.0) return juce::String (static_cast<juce::int64> (d));
+        return juce::String (d);
+    }
+    if (v.isString()) return "\"" + v.toString() + "\"";
+    if (v.isMethod()) return "a function";
+    return "a list";
+}
+
+/** Text that is a decimal number, as the WebView runtime's realNumber reads it ("64", " -1.5 ",
+ *  "2e3"), into `out`; false for anything else, hex and "inf" included. */
+inline bool decimalTextValue (const juce::String& text, double& out)
+{
+    const auto t = text.trim();
+    int i = 0, digits = 0;
+    if (t[i] == '+' || t[i] == '-') ++i;
+    while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; }
+    if (t[i] == '.') { ++i; while (juce::CharacterFunctions::isDigit (t[i])) { ++i; ++digits; } }
+    if (digits == 0) return false;
+    if (t[i] == 'e' || t[i] == 'E')
+    {
+        ++i;
+        if (t[i] == '+' || t[i] == '-') ++i;
+        if (! juce::CharacterFunctions::isDigit (t[i])) return false;
+        while (juce::CharacterFunctions::isDigit (t[i])) ++i;
+    }
+    if (i != t.length()) return false;
+    out = t.getDoubleValue();
+    return std::isfinite (out);
+}
+
+/** One item of a script's list of bytes: a whole number from 0 to 255, or text that is one hex
+ *  byte. -1 when it is neither. */
+inline int scriptListByte (const juce::var& v)
+{
+    if (v.isInt() || v.isInt64())
+    {
+        const auto n = static_cast<juce::int64> (v);
+        return n >= 0 && n <= 255 ? static_cast<int> (n) : -1;
+    }
+    if (v.isDouble())
+    {
+        const double d = v;
+        return d >= 0.0 && d <= 255.0 && d == std::floor (d) ? static_cast<int> (d) : -1;
+    }
+    return v.isString() ? hexTextByte (v.toString()) : -1;
+}
+
+/** "sendSysex: "F0411000" is not one byte, so nothing was sent. Put a space between …" */
+inline juce::String notOneByteMessage (const juce::String& verb, const juce::String& token, const juce::String& outcome)
+{
+    auto message = verb + ": \"" + token + "\" is not one byte, so " + outcome + ". ";
+    if (token.containsOnly ("0123456789abcdefABCDEF") && token.length() % 2 == 0)
+    {
+        juce::StringArray pairs;
+        for (int i = 0; i < token.length(); i += 2) pairs.add (token.substring (i, i + 2));
+        return message + "Put a space between the bytes: \"" + pairs.joinIntoString (" ") + "\".";
+    }
+    return message + "Each byte is one or two hex digits, with spaces between the bytes: \"F0 41 10 F7\".";
+}
 
 class BridgeScriptHost final : public ScriptHostApi
 {
@@ -25,10 +133,25 @@ public:
     {
         // Values (path = "control.value" style; form = value|normalizedValue|midiValue).
         std::function<juce::var (const juce::String& path, const juce::String& form)> getValue;
+        // Why a read that answered nothing found nothing, as the line to write, or empty when the
+        // answer is simply nothing (PanelValueModel::whyNoAnswer). Optional: unset, get() of a
+        // control that is not there says nothing, which is what it always did.
+        std::function<juce::String (const juce::String& path)> whyNoValue;
         // `form` is the value representation the script asked for: "value" (default) or
         // "normalizedValue". The app maps it, because only the app knows the control's range.
         std::function<void (const juce::String& path, const juce::var& value, bool transmit,
                             const juce::String& form)> setValue;
+        // What a write stores in the colour properties it reaches, by the editor's rule
+        // (ScriptColours.h; PanelValueModel::colourWrites): CSS's short forms written out, and a
+        // refusal line for each colour the panel cannot read, in which case nothing is written.
+        // `call` begins each line: set("<path as the script wrote it>"). Asked before setValue, for
+        // every engine's set(), Lua's self.set and a native handler's set alike. Unset: every value
+        // is written as it was given, which is all a host with no panel document can do.
+        std::function<colours::Writes (const juce::String& call, const juce::String& path,
+                                       const juce::var& value, const juce::String& form)> colourWrites;
+        // Whether a path is a colour property, which ce.anim refuses to move (isColourProperty).
+        // Unset: nothing is, as before.
+        std::function<bool (const juce::String& path)> isColourProperty;
         // Whether a transmitting write to `path` would reach the synth at all — the path is bound to
         // a device parameter. Only those writes spend the MIDI flood budget. Unset: every
         // transmitting write counts, which is how every set() was counted before this existed.
@@ -113,6 +236,39 @@ public:
         return { path, explicitIsDerived ? explicitForm : juce::String ("value") };
     }
 
+    /** The form `text` is another way of writing (other capitals, the label's leading dot, or
+        "normalised"/"normalise"/"normalize" for "normalized"), or empty. Mirrors formMeant in
+        panelRuntime.js, regular expression and all: the first normali[sz]e?d? becomes normalized. */
+    static juce::String formMeant (const juce::String& text)
+    {
+        auto canonical = text.trim().toLowerCase();
+        if (canonical.startsWithChar ('.')) canonical = canonical.substring (1);
+        const int s = canonical.indexOf ("normalis"), z = canonical.indexOf ("normaliz");
+        if (const int at = (s < 0 || (z >= 0 && z < s)) ? z : s; at >= 0)
+        {
+            int end = at + 8;
+            if (end < canonical.length() && canonical[end] == 'e') ++end;
+            if (end < canonical.length() && canonical[end] == 'd') ++end;
+            canonical = canonical.substring (0, at) + "normalized" + canonical.substring (end);
+        }
+        for (const char* form : { "value", "normalizedValue", "midiValue" })
+            if (canonical == juce::String (form).toLowerCase()) return form;
+        return {};
+    }
+
+    /** The console's line refusing an explicit `form` that is not one of a value's three, or empty
+        when it is one or none was given. A form that was not one used to be dropped here without a
+        word, so get("cutoff", "normalisedValue") answered the raw value and set("cutoff", 0.5,
+        "normalisedValue") wrote 0.5 into a 0..200 control. The WebView runtime refuses the same
+        calls in the same words (formRefusal in panelRuntime.js; scriptGetReports.test.js). */
+    static juce::String formRefusal (const juce::String& call, const juce::String& outcome, const juce::String& form)
+    {
+        if (form.isEmpty() || form == "value" || form == "normalizedValue" || form == "midiValue") return {};
+        const auto meant = formMeant (form);
+        return call + ": \"" + form + "\" is not a value form, so " + outcome
+             + ". The forms are value, normalizedValue and midiValue." + (meant.isNotEmpty() ? " Write " + meant + "." : juce::String());
+    }
+
     /** Does this path write a read-only property of the panel document? Mirrors
         PANEL_READONLY_PROPERTIES in panelApi.js — panelApiParity.test.js checks the two agree. */
     static bool isPanelReadOnlyPath (const juce::String& path)
@@ -133,6 +289,11 @@ public:
 
     juce::var getValue (const juce::String& path, const juce::String& form) override
     {
+        if (const auto refusal = formRefusal ("get(\"" + path + "\")", "there is no answer", form); refusal.isNotEmpty())
+        {
+            logAt ("error", refusal, juce::var());
+            return {};
+        }
         const auto addressed = splitAccessor (path, form);
         if (addressed.second == "midiValue")
         {
@@ -142,9 +303,30 @@ public:
         return callbacks.getValue ? callbacks.getValue (addressed.first, addressed.second) : juce::var();
     }
 
+    // set() reports a control it cannot find; get() returned nothing, the same nothing an unset value
+    // is. The app says why (PanelValueModel::whyNoAnswer), in the editor's words, of the path with
+    // its accessor taken off, as getValue hands it over. .midiValue has its own message already.
+    juce::String whyNoValue (const juce::String& path, const juce::String& form) override
+    {
+        // A form that is not one has been refused by getValue, in words of its own.
+        if (formRefusal ({}, {}, form).isNotEmpty()) return {};
+        const auto addressed = splitAccessor (path, form);
+        if (addressed.second == "midiValue" || ! callbacks.whyNoValue) return {};
+        return callbacks.whyNoValue (addressed.first);
+    }
+
+    // The third argument is set()'s options table, or, as text, the value form, as the WebView
+    // runtime reads it: set("cutoff", 0.5, "normalizedValue") is the form-argument spelling of
+    // set("cutoff.normalizedValue", 0.5). Text was dropped here, so that spelling wrote 0.5 as it was.
     void setValue (const juce::String& path, const juce::var& value, const juce::var& options) override
     {
-        const auto addressed = splitAccessor (path, {});
+        const auto form = options.isString() ? options.toString() : juce::String();
+        if (const auto refusal = formRefusal ("set(\"" + path + "\")", "nothing was set", form); refusal.isNotEmpty())
+        {
+            logAt ("error", refusal, juce::var());
+            return;
+        }
+        const auto addressed = splitAccessor (path, form);
         if (addressed.second == "midiValue")
         {
             reportNeedsDeviceHost ("set(.midiValue)", addressed.first);
@@ -163,6 +345,23 @@ public:
             return;
         }
 
+        // A colour the panel cannot read used to be stored as written: "red", "#000", a number, a
+        // name ce.anim had swept into a number. Read as the editor's set() reads it, after any
+        // intercept() filter has answered (the engines run those first) and before anything is
+        // written or sent: the short forms are written out, and what has no one reading is refused,
+        // a line for each colour, in the editor's sentence, with nothing written.
+        juce::var toWrite = value;
+        if (callbacks.colourWrites)
+        {
+            const auto read = callbacks.colourWrites ("set(\"" + path + "\")", addressed.first, value, addressed.second);
+            if (read.refused)
+            {
+                for (const auto& line : read.lines) logAt ("error", line, juce::var());
+                return;
+            }
+            toWrite = read.value;
+        }
+
         bool transmit = runtime ? runtime->defaultTransmit() : true;
         if (auto* o = options.getDynamicObject())
             if (o->hasProperty ("transmit")) transmit = (bool) o->getProperty ("transmit");
@@ -173,13 +372,44 @@ public:
         const bool wouldSend = ! callbacks.transmitsTo || callbacks.transmitsTo (addressed.first);
         if (transmit && wouldSend && ! midiSendAllowed())
             transmit = false;
-        if (callbacks.setValue) callbacks.setValue (addressed.first, value, transmit, addressed.second);
+        if (callbacks.setValue) callbacks.setValue (addressed.first, toWrite, transmit, addressed.second);
     }
 
-    void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
-    void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
-    void sendSysex (const juce::var& bytes) override                 { if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (bytes); }
-    void sendMidi (const juce::var& bytes) override                  { if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (bytes); }
+    // The Lua, JavaScript and Python preludes check a CC's numbers before they get here (__midiArg);
+    // a native handler's sendCC does not pass through a prelude, so the same check is made here, in
+    // the same words: an address outside its range, or a value that is not a number, is refused,
+    // and a value is rounded half up and clamped. A script's call arrives already checked.
+    void sendCC (int ch, int cc, const juce::var& v) override
+    {
+        juce::var value;
+        if (! midiAddress ("sendCC", ch, 1, 16, "a channel", "A channel is a whole number from 1 to 16.")
+            || ! midiAddress ("sendCC", cc, 0, 127, "a controller number", "A controller number is a whole number from 0 to 127.")
+            || ! midiValue ("sendCC", v, 127, "A value is a number from 0 to 127.", value))
+            return;
+        if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, value);
+    }
+    void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override
+    {
+        juce::var value;
+        if (! midiAddress ("sendNRPN", ch, 1, 16, "a channel", "A channel is a whole number from 1 to 16.")
+            || ! midiAddress ("sendNRPN", msb, 0, 127, "an MSB", "An MSB is a whole number from 0 to 127.")
+            || ! midiAddress ("sendNRPN", lsb, 0, 127, "an LSB", "An LSB is a whole number from 0 to 127.")
+            || ! midiValue ("sendNRPN", v, 16383, "A value is a number from 0 to 16383.", value))
+            return;
+        if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, value);
+    }
+    void sendSysex (const juce::var& bytes) override
+    {
+        auto message = bytes;
+        if (! bytesFromScript ("sendSysex", "nothing was sent", message) || ! hasBytes ("sendSysex", message)) return;
+        if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (message);
+    }
+    void sendMidi (const juce::var& bytes) override
+    {
+        auto message = bytes;
+        if (! bytesFromScript ("sendMidi", "nothing was sent", message) || ! hasBytes ("sendMidi", message)) return;
+        if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (message);
+    }
     // routeMidi / feedMidi. A host that wires neither gets the honest failure rather than the quiet
     // one: the block still RUNS (its sends go to the default device, which is what they did before
     // routing existed), and feedMidi says it could not. Silence here is exactly the defect the
@@ -195,7 +425,9 @@ public:
 
     void feedMidi (const juce::var& bytes) override
     {
-        if (callbacks.feedMidi) { callbacks.feedMidi (bytes); return; }
+        auto message = bytes;
+        if (! bytesFromScript ("feedMidi", "nothing was fed", message) || ! hasBytes ("feedMidi", message)) return;
+        if (callbacks.feedMidi) { callbacks.feedMidi (message); return; }
         logAt ("error", "feedMidi(): this host has no MIDI input to inject into — nothing was fed.", juce::var());
     }
     // A layout the SCRIPT declared carries its own request bytes, so asking for it is a raw send
@@ -218,7 +450,14 @@ public:
         }
         if (callbacks.requestDump) callbacks.requestDump (kind);
     }
-    void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
+    void applyDump (const juce::var& bytes) override
+    {
+        auto dump = bytes;
+        // A decoded { parameter: value } map is not bytes, and goes to the callback as it is.
+        const bool decodedMap = dump.getDynamicObject() != nullptr && ! dump.isArray();
+        if (! decodedMap && ! bytesFromScript ("applyDump", "nothing was decoded", dump)) return;
+        if (callbacks.applyDump) callbacks.applyDump (dump);
+    }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
 
@@ -290,13 +529,17 @@ public:
     {
         if (runtime != nullptr)
         {
-            const auto bytes = runtime->encodeDeviceParameter (role.isEmpty() ? defaultDeviceRole : role,
-                                                               parameterId, value);
+            const auto& r = role.isEmpty() ? defaultDeviceRole : role;
+            const auto bytes = runtime->encodeDeviceParameter (r, parameterId, value);
             if (auto* arr = bytes.getArray(); arr != nullptr && ! arr->isEmpty())
             {
                 sendMidi (bytes);
                 return true;
             }
+            // A parameter the script declared, whose write the runtime refused (and said why), is
+            // finished here. Falling through handed the same id to the device profile, which sent
+            // whatever its own parameter of that name means, or nothing.
+            if (runtime->hasDeviceParameter (r, parameterId)) return false;
         }
         return callbacks.deviceWrite && callbacks.deviceWrite (parameterId, value, role);
     }
@@ -310,11 +553,13 @@ public:
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE
     // place or two hosts would each run their own copy of the same sweep.
-    void startAnimation (const juce::String& kind, const juce::var& path,
+    bool startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts) override
-    { if (runtime) runtime->startAnimation (kind, path, target, opts); }
+    { return runtime && runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime) runtime->stopAnimation (path); }
+    bool isColourProperty (const juce::String& path) override
+    { return callbacks.isColourProperty && callbacks.isColourProperty (path); }
     bool animationRunning (const juce::String& path) override
     { return runtime && runtime->animationRunning (path); }
     juce::var animationValue (const juce::String& path) override
@@ -376,6 +621,7 @@ private:
     // Whether the host actually wired routing, so endRouteOverride does not unbalance a host
     // that never began one.
     bool routeWired = false;
+    std::set<juce::String> edgeWarned;   // the commands that have said a value was past its end
 
     // Scope (Q7) is NOT enforced here, and that is a decision rather than an omission. The
     // Device/MIDI verbs used to declare device/panel/project scope; enforcing that list denied a
@@ -384,6 +630,103 @@ private:
     // verbs 'any' and the only genuinely scoped members left are the panel-component verbs, which
     // need a component to exist. Those are webview-only: the C++ engines define them as stubs that
     // explain themselves, which is the enforcement. scriptValidate flags the misuse at edit time.
+
+    // A script's bytes as the app's callbacks take them. Every engine's sendSysex, sendMidi, feedMidi
+    // and applyDump comes through here, so this is the one place the player reads a script's hex
+    // text: refused when a token is not one byte (see firstTokenNotOneByte above), in the WebView
+    // runtime's words, and otherwise turned into the list of numbers the callback is handed. The
+    // app's callbacks never parse text of their own, so they cannot split it differently. Text was
+    // the editor's alone until now for every verb but sendSysex: the player's sendMidi took a list
+    // and dropped text without a word.
+    //
+    // A list is read here too, by the same rule as the WebView runtime's scriptBytes: each item a
+    // whole number from 0 to 255, or text that is one hex byte. The callbacks clamped what they were
+    // handed, so 300 went out as FF, a System Reset in the middle of a SysEx, and "41" was read as
+    // decimal. An object is read as its values, the way the editor reads a Lua table, which is also
+    // what QuickJS makes of a Uint8Array; it used to be "no bytes given". Nothing given becomes the
+    // empty list, for hasBytes to report.
+    bool bytesFromScript (const juce::String& verb, const juce::String& outcome, juce::var& bytes)
+    {
+        juce::Array<juce::var> list;
+        if (bytes.isVoid() || bytes.isUndefined()) { bytes = juce::var (list); return true; }
+        if (bytes.isString())
+        {
+            if (const auto token = firstTokenNotOneByte (bytes); token.isNotEmpty())
+            {
+                logAt ("error", notOneByteMessage (verb, token, outcome), juce::var());
+                return false;
+            }
+            for (const auto& token : hexTextTokens (bytes.toString()))
+                list.add (hexTextByte (token));
+            bytes = juce::var (list);
+            return true;
+        }
+        juce::Array<juce::var> items;
+        if (auto* array = bytes.getArray()) items = *array;
+        else if (auto* object = bytes.getDynamicObject())
+            for (const auto& property : object->getProperties()) items.add (property.value);
+        else
+        {
+            logAt ("error", verb + ": " + shownScriptValue (bytes) + " is not a list of bytes, so " + outcome + ".", juce::var());
+            return false;
+        }
+        for (int i = 0; i < items.size(); ++i)
+        {
+            const int b = scriptListByte (items.getReference (i));
+            if (b < 0)
+            {
+                logAt ("error", verb + ": " + shownScriptValue (items.getReference (i)) + " at position " + juce::String (i)
+                                    + " is not a byte, so " + outcome
+                                    + ". A byte is a whole number from 0 to 255, or one or two hex digits such as \"F7\".",
+                       juce::var());
+                return false;
+            }
+            list.add (b);
+        }
+        bytes = juce::var (list);
+        return true;
+    }
+
+    bool midiAddress (const juce::String& verb, int v, int lo, int hi, const char* aNoun, const char* hint)
+    {
+        if (v >= lo && v <= hi) return true;
+        logAt ("error", verb + ": " + juce::String (v) + " is not " + aNoun + ", so nothing was sent. " + hint, juce::var());
+        return false;
+    }
+    bool midiValue (const juce::String& verb, const juce::var& v, int hi, const char* hint, juce::var& out)
+    {
+        if (v.isVoid() || v.isUndefined())
+        {
+            logAt ("error", verb + ": no value given, so nothing was sent.", juce::var());
+            return false;
+        }
+        double d = 0.0;   // text that is a number ("64") is read as one, as the preludes read it
+        const bool number = (v.isInt() || v.isInt64() || v.isDouble()) ? std::isfinite (d = static_cast<double> (v))
+                                                                       : v.isString() && decimalTextValue (v.toString(), d);
+        if (! number)
+        {
+            logAt ("error", verb + ": " + shownScriptValue (v) + " is not a value, so nothing was sent. " + hint, juce::var());
+            return false;
+        }
+        const int n = static_cast<int> (std::floor (d + 0.5));
+        out = juce::jlimit (0, hi, n);
+        // Past the end is sent as the nearest end, and said once per command, in the preludes' words.
+        if (n != static_cast<int> (out) && edgeWarned.insert (verb).second)
+            logAt ("warn", verb + ": the value " + shownScriptValue (v) + " is outside 0 to " + juce::String (hi) + ", so "
+                               + juce::String (static_cast<int> (out)) + " was sent. This is said only the first time.", juce::var());
+        return true;
+    }
+
+    // Whether there is anything to send. The editor's sendMidi, sendSysex and feedMidi say "no bytes
+    // given" for empty text, an empty list or nothing at all; the player handed its callback the
+    // empty list, which sent nothing without a word. Same words now, and an empty call no longer
+    // spends the flood budget either.
+    bool hasBytes (const juce::String& verb, const juce::var& bytes)
+    {
+        if (auto* list = bytes.getArray(); list != nullptr && ! list->isEmpty()) return true;
+        logAt ("error", verb + ": no bytes given", juce::var());
+        return false;
+    }
 
     // `.midiValue` is what the DPD codec would put on the wire, and the codec is the device host's,
     // not the panel's. Say so once and clearly rather than returning a quiet nothing and leaving the

@@ -20,6 +20,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { scriptApiForTesting, setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createInstanceStorage, createPlayerHost } from '../src/CE_Application/scripting/playerScriptHost.js';
 import {
   MEMBER_BY_ID, MODULES, memberPath, memberRuntime, RUNTIME_ANY,
@@ -139,6 +140,49 @@ test('an unknown scope is refused, not quietly treated as panel', () => {
     assert.equal(a.clearSettings({ scope: 'sript' }), 0);
     assert.equal(a.storageInfo({ scope: 'sript' }), undefined);
     assert.equal(a.forgetSetting('k', { scope: 'sript' }), false);
+  });
+});
+
+test('a misspelled scope KEY is refused too, not quietly treated as panel', () => {
+  withPanel((a, b, panel) => {
+    // The same leak by another door: { scop = "script" } has no `scope`, so it was the panel store,
+    // and the other script read the "private" value straight back.
+    const errors = [];
+    const unsubscribe = scriptTrace.subscribe((lines) => {
+      errors.length = 0;
+      errors.push(...lines.filter((l) => l.kind === 'error').map((l) => l.message));
+    });
+    try {
+      clearScriptTrace();
+      assert.equal(a.saveSetting('secret', 7, { scop: 'script' }), false);
+      assert.deepEqual(panel.scripting.settings ?? {}, {}, 'nothing was stored anywhere');
+      assert.equal(b.loadSetting('secret', 'none'), 'none', 'and the other script reads nothing');
+      assert.deepEqual(errors, [
+        'ce.storage.saveSetting: "scop" is not one of its options, so nothing was done. Its only option is scope.',
+      ]);
+      clearScriptTrace();
+      assert.equal(a.loadSetting('secret', 'fallback', { scope: 'script', fallbak: 1 }), 'fallback');
+      assert.deepEqual(a.listSettings({ b: 1, a: 2 }), []);
+      assert.deepEqual(a.allSettings({ scope: 'script', x: 1 }), {});
+      assert.equal(a.clearSettings({ scop: 'script' }), 0);
+      assert.equal(a.forgetSetting('k', { scop: 'script' }), false);
+      assert.equal(a.storageInfo({ scope: 'panel', extra: true }), undefined);
+      assert.deepEqual(errors, [
+        'ce.storage.loadSetting: "fallbak" is not one of its options, so nothing was done. Its only option is scope.',
+        'ce.storage.settings: "a" and "b" are not among its options, so nothing was done. Its only option is scope.',
+        'ce.storage.all: "x" is not one of its options, so nothing was done. Its only option is scope.',
+        'ce.storage.clear: "scop" is not one of its options, so nothing was done. Its only option is scope.',
+        'ce.storage.forget: "scop" is not one of its options, so nothing was done. Its only option is scope.',
+        'ce.storage.info: "extra" is not one of its options, so nothing was done. Its only option is scope.',
+      ]);
+      // A key that is a number is a list entry (a Lua list arrives that way), not a misspelling.
+      clearScriptTrace();
+      assert.equal(a.saveSetting('k', 1, { 1: 'x', scope: 'script' }), true);
+      assert.equal(a.loadSetting('k', null, { scope: 'script' }), 1);
+      assert.deepEqual(errors, []);
+    } finally {
+      unsubscribe();
+    }
   });
 });
 

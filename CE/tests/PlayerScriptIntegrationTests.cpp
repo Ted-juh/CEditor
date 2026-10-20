@@ -206,6 +206,146 @@ int main()
                ".midiValue explains itself rather than returning a quiet nothing");
     }
 
+    // --- get() of something that is not there, window-closed --------------------------------
+    // set() always said "nothing was written" for a path that led nowhere; get() returned the
+    // nothing an unset value returns, so a misspelled control or property read as an empty one. It
+    // says why now, in the WebView runtime's words (PanelValueModel::whyNoAnswer, wired the way
+    // PluginProcessor wires it), from a script's own get() in Lua and in JavaScript, and still
+    // returns nothing. A watch on a path that is not there stays quiet, as the editor's does.
+    {
+        const char* kGetPanel = R"JSON({
+          "name": "Gets",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "gl", "name": "gl", "language": "lua", "scope": "panel", "event": "onGetsLua", "target": "*", "enabled": true,
+              "source": "function onGetsLua()\n  watch(\"ghost.value\", function() end)\n  local a = get(\"ghost.value\")\n  local b = get(\"cutoff.vlaue\")\n  log(\"lua \" .. tostring(get(\"cutoff.value\")) .. \" \" .. tostring(a) .. \" \" .. tostring(b))\nend\n" },
+            { "id": "gj", "name": "gj", "language": "javascript", "scope": "panel", "event": "onGetsJs", "target": "*", "enabled": true,
+              "source": "function onGetsJs(){ watch('ghost.value', function(){}); var a = get('ghost.value'); var b = get('cutoff.vlaue.normalizedValue'); log('js ' + get('cutoff.value') + ' ' + a + ' ' + b); }" }
+          ],
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+              "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 200 },
+              "Value": { "_type": "Value", "value": 40 }
+            } }
+          ]
+        })JSON";
+
+        PanelValueModel getModel;
+        check (getModel.loadFromJson (kGetPanel), "loaded the get panel");
+        juce::StringArray getLogs;
+        BridgeScriptHost::Callbacks gcb;
+        gcb.getValue = [&] (const juce::String& path, const juce::String& form) { return getModel.getValue (path, form); };
+        gcb.whyNoValue = [&] (const juce::String& path) { return getModel.whyNoAnswer (path); };
+        gcb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { getModel.setValue (path, v, form); };
+        gcb.log = [&] (const juce::String& m, const juce::var&) { getLogs.add (m); };
+        BridgeScriptHost getHost (std::move (gcb));
+        ScriptRuntime getRuntime (getHost);
+        getHost.attachRuntime (&getRuntime);
+        getRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        getRuntime.loadScripts (gatherPanelScripts (getModel.panel()));
+
+        const juce::String ghost = "get: control \"ghost\" not found on the active panel, so there is no answer.";
+        const juce::String vlaue = "get(\"cutoff.vlaue\"): \"vlaue\" does not lead anywhere on \"cutoff\", so there is no answer.";
+        for (const char* lang : { "Lua", "Js" })
+        {
+            getLogs.clear();
+            getRuntime.runAction (juce::String ("onGets") + lang, juce::var());
+            const juce::String tag (lang);
+            // Three lines and no more: the watch on the same missing path said nothing, and the
+            // missing path answered nothing (nil, or null from JavaScript), not a plausible 0.
+            const bool nothing = getLogs.size() == 3
+                && (getLogs[2] == "lua 40 nil nil" || getLogs[2] == "js 40 null null");
+            check (getLogs.size() == 3 && getLogs[0] == ghost && getLogs[1] == vlaue && nothing,
+                   tag + ": get() names the missing control and the path that leads nowhere, once each, and a watch "
+                         "says nothing (got: " + getLogs.joinIntoString (" | ") + ")");
+        }
+        check (getModel.whyNoAnswer ("cutoff.value").isEmpty() && getModel.whyNoAnswer ("panel.anything").isEmpty()
+                   && getModel.whyNoAnswer ("cutoff.Value.value").isEmpty(),
+               "whyNoAnswer is silent for a path that is there, and for the panel document");
+    }
+
+    // --- an explicit form that is not one of the three, window-closed ------------------------
+    // get(path, form) and set(path, value, form): a form that was not value, normalizedValue or
+    // midiValue was dropped without a word (BridgeScriptHost::splitAccessor), so get("cutoff",
+    // "normalisedValue") answered the raw value. And set's text form never arrived at all: Lua's
+    // set took only a table there and self.set no third argument, and the host read only options
+    // from it, so set("cutoff", 0.5, "normalizedValue") wrote 0.5 as it was, where the WebView
+    // runtime wrote 100 of 0..200. A form that is not one now refuses the call in the WebView's
+    // words (scriptGetReports.test.js), naming the form meant, and a right one works in every spelling.
+    {
+        const char* kFormPanel = R"JSON({
+          "name": "Forms",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "fl", "name": "fl", "language": "lua", "scope": "panel", "owner": "cutoff", "event": "onFormsLua", "target": "*", "enabled": true,
+              "source": "function onFormsLua()\n  log(\"a \" .. tostring(get(\"cutoff\", \"normalisedValue\")))\n  set(\"cutoff\", 0.5, \"normalisedValue\")\n  log(\"b \" .. tostring(get(\"cutoff\")))\n  log(\"c \" .. tostring(get(\"cutoff\", \"NormalizedValue\")))\n  set(\"cutoff\", 50, \"percent\")\n  self.set(\"value\", 1, \"Normalized\")\n  log(\"d \" .. tostring(self.get(\"value\", \".normalizedValue\")))\n  log(\"e \" .. tostring(get(\"cutoff\")))\n  set(\"cutoff\", 0.25, \"normalizedValue\")\n  log(\"f \" .. tostring(get(\"cutoff\")))\n  self.set(\"value\", 0.75, \"normalizedValue\")\n  log(\"g \" .. tostring(get(\"cutoff\", \"normalizedValue\")))\n  set(\"cutoff\", 120, { transmit = false })\n  log(\"h \" .. tostring(get(\"cutoff\", { transmit = false })))\nend\n" },
+            { "id": "fj", "name": "fj", "language": "javascript", "scope": "panel", "owner": "cutoff", "event": "onFormsJs", "target": "*", "enabled": true,
+              "source": "function onFormsJs(){ log('a ' + get('cutoff', 'normalisedValue')); set('cutoff', 0.5, 'normalisedValue'); log('b ' + get('cutoff')); log('c ' + get('cutoff', 'NormalizedValue')); set('cutoff', 50, 'percent'); self.set('value', 1, 'Normalized'); log('d ' + self.get('value', '.normalizedValue')); log('e ' + get('cutoff')); set('cutoff', 0.25, 'normalizedValue'); log('f ' + get('cutoff')); self.set('value', 0.75, 'normalizedValue'); log('g ' + get('cutoff', 'normalizedValue')); set('cutoff', 120, { transmit: false }); log('h ' + get('cutoff', { transmit: false })); }" }
+          ],
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+              "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 200 },
+              "Value": { "_type": "Value", "value": 100 }
+            } }
+          ]
+        })JSON";
+
+        const juce::String forms = " The forms are value, normalizedValue and midiValue.";
+        const juce::StringArray expectedRefusals {
+            "get(\"cutoff\"): \"normalisedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "set(\"cutoff\"): \"normalisedValue\" is not a value form, so nothing was set." + forms + " Write normalizedValue.",
+            "get(\"cutoff\"): \"NormalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+            "set(\"cutoff\"): \"percent\" is not a value form, so nothing was set." + forms,
+            "set(\"cutoff.value\"): \"Normalized\" is not a value form, so nothing was set." + forms,
+            "get(\"cutoff.value\"): \".normalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
+        };
+
+        for (const char* lang : { "Lua", "Js" })
+        {
+            PanelValueModel formModel;
+            check (formModel.loadFromJson (kFormPanel), "loaded the form panel");
+            juce::StringArray formLogs;
+            BridgeScriptHost::Callbacks fcb;
+            fcb.getValue = [&] (const juce::String& path, const juce::String& form) { return formModel.getValue (path, form); };
+            fcb.whyNoValue = [&] (const juce::String& path) { return formModel.whyNoAnswer (path); };
+            fcb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { formModel.setValue (path, v, form); };
+            fcb.log = [&] (const juce::String& m, const juce::var&) { formLogs.add (m); };
+            BridgeScriptHost formHost (std::move (fcb));
+            ScriptRuntime formRuntime (formHost);
+            formHost.attachRuntime (&formRuntime);
+            formRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+            formRuntime.loadScripts (gatherPanelScripts (formModel.panel()));
+            formRuntime.runAction (juce::String ("onForms") + lang, juce::var());
+
+            const juce::String tag (lang);
+            const juce::String nothing = tag == "Lua" ? "nil" : "null";
+            const juce::StringArray expected {
+                expectedRefusals[0], "a " + nothing,
+                expectedRefusals[1],
+                "b 100",
+                expectedRefusals[2], "c " + nothing,
+                expectedRefusals[3],
+                expectedRefusals[4],
+                expectedRefusals[5], "d " + nothing,
+                "e 100",
+                "f 50",
+                "g 0.75",
+                "h 120",
+            };
+            check (formLogs == expected,
+                   tag + ": a form that is not one refuses get and set in the WebView's words, writes nothing, and the "
+                         "right one works by set, self.set and get (got: " + formLogs.joinIntoString (" | ") + ")");
+        }
+        // The host's own reading, without an engine: what a native handler reaches.
+        check (BridgeScriptHost::formMeant ("normalised") == "" && BridgeScriptHost::formMeant (" Normalisedvalue ") == "normalizedValue"
+                   && BridgeScriptHost::formMeant ("MIDIVALUE") == "midiValue" && BridgeScriptHost::formMeant (".value") == "value"
+                   && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "normalizedValue").isEmpty()
+                   && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "").isEmpty(),
+               "formMeant names the form written another way, and formRefusal passes a form and no form");
+    }
+
     // --- slice 2: ce.midi channel messages + ce.storage, window-closed -----------------------
     {
         PanelValueModel modModel;
@@ -333,7 +473,7 @@ int main()
           "scripting": { "modules": ["ce.core", "ce.device", "ce.time"] },
           "scripts": [
             { "id": "d1", "name": "dev", "language": "lua", "scope": "panel", "event": "onPanelLoad", "target": "*", "enabled": true,
-              "source": "function onPanelLoad()\n  ce.device.defineParameter(\"cutoff\", { name = \"Mine\", min = 0, max = 127, cc = 74 })\nend\nfunction onList()\n  for _, p in ipairs(ce.device.parameters()) do log(\"p \" .. p.id .. \" \" .. p.name) end\nend\nfunction onMine() ce.device.write(\"cutoff\", 9) end\nfunction onTheirs() ce.device.write(\"reso\", 9) end\nfunction onAsk() requestDump(\"patch\") end" }
+              "source": "function onPanelLoad()\n  ce.device.defineParameter(\"cutoff\", { name = \"Mine\", min = 0, max = 127, cc = 74 })\nend\nfunction onList()\n  for _, p in ipairs(ce.device.parameters()) do log(\"p \" .. p.id .. \" \" .. p.name) end\nend\nfunction onMine() ce.device.write(\"cutoff\", 9) end\nfunction onTheirs() ce.device.write(\"reso\", 9) end\nfunction onAsk() requestDump(\"patch\") end\nfunction onRefused() ce.device.write(\"cutoff\", \"abc\") end" }
           ],
           "controls": []
         })JSON";
@@ -395,6 +535,13 @@ int main()
         check (devWrites.isEmpty(), "…and never reaches the profile's encoder");
         devRuntime.runAction ("onTheirs", juce::var());
         check (devWrites.contains ("reso=9"), "writing a profile parameter still goes through the profile");
+        // A declared parameter's write that the runtime refuses ends there. It used to fall through
+        // to the profile, whose own "cutoff" then sent whatever it means by that.
+        devWrites.clear();
+        devMidi.clear();
+        devRuntime.runAction ("onRefused", juce::var());
+        check (devWrites.isEmpty() && devMidi.isEmpty(), "a refused write to a declared parameter reaches neither encoder (got "
+                   + devWrites.joinIntoString (" | ") + " / " + devMidi.joinIntoString (" | ") + ")");
 
         // requestDump with nothing declared for that kind falls through to the profile's sync.
         devRuntime.runAction ("onAsk", juce::var());
@@ -453,6 +600,451 @@ int main()
         check (last == 1, "with transmitsTo, label writes spend nothing and the bound write still sends");
         run (true, "onFlood", sent, last);
         check (sent == 1000, "a real flood of bound writes is still cut at 1,000 a second (sent " + juce::String (sent) + ")");
+    }
+
+    // --- SysEx hex text is read a byte at a time -----------------------------------------------
+    // "F0411000" was one number to PluginProcessor's parser, which kept the low byte and sent
+    // F0 00 F7 (the WebView runtime clamped it to F0 FF F7). BridgeScriptHost now refuses a token
+    // that is not one byte, in the WebView runtime's words, and hands the callback a list.
+    {
+        juce::StringArray sysexLogs, sysexOut, otherOut;
+        // What each callback was handed, as the bytes or as "text:…" if text got through.
+        auto shown = [] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
+            return bytes.isString() ? "text:" + bytes.toString() : hex (b);
+        };
+        BridgeScriptHost::Callbacks scb;
+        scb.log = [&] (const juce::String& m, const juce::var&) { sysexLogs.add (m); };
+        scb.sendSysex = [&] (const juce::var& bytes) { sysexOut.add (shown (bytes)); };
+        scb.sendMidi  = [&] (const juce::var& bytes) { otherOut.add ("midi " + shown (bytes)); };
+        scb.feedMidi  = [&] (const juce::var& bytes) { otherOut.add ("feed " + shown (bytes)); };
+        scb.applyDump = [&] (const juce::var& bytes) { otherOut.add ("dump " + shown (bytes)); };
+        BridgeScriptHost sysexHost (std::move (scb));
+        ScriptRuntime sysexRuntime (sysexHost);
+        sysexHost.attachRuntime (&sysexRuntime);
+        sysexRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+
+        auto script = [] (const char* id, const char* language, const char* event, const char* source)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", id);
+            o->setProperty ("language", language);
+            o->setProperty ("scope", "panel");
+            o->setProperty ("event", event);
+            o->setProperty ("target", "*");
+            o->setProperty ("enabled", true);
+            o->setProperty ("source", source);
+            return juce::var (o);
+        };
+        juce::Array<juce::var> scripts;
+        scripts.add (script ("sxlua", "lua", "onSysexLua",
+            "function onSysexLua()\n"
+            "  sendSysex(\"F0411000\")\n"
+            "  sendSysex(\"F0 41 zz F7\")\n"
+            "  sendSysex(\"F0 41 10 00 F7\")\n"
+            "  sendSysex(\"0xF0,0x41\\n10 0 F7\")\n"     // 0x, commas, a newline and a one-digit byte
+            "  sendSysex({ 0xF0, 0x41, 0x10, 0x00, 0xF7 })\n"
+            "end\n"));
+        scripts.add (script ("sxjs", "javascript", "onSysexJs",
+            "function onSysexJs() { ce.midi.sendSysex('903C64'); }"));
+        // sendMidi, feedMidi and applyDump took text in the editor only: the player's sendMidi
+        // dropped it without a word. They read it now, by the same rule, refusing the same way.
+        scripts.add (script ("textlua", "lua", "onTextLua",
+            "function onTextLua()\n"
+            "  sendMidi(\"90 3C 64\")\n"
+            "  sendMidi(\"903C64\")\n"
+            "  feedMidi(\"0x90,0x3C,0x40\")\n"
+            "  applyDump(\"F0 7D 01 40 F7\")\n"
+            "  applyDump(\"F07D0140F7\")\n"
+            "  sendMidi({ 0x80, 0x3C, 0 })\n"
+            "end\n"));
+        // Nothing to send: the editor says "no bytes given"; the player used to hand the empty list
+        // on and send nothing without a word.
+        scripts.add (script ("emptylua", "lua", "onEmptyLua",
+            "function onEmptyLua()\n"
+            "  sendMidi(\"\")\n"
+            "  sendSysex({})\n"
+            "  feedMidi(\"  \")\n"
+            "  sendMidi()\n"
+            "end\n"));
+        sysexRuntime.loadScripts (juce::var (scripts));
+
+        sysexRuntime.runAction ("onSysexLua", juce::var());
+        check (sysexOut.size() == 3, "two refused, three sent (got " + sysexOut.joinIntoString (" | ") + ")");
+        for (const auto& sent : sysexOut)
+            check (sent == "F0 41 10 00 F7", "hex text reaches the callback as a list of the bytes written (got " + sent + ")");
+        check (sysexLogs.contains ("sendSysex: \"F0411000\" is not one byte, so nothing was sent. "
+                                   "Put a space between the bytes: \"F0 41 10 00\"."),
+               "an unspaced run is refused, with the spaced form to copy");
+        check (sysexLogs.contains ("sendSysex: \"zz\" is not one byte, so nothing was sent. "
+                                   "Each byte is one or two hex digits, with spaces between the bytes: \"F0 41 10 F7\"."),
+               "a token that is not hex is refused");
+
+        sysexOut.clear();
+        sysexLogs.clear();
+        sysexRuntime.runAction ("onSysexJs", juce::var());
+        check (sysexOut.isEmpty() && sysexLogs.size() == 1 && sysexLogs[0].startsWith ("sendSysex: \"903C64\" is not one byte"),
+               "the same refusal from JavaScript (got " + sysexLogs.joinIntoString (" | ") + ")");
+
+        sysexLogs.clear();
+        sysexRuntime.runAction ("onTextLua", juce::var());
+        check (otherOut.joinIntoString (" | ") == "midi 90 3C 64 | feed 90 3C 40 | dump F0 7D 01 40 F7 | midi 80 3C 00",
+               "sendMidi, feedMidi and applyDump read hex text as lists, and lists as before (got "
+                   + otherOut.joinIntoString (" | ") + ")");
+        check (sysexLogs.size() == 2
+                   && sysexLogs[0] == "sendMidi: \"903C64\" is not one byte, so nothing was sent. Put a space between the bytes: \"90 3C 64\"."
+                   && sysexLogs[1] == "applyDump: \"F07D0140F7\" is not one byte, so nothing was decoded. Put a space between the bytes: \"F0 7D 01 40 F7\".",
+               "and refuse an unspaced run in the WebView runtime's words (got " + sysexLogs.joinIntoString (" | ") + ")");
+
+        otherOut.clear();
+        sysexOut.clear();
+        sysexLogs.clear();
+        sysexRuntime.runAction ("onEmptyLua", juce::var());
+        check (otherOut.isEmpty() && sysexOut.isEmpty(), "empty text, an empty table or nothing reaches no callback (got "
+                   + otherOut.joinIntoString (" | ") + sysexOut.joinIntoString (" | ") + ")");
+        check (sysexLogs.joinIntoString (" | ")
+                   == "sendMidi: no bytes given | sendSysex: no bytes given | feedMidi: no bytes given | sendMidi: no bytes given",
+               "and each says so in the editor's words (got " + sysexLogs.joinIntoString (" | ") + ")");
+    }
+
+    // --- One byte rule for lists, and the channel messages checked before they reach the host ---
+    // A list item was clamped by the callbacks (300 went out as FF, a System Reset inside a SysEx)
+    // and a text item read as decimal; QuickJS's Uint8Array arrived as an object and was "no bytes
+    // given". The engines' sendCC, notes and transport clamped or guessed: CC 200 was CC 127, "C10"
+    // put 132 in a data byte, "pause" sent Start. Each is refused now, in the WebView runtime's words.
+    {
+        juce::StringArray logs, out;
+        auto bytesOf = [] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr) b.add ((int) x);
+            return hex (b);
+        };
+        BridgeScriptHost::Callbacks rcb;
+        rcb.log = [&] (const juce::String& m, const juce::var&) { logs.add (m); };
+        rcb.sendSysex = [&] (const juce::var& bytes) { out.add ("sysex " + bytesOf (bytes)); };
+        rcb.sendMidi  = [&] (const juce::var& bytes) { out.add ("midi " + bytesOf (bytes)); };
+        rcb.applyDump = [&] (const juce::var& bytes) { out.add (bytes.getDynamicObject() != nullptr && ! bytes.isArray()
+                                                                   ? "dump map" : "dump " + bytesOf (bytes)); };
+        rcb.sendCC = [&] (int ch, int cc, const juce::var& v) { out.add ("cc " + juce::String (ch) + " " + juce::String (cc) + " " + v.toString()); };
+        BridgeScriptHost ruleHost (std::move (rcb));
+        ScriptRuntime ruleRuntime (ruleHost);
+        ruleHost.attachRuntime (&ruleRuntime);
+
+        auto script = [] (const char* id, const char* language, const char* event, const char* source)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", id);
+            o->setProperty ("language", language);
+            o->setProperty ("scope", "panel");
+            o->setProperty ("event", event);
+            o->setProperty ("target", "*");
+            o->setProperty ("enabled", true);
+            o->setProperty ("source", source);
+            return juce::var (o);
+        };
+        juce::Array<juce::var> scripts;
+        scripts.add (script ("rulelua", "lua", "onRuleLua",
+            "function onRuleLua()\n"
+            "  sendSysex({ 0x41, 0x10, 300 })\n"
+            "  sendSysex({ \"F0\", \"41\", \"0xF7\" })\n"
+            "  sendMidi(42)\n"
+            "  sendSysex(\"F0\\f41 F7\")\n"
+            "  applyDump({ cutoff = 5 })\n"
+            "  sendCC(1, 200, 5)\n"
+            "  sendCC(1, 7, 64.5)\n"
+            "  sendNote(1, \"C10\", 100)\n"
+            "  sendNote(1, 60)\n"
+            "  sendTransport(\"pause\")\n"
+            "end\n"));
+        scripts.add (script ("rulejs", "javascript", "onRuleJs",
+            "function onRuleJs() {\n"
+            "  sendSysex(new Uint8Array([0xF0, 0x41, 0xF7]));\n"
+            "  sendMidi([0x90, 60, 1.5]);\n"
+            "  sendCC(0, 7, 5);\n"
+            "  sendCC(16, 7.4, 64.5);\n"
+            "  panic({ channel: 'all' });\n"
+            "}\n"));
+        ruleRuntime.loadScripts (juce::var (scripts));
+
+        ruleRuntime.runAction ("onRuleLua", juce::var());
+        check (out.joinIntoString (" | ") == "sysex F0 41 F7 | sysex F0 41 F7 | dump map | cc 1 7 65",
+               "text items are hex bytes, a form feed separates, a decoded map is not bytes, a fraction rounds half up (got "
+                   + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") ==
+                   "sendSysex: 300 at position 2 is not a byte, so nothing was sent. A byte is a whole number from 0 to 255, "
+                   "or one or two hex digits such as \"F7\". | "
+                   "sendMidi: 42 is not a list of bytes, so nothing was sent. | "
+                   "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
+                   "sendNote: \"C10\" is outside the MIDI notes, so nothing was sent. MIDI notes run from 0 to 127, which is C-1 to G9. | "
+                   "sendNote: no velocity given, so nothing was sent. | "
+                   "sendTransport: \"pause\" is not a transport action, so nothing was sent. The actions are \"start\", \"continue\" and \"stop\".",
+               "and the rest are refused in the WebView runtime's words (got " + logs.joinIntoString (" | ") + ")");
+
+        out.clear();
+        logs.clear();
+        ruleRuntime.runAction ("onRuleJs", juce::var());
+        check (out.joinIntoString (" | ") == "sysex F0 41 F7 | cc 16 7 65",
+               "a Uint8Array is a list, and JavaScript rounds as the others do (got " + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") ==
+                   "sendMidi: 1.5 at position 2 is not a byte, so nothing was sent. A byte is a whole number from 0 to 255, "
+                   "or one or two hex digits such as \"F7\". | "
+                   "sendCC: 0 is not a channel, so nothing was sent. A channel is a whole number from 1 to 16. | "
+                   "panic: \"all\" is not a channel, so nothing was sent. A channel is a whole number from 1 to 16.",
+               "and JavaScript refuses in the same words (got " + logs.joinIntoString (" | ") + ")");
+
+        // A native handler's sendCC reaches the host without passing through a prelude, so the host
+        // makes the same check, in the same words.
+        out.clear();
+        logs.clear();
+        ruleHost.sendCC (1, 200, juce::var (5));
+        ruleHost.sendCC (2, 7, juce::var ("loud"));
+        ruleHost.sendCC (2, 7, juce::var (64.5));
+        ruleHost.sendCC (2, 7, juce::var (" 64 "));   // text that is a number, as a script may pass
+        check (out.joinIntoString (" | ") == "cc 2 7 65 | cc 2 7 64", "the host passes a valid CC on, rounded (got " + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") ==
+                   "sendCC: 200 is not a controller number, so nothing was sent. A controller number is a whole number from 0 to 127. | "
+                   "sendCC: \"loud\" is not a value, so nothing was sent. A value is a number from 0 to 127.",
+               "and refuses the rest itself (got " + logs.joinIntoString (" | ") + ")");
+
+        // A value past its end is sent as the nearest end, and said the first time only.
+        out.clear();
+        logs.clear();
+        ruleHost.sendCC (2, 7, juce::var (200));
+        ruleHost.sendCC (2, 7, juce::var (300));
+        check (out.joinIntoString (" | ") == "cc 2 7 127 | cc 2 7 127", "a value past its end is sent as the end (got "
+                   + out.joinIntoString (" | ") + ")");
+        check (logs.joinIntoString (" | ") == "sendCC: the value 200 is outside 0 to 127, so 127 was sent. This is said only the first time.",
+               "and said once, in the preludes' words (got " + logs.joinIntoString (" | ") + ")");
+    }
+
+    // ce.anim in the player: `repeat` is the runs in all, and done(completed) gets one boolean,
+    // through BridgeScriptHost as PluginProcessor wires it: the host forwards the move to the
+    // runtime, and the completion's emit falls through to it. ScriptRuntimeTests.cpp §39b and
+    // PythonScriptEngineTests.cpp run the full set of moves in each language.
+    {
+        juce::StringArray animLogs;
+        BridgeScriptHost::Callbacks acb;
+        acb.log = [&] (const juce::String& m, const juce::var&) { animLogs.add (m); };
+        BridgeScriptHost animHost (std::move (acb));
+        ScriptRuntime animRuntime (animHost);
+        animHost.attachRuntime (&animRuntime);
+        animRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+
+        auto script = [] (const char* id, const char* language, const char* source)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", id);
+            o->setProperty ("language", language);
+            o->setProperty ("scope", "panel");
+            o->setProperty ("event", "onMove");
+            o->setProperty ("target", "*");
+            o->setProperty ("enabled", true);
+            o->setProperty ("source", source);
+            return juce::var (o);
+        };
+        juce::Array<juce::var> scripts;
+        scripts.add (script ("animlua", "lua",
+            "function onMove()\n"
+            "  ce.anim.to('cutoff', 100, { duration = 100, from = 0, ['repeat'] = 2,\n"
+            "    done = function(c, extra) log('lua ' .. type(c) .. ' ' .. tostring(c) .. ' ' .. tostring(extra)) end })\n"
+            "end\n"));
+        scripts.add (script ("animjs", "javascript",
+            "function onMove() {\n"
+            "  ce.anim.to(['reso', 'drive'], 100, { duration: 100, from: 0, repeat: 1,\n"
+            "    done: function (c) { log('js ' + arguments.length + ' ' + typeof c + ' ' + c); } });\n"
+            "  ce.anim.to('pan', 100, { duration: 100, from: 0, repeat: 0,\n"
+            "    done: function (c) { log('pan ' + typeof c + ' ' + c); } });\n"
+            "}\n"));
+        animRuntime.loadScripts (juce::var (scripts));
+        animRuntime.tickAnimations (0.0);
+        animRuntime.dispatchEvent ("onMove", "panel", juce::var());
+
+        animRuntime.tickAnimations (100.0);
+        check (animLogs.joinIntoString (" | ") == "js 1 boolean true",
+               "ce.anim: repeat = 1 is one run, and a list's done gets one boolean (got " + animLogs.joinIntoString (" | ") + ")");
+        check (animRuntime.animationRunning ("cutoff"), "ce.anim: repeat = 2 is still on its second run");
+        animLogs.clear();
+        animRuntime.tickAnimations (200.0);
+        check (animLogs.joinIntoString (" | ") == "lua boolean true nil",
+               "ce.anim: …which ends there, with done(true) and nothing else (got " + animLogs.joinIntoString (" | ") + ")");
+        animLogs.clear();
+        animRuntime.tickAnimations (1000.0);
+        check (animRuntime.animationRunning ("pan") && animLogs.isEmpty(), "ce.anim: repeat = 0 runs until it is stopped");
+        animRuntime.stopAnimation ("pan");
+        check (animLogs.joinIntoString (" | ") == "pan boolean false",
+               "ce.anim: …and stopping it is done(false) (got " + animLogs.joinIntoString (" | ") + ")");
+    }
+
+    // A colour written window shut is read by the editor's rule (Scripting/ScriptColours.h), whichever
+    // door it came through: a Lua and a JavaScript set(), Lua's self.set, a whole section, and ce.anim,
+    // which refuses a colour property as its path. Wired as PluginProcessor wires it: the model's
+    // colourWrites and isColourProperty behind BridgeScriptHost's callbacks, its setValue behind that.
+    {
+        const char* kColourPanel = R"JSON({
+          "name": "Colours",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "cl", "name": "cl", "language": "lua", "scope": "panel", "event": "onColoursLua", "target": "*", "enabled": true,
+              "source": "function onColoursLua()\n  set(\"lbl.background.fill.colour\", \"red\")\n  log(\"lua \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.fill.colour\", \"redd\")\n  set(\"lbl.background.fill.colour\", 16711680)\n  log(\"lua kept \" .. tostring(get(\"lbl.background.fill.colour\")))\n  set(\"lbl.background.border.top\", { style = \"solid\", thickness = 3, colour = \"#0008\" })\n  log(\"lua top \" .. tostring(get(\"lbl.background.border.top.thickness\")))\n  set(\"lbl.text.content\", \"red\")\n  log(\"lua text \" .. tostring(get(\"lbl.text.content\")))\nend\n" },
+            { "id": "cj", "name": "cj", "language": "javascript", "scope": "panel", "event": "onColoursJs", "target": "*", "enabled": true,
+              "source": "function onColoursJs(){ set('lbl.background.fill.colour', 'rgb(0, 128, 255)'); log('js ' + get('lbl.background.fill.colour')); set('lbl.text.font.underlineColour', ''); log('js underline [' + get('lbl.text.font.underlineColour') + ']'); set('lbl.background.border.top', { colour: 'hsl(120, 100%, 25%)', thickness: 4 }); log('js top ' + get('lbl.background.border.top.colour') + ' ' + get('lbl.background.border.top.thickness')); }\nfunction onMovesJs(){ var a = ce.anim.to('lbl.background.fill.colour', 1, { duration: 10 }); var b = ce.anim.spring(['lbl.transform.x', 'lbl.background.border.top.colour', 'panel.bgColour'], 50, { duration: 10, done: function (c) { log('js list done ' + c); } }); var c = ce.anim.to(['lbl.transform.x', 'lbl.transform.y'], 50, { duration: 10, done: function (c) { log('js done ' + c); } }); var d = ce.anim.to('lbl.transform.width', 'wide'); log('js moving ' + a + ' ' + b + ' ' + c + ' ' + d + ' ' + ce.anim.running('lbl.background.fill.colour') + ' ' + ce.anim.running('lbl.transform.x') + ' ' + ce.anim.running('lbl.background.border.top.colour')); }\nfunction onPanelJs(){ set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: 'nope', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('panel.bgGradient', { type: 'linear', stops: [ { color: 'navy', position: 0 }, { color: '0000FF', position: 100 } ] }); log('js stop ' + get('panel.bgGradient.stops.0.color')); set('lbl.background.fill.gradient', { type: 'linear', stops: [ { color: 'teal', position: 0 }, { color: '80FF0000', position: 100 } ] }); set('lbl.background.fill.gradient', { type: 'linear', stops: [ { color: 'teal', position: 0 }, { color: 'red', position: 100 } ] }); set('lbl.background.fill.gradient.stops.1.color', '#5b9bd5'); log('js control stops ' + get('lbl.background.fill.gradient.stops.0.color') + ' ' + get('lbl.background.fill.gradient.stops.1.color') + ' ' + ce.anim.to('lbl.background.fill.gradient.stops.1.color', 1)); }" },
+            { "id": "cm", "name": "cm", "language": "lua", "scope": "panel", "event": "onMovesLua", "target": "*", "enabled": true,
+              "source": "function onMovesLua()\n  local r = ce.anim.envelope({ \"lbl.transform.width\", \"lbl.text.font.underlineColour\" }, { { x = 0, y = 0 }, { x = 1, y = 1 } }, { to = 10, duration = 10, done = function(c) log(\"lua list done \" .. tostring(c)) end })\n  log(\"lua envelope \" .. tostring(r) .. \" \" .. tostring(ce.anim.running(\"lbl.transform.width\")))\n  log(\"lua panel move \" .. tostring(ce.anim.to(\"panel.gridColour\", 1)))\nend\nfunction onPanelLua()\n  set(\"panel.bgColour\", \"red\")\n  set(\"panel.gridColour\", \"{accent}\")\n  set(\"panel.bgGradient.stops.0.color\", \"#abc\")\n  log(\"lua panel \" .. tostring(get(\"panel.bgColour\")) .. \" \" .. tostring(get(\"panel.gridColour\")) .. \" \" .. tostring(get(\"panel.bgGradient.stops.0.color\")))\nend\n" },
+            { "id": "cs", "name": "cs", "language": "lua", "scope": "component", "event": "onColoursSelf", "target": "lbl", "enabled": true,
+              "source": "function onColoursSelf()\n  self.set(\"background.fill.colour\", \"#abc\")\n  log(\"self \" .. tostring(self.get(\"background.fill.colour\")))\n  self.set(\"background.fill.colour\", \"#abcd\")\nend\n" }
+          ],
+          "bgColour": "FF333333", "gridColour": "33FFFFFF",
+          "bgGradient": { "type": "linear", "angle": 90, "stops": [ { "color": "FF0000", "position": 0 }, { "color": "0000FF", "position": 100 } ] },
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "l1", "name": "lbl", "controlType": "Label" },
+              "Transform": { "_type": "Transform", "x": 0, "y": 0, "width": 100, "height": 40 },
+              "Background": { "_type": "Background", "_children": {
+                "Fill": { "_type": "Fill", "colour": "FF112233", "gradient": null },
+                "Border": { "_type": "Border", "top": { "style": "solid", "thickness": 1, "colour": "FF000000" } } } },
+              "Text": { "_type": "Text", "content": "Hi", "_children": {
+                "Font": { "_type": "Font", "colour": "FFFFFFFF", "underlineColour": "FF00FF00" } } }
+            } }
+          ]
+        })JSON";
+
+        PanelValueModel colourModel;
+        check (colourModel.loadFromJson (kColourPanel), "loaded the colour panel");
+        juce::StringArray colourLogs;
+        BridgeScriptHost::Callbacks ccb;
+        ccb.getValue = [&] (const juce::String& path, const juce::String& form) { return colourModel.getValue (path, form); };
+        ccb.colourWrites = [&] (const juce::String& call, const juce::String& path, const juce::var& value, const juce::String& form)
+        { return colourModel.colourWrites (call, path, value, form); };
+        ccb.isColourProperty = [&] (const juce::String& path) { return colourModel.isColourProperty (path); };
+        ccb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { colourModel.setValue (path, v, form); };
+        ccb.log = [&] (const juce::String& m, const juce::var&) { colourLogs.add (m); };
+        BridgeScriptHost colourHost (std::move (ccb));
+        ScriptRuntime colourRuntime (colourHost);
+        colourHost.attachRuntime (&colourRuntime);
+        colourRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        colourRuntime.loadScripts (gatherPanelScripts (colourModel.panel()));
+
+        const juce::String forms = "A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", "
+                                   "a CSS colour name, rgb() or hsl()";
+        colourRuntime.runAction ("onColoursLua", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "lua #FF0000 | "
+                   "set(\"lbl.background.fill.colour\"): \"redd\" is not a colour the panel can read, so nothing was set. " + forms + ". | "
+                   "set(\"lbl.background.fill.colour\"): 16711680 is not a colour the panel can read, so nothing was set. " + forms
+                       + ". As text, 16711680 is \"#FF0000\". | "
+                   "lua kept #FF0000 | "
+                   "set(\"lbl.background.border.top\"): at colour, \"#0008\" is not a colour the panel can read, so nothing was set. "
+                       + forms + ". Write \"88000000\". | "
+                   "lua top 1 | "
+                   "lua text red",
+               "Lua's set(): a name written out, the rest refused in the editor's words, a whole section with it, and text "
+               "left alone (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        colourLogs.clear();
+        colourRuntime.runAction ("onColoursJs", juce::var());
+        check (colourLogs.joinIntoString (" | ") == "js #0080FF | js underline [] | js top #008000 4",
+               "JavaScript's set(): rgb() written out, \"\" where the property has no colour of its own, and a section's "
+               "colour written out as it is stored (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        colourLogs.clear();
+        colourRuntime.runAction ("onColoursSelf", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "self #AABBCC | "
+                   "set(\"lbl.background.fill.colour\"): \"#abcd\" is not a colour the panel can read, so nothing was set. " + forms
+                       + ". Write \"DDAABBCC\".",
+               "Lua's self.set reads a colour as set() does (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        // A native handler's set() (NativeHandlerEngine's host_set, through the C ABI) and Python's are
+        // this same call on the host, with no prelude in front of it.
+        colourLogs.clear();
+        colourHost.setValue ("lbl.background.fill.colour", juce::var ("RebeccaPurple"), juce::var());
+        const auto purple = colourModel.getValue ("lbl.background.fill.colour").toString();
+        colourHost.setValue ("lbl.background.fill.colour", juce::var (1.5), juce::var());
+        check (purple == "#663399" && colourModel.getValue ("lbl.background.fill.colour").toString() == "#663399"
+                   && colourLogs.joinIntoString (" | ") == "set(\"lbl.background.fill.colour\"): 1.5 is not a colour the panel can "
+                                                           "read, so nothing was set. " + forms + ".",
+               "the host's own setValue, a native handler's door, reads a colour the same way (got "
+                   + colourLogs.joinIntoString (" | ") + ")");
+        colourHost.setValue ("lbl.background.fill.colour", juce::var ("#abc"), juce::var());
+
+        // The panel's own colours, through both engines' set() and get(): written out, refused in the
+        // editor's words, a gradient's stop by its path and the gradient written whole. A stop is stored
+        // in its own form, RRGGBB with no "#", the panel's and a control's alike, and refused with an
+        // alpha; ce.anim refuses a control's stop as its path, as it refuses any colour.
+        colourLogs.clear();
+        colourRuntime.runAction ("onPanelLua", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "set(\"panel.gridColour\"): \"{accent}\" is not a colour the panel can read, so nothing was set. " + forms
+                       + ". A control-set colour is not read in this property. | "
+                   "lua panel #FF0000 33FFFFFF AABBCC",
+               "Lua's set() reads the panel's own colours by the editor's rule (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourLogs.clear();
+        colourRuntime.runAction ("onPanelJs", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "set(\"panel.bgGradient\"): at stops.1.color, \"nope\" is not a colour the panel can read, so nothing was set. "
+                       + forms + ", and a gradient stop takes no alpha. | "
+                   "js stop AABBCC | js stop 000080 | "
+                   "set(\"lbl.background.fill.gradient\"): at stops.1.color, \"80FF0000\" has an alpha, and a gradient stop has "
+                   "none: its opacity is the gradient layer's, so nothing was set. Write \"FF0000\", the colour without its alpha. | "
+                   "ce.anim.to: \"lbl.background.fill.gradient.stops.1.color\" is a colour, and ce.anim moves numbers, so nothing was "
+                   "started. | "
+                   "js control stops 008080 5B9BD5 false",
+               "JavaScript's set() reads a gradient written whole stop by stop, the panel's and a control's, and writes none "
+               "of it for one it cannot read (got " + colourLogs.joinIntoString (" | ") + ")");
+
+        // A list with a colour in it is refused whole: each colour named, nothing started, its done
+        // never called, and the call answers false, as a target that is not a number does.
+        colourLogs.clear();
+        colourRuntime.tickAnimations (0.0);
+        colourRuntime.runAction ("onMovesJs", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.to: \"lbl.background.fill.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "ce.anim.spring: \"lbl.background.border.top.colour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "ce.anim.spring: \"panel.bgColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "ce.anim.to: \"wide\" is not a number, so nothing was started. | "
+                   "js moving false false true false false true false",
+               "ce.anim refuses a colour property as its path, in the editor's words, and a list with one in it whole, "
+               "naming each (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourLogs.clear();
+        colourRuntime.runAction ("onMovesLua", juce::var());
+        check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.envelope: \"lbl.text.font.underlineColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "lua envelope false false | "
+                   "ce.anim.to: \"panel.gridColour\" is a colour, and ce.anim moves numbers, so nothing was started. | "
+                   "lua panel move false",
+               "Lua's envelope refuses a list with a colour in it the same way, and one of the panel's colours is refused "
+               "as a path (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourLogs.clear();
+        colourRuntime.tickAnimations (100.0);
+        check (colourLogs.joinIntoString (" | ") == "js done true",
+               "only the list that started calls its done (got " + colourLogs.joinIntoString (" | ") + ")");
+        // An envelope arrives at the same place from every prelude. Started there directly: the
+        // preludes' own envelope sampling is not what this is about.
+        colourLogs.clear();
+        auto* envelopeOpts = new juce::DynamicObject();
+        envelopeOpts->setProperty ("samples", juce::Array<juce::var> { 0.0, 1.0 });
+        colourHost.startAnimation ("envelope", juce::var ("lbl.background.fill.colour"), 1.0, juce::var (envelopeOpts));
+        check (colourLogs.joinIntoString (" | ") ==
+                   "ce.anim.envelope: \"lbl.background.fill.colour\" is a colour, and ce.anim moves numbers, so nothing was started."
+                   && ! colourRuntime.animationRunning ("lbl.background.fill.colour"),
+               "ce.anim.envelope refuses a colour too (got " + colourLogs.joinIntoString (" | ") + ")");
+        colourRuntime.tickAnimations (1000.0);
+        check (colourModel.getValue ("lbl.background.fill.colour").toString() == "#AABBCC"
+                   && colourModel.getValue ("lbl.background.border.top.colour").toString() == "#008000"
+                   && colourModel.getValue ("panel.bgColour").toString() == "#FF0000"
+                   && colourModel.getValue ("lbl.text.font.underlineColour").isString()
+                   && colourModel.getValue ("lbl.text.font.underlineColour").toString().isEmpty()
+                   && (double) colourModel.getValue ("lbl.transform.x") == 50.0
+                   && (double) colourModel.getValue ("lbl.transform.width") == 100.0,
+               "so no tick wrote a number into a colour, nothing in a refused list moved, and the list that started did");
     }
 
     std::cout << "--------------------------------------------\n"

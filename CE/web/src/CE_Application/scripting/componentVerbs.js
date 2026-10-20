@@ -239,8 +239,11 @@ export const COMPONENT_FAMILIES = [
         doc: 'Rename one pad, 1-based. Empty restores the name the map gives it.' }),
       v('choke', 'pads', ITEM, { item: 'choke', kind: INT, min: 0, max: 8, ...PADS,
         doc: 'Put one pad in a choke group, 1-based — pads sharing a non-zero group cut each other. 0 is none.' }),
+      // A colour is read as set() reads one, by the shared component writer (panelRuntime's
+      // writeComponentFields), because `pads.*.colour` is a colour field (scriptColours.LIST_ITEMS).
       v('colour', 'pads', ITEM, { item: 'colour', kind: STR, ...PADS,
-        doc: 'Tint one pad, AARRGGBB, 1-based. Empty returns it to the section accent.' }),
+        doc: 'Tint one pad, 1-based. The colour is stored as `set()` stores one ("red" as "#FF0000"), '
+          + 'and one it would refuse changes nothing and answers false. "" returns the pad to the section accent.' }),
       // ROLL — a pad restrikes for as long as it is on. Per-pad, because a kick that buzzed every
       // time you leant on it would be unplayable, and because "the snare rolls and nothing else
       // does" is the whole shape of the feature.

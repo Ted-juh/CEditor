@@ -932,8 +932,9 @@ test('the conversions are the colour editor\'s, in both directions', () => {
 });
 
 test('every input form the app accepts, because a stored colour is AARRGGBB', () => {
-  // "66FFFFFF" is a 40%-opaque white in every panel document. The parser reads the last six
-  // characters, so a stored colour goes straight in without being unpacked first.
+  // "66FFFFFF" is a 40%-opaque white in every panel document. Eight digits are read as the panel
+  // reads them, AARRGGBB with the alpha set aside, so a stored colour goes straight in without
+  // being unpacked first.
   assert.equal(api.lighten('336699'), api.lighten('#336699'));
   assert.equal(api.lighten('66336699'), api.lighten('336699'));
   assert.deepEqual(api.hexToRgb('FF336699'), { r: 51, g: 102, b: 153 });
@@ -967,7 +968,9 @@ test('alpha returns the PANEL\'s form, which is the one asymmetry here', () => {
   assert.equal(api.colourAlpha('336699', 0.4), '66336699');
   assert.equal(api.colourAlpha('336699', 0), '00336699');
   assert.equal(api.colourAlpha('336699', 1), 'FF336699');
-  assert.equal(api.colourAlpha('336699', 5), 'FF336699', 'clamped, not wrapped');
+  // Outside 0..1 is refused rather than clamped: 128 meant out of 255 used to come out solid.
+  // scriptVisualValues.test.js has the words.
+  assert.equal(api.colourAlpha('336699', 5), undefined, 'refused, not clamped');
   // …and it round-trips back through the same parser, which is what makes the pair usable.
   assert.deepEqual(api.hexToRgb(api.colourAlpha('336699', 0.4)), { r: 51, g: 102, b: 153 });
 });

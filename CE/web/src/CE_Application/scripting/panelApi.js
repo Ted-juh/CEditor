@@ -41,6 +41,9 @@ import { FEATURE_KEYS, CASE_MODES, SCRIPT_MODES, JUSTIFICATIONS } from './textSt
 // And ce.anim's curve names from the table ce.anim evaluates. This list was typed out, and when the
 // animation overhaul added five easings every runtime accepted them and the documentation did not.
 import { ANIM_CURVE_NAMES, CURVE_NAMES } from './easingTables.js';
+// The two vocabularies a component verb's enum may be, so its argument can say which (verbValueTyping).
+import { DIVISION_NAMES } from './timeTables.js';
+import { SCALE_NAMES } from './musicTheory.js';
 
 /** `"a", "b" or "c"` from a table, for a summary that names the values a verb accepts.
  *
@@ -182,7 +185,7 @@ export const PANEL_PROPERTIES = [
   { id: 'locked', type: 'boolean', summary: 'Whether editing is locked.' },
   { id: 'resizable', type: 'boolean', summary: 'Whether the panel window can be resized.' },
   { id: 'panicShortcut', type: 'string', summary: 'The panel-wide emergency-stop key. Empty string switches it off.' },
-  { id: 'bgColour', type: 'string', summary: 'Background colour, AARRGGBB hex.' },
+  { id: 'bgColour', type: 'string', summary: 'Background colour: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". Read as every colour property is, so "red" is stored as "#FF0000" and what is not a colour is refused.' },
   { id: 'bgSolid', type: 'boolean', summary: 'Whether the solid background layer is drawn.' },
   { id: 'bgGradientEnabled', type: 'boolean', summary: 'Whether the gradient background layer is drawn.' },
   { id: 'bgImageEnabled', type: 'boolean', summary: 'Whether the image background layer is drawn.' },
@@ -276,17 +279,19 @@ const SHARED_OPTION_FIELDS = {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
     summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
       + 'it; "script" is private to this one; "local" stays on this machine and is never written '
-      + 'into the panel document.',
+      + 'into the panel document. A scope that is not one of these is refused, and so is an options '
+      + 'table with any other key, such as a misspelled `scop`: nothing is saved or read, and a '
+      + 'message says why, because falling back to "panel" would share a private setting.',
   },
 
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
   duration: {
     name: 'duration', type: 'number', default: '300', unit: 'milliseconds',
-    summary: 'How long the move takes.',
+    summary: 'How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once.',
   },
   beats: {
-    name: 'beats', type: 'number', sample: '2',
-    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo.',
+    name: 'beats', type: 'number', sample: '2', unit: 'beats',
+    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move\'s length is its `duration`.',
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
@@ -295,30 +300,77 @@ const SHARED_OPTION_FIELDS = {
   },
   delay: {
     name: 'delay', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'Wait this long before starting.',
+    summary: 'Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once.',
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
     summary: 'When `path` is a list, offset each move after the first by this much, so they start '
       + 'in turn.',
   },
+  // The runs IN ALL, which is what this always said. Every runtime used to read it as runs after
+  // the first (repeat = 1 ran twice, repeat = 0 once); startAnimationImpl and
+  // ScriptRuntime::startAnimation now do what it says. apiContractRuntimes.test.js counts the runs.
   repeat: {
     name: 'repeat', type: 'number', default: '1',
-    summary: 'How many times to run it. 0 or less repeats until you stop it.',
+    summary: 'How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or '
+      + 'less repeats it until you stop it. A fraction is rounded to the nearest whole number, text '
+      + 'that is a number is read as one, and anything else runs it once. In Lua, where repeat is a '
+      + 'keyword, write it as ["repeat"] = 3.',
   },
   pingpong: {
     name: 'pingpong', type: 'true or false', default: 'false',
     summary: 'On a repeat, run the move backwards every other time instead of jumping back to the '
       + 'start.',
   },
+  // done(completed), which is what this always said. Every runtime used to pass one table,
+  // { path, completed } or { paths, completed }, and a table is always true, so `if completed then`
+  // read a cancelled move as a finished one. fireAnimationDone and the preludes' __animDone
+  // listeners now pass the boolean alone.
   done: {
     name: 'done', type: 'function',
-    summary: 'Called when the move ends: done(completed). `completed` is false if the move was '
-      + 'stopped early.',
+    summary: 'Called once when the move ends, with one argument: done(completed). `completed` is '
+      + 'true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped '
+      + 'or replaced first. When `path` is a list it is called once, after the last of them ends, '
+      + 'and `completed` is true only if every one of them got to the end.',
   },
   animFrom: {
     name: 'from', type: 'number', sample: '0',
     summary: 'Start from this value instead of wherever the control is now.',
+  },
+
+  /* --- a control's props (ce.panel.create / .clone) ---------------------- */
+  // Shared because clone's `props` "works as in create", and listed nothing while it did: the two
+  // read the same keys through applyControlProps.
+  controlName: {
+    name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
+    summary: 'The control\'s name. Every other command addresses the control by this name.',
+  },
+  controlX: {
+    name: 'x', type: 'number', default: '0', unit: 'pixels',
+    summary: 'Distance from the left edge of whatever contains it.',
+  },
+  controlY: { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Distance from the top edge.' },
+  controlWidth: {
+    name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
+    summary: 'How wide to make it.',
+  },
+  controlHeight: {
+    name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
+    summary: 'How tall to make it.',
+  },
+  controlParent: {
+    name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"', kind: 'control',
+    summary: 'The name of a container to put it inside.',
+  },
+  controlSection: {
+    name: '<section>', type: 'object', group: 'any section',
+    summary: 'Any section of the control, to set up as you make it — for example '
+      + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals '
+      + 'and all (Behavior, not behavior), and one the control does not have refuses the call. Inside '
+      + 'one, names are read in any capitals, as a path is: '
+      + '{ Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A '
+      + 'colour is stored as set() stores it, and a setting the section does not have is written with '
+      + 'a warning, as set() writes one.',
   },
 
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
@@ -344,17 +396,35 @@ const SHARED_OPTION_FIELDS = {
     summary: 'Which configured device to use, when the panel is set up for more than one.',
   },
 
+  /* --- byte lists (ce.midi.read / .write) ----------------------------------- */
+  // One definition for the two, because a number is read back the way it was written: write's
+  // options were only "the same as read's" in its summary, listed nowhere, so the check of option
+  // keys could not refuse { bit = 8 } there, and a 300 went to the synth as 02 2C rather than 01 2C.
+  bytesBits: {
+    name: 'bits', type: 'number', default: '7', values: [7, 8],
+    summary: 'How many bits of each byte carry the number: 7 for SysEx data, 8 for a whole byte.',
+  },
+  bytesOrder: {
+    name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
+    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").',
+  },
+
   /* --- image layers (ce.image) -------------------------------------------- */
   tint: {
     name: 'tint', type: 'colour',
-    summary: 'Tint colour, as "#RRGGBB". Omit to leave the image untinted.',
+    summary: 'Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. '
+      + 'A web colour with only one meaning is taken too and stored as those digits, as `set()` '
+      + 'stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the '
+      + 'same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four '
+      + 'digits included, is refused with a message, and the other options still apply. Omit it to '
+      + 'leave the image untinted.',
   },
   opacity: {
     name: 'opacity', type: 'number', default: '1', unit: '0 to 1',
-    summary: 'Image opacity. 0 is invisible, 1 is fully opaque.',
+    summary: 'Image opacity. 0 is invisible, 1 is fully opaque. A value above 1, such as 50 written for ce.image.set\'s scale, draws fully opaque and writes a warning.',
   },
   imageRotation: {
-    name: 'rotation', type: 'number', default: '0', unit: 'degrees',
+    name: 'rotation', type: 'number', default: '0', unit: 'degrees', hint: '0 is upright, increasing clockwise',
     summary: 'Turn the image clockwise, with 0 upright.',
   },
 };
@@ -611,10 +681,10 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.',
+    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A gradient stop is stored as RRGGBB and takes no alpha. The change is sent to the synth, except while your script reacts to MIDI from the synth, so it does not hear its own value echoed back.',
     params: [
       { name: 'path', type: 'path', required: true },
-      { name: 'value', type: 'value', required: true },
+      { name: 'value', type: 'value', required: true, at: 'path' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'transmit', type: 'true or false', default: 'decided by where the write came from',
           summary: 'Whether to send the change to the synth. Left out, a write made while handling '
@@ -627,7 +697,7 @@ export const COMMANDS = [
   },
   {
     id: 'get', category: 'Values', signature: 'get(path [, form])',
-    summary: 'Read a value from the panel. A control\'s value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form\'s name as `form`. Returns nothing if the control or property does not exist.',
+    summary: 'Read a value from the panel. A control\'s value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form\'s name as `form`. A `form` that is not one of the three is refused with a message that names them, and the one you meant when it is one written another way ("normalisedValue" is answered with "Write normalizedValue."), and nothing comes back. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'form', type: 'string', required: false, values: VALUE_ACCESSOR_IDS },
@@ -689,7 +759,7 @@ export const COMMANDS = [
     id: 'watch', category: 'Events & Flow', signature: 'watch(path, fn)',
     summary: 'Call `fn(value, previous)` whenever a path on the panel changes — a control\'s value, a colour, a setting deep inside a section. It fires whatever made the change: a script, the user, or MIDI from the synth.',
     params: [
-      { name: 'path', type: 'string', required: true },
+      { name: 'path', type: 'string', required: true, kind: 'path' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -702,7 +772,7 @@ export const COMMANDS = [
     id: 'compute', category: 'Events & Flow', signature: 'compute(path, fn)',
     summary: 'Turn a property into a formula. `fn` is worked out again whenever anything on the panel changes, and its result is written to `path` — for example a label that always shows the cutoff frequency.',
     params: [
-      { name: 'path', type: 'string', required: true },
+      { name: 'path', type: 'string', required: true, kind: 'path' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -715,7 +785,7 @@ export const COMMANDS = [
     id: 'intercept', category: 'Events & Flow', signature: 'intercept(path, fn)',
     summary: 'Check or change every value written to `path` before it lands. `fn(value, previous)` can return a different value to use instead (to clamp, round or snap it), return false to refuse the change, or return nothing to let it through unchanged.',
     params: [
-      { name: 'path', type: 'string', required: true },
+      { name: 'path', type: 'string', required: true, kind: 'path' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -764,19 +834,19 @@ export const COMMANDS = [
   // yours — start with the same id twice and the second call re-times the existing timer.
   {
     id: 'startTimer', category: 'Events & Flow', signature: 'startTimer(id, ms)',
-    summary: 'Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one.',
+    summary: 'Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.',
     params: [
       { name: 'id', type: 'string', required: true },
-      { name: 'ms', type: 'number', required: true },
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
     ],
     scopes: 'any',
     snippet: { lua: 'startTimer("${1:id}", ${2:250})$0', javascript: 'startTimer("${1:id}", ${2:250})$0' },
   },
   {
     id: 'after', category: 'Events & Flow', signature: 'after(ms, fn) -> id',
-    summary: 'Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs.',
+    summary: 'Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs. 0 runs it as soon as the handler that asked has returned. A missing delay, text (even "1000") or a negative number schedules nothing and writes a message.',
     params: [
-      { name: 'ms', type: 'number', required: true },
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -796,6 +866,7 @@ export const COMMANDS = [
   /* --- Device / MIDI: bulk (Q9) --- */
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
+    refusal: 'false',
     summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile knows, such as "patch" or "global", or one declared with defineDump. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).',
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
@@ -814,6 +885,7 @@ export const COMMANDS = [
   },
   {
     id: 'recallPreset', category: 'Device / MIDI', signature: 'recallPreset(slot [, opts])',
+    refusal: 'result',
     summary: 'Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank\'s first preset, whatever program number it uses.',
     params: [
       { name: 'slot', type: 'number', required: true },
@@ -834,7 +906,7 @@ export const COMMANDS = [
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
-    summary: 'Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth.',
+    summary: 'Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth. Raw bytes can be a list of numbers or hex text, read a byte at a time as `sendSysex` reads it.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'applyDump(${1:bytes})$0', javascript: 'applyDump(${1:bytes})$0' },
@@ -863,8 +935,11 @@ export const COMMANDS = [
      colorHelpers.js do not match that glob — the sweep had a blind spot exactly the shape of its
      own search pattern, which is worth writing down because it is the failure mode of any sweep.
 
-     ONE input form, and a trap worth naming. Every verb here accepts "RRGGBB", "AARRGGBB" or
-     "#RRGGBB" — the app's own parser reads the last six characters — and returns "#RRGGBB", which
+     ONE input form, and a trap worth naming. Every verb here accepts what a colour property
+     accepts, read as if the long form the property would store had been given
+     (scriptColours.storedColour): "RRGGBB", "AARRGGBB" or "#RRGGBB" as written (6 or 8 hex digits,
+     one "#" at most), and CSS's short forms written out first, as set() writes them out ("#abc",
+     "red", rgb(), hsl()); anything else is refused with a message. Each returns "#RRGGBB", which
      CSS, SVG and a panel property all accept. The app STORES colours as AARRGGBB (JUCE's order:
      "66FFFFFF" is a 40%-opaque white in every panel document) while CSS wants #RRGGBBAA — the same
      four bytes the other way round. So exactly one verb, `alpha`, returns the panel's form, and
@@ -872,45 +947,45 @@ export const COMMANDS = [
      answer. Case is normalised to upper; hex is case-insensitive everywhere it is read. */
   {
     id: 'lighten', category: 'Value / range', signature: 'lighten(colour [, amount]) -> string',
-    summary: 'Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4. Returns nothing if the colour cannot be read.',
+    summary: 'Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is read as a colour property reads it: 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#", or a short form, "#RGB", a name such as "red", rgb(), rgba(), hsl() or hsla(), read as the colour a property would store for it ("red" is "#FF0000", and rgba(255, 0, 0, 0.5) is "80FF0000", its alpha set aside). A number, "#" with four digits, text with space around it and anything else that cannot be read are refused with a message, and nothing is returned.',
     params: [
-      { name: 'colour', type: 'string', required: true },
-      { name: 'amount', type: 'number', required: false },
+      { name: 'colour', type: 'string', required: true, kind: 'colour' },
+      { name: 'amount', type: 'number', required: false, unit: '0 to 1' },
     ],
     scopes: 'any',
   },
   {
     id: 'darken', category: 'Value / range', signature: 'darken(colour [, amount]) -> string',
-    summary: 'Make a colour darker. `amount` is how much of the colour\'s brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. Returns nothing if the colour cannot be read.',
+    summary: 'Make a colour darker. `amount` is how much of the colour\'s brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55; a number outside 0 to 1 is refused with a message. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. The colour is read as `ce.math.lighten()` reads it, and one that cannot be read is refused with a message, so nothing is returned.',
     params: [
-      { name: 'colour', type: 'string', required: true },
-      { name: 'amount', type: 'number', required: false },
+      { name: 'colour', type: 'string', required: true, kind: 'colour' },
+      { name: 'amount', type: 'number', required: false, unit: '0 to 1' },
     ],
     scopes: 'any',
   },
   {
     id: 'mixColour', category: 'Value / range', signature: 'mixColour(a, b, t) -> string',
-    summary: 'Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Returns nothing if either colour cannot be read.',
+    summary: 'Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Each colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and if either cannot be read, it is refused with a message and nothing is returned.',
     params: [
-      { name: 'a', type: 'string', required: true },
-      { name: 'b', type: 'string', required: true },
-      { name: 't', type: 'number', required: true },
+      { name: 'a', type: 'string', required: true, kind: 'colour' },
+      { name: 'b', type: 'string', required: true, kind: 'colour' },
+      { name: 't', type: 'number', required: true, unit: '0 to 1' },
     ],
     scopes: 'any',
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'Give a colour a transparency, ready to store in a control\'s colour property. `a` runs from 0 (fully transparent) to 1 (fully solid). The result is in the panel\'s own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web\'s `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. Returns nothing if the colour cannot be read.',
+    summary: 'Give a colour a transparency, ready to store in a control\'s colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel\'s own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web\'s `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. The colour is read as `ce.math.lighten()` reads it, and any alpha it has is replaced; one it cannot read is refused with a message, and nothing is returned.',
     params: [
-      { name: 'colour', type: 'string', required: true },
-      { name: 'a', type: 'number', required: true },
+      { name: 'colour', type: 'string', required: true, kind: 'colour' },
+      { name: 'a', type: 'number', required: true, unit: '0 to 1' },
     ],
     scopes: 'any',
   },
   {
     id: 'hexToRgb', category: 'Value / range', signature: 'hexToRgb(colour) -> table',
-    summary: 'Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Returns nothing if the colour cannot be read.',
-    params: [{ name: 'colour', type: 'string', required: true }],
+    summary: 'Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. The colour is read as `ce.math.lighten()` reads it: eight hex digits are AARRGGBB, short forms such as "#abc", "red" and rgb() are read too, and any alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.',
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour' }],
     scopes: 'any',
   },
   {
@@ -924,9 +999,21 @@ export const COMMANDS = [
     scopes: 'any',
   },
   {
+    id: 'colourFromArgb', category: 'Value / range', signature: 'colourFromArgb(colour) -> string',
+    summary: 'Read a colour written with its alpha first, `AARRGGBB`, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are AARRGGBB to a colour property and to the other colour commands, but the other way round to a drawing, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromRGBA()` reads the alpha last.',
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'argb' }],
+    scopes: 'any',
+  },
+  {
+    id: 'colourFromRgba', category: 'Value / range', signature: 'colourFromRgba(colour) -> string',
+    summary: 'Read a colour written with its alpha last, `RRGGBBAA`, the web\'s order, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are read this way by a drawing, but as AARRGGBB by a colour property and the other colour commands, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromARGB()` reads the alpha first.',
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'rgba' }],
+    scopes: 'any',
+  },
+  {
     id: 'hexToHsl', category: 'Value / range', signature: 'hexToHsl(colour) -> table',
-    summary: 'Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. Returns nothing if the colour cannot be read.',
-    params: [{ name: 'colour', type: 'string', required: true }],
+    summary: 'Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. The colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and one that cannot be read is refused with a message, so nothing is returned.',
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour' }],
     scopes: 'any',
   },
   {
@@ -951,14 +1038,15 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
-    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` callback runs with `completed` set to false, because it was cancelled rather than finished.',
+    refusal: 'false',
+    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           'duration', 'beats', 'sync',
-          { name: 'curve', type: 'text or list', default: '"linear"',
+          { name: 'curve', type: 'text or list', default: '"linear"', kind: 'curve',
             values: [...ANIM_CURVE_NAMES],
             summary: `The shape of the move. The first ${CURVE_NAMES.length} names are the curves of `
               + '`ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an '
@@ -967,9 +1055,9 @@ export const COMMANDS = [
               + 'four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an '
               + 'animation\'s `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name '
               + 'it does not know is reported, and the move runs in a straight line.' },
-          { name: 'damping', type: 'number', default: '6',
+          { name: 'damping', type: 'number', default: '6', kind: 'number',
             summary: 'With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it.' },
-          { name: 'frequency', type: 'number', default: '12',
+          { name: 'frequency', type: 'number', default: '12', kind: 'number',
             summary: 'With curve = "spring": how fast it wobbles, as ce.anim.spring reads it.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
@@ -982,17 +1070,18 @@ export const COMMANDS = [
   },
   {
     id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
-    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way.',
+    refusal: 'false',
+    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { like: 'duration', default: '600' },
-          { name: 'damping', type: 'number', default: '6',
+          { name: 'damping', type: 'number', default: '6', kind: 'number',
             summary: 'How quickly the wobble dies away. Higher settles sooner; lower keeps '
               + 'bouncing.' },
-          { name: 'frequency', type: 'number', default: '12',
+          { name: 'frequency', type: 'number', default: '12', kind: 'number',
             summary: 'How fast it wobbles. Higher is a tighter, faster bounce.' },
           'animFrom', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
@@ -1005,7 +1094,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
-    summary: 'Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback runs with `completed` set to false. To jump to the end instead, use `ce.anim.finish()`.',
+    summary: 'Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback is called with false. To jump to the end instead, use `ce.anim.finish()`.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
@@ -1028,7 +1117,8 @@ export const COMMANDS = [
      now. These seven are the other direction: things a stored property structurally cannot be. */
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
-    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console.',
+    refusal: 'false',
+    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'points', type: 'list', required: true },
@@ -1038,7 +1128,7 @@ export const COMMANDS = [
             summary: 'The value that y = 0 in the shape means.' },
           { name: 'to', type: 'number', default: '1',
             summary: 'The value that y = 1 in the shape means.' },
-          'duration', 'beats', 'sync', 'delay', 'repeat', 'pingpong', 'done',
+          'duration', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],
     scopes: 'any',
@@ -1078,7 +1168,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateFinish', category: 'Animation', signature: 'animateFinish(path)',
-    summary: 'End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` runs with `completed` set to true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.',
+    summary: 'End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` is called with true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
@@ -1091,8 +1181,8 @@ export const COMMANDS = [
     summary: 'Play one of a control\'s keyframe animations (the ones made in the Animation tab) right now, from its first frame — restarting it if it is already playing. Returns true if the control has a keyframe animation with that name; the name is not case-sensitive. A transition cannot be started this way, because it plays when its own trigger happens: asking for one returns false and writes a message to the script console listing the keyframe animations the control does have.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true },
-      { name: 'animation', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
+      { name: 'animation', type: 'string', required: true, kind: 'animation' },
     ],
     scopes: 'any',
   },
@@ -1109,7 +1199,7 @@ export const COMMANDS = [
       { name: 'message', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'uiKind',
-        { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds',
+        { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds', min: null,
           summary: 'How long the message stays up. 0 or less keeps it visible until something '
             + 'dismisses it.' },
       ]) },
@@ -1119,6 +1209,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
+    refusal: 'false',
     summary: 'Show a line of text in the status bar. It stays until you replace it; call this with no message to clear it. Use it for an ongoing state, such as "Recording" or "Synced" — for a one-off event, use `ce.ui.notify()`. Read the current status back with `ce.ui.state()`.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1130,6 +1221,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
+    refusal: 'unanswered',
     summary: 'Ask a question with buttons. The answer arrives later through `onChoice`, which receives the label of the button that was clicked, or nothing if the dialog was closed without a choice. Only one dialog can be open at a time. The call itself returns true if the dialog appeared; if it returns false, nothing was shown — for example because another dialog is already open — and `onChoice` has already been called with nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1162,6 +1254,7 @@ export const COMMANDS = [
      them, and it copies to the clipboard in six places. A script could do none of those. */
   {
     id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
+    refusal: 'unanswered',
     summary: 'Ask the user to type some text. The answer arrives through `onAnswer`: the text they typed, or nothing if they cancelled. An empty answer (they accepted an empty field) is not the same as no answer. Pressing Enter accepts. Returns true if the dialog appeared; if it returns false, `onAnswer` has already been called with nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1173,6 +1266,11 @@ export const COMMANDS = [
           { name: 'placeholder', type: 'text', sample: '"Patch name"',
             summary: 'Grey hint text shown while the field is empty.' },
           'uiAccept', 'uiCancel', 'uiKind',
+          // Read by the dialog store for every shape, and listed so the check of option keys
+          // (panelRuntime.js) does not refuse a key that works.
+          { name: 'default', type: 'text', default: 'the accept label', sample: '"Cancel"',
+            summary: 'Which of the two buttons is drawn as the default one: the accept label or the '
+              + 'cancel label. Pressing Enter in the field accepts either way.' },
         ]) },
       { name: 'onAnswer', type: 'function', required: false },
     ],
@@ -1184,6 +1282,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
+    refusal: 'unanswered',
     summary: 'Ask the user to pick from a list. The answer arrives through `onAnswer`: the chosen item, a list of items if `opts.multiple` is set, or nothing if they cancelled. A long list scrolls rather than making the dialog taller. Returns true if the dialog appeared; if it returns false — for example because `opts.items` is empty — `onAnswer` has already been called with nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -1265,25 +1364,25 @@ export const COMMANDS = [
     id: 'drawClear', category: 'Drawing', signature: 'drawClear([target])',
     summary: 'Erase everything drawn on this control, or on the control named `target`. Drawing commands add to what is already there rather than replacing it, so this is usually the first line of onDraw.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'target', type: 'string', required: false }],
+    params: [{ name: 'target', type: 'string', required: false, kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'ce.draw.clear()$0', javascript: 'ce.draw.clear();$0' },
   },
   {
     id: 'drawFill', category: 'Drawing', signature: 'drawFill(colour)',
-    summary: 'Set the fill colour for the shapes drawn after this: a hex string such as "#5B9BD5", or a gradient from `ce.draw.gradient()`. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.',
+    summary: 'Set the fill colour for the shapes drawn after this: the panel\'s own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web\'s way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'colour', type: 'string', required: false }],
+    params: [{ name: 'colour', type: 'string', required: false, kind: 'colour' }],
     scopes: 'any',
     snippet: { lua: 'ce.draw.fill("${1:#5B9BD5}")$0', javascript: 'ce.draw.fill("${1:#5B9BD5}");$0' },
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` can be a hex string or a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. `opts` adds dashes and sets the style of line ends and corners.',
+    summary: 'Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'colour', type: 'value', required: false },
-      { name: 'width', type: 'number', required: false },
+      { name: 'colour', type: 'value', required: false, kind: 'colour' },
+      { name: 'width', type: 'number', required: false, unit: 'pixels' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'dash', type: 'list of numbers', default: 'a solid line',
           summary: 'Alternating on and off lengths in pixels. The panel\'s own beat marks are '
@@ -1355,7 +1454,8 @@ export const COMMANDS = [
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
       { name: 'radius', type: 'number', required: true },
-      { name: 'from', type: 'number', required: true }, { name: 'to', type: 'number', required: true },
+      { name: 'from', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise' },
+      { name: 'to', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise' },
     ],
     scopes: 'any',
     snippet: {
@@ -1371,11 +1471,11 @@ export const COMMANDS = [
      script could do none of it. */
   {
     id: 'drawGradient', category: 'Drawing', signature: 'drawGradient(stops [, angle]) -> value',
-    summary: 'Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` runs from 0 to 1); you can mix the two. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section\'s gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two usable colours.',
+    summary: 'Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` and `opacity` run from 0 to 1); you can mix the two. Colours are read as `ce.draw.fill()` reads them. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section\'s gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two colours, and refuses a stop it cannot read with a message, returning nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'stops', type: 'list', required: true },
-      { name: 'angle', type: 'number', required: false },
+      { name: 'stops', type: 'list', required: true, kind: 'gradient' },
+      { name: 'angle', type: 'number', required: false, unit: 'degrees', hint: '0 points up and 90 right; left out, it is 180, top to bottom' },
     ],
     scopes: 'any',
     snippet: {
@@ -1385,9 +1485,9 @@ export const COMMANDS = [
   },
   {
     id: 'drawOpacity', category: 'Drawing', signature: 'drawOpacity(a)',
-    summary: 'Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. To make a single colour see-through instead, use `ce.math.alpha()`.',
+    summary: 'Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. A number outside 0 to 1, such as 50 written for 0.5, or anything that is not a number, is refused with a message, and the opacity stays as it was. To make a single colour see-through instead, use `ce.math.alpha()`.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'a', type: 'number', required: true }],
+    params: [{ name: 'a', type: 'number', required: true, unit: '0 to 1' }],
     scopes: 'any',
   },
   {
@@ -1395,7 +1495,7 @@ export const COMMANDS = [
     summary: 'Rotate, move or scale everything drawn after this. To turn a shape about its own centre, such as a knob\'s pointer, give that centre as `opts.cx` and `opts.cy`. Each call replaces the previous transform rather than adding to it, and calling it with no options clears it.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
-      { name: 'rotate', type: 'number', default: '0', unit: 'degrees',
+      { name: 'rotate', type: 'number', default: '0', unit: 'degrees', hint: '0 is upright, increasing clockwise',
         summary: 'Turn everything drawn after this clockwise.' },
       { name: 'cx', type: 'number', default: 'the top-left corner', unit: 'pixels', sample: '40',
         summary: 'The horizontal point to rotate about. Give `cx` and `cy` together; without them '
@@ -1442,7 +1542,7 @@ export const COMMANDS = [
       { name: 'text', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'size', type: 'number', unit: 'pixels', sample: '14', summary: 'The text size to measure at.' },
-        { name: 'family', type: 'text', sample: '"Inter Tight"', summary: 'The font family to measure in.' },
+        { name: 'family', type: 'text', sample: '"Inter Tight"', kind: 'font', summary: 'The font family to measure in.' },
         { name: 'pixel', type: 'true or false', default: 'false',
           summary: 'Measure in the panel\'s built-in LCD font instead of a normal one. That font '
             + 'is a fixed grid, so the answer is exact arithmetic.' },
@@ -1528,7 +1628,7 @@ export const COMMANDS = [
       { name: 'radius', type: 'number', required: true },
       { name: 'sides', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'rotation', type: 'number', default: '0', unit: 'degrees',
+        { name: 'rotation', type: 'number', default: '0', unit: 'degrees', hint: '0 puts a corner at twelve o\'clock, increasing clockwise',
           summary: 'Turn the shape clockwise, with 0 putting a corner at twelve o\'clock — the '
             + 'same convention drawArc uses, so a polygon and an arc at the same angle line up.' },
       ]) },
@@ -1537,10 +1637,10 @@ export const COMMANDS = [
   },
   {
     id: 'drawImage', category: 'Drawing', signature: 'drawImage(src, x, y, w, h [, opts]) -> boolean',
-    summary: 'Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. An asset\'s name on its own draws nothing, and an empty `src` is refused with a message. `opts.fit` sets how the image fills the box.',
+    summary: 'Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. Anything else, an asset\'s name included, is refused with a message and nothing is drawn. `opts.fit` sets how the image fills the box.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'src', type: 'string', required: true },
+      { name: 'src', type: 'string', required: true, kind: 'image' },
       { name: 'x', type: 'number', required: true },
       { name: 'y', type: 'number', required: true },
       { name: 'w', type: 'number', required: true },
@@ -1605,16 +1705,16 @@ export const COMMANDS = [
     id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
     summary: 'Look up one image in the icon library or among the icons the panel carries, by id first and then by name (capitals do not matter), the same way the panel finds an icon when it draws one. Returns the entry, in the same form as `ce.image.assets()`, or nothing if there is no such image, so check with it before pointing a control at an asset. Be aware that a name which happens to match is returned just as an id match would be.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'idOrName', type: 'string', required: true }],
+    params: [{ name: 'idOrName', type: 'string', required: true, kind: 'image' }],
     scopes: 'any',
   },
   {
     id: 'imageSet', category: 'Images', signature: 'imageSet(target, src [, opts]) -> boolean',
-    summary: 'Put a picture on one of a control\'s four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option the chosen layer does not have is refused with a message, and the command returns false.',
+    summary: 'Put a picture on one of a control\'s four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option it does not take at all refuses the whole call; one the chosen layer does not have is refused with a message. Either way the command returns false.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
-      { name: 'src', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
+      { name: 'src', type: 'string', required: true, kind: 'image' },
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { name: 'layer', type: 'text', default: '"image"', values: IMAGE_LAYER_IDS,
@@ -1632,7 +1732,7 @@ export const COMMANDS = [
             summary: 'Where the image sits when it does not fill the layer. Background layers '
               + 'only — on a text layer use offsetX and offsetY instead. Note the hyphens.' },
           { like: 'opacity', unit: '0 to 100', default: '100',
-            summary: 'How solid the layer is, on the panel\'s own 0 to 100 scale — not 0 to 1.' },
+            summary: 'How solid the layer is, on the panel\'s own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning.' },
           'tint',
           { name: 'blend', type: 'text', default: '"normal"', values: IMAGE_BLENDS,
             summary: 'How the layer mixes with what is underneath it. Background layers only.' },
@@ -1673,7 +1773,7 @@ export const COMMANDS = [
     summary: 'Switch an image layer off and empty it in one step. `layer` is "image" unless you name another. Clearing "textImage" or "textTexture" also sets the text fill back to "solid", because a text fill with no picture would show nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'layer', type: 'string', required: false,
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
@@ -1684,7 +1784,7 @@ export const COMMANDS = [
     summary: 'Read all the settings of one image layer (`layer` is "image" unless you name another), plus three extra fields. `active` says whether the layer will actually be drawn; for a text layer that depends on the text\'s fill mode, not on its Enabled switch. `source` is "data", "file" or "none". `portable` says whether the image survives an export, which only embedded image data does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'layer', type: 'string', required: false,
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
@@ -1695,8 +1795,8 @@ export const COMMANDS = [
     summary: 'Show an image from the icon library (or one the panel carries) in a control\'s Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. A control that shows only its text is switched to show the icon beside it (or alone, when there is no text). Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset\'s id and name together, so the control finds exactly that image.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
-      { name: 'idOrName', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
+      { name: 'idOrName', type: 'string', required: true, kind: 'image' },
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { name: 'size', type: 'number', default: '16', unit: 'pixels',
@@ -1713,7 +1813,7 @@ export const COMMANDS = [
     summary: 'Copy a layer\'s image into the panel itself, in place of a file path that only exists on this computer, so the image survives export. If the layer already holds embedded image data, it returns true and changes nothing. If the file has not been read yet, it returns false and starts reading it; call it again once the file has loaded and it will succeed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'layer', type: 'string', required: false,
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
@@ -1745,15 +1845,15 @@ export const COMMANDS = [
     id: 'textFont', category: 'Typography', signature: 'textFont(family) -> table|nil',
     summary: 'Look up one font by family name. Returns its description, with the same fields as `ce.text.fonts()`, or nothing if no such font is available. Capitals do not matter, and the font\'s display name works too, just as in the Properties panel. Use it to check that a font exists before you set it, or to see which variable axes it has.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'family', type: 'string', required: true }],
+    params: [{ name: 'family', type: 'string', required: true, kind: 'font' }],
     scopes: 'any',
   },
   {
     id: 'textStyle', category: 'Typography', signature: 'textStyle(target, opts) -> boolean',
-    summary: 'Set a control\'s typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. A font that is not available, a typographic feature the font does not have, or an option that is not a text option is refused with a message, while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.',
+    summary: 'Set a control\'s typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. An option it does not take refuses the whole call. A font that is not available, or a typographic feature the font does not have, is refused with a message while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'opts', type: 'object', required: true,
         // The declared list used to name 17 fields while the implementation accepted 27: the four
         // paddings and five of the six OpenType switches were missing, so the only way to learn
@@ -1761,7 +1861,7 @@ export const COMMANDS = [
         // from FEATURE_KEYS and the three word-lists from their own tables, so this cannot
         // fall behind again.
         fields: optionFields([
-          { name: 'family', type: 'text', sample: '"Inter Tight"',
+          { name: 'family', type: 'text', sample: '"Inter Tight"', kind: 'font',
             summary: 'The font family. An unavailable family is refused rather than stored; a '
               + 'bare set() would store it and quietly fall back to a system font.' },
           { name: 'size', type: 'number', unit: 'pixels', sample: '18',
@@ -1814,7 +1914,7 @@ export const COMMANDS = [
     summary: 'Set one axis of a variable font by its four-letter tag, such as "wght" for weight. The value is kept within the range the font allows, and an axis the font does not have is refused rather than stored. Setting "wght" also updates the control\'s weight, as the Properties panel\'s own axis slider does; otherwise the text would still be drawn at its old weight.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'tag', type: 'string', required: true },
       { name: 'value', type: 'number', required: true },
     ],
@@ -1825,7 +1925,7 @@ export const COMMANDS = [
     summary: 'Read one text setting by name, such as "size" or "lineHeight", without having to know which part of the Text section (Font, Multiline or Position) holds it. With no name, returns everything as { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the text is actually drawn at, worked out from the two stored weight fields.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'name', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -1835,7 +1935,7 @@ export const COMMANDS = [
     summary: 'Measure how much room a control\'s text takes up in its own font. Returns { width, height, lines, truncated, exact }, where `truncated` says whether some of the text is cut off. It lays the text out exactly as the panel does, so spacing, wrapping and line limits all count. Pass `text` to measure something the control does not hold yet. `exact` is false when the text could not actually be measured and the answer is an estimate.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'text', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -1845,7 +1945,7 @@ export const COMMANDS = [
     summary: 'Find the largest text size at which a control\'s text fits inside its box, write that size to the control, and return { size, fits, changed, exact }. It tries whole-number sizes from `opts.max` (the current size) down to `opts.min` (6). Setting Text.Multiline.fitMode to "shrink" only shrinks the text as it is drawn and never changes the stored size; this writes the size, so other code can read it and line things up with it. If even `opts.min` overflows, `fits` is false and the size is set to `opts.min`; the call still succeeds.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true },
+      { name: 'target', type: 'string', required: true, kind: 'control' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'min', type: 'number', default: '6', unit: 'pixels',
           summary: 'The smallest size to shrink to. If the text still overflows at this size, the '
@@ -1861,7 +1961,8 @@ export const COMMANDS = [
   },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
-    summary: 'Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.',
+    refusal: 'false',
+    summary: 'Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
@@ -1869,8 +1970,9 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'size', type: 'number', unit: 'pixels', sample: '12', summary: 'How big the text is.' },
         { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
-          summary: 'Which part of the text sits at the x you gave.' },
-        { name: 'family', type: 'text', sample: '"Inter Tight"', summary: 'The font family to draw in.' },
+          summary: 'Which part of the text sits at the x you gave. "center", "centre" and "centred" '
+            + 'are read as "middle".' },
+        { name: 'family', type: 'text', sample: '"Inter Tight"', kind: 'font', summary: 'The font family to draw in.' },
       ]) },
     ],
     scopes: 'any',
@@ -1880,7 +1982,7 @@ export const COMMANDS = [
     id: 'drawRedraw', category: 'Drawing', signature: 'drawRedraw([target])',
     summary: 'Ask for onDraw to run again, for this control or for the one named `target`. Nothing is redrawn on its own: to animate, call this from onTimer.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'target', type: 'string', required: false }],
+    params: [{ name: 'target', type: 'string', required: false, kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'ce.draw.redraw()$0', javascript: 'ce.draw.redraw();$0' },
   },
@@ -1901,26 +2003,13 @@ export const COMMANDS = [
      from a script. */
   {
     id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
-    summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
+    summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'type', type: 'string', required: true },
       { name: 'props', type: 'object', required: false, fields: optionFields([
-        { name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-          summary: 'The control\'s name. Every other command addresses the control by this name.' },
-        { name: 'x', type: 'number', default: '0', unit: 'pixels',
-          summary: 'Distance from the left edge of whatever contains it.' },
-        { name: 'y', type: 'number', default: '0', unit: 'pixels',
-          summary: 'Distance from the top edge.' },
-        { name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-          summary: 'How wide to make it.' },
-        { name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-          summary: 'How tall to make it.' },
-        { name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"',
-          summary: 'The name of a container to put it inside.' },
-        { name: '<section>', type: 'object', group: 'any section',
-          summary: 'Any section of the control, to set up as you create it — for example '
-            + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses.' },
+        'controlName', 'controlX', 'controlY', 'controlWidth', 'controlHeight', 'controlParent',
+        'controlSection',
       ]) },
     ],
     scopes: 'any',
@@ -1931,11 +2020,16 @@ export const COMMANDS = [
   },
   {
     id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
-    summary: 'Copy an existing control, with all its settings, and return the copy\'s name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it.',
+    summary: 'Copy an existing control, with all its settings, and return the copy\'s name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it, and a colour in them that `set()` would refuse means no copy is made.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'name', type: 'string', required: true },
-      { name: 'props', type: 'object', required: false },
+      { name: 'name', type: 'string', required: true, kind: 'control' },
+      { name: 'props', type: 'object', required: false, at: 'name', fields: optionFields([
+        { like: 'controlName', default: 'the original\'s name with _copy added' },
+        'controlX', 'controlY', 'controlWidth', 'controlHeight',
+        { like: 'controlParent', default: 'the original\'s container' },
+        'controlSection',
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -1947,7 +2041,7 @@ export const COMMANDS = [
     id: 'panelDestroy', category: 'Panel structure', signature: 'panelDestroy(name)',
     summary: 'Remove a control, together with everything inside it. Returns true if the control was there and has been removed, false if there was no such control. It works on any control: the ones you placed in the editor as well as the ones a script created.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'string', required: true }],
+    params: [{ name: 'name', type: 'string', required: true, kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'ce.panel.destroy("${1:name}")$0', javascript: 'ce.panel.destroy("${1:name}");$0' },
   },
@@ -1956,22 +2050,23 @@ export const COMMANDS = [
     summary: 'Move a control into a container, or back to the top level of the panel when `containerName` is left out. Returns true on success. A container is any control with a Children section, such as a Container or a Group. A control cannot be moved into itself or into one of the controls it contains.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'name', type: 'string', required: true },
-      { name: 'containerName', type: 'string', required: false },
+      { name: 'name', type: 'string', required: true, kind: 'control' },
+      { name: 'containerName', type: 'string', required: false, kind: 'control' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.panel.parent("${1:knob}", "${2:row}")$0', javascript: 'ce.panel.parent("${1:knob}", "${2:row}");$0' },
   },
   {
     id: 'panelFind', category: 'Panel structure', signature: 'panelFind([query])',
-    summary: 'List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control.',
+    summary: 'List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'query', type: 'object', required: false, fields: optionFields([
       { name: 'name', type: 'text', sample: '"osc"', summary: 'Match controls whose name contains this.' },
       { name: 'type', type: 'text', sample: '"Knob"', summary: 'Match one kind of control, such as "Knob". '
         + 'ce.panel.types() lists the spellings.' },
       { name: 'generated', type: 'true or false',
-        summary: 'Match only controls a script created, or only ones you placed by hand.' },
+        summary: '`true` matches only controls a script created, `false` only the ones you placed '
+          + 'by hand. The text "true" is refused.' },
       { name: 'parent', type: 'text', sample: '"row1"',
         summary: 'Match only what is inside the container of this name.' },
     ]) }],
@@ -1985,7 +2080,7 @@ export const COMMANDS = [
     id: 'panelInfo', category: 'Panel structure', signature: 'panelInfo(name)',
     summary: 'Describe a control: { name, id, type, x, y, width, height, parent, generated }, or nothing if there is no such control. `x` and `y` are measured from the control\'s container; use `ce.panel.rect()` for its position on the panel. `generated` is true for a control a script created.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'string', required: true }],
+    params: [{ name: 'name', type: 'string', required: true, kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'local c = ce.panel.info("${1:name}")$0', javascript: 'const c = ce.panel.info("${1:name}");$0' },
   },
@@ -2021,7 +2116,8 @@ export const COMMANDS = [
      back through it, exactly as the canvas does. */
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
-    summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead. Returns how many controls it moved. Names that are not controls are reported and skipped.',
+    refusal: 'zero',
+    summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2040,7 +2136,8 @@ export const COMMANDS = [
   },
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
-    summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align` also lines them up the other way. Needs at least two controls; returns how many it moved.',
+    refusal: 'zero',
+    summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control\'s ("hSpacing") or every left edge in line with the topmost control\'s ("vSpacing"). Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2050,16 +2147,21 @@ export const COMMANDS = [
           unit: 'pixels',
           summary: 'Force a fixed gap between the controls rather than spreading them to fill '
             + 'what is there.' },
-        { name: 'align', type: 'text', sample: '"top"',
-          summary: 'Also line them up on this edge across the other axis, so a row ends up level '
-            + 'as well as evenly spaced. Takes the same words as ce.panel.align.' },
+        // true is all distributePatches acts on (alignOpposite). This was typed as text, sampled
+        // "top" and said it took ce.panel.align's words, every one of which did nothing.
+        { name: 'align', type: 'true or false', default: 'false',
+          summary: 'With "hSpacing" or "vSpacing" only. true also lines them up across the other '
+            + 'axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge '
+            + 'level with the leftmost control\'s, and "vSpacing" puts every left edge in line with '
+            + 'the topmost control\'s. It is not an edge name: "top" or "left" does nothing.' },
       ]) },
     ],
     scopes: 'any',
   },
   {
     id: 'panelMatch', category: 'Panel structure', signature: 'panelMatch(names, what [, opts]) -> number',
-    summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. Needs at least two controls. Returns how many controls changed.',
+    refusal: 'zero',
+    summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2073,6 +2175,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Arrange controls in a grid of equal cells, each as big as the largest control. They are placed in reading order (top to bottom, then left to right, with controls at about the same height, within roughly 20 pixels, counted as one row), not in the order you list them. The first control in that order stays where it is and the grid grows from there. Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2094,6 +2197,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
+    refusal: 'zero',
     summary: 'Arrange controls evenly around a circle, centred on the middle of the box they currently fill, in the order you list them. Each control\'s centre sits on the circle. `opts.startAngle` is in degrees, with 0 at three o\'clock and angles running clockwise, which differs from `ce.draw.arc()`, where 0 is twelve o\'clock. Needs at least two controls; returns how many it moved.',
     runtime: RUNTIME_WEBVIEW,
     params: [
@@ -2101,8 +2205,8 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'radius', type: 'number', default: '100', unit: 'pixels',
           summary: 'How far from the centre to place each control.' },
-        { name: 'startAngle', type: 'number', default: '0', unit: 'degrees',
-          summary: 'Where the first control goes, clockwise from twelve o\'clock.' },
+        { name: 'startAngle', type: 'number', default: '0', unit: 'degrees', hint: '0 is three o\'clock, increasing clockwise',
+          summary: 'Where the first control goes, clockwise from three o\'clock.' },
       ]) },
     ],
     scopes: 'any',
@@ -2161,7 +2265,7 @@ export const COMMANDS = [
     summary: 'List the names of the entries in one of a control\'s collection sections (States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants), in the order the control holds them. Any other section name is refused with a message listing the ones that work.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'section', type: 'string', required: true },
     ],
     scopes: 'any',
@@ -2175,7 +2279,7 @@ export const COMMANDS = [
     summary: 'Get one entry from a collection section, or nothing if there is no entry of that name. Capitals in `name` do not matter, just as in a path.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'section', type: 'string', required: true },
       { name: 'name', type: 'string', required: true },
     ],
@@ -2187,18 +2291,18 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. Returns true if the entry was written.',
+    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, or with `kind = "keyframes"` one that plays all the time over the frames you give. A state applies while its `when` flags hold and its `rule` is true, and a rule can compare the control\'s value: `rule = "value > 64"`. A key the section\'s entries do not have, capitals included, is refused with the keys it takes, and nothing is defined. Returns true if the entry was written.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'section', type: 'string', required: true },
       { name: 'name', type: 'string', required: true },
       { name: 'spec', type: 'object', required: false },
     ],
     scopes: 'any',
     snippet: {
-      lua: 'ce.panel.define("${1:knob}", "States", "${2:Warn}", { when = { valueGreaterThan = 0.9 } })$0',
-      javascript: 'ce.panel.define("${1:knob}", "States", "${2:Warn}", { when: { valueGreaterThan: 0.9 } });$0',
+      lua: 'ce.panel.define("${1:knob}", "States", "${2:Held}", { when = { pressed = true } })$0',
+      javascript: 'ce.panel.define("${1:knob}", "States", "${2:Held}", { when: { pressed: true } });$0',
     },
   },
   {
@@ -2206,7 +2310,7 @@ export const COMMANDS = [
     summary: 'Remove an entry from a collection section. Returns true if the entry was there, false if not. `set(path, nil)` does not remove an entry; this command does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'section', type: 'string', required: true },
       { name: 'name', type: 'string', required: true },
     ],
@@ -2218,12 +2322,12 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. This is the way to reach the settings inside a state, which `set()` cannot.',
+    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'state', type: 'string', required: true },
-      { name: 'patch', type: 'object', required: true },
+      { name: 'patch', type: 'object', required: true, kind: 'patch', at: 'control' },
       { name: 'part', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2284,20 +2388,25 @@ export const COMMANDS = [
   },
   {
     id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
-    summary: 'Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. If there is no tempo to work from, no timer starts and a note is written to the script console.',
+    summary: 'Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division\'s name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.',
     params: [
       { name: 'id', type: 'string', required: true },
-      { name: 'beats', type: 'number', required: true },
-      { name: 'opts', type: 'table', required: false },
+      { name: 'beats', type: 'number or division', required: true, kind: 'division' },
+      // Typed 'table' with no fields, so the one option the summary describes was unchecked.
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'follow', type: 'true or false', default: 'true',
+          summary: 'Change the interval when the tempo changes. false keeps the interval the tempo '
+            + 'gave it when it started.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'syncTimer("${1:step}", 0.25)$0', javascript: 'syncTimer("${1:step}", 0.25);$0' },
   },
   {
     id: 'afterBeats', category: 'Time', signature: 'afterBeats(beats, fn) -> id',
-    summary: 'Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.',
+    summary: 'Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. `beats` may also be a division\'s name, such as "1/4", read as `ce.time.division()` reads it; 0 runs `fn` as soon as the handler has returned. A negative number, a name that is not a division, or no delay at all schedules nothing and writes a message. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.',
     params: [
-      { name: 'beats', type: 'number', required: true },
+      { name: 'beats', type: 'number', required: true, kind: 'division' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -2331,8 +2440,8 @@ export const COMMANDS = [
   },
   {
     id: 'beatsPerDivision', category: 'Time', signature: 'beatsPerDivision(name) -> number',
-    summary: 'Return how many beats a note division lasts: "1/16" is 0.25, "1/8T" is 0.333… and "1/4D" is 1.5. These are the same names the sequencer components use for their division settings. Returns nothing for a name it does not recognise.',
-    params: [{ name: 'name', type: 'string', required: true }],
+    summary: 'Return how many beats a note division lasts: "1/16" is 0.25, "1/8T" is 0.333… and "1/4D" is 1.5. These are the same names the sequencer components use for their division settings, and capitals do not matter ("1/8t" is "1/8T"). A name it does not recognise returns nothing and writes a message listing the divisions.',
+    params: [{ name: 'name', type: 'string', required: true, kind: 'division' }],
     scopes: 'any',
     snippet: { lua: 'local beats = beatsPerDivision("1/16")$0', javascript: 'const beats = beatsPerDivision("1/16");$0' },
   },
@@ -2354,31 +2463,31 @@ export const COMMANDS = [
   },
   {
     id: 'stepAt', category: 'Time', signature: 'stepAt(beats, division) -> number',
-    summary: 'Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Returns nothing if `division` is not a name it recognises.',
+    summary: 'Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Capitals in `division` do not matter; a name it does not recognise returns nothing and writes a message.',
     params: [
       { name: 'beats', type: 'number', required: true },
-      { name: 'division', type: 'string', required: true },
+      { name: 'division', type: 'string', required: true, kind: 'division' },
     ],
     scopes: 'any',
   },
   {
     id: 'stepsBetween', category: 'Time', signature: 'stepsBetween(from, to, division [, max]) -> table',
-    summary: 'Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. Returns nothing for an unknown division.',
+    summary: 'Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. An unknown division returns nothing and writes a message.',
     params: [
       { name: 'from', type: 'number', required: true },
       { name: 'to', type: 'number', required: true },
-      { name: 'division', type: 'string', required: true },
+      { name: 'division', type: 'string', required: true, kind: 'division' },
       { name: 'max', type: 'number', required: false },
     ],
     scopes: 'any',
   },
   {
     id: 'swingOffset', category: 'Time', signature: 'swingOffset(step, amount, division) -> number',
-    summary: 'Return how far to delay a step to give it swing, in beats — add it to the step\'s position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport\'s swing setting holds. It uses the Transport\'s own swing calculation, so your timing matches the panel\'s sequencers. Returns nothing for an unknown division.',
+    summary: 'Return how far to delay a step to give it swing, in beats — add it to the step\'s position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport\'s swing setting holds. It uses the Transport\'s own swing calculation, so your timing matches the panel\'s sequencers. An unknown division returns nothing and writes a message.',
     params: [
       { name: 'step', type: 'number', required: true },
-      { name: 'amount', type: 'number', required: true },
-      { name: 'division', type: 'string', required: true },
+      { name: 'amount', type: 'number', required: true, unit: '0 to 1' },
+      { name: 'division', type: 'string', required: true, kind: 'division' },
     ],
     scopes: 'any',
   },
@@ -2439,6 +2548,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
+    refusal: 'empty list',
     summary: 'List the synth\'s parameters as the device profile describes them, each as { id, name, group, type, min, max, access }. Use `opts` to narrow the list, for example to one group. Returns an empty list when there is nothing to show, and nothing at all only when the ce.device module is switched off.',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
@@ -2533,7 +2643,7 @@ export const COMMANDS = [
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
     signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
-    summary: 'Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with no MIDI form is refused, with a message saying why. In a SysEx template you can use hex bytes, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
+    summary: 'Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with anything wrong in it is refused and nothing is defined, with a message saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry. A value that write() cannot read is refused the same way, and nothing is sent.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
@@ -2541,34 +2651,73 @@ export const COMMANDS = [
           summary: 'What to call it in the parameter list.' },
         { name: 'group', type: 'text', sample: '"Filter"', summary: 'Which group to file it under, such as "Filter".' },
         { name: 'type', type: 'text', default: '"number"',
-          summary: 'What kind of value it holds — a number, or a choice from `choices`.' },
-        { name: 'min', type: 'number', default: '0', summary: 'The lowest value it accepts.' },
+          summary: 'What kind of value it holds: "number" (or "integer"), "boolean", "choice" (or '
+            + '"enum") for one of `choices`, or "text" for a name read out of a dump, which cannot be '
+            + 'written on its own. A number reads a number or decimal text such as "64". A boolean '
+            + 'reads true or false, a number (0 is off, any other number is on), or "on", "off", '
+            + '"true" or "false" in any case. Any case of the type is read; another type is refused.' },
+        { name: 'min', type: 'number', default: '0',
+          summary: 'The lowest value it accepts. Nothing here sends a negative number, so a minimum '
+            + 'below 0 is refused: declare what the synth receives and add the offset in your script '
+            + 'with ce.midi.toOffset.' },
         { name: 'max', type: 'number', default: '127',
-          summary: 'The highest value it accepts.' },
+          summary: 'The highest value it accepts, up to what the MIDI form carries: 127 for a CC or '
+            + 'one SysEx byte, 16383 for an NRPN or "u14". With choices given as names it is the last '
+            + 'one\'s value unless you say otherwise. A higher maximum is refused.' },
         { name: 'access', type: 'text', default: '"readwrite"',
           summary: 'Whether the synth lets you read this parameter, write it, or both.' },
         { name: 'choices', type: 'list of text',
-          summary: 'The names of the settings, in order, when the parameter is a choice rather '
-            + 'than a number.' },
+          summary: 'The settings, in order, when the parameter is a choice: their names, each worth '
+            + 'its position plus `min` (so { "LP", "HP", "BP" } sends 0, 1 and 2), or { id, value } '
+            + 'pairs. write() takes a name in any case, or the number itself; another name is '
+            + 'refused, with the choices listed.' },
+        { name: 'trueValue', type: 'number', default: '1',
+          summary: 'What a boolean sends when it is on.' },
+        { name: 'falseValue', type: 'number', default: '0',
+          summary: 'What a boolean sends when it is off.' },
         { name: 'cc', type: 'number', sample: '74', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as this CC number. The simplest of the three wire formats.' },
+          summary: 'Send it as this CC number, 0 to 127. The simplest of the three wire formats.' },
+        // `fields` here are msb and lsb, which the check of option keys reads one level down, in
+        // every runtime: { mbs = 1 } was accepted and sent MSB 0.
         { name: 'nrpn', type: 'object', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as an NRPN, as { msb, lsb }.' },
-        { name: 'sysex', type: 'list', group: 'how it reaches the synth — pick one',
-          summary: 'Send it as a SysEx message built from this template. Entries are hex literals '
-            + 'or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you '
-            + 'listed in `variables`.' },
-        { name: 'channel', type: 'number', default: 'the panel\'s channel', sample: '1',
-          summary: 'The MIDI channel to send on.' },
-        { name: 'encoding', type: 'text', sample: '"to14bit"',
-          summary: 'How the number is packed into bytes when one byte is not enough — the same '
-            + 'names ce.midi\'s encoders use.' },
-        { name: 'checksum', type: 'text', sample: '"roland-7bit"',
-          summary: 'Which checksum to compute for a SysEx template that asks for one. The names '
-            + 'are ce.midi.checksum\'s.' },
+          summary: 'Send it as an NRPN, as { msb, lsb } or the two numbers as a list.',
+          fields: [
+            { name: 'msb', type: 'number', summary: 'The parameter number\'s high byte (CC 99).' },
+            { name: 'lsb', type: 'number', summary: 'The parameter number\'s low byte (CC 98).' },
+          ] },
+        { name: 'sysex', type: 'text or list', group: 'how it reaches the synth — pick one', kind: 'bytes', template: true,
+          summary: 'Send it as a SysEx message built from this template, a list or text such as '
+            + '"F0 41 10 $value F7". Each entry is one byte, a number from 0 to 255 or one or two hex '
+            + 'digits, or one of the tokens $value, $deviceId (16 unless `variables` says otherwise), '
+            + '$channel, $checksumStart, $checksum, or any $name you listed in `variables`. Anything '
+            + 'else is refused. The checksum covers everything after F0 unless $checksumStart says '
+            + 'where it begins. A Roland checksum covers only the address and the data, so a Roland '
+            + 'template (41 after F0) with $checksum and no $checksumStart is defined with a warning.' },
+        { name: 'channel', type: 'number', default: '1',
+          summary: 'The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel '
+            + 'puts there.' },
+        { name: 'encoding', type: 'text', default: '"u7"', sample: '"to14bit"',
+          summary: 'How the number is packed into a SysEx template\'s $value: "u7" is one byte, '
+            + '"u14" two, most significant first, as ce.midi.to14bit gives them ("to14bit" is read as '
+            + 'the same), and "nibbled" is `nibbles` 4-bit nibbles, most significant first. '
+            + '"boolean-u7", the device profiles\' name for a switch\'s byte, is one byte too. Any case '
+            + 'is read; another name is refused.' },
+        { name: 'nibbles', type: 'number', default: '2',
+          summary: 'How many nibbles a "nibbled" value takes, 1 to 8.' },
+        { name: 'checksum', type: 'text', default: '"roland"', sample: '"xor-7bit"',
+          summary: 'Which checksum $checksum puts in the template: any of ce.midi.checksum\'s names, '
+            + 'in any case, computed the same way. One wider than a byte, such as a CRC, takes as '
+            + 'many bytes as it needs. An unknown name is refused, with the names listed.' },
         { name: 'variables', type: 'object',
-          summary: 'Extra named values your SysEx template can refer to as $name, such as an '
-            + 'address or a part number.' },
+          summary: 'Extra named bytes your SysEx template can refer to as $name, such as an address '
+            + 'or a part number. Each is a number from 0 to 255, or one or two hex digits as text.' },
+        // Read by both runtimes (deviceDefinitions.js, ScriptRuntime::defineDeviceParameter) and
+        // listed nowhere, so the check of option keys would have refused them.
+        { name: 'length', type: 'number', default: '0',
+          summary: 'For a text parameter, how many characters it holds.' },
+        { name: 'pad', type: 'number', default: '32',
+          summary: 'For a text parameter, the character code that fills it out to `length` (32 is '
+            + 'a space).' },
       ]) },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2581,23 +2730,39 @@ export const COMMANDS = [
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
     signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
-    summary: 'Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.',
+    summary: 'Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Bytes are read the way defineParameter reads them, and a layout with anything wrong in it, or with no prefix to recognise it by, is refused with a message saying what. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.',
     params: [
       { name: 'kind', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
         { name: 'name', type: 'text', default: 'the kind', sample: '"Patch"',
           summary: 'What to call this dump where it is listed.' },
-        { name: 'request', type: 'text or list', summary: 'The bytes that ask the synth for it.' },
+        { name: 'request', type: 'text or list',
+          summary: 'The bytes that ask the synth for it, a list or text such as "F0 7D 00 F7", one '
+            + 'byte to an entry.' },
         { name: 'match', type: 'object', required: true,
           summary: 'How to recognise the reply, as { prefix, suffix } — the bytes a matching '
-            + 'message starts and ends with.' },
+            + 'message starts and ends with, which may include $deviceId (16) and $channel (1). A '
+            + 'layout with no prefix is refused, because it would match every SysEx that arrives.',
+          fields: [
+            { name: 'prefix', type: 'text or list', summary: 'The bytes a matching message starts with.' },
+            { name: 'suffix', type: 'text or list', summary: 'The bytes a matching message ends with.' },
+          ] },
+        // Both runtimes read these at the top level when `match` does not give them.
+        { name: 'prefix', type: 'text or list',
+          summary: 'The same as `match.prefix`, used when `match` does not give one.' },
+        { name: 'suffix', type: 'text or list',
+          summary: 'The same as `match.suffix`, used when `match` does not give one.' },
         { name: 'offset', type: 'number', default: '0',
           summary: 'How many bytes in from the start of the message the values begin.' },
         { name: 'size', type: 'number', default: 'whatever is left', sample: '256',
           summary: 'How many bytes of values there are.' },
-        { name: 'checksum', type: 'text', sample: '"roland-7bit"',
-          summary: 'Which checksum the message carries, so it can be verified. The names are '
-            + 'ce.midi.checksum\'s.' },
+        { name: 'checksum', type: 'text or object', sample: '"roland-7bit"',
+          summary: 'Which checksum the message carries, so it is checked on the way in and computed '
+            + 'by buildDump: any of ce.midi.checksum\'s names. Named alone, it sits just before the '
+            + 'suffix (at the end when there is none) and covers every byte from the end of the '
+            + 'prefix up to it, which is the Roland layout when the prefix is the header. Anywhere '
+            + 'else, give { type, fromOffset, toOffset, byteOffset }, counted from the start of the '
+            + 'message; any you leave out are placed as for a name. An unknown name is refused.' },
         { name: 'fields', type: 'list of objects', required: true,
           summary: 'Where each value sits among those bytes, one { parameter, offset } per '
             + 'value. Every parameter must already be declared with defineParameter; an unknown '
@@ -2619,7 +2784,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     summary: 'Connect a control to a synth parameter from your script, so moving the control changes the parameter. It replaces any existing connection on the same port rather than adding a second one, and switches the control\'s device binding back on if it was off. The port defaults to "value".',
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'parameterId', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'role',
@@ -2640,7 +2805,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     summary: 'Disconnect a control from its synth parameter. Returns whether there was a connection to remove.',
     params: [
-      { name: 'control', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, kind: 'control' },
       { name: 'port', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2758,11 +2923,11 @@ export const COMMANDS = [
   /* --- Device / MIDI: raw (Q9) --- */
   {
     id: 'sendCC', category: 'Device / MIDI', signature: 'sendCC(channel, cc, value)',
-    summary: 'Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.',
+    summary: 'Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127. A channel or controller number outside its range, or anything that is not a number, is refused with a message and nothing is sent, in every send command; a value past the end of its range is sent as the nearest end, and the first time for each command a warning says so. Text that is a number is read as one, and a fraction is rounded.',
     params: [
-      { name: 'channel', type: 'number', required: true },
-      { name: 'cc', type: 'number', required: true },
-      { name: 'value', type: 'value', required: true },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
+      { name: 'cc', type: 'number', required: true, unit: '0 to 127' },
+      { name: 'value', type: 'value', required: true, unit: '0 to 127' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendCC(${1:channel}, ${2:cc}, ${3:value})$0', javascript: 'sendCC(${1:channel}, ${2:cc}, ${3:value})$0' },
@@ -2771,10 +2936,10 @@ export const COMMANDS = [
     id: 'sendNRPN', category: 'Device / MIDI', signature: 'sendNRPN(channel, msb, lsb, value)',
     summary: 'Send an NRPN (Non-Registered Parameter Number) message: `msb` and `lsb` pick the parameter and `value` runs from 0 to 16383. Many synths use NRPNs for parameters that need more than 128 steps.',
     params: [
-      { name: 'channel', type: 'number', required: true },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
       { name: 'msb', type: 'number', required: true },
       { name: 'lsb', type: 'number', required: true },
-      { name: 'value', type: 'value', required: true },
+      { name: 'value', type: 'value', required: true, unit: '0 to 16383' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0', javascript: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0' },
@@ -2783,10 +2948,10 @@ export const COMMANDS = [
     id: 'sendRPN', category: 'Device / MIDI', signature: 'sendRPN(channel, msb, lsb, value)',
     summary: 'Send an RPN (Registered Parameter Number) message — the standard way to set pitch-bend range (0, 0), fine tuning (0, 1) and coarse tuning (0, 2). It works like sendNRPN, but uses controllers 101 and 100 instead of 99 and 98.',
     params: [
-      { name: 'channel', type: 'number', required: true },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
       { name: 'msb', type: 'number', required: true },
       { name: 'lsb', type: 'number', required: true },
-      { name: 'value', type: 'value', required: true },
+      { name: 'value', type: 'value', required: true, unit: '0 to 16383' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendRPN(${1:1}, 0, 0, ${2:2})  -- pitch-bend range$0', javascript: 'sendRPN(${1:1}, 0, 0, ${2:2});  // pitch-bend range$0' },
@@ -2807,26 +2972,26 @@ export const COMMANDS = [
   // sendCC. That is what makes them portable to every runtime and every exported language.
   {
     id: 'sendMidi', category: 'Device / MIDI', signature: 'sendMidi(bytes)',
-    summary: 'Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits.',
+    summary: 'Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendMidi({0x90, 60, 100})$0', javascript: 'sendMidi([0x90, 60, 100])$0' },
   },
   {
     id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity [, ms])',
-    summary: 'Play a note. `note` is a MIDI note number or a name such as "C3". A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.',
+    summary: 'Play a note. `note` is a MIDI note number from 0 to 127 or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, a note outside 0 to 127 ("C10"), or a note left out is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too. The velocity must be given; 0 means note off. Give `ms`, a number above 0, and the matching note off is sent for you after that many milliseconds.',
     params: [
-      { name: 'channel', type: 'number', required: true },
-      { name: 'note', type: 'value', required: true },
-      { name: 'velocity', type: 'number', required: true },
-      { name: 'ms', type: 'number', required: false },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
+      { name: 'note', type: 'value', required: true, kind: 'note' },
+      { name: 'velocity', type: 'number', required: true, unit: '0 to 127' },
+      { name: 'ms', type: 'number', required: false, unit: 'milliseconds' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendNote(${1:1}, ${2:60}, ${3:100})$0', javascript: 'sendNote(${1:1}, ${2:60}, ${3:100})$0' },
   },
   {
     id: 'interceptMidiIn', category: 'Device / MIDI', signature: 'interceptMidiIn(fn)',
-    summary: 'See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged.',
+    summary: 'See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2836,7 +3001,7 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiOut', category: 'Device / MIDI', signature: 'interceptMidiOut(fn)',
-    summary: 'See every MIDI message the panel sends — from a script or from a control\'s own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged.',
+    summary: 'See every MIDI message the panel sends — from a script or from a control\'s own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2846,8 +3011,8 @@ export const COMMANDS = [
   },
   {
     id: 'feedMidi', category: 'Device / MIDI', signature: 'feedMidi(bytes)',
-    summary: 'Pretend a MIDI message arrived from the synth. The panel\'s controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first.',
-    params: [{ name: 'bytes', type: 'value', required: true }],
+    summary: 'Pretend a MIDI message arrived from the synth. The panel\'s controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.',
+    params: [{ name: 'bytes', type: 'value', required: true, kind: 'bytes' }],
     scopes: 'any',
     snippet: { lua: 'feedMidi(${1:{0x90, 60, 100\}})$0', javascript: 'feedMidi([${1:0x90, 60, 100}])$0' },
   },
@@ -2868,9 +3033,9 @@ export const COMMANDS = [
     id: 'sendNoteOff', category: 'Device / MIDI', signature: 'sendNoteOff(channel, note [, velocity])',
     summary: 'Release a note. The release velocity defaults to 0. Nothing does this for you: every note you start with sendNote (without `ms`) needs its own note off.',
     params: [
-      { name: 'channel', type: 'number', required: true },
-      { name: 'note', type: 'value', required: true },
-      { name: 'velocity', type: 'number', required: false },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
+      { name: 'note', type: 'value', required: true, kind: 'note' },
+      { name: 'velocity', type: 'number', required: false, unit: '0 to 127' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendNoteOff(${1:1}, ${2:60})$0', javascript: 'sendNoteOff(${1:1}, ${2:60})$0' },
@@ -2879,8 +3044,8 @@ export const COMMANDS = [
     id: 'sendProgramChange', category: 'Device / MIDI', signature: 'sendProgramChange(channel, program [, bankMsb, bankLsb])',
     summary: 'Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first.',
     params: [
-      { name: 'channel', type: 'number', required: true },
-      { name: 'program', type: 'number', required: true },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
+      { name: 'program', type: 'number', required: true, unit: '0 to 127' },
       { name: 'bankMsb', type: 'number', required: false },
       { name: 'bankLsb', type: 'number', required: false },
     ],
@@ -2889,21 +3054,21 @@ export const COMMANDS = [
   },
   {
     id: 'sendPitchBend', category: 'Device / MIDI', signature: 'sendPitchBend(channel, value)',
-    summary: 'Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). How many semitones the full range covers is set on the synth.',
+    summary: 'Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). Left out, the bend centres; anything that is not a number is refused with a message. How many semitones the full range covers is set on the synth.',
     params: [
-      { name: 'channel', type: 'number', required: true },
-      { name: 'value', type: 'number', required: true },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
+      { name: 'value', type: 'number', required: true, unit: '0 to 16383' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendPitchBend(${1:1}, ${2:8192})$0', javascript: 'sendPitchBend(${1:1}, ${2:8192})$0' },
   },
   {
     id: 'sendAftertouch', category: 'Device / MIDI', signature: 'sendAftertouch(channel, pressure [, note])',
-    summary: 'Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch).',
+    summary: 'Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch). Leaving the note out means channel pressure; the pressure itself must be given.',
     params: [
-      { name: 'channel', type: 'number', required: true },
-      { name: 'pressure', type: 'number', required: true },
-      { name: 'note', type: 'value', required: false },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
+      { name: 'pressure', type: 'number', required: true, unit: '0 to 127' },
+      { name: 'note', type: 'value', required: false, kind: 'note' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendAftertouch(${1:1}, ${2:64})$0', javascript: 'sendAftertouch(${1:1}, ${2:64})$0' },
@@ -2917,21 +3082,21 @@ export const COMMANDS = [
   },
   {
     id: 'sendTransport', category: 'Device / MIDI', signature: 'sendTransport(action)',
-    summary: 'Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`).',
+    summary: 'Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`), in any case. Any other action, or none, is refused with a message and nothing is sent.',
     params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'] }],
     scopes: 'any',
     snippet: { lua: 'sendTransport("${1:start}")$0', javascript: 'sendTransport("${1:start}")$0' },
   },
   {
     id: 'sendSysex', category: 'Device / MIDI', signature: 'sendSysex(bytes)',
-    summary: 'Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7".',
+    summary: 'Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7". In hex text each byte is one or two digits, with spaces or commas between the bytes; text with a longer run, such as "F04110", is refused with a message and nothing is sent. In a list each byte is a whole number from 0 to 255, or text that is one hex byte ("F7"); anything else, such as 300, is refused the same way.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendSysex(${1:bytes})$0', javascript: 'sendSysex(${1:bytes})$0' },
   },
   {
     id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes [, opts]) -> number',
-    summary: 'Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name returns nothing and prints the names it accepts. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.',
+    summary: 'Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts, and so do bytes that are not bytes. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.',
     params: [
       { name: 'type', type: 'string', required: true,
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
@@ -2948,7 +3113,7 @@ export const COMMANDS = [
   },
   {
     id: 'panic', category: 'Device / MIDI', signature: 'panic([opts])',
-    summary: 'Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`; set `opts.resetControllers` to false to leave controllers alone.',
+    summary: 'Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`, a number from 1 to 16 (anything else, such as "all", is refused and nothing is sent); set `opts.resetControllers` to false to leave controllers alone.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'channel', type: 'number', default: 'all sixteen channels', sample: '1',
         summary: 'Silence one channel instead of every one.' },
@@ -3128,6 +3293,27 @@ const PARAM_TYPE_FOR = {
   list: 'value',
 };
 
+/** What the value a component verb writes may be, as the spec says it: the closed list an enum
+ *  takes (with `kind` naming the vocabulary when it is the divisions or the scales), or a number's
+ *  range. Read by the script editor's Values sidebar; the reference renders neither, as it renders
+ *  no argument's, and says both in the verb's summary instead. Only for the argument that IS the
+ *  value — the last, when its kind is the verb's own (an addressed verb's index is not). */
+function verbValueTyping(verb, kind) {
+  if (kind !== verb.k && kind !== verb.kind) return {};
+  if (kind === 'enum' && Array.isArray(verb.values)) {
+    const same = (list) => list.length === verb.values.length && list.every((x, i) => x === verb.values[i]);
+    const named = same(DIVISION_NAMES) ? { kind: 'division' } : same(SCALE_NAMES) ? { kind: 'scale' } : {};
+    return { values: verb.values, ...named };
+  }
+  if ((kind === 'num' || kind === 'int') && Number.isFinite(verb.min) && Number.isFinite(verb.max)) {
+    return { min: verb.min, max: verb.max };
+  }
+  // A colour field, named as the renderer names one (controlSets.isColourKey): the Drum Pads' pad
+  // colour, which set() reads by the colour rule too.
+  if (kind === 'str' && /(?:^c|C)olou?r$/.test(String(verb.item ?? verb.f ?? ''))) return { kind: 'colour' };
+  return {};
+}
+
 const panelVerb = (id, signature, summary, params) => ({
   id, signature, summary, params, category: 'Panel components',
   runtime: RUNTIME_WEBVIEW, scopes: ['component', 'panel'],
@@ -3140,7 +3326,7 @@ export const PANEL_COMMANDS = [
   panelVerb('splitPreset', 'splitPreset(target, preset [, lowNote, highNote])',
     'Apply a split layout ("single"/"split"/"layer"/"three"…), optionally bounding the key range.',
     [T, { name: 'preset', type: 'string', required: true },
-     { name: 'lowNote', type: 'number', required: false }, { name: 'highNote', type: 'number', required: false }]),
+     { name: 'lowNote', type: 'number', required: false, kind: 'note' }, { name: 'highNote', type: 'number', required: false, kind: 'note' }]),
   panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone.',
     [T, { name: 'zone', type: 'number', required: true }, { name: 'enabled', type: 'boolean', required: true }]),
   panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel.',
@@ -3148,7 +3334,7 @@ export const PANEL_COMMANDS = [
   panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone.',
     [T, { name: 'zone', type: 'number', required: true }, { name: 'semitones', type: 'number', required: true }]),
   panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the split point between two zones.',
-    [T, { name: 'zone', type: 'number', required: true }, { name: 'note', type: 'number', required: true }]),
+    [T, { name: 'zone', type: 'number', required: true }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
 
   // --- Phrase Sequencer ---
   panelVerb('phraseSeed', 'phraseSeed(target, seed)', 'Fill the grid from a named seed pattern.',
@@ -3157,7 +3343,7 @@ export const PANEL_COMMANDS = [
   panelVerb('phraseKey', 'phraseKey(target, key)', 'Change the key the degrees resolve against.',
     [T, { name: 'key', type: 'string', required: true }]),
   panelVerb('phraseScale', 'phraseScale(target, scale)', 'Change the scale ("major"/"minor"/"dorian"…).',
-    [T, { name: 'scale', type: 'string', required: true }]),
+    [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
   panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose the phrase, leaving the pattern alone.',
     [T, { name: 'semitones', type: 'number', required: true }]),
   panelVerb('phraseDirection', 'phraseDirection(target, direction)', 'Play direction ("forward"/"reverse"/"pingpong"/"random").',
@@ -3179,7 +3365,7 @@ export const PANEL_COMMANDS = [
   panelVerb('recorderQuantize', 'recorderQuantize(target, grid [, strength, scale, key])',
     'Quantise the take to a grid; strength 0–1, optional pitch repair to a scale/key.',
     [T, { name: 'grid', type: 'string', required: true }, { name: 'strength', type: 'number', required: false },
-     { name: 'scale', type: 'string', required: false }, { name: 'key', type: 'string', required: false }]),
+     { name: 'scale', type: 'string', required: false, kind: 'scale' }, { name: 'key', type: 'string', required: false }]),
   panelVerb('recorderTranspose', 'recorderTranspose(target, semitones)', 'Transpose the take.',
     [T, { name: 'semitones', type: 'number', required: true }]),
   panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set the loop length in bars.',
@@ -3205,7 +3391,7 @@ export const PANEL_COMMANDS = [
   panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song.',
     [T, { name: 'key', type: 'string', required: true }]),
   panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Change the scale the harmony follows.',
-    [T, { name: 'scale', type: 'string', required: true }]),
+    [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
   panelVerb('harmonySize', 'harmonySize(target, size)', 'How many voices to add.',
     [T, { name: 'size', type: 'number', required: true }]),
   panelVerb('harmonyShape', 'harmonyShape(target, shape)', 'Apply a named chord shape / preset.',
@@ -3228,7 +3414,7 @@ export const PANEL_COMMANDS = [
     `Voice-leading strategy — ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
     [T, { name: 'mode', type: 'string', required: true }]),
   panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the voices over `ms` milliseconds.',
-    [T, { name: 'ms', type: 'number', required: true }]),
+    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
   panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Override the chord used for one scale degree.',
     [T, { name: 'degree', type: 'number', required: true }, { name: 'chord', type: 'string', required: true }]),
 
@@ -3244,7 +3430,7 @@ export const PANEL_COMMANDS = [
   panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Wrap from the last scene back to the first.',
     [T, { name: 'wrap', type: 'boolean', required: false }]),
   panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
-    [T, { name: 'ms', type: 'number', required: true }]),
+    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
 
   /* --- Reading the five (design doc §44) ---
      Every component member in the API was a WRITE. The twenty-three spec-driven families now read
@@ -3306,14 +3492,16 @@ export const PANEL_COMMANDS = [
   ...COMPONENT_VERBS.map((verb) => {
     const kinds = verbArgKinds(verb);
     const optional = verbArgOptional(verb);
+    const args = verbArgs(verb);
     return panelVerb(verb.id, verbSignature(verb), verbSummary(verb),
-      [T, ...verbArgs(verb).map((name, i) => ({
+      [T, ...args.map((name, i) => ({
         name,
         type: PARAM_TYPE_FOR[kinds[i]] ?? 'value',
         // Both halves come from the spec rather than from this file's reading of it, and
         // componentVerbs.test.js holds them to the signature line — which is how the two used to
         // disagree, every optional argument being published as required.
         required: !optional[i],
+        ...(i === args.length - 1 ? verbValueTyping(verb, kinds[i]) : {}),
       }))]);
   }),
 ];
@@ -3457,14 +3645,14 @@ export const HELPERS = [
     id: 'noteName', category: 'Music', signature: 'noteName(n [, flats])',
     summary: 'Turn a MIDI note number into a name: 60 gives "C4" (middle C). With `flats` left out, you get plain text with # for sharps ("C#4"), which is easy to type and compare against. Pass `flats` to get the panel\'s own spelling instead: true gives flats ("D♭4") and false gives sharps ("C♯4"). `ce.music.spelling()` tells you which one a key uses.',
     params: [
-      { name: 'n', type: 'number', required: true },
+      { name: 'n', type: 'number', required: true, kind: 'note' },
       { name: 'flats', type: 'boolean', required: false },
     ],
   },
   {
     id: 'noteNumber', category: 'Music', signature: 'noteNumber(name) -> number',
     summary: 'Turn a note name into a MIDI note number: "C4" gives 60 (middle C is C4). Sharps and flats can be typed either way, so "C#4", "C♯4", "Db4" and "D♭4" all work. The letter must be a capital and the octave must be there. A name it cannot read returns nothing rather than 0, because 0 is a real note (C-1).',
-    params: [{ name: 'name', type: 'string', required: true }],
+    params: [{ name: 'name', type: 'string', required: true, kind: 'note' }],
   },
   // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
   // tables are the panel's OWN: a script asking for "dorian" and a Chord Pad set to "dorian" mean
@@ -3472,27 +3660,27 @@ export const HELPERS = [
   // every prelude. `root` and `note` accept a MIDI number or a name ("C4"), like sendNote does.
   {
     id: 'scaleNotes', category: 'Music', signature: 'scaleNotes(root [, scale]) -> list',
-    summary: 'One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing.',
+    summary: 'One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
     params: [
-      { name: 'root', type: 'value', required: true },
-      { name: 'scale', type: 'string', required: false },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'scale', type: 'string', required: false, kind: 'scale' },
     ],
   },
   {
     id: 'chordNotes', category: 'Music', signature: 'chordNotes(root [, type]) -> list',
-    summary: 'The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. To build a chord on a step of a key, use `ce.music.degreeChord()`.',
+    summary: 'The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. To build a chord on a step of a key, use `ce.music.degreeChord()`.',
     params: [
-      { name: 'root', type: 'value', required: true },
-      { name: 'type', type: 'string', required: false },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'type', type: 'string', required: false, kind: 'chord' },
     ],
   },
   {
     id: 'quantizeNote', category: 'Music', signature: 'quantizeNote(note, root [, scale]) -> number',
-    summary: 'Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing.',
+    summary: 'Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
     params: [
-      { name: 'note', type: 'value', required: true },
-      { name: 'root', type: 'value', required: true },
-      { name: 'scale', type: 'string', required: false },
+      { name: 'note', type: 'value', required: true, kind: 'note' },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'scale', type: 'string', required: false, kind: 'scale' },
     ],
   },
   // Key, degree and voicing — phase 12. The three verbs above answer questions about a note or a
@@ -3502,36 +3690,36 @@ export const HELPERS = [
   // Chord Pad labelling the same chord have to agree, or the panel contradicts itself on screen.
   {
     id: 'noteSpelling', category: 'Music', signature: 'noteSpelling(root [, scale]) -> boolean',
-    summary: 'Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel\'s. An unknown scale returns nothing.',
+    summary: 'Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel\'s. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
     params: [
-      { name: 'root', type: 'value', required: true },
-      { name: 'scale', type: 'string', required: false },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'scale', type: 'string', required: false, kind: 'scale' },
     ],
   },
   {
     id: 'inScale', category: 'Music', signature: 'inScale(note, root [, scale]) -> boolean',
-    summary: 'Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing.',
+    summary: 'Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
     params: [
-      { name: 'note', type: 'value', required: true },
-      { name: 'root', type: 'value', required: true },
-      { name: 'scale', type: 'string', required: false },
+      { name: 'note', type: 'value', required: true, kind: 'note' },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'scale', type: 'string', required: false, kind: 'scale' },
     ],
   },
   {
     id: 'scaleDegree', category: 'Music', signature: 'scaleDegree(note, root [, scale]) -> number',
-    summary: 'Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing.',
+    summary: 'Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
     params: [
-      { name: 'note', type: 'value', required: true },
-      { name: 'root', type: 'value', required: true },
-      { name: 'scale', type: 'string', required: false },
+      { name: 'note', type: 'value', required: true, kind: 'note' },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'scale', type: 'string', required: false, kind: 'scale' },
     ],
   },
   {
     id: 'degreeChord', category: 'Music', signature: 'degreeChord(root, scale, degree [, size]) -> table',
-    summary: 'The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. For a chord you already know by name, use `ce.music.chord()`.',
+    summary: 'The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. For a chord you already know by name, use `ce.music.chord()`.',
     params: [
-      { name: 'root', type: 'value', required: true },
-      { name: 'scale', type: 'string', required: true },
+      { name: 'root', type: 'value', required: true, kind: 'note' },
+      { name: 'scale', type: 'string', required: true, kind: 'scale' },
       { name: 'degree', type: 'number', required: true },
       { name: 'size', type: 'number', required: false },
     ],
@@ -3584,6 +3772,103 @@ export const HELPERS = [
   { id: 'fromOffset', category: 'MIDI encoding', signature: 'fromOffset(b, center)', summary: 'Decode an offset value by subtracting `center` — the reverse of toOffset.' },
   { id: 'toSigned', category: 'MIDI encoding', signature: 'toSigned(v, bits)', summary: 'Turn a negative number into the form a synth uses for a signed value of `bits` bits (two\'s complement). Positive numbers come back unchanged. Use fromSigned to read one back.' },
   { id: 'fromSigned', category: 'MIDI encoding', signature: 'fromSigned(b, bits)', summary: 'Read a signed value of `bits` bits (two\'s complement) back into an ordinary number, which may be negative. The reverse of toSigned.' },
+
+  // Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+  // (docs/design/script-bytes.md says why lists and not a block object). Shared rules, stated once
+  // in each summary that needs them: offsets and bit positions count from 0 in every language, Lua
+  // included, as dump layouts do; a list may be hex text; a mistake answers nothing and says why;
+  // every list that comes back is new.
+  {
+    id: 'getBits', category: 'MIDI encoding', signature: 'getBits(value, start, count) -> number',
+    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0, and so is a list item that is not a byte from 0 to 255.',
+    params: [
+      { name: 'value', type: 'value', required: true },
+      { name: 'start', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+    ],
+  },
+  {
+    id: 'setBits', category: 'MIDI encoding', signature: 'setBits(value, start, count, bits) -> number|list',
+    summary: 'Write `bits` into the `count` bits starting at bit `start`, and return the result: a number for a number, a new list for a list (the one passed in is not changed). The reverse of getBits: `setBits(0xB4, 4, 3, 5)` is 0xD4. A value that does not fit in `count` bits is refused with a message rather than cut down to fit.',
+    params: [
+      { name: 'value', type: 'value', required: true },
+      { name: 'start', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+      { name: 'bits', type: 'number', required: true },
+    ],
+  },
+  {
+    id: 'bytesRead', category: 'MIDI encoding', signature: 'bytesRead(bytes, offset, count [, opts]) -> number',
+    summary: 'Read the number stored in `count` bytes (1 to 4) starting at `offset`, which counts from 0 in every language, as dump layouts do. By default the bytes are SysEx\'s 7-bit bytes, most significant first, the way to7bit writes them; `opts` can say otherwise. Bytes past the end of the list are refused with a message.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['bytesBits', 'bytesOrder']) },
+    ],
+  },
+  {
+    id: 'bytesWrite', category: 'MIDI encoding', signature: 'bytesWrite(bytes, offset, count, value [, opts]) -> list',
+    // Its signature ends `-> list`, which would make a refused call answer an empty list; but every
+    // byte-list verb answers nothing when it refuses (ce.midi.write already did for a value that does
+    // not fit), because an empty list reads as a message with nothing in it.
+    refusal: 'nothing',
+    summary: 'Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` takes the same `bits` and `order` as bytesRead\'s; any other key is refused with a message, and nothing comes back. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'count', type: 'number', required: true },
+      { name: 'value', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['bytesBits', 'bytesOrder']) },
+    ],
+  },
+  {
+    id: 'bytesSlice', category: 'MIDI encoding', signature: 'bytesSlice(bytes, offset [, count]) -> list',
+    summary: 'Copy `count` bytes starting at `offset` (counted from 0) into a new list, or every byte from `offset` to the end when `count` is left out. For a patch name, `fromAscii(bytesSlice(dump, 10, 12))`. Bytes past the end are refused with a message.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'count', type: 'number', required: false },
+    ],
+  },
+  {
+    id: 'bytesPut', category: 'MIDI encoding', signature: 'bytesPut(bytes, offset, values) -> list',
+    summary: 'Write the bytes in `values` into a copy of `bytes`, starting at `offset` (counted from 0), and return it. The write may run past the end and the list grows, but it cannot start past the end. For a patch name, `bytesPut(dump, 10, toAscii("Lead", 12))`.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'offset', type: 'number', required: true },
+      { name: 'values', type: 'bytes', required: true },
+    ],
+  },
+  {
+    id: 'bytesFind', category: 'MIDI encoding', signature: 'bytesFind(bytes, pattern [, from]) -> number',
+    summary: 'Find where `pattern` (a list of bytes, or hex text) first occurs in `bytes`, at or after `from` (0 by default), and return its offset, counted from 0. Returns nothing when it does not occur, which is an answer rather than a mistake, so nothing is written to the console. Use it to find each patch\'s header inside a bulk dump.',
+    params: [
+      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'pattern', type: 'bytes', required: true },
+      { name: 'from', type: 'number', required: false },
+    ],
+  },
+  {
+    id: 'bytesToHex', category: 'MIDI encoding', signature: 'bytesToHex(bytes) -> string',
+    summary: 'Write bytes as hex text, two uppercase digits a byte with one space between, "F0 41 10 F7": the form the console shows MIDI in, and the form every send reads back.',
+    params: [{ name: 'bytes', type: 'bytes', required: true }],
+  },
+  {
+    id: 'bytesFromHex', category: 'MIDI encoding', signature: 'bytesFromHex(text) -> list',
+    summary: 'Read hex text into a list of bytes, by the rule every send uses: one or two digits a byte, with or without 0x, with spaces or commas between. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text.',
+    params: [{ name: 'text', type: 'text', required: true }],
+  },
+  {
+    id: 'bytesToBase64', category: 'MIDI encoding', signature: 'bytesToBase64(bytes) -> string',
+    summary: 'Write bytes as base64 text, the standard alphabet with = padding: about a third shorter than hex, for keeping a dump in a setting or in state.',
+    params: [{ name: 'bytes', type: 'bytes', required: true }],
+  },
+  {
+    id: 'bytesFromBase64', category: 'MIDI encoding', signature: 'bytesFromBase64(text) -> list',
+    summary: 'Read base64 text back into a list of bytes. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message.',
+    params: [{ name: 'text', type: 'text', required: true }],
+  },
 ];
 
 /* ------------------------------------------------------------------- modules */
@@ -3802,11 +4087,16 @@ const MODULE_MEMBERS = {
     'sendAftertouch', 'sendClock', 'sendTransport',
     'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
     'denibblize', 'toAscii', 'fromAscii', 'toOffset', 'fromOffset', 'toSigned', 'fromSigned',
+    'getBits', 'setBits',
   ].reduce((acc, id) => { acc[id] = id; return acc; }, {
     // The namespaced names read well; the flat aliases have to stay distinct from ce.core.intercept,
     // which is a different thing entirely — one filters a model path, these filter the wire.
     interceptIn: 'interceptMidiIn', interceptOut: 'interceptMidiOut',
     feed: 'feedMidi', route: 'routeMidi',
+    // The byte-list helpers: short names in the namespace, and flat names that say "bytes", since
+    // a bare global read, write, slice, put or find is a word a script reaches for itself.
+    read: 'bytesRead', write: 'bytesWrite', slice: 'bytesSlice', put: 'bytesPut', find: 'bytesFind',
+    toHex: 'bytesToHex', fromHex: 'bytesFromHex', toBase64: 'bytesToBase64', fromBase64: 'bytesFromBase64',
   }),
   'ce.device': {
     requestDump: 'requestDump', applyDump: 'applyDump', sendDump: 'sendDump', buildDump: 'buildDump',
@@ -3852,6 +4142,7 @@ const MODULE_MEMBERS = {
                // globals, so the flat spellings say what they convert.
                lighten: 'lighten', darken: 'darken', mix: 'mixColour', alpha: 'colourAlpha',
                rgb: 'hexToRgb', hex: 'rgbToHex', hsl: 'hexToHsl', fromHsl: 'hslToHex',
+               fromARGB: 'colourFromArgb', fromRGBA: 'colourFromRgba',
                degrees: 'toDegrees', radians: 'toRadians',
                distance: 'distance', angle: 'angleOf', polar: 'polar',
                // The panel's own transforms. `shape` is deliberately NOT `curve` — the two compute
@@ -4381,6 +4672,112 @@ export const ALL_MEMBERS = [
 ];
 
 export const MEMBER_BY_ID = Object.fromEntries(ALL_MEMBERS.map((m) => [m.id, m]));
+
+/* ------------------------------------------------------------ option keys a call does not take
+ * An options table is the one argument where a mistake cannot show: `{ easing = "outBack" }` on
+ * ce.anim.to moved in a straight line, and the call succeeded. So a key a member's options do not
+ * list REFUSES the call, in every runtime that implements the member: the WebView runtime checks
+ * each call against what is listed here (panelRuntime.js, applyOptionChecks), and
+ * tools/scripts/gen-script-modules.mjs writes the same lists, and the same check, into each C++
+ * engine's prelude. A panel cannot then work in the exported plug-in and refuse in the editor, or
+ * the other way round.
+ *
+ * What is not a mistake, and is not checked: a key that is a number (a Lua list arrives as a table of
+ * numbered keys, and a list is not an options table); anything inside an option's value, unless
+ * the option lists fields of its own (a NRPN's msb and lsb); a section name where `<section>` is
+ * listed; and every key of a member whose options list no fields, since nothing says what such a
+ * member does not take. */
+
+/** Members that check their own option keys: ce.text.style and ce.image.set (whose keys image.set
+ *  reads in any case), which refuse the whole call for an unknown one in the common words
+ *  (panelRuntime's refusedForUnknownOptions), ce.panel.find for its filters, and the storage calls,
+ *  where a misspelled `scope` key would share a private setting. ce.panel.define checks its spec,
+ *  whose keys depend on the section it defines in, in the common words with the call before them
+ *  (panelRuntime's DEFINE_SPECS); its spec lists no fields, so the common check would pass it by in
+ *  any case. The common check leaves them to it rather than saying it twice. */
+export const MEMBERS_CHECKING_OWN_OPTIONS = new Set([
+  'textStyle', 'imageSet', 'panelFind', 'panelDefine',
+  'saveSetting', 'loadSetting', 'listSettings', 'forgetSetting', 'allSettings', 'clearSettings',
+  'storageInfo',
+]);
+
+/** What a refused call answers. A call refused before it does anything, as an unknown option key
+ *  refuses it, answers what the member answers when it refuses anything else:
+ *    'nothing'     nil, undefined or None, as most members do;
+ *    'false'       a member that answers whether it did what was asked;
+ *    'zero'        a count of what it changed, as ce.panel's arranging verbs answer;
+ *    'empty list'  a member that answers a list, so a loop over the answer still runs;
+ *    'result'      a result table, { ok = false, error = <what the console says> }, recallPreset's;
+ *    'unanswered'  false, with the callback already called with nothing, which is what false
+ *                  always means from ce.ui.dialog, prompt and choose.
+ *  A member names its own with `refusal`; without one, a signature that ends `-> boolean` answers
+ *  'false', one that ends `-> list` 'empty list', and anything else 'nothing'. */
+export const REFUSAL_ANSWERS = ['nothing', 'false', 'zero', 'empty list', 'result', 'unanswered'];
+
+export function refusalOf(member) {
+  if (member?.refusal) return member.refusal;
+  const returns = /->\s*(\w+)\s*$/.exec(String(member?.signature ?? ''))?.[1];
+  if (returns === 'boolean') return 'false';
+  if (returns === 'list') return 'empty list';
+  return 'nothing';
+}
+
+/** A field list as the check reads it: the names in the contract's order (which is the order a
+ *  refusal lists them in), the fields of any option that lists its own, and whether a section name
+ *  is an option too. */
+function optionShape(fields) {
+  const names = [];
+  const nested = {};
+  let sections = false;
+  for (const field of fields) {
+    if (field.name === '<section>') { sections = true; continue; }
+    names.push(field.name);
+    if (Array.isArray(field.fields) && field.fields.length) nested[field.name] = optionShape(field.fields);
+  }
+  return { names, nested, sections };
+}
+
+/** Every member whose calls have their option keys checked, with what is checked:
+ *  [{ id, path, refusal, params: [{ index, name, shape }] }], one entry per member whose options
+ *  list fields, except the members that check their own. Built-in members only. */
+export function optionChecks() {
+  const out = [];
+  for (const member of ALL_MEMBERS) {
+    if (member.kind === 'lifecycle' || MEMBERS_CHECKING_OWN_OPTIONS.has(member.id)) continue;
+    const params = [];
+    (member.params ?? []).forEach((param, index) => {
+      if (Array.isArray(param.fields) && param.fields.length) {
+        params.push({ index, name: param.name, shape: optionShape(param.fields) });
+      }
+    });
+    if (params.length) out.push({ id: member.id, path: memberPath(member.id), refusal: refusalOf(member), params });
+  }
+  return out;
+}
+
+/** "a", "a and b", "a, b and c": several things named in one sentence. */
+export const andList = (items) => (items.length < 2 ? items.join('')
+  : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+
+/** `ce.anim.to: "easing" is not one of its options, so nothing was done. Its options are: …`, in
+ *  the words the storage calls, the first to refuse an unknown key, already used in every runtime.
+ *  `keys` are the unknown keys of one group (sorted), `parent` the option they sit in ('' for the
+ *  call's own), and `shape` what optionChecks gives for it. The WebView runtime refuses a call in
+ *  these words (panelRuntime.js, applyOptionChecks), and the script editor's Values sidebar shows
+ *  them on the key's row. */
+export function unknownOptionsMessage(path, { parent, keys, shape }) {
+  const quoted = keys.map((key) => `"${parent ? `${parent}.` : ''}${key}"`);
+  const what = keys.length === 1
+    ? `${quoted[0]} is not one of its options, so nothing was done.`
+    : `${andList(quoted)} are not among its options, so nothing was done.`;
+  const names = shape.sections
+    ? [...shape.names, 'and the name of any section, such as Behavior']
+    : shape.names;
+  const listed = names.length === 1
+    ? `${parent ? `The only option of ${parent}` : 'Its only option'} is ${names[0]}.`
+    : `${parent ? `The options of ${parent}` : 'Its options'} are: ${names.join(', ')}.`;
+  return `${path}: ${what} ${listed}`;
+}
 
 /** Where a member runs — 'any' unless it explicitly declares otherwise. */
 export function memberRuntime(member) {

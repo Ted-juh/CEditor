@@ -22,6 +22,7 @@ import { scriptDrawings } from '../src/CE_Application/stores/scriptDraw.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { moduleMemberMap, MEMBER_BY_ID } from '../src/CE_Application/scripting/panelApi.js';
+import { appSettings } from '../src/CE_Application/stores/appSettings.js';
 
 function scopePanel() {
   return {
@@ -200,6 +201,27 @@ test('image refuses a source the renderer could not load', () => {
     assert.equal(api.drawImage('', 0, 0, 10, 10), false);
     assert.match(traced(), /no source/);
     assert.equal(drawn().length, 0);
+
+    // The name itself, which this test was written about and did not pass until now: the command
+    // was recorded and the overlay drew an image that never loaded.
+    clearScriptTrace();
+    assert.equal(api.drawImage('knob-cap', 0, 0, 10, 10), false);
+    assert.equal(drawn().length, 0, 'a name draws nothing, and now records nothing either');
+    assert.equal(traced(), 'ce.draw.image: "knob-cap" is not image data, so nothing was drawn. '
+      + 'Pass a data URL, or ce.image.asset(name).dataUrl for a library icon.');
+
+    // When the name IS an icon's, the error says exactly what to pass.
+    const before = get(appSettings);
+    appSettings.set({ ...before, icons: [{ id: 'i1', name: 'knob-cap', enabled: true, dataUrl: 'data:image/svg+xml;base64,PHN2Zy8+' }] });
+    try {
+      clearScriptTrace();
+      assert.equal(api.drawImage('knob-cap', 0, 0, 10, 10), false);
+      assert.equal(traced(), 'ce.draw.image: "knob-cap" is an icon\'s name, not its image, so nothing was drawn. '
+        + 'Pass ce.image.asset("knob-cap").dataUrl.');
+      assert.equal(drawn().length, 0);
+    } finally {
+      appSettings.set(before);
+    }
   });
 });
 

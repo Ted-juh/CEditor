@@ -117,6 +117,16 @@ test('writing a declared parameter sends its own bytes, with no profile involved
   });
 });
 
+test('a Roland template without $checksumStart is declared, and the console warns about it', () => {
+  withPanel(panelWith(), (api) => {
+    clearScriptTrace();
+    assert.equal(api.deviceDefineParameter('lvl', { sysex: ['F0', '41', '10', '42', '12', '40', '01', '33', '$value', '$checksum', 'F7'] }), true);
+    const warns = get(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+    assert.equal(warns.length, 1);
+    assert.match(warns[0], /^defineParameter\("lvl"\): this is a Roland template .* Put \$checksumStart where the address begins\.$/);
+  });
+});
+
 test('a parameter with no wire format is refused, and the panel does not look built', () => {
   withPanel(panelWith(), (api) => {
     assert.equal(api.deviceDefineParameter('cutoff', { name: 'Cutoff', max: 127 }), false);
@@ -144,6 +154,22 @@ test('bind writes a real DeviceBindings entry, and the control then sends on set
     // to fix, and half-fixed would look done.
     clearScriptTrace();
     api.set('cutoffKnob.value', 100);
+    assert.ok(midiLines().some((l) => l.includes('B0 4A 64')), `expected B0 4A 64 in:\n${traced()}`);
+  });
+});
+
+test('set()\'s transmit option reaches the write: transmit = false moves the control and sends nothing', () => {
+  // The binding handed setValue an empty form for an object, so { transmit = false } was accepted
+  // and dropped, in the editor only: a bound control sent its value whatever the script asked.
+  const knob = createControl('Knob', { name: 'cutoffKnob' });
+  withPanel(panelWith([knob]), (api) => {
+    api.deviceDefineParameter('cutoff', { min: 0, max: 127, cc: 74 });
+    api.deviceBind('cutoffKnob', 'cutoff');
+    clearScriptTrace();
+    api.set('cutoffKnob.value', 90, { transmit: false });
+    api.self.set('cutoffKnob.value', 91, { transmit: false });
+    assert.deepEqual(midiLines(), [], `nothing should have been sent:\n${traced()}`);
+    api.set('cutoffKnob.value', 100, { transmit: true });
     assert.ok(midiLines().some((l) => l.includes('B0 4A 64')), `expected B0 4A 64 in:\n${traced()}`);
   });
 });
@@ -261,10 +287,48 @@ test('a declared layout is asked for with its own request bytes', () => {
 test('a layout with no request says there is nothing to send, rather than sending nothing', () => {
   withPanel(panelWith(), (api) => {
     api.deviceDefineParameter('cutoff', { cc: 74 });
-    api.deviceDefineDump('patch', { fields: [{ parameter: 'cutoff', offset: 0 }] });
+    api.deviceDefineDump('patch', { match: { prefix: ['f0', '7d', '01'] }, fields: [{ parameter: 'cutoff', offset: 0 }] });
     clearScriptTrace();
     assert.equal(api.requestDump('patch'), false);
     assert.match(traced(), /has no request bytes/);
+  });
+});
+
+test('a request that is not bytes is refused when declared, so requestDump never sends FF', () => {
+  // "F07D00F7" was read as one number, clamped to 255, and requestDump sent FF: System Reset.
+  withPanel(panelWith(), (api) => {
+    api.deviceDefineParameter('cutoff', { cc: 74 });
+    clearScriptTrace();
+    assert.equal(api.deviceDefineDump('patch', {
+      request: 'F07D00F7', match: { prefix: ['f0', '7d', '01'] }, fields: [{ parameter: 'cutoff', offset: 0 }],
+    }), false);
+    const errors = get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+    assert.deepEqual(errors, ['defineDump("patch"): in the request, "F07D00F7" is not one byte, so the dump was '
+      + 'not defined. Put a space between the bytes: "F0 7D 00 F7".']);
+    clearScriptTrace();
+    api.requestDump('patch');
+    assert.ok(!midiLines().some((l) => /\bFF\b/.test(l)), `something was sent:\n${traced()}`);
+  });
+});
+
+test('a write the parameter cannot read is refused on the console, from write() and from a bound control', () => {
+  const knob = createControl('Knob', { name: 'k' });
+  withPanel(panelWith([knob]), (api) => {
+    api.deviceDefineParameter('sw', { type: 'boolean', cc: 65, trueValue: 127 });
+    api.deviceDefineParameter('filter', { type: 'choice', cc: 70, choices: ['LP', 'HP', 'BP'] });
+    clearScriptTrace();
+    assert.equal(api.deviceWrite('sw', 'enabled'), false);
+    assert.equal(api.deviceWrite('filter', 'hp'), true);
+    assert.ok(midiLines().some((l) => l.includes('B0 46 01')), `expected B0 46 01 in:\n${traced()}`);
+
+    api.deviceBind('k', 'filter');
+    api.set('k.value', 'Notch');
+    const errors = get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+    assert.deepEqual(errors, [
+      'deviceWrite("sw"): "enabled" is not on or off, so nothing was sent. Write true or false, a number '
+        + '(0 is off, any other number is on), or "on", "off", "true" or "false".',
+      'set("k.value"): "Notch" is not one of its choices, so nothing was sent. The choices are "LP", "HP" and "BP".',
+    ]);
   });
 });
 

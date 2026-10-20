@@ -278,6 +278,11 @@ positions:
 set("resonance.normalizedValue", get("cutoff.normalizedValue"))
 ```
 
+The form's name can also go after the path as an argument of its own: `get("cutoff",
+"normalizedValue")`, and `set("cutoff", 0.5, "normalizedValue")`. A name that is not one of the
+three is refused with a message, and nothing is read or written. When it is a form written another
+way, other capitals or the British "normalised", the message names the one to write.
+
 ### The script's own control: self
 
 The control or panel this script belongs to: the control for a control script, the panel for a panel script. Use it instead of a fixed name, so that one script works on every copy of a control.
@@ -289,7 +294,16 @@ sets it. Write it with a dot, not a colon, in Lua as well.
 
 Paths that start with `panel` reach the panel rather than a control: `get("panel.width")`,
 `set("panel.bgColour", "FF202020")`. Its name, size and background can be read and changed this
-way; the things that identify the panel, such as its file path, can only be read.
+way; the things that identify the panel, such as its file path, can only be read. Its colours
+(`bgColour`, `gridColour`, `gridSubColour` and the image and texture tints) take what a
+control's colour properties take, and refuse the same.
+
+The colour of each of `bgGradient`'s stops is read the same way and stored as six digits,
+RRGGBB, with no "#": `set("panel.bgGradient.stops.0.color", "red")` stores "FF0000". A stop has
+no alpha of its own, because the gradient's opacity belongs to its layer (`bgGradientOpacity`),
+so a colour with one, such as "80FF0000" or rgba() below 1, is refused. A control's gradients take
+their stops the same way, `Background.Fill.gradient` and the rest, whether a stop is written by
+its path or the gradient is written whole.
 
 ## 5. Talking to your synth
 
@@ -554,7 +568,13 @@ Each command is shown the way you type it, with its arguments:
   means `nil` in Lua, `undefined` in JavaScript and `None` in Python.
 - **`opts`** is a table (Lua) or object (JavaScript) of optional settings, such as
   `{ duration = 500 }` or `{ duration: 500 }`. When a command takes one, a table lists what it can
-  contain and what each setting is when you leave it out.
+  contain and what each setting is when you leave it out. A setting that is not in that table
+  refuses the whole command: nothing is done, the script console names the setting and lists the
+  ones the command has, and the command gives back what it gives whenever it refuses: false from a
+  command that says whether it worked, 0 from one that counts what it changed, an empty list from
+  one that gives a list, a result whose `ok` is false from `ce.device.recallPreset`, and
+  otherwise nothing. So a misspelling such as `{ duraton = 500 }` cannot pass for a setting that
+  worked, with the panel window open or closed.
 - ***Short name*** gives the other name a command answers to (see
   [chapter 10](#10-command-names-and-modules)).
 - ***Panel window only*** means the command needs the panel window
@@ -878,7 +898,7 @@ The commands nearly every script uses: reading and changing values, deciding whe
 
 #### `set(path, value [, opts])`
 
-Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A change you make this way is sent to the synth, except while your script is reacting to MIDI that came from the synth: then it stays silent, so the synth does not get its own value echoed back.
+Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A gradient stop is stored as RRGGBB and takes no alpha. The change is sent to the synth, except while your script reacts to MIDI from the synth, so it does not hear its own value echoed back.
 
 **`opts`** can contain:
 
@@ -892,7 +912,7 @@ set("path", value)
 
 #### `get(path [, form])`
 
-Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. Returns nothing if the control or property does not exist.
+Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. A `form` that is not one of the three is refused with a message that names them, and the one you meant when it is one written another way ("normalisedValue" is answered with "Write normalizedValue."), and nothing comes back. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.
 
 ```lua
 get("path")
@@ -1081,7 +1101,7 @@ Sending MIDI yourself, and catching MIDI on its way in or out. Most panels do no
 
 #### `ce.midi.sendCC(channel, cc, value)`
 
-Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.
+Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127. A channel or controller number outside its range, or anything that is not a number, is refused with a message and nothing is sent, in every send command; a value past the end of its range is sent as the nearest end, and the first time for each command a warning says so. Text that is a number is read as one, and a fraction is rounded.
 
 *Short name: `sendCC`.*
 
@@ -1131,7 +1151,7 @@ ce.midi.sendSongPosition(0);
 
 #### `ce.midi.sendMidi(bytes)`
 
-Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits.
+Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.
 
 *Short name: `sendMidi`.*
 
@@ -1146,7 +1166,7 @@ ce.midi.sendMidi([0x90, 60, 100])
 
 #### `ce.midi.sendNote(channel, note, velocity [, ms])`
 
-Play a note. `note` is a MIDI note number or a name such as "C3". A velocity of 0 means note off. Give `ms` and the matching note off is sent for you after that many milliseconds.
+Play a note. `note` is a MIDI note number from 0 to 127 or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, a note outside 0 to 127 ("C10"), or a note left out is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too. The velocity must be given; 0 means note off. Give `ms`, a number above 0, and the matching note off is sent for you after that many milliseconds.
 
 *Short name: `sendNote`.*
 
@@ -1156,7 +1176,7 @@ ce.midi.sendNote(1, 60, 100)
 
 #### `ce.midi.interceptIn(fn)`
 
-See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged.
+See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.
 
 *Short name: `interceptMidiIn`.*
 
@@ -1177,7 +1197,7 @@ ce.midi.interceptIn((bytes) => {
 
 #### `ce.midi.interceptOut(fn)`
 
-See every MIDI message the panel sends — from a script or from a control's own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged.
+See every MIDI message the panel sends — from a script or from a control's own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.
 
 *Short name: `interceptMidiOut`.*
 
@@ -1198,7 +1218,7 @@ ce.midi.interceptOut((bytes) => {
 
 #### `ce.midi.feed(bytes)`
 
-Pretend a MIDI message arrived from the synth. The panel's controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first.
+Pretend a MIDI message arrived from the synth. The panel's controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.
 
 *Short name: `feedMidi`.*
 
@@ -1252,7 +1272,7 @@ ce.midi.sendProgramChange(1, 0)
 
 #### `ce.midi.sendPitchBend(channel, value)`
 
-Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). How many semitones the full range covers is set on the synth.
+Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). Left out, the bend centres; anything that is not a number is refused with a message. How many semitones the full range covers is set on the synth.
 
 *Short name: `sendPitchBend`.*
 
@@ -1262,7 +1282,7 @@ ce.midi.sendPitchBend(1, 8192)
 
 #### `ce.midi.sendAftertouch(channel, pressure [, note])`
 
-Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch).
+Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch). Leaving the note out means channel pressure; the pressure itself must be given.
 
 *Short name: `sendAftertouch`.*
 
@@ -1282,7 +1302,7 @@ ce.midi.sendClock()
 
 #### `ce.midi.sendTransport(action)`
 
-Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`).
+Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`), in any case. Any other action, or none, is refused with a message and nothing is sent.
 
 *Short name: `sendTransport`.*
 
@@ -1292,7 +1312,7 @@ ce.midi.sendTransport("start")
 
 #### `ce.midi.sendSysex(bytes)`
 
-Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7".
+Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7". In hex text each byte is one or two digits, with spaces or commas between the bytes; text with a longer run, such as "F04110", is refused with a message and nothing is sent. In a list each byte is a whole number from 0 to 255, or text that is one hex byte ("F7"); anything else, such as 300, is refused the same way.
 
 *Short name: `sendSysex`.*
 
@@ -1302,7 +1322,7 @@ ce.midi.sendSysex(bytes)
 
 #### `ce.midi.checksum(type, bytes [, opts]) -> number`
 
-Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name returns nothing and prints the names it accepts. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.
+Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts, and so do bytes that are not bytes. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.
 
 *Short name: `checksum`.*
 
@@ -1318,7 +1338,7 @@ ce.midi.checksum("roland", bytes)
 
 #### `ce.midi.panic([opts])`
 
-Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`; set `opts.resetControllers` to false to leave controllers alone.
+Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`, a number from 1 to 16 (anything else, such as "all", is refused and nothing is sent); set `opts.resetControllers` to false to leave controllers alone.
 
 *Short name: `panic`.*
 
@@ -1351,6 +1371,17 @@ ce.midi.panic()
 | `ce.midi.fromOffset(b, center)` | Decode an offset value by subtracting `center` — the reverse of toOffset. Short name: `fromOffset`. |
 | `ce.midi.toSigned(v, bits)` | Turn a negative number into the form a synth uses for a signed value of `bits` bits (two's complement). Positive numbers come back unchanged. Use fromSigned to read one back. Short name: `toSigned`. |
 | `ce.midi.fromSigned(b, bits)` | Read a signed value of `bits` bits (two's complement) back into an ordinary number, which may be negative. The reverse of toSigned. Short name: `fromSigned`. |
+| `ce.midi.getBits(value, start, count) -> number` | Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0, and so is a list item that is not a byte from 0 to 255. Short name: `getBits`. |
+| `ce.midi.setBits(value, start, count, bits) -> number\|list` | Write `bits` into the `count` bits starting at bit `start`, and return the result: a number for a number, a new list for a list (the one passed in is not changed). The reverse of getBits: `setBits(0xB4, 4, 3, 5)` is 0xD4. A value that does not fit in `count` bits is refused with a message rather than cut down to fit. Short name: `setBits`. |
+| `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read the number stored in `count` bytes (1 to 4) starting at `offset`, which counts from 0 in every language, as dump layouts do. By default the bytes are SysEx's 7-bit bytes, most significant first, the way to7bit writes them; `opts` can say otherwise. Bytes past the end of the list are refused with a message. Short name: `bytesRead`. |
+| `ce.midi.write(bytes, offset, count, value [, opts]) -> list` | Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` takes the same `bits` and `order` as bytesRead's; any other key is refused with a message, and nothing comes back. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message. Short name: `bytesWrite`. |
+| `ce.midi.slice(bytes, offset [, count]) -> list` | Copy `count` bytes starting at `offset` (counted from 0) into a new list, or every byte from `offset` to the end when `count` is left out. For a patch name, `fromAscii(bytesSlice(dump, 10, 12))`. Bytes past the end are refused with a message. Short name: `bytesSlice`. |
+| `ce.midi.put(bytes, offset, values) -> list` | Write the bytes in `values` into a copy of `bytes`, starting at `offset` (counted from 0), and return it. The write may run past the end and the list grows, but it cannot start past the end. For a patch name, `bytesPut(dump, 10, toAscii("Lead", 12))`. Short name: `bytesPut`. |
+| `ce.midi.find(bytes, pattern [, from]) -> number` | Find where `pattern` (a list of bytes, or hex text) first occurs in `bytes`, at or after `from` (0 by default), and return its offset, counted from 0. Returns nothing when it does not occur, which is an answer rather than a mistake, so nothing is written to the console. Use it to find each patch's header inside a bulk dump. Short name: `bytesFind`. |
+| `ce.midi.toHex(bytes) -> string` | Write bytes as hex text, two uppercase digits a byte with one space between, "F0 41 10 F7": the form the console shows MIDI in, and the form every send reads back. Short name: `bytesToHex`. |
+| `ce.midi.fromHex(text) -> list` | Read hex text into a list of bytes, by the rule every send uses: one or two digits a byte, with or without 0x, with spaces or commas between. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text. Short name: `bytesFromHex`. |
+| `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, the standard alphabet with = padding: about a third shorter than hex, for keeping a dump in a setting or in state. Short name: `bytesToBase64`. |
+| `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
 
 ### ce.device: your synth
 
@@ -1414,7 +1445,7 @@ const p = ce.device.preset();
 
 #### `ce.device.applyDump(bytes)`
 
-Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth.
+Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth. Raw bytes can be a list of numbers or hex text, read a byte at a time as `sendSysex` reads it.
 
 *Short name: `applyDump`.*
 
@@ -1558,7 +1589,7 @@ if (ce.device.connected()) requestDump("patch");
 
 #### `ce.device.defineParameter(id, spec [, role]) -> boolean`
 
-Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with no MIDI form is refused, with a message saying why. In a SysEx template you can use hex bytes, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.
+Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with anything wrong in it is refused and nothing is defined, with a message saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry. A value that write() cannot read is refused the same way, and nothing is sent.
 
 *Short name: `deviceDefineParameter`.*
 
@@ -1568,18 +1599,23 @@ Describe a synth parameter from your script, for a synth that has no device prof
 |---|---|---|---|
 | `name` | text | the id | What to call it in the parameter list. |
 | `group` | text | — | Which group to file it under, such as "Filter". |
-| `type` | text | "number" | What kind of value it holds — a number, or a choice from `choices`. |
-| `min` | number | 0 | The lowest value it accepts. |
-| `max` | number | 127 | The highest value it accepts. |
+| `type` | text | "number" | What kind of value it holds: "number" (or "integer"), "boolean", "choice" (or "enum") for one of `choices`, or "text" for a name read out of a dump, which cannot be written on its own. A number reads a number or decimal text such as "64". A boolean reads true or false, a number (0 is off, any other number is on), or "on", "off", "true" or "false" in any case. Any case of the type is read; another type is refused. |
+| `min` | number | 0 | The lowest value it accepts. Nothing here sends a negative number, so a minimum below 0 is refused: declare what the synth receives and add the offset in your script with ce.midi.toOffset. |
+| `max` | number | 127 | The highest value it accepts, up to what the MIDI form carries: 127 for a CC or one SysEx byte, 16383 for an NRPN or "u14". With choices given as names it is the last one's value unless you say otherwise. A higher maximum is refused. |
 | `access` | text | "readwrite" | Whether the synth lets you read this parameter, write it, or both. |
-| `choices` | list of text | — | The names of the settings, in order, when the parameter is a choice rather than a number. |
-| `cc` | number | — | Send it as this CC number. The simplest of the three wire formats. |
-| `nrpn` | object | — | Send it as an NRPN, as { msb, lsb }. |
-| `sysex` | list | — | Send it as a SysEx message built from this template. Entries are hex literals or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you listed in `variables`. |
-| `channel` | number | the panel's channel | The MIDI channel to send on. |
-| `encoding` | text | — | How the number is packed into bytes when one byte is not enough — the same names ce.midi's encoders use. |
-| `checksum` | text | — | Which checksum to compute for a SysEx template that asks for one. The names are ce.midi.checksum's. |
-| `variables` | object | — | Extra named values your SysEx template can refer to as $name, such as an address or a part number. |
+| `choices` | list of text | — | The settings, in order, when the parameter is a choice: their names, each worth its position plus `min` (so { "LP", "HP", "BP" } sends 0, 1 and 2), or { id, value } pairs. write() takes a name in any case, or the number itself; another name is refused, with the choices listed. |
+| `trueValue` | number | 1 | What a boolean sends when it is on. |
+| `falseValue` | number | 0 | What a boolean sends when it is off. |
+| `cc` | number | — | Send it as this CC number, 0 to 127. The simplest of the three wire formats. |
+| `nrpn` | object | — | Send it as an NRPN, as { msb, lsb } or the two numbers as a list. |
+| `sysex` | text or list | — | Send it as a SysEx message built from this template, a list or text such as "F0 41 10 $value F7". Each entry is one byte, a number from 0 to 255 or one or two hex digits, or one of the tokens $value, $deviceId (16 unless `variables` says otherwise), $channel, $checksumStart, $checksum, or any $name you listed in `variables`. Anything else is refused. The checksum covers everything after F0 unless $checksumStart says where it begins. A Roland checksum covers only the address and the data, so a Roland template (41 after F0) with $checksum and no $checksumStart is defined with a warning. |
+| `channel` | number | 1 | The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel puts there. |
+| `encoding` | text | "u7" | How the number is packed into a SysEx template's $value: "u7" is one byte, "u14" two, most significant first, as ce.midi.to14bit gives them ("to14bit" is read as the same), and "nibbled" is `nibbles` 4-bit nibbles, most significant first. "boolean-u7", the device profiles' name for a switch's byte, is one byte too. Any case is read; another name is refused. |
+| `nibbles` | number | 2 | How many nibbles a "nibbled" value takes, 1 to 8. |
+| `checksum` | text | "roland" | Which checksum $checksum puts in the template: any of ce.midi.checksum's names, in any case, computed the same way. One wider than a byte, such as a CRC, takes as many bytes as it needs. An unknown name is refused, with the names listed. |
+| `variables` | object | — | Extra named bytes your SysEx template can refer to as $name, such as an address or a part number. Each is a number from 0 to 255, or one or two hex digits as text. |
+| `length` | number | 0 | For a text parameter, how many characters it holds. |
+| `pad` | number | 32 | For a text parameter, the character code that fills it out to `length` (32 is a space). |
 
 ```lua
 -- Lua
@@ -1592,7 +1628,7 @@ ce.device.defineParameter("cutoff", { name: "Cutoff", group: "Filter", min: 0, m
 
 #### `ce.device.defineDump(kind, spec [, role]) -> boolean`
 
-Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.
+Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Bytes are read the way defineParameter reads them, and a layout with anything wrong in it, or with no prefix to recognise it by, is refused with a message saying what. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.
 
 *Short name: `deviceDefineDump`.*
 
@@ -1601,11 +1637,13 @@ Describe a SysEx dump layout from your script: `request` (the bytes that ask for
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `name` | text | the kind | What to call this dump where it is listed. |
-| `request` | text or list | — | The bytes that ask the synth for it. |
-| `match` | object | required | How to recognise the reply, as { prefix, suffix } — the bytes a matching message starts and ends with. |
+| `request` | text or list | — | The bytes that ask the synth for it, a list or text such as "F0 7D 00 F7", one byte to an entry. |
+| `match` | object | required | How to recognise the reply, as { prefix, suffix } — the bytes a matching message starts and ends with, which may include $deviceId (16) and $channel (1). A layout with no prefix is refused, because it would match every SysEx that arrives. |
+| `prefix` | text or list | — | The same as `match.prefix`, used when `match` does not give one. |
+| `suffix` | text or list | — | The same as `match.suffix`, used when `match` does not give one. |
 | `offset` | number | 0 | How many bytes in from the start of the message the values begin. |
 | `size` | number | whatever is left | How many bytes of values there are. |
-| `checksum` | text | — | Which checksum the message carries, so it can be verified. The names are ce.midi.checksum's. |
+| `checksum` | text or object | — | Which checksum the message carries, so it is checked on the way in and computed by buildDump: any of ce.midi.checksum's names. Named alone, it sits just before the suffix (at the end when there is none) and covers every byte from the end of the prefix up to it, which is the Roland layout when the prefix is the header. Anywhere else, give { type, fromOffset, toOffset, byteOffset }, counted from the start of the message; any you leave out are placed as for a name. An unknown name is refused. |
 | `fields` | list of objects | required | Where each value sits among those bytes, one { parameter, offset } per value. Every parameter must already be declared with defineParameter; an unknown name is refused. |
 
 ```lua
@@ -1803,13 +1841,13 @@ Helper functions for notes and harmony: note names and numbers, scales, chords, 
 |---|---|
 | `ce.music.name(n [, flats])` | Turn a MIDI note number into a name: 60 gives "C4" (middle C). With `flats` left out, you get plain text with # for sharps ("C#4"), which is easy to type and compare against. Pass `flats` to get the panel's own spelling instead: true gives flats ("D♭4") and false gives sharps ("C♯4"). `ce.music.spelling()` tells you which one a key uses. Short name: `noteName`. |
 | `ce.music.number(name) -> number` | Turn a note name into a MIDI note number: "C4" gives 60 (middle C is C4). Sharps and flats can be typed either way, so "C#4", "C♯4", "Db4" and "D♭4" all work. The letter must be a capital and the octave must be there. A name it cannot read returns nothing rather than 0, because 0 is a real note (C-1). Short name: `noteNumber`. |
-| `ce.music.scale(root [, scale]) -> list` | One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing. Short name: `scaleNotes`. |
-| `ce.music.chord(root [, type]) -> list` | The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. To build a chord on a step of a key, use `ce.music.degreeChord()`. Short name: `chordNotes`. |
-| `ce.music.quantize(note, root [, scale]) -> number` | Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing. Short name: `quantizeNote`. |
-| `ce.music.spelling(root [, scale]) -> boolean` | Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel's. An unknown scale returns nothing. Short name: `noteSpelling`. |
-| `ce.music.inScale(note, root [, scale]) -> boolean` | Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. Short name: `inScale`. |
-| `ce.music.degree(note, root [, scale]) -> number` | Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. Short name: `scaleDegree`. |
-| `ce.music.degreeChord(root, scale, degree [, size]) -> table` | The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. For a chord you already know by name, use `ce.music.chord()`. Short name: `degreeChord`. |
+| `ce.music.scale(root [, scale]) -> list` | One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `scaleNotes`. |
+| `ce.music.chord(root [, type]) -> list` | The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. To build a chord on a step of a key, use `ce.music.degreeChord()`. Short name: `chordNotes`. |
+| `ce.music.quantize(note, root [, scale]) -> number` | Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `quantizeNote`. |
+| `ce.music.spelling(root [, scale]) -> boolean` | Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel's. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `noteSpelling`. |
+| `ce.music.inScale(note, root [, scale]) -> boolean` | Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `inScale`. |
+| `ce.music.degree(note, root [, scale]) -> number` | Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `scaleDegree`. |
+| `ce.music.degreeChord(root, scale, degree [, size]) -> table` | The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. For a chord you already know by name, use `ce.music.chord()`. Short name: `degreeChord`. |
 | `ce.music.quality(notes) -> string` | Name a chord from its notes: [60, 63, 70] gives "min7". It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list. Short name: `chordQuality`. |
 | `ce.music.lead(notes, previous [, mode]) -> list` | Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Short name: `voiceLead`. |
 | `ce.music.octaves(notes [, octaves]) -> list` | Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1. Notes that would go above 127 are left out, not squeezed onto 127. Short name: `expandOctaves`. |
@@ -1821,7 +1859,7 @@ Timers, and the musical clock. A timer runs your code later or repeatedly; the m
 
 #### `ce.time.startTimer(id, ms)`
 
-Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one.
+Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.
 
 *Short name: `startTimer`.*
 
@@ -1831,7 +1869,7 @@ ce.time.startTimer("id", 250)
 
 #### `ce.time.after(ms, fn) -> id`
 
-Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs.
+Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs. 0 runs it as soon as the handler that asked has returned. A missing delay, text (even "1000") or a negative number schedules nothing and writes a message.
 
 *Short name: `after`.*
 
@@ -1937,9 +1975,15 @@ const beats = ce.time.msToBeats(500);
 
 #### `ce.time.syncTimer(id, beats [, opts])`
 
-Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. If there is no tempo to work from, no timer starts and a note is written to the script console.
+Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division's name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.
 
 *Short name: `syncTimer`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `follow` | true or false | true | Change the interval when the tempo changes. false keeps the interval the tempo gave it when it started. |
 
 ```lua
 -- Lua
@@ -1952,7 +1996,7 @@ ce.time.syncTimer("step", 0.25);
 
 #### `ce.time.afterBeats(beats, fn) -> id`
 
-Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.
+Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. `beats` may also be a division's name, such as "1/4", read as `ce.time.division()` reads it; 0 runs `fn` as soon as the handler has returned. A negative number, a name that is not a division, or no delay at all schedules nothing and writes a message. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.
 
 *Short name: `afterBeats`.*
 
@@ -2001,7 +2045,7 @@ const t0 = ce.time.now();
 
 #### `ce.time.division(name) -> number`
 
-Return how many beats a note division lasts: "1/16" is 0.25, "1/8T" is 0.333… and "1/4D" is 1.5. These are the same names the sequencer components use for their division settings. Returns nothing for a name it does not recognise.
+Return how many beats a note division lasts: "1/16" is 0.25, "1/8T" is 0.333… and "1/4D" is 1.5. These are the same names the sequencer components use for their division settings, and capitals do not matter ("1/8t" is "1/8T"). A name it does not recognise returns nothing and writes a message listing the divisions.
 
 *Short name: `beatsPerDivision`.*
 
@@ -2046,19 +2090,19 @@ log(ce.time.position(transportInfo().beats).text);
 
 #### `ce.time.step(beats, division) -> number`
 
-Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Returns nothing if `division` is not a name it recognises.
+Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Capitals in `division` do not matter; a name it does not recognise returns nothing and writes a message.
 
 *Short name: `stepAt`.*
 
 #### `ce.time.steps(from, to, division [, max]) -> table`
 
-Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. Returns nothing for an unknown division.
+Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. An unknown division returns nothing and writes a message.
 
 *Short name: `stepsBetween`.*
 
 #### `ce.time.swing(step, amount, division) -> number`
 
-Return how far to delay a step to give it swing, in beats — add it to the step's position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport's swing setting holds. It uses the Transport's own swing calculation, so your timing matches the panel's sequencers. Returns nothing for an unknown division.
+Return how far to delay a step to give it swing, in beats — add it to the step's position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport's swing setting holds. It uses the Transport's own swing calculation, so your timing matches the panel's sequencers. An unknown division returns nothing and writes a message.
 
 *Short name: `swingOffset`.*
 
@@ -2096,31 +2140,31 @@ Helper functions for working out values: scaling a value from one range to anoth
 
 #### `ce.math.lighten(colour [, amount]) -> string`
 
-Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4. Returns nothing if the colour cannot be read.
+Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is read as a colour property reads it: 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#", or a short form, "#RGB", a name such as "red", rgb(), rgba(), hsl() or hsla(), read as the colour a property would store for it ("red" is "#FF0000", and rgba(255, 0, 0, 0.5) is "80FF0000", its alpha set aside). A number, "#" with four digits, text with space around it and anything else that cannot be read are refused with a message, and nothing is returned.
 
 *Short name: `lighten`.*
 
 #### `ce.math.darken(colour [, amount]) -> string`
 
-Make a colour darker. `amount` is how much of the colour's brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. Returns nothing if the colour cannot be read.
+Make a colour darker. `amount` is how much of the colour's brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55; a number outside 0 to 1 is refused with a message. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. The colour is read as `ce.math.lighten()` reads it, and one that cannot be read is refused with a message, so nothing is returned.
 
 *Short name: `darken`.*
 
 #### `ce.math.mix(a, b, t) -> string`
 
-Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Returns nothing if either colour cannot be read.
+Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Each colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and if either cannot be read, it is refused with a message and nothing is returned.
 
 *Short name: `mixColour`.*
 
 #### `ce.math.alpha(colour, a) -> string`
 
-Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid). The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. Returns nothing if the colour cannot be read.
+Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. The colour is read as `ce.math.lighten()` reads it, and any alpha it has is replaced; one it cannot read is refused with a message, and nothing is returned.
 
 *Short name: `colourAlpha`.*
 
 #### `ce.math.rgb(colour) -> table`
 
-Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. Returns nothing if the colour cannot be read.
+Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. The colour is read as `ce.math.lighten()` reads it: eight hex digits are AARRGGBB, short forms such as "#abc", "red" and rgb() are read too, and any alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.
 
 *Short name: `hexToRgb`.*
 
@@ -2130,9 +2174,21 @@ Build a colour from red, green and blue parts, each from 0 to 255, and return it
 
 *Short name: `rgbToHex`.*
 
+#### `ce.math.fromARGB(colour) -> string`
+
+Read a colour written with its alpha first, `AARRGGBB`, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are AARRGGBB to a colour property and to the other colour commands, but the other way round to a drawing, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromRGBA()` reads the alpha last.
+
+*Short name: `colourFromArgb`.*
+
+#### `ce.math.fromRGBA(colour) -> string`
+
+Read a colour written with its alpha last, `RRGGBBAA`, the web's order, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are read this way by a drawing, but as AARRGGBB by a colour property and the other colour commands, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromARGB()` reads the alpha first.
+
+*Short name: `colourFromRgba`.*
+
 #### `ce.math.hsl(colour) -> table`
 
-Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. Returns nothing if the colour cannot be read.
+Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. The colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and one that cannot be read is refused with a message, so nothing is returned.
 
 *Short name: `hexToHsl`.*
 
@@ -2204,7 +2260,7 @@ Moving a value smoothly over time instead of jumping: to a target, with a spring
 
 #### `ce.anim.to(path, target [, opts])`
 
-Move a value smoothly to `target` over time instead of jumping straight there. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` callback runs with `completed` set to false, because it was cancelled rather than finished.
+Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` is called with false, because it was cancelled rather than finished.
 
 *Short name: `animateTo`.*
 
@@ -2212,18 +2268,18 @@ Move a value smoothly to `target` over time instead of jumping straight there. P
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 300 | How long the move takes. |
-| `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
+| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
+| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
 | `curve` | text or list | "linear" | The shape of the move. The first 4 names are the curves of `ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an animation that name the same curve move the same way. "spring" overshoots and settles like `ce.anim.spring()`, shaped by `damping` and `frequency`. Instead of a name you can give the four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an animation's `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name it does not know is reported, and the move runs in a straight line. One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it. |
 | `frequency` | number | 12 | With curve = "spring": how fast it wobbles, as ce.anim.spring reads it. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. |
+| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run it. 0 or less repeats until you stop it. |
+| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called when the move ends: done(completed). `completed` is false if the move was stopped early. |
+| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
 
 ```lua
 -- Lua
@@ -2236,7 +2292,7 @@ ce.anim.to("cutoff", 127, { duration: 500, curve: "s" });
 
 #### `ce.anim.spring(path, target [, opts])`
 
-Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way.
+Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.
 
 *Short name: `animateSpring`.*
 
@@ -2244,17 +2300,17 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 600 | How long the move takes. |
+| `duration` | number (milliseconds) | 600 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
 | `damping` | number | 6 | How quickly the wobble dies away. Higher settles sooner; lower keeps bouncing. |
 | `frequency` | number | 12 | How fast it wobbles. Higher is a tighter, faster bounce. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
-| `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
+| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. |
+| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run it. 0 or less repeats until you stop it. |
+| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called when the move ends: done(completed). `completed` is false if the move was stopped early. |
+| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
 
 ```lua
 -- Lua
@@ -2267,7 +2323,7 @@ ce.anim.spring("cutoff", 127);
 
 #### `ce.anim.stop([path])`
 
-Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback runs with `completed` set to false. To jump to the end instead, use `ce.anim.finish()`.
+Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback is called with false. To jump to the end instead, use `ce.anim.finish()`.
 
 *Short name: `animateStop`.*
 
@@ -2297,7 +2353,7 @@ if (!ce.anim.running("cutoff")) {  }
 
 #### `ce.anim.envelope(path, points [, opts])`
 
-Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console.
+Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.
 
 *Short name: `animateEnvelope`.*
 
@@ -2307,13 +2363,14 @@ Move a value through a shape with several points — an attack and decay, say, o
 |---|---|---|---|
 | `from` | number | 0 | The value that y = 0 in the shape means. |
 | `to` | number | 1 | The value that y = 1 in the shape means. |
-| `duration` | number (milliseconds) | 300 | How long the move takes. |
-| `beats` | number | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. |
+| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
+| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
 | `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. |
-| `repeat` | number | 1 | How many times to run it. 0 or less repeats until you stop it. |
+| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
+| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
+| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called when the move ends: done(completed). `completed` is false if the move was stopped early. |
+| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
 
 ```lua
 -- Lua
@@ -2356,7 +2413,7 @@ Turn a running animation round so it heads back to where it started, at the same
 
 #### `ce.anim.finish(path)`
 
-End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` runs with `completed` set to true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.
+End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` is called with true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.
 
 *Short name: `animateFinish`.*
 
@@ -2376,7 +2433,7 @@ Changing the panel itself from a script: creating, copying and removing controls
 
 #### `ce.panel.create(type, props)`
 
-Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.
+Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.
 
 *Short name: `panelCreate` · Panel window only.*
 
@@ -2390,7 +2447,7 @@ Create a new control of the given `type`, such as "Knob", and return its name, o
 | `width` | number (pixels) | the type's own | How wide to make it. |
 | `height` | number (pixels) | the type's own | How tall to make it. |
 | `parent` | text | the panel itself | The name of a container to put it inside. |
-| `<section>` | object | — | Any section of the control, to set up as you create it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses. |
+| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals and all (Behavior, not behavior), and one the control does not have refuses the call. Inside one, names are read in any capitals, as a path is: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour is stored as set() stores it, and a setting the section does not have is written with a warning, as set() writes one. |
 
 ```lua
 -- Lua
@@ -2403,9 +2460,21 @@ ce.panel.create("Knob", { name: "cutoff", x: 20, y: 40 });
 
 #### `ce.panel.clone(name, props)`
 
-Copy an existing control, with all its settings, and return the copy's name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it.
+Copy an existing control, with all its settings, and return the copy's name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it, and a colour in them that `set()` would refuse means no copy is made.
 
 *Short name: `panelClone` · Panel window only.*
+
+**`props`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `name` | text | the original's name with _copy added | The control's name. Every other command addresses the control by this name. |
+| `x` | number (pixels) | 0 | Distance from the left edge of whatever contains it. |
+| `y` | number (pixels) | 0 | Distance from the top edge. |
+| `width` | number (pixels) | the type's own | How wide to make it. |
+| `height` | number (pixels) | the type's own | How tall to make it. |
+| `parent` | text | the original's container | The name of a container to put it inside. |
+| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals and all (Behavior, not behavior), and one the control does not have refuses the call. Inside one, names are read in any capitals, as a path is: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour is stored as set() stores it, and a setting the section does not have is written with a warning, as set() writes one. |
 
 ```lua
 -- Lua
@@ -2448,7 +2517,7 @@ ce.panel.parent("knob", "row");
 
 #### `ce.panel.find([query])`
 
-List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control.
+List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.
 
 *Short name: `panelFind` · Panel window only.*
 
@@ -2458,7 +2527,7 @@ List the names of the controls that match `query`, including controls inside con
 |---|---|---|
 | `name` | text | Match controls whose name contains this. |
 | `type` | text | Match one kind of control, such as "Knob". ce.panel.types() lists the spellings. |
-| `generated` | true or false | Match only controls a script created, or only ones you placed by hand. |
+| `generated` | true or false | `true` matches only controls a script created, `false` only the ones you placed by hand. The text "true" is refused. |
 | `parent` | text | Match only what is inside the container of this name. |
 
 ```lua
@@ -2506,7 +2575,7 @@ log(ce.panel.types().join(", "));
 
 #### `ce.panel.align(names, edge [, opts]) -> number`
 
-Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead. Returns how many controls it moved. Names that are not controls are reported and skipped.
+Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.
 
 *Short name: `panelAlign` · Panel window only.*
 
@@ -2527,7 +2596,7 @@ ce.panel.align(["knob1", "knob2"], "left");
 
 #### `ce.panel.distribute(names, what [, opts]) -> number`
 
-Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align` also lines them up the other way. Needs at least two controls; returns how many it moved.
+Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control's ("hSpacing") or every left edge in line with the topmost control's ("vSpacing"). Needs at least two controls; returns how many it moved.
 
 *Short name: `panelDistribute` · Panel window only.*
 
@@ -2536,11 +2605,11 @@ Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "v
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `gap` | number (pixels) | worked out from the space available | Force a fixed gap between the controls rather than spreading them to fill what is there. |
-| `align` | text | — | Also line them up on this edge across the other axis, so a row ends up level as well as evenly spaced. Takes the same words as ce.panel.align. |
+| `align` | true or false | false | With "hSpacing" or "vSpacing" only. true also lines them up across the other axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge level with the leftmost control's, and "vSpacing" puts every left edge in line with the topmost control's. It is not an edge name: "top" or "left" does nothing. |
 
 #### `ce.panel.match(names, what [, opts]) -> number`
 
-Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. Needs at least two controls. Returns how many controls changed.
+Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.
 
 *Short name: `panelMatch` · Panel window only.*
 
@@ -2584,7 +2653,7 @@ Arrange controls evenly around a circle, centred on the middle of the box they c
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `radius` | number (pixels) | 100 | How far from the centre to place each control. |
-| `startAngle` | number (degrees) | 0 | Where the first control goes, clockwise from twelve o'clock. |
+| `startAngle` | number (degrees) | 0 | Where the first control goes, clockwise from three o'clock. |
 
 #### `ce.panel.flip(names, axis) -> number`
 
@@ -2665,17 +2734,17 @@ const st = ce.panel.entry("knob", "States", "Hover");
 
 #### `ce.panel.define(control, section, name, spec)`
 
-Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in for you. A new state starts with no condition and no changes. A new animation is a 120 ms change into hover and back from any state, as the Animation tab makes one, or, with `kind = "keyframes"`, an animation that plays all the time over the frames you give. Returns true if the entry was written.
+Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, or with `kind = "keyframes"` one that plays all the time over the frames you give. A state applies while its `when` flags hold and its `rule` is true, and a rule can compare the control's value: `rule = "value > 64"`. A key the section's entries do not have, capitals included, is refused with the keys it takes, and nothing is defined. Returns true if the entry was written.
 
 *Short name: `panelDefine` · Panel window only.*
 
 ```lua
 -- Lua
-ce.panel.define("knob", "States", "Warn", { when = { valueGreaterThan = 0.9 } })
+ce.panel.define("knob", "States", "Held", { when = { pressed = true } })
 ```
 ```js
 // JavaScript
-ce.panel.define("knob", "States", "Warn", { when: { valueGreaterThan: 0.9 } });
+ce.panel.define("knob", "States", "Held", { when: { pressed: true } });
 ```
 
 #### `ce.panel.undefine(control, section, name)`
@@ -2695,7 +2764,7 @@ ce.panel.undefine("knob", "States", "Disabled");
 
 #### `ce.panel.patch(control, state, patch [, part])`
 
-Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, and is added to what the state already changes rather than replacing it. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state of that name. This is the way to reach the settings inside a state, which `set()` cannot.
+Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.
 
 *Short name: `panelPatch` · Panel window only.*
 
@@ -2786,7 +2855,7 @@ Save a value under `key` so it outlasts the script — unlike `ce.storage.state`
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 ce.storage.saveSetting("key", value)
@@ -2802,7 +2871,7 @@ Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if n
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2823,7 +2892,7 @@ List the keys saved in one scope, in no particular order. An empty list only mea
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2844,7 +2913,7 @@ Delete a saved setting. Returns true if there was a value to delete and false if
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2865,7 +2934,7 @@ Return every setting in one scope as a table of keys and values. `opts.scope` is
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -2886,7 +2955,7 @@ Delete every setting in one scope and return how many were deleted. Clearing the
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 #### `ce.storage.info([opts]) -> table`
 
@@ -2898,7 +2967,7 @@ Describe where one scope's settings are kept: `scope`, `backing`, `available`, `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 #### `ce.storage.encode(value [, opts]) -> string`
 
@@ -2954,7 +3023,7 @@ ce.draw.clear();
 
 #### `ce.draw.fill(colour)`
 
-Set the fill colour for the shapes drawn after this: a hex string such as "#5B9BD5", or a gradient from `ce.draw.gradient()`. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.
+Set the fill colour for the shapes drawn after this: the panel's own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web's way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.
 
 *Short name: `drawFill`.*
 
@@ -2969,7 +3038,7 @@ ce.draw.fill("#5B9BD5");
 
 #### `ce.draw.stroke([colour] [, width] [, opts])`
 
-Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` can be a hex string or a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. `opts` adds dashes and sets the style of line ends and corners.
+Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.
 
 *Short name: `drawStroke`.*
 
@@ -3075,7 +3144,7 @@ ce.draw.arc(30, 30, 24, 135, 135 + 270 * value);
 
 #### `ce.draw.gradient(stops [, angle]) -> value`
 
-Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` runs from 0 to 1); you can mix the two. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section's gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two usable colours.
+Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` and `opacity` run from 0 to 1); you can mix the two. Colours are read as `ce.draw.fill()` reads them. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section's gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two colours, and refuses a stop it cannot read with a message, returning nothing.
 
 *Short name: `drawGradient`.*
 
@@ -3090,7 +3159,7 @@ ce.draw.fill(ce.draw.gradient(["#2A6BD4", "#0A1830"], 180));
 
 #### `ce.draw.opacity(a)`
 
-Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. To make a single colour see-through instead, use `ce.math.alpha()`.
+Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. A number outside 0 to 1, such as 50 written for 0.5, or anything that is not a number, is refused with a message, and the opacity stays as it was. To make a single colour see-through instead, use `ce.math.alpha()`.
 
 *Short name: `drawOpacity`.*
 
@@ -3212,7 +3281,7 @@ Draw a shape with `sides` equal sides, such as a triangle or a hexagon, centred 
 
 #### `ce.draw.image(src, x, y, w, h [, opts]) -> boolean`
 
-Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. An asset's name on its own draws nothing, and an empty `src` is refused with a message. `opts.fit` sets how the image fills the box.
+Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. Anything else, an asset's name included, is refused with a message and nothing is drawn. `opts.fit` sets how the image fills the box.
 
 *Short name: `drawImage`.*
 
@@ -3248,7 +3317,7 @@ Bring back the style saved by the most recent `ce.draw.save()`. If nothing was s
 
 #### `ce.draw.text(x, y, text [, opts])`
 
-Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.
+Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.
 
 *Short name: `drawText`.*
 
@@ -3257,7 +3326,7 @@ Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `size` | number (pixels) | — | How big the text is. |
-| `align` | text | "left" | Which part of the text sits at the x you gave. One of "left", "middle" or "right". |
+| `align` | text | "left" | Which part of the text sits at the x you gave. "center", "centre" and "centred" are read as "middle". One of "left", "middle" or "right". |
 | `family` | text | — | The font family to draw in. |
 
 ```lua
@@ -3311,7 +3380,7 @@ Look up one image in the icon library or among the icons the panel carries, by i
 
 #### `ce.image.set(target, src [, opts]) -> boolean`
 
-Put a picture on one of a control's four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option the chosen layer does not have is refused with a message, and the command returns false.
+Put a picture on one of a control's four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option it does not take at all refuses the whole call; one the chosen layer does not have is refused with a message. Either way the command returns false.
 
 *Short name: `imageSet`.*
 
@@ -3322,8 +3391,8 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported. One of "image", "overlay", "textImage" or "textTexture". |
 | `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit. One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
 | `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens. One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
-| `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. |
-| `tint` | colour | — | Tint colour, as "#RRGGBB". Omit to leave the image untinted. |
+| `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
+| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
 | `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only. One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
 | `offsetX` | number (pixels) | 0 | Nudge the image sideways. |
@@ -3363,8 +3432,8 @@ Show an image from the icon library (or one the panel carries) in a control's Ic
 |---|---|---|---|
 | `size` | number (pixels) | 16 | How big the icon is drawn. |
 | `fit` | text | "contain" | How the icon fills its box, using the Icon section's own values. |
-| `tint` | colour | — | Tint colour, as "#RRGGBB". Omit to leave the image untinted. |
-| `opacity` | number (0 to 1) | 1 | Image opacity. 0 is invisible, 1 is fully opaque. |
+| `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
+| `opacity` | number (0 to 1) | 1 | Image opacity. 0 is invisible, 1 is fully opaque. A value above 1, such as 50 written for ce.image.set's scale, draws fully opaque and writes a warning. |
 | `rotation` | number (degrees) | 0 | Turn the image clockwise, with 0 upright. |
 
 #### `ce.image.embed(target [, layer]) -> boolean`
@@ -3406,7 +3475,7 @@ Look up one font by family name. Returns its description, with the same fields a
 
 #### `ce.text.style(target, opts) -> boolean`
 
-Set a control's typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. A font that is not available, a typographic feature the font does not have, or an option that is not a text option is refused with a message, while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.
+Set a control's typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. An option it does not take refuses the whole call. A font that is not available, or a typographic feature the font does not have, is refused with a message while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.
 
 *Short name: `textStyle`.*
 
@@ -3572,6 +3641,7 @@ Ask the user to type some text. The answer arrives through `onAnswer`: the text 
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
 | `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `default` | text | the accept label | Which of the two buttons is drawn as the default one: the accept label or the cancel label. Pressing Enter in the field accepts either way. |
 
 ```lua
 -- Lua

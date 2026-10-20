@@ -148,7 +148,8 @@ public:
     void sendNRPN(int ch, int msb, int lsb, const Var& v) { h_->send_nrpn(h_->host_ctx, ch, msb, lsb, v.abi()); }
 
     /** sendSysex(bytes) or sendSysex("F0 41 10 …"). The list or the string goes to the host as it
-        is — the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS. The bytes
+        is — the host reads it as it does for Lua and JS (each byte 0 to 255, each hex token one byte,
+        anything else refused with a message) and adds F0/F7. The bytes
         may be any container or array of integers: std::vector<uint8_t>, std::array<int, N>,
         int bytes[] = {…}, a braced list. Not of char, which is text: a std::string or a char
         array is the hex form. */

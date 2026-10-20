@@ -580,6 +580,11 @@ positions:
 set("resonance.normalizedValue", get("cutoff.normalizedValue"))
 \`\`\`
 
+The form's name can also go after the path as an argument of its own: \`get("cutoff",
+"normalizedValue")\`, and \`set("cutoff", 0.5, "normalizedValue")\`. A name that is not one of the
+three is refused with a message, and nothing is read or written. When it is a form written another
+way, other capitals or the British "normalised", the message names the one to write.
+
 ### The script's own control: self
 
 ${SELF.summary}
@@ -591,7 +596,16 @@ sets it. Write it with a dot, not a colon, in Lua as well.
 
 Paths that start with \`panel\` reach the panel rather than a control: \`get("panel.width")\`,
 \`set("panel.bgColour", "FF202020")\`. Its name, size and background can be read and changed this
-way; the things that identify the panel, such as its file path, can only be read.
+way; the things that identify the panel, such as its file path, can only be read. Its colours
+(\`bgColour\`, \`gridColour\`, \`gridSubColour\` and the image and texture tints) take what a
+control's colour properties take, and refuse the same.
+
+The colour of each of \`bgGradient\`'s stops is read the same way and stored as six digits,
+RRGGBB, with no "#": \`set("panel.bgGradient.stops.0.color", "red")\` stores "FF0000". A stop has
+no alpha of its own, because the gradient's opacity belongs to its layer (\`bgGradientOpacity\`),
+so a colour with one, such as "80FF0000" or rgba() below 1, is refused. A control's gradients take
+their stops the same way, \`Background.Fill.gradient\` and the rest, whether a stop is written by
+its path or the gradient is written whole.
 
 ## 5. Talking to your synth
 
@@ -848,7 +862,13 @@ Each command is shown the way you type it, with its arguments:
   means \`nil\` in Lua, \`undefined\` in JavaScript and \`None\` in Python.
 - **\`opts\`** is a table (Lua) or object (JavaScript) of optional settings, such as
   \`{ duration = 500 }\` or \`{ duration: 500 }\`. When a command takes one, a table lists what it can
-  contain and what each setting is when you leave it out.
+  contain and what each setting is when you leave it out. A setting that is not in that table
+  refuses the whole command: nothing is done, the script console names the setting and lists the
+  ones the command has, and the command gives back what it gives whenever it refuses: false from a
+  command that says whether it worked, 0 from one that counts what it changed, an empty list from
+  one that gives a list, a result whose \`ok\` is false from \`ce.device.recallPreset\`, and
+  otherwise nothing. So a misspelling such as \`{ duraton = 500 }\` cannot pass for a setting that
+  worked, with the panel window open or closed.
 - ***Short name*** gives the other name a command answers to (see
   [chapter 10](#10-command-names-and-modules)).
 - ***${PANEL_WINDOW_ONLY.replace(/\.$/, '')}*** means the command needs the panel window

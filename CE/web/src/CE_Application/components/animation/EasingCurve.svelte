@@ -8,6 +8,9 @@
    * `easing` is a name or a whole Animation node — the node is how a custom bezier or a spring draws
    * its own shape. The box leaves a margin above and below, because the "back" curves and a spring
    * overshoot, and a curve clipped at the edge would look like one that does not.
+   *
+   * `fn` (t → value) draws a curve no Animation node describes: the script editor's Values sidebar
+   * draws ce.anim's own curves (exp, log, s) by the function the runtime moves along.
    */
   import { easingPoints } from '../../utils/animationModel.js';
 
@@ -18,6 +21,7 @@
     height = 64,
     active = false,
     label = '',
+    fn = null,
   } = $props();
 
   const PAD = 6;
@@ -30,7 +34,9 @@
   const yOf = (value, h) => PAD + ((Y_HI - value) / (Y_HI - Y_LO)) * h;
 
   let path = $derived.by(() => {
-    const points = easingPoints(shape, 48);
+    const points = typeof fn === 'function'
+      ? Array.from({ length: 49 }, (_, i) => ({ x: i / 48, y: Number(fn(i / 48)) || 0 }))
+      : easingPoints(shape, 48);
     const w = width - PAD * 2;
     const h = height - PAD * 2;
     return points
