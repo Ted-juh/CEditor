@@ -720,6 +720,60 @@ test('a dash is read as ce.draw.stroke reads it: the line its row draws is the r
   resetScriptStateForTesting();
 });
 
+test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in its words, once', () => {
+  const panel = { id: 'p', name: 'P', width: 400, height: 200, scripting: { modules: ['ce.draw'] },
+    controls: [createControl('Background', { name: 'screen' })] };
+  /** What the runtime hands the overlay for `opts`, and what it writes to the console, drawn twice. */
+  const drawn = (opts) => {
+    resetScriptStateForTesting();
+    setRuntimeHost({ panel });
+    try {
+      const api = scriptApiForTesting('screen', 'values-probe');
+      clearScriptTrace();
+      clearAllDrawings();
+      for (let frame = 0; frame < 2; frame += 1) { api.ce.draw.stroke('#FFF', 1, opts); api.ce.draw.line(0, 0, 10, 10); }
+      const command = drawCommandsFor('screen')[0];
+      return { cap: command?.cap ?? null, join: command?.join ?? null, said: get(scriptTrace).filter((t) => t.kind === 'warn' || t.kind === 'error') };
+    } finally { clearAllDrawings(); setRuntimeHost(null); }
+  };
+  const cases = [
+    // [the option in Lua, the option as the runtime is given it, what the overlay is handed]
+    ['cap = "round"', { cap: 'round' }, 'round'], ['cap = "square"', { cap: 'square' }, 'square'],
+    ['cap = "sausage"', { cap: 'sausage' }, null], ['cap = "Round"', { cap: 'Round' }, null],
+    ['cap = 5', { cap: 5 }, null], ['cap = true', { cap: true }, null], ['cap = false', { cap: false }, null],
+    ['join = "bevel"', { join: 'bevel' }, 'bevel'], ['join = "mitre"', { join: 'mitre' }, null],
+    ['join = "ROUND"', { join: 'ROUND' }, null],
+  ];
+  for (const [lua, opts, handed] of cases) {
+    const name = Object.keys(opts)[0];
+    const src = `ce.draw.stroke("#FFF", 1, { ${lua} })`;
+    const row = optOf(argOf(callOf(readStatement(src, 'lua', 3, {})), 'opts'), name);
+    const runtime = drawn(opts);
+    assert.equal(runtime[name], handed, `${src}: the overlay is handed ${runtime[name]}`);
+    assert.equal(runtime.said.length, handed === null && opts[name] !== false ? 1 : 0,
+      `${src}: said once over two frames, or not at all: ${JSON.stringify(runtime.said.map((t) => t.message))}`);
+    assert.equal(Boolean(row.problem), runtime.said.length === 1, `${src}: the row says something exactly when the runtime does`);
+    if (!row.problem) continue;
+    const said = runtime.said[0].message.replace(/ This is said only the first time\.$/, '');
+    assert.ok(runtime.said[0].message.endsWith(' This is said only the first time.'), src);
+    assert.ok(row.problem.message.startsWith(said), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${said}`);
+    assert.equal(runtime.said[0].kind, 'error', src);
+    assert.equal(row.problem.severity, 'error', src);
+  }
+  assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Round" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
+    'ce.draw.stroke: the join is "Round", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');
+  // ce.draw.blend reads only its spelling as well, and its row now says so in its words.
+  const blend = argOf(callOf(readStatement('ce.draw.blend("Multiply")', 'lua', 3, {})), 'mode');
+  resetScriptStateForTesting();
+  setRuntimeHost({ panel });
+  try {
+    clearScriptTrace();
+    assert.equal(scriptApiForTesting('screen', 'values-probe').ce.draw.blend('Multiply'), false);
+    const [line] = get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+    assert.ok(blend.problem.message.startsWith(line), `read: ${blend.problem.message}\nruntime: ${line}`);
+  } finally { setRuntimeHost(null); resetScriptStateForTesting(); }
+});
+
 test('ce.anim\'s duration, delay and beats are said in the words the move says them in, once', () => {
   const knob = createControl('Knob', { name: 'X' });
   const optionOf = (src, name) => optOf(argOf(callOf(readStatement(src, 'lua', 3, { panel: { controls: [knob] } })), 'opts'), name);

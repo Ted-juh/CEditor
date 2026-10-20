@@ -37,7 +37,7 @@ import {
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
-import { dashPattern } from './drawDash.js';
+import { dashPattern, strokeEnd } from './drawDash.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -4866,13 +4866,13 @@ function drawPaint(call, what, colour) {
   return undefined;
 }
 
-// What ce.draw.stroke made of a dash it could not draw as written (drawDash.js), said once per
-// message: a stroke is set on every redraw, and a message per frame would bury the console.
-// resetScriptState clears what has been said.
-const drawDashWarned = new Set();
-function warnDrawDash(problem) {
-  if (drawDashWarned.has(problem.message)) return;
-  drawDashWarned.add(problem.message);
+// What ce.draw.stroke made of a dash, a cap or a join it could not draw as written (drawDash.js),
+// said once per message: a stroke is set on every redraw, and a message per frame would bury the
+// console. resetScriptState clears what has been said.
+const drawStrokeWarned = new Set();
+function warnDrawStroke(problem) {
+  if (drawStrokeWarned.has(problem.message)) return;
+  drawStrokeWarned.add(problem.message);
   addScriptTrace(problem.severity === 'error' ? 'error' : 'warn', '', `${problem.message} This is said only the first time.`);
 }
 
@@ -8410,12 +8410,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
       // probe link) are "3 3" and "2 3". drawDash.js reads it, for this and for the script editor's
       // Values tab: a length below 0 or not a number is drawn as 0, and a dash that is not a list
-      // is none, each said once in the words the Values tab says it in.
+      // is none, each said once in the words the Values tab says it in. So is a cap or a join that
+      // is not one of its three words, which draws the default.
       const dash = dashPattern(opts?.dash);
-      if (dash.problem) warnDrawDash(dash.problem);
+      if (dash.problem) warnDrawStroke(dash.problem);
       drawState.dash = dash.dasharray;
-      drawState.cap = ['butt', 'round', 'square'].includes(opts?.cap) ? opts.cap : null;
-      drawState.join = ['miter', 'round', 'bevel'].includes(opts?.join) ? opts.join : null;
+      const cap = strokeEnd('cap', opts?.cap);
+      const join = strokeEnd('join', opts?.join);
+      for (const said of [cap.problem, join.problem]) if (said) warnDrawStroke(said);
+      drawState.cap = cap.value;
+      drawState.join = join.value;
       // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
       // which is how a panel shows "this is recording" without redrawing the shape (§49).
       drawState.dashOffset = Number.isFinite(Number(opts?.dashOffset)) ? Number(opts.dashOffset) : null;
@@ -9619,7 +9623,7 @@ function resetScriptState() {
   executionEpoch += 1;
   edgeWarned.clear();
   animTimingWarned.clear();
-  drawDashWarned.clear();
+  drawStrokeWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

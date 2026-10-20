@@ -1394,9 +1394,9 @@ export const COMMANDS = [
           summary: 'How far into the dash pattern to start. Advance it on a timer and the dashes '
             + 'march along the line.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'The shape a line ends in.' },
+          summary: 'The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
-          summary: 'How two line segments meet at a corner.' },
+          summary: 'How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so.' },
       ]) },
     ],
     scopes: 'any',

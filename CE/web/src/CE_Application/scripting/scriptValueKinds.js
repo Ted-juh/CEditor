@@ -25,7 +25,7 @@ import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
-import { dashPattern } from './drawDash.js';
+import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
 import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
@@ -624,24 +624,33 @@ export const OPACITY_SCALE_WARNINGS = {
 
 /* --------------------------------------------------------------------- lists of names */
 
-/** A value from a closed list. `refusal(value, list)` gives the runtime's own sentence where it has one. */
+/**
+ * A value from a closed list. `refusal(value, list, name)` gives the runtime's own sentence where it
+ * has one, and then it is said of a word in another case too: a call with a sentence of its own
+ * reads only its spelling (ce.draw.blend, ce.draw.stroke's cap and join), and refuses "Multiply" in
+ * the words it refuses "sausage" in, with the spelling it wanted as the "Did you mean".
+ */
 export function readEnum(value, values, { path, name, refusal } = {}) {
   const meaning = { choices: values.map(String) };
   if (value === undefined || value === null) return { meaning, problem: null };
   if (values.some((v) => v === value)) return { meaning, problem: null };
   const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.toLowerCase()) : undefined;
-  if (exactish !== undefined) {
+  if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };
   }
   const message = refusal
-    ? refusal(value, values)
+    ? refusal(value, values, name)
     : `${path ? `${path}: ` : ''}${typeof value === 'string' ? `"${value}"` : String(value)} is not one of the values ${name} takes. They are ${words(quoted(values))}.`;
+  // A refusal with nothing to say takes the value: ce.draw.stroke's `false` is no cap.
+  if (!message) return { meaning, problem: null };
   return { meaning, problem: { severity: 'error', message: `${message}${typeof value === 'string' ? didYouMean(value, values.map(String)) : ''}` } };
 }
 
 /** The runtime's own sentences for a value not in a list, where a member has one. */
 export const ENUM_REFUSALS = {
   drawBlend: (value, list) => `ce.draw.blend("${value}"): not a blend mode. One of: ${list.join(', ')}.`,
+  // Its two lists are cap's and join's; drawDash.js says both, as the runtime draws them.
+  drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
 };
 
 /** An event's name: an id ("valueChanged") or a handler name ("onValueChanged"). */
@@ -1036,7 +1045,7 @@ export function readDash(value, { cap } = {}) {
       drawn: sum(0),
       skipped: sum(1),
       // The runtime takes a cap it knows and draws the default for any other.
-      cap: ['butt', 'round', 'square'].includes(cap) ? cap : 'butt',
+      cap: strokeEnd('cap', cap).value ?? STROKE_ENDS.cap.otherwise,
     },
     problem: read.problem,
   };

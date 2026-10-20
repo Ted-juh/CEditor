@@ -1,7 +1,7 @@
-// drawDash.js — the dash pattern a script gives ce.draw.stroke (`{ dash = { 3, 3 } }`), read once:
-// for the WebView runtime, which draws with it (panelRuntime's drawStroke), and for the script
-// editor's Values tab, which shows it (scriptValueKinds' readDash), so the row says what the drawing
-// does in the words the console says it in.
+// drawDash.js — the dash pattern a script gives ce.draw.stroke (`{ dash = { 3, 3 } }`), and the cap
+// and join beside it, read once: for the WebView runtime, which draws with them (panelRuntime's
+// drawStroke), and for the script editor's Values tab, which shows them (scriptValueKinds' readDash
+// and ENUM_REFUSALS), so the row says what the drawing does in the words the console says it in.
 //
 // It is the only reader there is. ce.draw is panel-view only: the plug-in's window runs this same
 // runtime (playerScriptHost.js), and with the window shut the C++ engines' preludes answer
@@ -69,4 +69,32 @@ export function dashPattern(dash) {
     return 0;
   });
   return { dasharray: lengths.length ? lengths.join(' ') : null, lengths, problem };
+}
+
+// A cap or a join is one of three words, in that spelling: the overlay hands it to SVG as
+// stroke-linecap or stroke-linejoin, which takes no other. Any other word drew the default, "butt"
+// or "miter", without a word, so `cap = "sausage"` and `join = "Round"` drew square ends and sharp
+// corners with nothing to say why. Nothing given, or `false`, is the default, and no mistake.
+export const STROKE_ENDS = {
+  cap: { values: ['butt', 'round', 'square'], otherwise: 'butt' },
+  join: { values: ['miter', 'round', 'bevel'], otherwise: 'miter' },
+};
+
+/**
+ * What ce.draw.stroke draws for its `cap` or `join` option.
+ *
+ * @param {'cap'|'join'} name
+ * @param {*} value  the option as the script gave it.
+ * @returns {{ value: string|null, problem: { severity: 'error', message: string }|null }}
+ *   `value` is what the overlay is handed (null: the default); `problem` what is said of it.
+ */
+export function strokeEnd(name, value) {
+  const { values, otherwise } = STROKE_ENDS[name];
+  if (value === undefined || value === null || value === false) return { value: null, problem: null };
+  if (values.includes(value)) return { value, problem: null };
+  const list = values.map((v) => `"${v}"`);
+  return {
+    value: null,
+    problem: { severity: 'error', message: `ce.draw.stroke: the ${name} is ${shown(value)}, not ${list[0]}, ${list[1]} or ${list[2]}, so "${otherwise}" is drawn.` },
+  };
 }

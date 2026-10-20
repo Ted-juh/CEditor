@@ -3048,8 +3048,8 @@ Set the line colour and thickness for the shapes drawn after this. `width` defau
 |---|---|---|---|
 | `dash` | list of numbers | a solid line | Alternating on and off lengths in pixels. The panel's own beat marks are { 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so. |
 | `dashOffset` | number (pixels) | 0 | How far into the dash pattern to start. Advance it on a timer and the dashes march along the line. |
-| `cap` | text | "butt" | The shape a line ends in. One of "butt", "round" or "square". |
-| `join` | text | "miter" | How two line segments meet at a corner. One of "miter", "round" or "bevel". |
+| `cap` | text | "butt" | The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so. One of "butt", "round" or "square". |
+| `join` | text | "miter" | How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so. One of "miter", "round" or "bevel". |
 
 ```lua
 -- Lua
