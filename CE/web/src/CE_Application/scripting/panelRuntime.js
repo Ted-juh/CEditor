@@ -35,7 +35,7 @@ import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken 
 import {
   COLOUR_FORMS, DRAW_COLOUR_FORMS, MADE_CHILDREN, colourFieldAt, colourHint, drawColour, mapColourWrites,
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
-  shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
+  shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS, colourFromRgb, colourFromHsl, hslOfChannels,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
@@ -1017,7 +1017,6 @@ export function readWatch(path) {
 // it was (lightening by 40 gave white) or clamped (an alpha of 128 gave solid). It is refused, with
 // the number out of 100 when that is what it looks like, in the words of each prelude's __cunit.
 
-const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
 
 /** A colour a property could store -> [r, g, b], or null after saying why it cannot be read. */
 function colourChannels(verb, hex) {
@@ -1042,11 +1041,6 @@ function colourUnit(verb, what, value, fallback) {
   if (!problem) return realNumber(value);
   addScriptTrace('error', '', `${verb}: ${problem.why}, so there is no answer.${problem.hint}`);
   return undefined;
-}
-
-function colourFromRgb(r, g, b) {
-  const c = (v) => colourClampByte(Number(v) || 0).toString(16).padStart(2, '0');
-  return `#${c(r)}${c(g)}${c(b)}`.toUpperCase();
 }
 
 function colourToRgb(hex) {
@@ -1112,29 +1106,7 @@ function colourFromOrder(verb, order, value) {
 /** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
 function colourToHsl(hex) {
   const rgb = colourChannels('ce.math.hsl', hex);
-  if (!rgb) return undefined;
-  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, sat = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-    else if (max === g) h = ((b - r) / d + 2) * 60;
-    else h = ((r - g) / d + 4) * 60;
-  }
-  return { h, s: sat * 100, l: l * 100 };
-}
-
-function colourFromHsl(hue, sat, light) {
-  const h = Number(hue) || 0;
-  const s = (Number(sat) || 0) / 100;
-  const l = (Number(light) || 0) / 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  return colourFromRgb(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
+  return rgb ? hslOfChannels(rgb) : undefined;
 }
 
 // @module ce.music

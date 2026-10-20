@@ -7,6 +7,7 @@ import { tokenize, matchBrackets, literalOf, isLiteral, valueOf, familyOf } from
 import { colourForm, panelParts, cssParts } from './scriptValueKinds.js';
 import { CSS_NAMED_COLOURS, storedColour, realNumber } from './scriptColours.js';
 import { envelopePointParts } from './animEnvelope.js';
+import { builtNumbers, buildsColour } from './builtColours.js';
 import { formatJson } from '../utils/jsonText.js';
 
 const LANGUAGE_ALIASES = { ts: 'typescript', 'c++': 'cpp', cs: 'csharp', js: 'javascript' };
@@ -31,7 +32,9 @@ const JS_IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
  *    the new colour is that name's; rgb() and hsl() keep their function and syntax; a gradient stop in
  *    a stored gradient is written RRGGBB, upper case. Where the Arg's meaning says `takesAlpha:
  *    false` (a stored stop, a "#RRGGBB" claimed by its form alone) a colour that is not opaque is
- *    refused: null.
+ *    refused: null. A colour built from numbers (ce.math.rgbToHex, hslToHex: the Arg's meaning has
+ *    `built`) is written as the call's three numbers, each in the form it had, and the call around
+ *    them as it was; it takes no alpha.
  *  - gradient: `newValue` is { stops: [{ at (0..1) | position (0..100), colour | color, opacity? }],
  *    angle? }, the Gradient tab's object as it is. The stops are rebuilt in the script's own syntax:
  *    bare colours while they are evenly spaced and carry no opacity, else { at, colour }; a stop keeps
@@ -71,6 +74,7 @@ export function writeValue(source, languageId, arg, newValue) {
   const node = literalOf(toks, 0, toks.length, fam, match);
   const w = { fam, old, toks, match, node };
   if (arg.kind === 'gradient') return arg.meaning?.stored ? writeStoredGradient(src, arg, newValue, w) : writeDrawGradient(src, arg, newValue, w);
+  if (arg.kind === 'colour' && arg.meaning?.built) return writeBuiltColour(src, arg, newValue, fam);
   let text;
   if (arg.kind === 'colour') text = writeColour(arg, newValue, w);
   else if (arg.kind === 'envelope') text = writeEnvelope(newValue, w);
@@ -223,6 +227,28 @@ function writeColour(arg, newValue, w) {
   const oldText = w.node.type === 'string' ? w.node.value : null;
   const inner = colourText(oldText, reader, colour);
   return quoteLike(inner, w.node.type === 'string' ? w.toks[w.node.tok] : null, w.fam);
+}
+
+/**
+ * A colour written as the numbers a ce.math.rgbToHex or hslToHex call builds it from: the call's
+ * text with each number replaced in the form it was written (numberText), in source order, and
+ * what is between and around them kept. Numbers that already build the colour stay as they are.
+ */
+function writeBuiltColour(src, arg, newValue, fam) {
+  const colour = colourToWrite(newValue);
+  if (!colour || colour.alphaByte < 255) return null;
+  const { start, end } = arg.range;
+  const { from, parts } = arg.meaning.built;
+  if (buildsColour(from, parts.map((p) => p.value), colour.rgb)) return { start, end, text: src.slice(start, end) };
+  const numbers = builtNumbers(from, colour.rgb, parts.map((p) => p.value));
+  const written = parts.map((p, i) => ({ ...p, number: numbers[i] })).sort((a, b) => a.range.start - b.range.start);
+  let text = '';
+  let at = start;
+  for (const p of written) {
+    text += src.slice(at, p.range.start) + numberText(p.number, p.text, fam);
+    at = p.range.end;
+  }
+  return { start, end, text: text + src.slice(at, end) };
 }
 
 /* --------------------------------------------------------------------------- write: literals */

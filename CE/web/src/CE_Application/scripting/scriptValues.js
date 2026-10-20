@@ -28,8 +28,9 @@ import {
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
-  readLcdLine, readComponentType, readFontAxis,
+  readLcdLine, readComponentType, readFontAxis, panelParts, cssOf,
 } from './scriptValueKinds.js';
+import { builtColourOf, builtWords } from './builtColours.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
   unknownOptionsMessage,
@@ -427,6 +428,16 @@ function buildCall(raw, env) {
       if (at && !at.problem) at.problem = { severity: 'warning', message };
     }
   }
+  // A colour built from numbers written out has a row of its own, the colour it makes, which the
+  // Colors tab edits by writing the numbers back (builtColours.js); where the call is an argument,
+  // that argument's row shows the colour too, still.
+  const made = member ? builtColourOf(member.id, args) : null;
+  if (made) call.built = builtColourArg(doc.source, call, made);
+  for (const arg of args) {
+    if (arg.kind !== 'computed') continue;
+    const maker = children.find((c) => c.built && c.range.start === arg.range.start && c.range.end === arg.range.end);
+    if (maker) Object.assign(arg.meaning, { css: maker.built.meaning.css, stored: maker.built.meaning.stored });
+  }
   if (member) return call;
   // A ce.<module>.<name> the module does not have fails the moment it runs: said on the call, with
   // what was meant, in the words the editor's own check says it in (unknownCalls.js).
@@ -437,6 +448,24 @@ function buildCall(raw, env) {
   }
   if (args.some((a) => KEPT_KINDS(a.kind) || (a.options ?? []).some((o) => KEPT_KINDS(o.kind)))) return call;
   return children;
+}
+
+/**
+ * The row of the colour a ce.math.rgbToHex or hslToHex call builds from numbers written out: its
+ * range the whole call, which a write gives back with the three numbers changed and the rest as it
+ * was (scriptValueWrite.js). Every part of it is written out, so it is a literal; it has no alpha
+ * to take, and while the call's bracket is open it has no editor.
+ */
+function builtColourArg(source, call, made) {
+  const parts = panelParts(made.stored);
+  const meaning = {
+    reader: 'built', claimedBy: 'numbers', form: made.from, stored: made.stored, built: made, said: builtWords(made),
+    css: cssOf(parts), swatch: { rgb: parts.rgb, alpha: 1 }, alpha: 1, takesAlpha: false,
+  };
+  return {
+    name: 'colour', param: null, range: { ...call.range }, text: source.slice(call.range.start, call.range.end),
+    literal: true, value: made.stored, kind: 'colour', meaning, problem: null, editable: call.open ? null : 'colour',
+  };
 }
 
 /* ------------------------------------------------------------------------- ce.anim's refusals */

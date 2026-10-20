@@ -24,6 +24,8 @@ export function statementRows(statement) {
   };
   const pushCall = (call, depth) => {
     rows.push({ key: `c:${call.range.start}:${call.nameRange.end}:${call.path}`, type: 'call', depth, call });
+    // The colour a call builds from numbers written out, first under it (scriptValues' builtColourArg).
+    if (call.built) pushArg(call.built, depth, call);
     for (const arg of call.args ?? []) pushArg(arg, depth, call);
     for (const child of call.children ?? []) pushCall(child, depth + 1);
   };
@@ -165,6 +167,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (!m.stored && !m.css) return '';
       if (m.reader === 'drawing') return `drawn as ${seeThrough(m.css) ?? m.css ?? m.stored}${form}`;
       if (m.reader === 'math') return `read as ${m.stored}${opacity}`;
+      if (m.reader === 'built') return `${m.stored}, built from ${m.said}`;
       return `stored as ${m.stored}${opacity}${form}`;
     }
     case 'gradient': {
@@ -282,7 +285,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
     case 'computed': {
       // "an envelope", "an image", "an event": the article the kind's name takes.
       const what = m.expects ? `: ${/^[aeiou]/i.test(m.expects) ? 'an' : 'a'} ${m.expects}` : '';
-      if (madeBelow) return `made by the call below${what}`;
+      if (madeBelow) return `made by the call below${what}${m.stored ? `, ${m.stored}` : ''}`;
       return `worked out when the script runs${what}, so there is nothing to edit here`;
     }
     case 'enum': return '';

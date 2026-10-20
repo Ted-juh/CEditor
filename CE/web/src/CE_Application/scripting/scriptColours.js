@@ -282,6 +282,47 @@ export function orderedColour(value, order) {
   return aa === 'FF' ? `#${rgb}` : `${aa}${rgb}`;
 }
 
+/* ------------------------------------------------------- colours built from numbers */
+// ce.math.rgbToHex, hslToHex and hsl, here so that the Values tab, which reads a colour built from
+// numbers written out and writes a picked colour back as numbers (builtColours.js), builds it with
+// the runtime's own arithmetic. The exported plug-in's preludes have their own copy of each.
+
+const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
+
+/** ce.math.rgbToHex: "#RRGGBB" from parts 0 to 255, each held in that range and rounded. */
+export function colourFromRgb(r, g, b) {
+  const c = (v) => colourClampByte(Number(v) || 0).toString(16).padStart(2, '0');
+  return `#${c(r)}${c(g)}${c(b)}`.toUpperCase();
+}
+
+/** ce.math.hslToHex: "#RRGGBB" from hue 0-360, saturation and lightness 0-100. */
+export function colourFromHsl(hue, sat, light) {
+  const h = Number(hue) || 0;
+  const s = (Number(sat) || 0) / 100;
+  const l = (Number(light) || 0) / 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return colourFromRgb(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
+}
+
+/** ce.math.hsl's answer for [r, g, b] 0-255: { h 0-360, s 0-100, l 0-100 }, not rounded; a grey
+ *  has hue 0 and saturation 0. */
+export function hslOfChannels(rgb) {
+  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, sat = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    else if (max === g) h = ((b - r) / d + 2) * 60;
+    else h = ((r - g) / d + 4) * 60;
+  }
+  return { h, s: sat * 100, l: l * 100 };
+}
+
 /** What ce.math.fromARGB's and fromRGBA's refusals say can be written. */
 export const ORDERED_FORMS = Object.freeze({
   argb: 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',

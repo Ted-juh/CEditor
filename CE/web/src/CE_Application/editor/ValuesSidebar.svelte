@@ -600,7 +600,9 @@
     const flat = String(text ?? '').replace(/\s*\n\s*/g, ' ');
     return flat.length > 80 ? `${flat.slice(0, 79)}…` : flat;
   };
-  const shownText = (arg) => highlight(oneLine(editingArg(arg) && session ? session.arg.text : arg.text), language);
+  // A colour built from numbers is shown as the colour: its text is the whole call, headed above it.
+  const shownText = (arg) => (arg.meaning?.built ? arg.meaning.stored
+    : highlight(oneLine(editingArg(arg) && session ? session.arg.text : arg.text), language));
 
   // A call is headed by its name as written (ce.core.set, ctx.SendCC), not the contract's id for it.
   const callName = (call) => readText.slice(call.nameRange?.start ?? 0, call.nameRange?.end ?? 0).replace(/\s+/g, '') || call.path;
@@ -694,6 +696,9 @@
     {:else}
       <span class={['vswatch', 'still', !css && 'none']} style:--sw={css ?? 'transparent'} aria-hidden="true"></span>
     {/if}
+  {:else if arg.kind === 'computed' && m.css}
+    <!-- The colour the call below builds from numbers: edited on that call's colour row. -->
+    <span class="vswatch still" style:--sw={m.css} title={`${m.stored}, built by the call below, where it is edited`} aria-hidden="true"></span>
   {:else if arg.kind === 'gradient'}
     {@const strip = stripCss(arg)}
     {#if arg.editable === 'gradient' && !readOnly}
