@@ -35,6 +35,8 @@
  *              panel shows it selected on the canvas once its tab is in front again
  *   dash       a stroke's dash is drawn in its row as the line the drawing is handed, and a length
  *              below 0 is said in the runtime's words
+ *   shape      a drawing call's shape is drawn under it on the outline of the control the script is
+ *              on, and one wholly outside it is said in the runtime's words
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
  *              file are rows only, the whole file's at the line clicked
@@ -661,6 +663,8 @@ try {
   ce.anim.play("Cutoff", "Pulse");
   ce.draw.stroke("#5B9BD5", 2, { dash: [3, 3] });
   ce.draw.stroke("#5B9BD5", 2, { dash: [4, -2] });
+  ce.draw.rect(10, 10, 20, 20);
+  ce.draw.rect(5000, 5000, 10, 10);
 }
 `;
   // The panel's tab by a name no other open tab has, to go back to it as a person does.
@@ -748,6 +752,42 @@ try {
     { row: { kind: 'dash', dasharray: '3 3', drawn: true, text: '[3, 3]', meaning: 'in pixels: 3 drawn, 3 skipped' },
       clamped: { dasharray: '4 0', problem: 'ce.draw.stroke: length 2 of the dash is -2, which is less than 0, so 0 was used.' } },
     { row: dashRow, clamped });
+
+  // ---- shape -------------------------------------------------------------------------------------
+  /** The drawing call's shape under its header: the control's outline and the shape on it. */
+  const shapeOf = () => page.evaluate(() => {
+    const svg = document.querySelector('[data-testid="values-sidebar"] svg.vshape');
+    const box = svg?.querySelector('rect.vshape-box');
+    const r = svg?.getBoundingClientRect();
+    return { drawn: !!svg && (r?.width ?? 0) > 20 && (r?.height ?? 0) > 10, d: svg?.querySelector('path.vshape-in')?.getAttribute('d') ?? null,
+      box: box ? [box.getAttribute('width'), box.getAttribute('height')].join(' x ') : null,
+      problem: document.querySelector('[data-testid="values-sidebar"] .vrowproblem')?.textContent ?? '' };
+  });
+  // A script on any control draws on whichever raised the event, so the outline is the one of the
+  // control the script is set to run on.
+  await page.selectOption('#bd-target', 'Cutoff');
+  await kit.settle(300);
+  await clickAt(PICK.indexOf('rect(10') + 6);
+  await waitHead('Line 6');
+  const inside = await shapeOf();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-shape-inside.png` });
+  await clickAt(PICK.indexOf('rect(5000') + 6);
+  await waitHead('Line 7');
+  const outside = await shapeOf();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-shape-outside.png` });
+  const size = await page.evaluate(async () => {
+    const { panels, scriptRuntimePanelId } = await import('/src/CE_Application/stores/panels.js');
+    const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+    const panel = get(panels).find((p) => p.id === get(scriptRuntimePanelId));
+    const t = panel.controls.find((c) => c._children.Core.name === 'Cutoff')._children.Transform;
+    return `${t.width} x ${t.height}`;
+  });
+  await page.selectOption('#bd-target', '*');
+  await kit.settle(300);
+  led.check(S, 'a drawing call\'s shape on its control', 'with the script set to run on Cutoff, ce.draw.rect(10, 10, 20, 20) is drawn under its call on Cutoff\'s outline and says nothing; a rect at 5000, 5000 is drawn beside that outline and says, in the runtime\'s words, that none of it shows',
+    { inside: { drawn: true, d: 'M10 10h20v20h-20Z', box: size, problem: '' },
+      outside: { drawn: true, d: 'M5000 5000h10v10h-10Z', box: size, problem: `ce.draw.rect: the shape at 5000, 5000, 10 × 10 lies wholly outside the control, which is ${size.replace(' x ', ' × ')}, so none of it shows.` } },
+    { inside, outside });
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();

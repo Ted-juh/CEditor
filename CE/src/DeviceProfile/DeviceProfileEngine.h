@@ -268,6 +268,8 @@ private:
     [[nodiscard]] const juce::DynamicObject* findParameter (const juce::String& parameterId) const;
     [[nodiscard]] const juce::DynamicObject* findMessageRecipe (const juce::String& recipeId) const;
     [[nodiscard]] const juce::DynamicObject* findDeviceRequest (const juce::String& requestId) const;
+    /** The request that asks for a dump the profile defines, or nullptr. */
+    [[nodiscard]] const juce::DynamicObject* findRequestForDump (const juce::String& dumpId) const;
     [[nodiscard]] const juce::DynamicObject* findDumpDefinition (const juce::String& dumpId) const;
     [[nodiscard]] juce::var resolveVariable (const juce::String& name) const;
     [[nodiscard]] juce::String defaultStartupRequestId() const;

@@ -1396,8 +1396,9 @@ function scaleDegree(note, root, scale) {
 // Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 // chordNotes, in the vocabulary the Chord Pad labels with.
 function chordQuality(notes) {
-  var list = __sortedNotes(notes);
-  if (!list.length) return undefined;
+  var read = __noteList("chordQuality", "notes", notes);
+  if (!read || !read.length) return undefined;
+  var list = __sortedNotes(read);
   var iv = {};
   for (var i = 0; i < list.length; i++) iv[__m12(list[i] - list[0])] = true;
   var has = function (a) { return iv[a] === true; };
@@ -1458,13 +1459,48 @@ function degreeChord(root, scale, degree, size) {
 // A count argument that is not a finite number falls back to its default. Written out rather than
 // leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
 function __count(v, fallback) { var n = Number(v); return isFinite(n) ? Math.floor(n) : fallback; }
-function __sortedNotes(list) {
-  var out = [];
-  if (list && list.length !== undefined) {
-    for (var i = 0; i < list.length; i++) { var v = Number(list[i]); if (isFinite(v)) out.push(v); }
-  }
-  return out.sort(function (a, b) { return a - b; });
+// ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
+// or text that is a number, and one that is neither refuses the call, saying where it is. They were
+// read with Number(), so a chord written by name was an empty one, and true was a note. null for a
+// list refused, and the same sentences in all four runtimes.
+var __NOTE_LISTS = {
+  chordQuality: ["ce.music.quality", "there is no answer"], voiceLead: ["ce.music.lead", "the answer is an empty list"],
+  expandOctaves: ["ce.music.octaves", "the answer is an empty list"], arpOrder: ["ce.music.arp", "the answer is an empty list"]
+};
+function __noteListItem(v) {
+  if (typeof v === "number") return isFinite(v) ? v : undefined;
+  if (typeof v !== "string") return undefined;
+  var n = noteNumber(v);
+  if (n !== undefined && n !== null) return n;
+  return __realNumber(v);
 }
+function __noteList(fn, name, list, mayBeAbsent) {
+  var spec = __NOTE_LISTS[fn];
+  function say(why, more) { logError(spec[0] + ": " + why + ", so " + spec[1] + "." + (more || "")); return null; }
+  if (list === undefined || list === null) return mayBeAbsent ? [] : say("no " + name + " were given");
+  if (!Array.isArray(list)) return say(__shownValue(list) + " is not a list of notes");
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var n = __noteListItem(list[i]);
+    if (n === undefined) {
+      var where = __shownValue(list[i]) + " at position " + (i + 1) + " of " + name;
+      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        : say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".');
+    }
+    out.push(n);
+  }
+  return out;
+}
+function __sortedNotes(list) { return list.slice().sort(function (a, b) { return a - b; }); }
+// A word or a count used as its default, said once (noteLists.js).
+var __musicWarned = {};
+function __musicSaid(text) {
+  if (!text || __musicWarned[text]) return;
+  __musicWarned[text] = true;
+  logWarn(text + " This is said only the first time.");
+}
+var __VOICE_LEAD_MODES = ["closest", "smooth", "off"];
+var __ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"];
 // Each voice to its NEAREST note in the other chord — voice counts differ (a triad following a
 // seventh), so pairing by index would compare nonsense.
 function __motion(a, b) {
@@ -1480,8 +1516,15 @@ function __motion(a, b) {
 // voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
 // melody still), "off" returns root position. No previous chord means nothing to lead from.
 function voiceLead(notes, previous, mode) {
-  var chord = __sortedNotes(notes), prev = __sortedNotes(previous);
+  var read = __noteList("voiceLead", "notes", notes);
+  var before = read && __noteList("voiceLead", "previous", previous, true);
+  if (!read || !before) return [];
+  var chord = __sortedNotes(read), prev = __sortedNotes(before);
   var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  if (__VOICE_LEAD_MODES.indexOf(how) < 0) {
+    __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.');
+    how = "closest";
+  }
   if (!chord.length || !prev.length || how === "off") return chord;
   var cands = [chord], span = Math.max(1, chord.length - 1) * 2, cur = chord, i, nx;
   for (i = 0; i < span; i++) {
@@ -1509,8 +1552,19 @@ function voiceLead(notes, previous, mode) {
 // The Arpeggiator's octave expansion. Anything landing above 127 is DROPPED rather than clamped:
 // clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
 function expandOctaves(notes, octaves) {
-  var base = __sortedNotes(notes);
-  var oc = Math.max(1, Math.min(4, __count(octaves, 1)));
+  var read = __noteList("expandOctaves", "notes", notes);
+  if (!read) return [];
+  var base = __sortedNotes(read);
+  var oc = 1;
+  if (octaves !== undefined && octaves !== null) {
+    var say = function (why, used) { __musicSaid("ce.music.octaves: octaves is " + __shownValue(octaves) + ", which is " + why + ", so " + used + " was used."); return used; };
+    var r = __realNumber(octaves);
+    if (r === undefined) oc = say("not a number", 1);
+    else if (Math.floor(r) < 1) oc = say("less than 1", 1);
+    else if (Math.floor(r) > 4) oc = say("more than 4", 4);
+    else if (Math.floor(r) !== r) oc = say("not a whole number", Math.floor(r));
+    else oc = Math.floor(r);
+  }
   var out = [];
   for (var o = 0; o < oc; o++) {
     for (var i = 0; i < base.length; i++) {
@@ -1527,9 +1581,17 @@ function expandOctaves(notes, octaves) {
 // which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 // panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
 function arpOrder(notes, pattern) {
-  var asc = (notes && notes.length !== undefined) ? Array.prototype.slice.call(notes) : [];
+  var asc = __noteList("arpOrder", "notes", notes);
+  if (!asc) return [];
+  var p, seq, i;
+  if (pattern === undefined || pattern === null) {
+    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
+    p = "up";
+  } else if (__ARP_ORDER_PATTERNS.indexOf(String(pattern)) < 0) {
+    __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
+    p = "up";
+  } else p = String(pattern);
   if (!asc.length) return [];
-  var p = String(pattern), seq, i;
   if (p === "chord") return [asc];
   if (p === "down") { seq = asc.slice().reverse(); }
   else if (p === "updown") { seq = asc.concat(asc.slice(1, -1).reverse()); }   // no repeated endpoints
@@ -2333,15 +2395,21 @@ function transportInfo() {
 }
 function tempo() { var t = __transport(); return (t.bpm && t.bpm > 0) ? t.bpm : null; }
 function isPlaying() { return __transport().playing === true; }
+// A bpm that is not above 0, or not a number, is the transport's tempo, and says so (__tread). It
+// gave nothing here, where the WebView used the tempo, and "fast" gave NaN.
 function beatsToMs(beats, bpm) {
-  bpm = bpm || tempo();
-  if (!bpm || bpm <= 0) return null;
-  return (Number(beats) || 0) * 60000 / bpm;
+  var b = __tread("beatsToMs", "beats", beats);
+  var rate = __tread("beatsToMs", "bpm", bpm);
+  if (rate === undefined) rate = tempo();
+  if (!rate || rate <= 0) return null;
+  return b * 60000 / rate;
 }
 function msToBeats(ms, bpm) {
-  bpm = bpm || tempo();
-  if (!bpm || bpm <= 0) return null;
-  return (Number(ms) || 0) * bpm / 60000;
+  var m = __tread("msToBeats", "ms", ms);
+  var rate = __tread("msToBeats", "bpm", bpm);
+  if (rate === undefined) rate = tempo();
+  if (!rate || rate <= 0) return null;
+  return m * rate / 60000;
 }
 // syncTimer(id, beats [, opts]) — a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
 // The first version computed the interval once and then kept firing at the old rate forever; a verb
@@ -2440,6 +2508,47 @@ function afterBeats(beats, fn) {
 // fallback that differs by one is a sequencer a step out.
 function __tnum(v, fallback) { var n = Number(v); return isFinite(n) ? n : fallback; }
 function __tclamp(v, lo, hi) { var n = __tnum(v, lo); return n < lo ? lo : (n > hi ? hi : n); }
+// A helper's number argument as the transport reads it, with one not used as written said once
+// per helper and argument, in the words of the WebView runtime's timeWords.js. A position before
+// the start is the start, a bar of no beats is a bar of one, and text that is not a number is the
+// argument's default; each gave an answer for a number nobody wrote, without a word. For each
+// argument: what is used for one that is not a number, the least and the most it is read as, and
+// whether it is rounded first; a bpm falls back to the transport's tempo.
+var __TIME_NUMBERS = {
+  barBeatAt: ["ce.time.position", { beats: [0, 0], beatsPerBar: [4, 1] }],
+  stepAt: ["ce.time.step", { beats: [0, 0] }],
+  stepsBetween: ["ce.time.steps", { from: [0, 0], to: [0, 0], max: [16, 1, undefined, true] }],
+  swingOffset: ["ce.time.swing", { step: [0], amount: [0, 0, 1] }],
+  cycleAt: ["ce.time.cycle", { beats: [0, 0], bars: [0.25, 0.25, 64], beatsPerBar: [4, 1] }],
+  loopedBeats: ["ce.time.looped", { beats: [0, 0], startBeats: [0, 0], lengthBeats: [0.01, 0.01] }],
+  beatsToMs: ["ce.time.beatsToMs", { beats: [0], bpm: ["tempo"] }],
+  msToBeats: ["ce.time.msToBeats", { ms: [0], bpm: ["tempo"] }]
+};
+var __timeWarned = {};
+function __tread(fn, name, v) {
+  var helper = __TIME_NUMBERS[fn], s = helper[1][name], tempo = s[0] === "tempo";
+  if (v === undefined || v === null) return tempo ? undefined : s[0];
+  var read = __realNumber(v), n, why, used;
+  if (tempo) {
+    if (read !== undefined && read > 0) return read;
+    why = read === undefined ? "not a number" : "not above 0";
+    used = "the transport's tempo";
+  } else if (read === undefined) {
+    why = "not a number"; n = used = s[0];
+  } else {
+    n = s[3] ? Math.round(read) : read;
+    if (s[1] !== undefined && n < s[1]) { why = "less than " + s[1]; n = used = s[1]; }
+    else if (s[2] !== undefined && n > s[2]) { why = "more than " + s[2]; n = used = s[2]; }
+    else return n;
+  }
+  var key = fn + " " + name;
+  if (!__timeWarned[key]) {
+    __timeWarned[key] = true;
+    logWarn(helper[0] + ": " + name + " is " + __shownValue(v) + ", which is " + why + ", so " + used
+      + " was used. This is said only the first time.");
+  }
+  return n;
+}
 
 // A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and
 // only DIFFERENCES mean anything, so a machine syncing its clock cannot corrupt an interval.
@@ -2475,8 +2584,8 @@ function divisionNames() {
 // Where a beat position falls musically — for ANY position, not only the transport's. Bars and
 // beats count from 1 as musicians do; `text` is the Transport component's own readout.
 function barBeatAt(beats, beatsPerBar) {
-  var perBar = __tnum(beatsPerBar, 4); if (perBar < 1) perBar = 1;
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  var b = __tread("barBeatAt", "beats", beats);
+  var perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar);
   var bar = Math.floor(b / perBar) + 1;
   var beat = Math.floor(b % perBar) + 1;
   var tick = Math.floor((b % 1) * __CE_TIME.ppqn);
@@ -2488,8 +2597,7 @@ function barBeatAt(beats, beatsPerBar) {
 function stepAt(beats, division) {
   var per = __division("ce.time.step", division);
   if (per === undefined) return undefined;
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
-  return Math.floor(b / per);
+  return Math.floor(__tread("stepAt", "beats", beats) / per);
 }
 
 // The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
@@ -2499,14 +2607,14 @@ function stepAt(beats, division) {
 function stepsBetween(fromBeats, toBeats, division, maxSteps) {
   var per = __division("ce.time.steps", division);
   if (per === undefined) return undefined;
-  var from = __tnum(fromBeats, 0); if (from < 0) from = 0;
-  var to = __tnum(toBeats, 0); if (to < 0) to = 0;
+  var from = __tread("stepsBetween", "from", fromBeats);
+  var to = __tread("stepsBetween", "to", toBeats);
+  var cap = __tread("stepsBetween", "max", maxSteps);
   if (to <= from) return { steps: [], dropped: 0 };
   var first = Math.floor(from / per) + 1;
   var last = Math.floor(to / per);
   if (last < first) return { steps: [], dropped: 0 };
   var total = last - first + 1;
-  var cap = Math.round(__tnum(maxSteps, 16)); if (cap < 1) cap = 1;
   var kept = total < cap ? total : cap;
   var steps = [];
   for (var i = last - kept + 1; i <= last; i++) steps.push(i);
@@ -2518,20 +2626,18 @@ function stepsBetween(fromBeats, toBeats, division, maxSteps) {
 function swingOffset(step, amount, division) {
   var per = __division("ce.time.swing", division);
   if (per === undefined) return undefined;
-  var s = __tclamp(amount, 0, 1);
-  return (Math.abs(Math.round(__tnum(step, 0))) % 2 === 1) ? s * 0.5 * per : 0;
+  var n = __tread("swingOffset", "step", step);
+  var s = __tread("swingOffset", "amount", amount);
+  return (Math.abs(Math.round(n)) % 2 === 1) ? s * 0.5 * per : 0;
 }
 
 // For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
 // never accumulated, so a cycle running for an hour is still exactly on the bar line.
-function __cycleBeats(bars, beatsPerBar) {
-  var perBar = __tnum(beatsPerBar, 4); if (perBar < 1) perBar = 1;
-  var len = __tclamp(bars, 0.25, 64) * perBar;
-  return len < 0.01 ? 0.01 : len;
-}
 function cycleAt(beats, bars, beatsPerBar) {
-  var len = __cycleBeats(bars, beatsPerBar);
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  var b = __tread("cycleAt", "beats", beats);
+  var n = __tread("cycleAt", "bars", bars);
+  var len = n * __tread("cycleAt", "beatsPerBar", beatsPerBar);
+  if (len < 0.01) len = 0.01;
   return { phase: (((b / len) % 1) + 1) % 1, count: Math.floor(b / len), length: len };
 }
 
@@ -2539,9 +2645,9 @@ function cycleAt(beats, bars, beatsPerBar) {
 // run IN to a loop from earlier in the song. `pass` is which time round, -1 before the loop is
 // reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 function loopedBeats(beats, startBeats, lengthBeats) {
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
-  var st = __tnum(startBeats, 0); if (st < 0) st = 0;
-  var len = __tnum(lengthBeats, 0.01); if (len < 0.01) len = 0.01;
+  var b = __tread("loopedBeats", "beats", beats);
+  var st = __tread("loopedBeats", "startBeats", startBeats);
+  var len = __tread("loopedBeats", "lengthBeats", lengthBeats);
   if (b < st) return { beats: b, pass: -1 };
   return { beats: st + ((b - st) % len), pass: Math.floor((b - st) / len) };
 }
@@ -2863,13 +2969,18 @@ function requestDump(kind, fn, opts) {
   kind = String(kind === undefined || kind === null ? "" : kind);
   if (typeof fn === "function") {
     var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout) : 3000;
-    var waiter = { kind: kind, fn: fn, done: false };
+    // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    // so that is what the callback waits for; waiting for the request's own id, it heard only the
+    // timeout.
+    var answer = __deviceQuery("answers", { role: "mainSynth", request: kind });
+    var waitFor = typeof answer === "string" && answer ? answer : kind;
+    var waiter = { kind: waitFor, fn: fn, done: false };
     __dumpWaiters.push(waiter);
     // Resolved rather than left hanging: a synth that is off, or that does not answer this
     // request, is the common case and not the exotic one.
     after(ms, function() {
       if (waiter.done) return;
-      __resolveDumps(kind, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
+      __resolveDumps(waitFor, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
     });
   }
   return __api.requestDump(kind);

@@ -1828,6 +1828,38 @@ int runServiceRequestTests()
 
     std::cout << "[PASS] DeviceProfileService :: startDeviceSync request preview\n";
 
+    // A dump is asked for by its own id, the one its answer arrives under, which is what
+    // requestDump(kind, fn) matches its callback against. Only the request's id was taken.
+    auto* byDump = new juce::DynamicObject();
+    byDump->setProperty ("correlationId", "service_sync_dump_test");
+    byDump->setProperty ("deviceRole", "mainSynth");
+    byDump->setProperty ("profileId", "test-sysex-synth");
+    byDump->setProperty ("request", "currentPatchDump");
+    byDump->setProperty ("dryRun", true);
+    auto byDumpResult = service.startDeviceSync (juce::var (byDump));
+    auto* byDumpObject = byDumpResult.getDynamicObject();
+    auto* byDumpTransaction = byDumpObject != nullptr ? byDumpObject->getProperty ("transaction").getDynamicObject() : nullptr;
+    if (byDumpObject == nullptr || byDumpTransaction == nullptr || ! static_cast<bool> (byDumpObject->getProperty ("ok"))
+        || byDumpTransaction->getProperty ("hex").toString() != "F0 7D 10 00 01 F7")
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: a dump's id did not send the request that asks for it: "
+                  << juce::JSON::toString (byDumpResult, true) << "\n";
+        return 1;
+    }
+    auto* unknown = new juce::DynamicObject();
+    unknown->setProperty ("deviceRole", "mainSynth");
+    unknown->setProperty ("profileId", "test-sysex-synth");
+    unknown->setProperty ("request", "noSuchDump");
+    unknown->setProperty ("dryRun", true);
+    auto unknownResult = service.startDeviceSync (juce::var (unknown));
+    if (auto* unknownObject = unknownResult.getDynamicObject(); unknownObject == nullptr || static_cast<bool> (unknownObject->getProperty ("ok")))
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: an id that is neither a request nor a dump was sent\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] DeviceProfileService :: startDeviceSync asks for a dump by its own id\n";
+
     auto* identity = new juce::DynamicObject();
     identity->setProperty ("correlationId", "service_identity_test");
     identity->setProperty ("deviceRole", "mainSynth");

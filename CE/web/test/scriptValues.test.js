@@ -140,7 +140,7 @@ test('a call is known by every name the contract gives it', () => {
 
 test('every kind the contract gives a parameter or an option is one the sidebar reads, and its type is kept', () => {
   const READ = new Set(['colour', 'gradient', 'curve', 'envelope', 'division', 'scale', 'chord', 'enum', 'number', 'control',
-    'path', 'deviceParameter', 'note', 'event', 'animation', 'font', 'image', 'bytes', 'dash', 'options', 'patch']);
+    'path', 'deviceParameter', 'note', 'event', 'animation', 'font', 'image', 'bytes', 'dash', 'options', 'patch', 'componentIndex', 'componentWord', 'deviceRole', 'dumpKind', 'sharedName', 'noteList']);
   let count = 0;
   for (const member of ALL_MEMBERS) {
     for (const p of member.params ?? []) {
@@ -539,7 +539,9 @@ test('a component verb\'s value is typed by its spec: the divisions, the scales,
   assert.deepEqual([division.kind, division.editable, division.meaning.label], ['division', 'choice', '8th T']);
   assert.equal(argOf(callOf(read(src, 'lua', 'scale(')), 'scale').kind, 'scale');
   const gate = argOf(callOf(read(src, 'lua', 'gate')), 'gate');
-  assert.deepEqual([gate.kind, gate.meaning.min, gate.meaning.max, gate.problem?.severity], ['number', 0, 1, 'error']);
+  // Past its range the verb uses the nearest end, and says so in the console's words: it is not refused.
+  assert.deepEqual([gate.kind, gate.meaning.min, gate.meaning.max, gate.problem?.severity], ['number', 0, 1, 'warning']);
+  assert.equal(gate.problem.message, 'arp Arp: gate(1.5) — the gate 1.5 is outside 0 to 1, so 1 was used.');
   const colour = argOf(callOf(read(src, 'lua', 'drumpads')), 'colour');
   assert.deepEqual([colour.kind, colour.problem?.severity], ['colour', 'error']);
 });
@@ -626,6 +628,26 @@ test('a refusal is said in the words the runtime says it in', () => {
   const cases = [
     // [script (Lua), needle, how to find the row, the runtime call]
     ['ce.midi.sendSysex("F0411000")', 'ce.', (c) => argOf(c, 'bytes'), (api) => api.ce.midi.sendSysex('F0411000')],
+    // ce.time's numbers, which the helpers read as the transport does and say once (timeWords.js);
+    // each helper and argument once here, for that reason.
+    ['ce.time.position(-1)', 'ce.', (c) => argOf(c, 'beats'), (api) => api.ce.time.position(-1)],
+    ['ce.time.position(4, 0)', 'ce.', (c) => argOf(c, 'beatsPerBar'), (api) => api.ce.time.position(4, 0)],
+    ['ce.time.step("x", "1/16")', 'ce.', (c) => argOf(c, 'beats'), (api) => api.ce.time.step('x', '1/16')],
+    ['ce.time.steps(0, 4, "1/4", 0.4)', 'ce.', (c) => argOf(c, 'max'), (api) => api.ce.time.steps(0, 4, '1/4', 0.4)],
+    ['ce.time.swing(1, 2, "1/16")', 'ce.', (c) => argOf(c, 'amount'), (api) => api.ce.time.swing(1, 2, '1/16')],
+    ['ce.time.cycle(4, 100)', 'ce.', (c) => argOf(c, 'bars'), (api) => api.ce.time.cycle(4, 100)],
+    ['ce.time.looped(8, 0, 0)', 'ce.', (c) => argOf(c, 'lengthBeats'), (api) => api.ce.time.looped(8, 0, 0)],
+    ['ce.time.beatsToMs(2, -5)', 'ce.', (c) => argOf(c, 'bpm'), (api) => api.ce.time.beatsToMs(2, -5)],
+    ['ce.time.msToBeats("soon")', 'ce.', (c) => argOf(c, 'ms'), (api) => api.ce.time.msToBeats('soon')],
+    // MIDI numbers the runtime already refused in its words, now typed so their rows read them.
+    ['ce.midi.sendNRPN(1, 200, 0, 5)', 'ce.', (c) => argOf(c, 'msb'), (api) => api.ce.midi.sendNRPN(1, 200, 0, 5)],
+    ['ce.midi.sendRPN(1, 0, 300, 5)', 'ce.', (c) => argOf(c, 'lsb'), (api) => api.ce.midi.sendRPN(1, 0, 300, 5)],
+    ['ce.midi.panic({ channel = 20 })', 'ce.', (c) => optOf(argOf(c, 'opts'), 'channel'), (api) => api.ce.midi.panic({ channel: 20 })],
+    // defineParameter's spec, refused on the field the definition names.
+    ['ce.device.defineParameter("p", { cc = 74, channel = 20 })', 'ce.', (c) => optOf(argOf(c, 'spec'), 'channel'),
+      (api) => api.ce.device.defineParameter('p', { cc: 74, channel: 20 })],
+    ['ce.device.defineParameter("q", { nrpn = { msb = 200, lsb = 0 } })', 'ce.', (c) => optOf(optOf(argOf(c, 'spec'), 'nrpn'), 'msb'),
+      (api) => api.ce.device.defineParameter('q', { nrpn: { msb: 200, lsb: 0 } })],
     ['ce.midi.sendSysex({ 0xF0, 300 })', 'ce.', (c) => argOf(c, 'bytes'), (api) => api.ce.midi.sendSysex([0xF0, 300])],
     ['ce.midi.sendNote(1, "c4", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'c4', 100)],
     ['ce.midi.sendNote(1, "C10", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'C10', 100)],
@@ -683,6 +705,20 @@ test('a refusal is said in the words the runtime says it in', () => {
     const said = lines[0].replace(/ This is said only the first time\.$/, '');
     assert.ok(row.problem.message.startsWith(said), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${said}`);
   }
+});
+
+test('ce.time\'s numbers say nothing when the helper uses them as written, and convert at the call\'s own tempo', () => {
+  const rowsOf = (src) => callOf(readStatement(src, 'lua', 3, { tempo: 120 })).args;
+  for (const src of ['ce.time.position("8")', 'ce.time.position(9, 3)', 'ce.time.step(2.5, "1/8")', 'ce.time.cycle(0, 2)',
+    'ce.time.looped(10, 4, 8)', 'ce.time.beatsToMs(2, 90)', 'ce.time.msToBeats(500)', 'ce.time.swing(3, 0.5, "1/16")']) {
+    assert.deepEqual(rowsOf(src).filter((a) => a.problem).map((a) => a.problem.message), [], src);
+  }
+  assert.equal(argOf(callOf(readStatement('ce.time.msToBeats(250, 60)', 'lua', 3, { tempo: 120 })), 'ms').meaning.hint,
+    '250 ms is a quarter of a beat at 60 BPM');
+  assert.equal(argOf(callOf(readStatement('ce.time.msToBeats(250)', 'lua', 3, { tempo: 120 })), 'ms').meaning.hint,
+    '250 ms is half a beat at 120 BPM', 'no bpm given: the transport\'s');
+  // A beat position before the start is a warning, not a range error: the helper reads it as 0.
+  assert.equal(argOf(callOf(readStatement('ce.time.position(-2)', 'lua', 3, {})), 'beats').problem.severity, 'warning');
 });
 
 test('a dash is read as ce.draw.stroke reads it: the line its row draws is the runtime\'s, and what it says is in its words', () => {
@@ -1107,7 +1143,7 @@ test('record examples 9 to 13: a fixed list, a font, an image, two opacity scale
   assert.equal(argOf(callOf(read(src, 'lua', 'knob-cop', ctx)), 'idOrName').problem.message,
     'No image called "knob-cop" in the library or the panel. Did you mean "knob-cap"?');
   const arc = callOf(read(src, 'lua', 'arc'));
-  assert.deepEqual([argOf(arc, 'from').meaning.unit, argOf(arc, 'to').value, argOf(arc, 'radius').kind], ['degrees', 135, 'unknown']);
+  assert.deepEqual([argOf(arc, 'from').meaning.unit, argOf(arc, 'to').value, argOf(arc, 'radius').kind], ['degrees', 135, 'number']);
 });
 
 test('record example 15: a SysEx template, read by the encoder the runtime sends with', () => {

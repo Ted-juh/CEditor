@@ -435,7 +435,13 @@ DeviceRequestResult DeviceProfileEngine::compileDeviceRequest (const juce::Strin
     if (resolvedRequestId.isEmpty())
         return { false, "Profile has no startup request" };
 
+    // A dump the profile defines is asked for by the request that answers with it: requestDump
+    // takes the dump's id ("system"), which is also the id its answer arrives under, so a script's
+    // callback for it can be matched. Only a request id was taken, and a dump id was refused here.
     auto* request = findDeviceRequest (resolvedRequestId);
+    if (request == nullptr)
+        if ((request = findRequestForDump (resolvedRequestId)) != nullptr)
+            resolvedRequestId = propString (*request, "id");
     if (request == nullptr)
         return { false, "Unknown device request: " + resolvedRequestId };
 
@@ -1672,6 +1678,28 @@ const juce::DynamicObject* DeviceProfileEngine::findDeviceRequest (const juce::S
                 return request;
 
     return nullptr;
+}
+
+const juce::DynamicObject* DeviceProfileEngine::findRequestForDump (const juce::String& dumpId) const
+{
+    auto* dump = findDumpDefinition (dumpId);
+    if (dump == nullptr)
+        return nullptr;
+
+    // The request that says it answers with this dump, else the one the dump names as its own.
+    auto* root = profileObject();
+    if (auto* requests = root != nullptr ? asArray (root->getProperty ("requests")) : nullptr)
+        for (const auto& requestValue : *requests)
+            if (auto* request = asObject (requestValue))
+            {
+                auto* response = asObject (request->getProperty ("response"));
+                const auto expected = response != nullptr ? propString (*response, "dump") : propString (*request, "expectedDump");
+                if (expected == dumpId)
+                    return request;
+            }
+
+    const auto recipe = propString (*dump, "requestRecipe");
+    return recipe.isNotEmpty() ? findDeviceRequest (recipe) : nullptr;
 }
 
 juce::StringArray DeviceProfileEngine::dumpDefinitionIds() const

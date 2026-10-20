@@ -26,9 +26,28 @@ import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
+import { timeNumber } from './timeWords.js';
+import { LAYOUT_WORDS, layoutWord } from './layoutWords.js';
+import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
+import { DRAW_SHAPES, drawNumber, shapeOutline, outsideWords } from './drawShapes.js';
+import {
+  COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
+  familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
+} from './componentVerbs.js';
+import {
+  HAND_WRITTEN, READ_FIELDS, handWrittenRefusal, handWrittenWords, phraseGrid, sectionFieldRefusal, sectionFields, sectionRefusalLine,
+} from './handWrittenVerbs.js';
+import { MAX_SLOTS } from '../utils/noteRecorderLayout.js';
+import { zoneIndexOf } from '../utils/splitZoneLayout.js';
+import { setlistScenes } from '../utils/setlistLayout.js';
+import { SCALES as CHORD_PAD_SCALES } from '../utils/chordPadLayout.js';
+import { elementSites } from '../utils/pixelElements.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
-import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
+import {
+  deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, deviceSetNoProfileWords, dumpKindUnknownWords,
+} from './deviceWords.js';
+import { countRolesInControls } from '../utils/deviceRoles.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
@@ -488,7 +507,8 @@ export function timeRefusal(value, { call, unit, what, positive, outcome }) {
  * milliseconds are counted in. The two opacity scales (record example 12) warn in the words the
  * runtime warns in, given `site.scaleWarning`.
  */
-export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
+export function readNumber(value, param, { tempo: contextTempo = 120, site = {} } = {}) {
+  const tempo = site.tempo ?? contextTempo;
   const unit = param.unit ?? null;
   const range = rangeOfUnit(unit);
   // `min: null` in the contract: a unit with no floor (ce.ui.notify's 0 or less keeps a message up).
@@ -501,6 +521,17 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     if (refused) return { meaning, problem: { severity: 'error', message: refused } };
   }
   const n = typeof value === 'number' ? value : realNumber(value);
+  // ce.time's helpers (timeWords.js): what the helper does with a number it cannot use as written,
+  // in its words, and nothing of a range besides, since the helper reads its own.
+  // A count read as the nearest whole one in range, said once (expandOctaves' octaves).
+  if (site.numberSaid && value !== undefined && value !== null) {
+    const said = site.numberSaid(value);
+    if (said) return { meaning, problem: { severity: 'warning', message: said } };
+  }
+  if (site.timeNumber && value !== undefined && value !== null) {
+    const { said } = timeNumber(site.timeNumber.memberId, site.timeNumber.name, value);
+    if (said) return { meaning, problem: { severity: 'warning', message: said } };
+  }
   // sendNote's length (panelRuntime's noteLength): text that is a number is read, and it must be
   // above 0, or the note is not sent at all.
   if (site.noteLength && value !== undefined && value !== null && (n === undefined || !(n > 0))) {
@@ -561,7 +592,17 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     return { meaning, problem: null };
   }
   // ce.anim's timing has said above all the runtime says of it: a stagger below 0 is used as it is.
-  if (site.animTiming) return { meaning, problem: null };
+  // So have ce.time's helpers.
+  if (site.animTiming || site.timeNumber || site.numberSaid) return { meaning, problem: null };
+  // A component verb's number past its range is used as the nearest end, in the verb's words.
+  if (site.componentClamp) {
+    const { verb, target, args } = site.componentClamp;
+    if ((min !== null && n < min) || (max !== null && n > max)) {
+      const said = args.every((a) => a !== undefined) ? componentClampWarning(verb, target, args) : null;
+      return { meaning, problem: { severity: 'warning', message: said ?? `the ${param.name} ${shownValue(n)} is outside ${min} to ${max}, so ${n < min ? min : max} was used.` } };
+    }
+    return { meaning, problem: null };
+  }
   if ((min !== null && n < min) || (max !== null && n > max)) {
     if (unit === '0 to 1' && site.unitWhat) {
       const p = unitProblem(site.unitWhat, value);
@@ -638,12 +679,14 @@ export function readEnum(value, values, { path, name, refusal } = {}) {
   if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };
   }
-  const message = refusal
+  const said = refusal
     ? refusal(value, values, name)
     : `${path ? `${path}: ` : ''}${typeof value === 'string' ? `"${value}"` : String(value)} is not one of the values ${name} takes. They are ${words(quoted(values))}.`;
+  // A refusal may say how bad it is ({ severity, message }): a word used as the default warns.
+  const { severity, message } = typeof said === 'object' && said ? said : { severity: 'error', message: said };
   // A refusal with nothing to say takes the value: ce.draw.stroke's `false` is no cap.
   if (!message) return { meaning, problem: null };
-  return { meaning, problem: { severity: 'error', message: `${message}${typeof value === 'string' ? didYouMean(value, values.map(String)) : ''}` } };
+  return { meaning, problem: { severity, message: `${message}${typeof value === 'string' ? didYouMean(value, values.map(String)) : ''}` } };
 }
 
 /** The runtime's own sentences for a value not in a list, where a member has one. */
@@ -651,10 +694,25 @@ export const ENUM_REFUSALS = {
   drawBlend: (value, list) => `ce.draw.blend("${value}"): not a blend mode. One of: ${list.join(', ')}.`,
   // Its two lists are cap's and join's; drawDash.js says both, as the runtime draws them.
   drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
+  // ce.panel's arrangement verbs, each in its own sentence (layoutWords.js).
+  ...Object.fromEntries(Object.keys(LAYOUT_WORDS).map((id) => [id, (value) => layoutWord(id, value).refused])),
+  // ce.music's two words are not refused: one there is none of is the default, said once.
+  voiceLead: (value) => ({ severity: 'warning', message: voiceLeadMode(value).said }),
+  arpOrder: (value) => ({ severity: 'warning', message: arpOrderPattern(value).said }),
 };
 
+/**
+ * A list of notes as ce.music's helpers read it (noteLists.js): the notes by name, and the call's
+ * refusal of a list with anything in it that is not a note, in the runtime's words.
+ */
+export function readNoteList(value, { memberId, name }) {
+  const { notes, refused } = noteList(memberId, name, value);
+  const meaning = { notes, names: notes.map((n) => noteNameOf(n)) };
+  return { meaning, problem: refused ? { severity: 'error', message: refused } : null };
+}
+
 /** An event's name: an id ("valueChanged") or a handler name ("onValueChanged"). */
-export function readEvent(value, { anyTarget }) {
+export function readEvent(value, { anyTarget, names = null }) {
   const handlers = ALL_EVENTS.map((e) => e.fn);
   const meaning = { name: value, handler: null, id: null, found: false, choices: handlers };
   if (typeof value !== 'string') return { meaning, problem: null };
@@ -663,7 +721,16 @@ export function readEvent(value, { anyTarget }) {
     Object.assign(meaning, { handler: event.fn, id: event.id, found: true, summary: event.summary });
     return { meaning, problem: null };
   }
-  if (anyTarget) { meaning.custom = true; return { meaning, problem: null }; }
+  if (anyTarget) {
+    meaning.custom = true;
+    // A custom event is emit()'s, and only a script emits it (scriptNames.js).
+    meaning.choices = [...new Set([...(names?.emits ?? []).map((e) => e.name), ...handlers])];
+    const emitters = (names?.emits ?? []).filter((e) => e.name === value);
+    if (emitters.length) meaning.emittedBy = [...new Set(emitters.map((e) => names.scripts?.[e.scriptId]?.name ?? e.scriptId))];
+    if (!names || emitters.length || (names.computed ?? []).includes('emits')) return { meaning, problem: null };
+    const emitted = [...new Set((names.emits ?? []).map((e) => e.name))];
+    return { meaning, problem: { severity: 'warning', message: `no script emits "${value}", so this is never called.${didYouMean(value, emitted)}` } };
+  }
   return { meaning, problem: { severity: 'warning', message: `"${value}" is not an event the panel raises, so nothing will call this.${didYouMean(value, handlers)}` } };
 }
 
@@ -977,6 +1044,366 @@ function parameterSummary(p) {
   };
 }
 
+/* ------------------------------------------------------------------------ drawing */
+
+/**
+ * The shape a ce.draw call draws, on the control it is drawn on: its outline as SVG path data in the
+ * control's coordinates, its box, the control's { w, h } when the script is a control's, and the
+ * runtime's sentence for a shape that lies wholly outside it. Null when a coordinate is not written
+ * out, since then where it lands is not known until it runs.
+ */
+export function readDrawShape(memberId, args, self) {
+  const spec = DRAW_SHAPES[memberId];
+  if (!spec) return null;
+  const arg = (name) => args.find((a) => a.param?.name === name);
+  const nums = {};
+  for (const name of spec.nums) {
+    const a = arg(name);
+    if (a && !a.literal) return null;
+    nums[name] = drawNumber(memberId, name, a?.value).n;
+  }
+  let points = [];
+  if (memberId === 'drawPath') {
+    const a = arg('points');
+    if (!a?.literal || !Array.isArray(a.value)) return null;
+    for (let i = 0; i + 1 < a.value.length; i += 2) {
+      const x = Number(a.value[i]);
+      const y = Number(a.value[i + 1]);
+      if (Number.isFinite(x) && Number.isFinite(y)) points.push([x, y]);
+    }
+    nums.closed = arg('closed')?.value === true;
+  }
+  const opts = arg('opts');
+  const outline = shapeOutline(memberId, nums, {
+    points, sides: arg('sides')?.literal ? arg('sides').value : 3, rotation: opts?.literal ? opts.value?.rotation : 0,
+  });
+  if (!outline) return null;
+  const t = self?._children?.Transform;
+  const box = t && Number(t.width) > 0 && Number(t.height) > 0 ? { w: Number(t.width), h: Number(t.height) } : null;
+  // Half the stroke the drawing starts with, 1 wide, counts as inside: what the script set before
+  // this call is not read here.
+  return { ...outline, box, outside: outsideWords(memberId, outline.bounds, box, 1) };
+}
+
+/* ------------------------------------------------------------------------ roles and dumps */
+
+// What a call does with a role no profile is chosen for, as the runtime does it: the parameter
+// lookups take the main synth's profile, in both runtimes (DeviceProfileService::engineForRole);
+// the profile's own readers answer from the role's own mapping, and so give nothing; and the two
+// overrides refuse it (deviceWords.js).
+const ROLE_USE = {
+  deviceParameter: 'mainSynth', deviceParameters: 'mainSynth',
+  deviceProfile: 'nothing', deviceVariables: 'nothing', deviceTiming: 'nothing', deviceCoverage: 'nothing', deviceRead: 'nothing',
+  deviceRecipes: 'an empty list', deviceRequests: 'an empty list', deviceConnected: 'false',
+  deviceSetVariable: 'setVariable', deviceSetTiming: 'setTiming',
+  deviceDefineParameter: 'declares', deviceDefineDump: 'declares',
+};
+
+/**
+ * A device role: the roles there are (the main synth, each one a profile is chosen for, and each one
+ * the panel's controls are bound to), the profile behind this one, and what the call does with one
+ * no profile is chosen for: the overrides' refusal in the runtime's words, and for a role nothing
+ * on the panel knows of, which is likelier a slip than a device, what the call gives back instead.
+ */
+export function readDeviceRole(value, { devices, memberId, controls }) {
+  const roles = devices?.roles ?? {};
+  const used = [...countRolesInControls(controls ?? []).keys()];
+  const choices = [...new Set(['mainSynth', ...Object.keys(roles), ...used])];
+  const meaning = { role: value, profile: null, choices };
+  if (typeof value !== 'string' || !value || !devices) return { meaning, problem: null };
+  const device = roles[value];
+  if (device) {
+    meaning.profile = device.profileName;
+    meaning.hint = memberId in ROLE_USE && ROLE_USE[memberId] === 'declares' ? `declared for ${value}, whose profile is ${device.profileName}` : device.profileName;
+    return { meaning, problem: null };
+  }
+  const use = ROLE_USE[memberId];
+  if (use === 'setVariable' || use === 'setTiming') {
+    return { meaning, problem: { severity: 'error', message: deviceSetNoProfileWords(use, value) } };
+  }
+  const main = roles.mainSynth;
+  meaning.hint = use === 'mainSynth' ? `no profile is chosen for ${value}, so this reads mainSynth's${main ? `, ${main.profileName}` : ', and none is chosen for that either'}`
+    : use === 'declares' ? `declared for ${value}, which no profile is chosen for yet`
+    : use ? `no profile is chosen for ${value}, so this gives ${use}` : `no profile is chosen for ${value}`;
+  if (use === 'declares' || value === 'mainSynth' || used.includes(value)) return { meaning, problem: null };
+  return {
+    meaning,
+    problem: { severity: 'warning', message: `"${value}" is not a device of this panel: no profile is chosen for it, and no control is bound to it.${didYouMean(value, choices)}` },
+  };
+}
+
+/**
+ * The kind of dump requestDump, sendDump and buildDump take: a dump the main synth's profile
+ * defines, by its id, or one the scripts declare with defineDump; for requestDump a request's own id
+ * as well, whose answer arrives under the dump it answers with. The runtime's refusal of a kind it
+ * has none of (deviceWords.js), once the profile's document is there to say so.
+ */
+export function readDumpKind(value, { devices, memberId }) {
+  const main = devices?.roles?.mainSynth ?? null;
+  const declared = (devices?.declaredDumps ?? []).filter((d) => d.role == null || d.role === 'mainSynth').map((d) => d.id);
+  const dumps = main?.dumps ?? null;
+  const meaning = { kind: value, choices: [...new Set([...(dumps ?? []).map((d) => d.id), ...declared])] };
+  meaning.choiceNames = Object.fromEntries((dumps ?? []).filter((d) => d.name && d.name !== d.id).map((d) => [d.id, d.name]));
+  if (typeof value !== 'string' || !value) return { meaning, problem: null };
+  if (declared.includes(value)) { meaning.hint = "declared by this panel's scripts"; return { meaning, problem: null }; }
+  if (!dumps) return { meaning, problem: null };
+  const dump = dumps.find((d) => d.id === value);
+  if (dump) { meaning.hint = dump.name && dump.name !== dump.id ? dump.name : `a dump of ${main.profileName}`; return { meaning, problem: null }; }
+  const request = memberId === 'requestDump' ? (main.requests ?? []).find((r) => r.id === value) : null;
+  if (request) {
+    meaning.hint = request.dump ? `the request for the "${request.dump}" dump` : 'a request of the profile';
+    return { meaning, problem: null };
+  }
+  const verb = memberId === 'buildDump' ? 'buildDump' : memberId === 'sendDump' ? 'sendDump' : 'requestDump';
+  const message = dumpKindUnknownWords(verb, value, 'mainSynth', dumps.map((d) => d.id), verb === 'buildDump' ? 'nothing was built' : undefined);
+  return { meaning, problem: { severity: 'error', message } };
+}
+
+/* ------------------------------------------------------------------------ names across scripts */
+
+// For each call that names something another script names too: which of scriptNames' lists holds
+// the other side, what this call does with a name nobody answers, and the sentence for it.
+const SHARED_NAMES = {
+  startTimer: { other: 'stops', role: 'start' }, syncTimer: { other: 'stops', role: 'start' },
+  stopTimer: { other: 'starts', role: 'stop', none: (n) => `no script starts a timer called "${n}", so this stops nothing.` },
+  saveSetting: { other: 'loads', role: 'save' },
+  loadSetting: { other: 'saves', role: 'read', none: (n, scope) => `no script saves "${n}"${scope === 'panel' ? '' : ` in the ${scope} scope`}, and the panel holds no setting by it, so this gives its fallback.` },
+  forgetSetting: { other: 'saves', role: 'read', none: (n, scope) => `no script saves "${n}"${scope === 'panel' ? '' : ` in the ${scope} scope`}, and the panel holds no setting by it, so this forgets nothing.` },
+  emit: { other: 'hears', role: 'emit', none: (n) => `no script listens for "${n}", so this reaches nothing.` },
+  defineAction: { other: 'runs', role: 'define' },
+  run: { other: 'defines', role: 'run' },
+};
+const SCRIPT_KEY_PREFIX = '\u0001script:';   // panelRuntime's storageKeyFor
+
+/**
+ * A name a call shares with the panel's other scripts (scriptNames.js): the names there are on the
+ * other side, which script answers this one, and, when none does and no call builds one from parts,
+ * what the call does instead. A setting the panel already holds answers a read; a function by the
+ * action's name answers run(), as the runtime's runAction finds one, and run of neither is refused in
+ * the runtime's words.
+ */
+export function readSharedName(value, { names, memberId, scriptId, scope = 'panel', settings }) {
+  const spec = SHARED_NAMES[memberId];
+  const meaning = { name: value, choices: [] };
+  if (!spec || !names) return { meaning, problem: null };
+  const scriptName = (id) => `'${names.scripts?.[id]?.name ?? id}'`;
+  const sameScope = (e) => (e.scope ?? 'panel') === scope && (scope !== 'script' || e.scriptId === scriptId);
+  let others = names[spec.other] ?? [];
+  if (spec.role === 'emit') others = [...others, ...(names.runsOn ?? [])];
+  if (spec.role === 'read' || spec.role === 'save') others = others.filter(sameScope);
+  if (spec.role === 'run') others = [...others, ...(names.functions ?? [])];
+  meaning.choices = [...new Set(others.map((e) => e.name))].sort();
+  if (typeof value !== 'string' || !value) return { meaning, problem: null };
+
+  if (spec.role === 'run') {
+    const dot = value.lastIndexOf('.');
+    const owner = dot > 0 ? value.slice(0, dot).toLowerCase() : '';
+    const action = dot > 0 ? value.slice(dot + 1) : value;
+    const defined = owner ? [] : (names.defines ?? []).filter((e) => e.name.toLowerCase() === action.toLowerCase());
+    const fns = (names.functions ?? []).filter((e) => e.name === action && (!owner || names.scripts?.[e.scriptId]?.target.toLowerCase() === owner));
+    const by = defined[0] ?? fns[0];
+    if (by) { meaning.hint = `${defined.length ? 'defined' : 'a function'} in ${scriptName(by.scriptId)}`; return { meaning, problem: null }; }
+    if ((names.computed ?? []).includes('defines')) return { meaning, problem: null };
+    const registered = [...new Set((names.defines ?? []).map((e) => e.name))];
+    return {
+      meaning,
+      problem: { severity: 'error', message: `run("${value}") found no loaded script defining ${action}()${registered.length ? `. Registered actions: ${registered.join(', ')}` : ''}` },
+    };
+  }
+
+  const answering = others.filter((e) => e.name === value);
+  // A read of a setting the panel already holds is answered by it, whoever saved it.
+  const storedKey = scope === 'script' ? `${SCRIPT_KEY_PREFIX}${scriptId ?? ''}:${value}` : value;
+  const held = spec.role === 'read' && scope !== 'local' && settings && typeof settings === 'object' && Object.hasOwn(settings, storedKey);
+  if (answering.length) {
+    const where = [...new Set(answering.map((e) => scriptName(e.scriptId)))].join(', ');
+    const verb = { start: 'stopped', stop: 'started', save: 'read', read: 'saved', emit: 'heard', define: 'run' }[spec.role];
+    meaning.hint = `${verb} in ${where}`;
+    return { meaning, problem: null };
+  }
+  if (held) { meaning.hint = `the panel holds ${shownValue(settings[storedKey])}`; return { meaning, problem: null }; }
+  meaning.hint = { start: 'no script stops it', save: 'no script reads it', define: 'no script runs it' }[spec.role] ?? null;
+  if (!spec.none || (names.computed ?? []).includes(spec.other) || scope === null) return { meaning, problem: null };
+  return { meaning, problem: { severity: 'warning', message: `${spec.none(value, scope)}${didYouMean(value, meaning.choices)}` } };
+}
+
+/* ------------------------------------------------------------------------ component indexes */
+
+const VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
+
+/**
+ * The index a component verb addresses an element by (a pad, a lane, a grid cell, a named element;
+ * a zone, a phrase cell, a recorder slot), read against the control the call names as the verb reads
+ * it: what it addresses there now, how many there are, and the verb's own refusal when it addresses
+ * nothing, in the console's words (componentVerbs.componentRefusalLine, handWrittenVerbs.js).
+ *
+ * `args` are the call's arguments after the control, as written (undefined where one is not written
+ * out), and `at` which of them this is. The refusal is the whole line when every one is written out,
+ * as the console writes it; else only why.
+ */
+export function readComponentIndex(value, { memberId, at, args, target, control }) {
+  const meaning = { hint: null, min: null, max: null, integer: true };
+  const literal = args.every((a) => a !== undefined);
+  const verb = VERB_BY_ID.get(memberId);
+  if (verb && verbNameArgs(verb).length && at === 0) return readFamilyVerbName(value, verb, control);
+  if (verb?.k === 'read') return readFamilyIndex(value, verb, args, control);
+  if (verb) {
+    const cfg = control?._children?.[verb.section] ?? null;
+    if (!cfg) return { meaning, problem: null };
+    const range = componentIndexRange(verb, cfg);
+    const noun = verb.grid ? (at === 0 ? 'row' : 'column') : listNoun(verb);
+    const say = (reason) => ({ meaning, problem: reason ? { severity: 'error', message: literal ? componentRefusalLine(verb, target, args, cfg) : reason } : null });
+    if (verb.k === 'elem') {
+      meaning.choices = range?.names ?? [];
+      meaning.hint = elementSites(cfg, value).length ? `an element of ${target}` : null;
+      return say(typeof value === 'string' ? componentRefusalReason(verb, cfg, [value, args[1]]) : null);
+    }
+    if (verb.k === 'indexset') {
+      const n = Math.round(Number(value));
+      if (Number.isFinite(n) && n >= 1) {
+        const on = (Array.isArray(cfg[verb.f]) ? cfg[verb.f] : []).map(Number).includes(n - 1);
+        meaning.hint = `${noun} ${n}${on ? ' · muted now' : ''}`;
+      }
+      meaning.min = 1;
+      return say(componentRefusalReason(verb, cfg, [value]));
+    }
+    const count = verb.grid ? (at === 0 ? range.rows : range.cols) : range?.count ?? 0;
+    Object.assign(meaning, { min: count ? 1 : null, max: count || null });
+    const reason = indexRefusal(value, count, noun);
+    if (reason) return say(reason);
+    const n = Math.round(Number(value));
+    let now = '';
+    if (verb.k === 'item') {
+      const current = itemCurrent(verb, cfg, n - 1);
+      if (current !== undefined) now = ` · ${verb.item} now ${shownValue(current)}`;
+    } else if (verb.k === 'line') {
+      const line = cfg[verb.f]?.[n - 1];
+      if (typeof line === 'string') now = ` · now ${shownValue(line)}`;
+    } else if (!verb.grid) {
+      const cell = cfg[verb.f]?.[n - 1];
+      if (typeof cell === 'number') now = ` · now ${shownValue(cell)}`;
+    }
+    meaning.hint = `${noun} ${n} of ${count}${now}`;
+    return { meaning, problem: null };
+  }
+  if (READ_FIELDS[memberId]) return readSectionField(value, READ_FIELDS[memberId], control);
+  const spec = HAND_WRITTEN[memberId];
+  if (!spec) return { meaning, problem: null };
+  const cfg = control?._children?.[spec.section] ?? null;
+  const words = spec.kinds[at] === 'word' ? handWrittenWords(memberId) : null;
+  if (words) meaning.choices = words;
+  if (!cfg) return { meaning, problem: null };
+  const built = spec.args(...args);
+  const refused = handWrittenRefusal(spec.family, spec.action, cfg, built);
+  // Only what this argument is: a phrase cell's row says nothing of its step.
+  const problem = refused && refused.at === at
+    ? { severity: 'error', message: literal ? sectionRefusalLine(spec.family, target, spec.action, built, refused.reason) : refused.reason } : null;
+  if (spec.kinds[at] === 'word') {
+    if (spec.action === 'key' && !problem && Number.isFinite(Number(value))) {
+      const pc = ((Math.round(Number(value)) % 12) + 12) % 12;
+      meaning.hint = `${PITCH_NAMES[pc]}${pc !== Number(value) ? `: ${shownValue(value)} wraps round to ${pc}` : ''}`;
+    }
+    return { meaning, problem };
+  }
+  if (spec.family === 'split') {
+    const zones = Array.isArray(cfg.zones) ? cfg.zones : [];
+    const names = zones.map((z, i) => String(z?.label ?? `Zone ${i + 1}`));
+    meaning.choices = names;
+    Object.assign(meaning, { min: zones.length ? 0 : null, max: zones.length ? zones.length - 1 : null });
+    const i = zoneIndexOf(zones, value);
+    if (i >= 0) {
+      meaning.hint = typeof value === 'number' ? `zone ${value} is "${names[i]}", the ${ordinal(i + 1)} zone: a zone number counts from 0`
+        : `"${names[i]}" is zone ${i}, counted from 0`;
+    }
+    return { meaning, problem };
+  }
+  if (spec.family === 'phrase') {
+    const { steps, rows } = phraseGrid(cfg);
+    const count = at === 0 ? steps : rows;
+    Object.assign(meaning, { min: 0, max: count - 1 });
+    const n = Math.round(Number(value));
+    if (!problem && Number.isFinite(n)) meaning.hint = `${at === 0 ? 'step' : 'row'} ${n}: the ${at === 0 ? 'steps' : 'rows'} are 0 to ${count - 1}, counted from 0`;
+    return { meaning, problem };
+  }
+  if (spec.family === 'setlist') {
+    const scenes = setlistScenes({ _children: { Setlist: cfg } });
+    meaning.choices = scenes.map((sc) => sc.name);
+    Object.assign(meaning, { min: scenes.length ? 1 : null, max: scenes.length || null });
+    const n = typeof value === 'number' ? Math.round(value) - 1 : scenes.findIndex((sc) => sc.name === value || sc.id === value);
+    if (!problem && n >= 0 && n < scenes.length) {
+      meaning.hint = typeof value === 'number' ? `scene ${value} is "${scenes[n].name}"` : `scene ${n + 1} of ${scenes.length}`;
+    }
+    return { meaning, problem };
+  }
+  if (spec.family === 'harmoniser') {
+    const degrees = (CHORD_PAD_SCALES[String(cfg.scale ?? 'major')] ?? CHORD_PAD_SCALES.major).length;
+    Object.assign(meaning, { min: 1, max: degrees });
+    if (!problem && Number.isFinite(Number(value))) meaning.hint = `degree ${Math.round(Number(value))} of ${degrees}`;
+    return { meaning, problem };
+  }
+  const held = Math.min(Array.isArray(cfg.slots) ? cfg.slots.length : 0, MAX_SLOTS);
+  Object.assign(meaning, { min: 1, max: spec.action === 'store' ? MAX_SLOTS : (held || null) });
+  const n = Math.round(Number(value));
+  if (!problem && Number.isFinite(n)) {
+    const take = cfg.slots?.[n - 1];
+    meaning.hint = `slot ${n} of ${MAX_SLOTS}${take ? ` · holds ${shownValue(String(take.name ?? `Take ${n}`))}` : ' · empty'}`;
+  }
+  return { meaning, problem };
+}
+
+/**
+ * The verb name read, size, fill, insert and remove take: one of the family's verbs (any of them for
+ * read, a list for the rest), what it names on the control the call names, and the runtime's own
+ * refusal of one the family has not.
+ */
+function readFamilyVerbName(value, verb, control) {
+  const meaning = { hint: null, choices: familyVerbNames(verb.family, verb.k === 'read' ? 'read' : 'list') };
+  const refused = typeof value === 'string' || typeof value === 'number' ? familyVerbRefusal(verb.family, verb.k, value) : null;
+  if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  const named = COMPONENT_VERBS.find((v) => v.family === verb.family && v.v === String(value));
+  const cfg = control?._children?.[verb.section] ?? null;
+  if (named && cfg) {
+    const range = componentIndexRange(named, cfg);
+    const noun = listNoun(named);
+    if (range?.rows !== undefined) meaning.hint = `${range.rows} rows of ${range.cols} columns`;
+    else if (range?.names) meaning.hint = range.names.length ? `the elements ${range.names.map((n) => `"${n}"`).join(', ')}` : 'no elements yet';
+    else if (Number.isFinite(range?.count)) meaning.hint = `${range.count} ${noun}${range.count === 1 ? '' : 's'}`;
+  }
+  return { meaning, problem: null };
+}
+
+/** read's index into the list the verb it names writes: which element, and what it is now. */
+function readFamilyIndex(value, verb, args, control) {
+  const meaning = { hint: null, min: null, max: null, integer: true };
+  const named = COMPONENT_VERBS.find((v) => v.family === verb.family && v.v === String(args[0]));
+  const cfg = control?._children?.[verb.section] ?? null;
+  if (!named || !cfg || !LIST_KINDS.includes(named.k)) return { meaning, problem: null };
+  const refused = readIndexRefusal(named, cfg, value, args[2]);
+  if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  const range = componentIndexRange(named, cfg);
+  const count = named.grid ? range.rows : range.count;
+  Object.assign(meaning, { min: count ? 1 : null, max: count || null });
+  const n = Math.round(Number(value));
+  if (Number.isFinite(n)) meaning.hint = `${named.grid ? 'row' : listNoun(named)} ${n} of ${count}`;
+  return { meaning, problem: null };
+}
+
+/** The field a hand-written family's read takes: one of its section's, in any case, and what it is now. */
+function readSectionField(value, { section, label }, control) {
+  const cfg = control?._children?.[section] ?? null;
+  const meaning = { hint: null, choices: cfg ? sectionFields(cfg) : null };
+  if (!cfg || value === undefined || value === null || value === '') return { meaning, problem: null };
+  const refused = sectionFieldRefusal(label, cfg, value);
+  if (refused) return { meaning, problem: { severity: 'error', message: refused } };
+  const key = Object.keys(cfg).find((k) => k.toLowerCase() === String(value).toLowerCase());
+  const now = cfg[key];
+  meaning.hint = `${key !== value ? `${key}, ` : ''}now ${Array.isArray(now) ? `a list of ${now.length}` : shownValue(now)}`;
+  return { meaning, problem: null };
+}
+
+const PITCH_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+
 /* ------------------------------------------------------------------------ fonts and images */
 
 const familyName = (f) => (typeof f === 'string' ? f : f?.family ?? f?.name ?? '');
@@ -1145,6 +1572,17 @@ export function readSysexTemplate(spec, id) {
   const list = Array.isArray(spec.sysex) ? spec.sysex : hexTokens(String(spec.sysex ?? ''));
   meaning.hex = list.map((t) => (typeof t === 'number' ? hex2(t) : String(t))).join(' ');
   return { meaning, problem: defined.warning ? { severity: 'warning', message: defined.warning } : null };
+}
+
+/**
+ * ce.device.defineParameter's spec as the runtime defines it (deviceDefinitions.defineParameter):
+ * its refusal, or null. The definition checks every field in its own words and stops at the first
+ * it cannot use, so the row of that field says it, and no other row says another sentence.
+ */
+export function parameterSpecRefusal(spec, id) {
+  if (!spec || typeof spec !== 'object') return null;
+  const defined = defineParameter(TEMPLATE_ROLE, typeof id === 'string' && id ? id : 'parameter', spec);
+  return defined.ok ? null : defined.error;
 }
 
 /* ------------------------------------------------------------------------------- sections */

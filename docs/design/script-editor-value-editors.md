@@ -144,6 +144,9 @@ Grouped by how you would change each one. [The other kinds](#the-other-kinds) ha
 - The 16 parameters whose allowed values the API already lists, such as blend modes, line caps and
   image fit, and the keys of an options table, which the contract lists for every call.
 - Control names and property paths.
+- A component verb's element (a pad, a zone, a scene) and the words a hand-written family or one of
+  `ce.panel`'s arrangement verbs takes; a device role, and a dump's kind; and a timer, setting,
+  custom event or action another script names.
 
 The completion list (Ctrl+Space) also reopens over a value that is already there and offers the
 same alternatives, for someone who keeps their hands on the keyboard.
@@ -158,9 +161,12 @@ same alternatives, for someone who keeps their hands on the keyboard.
 - **SysEx**: the bytes that will actually be sent, and the checksum where it can be known.
 - **Note numbers**: `60` reads as C4, and `"C4"` as 60.
 - **Device parameters**: the range and the CC number.
+- **Lists of notes**: `{ "C4", "Eb4", 67 }` reads as C4 D#4 G4.
+- **Drawing shapes**: a `ce.draw` call's shape on the outline of the control it is drawn on.
 
 **Not worth doing:** true/false values, free text such as labels and log messages, and numbers with
-no unit or range.
+no unit or range. A drawing's coordinates have no unit and are fields all the same: the shape drawn
+under the call is what gives them a meaning.
 
 ## What looking into it showed
 
@@ -1232,11 +1238,66 @@ Building those found five things wrong beyond them, each fixed on the owner's wo
   the panel beside the script; the general split it meant was a layout nothing drew, and is removed.
   `browser-checks/panelFile.mjs` goes back by the tab and finds the control selected.
 
-Still open: nothing from this record.
+Then seven more kinds, in one change, each with the runtime made to say what it did in silence,
+in every runtime that does it:
+
+- **The untyped numbers.** `ce.time`'s helpers read every number they are given, a bpm that is not
+  above 0 included, and say one they cannot use as written once, in the same words in the WebView
+  and the three preludes (`timeWords.js`; `test/scriptPreludeAgreement.test.js`). They gave an
+  answer for a number nobody wrote: `beatsToMs(1, -5)` was 500 in the editor and nothing with the
+  window shut, and `"fast"` was NaN in JavaScript and an error in Lua and Python. The API's
+  numbers carry their units (beats, BPM, milliseconds, 0 to 127, 1 to 16), and a device
+  parameter's spec is read in `deviceDefineParameter`'s own words.
+- **A component verb's index.** A row says what an index addresses on the control the call names
+  ("pad 3 of 16 · note now 38", "line 1 of 2 · now …") and the verb's refusal when it addresses
+  nothing: "There is no pad 99: the pads are 1 to 16." The runtime said "refused, nothing changed"
+  and nothing more; the Zone Splitter logged a zone that is not one as though it had been set, and
+  a number past a verb's range was used as its nearest end without a word. `componentVerbs.js`
+  and `handWrittenVerbs.js` hold the words.
+- **Closed word lists the API did not list.** The hand-written families' words (a split preset, a
+  phrase seed, a harmoniser mode), the five verbs every generated family has (`read`, `size`,
+  `fill`, `insert`, `remove`, which take one of its verbs' names), the five families' `read(field)`
+  and `ce.panel`'s arrangement words (`layoutWords.js`) are offered as dropdowns and refused in the
+  runtime's words. An unknown split preset replaced every zone with one whole-keyboard zone; it is
+  refused. `splitPreset` was documented as taking "single", "split", "layer" and "three", none of
+  which is a preset, and both keys were typed as text, which the runtime refuses.
+- **Device roles and dump kinds.** A role row offers the main synth, each role with a profile and
+  each the panel's controls are bound to, names the profile, and says what the call does without
+  one. `setVariable` and `setTiming` for a role no profile was chosen for wrote the main synth's
+  profile onto a new mapping for it in the editor, and answered false without a word in the
+  plug-in; both refuse it now, and read the value as the nearest whole number in range, said once
+  (`deviceWords.js`, `BridgeScriptHost.h`). The profile's own readers answer from the role's own
+  mapping in both runtimes. A dump's kind is its id, as it arrives: the engine sends the request
+  that asks for it, each runtime's `requestDump` callback waits for the dump a request answers
+  with, and a kind the profile has none of is refused where the console can say so.
+- **Names one script uses and another answers.** `scriptNames.js` writes out the timers, settings,
+  custom events and actions the panel's scripts name, and a row says which script answers a name,
+  offers the ones there are, and warns of a `stopTimer`, `loadSetting`, `forgetSetting`, `emit` or
+  `on("*", …)` nothing answers. The runtime stays quiet about those: each is a thing a script may
+  mean. Writing the scan found the call scanner reading `:` as a chain in every language, so
+  `{ a: clamp(x) }` was a call to `a.clamp` and the call after a Python `def f():` went unread.
+- **Lists of notes.** `chordQuality`, `voiceLead`, `expandOctaves` and `arpOrder` read a list's items
+  as every other `ce.music` helper reads a note, a number or a name, and refuse one that is neither,
+  saying where; a chord written by name was an empty chord. Their mode, pattern and octave count
+  are said once when used as the default (`noteLists.js`), in all four runtimes alike.
+- **Drawing coordinates.** A drawing call's row draws its shape on the outline of the control the
+  script is set to run on, faint where the control clips it, or a line toward it when it lies far
+  off; one wholly outside the control is said, by the runtime too, once ("ce.draw.rect: the shape
+  at 5000, 5000, 10 × 10 lies wholly outside the control, which is 100 × 100, so none of it
+  shows."). A coordinate that is not a number was 0, and true was 1, without a word; it is 0 and
+  said (`drawShapes.js`). Checked in `test/drawShapes.test.js` and
+  `browser-checks/valuesSidebar.mjs`.
+
+Still open: one question, below.
 
 ## Open questions for the owner
 
-None left from this record. Decided on 2026-10-19:
+- **Zones and phrase cells count from 0.** `splitMute(target, 1, …)` mutes the second zone, which the
+  panel labels "Zone 2", and `phraseCell`'s step and row count from 0, where every other component
+  index counts from 1. The rows, the refusals and the summaries say so. Counting from 1 would match
+  the labels and the other verbs, and would move every script that names a zone or a cell by number.
+
+Decided on 2026-10-19:
 
 - **The edit surface** is the Values sidebar, and it covers the whole statement the caret is in
   ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).

@@ -11,6 +11,7 @@ import {
   SCALES, scalePitchClasses, stackedChord, chordQuality, QUALITY_SUFFIX,
   noteName, useFlats, romanNumeral,
 } from './chordPadLayout.js';
+import { UNCHANGED } from './scriptPatchOutcome.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -554,7 +555,8 @@ export function harmoniserScriptPatch(cfg, action, args = {}) {
       const key = String(Math.round(d) - 1);            // 1-based in, 0-based stored
       const prior = c.degreeChords && typeof c.degreeChords === 'object' ? c.degreeChords : {};
       if (a.chord === null || a.chord === 'clear') {
-        if (!(key in prior)) return {};
+        // Clearing an override there is none of is already that way, not a refusal.
+        if (!(key in prior)) return UNCHANGED;
         const next = { ...prior };
         delete next[key];
         return { degreeChords: next };

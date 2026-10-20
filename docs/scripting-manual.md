@@ -1346,7 +1346,7 @@ Silence everything: sends All Sound Off (controller 120), All Notes Off (123) an
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `channel` | number | all sixteen channels | Silence one channel instead of every one. |
+| `channel` | number (1 to 16) | all sixteen channels | Silence one channel instead of every one. |
 | `resetControllers` | true or false | true | Whether to send Reset All Controllers (121) as well as the two note-off messages. Set false to leave pitch bend and modulation where they are. |
 
 ```lua
@@ -1389,7 +1389,7 @@ Working with the synth through its device profile — the description of the syn
 
 #### `ce.device.requestDump(kind [, fn [, opts]])`
 
-Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile knows, such as "patch" or "global", or one declared with defineDump. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).
+Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request's own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.
 
 *Short name: `requestDump`.*
 
@@ -1455,7 +1455,7 @@ ce.device.applyDump(bytes)
 
 #### `ce.device.sendDump(kind)`
 
-Build a dump from the panel's current values and send it to the synth.
+Build a dump from the panel's current values and send it to the synth. `kind` is a dump the device profile defines, by its id, as requestDump takes it; a kind the profile has no dump by is refused and nothing is sent.
 
 *Short name: `sendDump`.*
 
@@ -1465,7 +1465,7 @@ ce.device.sendDump("patch")
 
 #### `ce.device.buildDump(kind)`
 
-Build a dump from the panel's current values and return its bytes without sending them — for example to store it or change it first.
+Build a dump from the panel's current values and return its bytes without sending them — for example to store it or change it first. `kind` is a dump the device profile defines, by its id, or one declared with defineDump; a kind it has no dump by is refused and nothing comes back.
 
 *Short name: `buildDump`.*
 
@@ -1606,10 +1606,10 @@ Describe a synth parameter from your script, for a synth that has no device prof
 | `choices` | list of text | — | The settings, in order, when the parameter is a choice: their names, each worth its position plus `min` (so { "LP", "HP", "BP" } sends 0, 1 and 2), or { id, value } pairs. write() takes a name in any case, or the number itself; another name is refused, with the choices listed. |
 | `trueValue` | number | 1 | What a boolean sends when it is on. |
 | `falseValue` | number | 0 | What a boolean sends when it is off. |
-| `cc` | number | — | Send it as this CC number, 0 to 127. The simplest of the three wire formats. |
+| `cc` | number (0 to 127) | — | Send it as this CC number, 0 to 127. The simplest of the three wire formats. |
 | `nrpn` | object | — | Send it as an NRPN, as { msb, lsb } or the two numbers as a list. |
 | `sysex` | text or list | — | Send it as a SysEx message built from this template, a list or text such as "F0 41 10 $value F7". Each entry is one byte, a number from 0 to 255 or one or two hex digits, or one of the tokens $value, $deviceId (16 unless `variables` says otherwise), $channel, $checksumStart, $checksum, or any $name you listed in `variables`. Anything else is refused. The checksum covers everything after F0 unless $checksumStart says where it begins. A Roland checksum covers only the address and the data, so a Roland template (41 after F0) with $checksum and no $checksumStart is defined with a warning. |
-| `channel` | number | 1 | The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel puts there. |
+| `channel` | number (1 to 16) | 1 | The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel puts there. |
 | `encoding` | text | "u7" | How the number is packed into a SysEx template's $value: "u7" is one byte, "u14" two, most significant first, as ce.midi.to14bit gives them ("to14bit" is read as the same), and "nibbled" is `nibbles` 4-bit nibbles, most significant first. "boolean-u7", the device profiles' name for a switch's byte, is one byte too. Any case is read; another name is refused. |
 | `nibbles` | number | 2 | How many nibbles a "nibbled" value takes, 1 to 8. |
 | `checksum` | text | "roland" | Which checksum $checksum puts in the template: any of ce.midi.checksum's names, in any case, computed the same way. One wider than a byte, such as a CRC, takes as many bytes as it needs. An unknown name is refused, with the names listed. |
@@ -1742,7 +1742,7 @@ log(`device id ${ce.device.variables().deviceId}`);
 
 #### `ce.device.setVariable(name, value [, role]) -> boolean`
 
-Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16).
+Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16). A number is used as the nearest whole number from 0 to 127, which is said the first time it is not the number given; text that is not a number is refused. Refused too, and nothing is changed, for a device no profile is chosen for.
 
 *Short name: `deviceSetVariable`.*
 
@@ -1772,7 +1772,7 @@ log(`gap ${ce.device.timing().minDelayBetweenMessagesMs} ms`);
 
 #### `ce.device.setTiming(name, ms [, role]) -> boolean`
 
-Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself.
+Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself, uses the nearest whole number in range, and is refused for a device no profile is chosen for.
 
 *Short name: `deviceSetTiming`.*
 
@@ -1848,10 +1848,10 @@ Helper functions for notes and harmony: note names and numbers, scales, chords, 
 | `ce.music.inScale(note, root [, scale]) -> boolean` | Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `inScale`. |
 | `ce.music.degree(note, root [, scale]) -> number` | Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `scaleDegree`. |
 | `ce.music.degreeChord(root, scale, degree [, size]) -> table` | The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. For a chord you already know by name, use `ce.music.chord()`. Short name: `degreeChord`. |
-| `ce.music.quality(notes) -> string` | Name a chord from its notes: [60, 63, 70] gives "min7". It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list. Short name: `chordQuality`. |
-| `ce.music.lead(notes, previous [, mode]) -> list` | Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Short name: `voiceLead`. |
-| `ce.music.octaves(notes [, octaves]) -> list` | Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1. Notes that would go above 127 are left out, not squeezed onto 127. Short name: `expandOctaves`. |
-| `ce.music.arp(notes, pattern) -> list` | The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord. Notes are used in the order you give them, so sort them first for a rising run. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel's arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`. Short name: `arpOrder`. |
+| `ce.music.quality(notes) -> string` | Name a chord from its notes: [60, 63, 70] gives "min7". Each note is a MIDI number or a name, such as 60 or "C4"; a list with anything else in it is refused, and says where. It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list. Short name: `chordQuality`. |
+| `ce.music.lead(notes, previous [, mode]) -> list` | Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Notes are MIDI numbers or names, and come back as numbers; a list with anything else in it is refused and gives an empty list. A mode there is none of is "closest", which is said the first time. Short name: `voiceLead`. |
+| `ce.music.octaves(notes [, octaves]) -> list` | Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1; a number outside that, or not a whole one, is used as the nearest that is, which is said the first time. Notes that would go above 127 are left out, not squeezed onto 127. Notes are MIDI numbers or names, as chordQuality reads them. Short name: `expandOctaves`. |
+| `ce.music.arp(notes, pattern) -> list` | The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord; any other, or none, is "up", said the first time. Notes are used in the order given, so sort them first for a rising run, and come back as MIDI numbers. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel's arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`. Short name: `arpOrder`. |
 
 ### ce.time: timers and musical time
 

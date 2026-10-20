@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -37,6 +37,12 @@ import { colourFieldAt, panelColourFieldAt, realNumber } from './scriptColours.j
 import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
 import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/controlSets.js';
 import { COMPONENT_VERBS } from './componentVerbs.js';
+import { TIME_NUMBERS } from './timeWords.js';
+import { octaveCount } from './noteLists.js';
+import { DRAW_SHAPES, drawNumber } from './drawShapes.js';
+import { componentClampWarning } from './componentVerbs.js';
+
+const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
 
 export { writeValue, colourText, colourToWrite, numberText } from './scriptValueWrite.js';
@@ -207,6 +213,9 @@ function contextOf(context = {}) {
     images: context?.images ?? null,
     // Each device role's profile and its whole parameter table (readDeviceParameter).
     devices: context?.devices ?? null,
+    // The names the panel's scripts share (scriptNames.js), and which script this one is.
+    names: context?.names ?? null,
+    scriptId: context?.scriptId ?? null,
     resolvesToken: (name) => (set ? resolveToken(name, set) !== undefined : false),
     resolve: (value) => (set ? resolveToken(tokenNameOf(value), set) : undefined),
   };
@@ -396,6 +405,15 @@ function buildCall(raw, env) {
     };
   }
   if (resolved?.self) call.self = true;
+  // A drawing's shape, on the outline of the control it is drawn on, and the runtime's sentence for
+  // one that lies wholly outside it (drawShapes.js).
+  if (member && DRAW_SHAPES[member.id]) {
+    const shape = readDrawShape(member.id, args, env.ctx.self);
+    if (shape) {
+      call.shape = shape;
+      if (shape.outside && !call.problem) call.problem = { severity: 'warning', message: shape.outside };
+    }
+  }
   if (member) return call;
   // A ce.<module>.<name> the module does not have fails the moment it runs: said on the call, with
   // what was meant, in the words the editor's own check says it in (unknownCalls.js).
@@ -472,6 +490,7 @@ function kindOfParam(param) {
   if (param.type === 'targetRef') return 'control';
   if (param.type === 'eventName') return 'event';
   if (param.type === 'bytes') return 'bytes';
+  if (param.type === 'dumpKind') return 'dumpKind';
   if (Array.isArray(param.fields) && param.fields.length) return 'options';
   if (param.type === 'object') return 'options';
   if (Array.isArray(param.values) && param.values.length) return 'enum';
@@ -547,11 +566,47 @@ function classify(arg, node, param, site, index) {
     }
     case 'event': {
       const target = site.args.find((a) => a !== arg && (a.param?.type === 'targetRef' || a.param?.kind === 'control'));
-      return setRead(arg, 'event', readEvent(value, { anyTarget: target?.literal && target.value === '*' }), 'choice');
+      return setRead(arg, 'event', readEvent(value, { anyTarget: target?.literal && target.value === '*', names: site.env.ctx.names }), 'choice');
     }
     case 'animation': {
       const read = readAnimation(value, { ...site.env.ctx, controlName: sibling(site, 'control') });
       return setRead(arg, 'animation', read, read.meaning.choices ? 'choice' : null);
+    }
+    // An element a component verb addresses (a pad, a cell, a zone, a slot), read against the
+    // control the call names, with the verb's refusal when it addresses nothing.
+    case 'componentIndex': case 'componentWord': {
+      const target = sibling(site, 'target');
+      const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
+      const rest = site.args.filter((a) => a.param?.name !== 'target');
+      const read = readComponentIndex(value, {
+        memberId: site.memberId, at: rest.indexOf(arg), args: rest.map((a) => (a.literal ? a.value : undefined)),
+        target: String(target ?? ''), control,
+      });
+      const editable = typeof value === 'number' ? 'number' : (typeof value === 'string' && read.meaning.choices?.length ? 'choice' : null);
+      return setRead(arg, kind, read, editable);
+    }
+    // A device role, read against the roles there are; a dump's kind, against the main synth's
+    // profile and the scripts' own declarations.
+    // A timer, a setting, a custom event or an action another script names too.
+    case 'sharedName': {
+      const opts = site.args.find((a) => a !== arg && a.param?.name === 'opts');
+      const scope = !opts ? 'panel' : !opts.literal ? null
+        : typeof opts.value === 'string' ? opts.value : (opts.value?.scope ?? 'panel');
+      const read = readSharedName(value, {
+        names: site.env.ctx.names, memberId: site.memberId, scriptId: site.env.ctx.scriptId, scope,
+        settings: site.env.ctx.panel?.scripting?.settings ?? null,
+      });
+      return setRead(arg, 'sharedName', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
+    }
+    // A list of notes, named, and refused where the runtime refuses it.
+    case 'noteList': return setRead(arg, 'noteList', readNoteList(value, { memberId: site.memberId, name: param.name }), null);
+    case 'deviceRole': {
+      const read = readDeviceRole(value, { devices: site.env.ctx.devices, memberId: site.memberId, controls: site.env.ctx.controls });
+      return setRead(arg, 'deviceRole', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
+    }
+    case 'dumpKind': {
+      const read = readDumpKind(value, { devices: site.env.ctx.devices, memberId: site.memberId });
+      return setRead(arg, 'dumpKind', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
     }
     case 'deviceParameter': {
       // The device is the call's own: read's and parameter's second argument, write's third, bind's
@@ -660,6 +715,21 @@ function numberSite(site, param) {
   if (site.memberId && module === 'ce.midi') out.path = site.memberId;
   out.time = timeSpec(site, param);
   if (site.memberId === 'sendNote' && param.name === 'ms') out.noteLength = 'sendNote';
+  // A component verb's number, which the verb uses as the nearest end of its range when it is past it.
+  if (COMPONENT_VERB_BY_ID.has(site.memberId)) {
+    const target = sibling(site, 'target');
+    const rest = site.args.filter((a) => a.param?.name !== 'target');
+    out.componentClamp = { verb: COMPONENT_VERB_BY_ID.get(site.memberId), target: String(target ?? ''),
+      args: rest.map((a) => (a.literal ? a.value : undefined)) };
+  }
+  // ce.time's helpers, which read every number they are given (timeWords.js).
+  if (TIME_NUMBERS[site.memberId]?.args?.[param.name]) out.timeNumber = { memberId: site.memberId, name: param.name };
+  if (site.memberId === 'expandOctaves' && param.name === 'octaves') out.numberSaid = (v) => octaveCount(v).said;
+  // A drawing's coordinate, read as the runtime reads it (drawShapes.js).
+  if (DRAW_SHAPES[site.memberId]?.nums.includes(param.name)) out.numberSaid = (v) => drawNumber(site.memberId, param.name, v).said;
+  // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
+  const bpm = (site.memberId === 'beatsToMs' || site.memberId === 'msToBeats') && param.name !== 'bpm' ? realNumber(sibling(site, 'bpm')) : undefined;
+  if (bpm > 0) out.tempo = bpm;
   // ce.anim's duration, delay and beats, as the moves read them (panelRuntime's animTiming).
   if (ANIM_VERBS[site.memberId] && ['duration', 'delay', 'beats', 'stagger', 'damping', 'frequency'].includes(param.name)) {
     const fallback = { duration: 300, damping: 6, frequency: 12 }[param.name] ?? 0;
@@ -743,6 +813,32 @@ function optionsArg(arg, node, param, site, parent = '') {
     classify(row, entry.node, field, optionSite);
   }
   arg.options = rows;
+  if (site.memberId === 'deviceDefineParameter' && param?.name === 'spec' && !parent) specRefusalRow(arg, site);
+}
+
+/**
+ * defineParameter's spec, refused as the runtime refuses it (parameterSpecRefusal): on the row of
+ * the field the refusal names ("channel is 20, …", "nrpn.msb is 200, …"), else on the spec's own.
+ * The definition says only the first field it cannot use, so the rows say only that one: a number
+ * row's own range sentence is not the runtime's, and is dropped for it.
+ */
+function specRefusalRow(arg, site) {
+  const flat = [];
+  const walk = (rows, at) => {
+    for (const row of rows ?? []) {
+      const path = at ? `${at}.${row.name}` : String(row.name);
+      flat.push({ row, path });
+      walk(row.options, path);
+    }
+  };
+  walk(arg.options, '');
+  for (const { row } of flat) if (row.kind === 'number') row.problem = null;
+  const error = arg.literal ? parameterSpecRefusal(arg.value, sibling(site, 'id')) : null;
+  if (!error) return;
+  const said = error.slice(error.indexOf('): ') + 3);
+  const target = flat.find(({ path }) => said.startsWith(`${path} is `) || said.startsWith(`the ${path} is `))?.row ?? arg;
+  for (const { row } of flat) if (row !== target && row.problem?.message === error) row.problem = null;
+  if (!target.problem) target.problem = { severity: 'error', message: error };
 }
 
 /** create's and clone's `<section>`: a section's settings, typed by the templates (or the clone's control). */

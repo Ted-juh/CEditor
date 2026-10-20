@@ -38,7 +38,9 @@ import { JOYSTICK_RETURN_AXES } from '../utils/joystickLayout.js';
 import { METER_SCALES } from '../utils/meterLayout.js';
 import { TRANSPORT_SOURCES } from '../utils/transportLayout.js';
 import { PANIC_SCOPES } from '../utils/panicLayout.js';
-import { VOICINGS, HARMONY_MODES, OUT_OF_KEY, VOICE_LEADING } from '../utils/harmoniserLayout.js';
+import { VOICINGS, HARMONY_MODES, OUT_OF_KEY, VOICE_LEADING, MEMORY_PRESETS } from '../utils/harmoniserLayout.js';
+import { SPLIT_PRESETS } from '../utils/splitZoneLayout.js';
+import { PHRASE_SEEDS, PHRASE_DIRECTIONS } from '../utils/phraseLayout.js';
 import { RECORDER_SOURCES } from '../utils/noteRecorderLayout.js';
 
 /* The LCD and the Pixel display have no layout module of their own — their behaviour lives in the
@@ -136,4 +138,9 @@ export const HAND_WRITTEN_VALUES = {
   'harmony.outOfKey': OUT_OF_KEY,
   'harmony.voiceLeading': VOICE_LEADING,
   'recorder.source': RECORDER_SOURCES,
+  // splitPreset was described as "single"/"split"/"layer"/"three", none of which is a preset.
+  'split.preset': SPLIT_PRESETS.map((p) => p.id),
+  'phrase.seed': PHRASE_SEEDS.map((p) => p.id),
+  'phrase.direction': PHRASE_DIRECTIONS,
+  'harmony.shape': MEMORY_PRESETS.map((p) => p.id),
 };

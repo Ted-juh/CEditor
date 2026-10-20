@@ -882,6 +882,10 @@ export function statementUnits(source, languageId, tokens, match, starts) {
 // Indices are into the token stream the caller passes, which may hold { t: 'hole' } markers.
 
 const CHAIN_SEPARATORS = new Set(['.', ':', '?.', '->', '::']);
+// ":" chains only in Lua (obj:name()). Elsewhere it ends a key or a block header, or is a ternary's
+// second half, and taking it for a chain read `{ a: clamp(x) }` as a call to a.clamp and lost the
+// call after a Python `def f():` and after a ternary's ":".
+const chains = (tok, fam) => tok?.t === 'op' && CHAIN_SEPARATORS.has(tok.v) && (tok.v !== ':' || fam === 'lua');
 
 /** The token stream of a unit: its own tokens, with each hole as one { t: 'hole' } marker. */
 export function unitStream(tokens, unit) {
@@ -911,9 +915,9 @@ export function scanCalls(stream, lo, hi, fam, match = matchBrackets(stream)) {
   while (i < hi) {
     const tok = stream[i];
     const before = stream[i - 1];
-    if (tok.t === 'id' && !(i > lo && before?.t === 'op' && CHAIN_SEPARATORS.has(before.v))) {
+    if (tok.t === 'id' && !(i > lo && chains(before, fam))) {
       let k = i + 1;
-      while (k + 1 < hi && stream[k].t === 'op' && CHAIN_SEPARATORS.has(stream[k].v) && stream[k + 1].t === 'id') k += 2;
+      while (k + 1 < hi && chains(stream[k], fam) && stream[k + 1].t === 'id') k += 2;
       const next = stream[k];
       const call = next && k < hi ? callAt(stream, i, k, hi, fam, match) : null;
       if (call) {

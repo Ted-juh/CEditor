@@ -207,10 +207,29 @@ const CASES = [
   // Tension 0 is the default, not a straight line: `tension || 1.6` in the app, as in shape().
   ['mapCurve', [0.75, [[0, 0], [0.5, 1, 'exp', 0], [1, 0, 'log']]]],
   ['mapCurve', [0.6, [[0, 0.2, 'exp'], [1, 0.8]]]],
+  // ce.time's numbers read as the transport reads them, where one is not used as written (the words
+  // are compared in their own test below). A boolean is no number: it was 1 in three runtimes and
+  // the default in Lua.
+  ['stepAt', ['x', '1/16']], ['stepAt', ['2.5', '1/8']], ['swingOffset', [true, 2, '1/16']],
+  ['beatsToMs', ['x', 120]], ['beatsToMs', ['2', 120]], ['msToBeats', [true, 60]], ['beatsToMs', [true, 120]],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
 // tables back to JS arrays.
+// ce.music's lists of notes and the words they take (noteLists.js): each call's answer, and what it
+// says, in every engine.
+const NOTE_CALLS = [
+  ['chordQuality', [['C4', 'Eb4', 'G4']]], ['chordQuality', [['60', '64', '67']]], ['chordQuality', [[60, 'X9']]],
+  ['chordQuality', [[60, true]]], ['chordQuality', [null]],
+  ['voiceLead', [['C4', 'E4', 'G4'], ['B3', 'D4', 'G4']]], ['voiceLead', [[60, 64, 67], [59, 'nope']]],
+  ['voiceLead', [[60, 64, 67], [59, 62, 67], 'loose']], ['voiceLead', [[60, 64, 67], [59, 62, 67], 'loose']],
+  ['voiceLead', ['C4', [60]]], ['voiceLead', [null, [60]]], ['voiceLead', [[60, 64]]],
+  ['expandOctaves', [['C4', 'E4'], 2]], ['expandOctaves', [[60], 7]], ['expandOctaves', [[60], 0]],
+  ['expandOctaves', [[60], 2.5]], ['expandOctaves', [[60], 'two']], ['expandOctaves', [[60, false]]],
+  ['arpOrder', [['C4', 'E4', 'G4'], 'down']], ['arpOrder', [[60, 64], 'sideways']], ['arpOrder', [[60, 64]]],
+  ['arpOrder', [[60, {}], 'up']],
+];
+
 const STRUCT_CASES = [
   ['to14bit', [16383]], ['to14bit', [128]],
   ['to7bit', [16383, 2, 'msb']], ['to7bit', [128, 2, 'lsb']], ['to7bit', [1, 4, 'msb']],
@@ -251,6 +270,9 @@ const STRUCT_CASES = [
   ['arpOrder', [[60, 64, 67], 'chord']], ['arpOrder', [[60, 64, 67], 'random']],
   ['arpOrder', [[60, 64, 67], 'asPlayed']], ['arpOrder', [[60, 64], 'updown']],
   ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
+  // Lists of notes by name, or with text that is a number, read as numbers; one with anything else
+  // in it refused. The words they take used as their defaults (noteLists.js).
+  ...NOTE_CALLS,
   ['divisionNames', []],
   ['hexToRgb', ['336699']], ['hexToRgb', ['#0A0B0C']], ['hexToRgb', ['bad']],
   ['hexToRgb', ['#5B9BD580']], ['hexToRgb', ['x5B9BD5']], ['hexToRgb', ['#12#34#56']], ['hexToRgb', [0xFF0000]],
@@ -265,6 +287,9 @@ const STRUCT_CASES = [
   ['cycleAt', [6, 0]], ['cycleAt', [6, 1000]], ['cycleAt', [-3, 2]],
   ['loopedBeats', [0, 4, 8]], ['loopedBeats', [4, 4, 8]], ['loopedBeats', [13, 4, 8]],
   ['loopedBeats', [20, 4, 8]], ['loopedBeats', [20, 4, 0]],
+  ['barBeatAt', [-1, 0]], ['barBeatAt', ['8', null]], ['barBeatAt', [true]], ['stepsBetween', [0, 4, '1/4', 0.4]],
+  ['stepsBetween', [-2, 'soon', '1/4']], ['cycleAt', ['x', 100, 0]], ['cycleAt', [4, 0.1, 'three']],
+  ['loopedBeats', [-3, -1, 0]],
   // Byte lists that come back as lists: a field written across a byte boundary, a write that grows
   // the list, the empty slice, and base64 with and without padding and with whitespace in it.
   ['setBits', [[0, 180], 12, 3, 5]], ['setBits', ['00 00', 7, 2, 3]], ['setBits', [[255], 0, 8, 0]],
@@ -401,6 +426,7 @@ test('the Lua engine prelude computes what the WebView runtime computes', async 
     // helper being tested — it fails the whole prelude, before any of them are defined.
     lua.global.set('log', () => {});
     lua.global.set('logError', () => {});
+    lua.global.set('logWarn', () => {});
     lua.global.set('sendCC', () => {});
     lua.global.set('on', () => {});
     lua.global.set('startTimer', () => {});
@@ -1353,6 +1379,106 @@ sys.stdout.write(json.dumps(warns, ensure_ascii=False))
   assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
 });
 
+/* ------------------------------------------------- ce.time's numbers, as the transport reads them */
+
+// A number ce.time's helpers cannot use as written is said, once per helper and argument, in the
+// same words in every engine (timeWords.js). The second barBeatAt and the second cycleAt's bars say
+// nothing; text that is a number, and an argument left out, say nothing at all.
+const TIME_CALLS = [
+  ['barBeatAt', [-1, 0]], ['barBeatAt', [-2, 0]], ['stepAt', ['x', '1/16']], ['stepsBetween', [0, 4, '1/4', 0.4]],
+  ['stepsBetween', [-2, 'soon', '1/4']], ['swingOffset', [true, 2, '1/16']], ['cycleAt', ['x', 100, 0]],
+  ['cycleAt', [4, 0.1]], ['loopedBeats', [-3, -1, 0]], ['beatsToMs', ['x', 120]], ['beatsToMs', [1, -5]],
+  ['msToBeats', [true, 'fast']], ['barBeatAt', ['8', null]], ['stepAt', ['2.5', '1/8']],
+];
+
+test('ce.time\'s helpers say a number they cannot use as written, once, in the same words everywhere', async (t) => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  for (const [fn, args] of TIME_CALLS) web[fn](...args);
+  const want = get(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+  const said = (text) => `${text} This is said only the first time.`;
+  assert.deepEqual(want, [
+    said('ce.time.position: beats is -1, which is less than 0, so 0 was used.'),
+    said('ce.time.position: beatsPerBar is 0, which is less than 1, so 1 was used.'),
+    said('ce.time.step: beats is "x", which is not a number, so 0 was used.'),
+    said('ce.time.steps: max is 0.4, which is less than 1, so 1 was used.'),
+    said('ce.time.steps: from is -2, which is less than 0, so 0 was used.'),
+    said('ce.time.steps: to is "soon", which is not a number, so 0 was used.'),
+    said('ce.time.swing: step is true, which is not a number, so 0 was used.'),
+    said('ce.time.swing: amount is 2, which is more than 1, so 1 was used.'),
+    said('ce.time.cycle: beats is "x", which is not a number, so 0 was used.'),
+    said('ce.time.cycle: bars is 100, which is more than 64, so 64 was used.'),
+    said('ce.time.cycle: beatsPerBar is 0, which is less than 1, so 1 was used.'),
+    said('ce.time.looped: beats is -3, which is less than 0, so 0 was used.'),
+    said('ce.time.looped: startBeats is -1, which is less than 0, so 0 was used.'),
+    said('ce.time.looped: lengthBeats is 0, which is less than 0.01, so 0.01 was used.'),
+    said('ce.time.beatsToMs: beats is "x", which is not a number, so 0 was used.'),
+    said('ce.time.beatsToMs: bpm is -5, which is not above 0, so the transport\'s tempo was used.'),
+    said('ce.time.msToBeats: ms is true, which is not a number, so 0 was used.'),
+    said('ce.time.msToBeats: bpm is "fast", which is not a number, so the transport\'s tempo was used.'),
+  ]);
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
+  resetScriptStateForTesting();
+
+  // JavaScript, under node:vm.
+  {
+    const warns = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'warn') warns.push(String(m)); } : () => undefined),
+    });
+    for (const [fn, args] of TIME_CALLS) sandbox[fn](...args);
+    assert.deepEqual(warns, want, 'JS prelude');
+  }
+  // Lua, under wasmoon.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      // __transportState answers nothing, as a host with no transport does: a bpm the helpers cannot
+      // use falls back to a tempo there is none of.
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = TIME_CALLS.map(([fn, args]) => `${fn}(${args.map(luaLiteral).join(', ')})`).join('\n');
+      const got = String(await lua.doString(`local w = {}\nlogWarn = function(m) w[#w + 1] = tostring(m) end\n${calls}\nreturn table.concat(w, "\\n")`));
+      assert.deepEqual(got.split('\n'), want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its warnings were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+warns = []
+g["logWarn"] = lambda m, *rest: warns.append(str(m))
+for fn, args in payload["calls"]:
+    g[fn](*args)
+sys.stdout.write(json.dumps(warns, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: TIME_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
 /* ---------------------------------------------- each language's own byte type, as a list */
 
 // The byte-list helpers take a list or hex text everywhere, and also the byte type each language
@@ -1622,4 +1748,158 @@ test('the three preludes derive the same private key for the same script, or sco
   assert.equal(sandbox.__storageStore('script'), 'panel',
     'script scope is a prefix on the panel store, not a store of its own');
   assert.equal(sandbox.__storageStore('local'), 'local');
+});
+
+// requestDump's callback is matched against the id a dump arrives under, which is the dump's own
+// ("system"), and a request ("requestSystem") is not one. Each runtime asks the host which dump a
+// request answers with (the plug-in's "answers" query; the WebView reads the profile itself) and
+// waits for that, so a callback for a request hears the dump instead of only its timeout.
+test('a callback for a request waits for the dump it answers with, in every prelude', async (t) => {
+  const answers = (kind, payload) => (kind === 'answers' && payload?.request === 'requestSystem' ? 'system' : undefined);
+  const want = [['system', true], ['common', true]];
+  // JavaScript, under node:vm.
+  {
+    const heard = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, { get: (_t, prop) => (prop === 'deviceQuery' ? answers : () => undefined) });
+    sandbox.requestDump('requestSystem', (values, info) => heard.push([info.kind, info.ok]));
+    sandbox.requestDump('common', (values, info) => heard.push([info.kind, info.ok]));
+    sandbox.__resolveDumps('system', 'mainSynth', {}, '');
+    sandbox.__resolveDumps('common', 'mainSynth', {}, '');
+    assert.deepEqual(heard, want, 'JS prelude');
+  }
+  // Lua, under wasmoon: the prelude's own onDumpReceived handler is how a dump reaches the waiters.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'startTimer', 'stopTimer', '__transportState', '__requestDump']) {
+        lua.global.set(name, () => {});
+      }
+      let onDump = null;
+      lua.global.set('on', (_target, event, fn) => { if (event === 'onDumpReceived') onDump = fn; });
+      lua.global.set('__deviceQuery', (kind, payload) => answers(kind, payload));
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      await lua.doString(`__heard = {}
+requestDump("requestSystem", function(values, info) __heard[#__heard + 1] = info.kind end)
+requestDump("common", function(values, info) __heard[#__heard + 1] = info.kind end)`);
+      assert.equal(typeof onDump, 'function', 'the prelude registers its onDumpReceived handler');
+      onDump({ kind: 'system', role: 'mainSynth', values: {} });
+      onDump({ kind: 'common', role: 'mainSynth', values: {} });
+      const heard = String(await lua.doString('return table.concat(__heard, ",")'));
+      assert.deepEqual(heard.split(','), want.map(([kind]) => kind), 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its waiters were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name):
+        if name == "deviceQuery":
+            return lambda kind, payload=None: "system" if kind == "answers" and (payload or {}).get("request") == "requestSystem" else None
+        return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "logWarn", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+heard = []
+g["requestDump"]("requestSystem", lambda values, info: heard.append([info["kind"], info["ok"]]))
+g["requestDump"]("common", lambda values, info: heard.append([info["kind"], info["ok"]]))
+g["__resolveDumps"]("system", "mainSynth", {}, None)
+g["__resolveDumps"]("common", "mainSynth", {}, None)
+sys.stdout.write(json.dumps(heard))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
+test('the note lists and their words are read, refused and said alike in every engine', async (t) => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  const said = [];
+  for (const [fn, args] of NOTE_CALLS) {
+    clearScriptTrace();
+    web[fn](...args);
+    said.push(get(scriptTrace).filter((e) => e.kind === 'error' || e.kind === 'warn').map((e) => `${e.kind}: ${e.message}`));
+  }
+  resetScriptStateForTesting();
+  assert.deepEqual(said[0], [], 'a chord by name is read');
+  assert.deepEqual(said[2], ['error: ce.music.quality: "X9" at position 2 of notes is not a note name, so there is no answer. '
+    + 'A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
+  assert.deepEqual([said[7].length, said[8].length], [1, 0], 'a word used as its default is said once');
+  // JavaScript, under node:vm.
+  {
+    const lines = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error' || kind === 'warn') lines.push(`${kind}: ${m}`); } : () => undefined),
+    });
+    const got = NOTE_CALLS.map(([fn, args]) => { lines.length = 0; sandbox[fn](...args); return [...lines]; });
+    assert.deepEqual(got, said, 'JS prelude');
+  }
+  // Lua, under wasmoon.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) lua.global.set(name, () => {});
+      await lua.doString(`__lines = {}
+logError = function(m) __lines[#__lines + 1] = "error: " .. tostring(m) end
+logWarn = function(m) __lines[#__lines + 1] = "warn: " .. tostring(m) end`);
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = NOTE_CALLS.map(([fn, args]) => `__lines = {}\n${fn}(${args.map(luaLiteral).join(', ')})\n__out[#__out + 1] = table.concat(__lines, "\\u{1}")`).join('\n');
+      const out = String(await lua.doString(`__out = {}\n${calls}\nreturn table.concat(__out, "\\u{2}")`));
+      const got = out.split('\u0002').map((x) => (x ? x.split('\u0001') : []));
+      assert.deepEqual(got, said, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its words were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+lines = []
+g["logWarn"] = lambda m, *rest: lines.append("warn: " + str(m))
+g["logError"] = lambda m, *rest: lines.append("error: " + str(m))
+out = []
+for fn, args in payload["calls"]:
+    lines.clear()
+    g[fn](*args)
+    out.append(list(lines))
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: NOTE_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), said, 'Python prelude');
 });

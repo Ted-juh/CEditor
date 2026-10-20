@@ -38,6 +38,11 @@ import {
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
+import { timeNumber } from './timeWords.js';
+import { HAND_WRITTEN, handWrittenRefusal, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
+import { layoutWord } from './layoutWords.js';
+import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
+import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -70,7 +75,10 @@ import {
 } from '../stores/deviceProfiles.js';
 import { profileSources } from '../stores/deviceProfileStores.js';
 import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
-import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
+import {
+  deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, DEVICE_OVERRIDES, deviceOverrideValue,
+  deviceSetNoNameWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
+} from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
@@ -134,7 +142,7 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, readIndexRefusal, LIST_KINDS,
   itemListLength, LINK_KIND, ELEM_KIND,
 } from './componentVerbs.js';
 import {
@@ -1174,8 +1182,22 @@ const musicNotes = (verb, kind, root, name) => {
   return steps.map((x) => base + x);
 };
 // Sorted ascending, which is what every voicing rule below assumes.
-const musicSorted = (list) => (Array.isArray(list) ? list.slice() : []).map(Number)
-  .filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+// ce.music's lists of notes, read as noteLists.js reads them: a number, a note name or text that
+// is a number, and one that is neither refuses the call where it is. They were read as numbers, so
+// a chord written by name was an empty one, without a word. null for a list refused.
+function musicNoteList(memberId, name, list) {
+  const { notes, refused } = noteList(memberId, name, list);
+  if (refused) { addScriptTrace('error', '', refused); return null; }
+  return notes;
+}
+const musicSorted = (notes) => notes.slice().sort((a, b) => a - b);
+// A word or a count used as its default, said once (noteLists.js); resetScriptState clears it.
+const musicWarned = new Set();
+function musicSaid(said) {
+  if (!said || musicWarned.has(said)) return;
+  musicWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
 // A count argument that is not a finite number falls back to its default. Written out rather than
 // leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree
 // or a size differing by one between runtimes is a chord differing by a third.
@@ -2097,7 +2119,9 @@ const helpers = {
   // built by hand. The vocabulary is the panel's, so a chord this names and a chord the Chord Pad
   // labels agree.
   chordQuality: (notes) => {
-    const list = musicSorted(notes);
+    const read = musicNoteList('chordQuality', 'notes', notes);
+    if (!read) return undefined;
+    const list = musicSorted(read);
     if (!list.length) return undefined;
     const iv = list.map((x) => musicMod12(x - list[0]));
     const has = (a) => iv.includes(a);
@@ -2118,9 +2142,13 @@ const helpers = {
   // lets the inner voices jump; 'off' returns the chord in root position. With no previous chord
   // there is nothing to lead from, so the chord comes back untouched.
   voiceLead: (notes, previous, mode) => {
-    const chord = musicSorted(notes);
-    const prev = musicSorted(previous);
-    const how = mode == null ? 'closest' : String(mode);
+    const read = musicNoteList('voiceLead', 'notes', notes);
+    const before = read && musicNoteList('voiceLead', 'previous', previous);
+    if (!read || !before) return [];
+    const chord = musicSorted(read);
+    const prev = musicSorted(before);
+    const { how, said } = voiceLeadMode(mode);
+    musicSaid(said);
     if (!chord.length || !prev.length || how === 'off') return chord;
     let best = chord;
     let bestScore = Infinity;
@@ -2139,8 +2167,11 @@ const helpers = {
   // ascending and clamped into MIDI range; anything that would land above 127 is DROPPED rather
   // than clamped, because clamping stacks strays on one pitch and that sounds like a stuck key.
   expandOctaves: (notes, octaves) => {
-    const base = musicSorted(notes).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
-    const oc = Math.min(4, Math.max(1, musicCount(octaves, 1)));
+    const read = musicNoteList('expandOctaves', 'notes', notes);
+    if (!read) return [];
+    const base = musicSorted(read).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
+    const { n: oc, said } = octaveCount(octaves);
+    musicSaid(said);
     const out = [];
     for (let o = 0; o < oc; o += 1) for (const n of base) { const v = n + o * 12; if (v <= 127) out.push(v); }
     return out;
@@ -2154,9 +2185,12 @@ const helpers = {
   // step at play time rather than shuffling the walk. A script that wants a shuffled WALK has
   // ce.math.shuffle, which is seeded and therefore repeatable.
   arpOrder: (notes, pattern) => {
-    const asc = (Array.isArray(notes) ? notes : []).slice();
+    const asc = musicNoteList('arpOrder', 'notes', notes);
+    if (!asc) return [];
+    const { which, said } = arpOrderPattern(pattern);
+    musicSaid(said);
     if (!asc.length) return [];
-    switch (String(pattern)) {
+    switch (which) {
       case 'down': return asc.slice().reverse().map((n) => [n]);
       case 'updown': return [...asc, ...asc.slice(1, -1).reverse()].map((n) => [n]);
       case 'downup': {
@@ -2204,14 +2238,19 @@ const helpers = {
   // Where a beat position falls, musically — for ANY position, not only the one the transport is
   // at. `text` is the Transport's own readout ("3.2.00"), so a script's label and the component's
   // agree character for character. Ticks are 24 PPQN, the MIDI clock resolution.
+  //
+  // Their numbers are read as the transport reads them, and one not used as written is said once
+  // (timeArg): a position before the start is the start, and text that is not a number is the
+  // argument's default.
   barBeatAt: (beats, beatsPerBar) => {
-    const signature = { beats: beatsPerBar == null ? 4 : beatsPerBar, unit: 4 };
-    return { ...panelBarBeat(beats, signature), text: panelFormatBarBeat(beats, signature) };
+    const b = timeArg('barBeatAt', 'beats', beats);
+    const signature = { beats: timeArg('barBeatAt', 'beatsPerBar', beatsPerBar), unit: 4 };
+    return { ...panelBarBeat(b, signature), text: panelFormatBarBeat(b, signature) };
   },
   // Which step of the grid a position is on, counting from 0 at the transport origin.
   stepAt: (beats, division) => {
     const id = divisionId('ce.time.step', division);
-    return id === undefined ? undefined : panelStepAtBeat(beats, id);
+    return id === undefined ? undefined : panelStepAtBeat(timeArg('stepAt', 'beats', beats), id);
   },
   // The step boundaries crossed between two readings — the never-lose-an-event rule every synced
   // follower in the panel runs on. A stalled frame must FIRE the steps it slept through rather than
@@ -2221,34 +2260,43 @@ const helpers = {
   // more than replaying where you were.
   stepsBetween: (fromBeats, toBeats, division, max) => {
     const id = divisionId('ce.time.steps', division);
-    return id === undefined ? undefined : panelCrossedSteps(fromBeats, toBeats, id, max == null ? 16 : max);
+    if (id === undefined) return undefined;
+    const from = timeArg('stepsBetween', 'from', fromBeats);
+    const to = timeArg('stepsBetween', 'to', toBeats);
+    return panelCrossedSteps(from, to, id, timeArg('stepsBetween', 'max', max));
   },
   // The panel's shuffle: every odd step pushed later by up to half a step. In BEATS, to add to a
   // step's position. Two sequencers at "the same" swing really are the same swing only if they
   // compute it the same way, which is why this is the transport's function and not a second one.
   swingOffset: (step, amount, division) => {
     const id = divisionId('ce.time.swing', division);
-    return id === undefined ? undefined : panelSwungBeatOffset(step, amount, id);
+    if (id === undefined) return undefined;
+    const s = timeArg('swingOffset', 'step', step);
+    return panelSwungBeatOffset(s, timeArg('swingOffset', 'amount', amount), id);
   },
   // For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep.
   // Derived from the position, never accumulated, so a cycle running for an hour is still exactly
   // on the bar line. `length` is the cycle in beats; `count` is how many have completed.
   cycleAt: (beats, bars, beatsPerBar) => {
-    const perBar = beatsPerBar == null ? 4 : beatsPerBar;
+    const b = timeArg('cycleAt', 'beats', beats);
+    const n = timeArg('cycleAt', 'bars', bars);
+    const perBar = timeArg('cycleAt', 'beatsPerBar', beatsPerBar);
     return {
-      phase: panelCyclePhaseAt(beats, bars, perBar),
-      count: panelCycleCountAt(beats, bars, perBar),
-      length: panelCycleBeats(bars, perBar),
+      phase: panelCyclePhaseAt(b, n, perBar),
+      count: panelCycleCountAt(b, n, perBar),
+      length: panelCycleBeats(n, perBar),
     };
   },
   // Fold a timeline position into a loop. Before the loop start the position is untouched — you can
   // run IN to a loop from earlier in the song, which is what every DAW does and what a count-in
   // needs. `pass` is which time round you are, and -1 before the loop has been reached; a script
   // watching it for CHANGES knows a wrap happened without a wrap handler that can miss one.
-  loopedBeats: (beats, startBeats, lengthBeats) => ({
-    beats: panelLoopedBeats(beats, startBeats, lengthBeats),
-    pass: panelLoopCycleIndex(beats, startBeats, lengthBeats),
-  }),
+  loopedBeats: (beats, startBeats, lengthBeats) => {
+    const b = timeArg('loopedBeats', 'beats', beats);
+    const start = timeArg('loopedBeats', 'startBeats', startBeats);
+    const length = timeArg('loopedBeats', 'lengthBeats', lengthBeats);
+    return { beats: panelLoopedBeats(b, start, length), pass: panelLoopCycleIndex(b, start, length) };
+  },
   // Tempo from tap times, in the milliseconds nowMs() reports. Taps more than `resetMs` apart start
   // a NEW measurement rather than averaging across the pause — otherwise the first tap after a
   // break poisons it, which is what every hand-rolled tap tempo gets wrong. Nothing comes back from
@@ -3061,6 +3109,11 @@ const midiApi = {
   // sendDump builds the dump from the device profile and sends it (host-side bulk send).
   sendDump: (kind) => {
     const role = DEFAULT_ROLE;
+    const refused = dumpKindRefusal('sendDump', kind);
+    if (refused) {
+      addScriptTrace('error', '', refused);
+      return;
+    }
     if (isJuceAvailable()) {
       startBulkDumpSend({ deviceRole: role, expectedDumpId: String(kind ?? ''), dryRun: false });
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) → bulk send requested`);
@@ -3079,6 +3132,11 @@ const midiApi = {
   // The error is at ERROR level, not 'midi': it used to be the latter, which reads as ordinary
   // chatter, so a script got a quiet null and no indication anything was wrong.
   buildDump: (kind, values) => {
+    const refused = dumpKindRefusal('buildDump', kind, { outcome: 'nothing was built' });
+    if (refused) {
+      addScriptTrace('error', '', refused);
+      return null;
+    }
     const built = buildRuntimeDump(DEFAULT_ROLE, String(kind ?? ''), values ?? {});
     if (built === null) {
       addScriptTrace('error', '',
@@ -3147,17 +3205,26 @@ function splitAction(path, action, args) {
     addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
     return;
   }
+  // A zone that is not one, or a preset there is none of, is refused, and says which there are
+  // (handWrittenVerbs.js). The zone was logged as though it had been set, and nothing changed; the
+  // preset replaced every zone with one whole-keyboard zone.
+  const refused = handWrittenRefusal('split', action, { zones: current }, args ?? {});
+  if (refused) {
+    addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, refused.reason));
+    return false;
+  }
   const next = applySplitScriptAction(current, action, args ?? {});
   setValue(zonesPath, next);
   addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
+  return true;
 }
 const splitApi = {
-  splitPreset: (target, preset, lowNote, highNote) =>
-    splitAction(target, 'preset', { preset, lowNote, highNote }),
-  splitMute: (target, zone, enabled) => splitAction(target, 'mute', { zone, enabled: enabled !== false }),
-  splitChannel: (target, zone, channel) => splitAction(target, 'channel', { zone, channel }),
-  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', { zone, transpose: semitones }),
-  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
+  // Their arguments are built where the Values tab builds them (handWrittenVerbs.js).
+  splitPreset: (target, preset, lowNote, highNote) => splitAction(target, 'preset', HAND_WRITTEN.splitPreset.args(preset, lowNote, highNote)),
+  splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN.splitMute.args(zone, enabled)),
+  splitChannel: (target, zone, channel) => splitAction(target, 'channel', HAND_WRITTEN.splitChannel.args(zone, channel)),
+  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN.splitTranspose.args(zone, semitones)),
+  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN.splitPoint.args(zone, note)),
   splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
 };
 
@@ -3173,6 +3240,13 @@ function phraseAction(path, action, args) {
     addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
     return;
   }
+  // A cell off the grid, a seed or a direction there is none of, and a key that is not a pitch
+  // class are refused, and say what there is (handWrittenVerbs.js). They said "nothing to change".
+  const refused = handWrittenRefusal('phrase', action, cfg, args ?? {});
+  if (refused) {
+    addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, refused.reason));
+    return false;
+  }
   const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
   const keys = Object.keys(patch);
   if (keys.length === 0) {
@@ -3185,14 +3259,14 @@ function phraseAction(path, action, args) {
   addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
 }
 const phraseApi = {
-  phraseSeed: (target, seed) => phraseAction(target, 'seed', { seed }),
+  phraseSeed: (target, seed) => phraseAction(target, 'seed', HAND_WRITTEN.phraseSeed.args(seed)),
   phraseClear: (target) => phraseAction(target, 'clear', {}),
-  phraseKey: (target, key) => phraseAction(target, 'key', { key }),
+  phraseKey: (target, key) => phraseAction(target, 'key', HAND_WRITTEN.phraseKey.args(key)),
   phraseScale: (target, scale) => phraseAction(target, 'scale', { scale }),
   phraseTranspose: (target, semitones) => phraseAction(target, 'transpose', { transpose: semitones }),
-  phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
+  phraseDirection: (target, direction) => phraseAction(target, 'direction', HAND_WRITTEN.phraseDirection.args(direction)),
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
-  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN.phraseCell.args(step, row, on)),
   phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
 };
 
@@ -3228,8 +3302,9 @@ function sectionAction(path, section, reducer, action, args) {
     }
     // Refused, and said so at error level: it reads exactly like a dead footswitch otherwise, and
     // a scene name that does not exist is a typo somebody needs to see.
-    addScriptTrace('error', '',
-      `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — refused, nothing changed`);
+    // With why (handWrittenVerbs.js): the words there are, a slot that holds no take, the scenes.
+    const family = section.toLowerCase();
+    addScriptTrace('error', '', sectionRefusalLine(family, target, action, args, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
     return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
@@ -3247,31 +3322,31 @@ const recorderApi = {
     recAction(target, 'quantize', { grid, strength, scale, key }),
   recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
   recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
-  recorderSource: (target, source) => recAction(target, 'source', { source }),
+  recorderSource: (target, source) => recAction(target, 'source', HAND_WRITTEN.recorderSource.args(source)),
   recorderNudge: (target, by) => recAction(target, 'nudge', { by }),
   recorderShift: (target, semitones) => recAction(target, 'shift', { semitones }),
-  recorderStore: (target, slot, name) => recAction(target, 'store', { slot, name }),
-  recorderLoad: (target, slot) => recAction(target, 'load', { slot }),
+  recorderStore: (target, slot, name) => recAction(target, 'store', HAND_WRITTEN.recorderStore.args(slot, name)),
+  recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN.recorderLoad.args(slot)),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
   recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
 };
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
 const harmoniserApi = {
-  harmonyMode: (target, mode) => harmAction(target, 'mode', { mode }),
-  harmonyKey: (target, key) => harmAction(target, 'key', { key }),
+  harmonyMode: (target, mode) => harmAction(target, 'mode', HAND_WRITTEN.harmonyMode.args(mode)),
+  harmonyKey: (target, key) => harmAction(target, 'key', HAND_WRITTEN.harmonyKey.args(key)),
   harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
   harmonySize: (target, size) => harmAction(target, 'size', { size }),
-  harmonyShape: (target, shape) => harmAction(target, 'shape', { shape, preset: shape }),
-  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', { voicing }),
+  harmonyShape: (target, shape) => harmAction(target, 'shape', HAND_WRITTEN.harmonyShape.args(shape)),
+  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', HAND_WRITTEN.harmonyVoicing.args(voicing)),
   harmonyInversion: (target, inversion) => harmAction(target, 'inversion', { inversion }),
   harmonyOctave: (target, octave) => harmAction(target, 'octave', { octave }),
-  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', { outOfKey: mode }),
+  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', HAND_WRITTEN.harmonyOutOfKey.args(mode)),
   harmonyKeepPlayed: (target, keep) => harmAction(target, 'keepPlayed', keep === undefined ? {} : { keepPlayed: keep !== false }),
   harmonyChannel: (target, channel) => harmAction(target, 'channel', { channel }),
-  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', { voiceLeading: mode }),
+  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', HAND_WRITTEN.harmonyVoiceLeading.args(mode)),
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
-  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
+  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', HAND_WRITTEN.harmonyDegree.args(degree, chord)),
   harmonyRead: (target, field) => sectionRead(target, 'Harmoniser', 'harmony', field),
 };
 
@@ -3324,6 +3399,7 @@ function writeComponentFields(verb, path, patch) {
   return true;
 }
 
+const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
   const cfg = getValue(`${path}.${verb.section}`);
@@ -3334,6 +3410,12 @@ function componentVerbAction(verb, target, args) {
   const patch = componentScriptPatch(verb, cfg, args);
   const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  // A number past the verb's range is used as the nearest end, and said once per verb.
+  const clamped = componentClampWarning(verb, path, args);
+  if (clamped && !componentClampWarned.has(verb.id)) {
+    componentClampWarned.add(verb.id);
+    addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
+  }
   if (keys.length === 0) {
     // An empty patch is two different things here, and this reducer DOES compare against the
     // current value — so ask the spec whether the request was one the component could have
@@ -3343,9 +3425,9 @@ function componentVerbAction(verb, target, args) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
       return true;
     }
-    addScriptTrace('error', '',
-      `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed`
-      + (verb.values ? `. One of: ${verb.values.join(', ')}.` : ''));
+    // Said with why (componentVerbs.componentRefusalLine): the index that addresses nothing and
+    // the ones there are, or the value that is not one, which the Values tab's rows say too.
+    addScriptTrace('error', '', componentRefusalLine(verb, path, args, cfg));
     return false;
   }
   if (!writeComponentFields(verb, path, patch)) return false;
@@ -3462,10 +3544,9 @@ function componentReadAction(verb, path, args) {
   }
 
   const spec = specs[String(name)];
-  if (!spec) {
-    addScriptTrace('error', '',
-      `${verb.family}.read: "${name}" is not a verb of this component. One of: `
-      + `${Object.keys(specs).filter((k) => k !== 'read').sort().join(', ')}.`);
+  const refusedName = familyVerbRefusal(verb.family, 'read', name);
+  if (refusedName) {
+    addScriptTrace('error', '', refusedName);
     return undefined;
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
@@ -3492,6 +3573,11 @@ function componentReadAction(verb, path, args) {
   if (index === undefined || index === null) return list;
 
   // 1-based, as everywhere else in this module — and for a grid the second index is the column.
+  const refusedIndex = readIndexRefusal(spec, cfg, index, index2);
+  if (refusedIndex) {
+    addScriptTrace('error', '', refusedIndex);
+    return undefined;
+  }
   const at = Math.round(Number(index)) - 1;
   if (!Number.isFinite(at) || at < 0 || at >= list.length) return undefined;
   const row = list[at];
@@ -3526,9 +3612,7 @@ function componentSizeAction(verb, path, args) {
   }
   const spec = specs[String(name)];
   if (!spec || !LIST_KINDS.includes(spec.k)) {
-    addScriptTrace('error', '',
-      `${verb.family}.size: "${name}" does not address a list. One of: `
-      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    addScriptTrace('error', '', familyVerbRefusal(verb.family, 'size', name));
     return undefined;
   }
   return sizeOf(spec);
@@ -3541,11 +3625,8 @@ function componentFillAction(verb, path, args) {
   const [name, values] = args;
   const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
   const spec = specs[String(name ?? '')];
-  const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
   if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
-    addScriptTrace('error', '',
-      `${verb.family}.fill: "${name}" does not address a list. One of: `
-      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    addScriptTrace('error', '', familyVerbRefusal(verb.family, 'fill', name));
     return false;
   }
   if (!Array.isArray(values)) {
@@ -3647,12 +3728,9 @@ function componentRemoveAction(verb, path, args) {
 /** The list-addressing verb a name refers to, having complained if it is not one. */
 function componentListSpec(verb, forWhat, name) {
   const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const lists = Object.entries(specs).filter(([, x]) => LIST_KINDS.includes(x.k) && !x.clear);
   const spec = specs[String(name ?? '')];
   if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
-  addScriptTrace('error', '',
-    `${verb.family}.${forWhat}: "${name}" does not address a list. One of: `
-    + `${lists.map(([k]) => k).sort().join(', ')}.`);
+  addScriptTrace('error', '', familyVerbRefusal(verb.family, forWhat, name));
   return null;
 }
 
@@ -3759,15 +3837,12 @@ function sectionRead(path, section, label, field) {
     // surface is in a sequence this frame, not something a script set or can set.
     return Object.fromEntries(Object.entries(cfg).filter(([k]) => !k.startsWith('_')));
   }
-  const name = String(field);
-  const key = Object.keys(cfg).find((k) => k.toLowerCase() === name.toLowerCase());
-  if (key === undefined || key.startsWith('_')) {
-    addScriptTrace('error', '',
-      `${label}.read: "${field}" is not a field of this component. One of: `
-      + `${Object.keys(cfg).filter((k) => !k.startsWith('_')).sort().join(', ')}.`);
+  const refused = sectionFieldRefusal(label, cfg, field);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return undefined;
   }
-  return cfg[key];
+  return cfg[Object.keys(cfg).find((k) => k.toLowerCase() === String(field).toLowerCase())];
 }
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
@@ -3776,8 +3851,8 @@ const setlistApi = {
   // scripted step and a footswitch step are the same event downstream.
   setlistNext: (target) => setAction(target, 'next', {}),
   setlistPrev: (target) => setAction(target, 'prev', {}),
-  setlistGoto: (target, scene) => setAction(target, 'goto', { scene }),
-  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
+  setlistGoto: (target, scene) => setAction(target, 'goto', HAND_WRITTEN.setlistGoto.args(scene)),
+  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', HAND_WRITTEN.setlistEnable.args(scene, enabled)),
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
   setlistRead: (target, field) => sectionRead(target, 'Setlist', 'setlist', field),
@@ -4866,6 +4941,20 @@ function drawPaint(call, what, colour) {
   return undefined;
 }
 
+// ce.time's number arguments as the transport reads them (timeWords.js), with one not used as
+// written said once per call and argument: these run on every frame, and a line per frame would
+// bury the console. resetScriptState clears what has been said.
+const timeNumberWarned = new Set();
+function timeArg(memberId, name, value) {
+  const { n, said } = timeNumber(memberId, name, value);
+  const key = `${memberId} ${name}`;
+  if (said && !timeNumberWarned.has(key)) {
+    timeNumberWarned.add(key);
+    addScriptTrace('warn', '', `${said} This is said only the first time.`);
+  }
+  return n;
+}
+
 // What ce.draw.stroke made of a dash, a cap or a join it could not draw as written (drawDash.js),
 // said once per message: a stroke is set on every redraw, and a message per frame would bury the
 // console. resetScriptState clears what has been said.
@@ -4975,8 +5064,25 @@ function drawTarget(explicit, ownerName) {
   return controlNamed(name);
 }
 
-/** Append a command for `target`, with the style in force at this moment baked into it. */
-function pushCommand(explicit, ownerName, command) {
+// A coordinate that is not a number, and a shape that lies wholly outside its control, said once
+// per call (and per argument, or per control), since drawing runs every frame (drawShapes.js).
+// resetScriptState clears it.
+const drawWarned = new Set();
+function drawSaid(key, said) {
+  if (!said || drawWarned.has(key)) return;
+  drawWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+/** A shape's coordinate, read as drawShapes.js reads it, and said when it is not a number. */
+function drawNum(memberId, name, value) {
+  const { n, said } = drawNumber(memberId, name, value);
+  drawSaid(`${memberId}\u0000${name}`, said);
+  return n;
+}
+
+/** Append a command for `target`, with the style in force at this moment baked into it. `memberId`
+ *  names the call, for saying when its shape lies wholly outside the control. */
+function pushCommand(explicit, ownerName, command, memberId = null) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
     addScriptTrace('error', '',
@@ -4984,6 +5090,13 @@ function pushCommand(explicit, ownerName, command) {
     return false;
   }
   const id = control._children.Core.id;
+  // Clipped at the control's box, a shape wholly outside it shows nothing; under a transform, where
+  // it lands is not known here, so nothing is said.
+  if (memberId && !drawState.transform) {
+    const t = control._children.Transform ?? {};
+    const outside = outsideWords(memberId, commandBounds(command), { w: Number(t.width), h: Number(t.height) }, drawState.strokeWidth);
+    drawSaid(`${id}\u0000${memberId}`, outside);
+  }
   const list = drawCommands.get(id) ?? [];
   list.push({
     ...command,
@@ -5142,9 +5255,9 @@ function drawCurveImpl(explicit, ownerName, value, opts) {
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
   const n = Math.max(3, Math.round(Number(sides) || 3));
-  const radius = Number(r) || 0;
-  const x = Number(cx) || 0;
-  const y = Number(cy) || 0;
+  const radius = drawNum('drawPolygon', 'radius', r);
+  const x = drawNum('drawPolygon', 'cx', cx);
+  const y = drawNum('drawPolygon', 'cy', cy);
   // Rotation in the panel's drawing convention: degrees, 0 at twelve o'clock, clockwise — the same
   // one drawArc uses, so a polygon and an arc drawn at the same angle line up.
   const from = ((Number(opts?.rotation) || 0) - 90) * (Math.PI / 180);
@@ -5154,7 +5267,7 @@ function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
     points.push([x + Math.cos(a) * radius, y + Math.sin(a) * radius]);
   }
   // Emitted as an ordinary closed path — no new renderer branch needed for a shape that IS one.
-  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true });
+  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true }, 'drawPolygon');
 }
 
 /**
@@ -6223,13 +6336,12 @@ function panelApplyPatches(transforms, patches) {
   return updateControls((controls) => apply(controls)) ? resolved.size : 0;
 }
 
-const ALIGN_EDGES = ['left', 'hCenter', 'right', 'top', 'vCenter', 'bottom'];
-
+// The words each arrangement verb takes, and its sentence for one it does not, are layoutWords.js's,
+// which the Values tab reads too.
 function panelAlignImpl(names, edge, opts) {
-  const which = String(edge ?? '');
-  if (!ALIGN_EDGES.includes(which)) {
-    addScriptTrace('error', '',
-      `ce.panel.align: "${edge}" is not an edge. One of: ${ALIGN_EDGES.join(', ')}.`);
+  const { which, refused } = layoutWord('panelAlign', edge);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'align');
@@ -6253,14 +6365,10 @@ function panelAlignImpl(names, edge, opts) {
   return panelApplyPatches(transforms, patches);
 }
 
-const DISTRIBUTE_WHAT = ['leftEdges', 'hCenters', 'rightEdges', 'topEdges', 'vCenters',
-                         'bottomEdges', 'hSpacing', 'vSpacing'];
-
 function panelDistributeImpl(names, what, opts) {
-  const which = String(what ?? '');
-  if (!DISTRIBUTE_WHAT.includes(which)) {
-    addScriptTrace('error', '',
-      `ce.panel.distribute: "${what}" is not something to spread. One of: ${DISTRIBUTE_WHAT.join(', ')}.`);
+  const { which, refused } = layoutWord('panelDistribute', what);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'distribute');
@@ -6271,9 +6379,9 @@ function panelDistributeImpl(names, what, opts) {
 }
 
 function panelMatchImpl(names, what, opts) {
-  const which = String(what ?? 'both');
-  if (!['width', 'height', 'both'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.match: "${what}" is not width, height or both.`);
+  const { which, refused } = layoutWord('panelMatch', what);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'match');
@@ -6316,9 +6424,9 @@ function panelCircleImpl(names, opts) {
 }
 
 function panelFlipImpl(names, axis) {
-  const which = String(axis ?? 'horizontal');
-  if (!['horizontal', 'vertical'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.flip: "${axis}" is not horizontal or vertical.`);
+  const { which, refused } = layoutWord('panelFlip', axis);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const transforms = panelTransforms(names, 'flip');
@@ -6352,9 +6460,9 @@ function panelRectImpl(names) {
  * moving something to the front of a container it is not in is not a thing.
  */
 function panelOrderImpl(names, where) {
-  const which = String(where ?? '');
-  if (!['front', 'forward', 'backward', 'back'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.order: "${where}" is not front, forward, backward or back.`);
+  const { which, refused } = layoutWord('panelOrder', where);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const wanted = new Set(panelTransforms(names, 'order').map((t) => t.id));
@@ -7132,16 +7240,19 @@ function transportInfoRead() {
 const tempoRead = () => transportSnapshot().bpm;
 const isPlayingRead = () => transportSnapshot().playing;
 
+// A bpm that is not above 0, or not a number, is the transport's tempo, and says so (timeArg).
 function beatsToMsRead(beats, bpm) {
-  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  const b = timeArg('beatsToMs', 'beats', beats);
+  const rate = timeArg('beatsToMs', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
-  return (Number(beats) || 0) * 60000 / rate;
+  return b * 60000 / rate;
 }
 
 function msToBeatsRead(ms, bpm) {
-  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  const m = timeArg('msToBeats', 'ms', ms);
+  const rate = timeArg('msToBeats', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
-  return (Number(ms) || 0) * rate / 60000;
+  return m * rate / 60000;
 }
 
 /**
@@ -7259,6 +7370,17 @@ function roleMapping(role) {
 }
 
 /**
+ * The mapping a role has of its OWN, or null. profile, variables, timing, coverage, recipes and
+ * requests answer from it, as the plug-in answers them, from the role's own session record. They
+ * answered from roleMapping, which falls back to the main synth, so a role nothing is mapped to read
+ * as the main synth window-open and as nothing window-closed. parameter() and parameters() still
+ * fall back, in both: the plug-in's engine does (DeviceProfileService::engineForRole).
+ */
+function ownRoleMapping(role) {
+  return (get(deviceRoleMappings) ?? {})[role] ?? null;
+}
+
+/**
  * The profile SOURCE behind a role — the authored JSON, not the catalogue entry.
  *
  * profile() has always answered from the catalogue listing (id, name) and the live session, which
@@ -7266,8 +7388,8 @@ function roleMapping(role) {
  * document: what variables the recipes interpolate, what the profile claims it can do, what
  * messages it can build.
  */
-function deviceProfileSource(role = DEFAULT_ROLE) {
-  const profileId = roleMapping(role)?.profileId;
+function deviceProfileSource(role = DEFAULT_ROLE, { own = false } = {}) {
+  const profileId = (own ? ownRoleMapping(role) : roleMapping(role))?.profileId;
   if (!profileId) return null;
   const text = (get(profileSources) ?? {})[profileId]?.source ?? '';
   if (!text) return null;
@@ -7289,8 +7411,8 @@ function deviceProfileSource(role = DEFAULT_ROLE) {
  * of the same synth must be able to sit on different device ids without editing it.
  */
 function deviceVariablesRead(role = DEFAULT_ROLE) {
-  const profile = deviceProfileSource(role);
-  const mapping = roleMapping(role);
+  const profile = deviceProfileSource(role, { own: true });
+  const mapping = ownRoleMapping(role);
   if (!profile && !mapping) return null;
   return {
     ...(profile?.variables && typeof profile.variables === 'object' ? profile.variables : {}),
@@ -7299,8 +7421,8 @@ function deviceVariablesRead(role = DEFAULT_ROLE) {
 }
 
 function deviceTimingRead(role = DEFAULT_ROLE) {
-  const profile = deviceProfileSource(role);
-  const mapping = roleMapping(role);
+  const profile = deviceProfileSource(role, { own: true });
+  const mapping = ownRoleMapping(role);
   if (!profile && !mapping) return null;
   return {
     ...(profile?.timing && typeof profile.timing === 'object' ? profile.timing : {}),
@@ -7308,24 +7430,38 @@ function deviceTimingRead(role = DEFAULT_ROLE) {
   };
 }
 
-/** One override written onto the role mapping, through the app's own writer so it persists. */
-function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
+/**
+ * One override written onto the role mapping, through the app's own writer so it persists.
+ *
+ * The role's OWN mapping, not roleMapping's: a read of a role nothing is mapped to takes the main
+ * synth's profile, and this took it too, and wrote it back as a new mapping for that role, so a
+ * misspelt role became a second device on the main synth's profile. It is refused, as the plug-in
+ * refuses it, and both say so in deviceWords.js's words, as they say a value used as the nearest
+ * whole number in range, once per name.
+ */
+const deviceOverrideWarned = new Set();   // label, role and name of each override that has said so; resetScriptState clears it
+function deviceOverrideWrite(kind, name, value, role) {
+  const { label, min, max } = DEVICE_OVERRIDES[kind];
   const key = String(name ?? '').trim();
   if (!key) {
-    addScriptTrace('error', '', `ce.device.${label}: a name is required.`);
+    addScriptTrace('error', '', deviceSetNoNameWords(label));
     return false;
   }
-  const mapping = roleMapping(role);
+  const mapping = (get(deviceRoleMappings) ?? {})[role];
   if (!mapping?.profileId) {
-    addScriptTrace('error', '', `ce.device.${label}: no device profile is mapped to "${role}".`);
+    addScriptTrace('error', '', deviceSetNoProfileWords(label, role));
     return false;
   }
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    addScriptTrace('error', '', `ce.device.${label}("${key}"): needs a number.`);
+  const { n: next, refused, said } = deviceOverrideValue(label, key, value, min, max);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return false;
   }
-  const next = Math.min(max, Math.max(min, Math.round(n)));
+  const warnedAs = `${label}\u0000${role}\u0000${key}`;
+  if (said && !deviceOverrideWarned.has(warnedAs)) {
+    deviceOverrideWarned.add(warnedAs);
+    addScriptTrace('warn', '', `${said} This is said only the first time.`);
+  }
   const current = (mapping[kind] && typeof mapping[kind] === 'object' ? mapping[kind] : {});
   if (current[key] === next) {
     addScriptTrace('log', '', `ce.device.${label}("${key}", ${next}) — already that way`);
@@ -7346,7 +7482,7 @@ function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
  * about; the ones that mean "no" are spelled that way.
  */
 function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
-  const coverage = deviceProfileSource(role)?.coverage;
+  const coverage = deviceProfileSource(role, { own: true })?.coverage;
   if (!coverage || typeof coverage !== 'object') return feature ? undefined : null;
   if (feature === undefined || feature === null || feature === '') return { ...coverage };
   const wanted = String(feature);
@@ -7356,18 +7492,18 @@ function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
 
 /** The ids of the messages a profile can build, and of the requests it can send. */
 function deviceListRead(role, field) {
-  const list = deviceProfileSource(role)?.[field];
+  const list = deviceProfileSource(role, { own: true })?.[field];
   if (!Array.isArray(list)) return [];
   return list.map((entry) => String(entry?.id ?? '')).filter(Boolean);
 }
 
 function deviceProfileRead(role = DEFAULT_ROLE) {
-  const mapping = roleMapping(role);
+  const mapping = ownRoleMapping(role);
   const profileId = mapping?.profileId;
   if (!profileId) return null;
   const listed = (get(deviceProfiles) ?? []).find((p) => String(p?.id) === String(profileId)) ?? null;
   const session = (get(deviceSessionState) ?? {})[role] ?? null;
-  const source = deviceProfileSource(role);
+  const source = deviceProfileSource(role, { own: true });
   return {
     id: profileId,
     name: listed?.name ?? profileId,
@@ -7825,13 +7961,17 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
 
   if (typeof fn === 'function') {
     const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
-    const waiter = { kind: key, fn, scriptId, timerId: null, done: false };
+    // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    // so that is what the callback waits for, in every runtime; waiting for the request's own id,
+    // it heard only the timeout.
+    const waitFor = requestAnswer(role, key) ?? key;
+    const waiter = { kind: waitFor, fn, scriptId, timerId: null, done: false };
     dumpWaiters.push(waiter);
     // A one-shot the RUNTIME owns rather than one the script asked for, so a script cannot cancel
     // somebody else's timeout by id, and stopAllTimers on panel close takes it with the panel.
     waiter.timerId = scheduleOneShot(ms, () => {
       if (waiter.done) return;
-      resolveDumpWaiters(key, role, undefined, `no dump arrived within ${ms}ms`);
+      resolveDumpWaiters(waitFor, role, undefined, `no dump arrived within ${ms}ms`);
     });
   }
 
@@ -7849,6 +7989,11 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
     return true;
   }
 
+  const refused = dumpKindRefusal('requestDump', key, { requests: true });
+  if (refused) {
+    addScriptTrace('error', '', refused);
+    return false;
+  }
   if (isJuceAvailable()) {
     startDeviceSync({ deviceRole: role, request: key });
     addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) → device sync requested`);
@@ -7856,6 +8001,29 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   }
   addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) — no device host`);
   return false;
+}
+
+/** The dump a request of the role's profile answers with, or null (the plug-in's "answers" query). */
+function requestAnswer(role, kind) {
+  const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
+  const dump = String(request?.response?.dump ?? request?.expectedDump ?? '');
+  return dump || null;
+}
+
+/**
+ * What requestDump, sendDump and buildDump say of a kind the main synth's profile has no dump by
+ * (deviceWords.js), or null: for no kind, a dump the script declared, one the profile defines (or,
+ * for requestDump, a request it can send), and while the profile's document has not arrived, when
+ * the host is the one to know.
+ */
+function dumpKindRefusal(verb, kind, { requests = false, outcome } = {}) {
+  const key = String(kind ?? '');
+  if (!key || hasDefinedDump(DEFAULT_ROLE, key)) return null;
+  const profile = deviceProfileSource(DEFAULT_ROLE);
+  if (!profile) return null;
+  const known = profileDumpKinds(profile);
+  if (known.dumps.includes(key) || (requests && known.requests.includes(key))) return null;
+  return dumpKindUnknownWords(verb, key, DEFAULT_ROLE, known.dumps, outcome);
 }
 
 /** Drop every runtime declaration. Called wherever generated controls are cleared, for the same
@@ -8466,8 +8634,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       drawState.transform = parts.length ? parts.join(' ') : null;
     },
     drawEllipse: (cx, cy, rx, ry) => pushCommand(null, ownerName,
-      { op: 'ellipse', cx: Number(cx) || 0, cy: Number(cy) || 0,
-        rx: Number(rx) || 0, ry: Number(ry) || 0 }),
+      { op: 'ellipse', cx: drawNum('drawEllipse', 'cx', cx), cy: drawNum('drawEllipse', 'cy', cy),
+        rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
     // LCD component prints are then the same letters, which a second font would not be.
     drawPixelText: (text, x, y, scale) => pushCommand(null, ownerName,
@@ -8504,9 +8672,9 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
-        x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
+        x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
         fit: ['fill', 'contain', 'cover'].includes(opts?.fit) ? opts.fit : 'fill',
-      });
+      }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
     // fill and stroke do, and save()/restore() put them back.
@@ -8579,25 +8747,27 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textRead: (target, field) => textReadImpl(target, field),
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
+    // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
-      { op: 'rect', x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
-        radius: Number(radius) > 0 ? Number(radius) : 0 }),
+      { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
+        h: drawNum('drawRect', 'h', h), radius: Math.max(0, drawNum('drawRect', 'radius', radius)) }, 'drawRect'),
     drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
-      { op: 'circle', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0 }),
+      { op: 'circle', cx: drawNum('drawCircle', 'cx', cx), cy: drawNum('drawCircle', 'cy', cy), r: drawNum('drawCircle', 'r', r) }, 'drawCircle'),
     // Angles in DEGREES, 0 at twelve o'clock, clockwise — the way a knob's arc is described, and
     // the convention the Meter's arcStart/arcSweep already use. The renderer converts.
     drawArc: (cx, cy, r, from, to) => pushCommand(null, ownerName,
-      { op: 'arc', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0,
-        from: Number(from) || 0, to: Number(to) || 0 }),
+      { op: 'arc', cx: drawNum('drawArc', 'x', cx), cy: drawNum('drawArc', 'y', cy), r: drawNum('drawArc', 'radius', r),
+        from: drawNum('drawArc', 'from', from), to: drawNum('drawArc', 'to', to) }, 'drawArc'),
     drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
-      { op: 'line', x1: Number(x1) || 0, y1: Number(y1) || 0, x2: Number(x2) || 0, y2: Number(y2) || 0 }),
+      { op: 'line', x1: drawNum('drawLine', 'x1', x1), y1: drawNum('drawLine', 'y1', y1),
+        x2: drawNum('drawLine', 'x2', x2), y2: drawNum('drawLine', 'y2', y2) }, 'drawLine'),
     drawPath: (points, closed) => pushCommand(null, ownerName,
-      { op: 'path', points: toPointList(points), closed: closed === true }),
+      { op: 'path', points: toPointList(points), closed: closed === true }, 'drawPath'),
     drawText: (x, y, text, opts) => {
       const align = drawTextAlign(opts?.align);
       if (align === undefined) return false;
       return pushCommand(null, ownerName,
-        { op: 'text', x: Number(x) || 0, y: Number(y) || 0, text: String(text ?? ''),
+        { op: 'text', x: drawNum('drawText', 'x', x), y: drawNum('drawText', 'y', y), text: String(text ?? ''),
           size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
           align,
           family: opts?.family ? String(opts.family) : null });
@@ -8658,13 +8828,9 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
     devicePorts: (opts) => devicePortsRead(opts ?? {}),
     deviceVariables: (role) => deviceVariablesRead(role || DEFAULT_ROLE),
-    deviceSetVariable: (name, value, role) => deviceOverrideWrite(
-      'variables', name, value, role || DEFAULT_ROLE,
-      { min: 0, max: 127, label: 'setVariable' }),
+    deviceSetVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
     deviceTiming: (role) => deviceTimingRead(role || DEFAULT_ROLE),
-    deviceSetTiming: (name, ms, role) => deviceOverrideWrite(
-      'timingOverrides', name, ms, role || DEFAULT_ROLE,
-      { min: 0, max: 60000, label: 'setTiming' }),
+    deviceSetTiming: (name, ms, role) => deviceOverrideWrite('timingOverrides', name, ms, role || DEFAULT_ROLE),
     deviceCoverage: (feature, role) => deviceCoverageRead(role || DEFAULT_ROLE, feature),
     deviceRecipes: (role) => deviceListRead(role || DEFAULT_ROLE, 'messageRecipes'),
     deviceRequests: (role) => deviceListRead(role || DEFAULT_ROLE, 'requests'),
@@ -9627,6 +9793,11 @@ function resetScriptState() {
   edgeWarned.clear();
   animTimingWarned.clear();
   drawStrokeWarned.clear();
+  timeNumberWarned.clear();
+  componentClampWarned.clear();
+  deviceOverrideWarned.clear();
+  musicWarned.clear();
+  drawWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

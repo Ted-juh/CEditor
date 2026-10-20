@@ -9,8 +9,9 @@
   import PanelFileView from './PanelFileView.svelte';
   import ScriptConsole from './ScriptConsole.svelte';
   import { readDockTab, writeDockTab } from './dockTabMemory.js';
-  import { valueCatalogueStore, deviceValueContext, declaredDeviceParameters } from './valuesContext.js';
-  import { deviceRoleMappings, deviceProfiles } from '../stores/deviceProfiles.js';
+  import { valueCatalogueStore, deviceValueContext, declaredDeviceParameters, declaredDeviceDumps } from './valuesContext.js';
+  import { scriptNames } from '../scripting/scriptNames.js';
+  import { deviceRoleMappings, deviceProfiles, profileSources } from '../stores/deviceProfiles.js';
   import { profileParameterTables, requestParameterTable } from '../stores/deviceParameterTable.js';
   import { transport } from '../stores/transport.js';
   import { panelSelectionPick, pickPanelSelection } from '../stores/panels.js';
@@ -407,19 +408,24 @@
   let editorMarks = $state.raw([]);
   let editorFolded = $state(false);
   let tempo = $derived($transport.bpm);
-  // The parameters the scripts declare, as one string, so the context below is new only when they
-  // change and not at every keystroke, which the Values tab's own edits are too.
+  // The parameters and dumps the scripts declare, as one string each, so the context below is new
+  // only when they change and not at every keystroke, which the Values tab's own edits are too.
   let declaredParameterKey = $derived(JSON.stringify(declaredDeviceParameters(scripts)));
+  let declaredDumpKey = $derived(JSON.stringify(declaredDeviceDumps(scripts)));
+  // …and the names they share, timers, settings, custom events and actions (scriptNames.js).
+  let scriptNamesKey = $derived(JSON.stringify(scriptNames(scripts)));
   let scriptValueContext = $derived({
     panel,
     controlSet: panel ? controlSetForPanel(panel) : null,
     tempo,
     selfControl: selected?.scope === 'component' && targetValue !== '*' ? targetValue : null,
+    names: JSON.parse(scriptNamesKey),
+    scriptId: selected?.id ?? null,
     fonts: $valueCatalogueStore.fonts,
     images: $valueCatalogueStore.images,
     devices: deviceValueContext({
-      mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables,
-      declared: JSON.parse(declaredParameterKey),
+      mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables, sources: $profileSources,
+      declared: JSON.parse(declaredParameterKey), declaredDumps: JSON.parse(declaredDumpKey),
     }),
   });
   // A device parameter's id is read against its profile's whole table, which is asked for once a
