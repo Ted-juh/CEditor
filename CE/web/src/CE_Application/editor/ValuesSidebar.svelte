@@ -39,6 +39,7 @@
   import { showDisplayPanelInScript as scriptDisplay } from '../stores/panelVisibility.js';
   import EasingCurve from '../components/animation/EasingCurve.svelte';
   import BezierEditor from '../components/animation/BezierEditor.svelte';
+  import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
 
   let {
     source = '',
@@ -376,6 +377,20 @@
   const drawnCurve = (arg) => !readOnly && arg.kind === 'curve' && arg.literal && arg.value !== null
     && typeof arg.value === 'object' && Array.isArray(arg.meaning?.bezier);
 
+  /** ce.anim.envelope's points, from their editor under the row: written once a point is let go,
+   *  added, taken out or typed in, one edit each time, every point in the form it was written in and
+   *  only the x and y of the ones that moved changed (writeValue's envelope). */
+  function commitEnvelope(arg, points) {
+    if (readOnly || !Array.isArray(points) || points.length < 2) return;
+    const s = openInRow(arg, 'envelope');
+    if (!s) return;
+    s.commit(points.map((p) => ({ x: p.x, y: p.y, from: p.from })));
+    s.done();
+  }
+
+  /** Points written out that the runtime would play: the editor goes under the row. */
+  const drawnEnvelope = (arg) => !readOnly && arg.kind === 'envelope' && arg.literal && arg.editable === 'envelope';
+
   function choiceCurrent(arg) {
     return typeof arg.value === 'string' ? arg.value : arg.value === undefined ? arg.text : String(arg.value);
   }
@@ -619,7 +634,7 @@
               <div class="vbody">
                 <div class="vline">
                   {@render valueControl(row)}
-                  {#if !hasEditor(arg) && !drawnCurve(arg) && arg.kind !== 'gradient'}
+                  {#if !hasEditor(arg) && !drawnCurve(arg) && !drawnEnvelope(arg) && arg.kind !== 'gradient'}
                     <code class="vtext">{@html shownText(arg)}</code>
                   {/if}
                   {@render valueEdit(row)}
@@ -635,6 +650,13 @@
                 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
                 <div class="vbezier" onclick={(e) => e.stopPropagation()}>
                   <BezierEditor points={arg.meaning.bezier} width={248} height={140} onchange={(points) => commitCurve(arg, points)} />
+                </div>
+              {:else if drawnEnvelope(arg)}
+                <!-- The shape the runtime plays, under the row at its whole width, its points to drag. -->
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                <div class="vbezier venvelope" onclick={(e) => e.stopPropagation()}>
+                  <EnvelopePointsEditor written={arg.value} points={arg.meaning.points} width={248} height={128}
+                    onchange={(points) => commitEnvelope(arg, points)} />
                 </div>
               {/if}
             {/if}

@@ -1398,6 +1398,43 @@ int main()
             runtime.stopAnimation();
         }
 
+        // A point the sampler cannot place starts nothing, in the WebView runtime's words: one whose x
+        // is written out of 100 was never reached, so the shape played was a sliver of the one
+        // written, and one that is not a number was dropped. Both went without a word. The words are
+        // held to the WebView's in scriptPreludeAgreement.test.js; these are the real engines.
+        for (const auto& [language, source] : std::vector<std::pair<const char*, juce::String>> {
+                 { "lua", "function onEnvelope()\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff', { { x = 0, y = 0 }, { x = 50, y = 1 } })))\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff', { { 0, 0 }, { 1, 'high' } })))\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff', { { x = 0, y = 0 } })))\n"
+                          "end\n" },
+                 { "javascript", "function onEnvelope() {\n"
+                          "  log('started ' + ce.anim.envelope('cutoff', [{ x: 0, y: 0 }, { x: 50, y: 1 }]));\n"
+                          "  log('started ' + ce.anim.envelope('cutoff', [[0, 0], [1, 'high']]));\n"
+                          "  log('started ' + ce.anim.envelope('cutoff', [{ x: 0, y: 0 }]));\n"
+                          "}\n" } })
+        {
+            juce::Array<juce::var> envelopeScripts;
+            envelopeScripts.add (makeScript ("envelope", language, "panel", "onEnvelope", "*", source));
+            runtime.loadScripts (juce::var (envelopeScripts));
+            host.logs.clear();
+            host.levelled.clear();
+            runtime.runAction ("onEnvelope", juce::var());
+            check (host.levelled.joinIntoString (" | ")
+                       == "error:ce.anim.envelope: the x of point 2 of 2 is a number from 0 to 1, and 50 is not, so nothing was "
+                          "started. If you meant 50 out of 100, write 0.5. | "
+                          "error:ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started.",
+                   juce::String (language) + ": a point the sampler cannot place is refused in the WebView's words (got "
+                       + host.levelled.joinIntoString (" | ") + ")");
+            check (host.logs.contains ("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started."),
+                   juce::String (language) + ": too few points is a note, in the same words (got " + host.logs.joinIntoString (" | ") + ")");
+            int answeredFalse = 0;
+            for (const auto& line : host.logs) answeredFalse += line == "started false" ? 1 : 0;
+            check (answeredFalse == 3 && ! host.logs.contains ("started true") && ! runtime.animationRunning ("cutoff"),
+                   juce::String (language) + ": …and nothing was started, each call answering false (got "
+                       + host.logs.joinIntoString (" | ") + ")");
+        }
+
         // ce.ui is webview-only: window-closed the verbs must explain themselves.
         juce::Array<juce::var> uiScripts;
         uiScripts.add (makeScript ("ui", "lua", "panel", "onSay", "*",

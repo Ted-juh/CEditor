@@ -1093,10 +1093,42 @@ def animateSpring(path, target, opts=None):
 # envelope(path, points, opts) - drive a value THROUGH a shape rather than between two numbers.
 # `to` has one destination; an envelope goes up before it comes down, which is the single most
 # obvious thing a synth panel animates and the one thing `to` cannot express.
+#
+# A point is { "x": , "y": } or the two as a pair, each a number or text that is one. One that is
+# not, or whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView
+# runtime's envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler
+# dropped a point it could not read, and never reached one whose x is past 0 to 1, both without a
+# word. A y past 0 to 1 is a level past `from` or `to`, and is read as it is.
 def animateEnvelope(path, points, opts=None):
     if not isinstance(points, (list, tuple)) or len(points) < 2:
-        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 - nothing was started.")
+        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
         return False
+    def written(v):
+        if v is None: return "none was given"
+        if isinstance(v, str): return '"' + v + '" is not'
+        if isinstance(v, (int, float)) and __realNumber(v) is not None: return __cshown(v) + " is not"
+        return "the value given is not"
+    count = len(points)
+    for i, p in enumerate(points):
+        which = "point " + str(i + 1) + " of " + str(count)
+        if isinstance(p, (list, tuple)):
+            x = p[0] if len(p) > 0 else None
+            y = p[1] if len(p) > 1 else None
+        elif hasattr(p, "get"):
+            x, y = p.get("x"), p.get("y")
+        else:
+            logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.")
+            return False
+        nx = __realNumber(x)
+        if nx is None or nx < 0 or nx > 1:
+            hint = ""
+            if nx is not None and 0 <= nx / 100 <= 1:
+                hint = " If you meant " + __cshown(nx) + " out of 100, write " + __cfour(nx / 100) + "."
+            logError("ce.anim.envelope: the x of " + which + " is a number from 0 to 1, and " + written(x) + ", so nothing was started." + hint)
+            return False
+        if __realNumber(y) is None:
+            logError("ce.anim.envelope: the y of " + which + " is a number, and " + written(y) + ", so nothing was started.")
+            return False
     o = dict(opts or {})
     o["samples"] = __animSample(points)
     o["from"] = float(o.get("from") or 0)

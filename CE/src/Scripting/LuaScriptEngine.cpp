@@ -2753,10 +2753,46 @@ end
 -- envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 -- `to` has one destination; an envelope goes up before it comes down, which is the single most
 -- obvious thing a synth panel animates and the one thing `to` cannot express.
+--
+-- A point is { x = , y = } or the two as a pair, each a number or text that is one. One that is not,
+-- or whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView runtime's
+-- envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler dropped a point
+-- it could not read, and never reached one whose x is past 0 to 1, both without a word. A y past 0
+-- to 1 is a level past `from` or `to`, and is read as it is.
 function animateEnvelope(path, points, opts)
   if type(points) ~= "table" or #points < 2 then
-    log("ce.anim.envelope(path, points): needs at least two points, each { x = , y = } in 0..1 — nothing was started.")
+    log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
     return false
+  end
+  local function written(v)
+    if v == nil then return "none was given" end
+    if type(v) == "string" then return '"' .. v .. '" is not' end
+    if type(v) == "number" and __realNumber(v) ~= nil then return __cshown(v) .. " is not" end
+    return "the value given is not"
+  end
+  local count = #points
+  for i = 1, count do
+    local p, which = points[i], "point " .. i .. " of " .. count
+    if type(p) ~= "table" then
+      logError("ce.anim.envelope: " .. which .. " is { x, y } or the two as a pair, and " .. written(p) .. ", so nothing was started.")
+      return false
+    end
+    local x, y = p.x, p.y
+    if x == nil then x = p[1] end
+    if y == nil then y = p[2] end
+    local nx = __realNumber(x)
+    if nx == nil or nx < 0 or nx > 1 then
+      local hint = ""
+      if nx ~= nil and nx / 100 >= 0 and nx / 100 <= 1 then
+        hint = " If you meant " .. __cshown(nx) .. " out of 100, write " .. __cfour(nx / 100) .. "."
+      end
+      logError("ce.anim.envelope: the x of " .. which .. " is a number from 0 to 1, and " .. written(x) .. ", so nothing was started." .. hint)
+      return false
+    end
+    if __realNumber(y) == nil then
+      logError("ce.anim.envelope: the y of " .. which .. " is a number, and " .. written(y) .. ", so nothing was started.")
+      return false
+    end
   end
   local o = {}
   if opts ~= nil then for k, v in pairs(opts) do o[k] = v end end

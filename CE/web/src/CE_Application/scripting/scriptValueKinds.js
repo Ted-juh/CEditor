@@ -3,8 +3,8 @@
 //
 // Each reader here is the runtime's own, imported, not a second opinion: a colour is read by
 // scriptColours (panelColour for a property, drawColour for a drawing, storedColour for ce.math), a
-// note by musicTheory, a division by timeTables, a curve by easingTables, a SysEx template by
-// deviceDefinitions. What a reader refuses is said in the words the runtime says it in, where it
+// note by musicTheory, a division by timeTables, a curve by easingTables, an envelope's points by
+// animEnvelope, a SysEx template by deviceDefinitions. What a reader refuses is said in the words the runtime says it in, where it
 // has words; scriptValues.test.js calls the runtime and compares.
 //
 // Pure functions. Nothing here reads a store; whatever is known about the panel arrives as plain
@@ -20,6 +20,7 @@ import {
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, divisionIdOf } from './timeTables.js';
 import { ANIM_CURVE_NAMES, EASING_BEZIERS, bezierOf } from './easingTables.js';
+import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
@@ -324,6 +325,35 @@ export function readCurve(value) {
   meaning.bezier = bezier;
   meaning.name = CURVE_NUMBERS.find(([, b]) => b.every((x, i) => Math.abs(x - bezier[i]) < 1e-9))?.[0] ?? null;
   return { meaning, problem: null };
+}
+
+/* ------------------------------------------------------------------------------- envelopes */
+
+/**
+ * ce.anim.envelope's points, read by the runtime's own reader (animEnvelope.js): each point's x and
+ * y in the order they are written, null where one cannot be read, and what the runtime refuses, in
+ * its words. `complete` when the runtime would start the move: only then is there a shape to draw
+ * and to edit. `sorted` is false when the points are not written in order of x, which the runtime
+ * sorts them by; `low` and `high` are the lowest and highest levels, which may pass 0 and 1.
+ */
+export function readEnvelope(value) {
+  const list = Array.isArray(value) ? value : [];
+  const points = list.map((p, index) => {
+    const parts = envelopePointParts(p);
+    return { index, x: realNumber(parts?.x) ?? null, y: realNumber(parts?.y) ?? null, pair: parts?.pair ?? null };
+  });
+  const refusal = envelopeRefusal(value);
+  const levels = points.map((p) => p.y).filter((y) => y !== null);
+  const meaning = {
+    points,
+    count: points.length,
+    complete: !refusal,
+    sorted: points.every((p, i) => i === 0 || p.x === null || points[i - 1].x === null || p.x >= points[i - 1].x),
+    low: levels.length ? Math.min(...levels) : null,
+    high: levels.length ? Math.max(...levels) : null,
+  };
+  // Too few points is a note in the console, and a refusal all the same: nothing starts.
+  return { meaning, problem: refusal ? { severity: 'error', message: refusal.message } : null };
 }
 
 /* ------------------------------------------------------------------------- music and time */

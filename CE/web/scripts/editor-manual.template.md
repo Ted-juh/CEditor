@@ -677,8 +677,11 @@ and **Cancel** puts back exactly what was there before. A gradient opens the **G
 same way, with the angle and the stops alone, since a drawing's gradient is always linear. A list of
 choices is a dropdown in the row, a font family's of the fonts the panel can use, an image's of
 the library's and the panel's images, and a device parameter's (`ce.device.write("cutoff", …)`) of
-the parameters of the synth's device profile, each with its name; a number with a unit is a field; and a curve written as four
-numbers has the **Animation** tab's curve editor under its row, written when you let go of a handle.
+the parameters of the synth's device profile, each with its name; a number with a unit is a field; a
+curve written as four numbers has the **Animation** tab's curve editor under its row, written when
+you let go of a handle; and the points of an envelope (`ce.anim.envelope`) have its shape under
+their row, with each point to drag, a double-click to add one and **Remove** to take one out,
+written when you let go.
 The lists are in the code as well: with the caret inside a
 value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
 selected, and the one you choose replaces the whole value. A property path is completed one part

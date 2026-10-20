@@ -1,8 +1,9 @@
 // valuesSidebar.test.js — the script editor's Values sidebar, the parts that are not a component:
 // where the editor draws its three highlights (editor/codeMarks.js), the rules every edit session
 // keeps (editor/valueEditSession.js), the dock remembering its tab (editor/dockTabMemory.js), the
-// rows laid out from what the core returns (editor/valueRows.js), and the catalogues it is given
-// (editor/valuesContext.js). docs/design/script-editor-value-editors.md is the record.
+// rows laid out from what the core returns (editor/valueRows.js), what the envelope editor does to
+// its points (editor/envelopePointEdit.js), and the catalogues it is given (editor/valuesContext.js).
+// docs/design/script-editor-value-editors.md is the record.
 //
 // The sessions run over the real core (readStatement, writeValue) and an editor that is a string:
 // each write is recorded, so "one undo step per settled edit" is "one write per settled edit", and
@@ -19,6 +20,9 @@ import {
   gradientStrip, unitLabel, plainSummary, shownNumber, hasRows,
 } from '../src/CE_Application/editor/valueRows.js';
 import { valueCatalogues } from '../src/CE_Application/editor/valuesContext.js';
+import {
+  editablePoints, movePoint, addPoint, removePoint, levelRange, shapeOf, shapeLine,
+} from '../src/CE_Application/editor/envelopePointEdit.js';
 import { readStatement, readJsonValues, writeValue } from '../src/CE_Application/scripting/scriptValues.js';
 import { lineStartsOf } from '../src/CE_Application/utils/lineIndex.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -429,6 +433,72 @@ test('swatches, strips, units and numbers as a row shows them', () => {
   assert.deepEqual(['milliseconds', 'degrees', 'pixels', '0 to 127', '0 to 1', undefined].map(unitLabel), ['ms', 'degrees', 'px', '', '', '']);
   assert.equal(plainSummary('Move a value smoothly to `target` over time.'), 'Move a value smoothly to target over time.');
   assert.deepEqual([shownNumber(0.4200001), shownNumber(3), shownNumber(NaN)], ['0.42', '3', 'NaN']);
+});
+
+/* ==================================================================== an envelope's points */
+
+const envelopeArg = (src, lang = 'lua') => readStatement(src, lang, 3, {}).calls[0].args.find((a) => a.name === 'points');
+
+test('an envelope\'s line says how many points, their levels, and what the runtime makes of them', () => {
+  assert.equal(meaningLine(envelopeArg('ce.anim.envelope("c", { {x=0,y=0}, {x=0.1,y=1}, {x=1,y=0.25} })')), '3 points · levels 0 to 1');
+  assert.equal(meaningLine(envelopeArg('ce.anim.envelope("c", { {x=1,y=0}, {x=0,y=1} })')), '2 points · levels 0 to 1 · played in order of x');
+  assert.equal(meaningLine(envelopeArg('ce.anim.envelope("c", { {x=0,y=0}, {x=1,y=1.2} })')), '2 points · levels 0 to 1.2 · above 1 goes past to');
+  assert.equal(meaningLine(envelopeArg('ce.anim.envelope("c", { {x=0,y=-1}, {x=1,y=0.5} })')), '2 points · levels -1 to 0.5 · below 0 goes past from');
+  assert.equal(meaningLine(envelopeArg('ce.anim.envelope("c", { {x=0,y=0}, {x=50,y=1} })')), '2 points · levels 0 to 1', 'refused: its problem says the rest');
+  assert.equal(meaningLine(envelopeArg('ce.anim.envelope("c", { {x=0,y=0}, {x=1,y=peak} })')),
+    'worked out when the script runs: an envelope, so there is nothing to edit here');
+});
+
+test('a dragged point stays between its neighbours in x and in 0 to 1, to three places', () => {
+  const points = editablePoints([{ index: 0, x: 0, y: 0 }, { index: 1, x: 0.2, y: 1 }, { index: 2, x: 0.6, y: 0.4 }, { index: 3, x: 1, y: 0 }]);
+  assert.deepEqual(movePoint(points, 1, 0.33333, 0.66666)[1], { x: 0.333, y: 0.667, from: 1 });
+  assert.deepEqual(movePoint(points, 1, 0.9, 2)[1], { x: 0.6, y: 1, from: 1 }, 'not past the next point, not above 1');
+  assert.deepEqual(movePoint(points, 1, -1, -1)[1], { x: 0, y: 0, from: 1 }, 'not before the one before it, not below 0');
+  assert.deepEqual(movePoint(points, 0, 0.5, 0.5)[0], { x: 0.2, y: 0.5, from: 0 }, 'the first stays before the second');
+  assert.equal(movePoint(points, 2, 0.5, 0.5)[3], points[3], 'the others are as they were');
+  // Written out of order: the neighbours are the ones either side in x, not in the list.
+  const unsorted = editablePoints([{ index: 0, x: 1, y: 0 }, { index: 1, x: 0, y: 0 }, { index: 2, x: 0.5, y: 1 }]);
+  assert.deepEqual(movePoint(unsorted, 2, 0.99, 1)[2], { x: 0.99, y: 1, from: 2 });
+  assert.deepEqual(movePoint(unsorted, 0, 0.2, 0)[0], { x: 0.5, y: 0, from: 0 }, 'the last in x stays after the one before it');
+  // A level written past 1 stays there when only the x moves, and moves back toward 0 to 1 only.
+  const over = editablePoints([{ index: 0, x: 0, y: 0 }, { index: 1, x: 0.5, y: 1.5 }, { index: 2, x: 1, y: 0 }]);
+  assert.deepEqual([movePoint(over, 1, 0.4, 1.5)[1].y, movePoint(over, 1, 0.5, 2)[1].y, movePoint(over, 1, 0.5, 0.75)[1].y], [1.5, 1.5, 0.75]);
+  // …and a coordinate given as it was is kept to every place it was written to.
+  const fine = editablePoints([{ index: 0, x: 0, y: 0 }, { index: 1, x: 0.12345, y: 1 }]);
+  assert.deepEqual(movePoint(fine, 1, 0.12345, 0.5)[1], { x: 0.12345, y: 0.5, from: 1 });
+});
+
+test('a point is added after the last one at or before it in x, and taken out leaving two at least', () => {
+  const points = editablePoints([{ index: 0, x: 0, y: 0 }, { index: 1, x: 0.5, y: 1 }, { index: 2, x: 1, y: 0 }]);
+  const added = addPoint(points, 0.25, 0.75);
+  assert.deepEqual([added.at, added.points.map((p) => [p.x, p.y, p.from])], [1, [[0, 0, 0], [0.25, 0.75, undefined], [0.5, 1, 1], [1, 0, 2]]]);
+  assert.equal(addPoint(points, 2, 0.5).at, 3, 'past the end: last, at x 1');
+  assert.deepEqual(addPoint(editablePoints([{ index: 0, x: 0.5, y: 0 }, { index: 1, x: 1, y: 1 }]), 0.1, 0.1).at, 0, 'before the first');
+  assert.deepEqual(removePoint(points, 1).map((p) => p.from), [0, 2]);
+  assert.equal(removePoint(removePoint(points, 1), 0), null, 'an envelope keeps two');
+  assert.deepEqual(levelRange([{ y: -0.5 }, { y: 0.5 }]), { lo: -0.5, hi: 1 });
+});
+
+test('the line is the runtime\'s own sampling of the points, curves and all, as they are while held', () => {
+  const written = [{ x: 0, y: 0 }, [0.5, 1, 'exp'], { 1: 1, 2: 0, curve: 'log' }];
+  const held = [{ x: 0, y: 0, from: 0 }, { x: 0.25, y: 0.5, from: 1 }, { x: 1, y: 0, from: 2 }, { x: 1, y: 1 }];
+  assert.deepEqual(shapeOf(written, held), [{ x: 0, y: 0 }, [0.25, 0.5, 'exp'], { 1: 1, 2: 0, curve: 'log', x: 1, y: 0 }, { x: 1, y: 1 }]);
+  const flat = shapeLine([0, 0.5, 1], { width: 20, height: 10, pad: 0, every: 1 });
+  assert.equal(flat, 'M0.00 10.00 L10.00 5.00 L20.00 0.00');
+  assert.equal(shapeLine(new Array(9).fill(0.5), { width: 8, height: 2, every: 4 }), 'M0.00 1.00 L4.00 1.00 L8.00 1.00');
+  assert.equal(shapeLine([], { width: 8, height: 2 }), '');
+});
+
+test('an envelope\'s edit is one write, in the script\'s form, and the same points again none', () => {
+  const lua = 'ce.anim.envelope("Cutoff.value", { {x=0,y=0}, {x=0.1,y=1}, {x=1,y=0} }, { to = 127 })\n';
+  const h = harness(lua, 'lua', '{x=0.1', { kind: 'envelope' });
+  const points = movePoint(editablePoints(h.arg.meaning.points), 1, 0.3, 0.8);
+  h.session.commit(points);
+  assert.deepEqual([h.editor.writes.length, h.editor.text], [1, lua.replace('{x=0.1,y=1}', '{x=0.3,y=0.8}')]);
+  h.session.commit(points);
+  assert.equal(h.editor.writes.length, 1, 'the same points again are no edit');
+  h.session.cancel();
+  assert.deepEqual([h.editor.writes.length, h.editor.text], [2, lua], 'Cancel puts the characters back, in one edit');
 });
 
 /* ================================================================================== catalogues */

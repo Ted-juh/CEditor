@@ -182,6 +182,17 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (m.name && m.bezier) return `cubic-bezier ${m.bezier.map(shownNumber).join(', ')}`;
       return m.name ? `${m.name}` : '';
     }
+    case 'envelope': {
+      if (!m.count) return '';
+      const parts = [`${m.count} point${m.count === 1 ? '' : 's'}`];
+      if (Number.isFinite(m.low) && Number.isFinite(m.high)) parts.push(`levels ${shownNumber(m.low)} to ${shownNumber(m.high)}`);
+      if (m.complete && !m.sorted) parts.push('played in order of x');
+      // A level past 0 to 1 is read as it is: past `to` above 1, past `from` below 0.
+      if (m.complete && (m.high > 1 || m.low < 0)) {
+        parts.push(m.high > 1 && m.low < 0 ? 'past from and to' : m.high > 1 ? 'above 1 goes past to' : 'below 0 goes past from');
+      }
+      return parts.join(' · ');
+    }
     case 'division': return m.label ? `${m.label}${Number.isFinite(m.beats) ? `, ${beatsText(m.beats)}` : ''}` : '';
     case 'scale': case 'chord': return m.notes ? m.notes.join(' ') : (m.label ?? '');
     case 'note': {
@@ -243,8 +254,10 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return parts.join(' · ');
     }
     case 'computed': {
-      if (madeBelow) return `made by the call below${m.expects ? `: a ${m.expects}` : ''}`;
-      return `worked out when the script runs${m.expects ? `: a ${m.expects}` : ''}, so there is nothing to edit here`;
+      // "an envelope", "an image", "an event": the article the kind's name takes.
+      const what = m.expects ? `: ${/^[aeiou]/i.test(m.expects) ? 'an' : 'a'} ${m.expects}` : '';
+      if (madeBelow) return `made by the call below${what}`;
+      return `worked out when the script runs${what}, so there is nothing to edit here`;
     }
     case 'enum': return '';
     default: return '';

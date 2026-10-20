@@ -26,8 +26,9 @@
  *   gradient   a gradient's strip opens the Gradient tab at the runtime's 180 and writes its stops and
  *              the angle in one edit
  *   editors    a font family is picked from the fonts there are, an image by its name (not where the
- *              call takes the picture itself), and a drawn curve with the Animation tab's editor,
- *              written once per drag or cell, in the form it was written in
+ *              call takes the picture itself), a drawn curve with the Animation tab's editor, and an
+ *              envelope's points dragged, added and taken out under its row, each written once per
+ *              drag, cell or click, in the form it was written in, and undone in one step
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
  *              file are rows only, the whole file's at the line clicked
@@ -538,8 +539,10 @@ try {
   ce.image.set("Title", "knob-cap");
   ce.draw.image("knob-cap", 0, 0, 8, 8);
   ce.anim.to("Cutoff.value", 100, { curve: [0.2, 0.9, 0.3, 1.4] });
+  ce.anim.envelope("Cutoff.value", [{ x: 0, y: 0 }, { x: 0.25, y: 1 }, { x: 1, y: 0 }], { to: 127 });
 }
 `;
+  const ENVELOPE = '[{ x: 0, y: 0 }, { x: 0.25, y: 1 }, { x: 1, y: 0 }]';
   await typeScript(MORE);
   await clickAt(MORE.indexOf('Arial') + 1);
   await waitHead('Line 2');
@@ -595,6 +598,54 @@ try {
   await page.keyboard.press('Control+z');
   await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('curve: [0.5, 0.9, 0.3, 1.4]'));
   led.check(S, 'a drag is one undo step', 'one Ctrl+Z takes the drag back, to the curve the cell wrote', true, true);
+
+  // An envelope's points: the shape under the row, a point dragged and written once when let go, in
+  // the spelling it was written in, and one Ctrl+Z to take it back.
+  more = await editorText();
+  await clickAt(more.indexOf('ce.anim.envelope') + 9);
+  await waitHead('Line 6');
+  await page.waitForSelector('.vrow[data-name="points"] .venvelope svg circle[data-point="1"]');
+  const envelopeRow = (await rows()).find((r) => r.name === 'points');
+  await countInputs();
+  const peak = await page.locator('.vrow[data-name="points"] .venvelope circle[data-point="1"]').boundingBox();
+  await page.mouse.move(peak.x + peak.width / 2, peak.y + peak.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i += 1) { await page.mouse.move(peak.x + peak.width / 2 + i * 4, peak.y + peak.height / 2 + i * 3); await page.waitForTimeout(20); }
+  const duringEnvelope = await inputs();
+  await page.mouse.up();
+  await until((n) => window.__inputs.length > n, duringEnvelope);
+  await kit.settle(300);
+  const afterEnvelope = await editorText();
+  const writtenPoints = afterEnvelope.match(/ce\.anim\.envelope\("Cutoff\.value", (\[[^\]]*\])/)?.[1] ?? '';
+  const draggedPoint = /^\[\{ x: 0, y: 0 \}, \{ x: (0\.\d{1,3}), y: (0\.\d{1,3}) \}, \{ x: 1, y: 0 \}\]$/.exec(writtenPoints);
+  led.check(S, 'an envelope\'s points are dragged', 'an envelope written out has its shape under its row; a point dragged writes nothing while it moves and once when let go, only its x and y changed, to three places, in JavaScript\'s spelling',
+    { meaning: '3 points · levels 0 to 1', duringDrag: 0, afterDrag: 1, form: true, later: true, lower: true, rest: true },
+    { meaning: envelopeRow?.meaning, duringDrag: duringEnvelope, afterDrag: await inputs(), form: Boolean(draggedPoint),
+      later: Number(draggedPoint?.[1]) > 0.25, lower: Number(draggedPoint?.[2]) < 1,
+      rest: afterEnvelope.replace(writtenPoints, ENVELOPE) === more });
+  await page.locator(`${SCRIPT} textarea.ce-ta`).focus();
+  await page.keyboard.press('Control+z');
+  await until((t) => document.querySelector('.bd-app .detail textarea.ce-ta').value === t, more);
+  led.check(S, 'an envelope\'s drag is one undo step', 'one Ctrl+Z puts the points back exactly as they were written', true, (await editorText()) === more);
+  // A double-click on the shape's ground adds a point there, as one edit, and the Remove button
+  // takes the selected one out again, as another.
+  await clickAt(more.indexOf('ce.anim.envelope') + 9);
+  await page.waitForSelector('.vrow[data-name="points"] .venvelope svg circle[data-point="2"]');
+  await countInputs();
+  const ground = await page.locator('.vrow[data-name="points"] .venvelope svg').boundingBox();
+  await page.mouse.dblclick(ground.x + ground.width * 0.7, ground.y + ground.height * 0.6);
+  await until(() => window.__inputs.length > 0);
+  await kit.settle(300);
+  const withAdded = await editorText();
+  const added = withAdded.match(/ce\.anim\.envelope\("Cutoff\.value", (\[[^\]]*\])/)?.[1] ?? '';
+  await page.waitForSelector('.vrow[data-name="points"] .venvelope svg circle[data-point="3"]');
+  await page.locator('.vrow[data-name="points"] .venvelope button.drop').click();
+  await until(() => window.__inputs.length > 1);
+  await kit.settle(300);
+  led.check(S, 'an envelope\'s point added and taken out', 'a double-click on the shape adds a point between the two it falls between, written as its neighbour is, in one edit; Remove takes it out again, in another, leaving the points as they were written',
+    { added: true, edits: 2, back: true },
+    { added: /^\[\{ x: 0, y: 0 \}, \{ x: 0\.25, y: 1 \}, \{ x: 0\.\d{1,3}, y: 0\.\d{1,3} \}, \{ x: 1, y: 0 \}\]$/.test(added),
+      edits: await inputs(), back: (await editorText()) === more });
 
   // ===============================================================================================
   // FILE — the panel file view's Values tab.

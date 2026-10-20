@@ -2639,10 +2639,42 @@ function animateSpring(path, target, opts) {
 // envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 // `to` has one destination; an envelope goes up before it comes down, which is the single most
 // obvious thing a synth panel animates and the one thing `to` cannot express.
+//
+// A point is { x, y } or the two as a pair, each a number or text that is one. One that is not, or
+// whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView runtime's
+// envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler dropped a point
+// it could not read, and never reached one whose x is past 0 to 1, both without a word. A y past 0
+// to 1 is a level past `from` or `to`, and is read as it is. The points are a list, as there: text
+// has a length too, and was read as a list of its characters.
 function animateEnvelope(path, points, opts) {
-  if (!points || points.length === undefined || points.length < 2) {
+  if (!Array.isArray(points) || points.length < 2) {
     log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
     return false;
+  }
+  var written = function (v) {
+    if (v === undefined || v === null) return "none was given";
+    if (typeof v === "string") return '"' + v + '" is not';
+    if (typeof v === "number" && isFinite(v)) return String(v) + " is not";
+    return "the value given is not";
+  };
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i], which = "point " + (i + 1) + " of " + points.length;
+    if (p === null || typeof p !== "object") {
+      logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.");
+      return false;
+    }
+    var x = Array.isArray(p) ? p[0] : p.x, y = Array.isArray(p) ? p[1] : p.y;
+    var nx = __realNumber(x);
+    if (nx === undefined || nx < 0 || nx > 1) {
+      var hint = nx !== undefined && nx / 100 >= 0 && nx / 100 <= 1
+        ? " If you meant " + String(nx) + " out of 100, write " + String(Number((nx / 100).toFixed(4))) + "." : "";
+      logError("ce.anim.envelope: the x of " + which + " is a number from 0 to 1, and " + written(x) + ", so nothing was started." + hint);
+      return false;
+    }
+    if (__realNumber(y) === undefined) {
+      logError("ce.anim.envelope: the y of " + which + " is a number, and " + written(y) + ", so nothing was started.");
+      return false;
+    }
   }
   var o = {}, k;
   if (opts) for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];

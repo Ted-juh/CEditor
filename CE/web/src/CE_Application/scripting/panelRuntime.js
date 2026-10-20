@@ -38,6 +38,7 @@ import {
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
+import { envelopeRefusal } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
 import { documentIcons } from '../utils/documentIcons.js';
 import { layoutModeForIcon } from '../utils/iconLayout.js';
@@ -4214,8 +4215,10 @@ function runScriptCallback(scriptId, label, fn) {
 export const ANIM_SAMPLES = 1024;
 
 /** Sample a { x, y, curve } point list into a flat table of y values, using ce.math.map — which IS
- *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. */
-function sampleEnvelope(points) {
+ *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. The
+ *  script editor's Values tab draws an envelope's shape under its row from it, so what it shows is
+ *  what moves. */
+export function sampleEnvelope(points) {
   const out = [];
   for (let i = 0; i <= ANIM_SAMPLES; i += 1) {
     const y = Number(mapCurveImpl(i / ANIM_SAMPLES, points));
@@ -4542,17 +4545,19 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
  *  and the lookup is ce.math.map, which IS envValueAt, so a script's sweep and the Envelope drawn
  *  beside it trace the same line. */
 function startEnvelopeImpl(scriptId, path, points, opts = {}) {
-  const list = Array.isArray(points) ? points : null;
-  if (!list || list.length < 2) {
-    addScriptTrace('log', scriptId,
-      'ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.');
+  // Fewer than two points is a note, as it always was; a point that is not one, or whose x is not
+  // from 0 to 1, is refused (animEnvelope.js says why each used to pass without a word). The
+  // preludes' animateEnvelope check the same, in the same words.
+  const refused = envelopeRefusal(points);
+  if (refused) {
+    addScriptTrace(refused.note ? 'log' : 'error', scriptId, refused.message);
     return false;
   }
   const lo = opts?.from != null ? Number(opts.from) : 0;
   const hi = opts?.to != null ? Number(opts.to) : 1;
   return startAnimationImpl(scriptId, 'envelope', path, hi, {
     ...opts,
-    samples: sampleEnvelope(list),
+    samples: sampleEnvelope(points),
     from: Number.isFinite(lo) ? lo : 0,
   });
 }

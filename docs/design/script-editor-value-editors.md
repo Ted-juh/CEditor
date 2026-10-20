@@ -411,7 +411,7 @@ One table, then notes on the kinds where there is something more to say.
 | Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line | none | negative lengths, which are clamped to 0 |
 | SysEx | `sendSysex("F0 41 10 42 F7")` | `bytes` parameters | byte count, checksum | none | a wrong checksum (`computeChecksum`), a missing `F0` or `F7` |
 | Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `bind`'s `parameterId`, the `id` of `write`, `read` and `parameter` | name, group and range (a profile's parameter has no CC of its own: that is its recipe's) | a dropdown from the device profile | a parameter the profile does not have |
-| Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points` from 0 to 1 | the shape | a polyline editor like `EnvelopeDesigner`'s | points outside 0 to 1 |
+| Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points`, typed `envelope` | the shape, as the runtime samples it | a point editor under the row: drag a point, add one, take one out | fewer than two points, a point that is not one, an x outside 0 to 1 (a y past 0 to 1 is a level past `from` or `to`) |
 
 ### Notes
 
@@ -1131,6 +1131,36 @@ Values tab's first version was merged:
   A `self.set` path starts at the script's own control. Checked by `test/valueCompletions.test.js`
   and a row of `browser-checks/valueCompletion.mjs` that builds `Cutoff.Transform.x` from the
   keyboard.
+- **An envelope's points have an editor.** `ce.anim.envelope`'s `points` is typed `envelope`, read
+  by the runtime's own reader (`scripting/animEnvelope.js`, through `scriptValueKinds`'
+  `readEnvelope`). Points written out that the runtime would play have the shape under their row,
+  at its whole width, drawn by the runtime's own sampling (`sampleEnvelope`), so a curve a point
+  carries bends the line there as it bends the move. A point is dragged, added with a double-click
+  on the shape's ground and taken out with Remove, and the selected one's x and y have fields; each
+  is written once, when the drag is let go or the field written, as one undo step. Only the x and y
+  of the point that moved change, as numbers in the form they had: a pair stays a pair, a key stays
+  where it was, a curve and the comments around it stay, and a point added is a copy of the one
+  after it, taking the curve of the segment it splits, as the Envelope component's added nodes do.
+  A point stays between the two either side of it in x, and in 0 to 1. `EnvelopeDesigner` was not
+  used: it edits a control's points through the store, with a sustain node and presets a script's
+  envelope does not have. The editor is `editor/EnvelopePointsEditor.svelte`, over the pure
+  `editor/envelopePointEdit.js`, and the write is `writeValue`'s envelope.
+- **A point the runtimes could not place now starts nothing, and says why.** Every runtime dropped
+  a point it could not read (a y left out, text that is not a number) without a word; with fewer
+  than two left the move was a flat line, and with none a straight ramp from `from` to `to`. A point
+  whose x is outside 0 to 1 was never reached, since the shape is sampled from 0 to 1: written in
+  milliseconds or out of 100, the move played a sliver of the shape written. Each of these is now
+  refused in the WebView and in the Lua, JavaScript and Python preludes, in the same words: "the x
+  of point 2 of 3 is a number from 0 to 1, and 50 is not, so nothing was started. If you meant 50
+  out of 100, write 0.5." A y past 0 to 1 is read as it is, a level past `to` above 1 and past
+  `from` below 0, as a target past a control's range is for `ce.anim.to`, and an overshoot is a
+  shape someone may mean; the row's line says so. The note for fewer than two points was spelled
+  three ways (Lua's `{ x = , y = }`, Python's hyphen), and is one now; the JavaScript prelude read
+  text as a list of its characters, and takes a list alone, as the WebView does. The plug-in's
+  `ScriptRuntime` is given the samples alone, and is unchanged. Checked in every engine by
+  `test/scriptPreludeAgreement.test.js` (and the real ones by `ScriptRuntimeTests.cpp` and
+  `PythonScriptEngineTests.cpp`), the row's words against the runtime's by
+  `test/scriptValues.test.js`, and the editor driven by `browser-checks/valuesSidebar.mjs`.
 
 Still open: nothing from this record.
 

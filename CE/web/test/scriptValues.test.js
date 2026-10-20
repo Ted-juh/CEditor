@@ -139,8 +139,8 @@ test('a call is known by every name the contract gives it', () => {
 });
 
 test('every kind the contract gives a parameter or an option is one the sidebar reads, and its type is kept', () => {
-  const READ = new Set(['colour', 'gradient', 'curve', 'division', 'scale', 'chord', 'enum', 'number', 'control', 'path', 'deviceParameter',
-    'note', 'event', 'animation', 'font', 'image', 'bytes', 'options', 'patch']);
+  const READ = new Set(['colour', 'gradient', 'curve', 'envelope', 'division', 'scale', 'chord', 'enum', 'number', 'control',
+    'path', 'deviceParameter', 'note', 'event', 'animation', 'font', 'image', 'bytes', 'options', 'patch']);
   let count = 0;
   for (const member of ALL_MEMBERS) {
     for (const p of member.params ?? []) {
@@ -420,6 +420,9 @@ const KIND_CASES = [
     (m) => { assert.equal(m.name, 'outBack'); assert.deepEqual(m.bezier, [0.175, 0.885, 0.32, 1.275]); assert.ok(m.choices.includes('spring')); }],
   ['ce.anim.to("cutoff", 1, { curve = { 0.2, 0.9, 0.3, 1.4 } })', 'ce.anim.to("cutoff", 1, { curve: [0.2, 0.9, 0.3, 1.4] })', 'ce.anim.to("cutoff", 1, {"curve": [0.2, 0.9, 0.3, 1.4]})',
     'ce.anim.to', 'opts.curve', 'curve', 'curve', (m) => assert.deepEqual([m.name, m.bezier], [null, [0.2, 0.9, 0.3, 1.4]])],
+  ['ce.anim.envelope("cutoff", { {x=0,y=0}, {x=0.25,y=1}, {x=1,y=0} })', 'ce.anim.envelope("cutoff", [{x:0,y:0},{x:0.25,y:1},[1,0]])',
+    'ce.anim.envelope("cutoff", [{"x": 0, "y": 0}, {"x": 0.25, "y": 1}, (1, 0)])', 'ce.anim.envelope', 'points', 'envelope', 'envelope',
+    (m) => assert.deepEqual([m.points.map((p) => [p.x, p.y]), m.count, m.complete, m.sorted, m.low, m.high], [[[0, 0], [0.25, 1], [1, 0]], 3, true, true, 0, 1])],
   ['ce.time.step(0, "1/8t")', null, null, 'ce.time.step', 'division', 'division', 'choice',
     (m) => assert.deepEqual([m.id, m.label, m.beats], ['1/8T', '8th T', 1 / 3])],
   ['ce.music.scale("C3", "harmonicMinor")', null, null, 'ce.music.scale', 'scale', 'scale', 'choice',
@@ -783,6 +786,111 @@ test('a curve the runtime does not know is said in its words, and the move runs 
   }
 });
 
+test('an envelope\'s points are refused in the words the runtime says them in, too few in its note', () => {
+  const knob = createControl('Knob', { name: 'X' });
+  const cases = [
+    // [the points in Lua, as the runtime is given them]
+    ['{ {x=0,y=0}, {x=50,y=1} }', [{ x: 0, y: 0 }, { x: 50, y: 1 }]],
+    ['{ {x=0,y=0}, {x="50",y=1} }', [{ x: 0, y: 0 }, { x: '50', y: 1 }]],
+    ['{ {0,0}, {1.5,0} }', [[0, 0], [1.5, 0]]],
+    ['{ {x=-0.25,y=0}, {x=1,y=1} }', [{ x: -0.25, y: 0 }, { x: 1, y: 1 }]],
+    ['{ {x=0,y=0}, 0.5 }', [{ x: 0, y: 0 }, 0.5]],
+    ['{ {x=0,y=0}, "up" }', [{ x: 0, y: 0 }, 'up']],
+    ['{ {x=0,y=0}, {x=1,y="high"} }', [{ x: 0, y: 0 }, { x: 1, y: 'high' }]],
+    ['{ {x=0,y=0}, {x=1} }', [{ x: 0, y: 0 }, { x: 1 }]],
+    ['{ {x=0,y=0}, {y=1} }', [{ x: 0, y: 0 }, { y: 1 }]],
+    ['{ {0,0}, {1,true} }', [[0, 0], [1, true]]],
+    ['{ {x=0,y=0} }', [{ x: 0, y: 0 }]],
+    ['{}', []],
+  ];
+  for (const [lua, given] of cases) {
+    const src = `ce.anim.envelope("X.value", ${lua})`;
+    const row = argOf(callOf(read(src, 'lua', 'ce.', { panel: { controls: [knob] } })), 'points');
+    resetScriptStateForTesting();
+    const lines = withPanel([knob], (api) => runtimeLines(() => api.ce.anim.envelope('X.value', given), ['log', 'warn', 'error']));
+    assert.equal(lines.length, 1, `${src}: the runtime says one thing, ${JSON.stringify(lines)}`);
+    assert.deepEqual([row.kind, row.problem?.severity, row.problem?.message, row.editable], ['envelope', 'error', lines[0], null], src);
+  }
+  const fifty = argOf(callOf(read('ce.anim.envelope("X.value", { {x=0,y=0}, {x=50,y=1} })', 'lua', 'ce.')), 'points');
+  assert.equal(fifty.problem.message, 'ce.anim.envelope: the x of point 2 of 2 is a number from 0 to 1, and 50 is not, so nothing was started. If you meant 50 out of 100, write 0.5.');
+  resetScriptStateForTesting();
+});
+
+test('an envelope the runtime plays is drawn and edited: text that is a number, levels past 0 to 1, any order', () => {
+  const knob = createControl('Knob', { name: 'X' });
+  const cases = [
+    // [the points in Lua, as the runtime is given them, what the reading says]
+    ['{ {x="0",y="0.5"}, {x=" 1 ",y=1} }', [{ x: '0', y: '0.5' }, { x: ' 1 ', y: 1 }], { low: 0.5, high: 1, sorted: true }],
+    ['{ {x=0,y=-0.5}, {x=1,y=1.5} }', [{ x: 0, y: -0.5 }, { x: 1, y: 1.5 }], { low: -0.5, high: 1.5, sorted: true }],
+    ['{ {x=1,y=0}, {x=0,y=1} }', [{ x: 1, y: 0 }, { x: 0, y: 1 }], { low: 0, high: 1, sorted: false }],
+    ['{ {0,0}, {0,1}, {1,0} }', [[0, 0], [0, 1], [1, 0]], { low: 0, high: 1, sorted: true }],
+    // Lua's table with numbered items and a key, as wasmoon hands it over.
+    ['{ {0,0}, {0.5,1,curve="exp"}, {1,0} }', [[0, 0], { 1: 0.5, 2: 1, curve: 'exp' }, [1, 0]], { low: 0, high: 1, sorted: true }],
+  ];
+  for (const [lua, given, want] of cases) {
+    const src = `ce.anim.envelope("X.value", ${lua})`;
+    const row = argOf(callOf(read(src, 'lua', 'ce.', { panel: { controls: [knob] } })), 'points');
+    resetScriptStateForTesting();
+    let started;
+    const lines = withPanel([knob], (api) => runtimeLines(() => { started = api.ce.anim.envelope('X.value', given); }, ['log', 'warn', 'error']));
+    assert.deepEqual([started, lines], [true, []], src);
+    assert.deepEqual([row.problem, row.editable, row.meaning.complete], [null, 'envelope', true], src);
+    assert.deepEqual({ low: row.meaning.low, high: row.meaning.high, sorted: row.meaning.sorted }, want, src);
+  }
+  resetScriptStateForTesting();
+  const computed = argOf(callOf(read('ce.anim.envelope("X.value", { {x=0,y=0}, {x=0.5,y=peak} })', 'lua', 'ce.')), 'points');
+  assert.deepEqual([computed.kind, computed.editable, computed.meaning.expects], ['computed', null, 'envelope'], 'a point worked out when it runs: no editor');
+});
+
+test('an envelope\'s points are written in the form they were written in, and only what moved changes', () => {
+  /** `src` with its points' writeValue given what `edit` makes of the points as read. */
+  const write = (src, lang, edit) => {
+    const arg = argOf(callOf(readStatement(src, lang, 3, {})), 'points');
+    const points = arg.meaning.points.map((p) => ({ x: p.x, y: p.y, from: p.index }));
+    const e = writeValue(src, lang, arg, edit(points, arg));
+    return e === null ? null : apply(src, e);
+  };
+  const move = (at, x, y) => (points) => points.map((p, i) => (i === at ? { ...p, x, y } : p));
+  // A drag: one point's x and y, in each language's spelling.
+  assert.equal(write('ce.anim.envelope("c", { {x=0,y=0}, {x=0.1,y=1}, {x=1,y=0} })', 'lua', move(1, 0.25, 0.875)),
+    'ce.anim.envelope("c", { {x=0,y=0}, {x=0.25,y=0.875}, {x=1,y=0} })');
+  assert.equal(write('ce.anim.envelope("c", [{ x: 0, y: 0 }, { x: 0.1, y: 1 }, { x: 1, y: 0 }]);', 'javascript', move(1, 0.25, 0.875)),
+    'ce.anim.envelope("c", [{ x: 0, y: 0 }, { x: 0.25, y: 0.875 }, { x: 1, y: 0 }]);');
+  assert.equal(write('ce.anim.envelope("c", [[0, 0], [0.1, 1], [1, 0]]);', 'typescript', move(1, 0.25, 0.875)),
+    'ce.anim.envelope("c", [[0, 0], [0.25, 0.875], [1, 0]]);');
+  assert.equal(write('ce.anim.envelope("c", [{"x": 0, "y": 0}, (0.1, 1), {\'x\': 1, \'y\': 0}])', 'python', move(2, 0.75, 0.5)),
+    'ce.anim.envelope("c", [{"x": 0, "y": 0}, (0.1, 1), {\'x\': 0.75, \'y\': 0.5}])');
+  // A number keeps its decimals where it can, text that is a number stays text, a key stays where it
+  // was written, and a point's curve and the comments around it stay.
+  assert.equal(write('ce.anim.envelope("c", { {x=0,y=0}, {y=1.00, x=0.10} })', 'lua', move(1, 0.5, 0.25)),
+    'ce.anim.envelope("c", { {x=0,y=0}, {y=0.25, x=0.50} })');
+  assert.equal(write('ce.anim.envelope("c", { {x="0",y="0"}, {x="1",y="1"} })', 'lua', move(1, 1, 0.5)),
+    'ce.anim.envelope("c", { {x="0",y="0"}, {x="1",y="0.5"} })');
+  const multi = 'ce.anim.envelope("c", {\n  { 0, 0 },\n  { 0.5, 1, curve = "exp" }, -- the peak\n  { 1, 0 },\n})';
+  assert.equal(write(multi, 'lua', move(1, 0.4, 0.9)),
+    'ce.anim.envelope("c", {\n  { 0, 0 },\n  { 0.4, 0.9, curve = "exp" }, -- the peak\n  { 1, 0 },\n})');
+  // A point added is a copy of the one after it, in its own line; one taken out goes with its line,
+  // and the last taken out leaves the comment on the line before it.
+  assert.equal(write(multi, 'lua', (points) => [points[0], { x: 0.25, y: 0.5 }, ...points.slice(1)]),
+    'ce.anim.envelope("c", {\n  { 0, 0 },\n  { 0.25, 0.5, curve = "exp" },\n  { 0.5, 1, curve = "exp" }, -- the peak\n  { 1, 0 },\n})');
+  assert.equal(write(multi, 'lua', (points) => [...points, { x: 1, y: 1 }]),
+    'ce.anim.envelope("c", {\n  { 0, 0 },\n  { 0.5, 1, curve = "exp" }, -- the peak\n  { 1, 0 },\n  { 1, 1 },\n})');
+  assert.equal(write(multi, 'lua', (points) => [points[0], points[2]]),
+    'ce.anim.envelope("c", {\n  { 0, 0 },\n  { 1, 0 },\n})');
+  assert.equal(write(multi, 'lua', (points) => points.slice(0, 2)),
+    'ce.anim.envelope("c", {\n  { 0, 0 },\n  { 0.5, 1, curve = "exp" }, -- the peak\n})');
+  assert.equal(write('ce.anim.envelope("c", [\n  [0, 0],\n  [0.5, 1], // the peak\n  [1, 0]\n]);', 'javascript', (points) => points.slice(0, 2)),
+    'ce.anim.envelope("c", [\n  [0, 0],\n  [0.5, 1] // the peak\n]);', 'no comma after the last point where the list had none');
+  assert.equal(write('ce.anim.envelope("c", [{x:0,y:0}, {x:1,y:0}]);', 'javascript', (points) => [points[0], { x: 0.5, y: 1 }, points[1]]),
+    'ce.anim.envelope("c", [{x:0,y:0}, {x:0.5,y:1}, {x:1,y:0}]);');
+  // The points as written give the text back; a point that is not a number is not written.
+  for (const [src, lang] of [[multi, 'lua'], ['ce.anim.envelope("c", [{"x": "0", "y": 0}, (1, 1)])', 'python']]) {
+    assert.equal(write(src, lang, (points) => points), src);
+    assert.equal(write(src, lang, (_p, arg) => arg.value), src);
+  }
+  assert.equal(write(multi, 'lua', move(1, Number.NaN, 0.5)), null);
+});
+
 test('the two image opacity scales warn in the runtime\'s words', () => {
   const set = optOf(argOf(callOf(read('ce.image.set("Logo", data, { opacity = 0.5 })', 'lua', 'ce.')), 'opts'), 'opacity');
   const { warnings } = planImage(imageLayer('image'), 'data:image/png;base64,AA', { opacity: 0.5 });
@@ -1127,6 +1235,7 @@ test('every literal kind round-trips: its own value gives its text back, a new o
     'ce.image.set("Logo", data, { opacity = 50, tint = "#FFAA00" })',
     'local base = "#2A6BD4"',
     'set("panel.bgColour", "red")',
+    'ce.anim.envelope("Cutoff.value", { {x=0,y=0}, {x=0.25,y=1}, {x=1,y=0} }, { duration = 800 })',
   ].join('\n');
   const js = [
     'ce.core.set("Cutoff.Background.Fill.colour", \'#5B9BD580\');',
@@ -1136,6 +1245,7 @@ test('every literal kind round-trips: its own value gives its text back, a new o
     'ce.draw.arc(30, 30, 24, -135, 135)',
     'ce.midi.sendSysex([0xF0, 0x41, 0xF7]);',
     'const accent = { colour: "FF5B9BD5" };',
+    'ce.anim.envelope("Cutoff.value", [[0, 0], [0.5, 1], [1, 0]]);',
   ].join('\n');
   const py = [
     'ce.core.set("Cutoff.Background.Fill.colour", "#5B9BD5")',
@@ -1143,6 +1253,7 @@ test('every literal kind round-trips: its own value gives its text back, a new o
     'ce.anim.to("Cutoff", 127, {"duration": 500, "curve": "outBack"})',
     'ce.music.scale("C3", scale="harmonicMinor")',
     'ce.midi.sendNote(1, 60, 100)',
+    'ce.anim.envelope("Cutoff.value", [{"x": 0, "y": 0}, {"x": 0.5, "y": 1}, {"x": 1, "y": 0}])',
   ].join('\n');
   const cs = 'ctx.SetValue("Cutoff.Background.Fill.colour", "FF5B9BD5");\nctx.SendCC(1, 74, 64);\nctx.Log("hi");';
   let total = 0;

@@ -74,8 +74,9 @@ Three tools help you while you type:
   puts back exactly what you had written. A value chosen from a list has a dropdown
   (a curve, a division, a font, an image, a parameter of your synth's device profile…),
   a number with a unit has a field, written
-  when you press Enter or leave it, and a curve drawn as four numbers has the curve
-  editor under its row.
+  when you press Enter or leave it, a curve drawn as four numbers has the curve
+  editor under its row, and an envelope's points have its shape there, each point
+  to drag, written when you let go.
   The dock opens on the tab you used last. The same lists are in the code too: with
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
   (or divisions, scales, events, your controls' names, your synth's parameters,

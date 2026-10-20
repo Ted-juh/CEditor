@@ -1118,10 +1118,12 @@ export const COMMANDS = [
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
     refusal: 'false',
-    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.',
+    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points, or pairs, as the Envelope component has them: x, from 0 to 1, is how far through the animation, and y is the level, where 0 means `opts.from` (default 0) and 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. With fewer than two points, or a point that is not one or whose x is outside 0 to 1, nothing starts and the console says why. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it.',
     params: [
       { name: 'path', type: 'path', required: true },
-      { name: 'points', type: 'list', required: true },
+      // The Values tab draws the shape and, for points written out, edits them (scriptValueKinds'
+      // readEnvelope, which reads them as the runtime does: scripting/animEnvelope.js).
+      { name: 'points', type: 'list', required: true, kind: 'envelope' },
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { name: 'from', type: 'number', default: '0',

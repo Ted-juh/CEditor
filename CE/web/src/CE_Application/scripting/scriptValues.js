@@ -24,7 +24,7 @@ import {
   valueOf, familyOf,
 } from './scriptValueScan.js';
 import {
-  readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve,
+  readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, SECTION_NAMES, didYouMean, midiArgOf,
@@ -231,19 +231,21 @@ function contextOf(context = {}) {
  * @property {string} text  The value's source text.
  * @property {boolean} literal  True when every part of it is written out.
  * @property {*} [value]  The literal's value: strings unquoted, numbers, booleans, null, arrays, objects.
- * @property {string} kind  colour | gradient | curve | division | scale | chord | enum | number | control |
- *   path | note | event | animation | font | image | bytes | options | text | computed | unknown.
+ * @property {string} kind  colour | gradient | curve | envelope | division | scale | chord | enum | number |
+ *   control | path | note | event | animation | font | image | bytes | options | text | computed | unknown.
  * @property {object} meaning  Kind by kind, as scriptValueKinds' readers document it; `meaning.choices`
  *   lists the alternatives for a choice. A colour's is { reader ('property' | 'stop' | 'drawing' |
  *   'math'), claimedBy ('schema' | 'path' | 'key' | 'form'), form, stored, css, swatch { rgb, alpha },
  *   alpha, takesAlpha, token?, none? }; a gradient's { stops [{ at, css, opacity?, … }], angle,
- *   defaultAngle, stored?, stopsTakeOpacity, complete }.
+ *   defaultAngle, stored?, stopsTakeOpacity, complete }; an envelope's { points [{ index, x, y,
+ *   pair }], count, complete, sorted, low, high }.
  * @property {Problem|null} problem
  * @property {Arg[]} [options]  An options table's keys (recursively), a section's or a patch map's
  *   settings, or a gradient's stops.
- * @property {'colour'|'gradient'|'choice'|'number'|'curve'|'font'|'image'|null} editable  The edit the
- *   UI may offer: the display panel's Colors or Gradient tab, a dropdown of meaning.choices, a field,
- *   the curve editor, the Text tab's family list, the Assets tab; null for none.
+ * @property {'colour'|'gradient'|'choice'|'number'|'curve'|'envelope'|'font'|'image'|null} editable  The
+ *   edit the UI may offer: the display panel's Colors or Gradient tab, a dropdown of meaning.choices, a
+ *   field, the curve editor, the envelope's point editor, the Text tab's family list, the Assets tab;
+ *   null for none.
  *
  * @typedef {object} Call
  * @property {string|null} memberId  The contract id, or null for a call that is not the API.
@@ -504,6 +506,12 @@ function classify(arg, node, param, site, index) {
   switch (kind) {
     case 'colour': return colourArg(arg, value, colourSiteFor(site, param), 'schema');
     case 'curve': return setRead(arg, 'curve', readCurve(value), 'curve');
+    // ce.anim.envelope's points: edited under the row only when the runtime would start the move,
+    // since a point it refuses (an x of 50, say) has no place in a shape from 0 to 1.
+    case 'envelope': {
+      const read = readEnvelope(value);
+      return setRead(arg, 'envelope', read, read.meaning.complete ? 'envelope' : null);
+    }
     case 'division':
       if (typeof value === 'number') {
         return setRead(arg, 'number', readNumber(value, { ...param, unit: 'beats' }, { tempo: site.env.ctx.tempo, site: { path: site.path, time: timeSpec(site, param) } }), 'number');
