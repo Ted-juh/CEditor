@@ -49,7 +49,18 @@
   let range = $derived(parameter?.range ?? null);
   let choices = $derived(Array.isArray(parameter?.choices) ? parameter.choices : []);
   let liveValue = $derived($deviceRuntimeState?.[deviceRole]?.[String(primary?.parameterId ?? '')]);
-  let address = $derived(primary?.parameterId ? resolveDeviceAddress(profile, primary.parameterId) : null);
+  // The address is read from the profile's runtime, which is loaded the first time one is asked
+  // of it (deviceAddress.js): undefined while it loads, so the line does not claim there is none.
+  let address = $state(null);
+  $effect(() => {
+    const parameterId = primary?.parameterId;
+    const of = profile;
+    if (!parameterId) { address = null; return; }
+    let current = true;
+    address = undefined;
+    resolveDeviceAddress(of, parameterId).then((found) => { if (current) address = found; });
+    return () => { current = false; };
+  });
 
   let compatibility = $derived.by(() => {
     if (!control || !primary || !primary.parameterId) return null;
@@ -152,7 +163,7 @@
         <div class="dev-row dev-row-2">
           {#if address}
             <span class="dev-addr" title="Hardware address (from the device profile)">{address}</span>
-          {:else}
+          {:else if address !== undefined}
             <span class="dev-addr muted" title="Address lives in the device profile — open the DPD to see it">addr → DPD</span>
           {/if}
           {#if liveValue !== undefined && liveValue !== null && liveValue !== ''}

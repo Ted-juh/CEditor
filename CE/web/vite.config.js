@@ -200,6 +200,12 @@ export default defineConfig(({ command }) => ({
     // into a component it renders (see `treeshake: false` below, which explains why a barrel import
     // is not free here). test/bundleHygiene.test.js now fails on both halves of that: any
     // `from 'lucide-svelte'` in src/, and any built chunk over this limit.
+    //
+    // And again, by `main` itself, at 4.05 MB: a fifth of it was the Yamaha AN1x's device runtime,
+    // 1.4 MB of JSON imported statically by deviceAddress.js for one line of the Device insight
+    // strip, and parsed at every start. The runtimes load when an address is first asked of one
+    // now, and `main` is 3.2 MB. That test only sees a build, and CI's web-tests job does not
+    // build, so it is a local gate: `npm run build` before `npm test`.
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
       // Tree-shaking off: profiling showed Rollup's `include` pass (includeCallArguments alone
