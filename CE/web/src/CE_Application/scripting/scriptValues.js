@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -39,6 +39,7 @@ import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/control
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { TIME_NUMBERS } from './timeWords.js';
 import { octaveCount } from './noteLists.js';
+import { DRAW_SHAPES, drawNumber } from './drawShapes.js';
 import { componentClampWarning } from './componentVerbs.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
@@ -404,6 +405,15 @@ function buildCall(raw, env) {
     };
   }
   if (resolved?.self) call.self = true;
+  // A drawing's shape, on the outline of the control it is drawn on, and the runtime's sentence for
+  // one that lies wholly outside it (drawShapes.js).
+  if (member && DRAW_SHAPES[member.id]) {
+    const shape = readDrawShape(member.id, args, env.ctx.self);
+    if (shape) {
+      call.shape = shape;
+      if (shape.outside && !call.problem) call.problem = { severity: 'warning', message: shape.outside };
+    }
+  }
   if (member) return call;
   // A ce.<module>.<name> the module does not have fails the moment it runs: said on the call, with
   // what was meant, in the words the editor's own check says it in (unknownCalls.js).
@@ -715,6 +725,8 @@ function numberSite(site, param) {
   // ce.time's helpers, which read every number they are given (timeWords.js).
   if (TIME_NUMBERS[site.memberId]?.args?.[param.name]) out.timeNumber = { memberId: site.memberId, name: param.name };
   if (site.memberId === 'expandOctaves' && param.name === 'octaves') out.numberSaid = (v) => octaveCount(v).said;
+  // A drawing's coordinate, read as the runtime reads it (drawShapes.js).
+  if (DRAW_SHAPES[site.memberId]?.nums.includes(param.name)) out.numberSaid = (v) => drawNumber(site.memberId, param.name, v).said;
   // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
   const bpm = (site.memberId === 'beatsToMs' || site.memberId === 'msToBeats') && param.name !== 'bpm' ? realNumber(sibling(site, 'bpm')) : undefined;
   if (bpm > 0) out.tempo = bpm;

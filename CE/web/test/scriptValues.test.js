@@ -1143,7 +1143,7 @@ test('record examples 9 to 13: a fixed list, a font, an image, two opacity scale
   assert.equal(argOf(callOf(read(src, 'lua', 'knob-cop', ctx)), 'idOrName').problem.message,
     'No image called "knob-cop" in the library or the panel. Did you mean "knob-cap"?');
   const arc = callOf(read(src, 'lua', 'arc'));
-  assert.deepEqual([argOf(arc, 'from').meaning.unit, argOf(arc, 'to').value, argOf(arc, 'radius').kind], ['degrees', 135, 'unknown']);
+  assert.deepEqual([argOf(arc, 'from').meaning.unit, argOf(arc, 'to').value, argOf(arc, 'radius').kind], ['degrees', 135, 'number']);
 });
 
 test('record example 15: a SysEx template, read by the encoder the runtime sends with', () => {

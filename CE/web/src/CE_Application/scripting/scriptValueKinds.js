@@ -29,6 +29,7 @@ import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
 import { LAYOUT_WORDS, layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
+import { DRAW_SHAPES, drawNumber, shapeOutline, outsideWords } from './drawShapes.js';
 import {
   COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
   familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
@@ -1041,6 +1042,47 @@ function parameterSummary(p) {
     range: Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null,
     choices,
   };
+}
+
+/* ------------------------------------------------------------------------ drawing */
+
+/**
+ * The shape a ce.draw call draws, on the control it is drawn on: its outline as SVG path data in the
+ * control's coordinates, its box, the control's { w, h } when the script is a control's, and the
+ * runtime's sentence for a shape that lies wholly outside it. Null when a coordinate is not written
+ * out, since then where it lands is not known until it runs.
+ */
+export function readDrawShape(memberId, args, self) {
+  const spec = DRAW_SHAPES[memberId];
+  if (!spec) return null;
+  const arg = (name) => args.find((a) => a.param?.name === name);
+  const nums = {};
+  for (const name of spec.nums) {
+    const a = arg(name);
+    if (a && !a.literal) return null;
+    nums[name] = drawNumber(memberId, name, a?.value).n;
+  }
+  let points = [];
+  if (memberId === 'drawPath') {
+    const a = arg('points');
+    if (!a?.literal || !Array.isArray(a.value)) return null;
+    for (let i = 0; i + 1 < a.value.length; i += 2) {
+      const x = Number(a.value[i]);
+      const y = Number(a.value[i + 1]);
+      if (Number.isFinite(x) && Number.isFinite(y)) points.push([x, y]);
+    }
+    nums.closed = arg('closed')?.value === true;
+  }
+  const opts = arg('opts');
+  const outline = shapeOutline(memberId, nums, {
+    points, sides: arg('sides')?.literal ? arg('sides').value : 3, rotation: opts?.literal ? opts.value?.rotation : 0,
+  });
+  if (!outline) return null;
+  const t = self?._children?.Transform;
+  const box = t && Number(t.width) > 0 && Number(t.height) > 0 ? { w: Number(t.width), h: Number(t.height) } : null;
+  // Half the stroke the drawing starts with, 1 wide, counts as inside: what the script set before
+  // this call is not read here.
+  return { ...outline, box, outside: outsideWords(memberId, outline.bounds, box, 1) };
 }
 
 /* ------------------------------------------------------------------------ roles and dumps */

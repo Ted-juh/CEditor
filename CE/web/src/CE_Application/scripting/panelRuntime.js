@@ -42,6 +42,7 @@ import { timeNumber } from './timeWords.js';
 import { HAND_WRITTEN, handWrittenRefusal, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
+import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -5063,8 +5064,25 @@ function drawTarget(explicit, ownerName) {
   return controlNamed(name);
 }
 
-/** Append a command for `target`, with the style in force at this moment baked into it. */
-function pushCommand(explicit, ownerName, command) {
+// A coordinate that is not a number, and a shape that lies wholly outside its control, said once
+// per call (and per argument, or per control), since drawing runs every frame (drawShapes.js).
+// resetScriptState clears it.
+const drawWarned = new Set();
+function drawSaid(key, said) {
+  if (!said || drawWarned.has(key)) return;
+  drawWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+/** A shape's coordinate, read as drawShapes.js reads it, and said when it is not a number. */
+function drawNum(memberId, name, value) {
+  const { n, said } = drawNumber(memberId, name, value);
+  drawSaid(`${memberId}\u0000${name}`, said);
+  return n;
+}
+
+/** Append a command for `target`, with the style in force at this moment baked into it. `memberId`
+ *  names the call, for saying when its shape lies wholly outside the control. */
+function pushCommand(explicit, ownerName, command, memberId = null) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
     addScriptTrace('error', '',
@@ -5072,6 +5090,13 @@ function pushCommand(explicit, ownerName, command) {
     return false;
   }
   const id = control._children.Core.id;
+  // Clipped at the control's box, a shape wholly outside it shows nothing; under a transform, where
+  // it lands is not known here, so nothing is said.
+  if (memberId && !drawState.transform) {
+    const t = control._children.Transform ?? {};
+    const outside = outsideWords(memberId, commandBounds(command), { w: Number(t.width), h: Number(t.height) }, drawState.strokeWidth);
+    drawSaid(`${id}\u0000${memberId}`, outside);
+  }
   const list = drawCommands.get(id) ?? [];
   list.push({
     ...command,
@@ -5230,9 +5255,9 @@ function drawCurveImpl(explicit, ownerName, value, opts) {
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
   const n = Math.max(3, Math.round(Number(sides) || 3));
-  const radius = Number(r) || 0;
-  const x = Number(cx) || 0;
-  const y = Number(cy) || 0;
+  const radius = drawNum('drawPolygon', 'radius', r);
+  const x = drawNum('drawPolygon', 'cx', cx);
+  const y = drawNum('drawPolygon', 'cy', cy);
   // Rotation in the panel's drawing convention: degrees, 0 at twelve o'clock, clockwise — the same
   // one drawArc uses, so a polygon and an arc drawn at the same angle line up.
   const from = ((Number(opts?.rotation) || 0) - 90) * (Math.PI / 180);
@@ -5242,7 +5267,7 @@ function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
     points.push([x + Math.cos(a) * radius, y + Math.sin(a) * radius]);
   }
   // Emitted as an ordinary closed path — no new renderer branch needed for a shape that IS one.
-  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true });
+  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true }, 'drawPolygon');
 }
 
 /**
@@ -8609,8 +8634,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       drawState.transform = parts.length ? parts.join(' ') : null;
     },
     drawEllipse: (cx, cy, rx, ry) => pushCommand(null, ownerName,
-      { op: 'ellipse', cx: Number(cx) || 0, cy: Number(cy) || 0,
-        rx: Number(rx) || 0, ry: Number(ry) || 0 }),
+      { op: 'ellipse', cx: drawNum('drawEllipse', 'cx', cx), cy: drawNum('drawEllipse', 'cy', cy),
+        rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
     // LCD component prints are then the same letters, which a second font would not be.
     drawPixelText: (text, x, y, scale) => pushCommand(null, ownerName,
@@ -8647,9 +8672,9 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
-        x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
+        x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
         fit: ['fill', 'contain', 'cover'].includes(opts?.fit) ? opts.fit : 'fill',
-      });
+      }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
     // fill and stroke do, and save()/restore() put them back.
@@ -8722,25 +8747,27 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textRead: (target, field) => textReadImpl(target, field),
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
+    // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
-      { op: 'rect', x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
-        radius: Number(radius) > 0 ? Number(radius) : 0 }),
+      { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
+        h: drawNum('drawRect', 'h', h), radius: Math.max(0, drawNum('drawRect', 'radius', radius)) }, 'drawRect'),
     drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
-      { op: 'circle', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0 }),
+      { op: 'circle', cx: drawNum('drawCircle', 'cx', cx), cy: drawNum('drawCircle', 'cy', cy), r: drawNum('drawCircle', 'r', r) }, 'drawCircle'),
     // Angles in DEGREES, 0 at twelve o'clock, clockwise — the way a knob's arc is described, and
     // the convention the Meter's arcStart/arcSweep already use. The renderer converts.
     drawArc: (cx, cy, r, from, to) => pushCommand(null, ownerName,
-      { op: 'arc', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0,
-        from: Number(from) || 0, to: Number(to) || 0 }),
+      { op: 'arc', cx: drawNum('drawArc', 'x', cx), cy: drawNum('drawArc', 'y', cy), r: drawNum('drawArc', 'radius', r),
+        from: drawNum('drawArc', 'from', from), to: drawNum('drawArc', 'to', to) }, 'drawArc'),
     drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
-      { op: 'line', x1: Number(x1) || 0, y1: Number(y1) || 0, x2: Number(x2) || 0, y2: Number(y2) || 0 }),
+      { op: 'line', x1: drawNum('drawLine', 'x1', x1), y1: drawNum('drawLine', 'y1', y1),
+        x2: drawNum('drawLine', 'x2', x2), y2: drawNum('drawLine', 'y2', y2) }, 'drawLine'),
     drawPath: (points, closed) => pushCommand(null, ownerName,
-      { op: 'path', points: toPointList(points), closed: closed === true }),
+      { op: 'path', points: toPointList(points), closed: closed === true }, 'drawPath'),
     drawText: (x, y, text, opts) => {
       const align = drawTextAlign(opts?.align);
       if (align === undefined) return false;
       return pushCommand(null, ownerName,
-        { op: 'text', x: Number(x) || 0, y: Number(y) || 0, text: String(text ?? ''),
+        { op: 'text', x: drawNum('drawText', 'x', x), y: drawNum('drawText', 'y', y), text: String(text ?? ''),
           size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
           align,
           family: opts?.family ? String(opts.family) : null });
@@ -9770,6 +9797,7 @@ function resetScriptState() {
   componentClampWarned.clear();
   deviceOverrideWarned.clear();
   musicWarned.clear();
+  drawWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

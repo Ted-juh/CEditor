@@ -1409,9 +1409,9 @@ export const COMMANDS = [
     summary: 'Draw a rectangle at (`x`, `y`), `w` wide and `h` tall, measured from the control\'s top-left corner. `radius` rounds the corners.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
-      { name: 'w', type: 'number', required: true }, { name: 'h', type: 'number', required: true },
-      { name: 'radius', type: 'number', required: false },
+      { name: 'x', type: 'number', required: true, kind: 'number' }, { name: 'y', type: 'number', required: true, kind: 'number' },
+      { name: 'w', type: 'number', required: true, kind: 'number' }, { name: 'h', type: 'number', required: true, kind: 'number' },
+      { name: 'radius', type: 'number', required: false, kind: 'number' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.rect(${1:0}, ${2:0}, ${3:40}, ${4:20})$0', javascript: 'ce.draw.rect(${1:0}, ${2:0}, ${3:40}, ${4:20});$0' },
@@ -1421,8 +1421,8 @@ export const COMMANDS = [
     summary: 'Draw a circle of radius `r`, centred on (`cx`, `cy`).',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'cx', type: 'number', required: true }, { name: 'cy', type: 'number', required: true },
-      { name: 'r', type: 'number', required: true },
+      { name: 'cx', type: 'number', required: true, kind: 'number' }, { name: 'cy', type: 'number', required: true, kind: 'number' },
+      { name: 'r', type: 'number', required: true, kind: 'number' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.circle(${1:20}, ${2:20}, ${3:8})$0', javascript: 'ce.draw.circle(${1:20}, ${2:20}, ${3:8});$0' },
@@ -1432,8 +1432,8 @@ export const COMMANDS = [
     summary: 'Draw a straight line from (`x1`, `y1`) to (`x2`, `y2`) in the current stroke colour and width. The fill colour does not apply to lines.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x1', type: 'number', required: true }, { name: 'y1', type: 'number', required: true },
-      { name: 'x2', type: 'number', required: true }, { name: 'y2', type: 'number', required: true },
+      { name: 'x1', type: 'number', required: true, kind: 'number' }, { name: 'y1', type: 'number', required: true, kind: 'number' },
+      { name: 'x2', type: 'number', required: true, kind: 'number' }, { name: 'y2', type: 'number', required: true, kind: 'number' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.line(${1:0}, ${2:0}, ${3:100}, ${4:0})$0', javascript: 'ce.draw.line(${1:0}, ${2:0}, ${3:100}, ${4:0});$0' },
@@ -1457,8 +1457,8 @@ export const COMMANDS = [
     summary: 'Draw part of a circle centred on (`x`, `y`), from angle `from` to angle `to`. Angles are in degrees, with 0 at twelve o\'clock and increasing clockwise, the same as the Meter\'s `arcStart` and `arcSweep`. The arc is drawn in the stroke colour; if a fill is set, it is filled as a pie slice.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
-      { name: 'radius', type: 'number', required: true },
+      { name: 'x', type: 'number', required: true, kind: 'number' }, { name: 'y', type: 'number', required: true, kind: 'number' },
+      { name: 'radius', type: 'number', required: true, kind: 'number' },
       { name: 'from', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise' },
       { name: 'to', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise' },
     ],
@@ -1523,8 +1523,8 @@ export const COMMANDS = [
     summary: 'Draw an oval centred on (`cx`, `cy`), with horizontal radius `rx` and vertical radius `ry`.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'cx', type: 'number', required: true }, { name: 'cy', type: 'number', required: true },
-      { name: 'rx', type: 'number', required: true }, { name: 'ry', type: 'number', required: true },
+      { name: 'cx', type: 'number', required: true, kind: 'number' }, { name: 'cy', type: 'number', required: true, kind: 'number' },
+      { name: 'rx', type: 'number', required: true, kind: 'number' }, { name: 'ry', type: 'number', required: true, kind: 'number' },
     ],
     scopes: 'any',
   },
@@ -1628,9 +1628,9 @@ export const COMMANDS = [
     summary: 'Draw a shape with `sides` equal sides, such as a triangle or a hexagon, centred on (`cx`, `cy`) with its corners `radius` away from the centre. At rotation 0 a corner points to twelve o\'clock; `opts.rotation` turns it clockwise in degrees, the same way `ce.draw.arc()` measures angles, so the two line up. Fewer than three sides counts as three.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'cx', type: 'number', required: true },
-      { name: 'cy', type: 'number', required: true },
-      { name: 'radius', type: 'number', required: true },
+      { name: 'cx', type: 'number', required: true, kind: 'number' },
+      { name: 'cy', type: 'number', required: true, kind: 'number' },
+      { name: 'radius', type: 'number', required: true, kind: 'number' },
       { name: 'sides', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'rotation', type: 'number', default: '0', unit: 'degrees', hint: '0 puts a corner at twelve o\'clock, increasing clockwise',
@@ -1646,10 +1646,10 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'src', type: 'string', required: true, kind: 'image' },
-      { name: 'x', type: 'number', required: true },
-      { name: 'y', type: 'number', required: true },
-      { name: 'w', type: 'number', required: true },
-      { name: 'h', type: 'number', required: true },
+      { name: 'x', type: 'number', required: true, kind: 'number' },
+      { name: 'y', type: 'number', required: true, kind: 'number' },
+      { name: 'w', type: 'number', required: true, kind: 'number' },
+      { name: 'h', type: 'number', required: true, kind: 'number' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'fit', type: 'text', default: '"fill"', values: ['fill', 'contain', 'cover'],
           summary: 'How the image fills the box you gave. "fill" stretches it to fit exactly, '
@@ -1970,7 +1970,7 @@ export const COMMANDS = [
     summary: 'Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
+      { name: 'x', type: 'number', required: true, kind: 'number' }, { name: 'y', type: 'number', required: true, kind: 'number' },
       { name: 'text', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'size', type: 'number', unit: 'pixels', sample: '12', summary: 'How big the text is.' },

@@ -510,6 +510,38 @@
     if (editingArg(arg) && sessView?.hasPending && sessView.kind === 'colour') return cssOfHex(sessView.pending);
     return arg.meaning?.css ?? null;
   }
+  // A drawing call's shape on the control's outline: a view box holding both, the control's box
+  // dashed, the shape faint where the control clips it and solid where it shows.
+  function shapeView(shape) {
+    const box = shape.box;
+    const b = shape.bounds ?? { x: 0, y: 0, w: 0, h: 0 };
+    const x0 = Math.min(b.x, box ? 0 : b.x);
+    const y0 = Math.min(b.y, box ? 0 : b.y);
+    const x1 = Math.max(b.x + b.w, box ? box.w : b.x + b.w);
+    const y1 = Math.max(b.y + b.h, box ? box.h : b.y + b.h);
+    // A shape far off the control would shrink both to specks: the control is drawn at its size
+    // instead, with a line from its middle toward where the shape lies.
+    if (box && Math.max(x1 - x0, y1 - y0) > 3 * Math.max(box.w, box.h)) {
+      const pad = Math.max(box.w, box.h) * 0.35;
+      const vx = -pad; const vy = -pad; const vw = box.w + 2 * pad; const vh = box.h + 2 * pad;
+      const cx = box.w / 2; const cy = box.h / 2;
+      const dx = b.x + b.w / 2 - cx; const dy = b.y + b.h / 2 - cy;
+      const reach = Math.min(dx ? Math.abs((dx > 0 ? vx + vw - cx : cx - vx) / dx) : Infinity, dy ? Math.abs((dy > 0 ? vy + vh - cy : cy - vy) / dy) : Infinity) * 0.92;
+      const scale = Math.min(180 / vw, 72 / vh);
+      return { viewBox: `${vx} ${vy} ${vw} ${vh}`, width: Math.round(vw * scale), height: Math.round(vh * scale),
+        toward: { x1: cx, y1: cy, x2: cx + dx * reach, y2: cy + dy * reach } };
+    }
+    const w = Math.max(1, x1 - x0);
+    const h = Math.max(1, y1 - y0);
+    const pad = Math.max(w, h) * 0.06;
+    const scale = Math.min(180 / (w + 2 * pad), 72 / (h + 2 * pad));
+    return {
+      viewBox: `${x0 - pad} ${y0 - pad} ${w + 2 * pad} ${h + 2 * pad}`,
+      width: Math.round((w + 2 * pad) * scale), height: Math.round((h + 2 * pad) * scale), toward: null,
+    };
+  }
+  const shapeClipId = (row) => `vshape-${String(row.key).replace(/[^\w-]/g, '_')}`;
+
   function stripCss(arg) {
     if (editingArg(arg) && sessView?.hasPending && sessView.kind === 'gradient') {
       const g = sessView.pending;
@@ -658,6 +690,26 @@
           {#if row.call.missing?.length}
             <div class="vmissing" style:--depth={row.depth}>Not written: {row.call.missing.map((p) => p.name).join(', ')}</div>
           {/if}
+          {#if row.call.shape}
+            {@const shape = row.call.shape}
+            {@const view = shapeView(shape)}
+            <!-- The shape on the outline of the control it is drawn on, at the script's own coordinates. -->
+            <svg class="vshape" style:--depth={row.depth} width={view.width} height={view.height} viewBox={view.viewBox}
+              role="img" aria-label={shape.box ? `The shape on the control's ${shape.box.w} by ${shape.box.h} outline` : 'The shape'}>
+              {#if shape.box}
+                <clipPath id={shapeClipId(row)}><rect x="0" y="0" width={shape.box.w} height={shape.box.h} /></clipPath>
+                <rect class="vshape-box" x="0" y="0" width={shape.box.w} height={shape.box.h} vector-effect="non-scaling-stroke" />
+                <path class="vshape-out" d={shape.d} vector-effect="non-scaling-stroke" />
+                <path class="vshape-in" d={shape.d} clip-path={`url(#${shapeClipId(row)})`} vector-effect="non-scaling-stroke" />
+                {#if view.toward}
+                  <line class="vshape-toward" x1={view.toward.x1} y1={view.toward.y1} x2={view.toward.x2} y2={view.toward.y2} vector-effect="non-scaling-stroke" />
+                  <circle class="vshape-toward-end" cx={view.toward.x2} cy={view.toward.y2} r={Math.max(shape.box.w, shape.box.h) * 0.04} />
+                {/if}
+              {:else}
+                <path class="vshape-in" d={shape.d} vector-effect="non-scaling-stroke" />
+              {/if}
+            </svg>
+          {/if}
         {:else if row.type === 'loose'}
           <div class="vcall" style:--depth={0}><div class="vsum">Values outside any call</div></div>
         {:else}
@@ -791,6 +843,12 @@
   .vstrip.on { box-shadow: 0 0 0 1.5px #6aa8ff; }
   .vstrip.still { cursor: default; }
   .vdash { flex-shrink: 0; color: var(--txt); }
+  .vshape { display: block; margin: 2px 8px 4px calc(8px + var(--depth, 0) * 14px); overflow: visible; color: var(--txt); }
+  .vshape-box { fill: none; stroke: var(--txt-faint); stroke-width: 1; stroke-dasharray: 3 2; }
+  .vshape-out { fill: none; stroke: currentColor; stroke-width: 1.5; opacity: 0.3; }
+  .vshape-in { fill: none; stroke: currentColor; stroke-width: 1.5; }
+  .vshape-toward { stroke: #e7c489; stroke-width: 1.25; stroke-dasharray: 2 2; }
+  .vshape-toward-end { fill: #e7c489; }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {
