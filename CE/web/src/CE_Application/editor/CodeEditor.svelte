@@ -33,6 +33,8 @@
   import { projectFolds, pruneFolds } from './foldModel.js';
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
+  import { carryPopupTheme } from './popupTheme.js';
+  import { placeSignatureHint } from './signatureHint.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import { markBoxes } from './codeMarks.js';
 
@@ -70,6 +72,7 @@
   }
 
   let taEl = $state(null);       // the editable textarea (the source of truth for editing)
+  let rootEl = null;             // the editor's own box, whose colours the portaled popups take
   let measureEl = $state(null);  // hidden element for measuring monospace character width
   let scrollTop = $state(0);
   let scrollLeft = $state(0);
@@ -398,13 +401,22 @@
     if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
     return getSignatureHelp(value, language, caretPos);
   });
-  let sigScreen = $derived.by(() => {
-    if (!signature || !taEl) return { x: 0, y: 0 };
+  // At the end of the caret's line when it fits there, else a box above it or below (signatureHint.js).
+  let sigPlace = $derived.by(() => {
+    if (!signature || !taEl) return null;
     const r = taEl.getBoundingClientRect();
-    return {
-      x: r.left + PAD_L + caretCol * charWidth - taEl.scrollLeft,
-      y: r.top + PAD_TOP + caretLine * lineHeight - taEl.scrollTop,
-    };
+    const text = taEl.value;
+    const starts = text === displayText ? displayStarts : lineStartsOf(text);
+    const start = starts[caretLine] ?? 0;
+    const end = caretLine + 1 < starts.length ? starts[caretLine + 1] - 1 : text.length;
+    const lineCols = Math.max(text.slice(start, end).trimEnd().length, caretCol);
+    const x0 = r.left + PAD_L - scrollLeft;
+    return placeSignatureHint({
+      name: signature.name, params: signature.params, active: signature.activeParam,
+      lineEndX: x0 + lineCols * charWidth, caretX: x0 + caretCol * charWidth,
+      lineTop: r.top + PAD_TOP + caretLine * lineHeight - scrollTop, lineHeight, charWidth, fontSize,
+      box: { left: r.left, right: r.left + taEl.clientWidth, top: r.top, bottom: r.top + taEl.clientHeight },
+    });
   });
 
   function refreshCompletion(force) {
@@ -1040,14 +1052,16 @@
   });
 
   // Move a node to <body> so fixed-positioned popups aren't clipped by an ancestor's
-  // overflow or transformed containing block.
+  // overflow or transformed containing block. Its colours go with it: they are set where the
+  // editor is, and do not reach <body> (popupTheme.js).
   function portal(node) {
+    carryPopupTheme(node, rootEl);
     document.body.appendChild(node);
     return { destroy() { node.remove(); } };
   }
 </script>
 
-<div class={['ce', theme === 'light' && 'light']} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
+<div class={['ce', theme === 'light' && 'light']} bind:this={rootEl} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
   <div class="ce-gutter">
     <div class="ce-gutter-inner" style="transform:translateY({firstRow * lineHeight - scrollTop}px)">
       {#each gutterRows as i (i)}
@@ -1195,10 +1209,16 @@
     </div>
   {/if}
 
-  {#if signature && !acOpen}
-    <div class="ce-sig" use:portal use:floating={{ anchor: { x: sigScreen.x, y: sigScreen.y, width: 0, height: lineHeight }, placement: 'top-start', offset: 5, fallbackPlacements: ['bottom-start'], track: false }}>
+  {#if signature && sigPlace && !acOpen}
+    <!-- Inline, it is on the caret's line in the code's own size; a box is cut at the editor's width. -->
+    <div class={['ce-sig', sigPlace.mode]} data-mode={sigPlace.mode} use:portal
+      style:left="{sigPlace.x}px" style:top="{sigPlace.y}px"
+      style:height={sigPlace.mode === 'inline' ? `${lineHeight}px` : null}
+      style:line-height={sigPlace.mode === 'inline' ? `${lineHeight}px` : null}
+      style:font-size={sigPlace.mode === 'inline' ? `${fontSize}px` : null}
+      style:max-width={sigPlace.mode === 'inline' ? null : `${sigPlace.width}px`}>
       <span class="ce-sig-name">{signature.name}</span>(<!--
-        -->{#each signature.params as p, i (i)}<span class={['ce-sig-param', i === signature.activeParam && 'active']}>{p}</span>{#if i < signature.params.length - 1}, {/if}{/each}<!--
+        -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active']}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
       -->)
     </div>
   {/if}
@@ -1628,10 +1648,12 @@
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
 
-  /* signature help */
+  /* signature help: a box above or below the line, or inline after its end (signatureHint.js, whose
+     HINT holds these sizes) */
   .ce-sig {
     position: fixed;
     z-index: 59;
+    box-sizing: border-box;
     background: var(--panel-2);
     border: 1px solid var(--line-2);
     border-radius: 6px;
@@ -1639,9 +1661,18 @@
     padding: 5px 9px;
     font-family: var(--mono);
     font-size: 12px;
+    line-height: 16px;
     color: var(--txt-dim);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     pointer-events: none;
+  }
+  .ce-sig.inline {
+    border: none;
+    border-radius: 4px;
+    box-shadow: none;
+    padding: 0 6px;
   }
   .ce-sig-name { color: var(--blue); }
   .ce-sig-param { color: var(--txt-faint); }
