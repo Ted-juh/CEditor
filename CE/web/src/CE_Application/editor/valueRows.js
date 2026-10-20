@@ -24,6 +24,8 @@ export function statementRows(statement) {
   };
   const pushCall = (call, depth) => {
     rows.push({ key: `c:${call.range.start}:${call.nameRange.end}:${call.path}`, type: 'call', depth, call });
+    // The colour a call builds from numbers written out, first under it (scriptValues' builtColourArg).
+    if (call.built) pushArg(call.built, depth, call);
     for (const arg of call.args ?? []) pushArg(arg, depth, call);
     for (const child of call.children ?? []) pushCall(child, depth + 1);
   };
@@ -165,6 +167,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (!m.stored && !m.css) return '';
       if (m.reader === 'drawing') return `drawn as ${seeThrough(m.css) ?? m.css ?? m.stored}${form}`;
       if (m.reader === 'math') return `read as ${m.stored}${opacity}`;
+      if (m.reader === 'built') return `${m.stored}, built from ${m.said}`;
       return `stored as ${m.stored}${opacity}${form}`;
     }
     case 'gradient': {
@@ -227,8 +230,16 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
-    case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': return m.hint ?? '';
+    case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': case 'presetSlot': case 'componentType': case 'fontAxis': return m.hint ?? '';
     case 'noteList': return m.names?.length ? m.names.join(' ') : '';
+    case 'lcdLine': {
+      const l = m.lcd;
+      if (!l) return '';
+      if (l.layouts) return 'not shown: the display shows its layouts';
+      if (l.tokens) return 'its {tokens} are filled in when it is drawn';
+      if (l.cut) return `${l.cols} of ${l.text.length} characters show`;
+      return l.scrolls && l.text.length > l.cols ? `scrolls through ${l.cols} cells` : `${l.text.length} of ${l.cols} cells`;
+    }
     case 'deviceParameter': {
       if (m.noProfile) return `no profile is chosen for ${m.role}`;
       if (m.declared) return 'declared by this panel\'s scripts';
@@ -274,7 +285,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
     case 'computed': {
       // "an envelope", "an image", "an event": the article the kind's name takes.
       const what = m.expects ? `: ${/^[aeiou]/i.test(m.expects) ? 'an' : 'a'} ${m.expects}` : '';
-      if (madeBelow) return `made by the call below${what}`;
+      if (madeBelow) return `made by the call below${what}${m.stored ? `, ${m.stored}` : ''}`;
       return `worked out when the script runs${what}, so there is nothing to edit here`;
     }
     case 'enum': return '';

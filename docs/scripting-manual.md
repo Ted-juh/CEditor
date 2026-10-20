@@ -1262,7 +1262,7 @@ ce.midi.sendNoteOff(1, 60)
 
 #### `ce.midi.sendProgramChange(channel, program [, bankMsb, bankLsb])`
 
-Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first.
+Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first. `program` is MIDI's number, 0 to 127; most synths show it counted from 1, so program 0 is the one they call 1.
 
 *Short name: `sendProgramChange`.*
 

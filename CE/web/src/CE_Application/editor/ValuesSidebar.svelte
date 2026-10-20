@@ -23,6 +23,16 @@
   // value, so the caret stays, the text is not touched, and an edit open in the display panel stays
   // open, since nothing about the selection changes while the script tab is in front.
   //
+  // A ce.anim.play row whose control is on the panel has Open: the Animation tab edits the panel,
+  // which a script tab does not have in front, so Open goes to the panel's tab with the control
+  // selected and the Animation tab on the animation the row names, where it previews.
+  //
+  // A row that can take a control moved on the instrument (sendCC's controller, sendNRPN's and
+  // sendRPN's numbers, a device parameter's id) has Learn: it shows the display panel's MIDI tab and
+  // writes the first such control the tab's learn chips see, in one edit, and a chip dragged from
+  // the tab onto the row is written the same way. A sendMidi or sendSysex row has Send, which hands
+  // its bytes to the Ports tab's Send raw MIDI box; nothing is sent from the row (valueLearn.js).
+  //
   // The same component serves the panel file view, over its JSON (readJsonValues), where an edit
   // becomes the item's draft as typing would; read-only there (Every field, the whole file) the rows
   // are to read.
@@ -47,6 +57,10 @@
   import EasingCurve from '../components/animation/EasingCurve.svelte';
   import BezierEditor from '../components/animation/BezierEditor.svelte';
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
+  import LcdLinePreview from './LcdLinePreview.svelte';
+  import { learnFor, learnTakes, learnedEdit, learnWords, sendableHex } from './valueLearn.js';
+  import { learnNext } from '../stores/midiLearnTap.js';
+  import { rawMidiDraft } from '../stores/rawMidiDraft.js';
 
   let {
     source = '',
@@ -63,6 +77,7 @@
     onreveal = null,         // (start, end) → a view with no editor (the whole file) goes there
     pickedControl = null,    // the id of the control picked to be the panel's selection, or null
     onpickcontrol = null,    // (id) → pick it, (null) → take the pick back; null: no Select at all
+    onopenanimation = null,  // (controlId, name) → the panel, its Animation tab on it; null: no Open
   } = $props();
 
   const READ_EVERY_MS = 60;
@@ -183,6 +198,103 @@
   function pickControl(arg) {
     const id = selectable(arg);
     if (id) onpickcontrol(pickedControl === id ? null : id);
+  }
+
+  /* --------------------------------------------- a control moved on the instrument, and Send */
+
+  // The learn under way: the row's key, what it writes, how to stop listening, and whether the
+  // display panel was showing before it opened the MIDI tab. `learnNote` says what the last one
+  // wrote, until the caret leaves the call it wrote into (`learnNoteIn`, that call's text as written):
+  // the write itself moves the caret, so any move would take the note away before it was read.
+  let learning = $state.raw(null);
+  let learnNote = $state('');
+  let learnNoteIn = null;
+  let dropKey = $state(null);
+  const DRAG_TYPE = 'application/x-ceditor-device-parameter';
+
+  /** What a row's Learn writes, or null: none in the panel file view, nor without an editor to write in. */
+  const learnable = (row) => (!readOnly && !isJson && editor?.replaceRange ? learnFor(row.call, row.arg) : null);
+
+  /** The profile a learn names what it hears against: the role's own for a device parameter, else
+   *  the main synth's. */
+  const learnProfile = (arg) => String(context?.devices?.roles?.[arg.meaning?.role ?? 'mainSynth']?.profileId
+    ?? context?.devices?.roles?.mainSynth?.profileId ?? '');
+
+  function stopLearn({ restore = true } = {}) {
+    const held = learning;
+    if (!held) return;
+    learning = null;
+    held.stop?.();
+    if (restore && !held.wasShowing) scriptDisplay.set(false);
+  }
+
+  function startLearn(row) {
+    const key = keyOf(row.arg);
+    if (learning?.key === key) { stopLearn(); return; }
+    const wasShowing = learning ? learning.wasShowing : get(scriptDisplay);
+    stopLearn({ restore: false });
+    session?.done();
+    const spec = learnable(row);
+    if (!spec) return;
+    learnNote = '';
+    learnNoteIn = null;
+    scriptDisplay.set(true);
+    displayTabRequest.set({ tab: 'midi' });
+    const stop = learnNext((chip) => learnTakes(spec, chip), (chip) => takeLearned(row, chip), { profileId: learnProfile(row.arg) });
+    learning = { key, spec, stop, wasShowing };
+  }
+
+  /** Write what was learned (a chip, or a chip's drag payload) into the row's call as it is now. */
+  function takeLearned(row, learned) {
+    clearTimeout(readTimer);
+    readNow();
+    const now = statementRows(statement).find((r) => r.type === 'arg' && r.arg.range.start === row.arg.range.start && r.arg.kind === row.arg.kind);
+    const spec = now ? learnable(now) : null;
+    const edit = spec ? learnedEdit(source, spec, learned, (a, v) => writeValue(source, language, a, v).text) : null;
+    stopLearn();
+    if (!edit) {
+      learnNoteIn = null;
+      learnNote = spec ? 'That is not what this row takes, so nothing was written.' : 'The call moved, so nothing was written.';
+      return;
+    }
+    writeThrough(edit.start, edit.end, edit.text);
+    learnNoteIn = { start: now.call.range.start, end: now.call.range.end + edit.text.length - (edit.end - edit.start) };
+    learnNote = learnWords(spec, learned);
+  }
+
+  function onRowDragOver(event, row) {
+    if (!learnable(row) || !event.dataTransfer?.types?.includes(DRAG_TYPE)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    dropKey = keyOf(row.arg);
+  }
+
+  function onRowDrop(event, row) {
+    dropKey = null;
+    if (!learnable(row)) return;
+    let payload = null;
+    try { payload = JSON.parse(event.dataTransfer.getData(DRAG_TYPE)); } catch { payload = null; }
+    if (!payload) return;
+    event.preventDefault();
+    takeLearned(row, payload);
+  }
+
+  /** Hand a sendMidi or sendSysex row's bytes to the Ports tab, to be sent from there. */
+  function sendFromPorts(row, hex) {
+    rawMidiDraft.set({ hex, role: 'mainSynth', from: `${labelPrefix.toLowerCase()} line ${lineNo(row.arg.range.start)}` });
+    scriptDisplay.set(true);
+    displayTabRequest.set({ tab: 'ports' });
+  }
+
+  /** Go to the panel, a ce.anim.play row's control selected and the Animation tab open on its
+   *  animation, where it previews; on the control's animations when it has none of that name, to
+   *  make one. An edit open here is ended first; the code is not touched. */
+  function openAnimation(arg) {
+    const m = arg.meaning ?? {};
+    if (!m.controlId || !onopenanimation) return;
+    stopLearn({ restore: false });
+    session?.done();
+    onopenanimation(m.controlId, m.key ?? null);
   }
 
   /* -------------------------------------------------------------------------------- sessions */
@@ -436,7 +548,7 @@
   $effect(() => {
     const key = docKey;
     untrack(() => {
-      if (lastDocKey !== null && key !== lastDocKey) session?.end('left');
+      if (lastDocKey !== null && key !== lastDocKey) { session?.end('left'); stopLearn(); }
       lastDocKey = key;
     });
   });
@@ -453,7 +565,15 @@
       if (r && (at < r.start || at > r.end)) session.done();
     });
   });
-  $effect(() => { if (readOnly) untrack(() => session?.end('left')); });
+  $effect(() => { if (readOnly) untrack(() => { session?.end('left'); stopLearn(); }); });
+  // What the last learn wrote is said until the caret leaves the call it wrote into.
+  $effect(() => {
+    const at = caret;
+    untrack(() => {
+      if (learning || !learnNote) return;
+      if (!learnNoteIn || at < learnNoteIn.start || at > learnNoteIn.end) { learnNote = ''; learnNoteIn = null; }
+    });
+  });
 
   onMount(() => {
     // Done, a tab switch, the dock closing: the target is no longer this session's.
@@ -484,6 +604,7 @@
     clearTimeout(readTimer);
     readTimer = null;
     session?.end('left');
+    stopLearn();
     onmarks?.([]);
   });
 
@@ -493,7 +614,9 @@
     const flat = String(text ?? '').replace(/\s*\n\s*/g, ' ');
     return flat.length > 80 ? `${flat.slice(0, 79)}…` : flat;
   };
-  const shownText = (arg) => highlight(oneLine(editingArg(arg) && session ? session.arg.text : arg.text), language);
+  // A colour built from numbers is shown as the colour: its text is the whole call, headed above it.
+  const shownText = (arg) => (arg.meaning?.built ? arg.meaning.stored
+    : highlight(oneLine(editingArg(arg) && session ? session.arg.text : arg.text), language));
 
   // A call is headed by its name as written (ce.core.set, ctx.SendCC), not the contract's id for it.
   const callName = (call) => readText.slice(call.nameRange?.start ?? 0, call.nameRange?.end ?? 0).replace(/\s+/g, '') || call.path;
@@ -561,6 +684,8 @@
 
   let footer = $derived.by(() => {
     if (readOnly) return 'Shown to read here: the values are listed, and nothing is edited.';
+    if (learning) return learnWords(learning.spec);
+    if (learnNote) return learnNote;
     if (sessView && (sessView.kind === 'colour' || sessView.kind === 'gradient')) {
       const was = oneLine(sessView.original);
       return `Done or Cancel in the display panel ends the edit. Cancel puts ${was.length > 48 ? 'what was written' : was} back exactly.`;
@@ -585,6 +710,9 @@
     {:else}
       <span class={['vswatch', 'still', !css && 'none']} style:--sw={css ?? 'transparent'} aria-hidden="true"></span>
     {/if}
+  {:else if arg.kind === 'computed' && m.css}
+    <!-- The colour the call below builds from numbers: edited on that call's colour row. -->
+    <span class="vswatch still" style:--sw={m.css} title={`${m.stored}, built by the call below, where it is edited`} aria-hidden="true"></span>
   {:else if arg.kind === 'gradient'}
     {@const strip = stripCss(arg)}
     {#if arg.editable === 'gradient' && !readOnly}
@@ -658,6 +786,36 @@
   {/if}
 {/snippet}
 
+{#snippet openAnimationTab(arg)}
+  {@const m = arg.meaning ?? {}}
+  {#if arg.kind === 'animation' && m.controlId && onopenanimation}
+    <!-- The Animation tab edits the panel, and a script tab has none in front: Open goes to it. -->
+    <button class="vpick vopen" aria-label={m.key ? `Open ${m.key} in the Animation tab` : `Open ${m.control}'s animations in the Animation tab`}
+      title={m.key ? `Go to the panel with ${m.control} selected and the Animation tab open on "${m.key}", where it previews. The script stays open in its tab.`
+        : `${m.control} has no animation called "${arg.value}". Go to the panel with ${m.control} selected and the Animation tab open, where one can be made.`}
+      onclick={(e) => { e.stopPropagation(); openAnimation(arg); }}>Open</button>
+  {/if}
+{/snippet}
+
+{#snippet learnAndSend(row)}
+  {@const spec = learnable(row)}
+  {@const hex = !readOnly && !isJson ? sendableHex(row.call, row.arg) : null}
+  {#if spec}
+    {@const on = learning?.key === keyOf(row.arg)}
+    <!-- Its own button, as Select is: the row's click goes to the value. -->
+    <button class={['vpick', 'vlearn', on && 'on']} aria-pressed={on}
+      aria-label={on ? 'Stop learning' : `Learn ${spec.label} from the instrument`}
+      title={on ? 'Listening on the MIDI input. Click again to stop.'
+        : `Move a control on the instrument and the first ${spec.label} the MIDI tab sees is written here, in one edit. Or drag a chip from the MIDI tab onto this row.`}
+      onclick={(e) => { e.stopPropagation(); startLearn(row); }}>{on ? 'Listening…' : 'Learn'}</button>
+  {/if}
+  {#if hex}
+    <button class="vpick vsend" aria-label="Send these bytes from the Ports tab"
+      title={`Put ${hex} in the Ports tab's Send raw MIDI box, to send from there. Nothing is sent from here.`}
+      onclick={(e) => { e.stopPropagation(); sendFromPorts(row, hex); }}>Send…</button>
+  {/if}
+{/snippet}
+
 <div class="values" data-testid="values-sidebar">
   {#if !statement}
     <p class="vempty">Put the caret in a statement: the values in it that the editor can read are listed here.</p>
@@ -719,8 +877,9 @@
           {@const line = meaningLine(arg, { madeBelow: madeByChild(row.call, arg) })}
           <!-- The row as a whole goes to its value on a click; its name is the keyboard's way there. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <div class={['vrow', group && 'group', key === caretKey && 'sel', editingArg(arg) && 'editing', arg.problem && arg.problem.severity]}
+          <div class={['vrow', group && 'group', key === caretKey && 'sel', editingArg(arg) && 'editing', arg.problem && arg.problem.severity, dropKey === key && 'drop']}
             style:--depth={row.depth} data-arg={key} data-kind={arg.kind} data-name={arg.name ?? ''}
+            ondragover={(e) => onRowDragOver(e, row)} ondragleave={() => { if (dropKey === key) dropKey = null; }} ondrop={(e) => onRowDrop(e, row)}
             onpointerenter={() => hoverKey = key} onpointerleave={() => { if (hoverKey === key) hoverKey = null; }}
             onfocusin={() => hoverKey = key} onfocusout={() => { if (hoverKey === key) hoverKey = null; }}
             onclick={() => revealArg(arg)}>
@@ -735,7 +894,13 @@
                   {/if}
                   {@render valueEdit(row)}
                   {@render selectControl(arg)}
+                  {@render openAnimationTab(arg)}
+                  {@render learnAndSend(row)}
                 </div>
+                {#if arg.kind === 'lcdLine' && arg.meaning?.lcd?.cells && !arg.meaning.lcd.layouts}
+                  <!-- The line as the display shows it: what of it is cut, and the cells it cannot draw. -->
+                  <LcdLinePreview line={arg.meaning.lcd} />
+                {/if}
                 {#if line}<div class={['vmeaning', arg.kind === 'path' && arg.meaning?.found && 'found']}>{line}</div>{/if}
                 {#if arg.problem}<div class={['vproblem', arg.problem.severity]}>{arg.problem.message}</div>{/if}
                 {#if editingArg(arg) && sessView?.refused !== null && sessView?.refused !== undefined}
@@ -869,5 +1034,6 @@
   }
   .vpick:hover, .vpick:focus-visible { color: var(--txt); border-color: var(--txt-dim); outline: none; }
   .vpick.on { color: var(--accent); border-color: var(--accent); }
+  .vrow.drop { border-color: var(--accent); border-style: dashed; }
   .vfoot { margin: 10px 2px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--txt-faint); line-height: 1.45; }
 </style>

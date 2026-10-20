@@ -12,9 +12,12 @@
   import { valueCatalogueStore, deviceValueContext, declaredDeviceParameters, declaredDeviceDumps } from './valuesContext.js';
   import { scriptNames } from '../scripting/scriptNames.js';
   import { deviceRoleMappings, deviceProfiles, profileSources } from '../stores/deviceProfiles.js';
+  import { presetLibrary } from '../stores/presetLibrarian.js';
   import { profileParameterTables, requestParameterTable } from '../stores/deviceParameterTable.js';
   import { transport } from '../stores/transport.js';
   import { panelSelectionPick, pickPanelSelection } from '../stores/panels.js';
+  import { activateEditorTargetOnPanel } from '../stores/editorTarget.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
   import { controlSetForPanel } from '../models/controlSets.js';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
@@ -422,10 +425,11 @@
     names: JSON.parse(scriptNamesKey),
     scriptId: selected?.id ?? null,
     fonts: $valueCatalogueStore.fonts,
+    fontFaces: $valueCatalogueStore.faces,
     images: $valueCatalogueStore.images,
     devices: deviceValueContext({
       mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables, sources: $profileSources,
-      declared: JSON.parse(declaredParameterKey), declaredDumps: JSON.parse(declaredDumpKey),
+      declared: JSON.parse(declaredParameterKey), declaredDumps: JSON.parse(declaredDumpKey), library: $presetLibrary,
     }),
   });
   // A device parameter's id is read against its profile's whole table, which is asked for once a
@@ -441,6 +445,10 @@
   let pickedControl = $derived($panelSelectionPick && panelId != null && String($panelSelectionPick.panelId) === String(panelId)
     ? $panelSelectionPick.id : null);
   const pickControl = (id) => pickPanelSelection(panelId, id);
+  // A ce.anim.play row's Open: the panel's tab, the control selected, its Animation tab on the name.
+  const openAnimation = (id, name) => {
+    if (activateEditorTargetOnPanel(panelId, 'animation', id, { focus: name })) displayTabRequest.set({ tab: 'animation' });
+  };
   // The panel file view's text, caret and editor, which it reports (PanelFileView's onvalues).
   let fileValues = $state.raw(null);
   let fileMarks = $state.raw([]);
@@ -936,6 +944,7 @@
         <ValuesSidebar source={selected.source} language={selected.language} caret={caretOffset} context={scriptValueContext}
           editor={codeEditor} folded={editorFolded} docKey={`script:${selectedId}`} labelPrefix="Script"
           {pickedControl} onpickcontrol={panelId != null ? pickControl : null}
+          onopenanimation={panelId != null ? openAnimation : null}
           onmarks={(m) => editorMarks = m} />
       {/key}
     {/await}

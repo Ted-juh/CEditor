@@ -890,7 +890,7 @@ export const COMMANDS = [
     refusal: 'result',
     summary: 'Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank\'s first preset, whatever program number it uses.',
     params: [
-      { name: 'slot', type: 'number', required: true },
+      { name: 'slot', type: 'number', required: true, kind: 'presetSlot' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
           summary: 'Which device to recall on, when the panel names more than one.' },
@@ -1920,8 +1920,8 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'tag', type: 'string', required: true },
-      { name: 'value', type: 'number', required: true },
+      { name: 'tag', type: 'string', required: true, kind: 'fontAxis' },
+      { name: 'value', type: 'number', required: true, kind: 'fontAxis' },
     ],
     scopes: 'any',
   },
@@ -2011,7 +2011,7 @@ export const COMMANDS = [
     summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'type', type: 'string', required: true },
+      { name: 'type', type: 'string', required: true, kind: 'componentType' },
       { name: 'props', type: 'object', required: false, fields: optionFields([
         'controlName', 'controlX', 'controlY', 'controlWidth', 'controlHeight', 'controlParent',
         'controlSection',
@@ -3047,12 +3047,12 @@ export const COMMANDS = [
   },
   {
     id: 'sendProgramChange', category: 'Device / MIDI', signature: 'sendProgramChange(channel, program [, bankMsb, bankLsb])',
-    summary: 'Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first.',
+    summary: 'Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first. `program` is MIDI\'s number, 0 to 127; most synths show it counted from 1, so program 0 is the one they call 1.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
       { name: 'program', type: 'number', required: true, unit: '0 to 127' },
-      { name: 'bankMsb', type: 'number', required: false },
-      { name: 'bankLsb', type: 'number', required: false },
+      { name: 'bankMsb', type: 'number', required: false, unit: '0 to 127' },
+      { name: 'bankLsb', type: 'number', required: false, unit: '0 to 127' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendProgramChange(${1:1}, ${2:0})$0', javascript: 'sendProgramChange(${1:1}, ${2:0})$0' },
@@ -3304,6 +3304,8 @@ const PARAM_TYPE_FOR = {
  *  no argument's, and says both in the verb's summary instead. Only for the argument that IS the
  *  value — the last, when its kind is the verb's own (an addressed verb's index is not). */
 function verbValueTyping(verb, kind) {
+  // A value the spec names a kind for (the LCD's line, read against the display it is written to).
+  if (verb.valueKind && kind === 'str') return { kind: verb.valueKind };
   if (kind !== verb.k && kind !== verb.kind) return {};
   if (kind === 'enum' && Array.isArray(verb.values)) {
     const same = (list) => list.length === verb.values.length && list.every((x, i) => x === verb.values[i]);

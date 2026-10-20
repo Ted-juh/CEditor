@@ -35,14 +35,18 @@ import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken 
 import {
   COLOUR_FORMS, DRAW_COLOUR_FORMS, MADE_CHILDREN, colourFieldAt, colourHint, drawColour, mapColourWrites,
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
-  shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
+  shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS, colourFromRgb, colourFromHsl, hslOfChannels,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
 import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
-import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
+import {
+  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
+} from './drawShapes.js';
+import { lcdLineWords } from './lcdLines.js';
+import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -61,7 +65,7 @@ import { checksumNames, computeChecksum } from '../utils/checksums.js';
 // ce.text measures through the renderer's own layout rather than a second implementation of it.
 import { buildBlockTextLayout } from '../editor/canvasControlTextLayout.js';
 import {
-  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight,
+  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight, axisClampWords, axisRefusalWords,
 } from './textStyle.js';
 import {
   isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed,
@@ -1013,7 +1017,6 @@ export function readWatch(path) {
 // it was (lightening by 40 gave white) or clamped (an alpha of 128 gave solid). It is refused, with
 // the number out of 100 when that is what it looks like, in the words of each prelude's __cunit.
 
-const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
 
 /** A colour a property could store -> [r, g, b], or null after saying why it cannot be read. */
 function colourChannels(verb, hex) {
@@ -1038,11 +1041,6 @@ function colourUnit(verb, what, value, fallback) {
   if (!problem) return realNumber(value);
   addScriptTrace('error', '', `${verb}: ${problem.why}, so there is no answer.${problem.hint}`);
   return undefined;
-}
-
-function colourFromRgb(r, g, b) {
-  const c = (v) => colourClampByte(Number(v) || 0).toString(16).padStart(2, '0');
-  return `#${c(r)}${c(g)}${c(b)}`.toUpperCase();
 }
 
 function colourToRgb(hex) {
@@ -1108,29 +1106,7 @@ function colourFromOrder(verb, order, value) {
 /** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
 function colourToHsl(hex) {
   const rgb = colourChannels('ce.math.hsl', hex);
-  if (!rgb) return undefined;
-  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, sat = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-    else if (max === g) h = ((b - r) / d + 2) * 60;
-    else h = ((r - g) / d + 4) * 60;
-  }
-  return { h, s: sat * 100, l: l * 100 };
-}
-
-function colourFromHsl(hue, sat, light) {
-  const h = Number(hue) || 0;
-  const s = (Number(sat) || 0) / 100;
-  const l = (Number(light) || 0) / 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  return colourFromRgb(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
+  return rgb ? hslOfChannels(rgb) : undefined;
 }
 
 // @module ce.music
@@ -3425,6 +3401,7 @@ function componentVerbAction(verb, target, args) {
     // of the list is not, and used to be indistinguishable from both success and silence.
     if (componentRequestLegal(verb, cfg, args)) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
+      lcdLineSaid(verb, path, cfg, args, shown);
       return true;
     }
     // Said with why (componentVerbs.componentRefusalLine): the index that addresses nothing and
@@ -3434,7 +3411,21 @@ function componentVerbAction(verb, target, args) {
   }
   if (!writeComponentFields(verb, path, patch)) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
+  lcdLineSaid(verb, path, cfg, args, shown);
   return true;
+}
+
+// A line the LCD cannot show all of (cut at its width, a character it has no shape for, a display
+// showing its layouts instead) is said once per line and reason (lcdLines.js).
+const lcdLineWarned = new Set();   // resetScriptState clears it
+function lcdLineSaid(verb, path, display, args, shown) {
+  if (verb.family !== 'lcd' || verb.v !== 'text') return;
+  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, args[1])) {
+    const key = `${path}\u0000${args[0]}\u0000${reason}`;
+    if (lcdLineWarned.has(key)) continue;
+    lcdLineWarned.add(key);
+    addScriptTrace('warn', '', `${message} This is said only the first time.`);
+  }
 }
 
 
@@ -5217,42 +5208,35 @@ function drawLinesImpl(explicit, ownerName, value) {
   return pushCommand(explicit, ownerName, { op: 'segments', segments });
 }
 
+// An item that is not a point is left out, a radius not above 0 is 1.5 and a tension outside 0 to
+// 1 its nearest end, each said once (drawShapes.js): they were done without a word, and a tension
+// that is not a number was NaN, which drew no curve.
 function drawPointsImpl(explicit, ownerName, value, radius) {
-  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
-  const points = [];
-  for (const item of list) {
-    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
-    if (!pair) continue;
-    const [px, py] = pair.map((n) => Number(n));
-    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
-  }
+  const { points, said } = pointList('drawPoints', value);
+  drawSaid('drawPoints\u0000points', said);
   if (!points.length) {
     addScriptTrace('error', '', 'ce.draw.points: no points. Pass a list of [x, y].');
     return false;
   }
-  const r = Number(radius) > 0 ? Number(radius) : 1.5;
-  return pushCommand(explicit, ownerName, { op: 'dots', points, r });
+  const { r, said: radiusSaid } = pointRadius(radius);
+  drawSaid('drawPoints\u0000radius', radiusSaid);
+  return pushCommand(explicit, ownerName, { op: 'dots', points, r }, 'drawPoints');
 }
 
 function drawCurveImpl(explicit, ownerName, value, opts) {
-  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
-  const points = [];
-  for (const item of list) {
-    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
-    if (!pair) continue;
-    const [px, py] = pair.map((n) => Number(n));
-    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
-  }
+  const { points, said } = pointList('drawCurve', value);
+  drawSaid('drawCurve\u0000points', said);
   if (points.length < 2) {
     addScriptTrace('error', '', 'ce.draw.curve: needs at least two points.');
     return false;
   }
   // A curve was inexpressible before: you approximated it with straight segments, which meant a
   // loop, which was the expensive thing. `tension` 0 is a polyline and 1 is fully round.
-  const tension = Math.max(0, Math.min(1, Number(opts?.tension ?? 0.5)));
+  const { t: tension, said: tensionSaid } = curveTension(opts?.tension);
+  drawSaid('drawCurve\u0000tension', tensionSaid);
   return pushCommand(explicit, ownerName, {
     op: 'curve', points, tension, closed: opts?.closed === true,
-  });
+  }, 'drawCurve');
 }
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
@@ -5607,19 +5591,23 @@ function textStyleImpl(target, opts) {
   return all && refused.length === 0;
 }
 
+const textAxisWarned = new Set();   // the controls and axes that have said a number was kept within the axis; resetScriptState clears it
 function textAxisImpl(target, tag, value) {
   const name = String(target ?? '');
   const font = textFontNode(name);
   if (!font) return textNeedsTextSection('axis', name) ?? false;
 
   const descriptor = findFont(textCatalogue(), font.family);
-  const { writes, refused } = planAxis(descriptor, tag, value);
-  for (const problem of refused) {
-    addScriptTrace('error', '',
-      `ce.text.axis("${name}", "${problem.option}"): refused — ${problem.reason}. `
-      + `ce.text.font("${font.family}") reports the axes it has.`);
-  }
+  const { writes, refused, axis, given, used } = planAxis(descriptor, tag, value);
+  for (const problem of refused) addScriptTrace('error', '', axisRefusalWords(name, font.family, problem.option, problem.reason));
   if (!writes.length) return false;
+  // A number the axis does not reach is kept within it, and said once per control and axis: it was
+  // kept within it without a word (textStyle.js).
+  const key = `${name}\u0000${axis.tag}`;
+  if (given !== used && !textAxisWarned.has(key)) {
+    textAxisWarned.add(key);
+    addScriptTrace('warn', '', `${axisClampWords(name, descriptor.family, axis, given, used)} This is said only the first time.`);
+  }
   let all = true;
   for (const write of writes) if (!textApplyWrite(name, write)) all = false;
   return all;
@@ -7935,6 +7923,8 @@ function recallPresetImpl(slot, opts = {}) {
 
   const profile = deviceProfileSource(role);
   if (!profile) {
+    // It answered with this and said nothing; the plug-in says the same (presetWords.js).
+    addScriptTrace('error', '', recallNoProfileWords(number, role));
     return { ok: false, error: `No device profile for role "${role}".`, slot: number };
   }
 
@@ -8640,9 +8630,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
         rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
     // LCD component prints are then the same letters, which a second font would not be.
-    drawPixelText: (text, x, y, scale) => pushCommand(null, ownerName,
-      { op: 'pixelText', text: String(text ?? ''), x: Number(x) || 0, y: Number(y) || 0,
-        scale: Math.max(1, Math.round(Number(scale) || 1)) }),
+    // Its numbers are read as every shape's are, and a character it has no glyph for is said
+    // (drawShapes.js): each left a gap, without a word.
+    drawPixelText: (text, x, y, scale) => {
+      const written = String(text ?? '');
+      const { scale: s, said } = pixelScale(scale);
+      drawSaid('drawPixelText\u0000scale', said);
+      drawSaid(`drawPixelText\u0000gaps\u0000${written}`, pixelGapWords(written));
+      return pushCommand(null, ownerName,
+        { op: 'pixelText', text: written, x: drawNum('drawPixelText', 'x', x), y: drawNum('drawPixelText', 'y', y), scale: s }, 'drawPixelText');
+    },
     drawMeasure: (text, opts) => drawMeasureImpl(text, opts),
 
     /* ce.draw, phase §49 — the bulk primitives, a style stack, clipping and images. */
@@ -8680,12 +8677,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
     // fill and stroke do, and save()/restore() put them back.
+    // A clip that leaves the control nothing to draw in hid everything after it without a word; it
+    // is said, once (drawShapes.js), and its numbers are read as every shape's are.
     drawClip: (x, y, w, h) => {
       if (x === undefined || x === null) { drawState.clip = null; return true; }
       drawState.clip = {
-        x: Number(x) || 0, y: Number(y) || 0,
-        w: Math.max(0, Number(w) || 0), h: Math.max(0, Number(h) || 0),
+        x: drawNum('drawClip', 'x', x), y: drawNum('drawClip', 'y', y),
+        w: Math.max(0, drawNum('drawClip', 'w', w)), h: Math.max(0, drawNum('drawClip', 'h', h)),
       };
+      const t = drawState.transform ? null : drawTarget(null, ownerName)?._children?.Transform;
+      drawSaid('drawClip', clipWords(drawState.clip, t ? { w: Number(t.width), h: Number(t.height) } : null));
       return true;
     },
     drawBlend: (mode) => {
@@ -9797,6 +9798,8 @@ function resetScriptState() {
   drawStrokeWarned.clear();
   timeNumberWarned.clear();
   componentClampWarned.clear();
+  lcdLineWarned.clear();
+  textAxisWarned.clear();
   deviceOverrideWarned.clear();
   musicWarned.clear();
   drawWarned.clear();

@@ -565,5 +565,5 @@ test('the fonts are given by their stored value and by their name, and the image
   assert.ok(fonts.includes('Inter Tight') && fonts.includes('Arial'));
   assert.equal(fonts.filter((f) => f === 'Arial').length, 1, 'each once');
   assert.deepEqual(images.map((i) => [i.id, i.name, Boolean(i.dataUrl)]), [['cap', 'knob-cap', true]], 'a disabled icon is not one');
-  assert.deepEqual(valueCatalogues(), { fonts: [], images: [] });
+  assert.deepEqual(valueCatalogues(), { fonts: [], faces: [], images: [] });
 });

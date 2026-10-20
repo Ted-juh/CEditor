@@ -11,7 +11,7 @@
   // script, and lives only in the scriptDrawings store.
   import { scriptDrawings } from '../stores/scriptDraw.js';
   import { gradientCoords } from '../utils/gradientGeometry.js';
-  import { glyphRows, FONT_W, FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
+  import { dotsPathData, curvePathData, pixelTextRects } from '../scripting/drawShapes.js';
 
   let { controlId = '', width = 0, height = 0 } = $props();
   const instanceId = $props.id();
@@ -96,57 +96,16 @@
   const segmentsPath = (c) => (c.segments ?? [])
     .map(([x1, y1, x2, y2]) => `M ${x1} ${y1} L ${x2} ${y2}`).join(' ');
 
-  /** Points as one path of full circles, so the radius is the point's own rather than the stroke
-   *  width's. Two arcs per dot because a single arc of 360° is degenerate in SVG. */
-  const dotsPath = (c) => {
-    const r = Math.max(0.01, Number(c.r) || 1.5);
-    return (c.points ?? [])
-      .map(([x, y]) => `M ${x - r} ${y} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0`)
-      .join(' ');
-  };
-
-  /** A Catmull-Rom spline emitted as cubic Béziers — the standard way to get a smooth curve THROUGH
-   *  a set of points rather than merely near them, which is what a script plotting an envelope or a
-   *  response curve wants. tension 0 collapses to straight lines. */
-  const curvePath = (c) => {
-    const pts = c.points ?? [];
-    if (pts.length < 2) return '';
-    const t = Math.max(0, Math.min(1, Number(c.tension ?? 0.5))) / 6;
-    const at = (i) => pts[Math.max(0, Math.min(pts.length - 1, i))];
-    let d = `M ${pts[0][0]} ${pts[0][1]}`;
-    for (let i = 0; i < pts.length - 1; i += 1) {
-      const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
-      d += ` C ${p1[0] + (p2[0] - p0[0]) * t} ${p1[1] + (p2[1] - p0[1]) * t}`
-        + ` ${p2[0] - (p3[0] - p1[0]) * t} ${p2[1] - (p3[1] - p1[1]) * t}`
-        + ` ${p2[0]} ${p2[1]}`;
-    }
-    return c.closed ? `${d} Z` : d;
-  };
+  /** Points as one path of full circles, and a Catmull-Rom curve through its points, drawn from the
+   *  same functions the Values tab draws a call's shape with (drawShapes.js). */
+  const dotsPath = (c) => dotsPathData(c.points, c.r);
+  const curvePath = (c) => curvePathData(c.points, c.tension, c.closed);
 
   /** The 5x7 pixel font, as one rect per lit pixel. The app's own glyphs — an LCD readout a script
-   *  draws and one an LCD component prints are the same letters, which a second font would not be. */
-  function pixelRects(c) {
-    const out = [];
-    const scale = Math.max(1, Math.round(c.scale || 1));
-    let x = c.x;
-    for (const ch of String(c.text ?? '')) {
-      // glyphRows gives FONT_H strings of FONT_W characters, a lit pixel being '#'. An unknown
-      // character comes back as the font's own block glyph rather than a hole, which is what the
-      // LCD components show too.
-      const rows = glyphRows(ch);
-      if (rows) {
-        for (let row = 0; row < FONT_H; row += 1) {
-          const line = rows[row] ?? '';
-          for (let col = 0; col < FONT_W; col += 1) {
-            if (line[col] !== '#') continue;
-            out.push({ x: x + col * scale, y: c.y + row * scale, s: scale });
-          }
-        }
-      }
-      x += FONT_ADVANCE * scale;
-    }
-    return out;
-  }
+   *  draws and one an LCD component prints are the same letters, which a second font would not be. A
+   *  character the font has no glyph for draws nothing and takes its advance, which ce.draw.pixelText
+   *  says (drawShapes.js); the rects come from the function the Values tab draws its shape with. */
+  const pixelRects = (c) => pixelTextRects(c.text, c.x, c.y, c.scale);
 
   // Arc geometry. Angles arrive in DEGREES with 0 at twelve o'clock, increasing clockwise — the
   // convention a knob's arc is described in. SVG measures from three o'clock, hence the -90.

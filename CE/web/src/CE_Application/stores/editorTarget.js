@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store';
-import { resolvedActivePanelId, selectedComponentIds } from './panels.js';
+import { pickPanelSelection, resolvedActivePanelId, selectedComponentIds, setActivePanel } from './panels.js';
 
 /**
  * editorTarget.js — one store for every dock tab that edits a control.
@@ -17,8 +17,13 @@ import { resolvedActivePanelId, selectedComponentIds } from './panels.js';
  * two is a separate job; this stops the bleeding.
  *
  * Target shape:
- *   { kind: 'effects' | 'typography' | 'assets' | 'screen' | 'api', type: 'control', controlId: 'ctrl_1', domain: string|null }
+ *   { kind: 'effects' | 'typography' | 'assets' | 'screen' | 'api', type: 'control', controlId: 'ctrl_1', domain: string|null,
+ *     focus?: string|null }
  *   null — nothing armed; the tab shows its empty state.
+ *
+ * `focus` names the thing in the tab to show first, for an opener that knows it: the Values tab's
+ * Open on ce.anim.play names the animation. The tab takes it once (`takeEditorTargetFocus`) and it
+ * is not checked here, for the reason `animation` gives below: what is in a tab is the tab's own.
  *
  * Text, Effects and Screen follow selection through their own dock state by default, with optional
  * pinning. They consume this store for explicit openers; ordinary tab clicks do not arm a target.
@@ -82,7 +87,7 @@ export function tabForEditorTarget(target) {
  * `domain` is optional — a caller that only knows "edit this control's effects" does not have to
  * work out whether it is a label or a screen; the tab picks the first domain the control has.
  */
-export function activateEditorTarget(kind, controlId, domain = null) {
+export function activateEditorTarget(kind, controlId, domain = null, focus = null) {
   if (!isEditorTargetKind(kind) || !controlId) return null;
   const allowed = EDITOR_TARGET_KINDS[kind].domains;
   const target = {
@@ -90,9 +95,35 @@ export function activateEditorTarget(kind, controlId, domain = null) {
     type: 'control',
     controlId,
     domain: allowed?.includes(domain) ? domain : null,
+    ...(focus ? { focus: String(focus) } : {}),
   };
   editorTarget.set(target);
   return target;
+}
+
+/**
+ * The armed target's `focus`, taken: returned once and cleared, the control kept. A tab takes it
+ * when it shows the target, so coming back to the tab later keeps whatever was picked there since.
+ */
+export function takeEditorTargetFocus() {
+  const target = get(editorTarget);
+  if (!target?.focus) return null;
+  const { focus, ...rest } = target;
+  editorTarget.set(rest);
+  return focus;
+}
+
+/**
+ * Arm a tab on a control of a panel that is not in front: from a script tab, which has no panel in
+ * front (stores/panels.js: resolvedActivePanelId is null there, so the tab would find no control).
+ * The panel's tab is brought to front with the control selected, and the tab armed after it, in that
+ * order: a change of panel clears whatever was armed.
+ */
+export function activateEditorTargetOnPanel(panelId, kind, controlId, { domain = null, focus = null } = {}) {
+  if (panelId == null || !isEditorTargetKind(kind) || !controlId) return null;
+  pickPanelSelection(panelId, controlId);
+  setActivePanel(panelId);
+  return activateEditorTarget(kind, controlId, domain, focus);
 }
 
 /**

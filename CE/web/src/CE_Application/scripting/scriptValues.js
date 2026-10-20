@@ -28,7 +28,9 @@ import {
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  readLcdLine, readComponentType, readFontAxis, panelParts, cssOf,
 } from './scriptValueKinds.js';
+import { builtColourOf, builtWords } from './builtColours.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
   unknownOptionsMessage,
@@ -39,7 +41,9 @@ import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/control
 import { COMPONENT_VERBS } from './componentVerbs.js';
 import { TIME_NUMBERS } from './timeWords.js';
 import { octaveCount } from './noteLists.js';
-import { DRAW_SHAPES, drawNumber } from './drawShapes.js';
+import { DRAW_SHAPES, drawNumber, curveTension } from './drawShapes.js';
+import { readPresetSlot, programWords, bankWords } from './presetWords.js';
+import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { componentClampWarning } from './componentVerbs.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
@@ -210,6 +214,8 @@ function contextOf(context = {}) {
     tempo: Number.isFinite(Number(context?.tempo)) && Number(context.tempo) > 0 ? Number(context.tempo) : 120,
     self: self && typeof self === 'object' ? self : null,
     fonts: context?.fonts ?? null,
+    // Each family's variation axes (valuesContext's faces), which ce.text.axis reads against.
+    fontFaces: context?.fontFaces ?? null,
     images: context?.images ?? null,
     // Each device role's profile and its whole parameter table (readDeviceParameter).
     devices: context?.devices ?? null,
@@ -409,10 +415,28 @@ function buildCall(raw, env) {
   // one that lies wholly outside it (drawShapes.js).
   if (member && DRAW_SHAPES[member.id]) {
     const shape = readDrawShape(member.id, args, env.ctx.self);
-    if (shape) {
+    if (shape?.d) {
       call.shape = shape;
       if (shape.outside && !call.problem) call.problem = { severity: 'warning', message: shape.outside };
     }
+    // …and what it says of an argument it does not use as given, on that argument's row: a point
+    // list's item, a radius, a scale, the text's characters, or opts' tension.
+    for (const [name, message] of Object.entries(shape?.said ?? {})) {
+      if (!message) continue;
+      const at = name === 'tension' ? args.find((a) => a.param?.name === 'opts')?.options?.find((o) => o.name === 'tension')
+        : args.find((a) => a.param?.name === name);
+      if (at && !at.problem) at.problem = { severity: 'warning', message };
+    }
+  }
+  // A colour built from numbers written out has a row of its own, the colour it makes, which the
+  // Colors tab edits by writing the numbers back (builtColours.js); where the call is an argument,
+  // that argument's row shows the colour too, still.
+  const made = member ? builtColourOf(member.id, args) : null;
+  if (made) call.built = builtColourArg(doc.source, call, made);
+  for (const arg of args) {
+    if (arg.kind !== 'computed') continue;
+    const maker = children.find((c) => c.built && c.range.start === arg.range.start && c.range.end === arg.range.end);
+    if (maker) Object.assign(arg.meaning, { css: maker.built.meaning.css, stored: maker.built.meaning.stored });
   }
   if (member) return call;
   // A ce.<module>.<name> the module does not have fails the moment it runs: said on the call, with
@@ -424,6 +448,24 @@ function buildCall(raw, env) {
   }
   if (args.some((a) => KEPT_KINDS(a.kind) || (a.options ?? []).some((o) => KEPT_KINDS(o.kind)))) return call;
   return children;
+}
+
+/**
+ * The row of the colour a ce.math.rgbToHex or hslToHex call builds from numbers written out: its
+ * range the whole call, which a write gives back with the three numbers changed and the rest as it
+ * was (scriptValueWrite.js). Every part of it is written out, so it is a literal; it has no alpha
+ * to take, and while the call's bracket is open it has no editor.
+ */
+function builtColourArg(source, call, made) {
+  const parts = panelParts(made.stored);
+  const meaning = {
+    reader: 'built', claimedBy: 'numbers', form: made.from, stored: made.stored, built: made, said: builtWords(made),
+    css: cssOf(parts), swatch: { rgb: parts.rgb, alpha: 1 }, alpha: 1, takesAlpha: false,
+  };
+  return {
+    name: 'colour', param: null, range: { ...call.range }, text: source.slice(call.range.start, call.range.end),
+    literal: true, value: made.stored, kind: 'colour', meaning, problem: null, editable: call.open ? null : 'colour',
+  };
 }
 
 /* ------------------------------------------------------------------------- ce.anim's refusals */
@@ -554,7 +596,46 @@ function classify(arg, node, param, site, index) {
     }
     case 'number': {
       const read = readNumber(value, param, { tempo: site.env.ctx.tempo, site: numberSite(site, param) });
+      // A program number and a bank select, as the synth finds them (presetWords.js). The channel
+      // is neither, and says only its range.
+      const bankByte = param.name === 'bankMsb' || param.name === 'bankLsb';
+      if (site.memberId === 'sendProgramChange' && !read.problem && (param.name === 'program' || bankByte)) {
+        const synth = site.env.ctx.devices?.roles?.mainSynth;
+        const msb = sibling(site, 'bankMsb');
+        const lsb = sibling(site, 'bankLsb');
+        const said = param.name === 'program' ? programWords(value, { msb, lsb, presets: synth?.presets, library: synth?.library })
+          : bankWords(msb, lsb, synth?.presets);
+        if (said) read.meaning.hint = said;
+      }
       return setRead(arg, 'number', read, typeof value === 'number' ? 'number' : null);
+    }
+    // A variable font's axis, and the number ce.text.axis sets it to, read against the font of the
+    // control it names, as the runtime reads them.
+    case 'fontAxis': {
+      const target = sibling(site, 'target');
+      const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
+      const read = readFontAxis(value, {
+        name: String(target ?? ''), family: control?._children?.Text?._children?.Font?.family, faces: site.env.ctx.fontFaces,
+        at: param.name, tag: param.name === 'tag' ? value : sibling(site, 'tag'),
+      });
+      const editable = param.name === 'tag' ? (typeof value === 'string' && read.meaning.choices?.length ? 'choice' : null)
+        : typeof value === 'number' ? 'number' : null;
+      return setRead(arg, 'fontAxis', read, editable);
+    }
+    // A component type ce.panel.create makes, against the ones there are.
+    case 'componentType': {
+      const read = readComponentType(value, { types: COMPONENT_TYPES });
+      return setRead(arg, 'componentType', read, typeof value === 'string' ? 'choice' : null);
+    }
+    // A preset slot, read against the role's profile's banks, as recallPreset recalls one.
+    case 'presetSlot': {
+      const devices = site.env.ctx.devices;
+      const role = sibling(site, 'opts')?.role ?? 'mainSynth';
+      const device = devices?.roles?.[role] ?? null;
+      const read = readPresetSlot(value, {
+        profile: device ? { presets: device.presets } : null, role, library: device?.library, known: Boolean(devices),
+      });
+      return setRead(arg, 'presetSlot', read, read.meaning.choices?.length ? 'choice' : typeof value === 'number' ? 'number' : null);
     }
     case 'control': {
       const read = readControl(value, site.env.ctx);
@@ -597,6 +678,13 @@ function classify(arg, node, param, site, index) {
         settings: site.env.ctx.panel?.scripting?.settings ?? null,
       });
       return setRead(arg, 'sharedName', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
+    }
+    // A line an LCD is given: the cells it shows of it, and what the runtime says of what it cannot.
+    case 'lcdLine': {
+      const target = sibling(site, 'target');
+      const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
+      const rest = site.args.filter((a) => a.param?.name !== 'target').map((a) => (a.literal ? a.value : undefined));
+      return setRead(arg, 'lcdLine', readLcdLine(value, { control, target: String(target ?? ''), args: rest }), null);
     }
     // A list of notes, named, and refused where the runtime refuses it.
     case 'noteList': return setRead(arg, 'noteList', readNoteList(value, { memberId: site.memberId, name: param.name }), null);
@@ -727,6 +815,8 @@ function numberSite(site, param) {
   if (site.memberId === 'expandOctaves' && param.name === 'octaves') out.numberSaid = (v) => octaveCount(v).said;
   // A drawing's coordinate, read as the runtime reads it (drawShapes.js).
   if (DRAW_SHAPES[site.memberId]?.nums.includes(param.name)) out.numberSaid = (v) => drawNumber(site.memberId, param.name, v).said;
+  // A curve's tension past 0 to 1 is drawn at its nearest end, and said: it is not refused.
+  if (site.memberId === 'drawCurve' && site.option === 'tension') out.numberSaid = (v) => curveTension(v).said;
   // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
   const bpm = (site.memberId === 'beatsToMs' || site.memberId === 'msToBeats') && param.name !== 'bpm' ? realNumber(sibling(site, 'bpm')) : undefined;
   if (bpm > 0) out.tempo = bpm;

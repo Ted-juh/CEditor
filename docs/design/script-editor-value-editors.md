@@ -919,7 +919,9 @@ For the owner to decide, and each decided since:
 5. **A session ends when the text moves under it.** It holds a character range, so an edit outside
    that range, switching scripts, folding, or closing the editor ends it. This mirrors the way
    `colorTarget.js` clears a target when the selection or panel changes.
-6. **Only literal text is edited.** A computed value gets a mark at most, never an editor.
+6. **Only literal text is edited.** A computed value gets a mark at most, never an editor. A colour
+   built from numbers written out (`ce.math.hex(255, 128, 0)`) is not computed in this sense, and
+   is edited as its numbers ([Built](#built)); the reason for the rule does not reach it.
 7. **The text shows what is being edited.** While an edit is open from a row, its value's
    characters carry the strong box described under
    [Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited), and the box moves with
@@ -1304,6 +1306,77 @@ Not built: a callback for a request answered by several dumps at once (a Roland 
 Scripts hear each dump under its own id, and the collection's id reaches neither runtime's scripts,
 so a `requestDump` callback would need a "collection complete" event in the editor, the plug-in
 and the three preludes. `requestDump`'s summary says to give the callback the dump wanted.
+
+Then eight more, in one change, rows that work with the display panel and with what the runtime
+already knows. Each is a commit of its own, Learn and Send together:
+
+- **An LCD line.** `ce.components.lcd.text` stored the line and said nothing of three things that
+  happen to it. A line longer than the display is cut at the display's width unless it scrolls. A
+  segment or graphic display has no shape for some characters, which stay blank. A display with
+  layouts shows its zones, never its lines. The runtime now says each once, in `lcdLines.js`'s
+  words, read as `LcdDisplayRenderer` reads the display. The row draws the line in the display's
+  own cells: a cell it cannot draw is marked, and what is past the width is struck through.
+  `{tokens}` are filled in when the line is drawn, so a line holding them has its width left
+  unjudged.
+- **Preset slots and program numbers.** `recallPreset`'s slot counts across the profile's banks.
+  Its row names the bank, the place in it and the patch's name, which comes from the catalogue or
+  from the preset library. A slot outside every bank is refused in the runtime's words.
+  `sendProgramChange`'s program stays MIDI's 0 to 127. Its row says how a synth counting from 1
+  shows it, and which slot it reaches in the bank `bankMsb`/`bankLsb` select (`presetWords.js`).
+  `recallPreset` for a role with no profile answered `{ ok: false }` without a word, in both
+  runtimes; both now say why.
+- **`ce.panel.create`'s type** is a dropdown of the types there are, a slip refused with the nearest
+  one beside it. `ce.draw.clip`, `pixelText`, `points` and `curve` draw their shape under their call,
+  and the runtime says what each of them did without a word. Among those: a number that was not one
+  was 0, a dropped point, a tension that stopped the curve drawing at all, a glyph the pixel font
+  lacks, and a clip that hid everything after it.
+- **Learn and Send, with the MIDI and Ports tabs.** A row that can take a control moved on the
+  instrument has Learn. That covers `sendCC`'s controller and channel, `sendNRPN`'s and `sendRPN`'s
+  numbers and channel, and a device parameter's id. Learn shows the MIDI tab and writes the first
+  such control that the tab's learn chips read, in one edit; a chip dragged onto the row is taken the
+  same way (`valueLearn.js`, `stores/midiLearnTap.js`). A `sendMidi` or `sendSysex` row has Send,
+  which puts the bytes the runtime would send in the Ports tab's Send raw MIDI box
+  (`stores/rawMidiDraft.js`). Nothing is sent from a row: that box sends, through its own checks
+  and to the device it shows.
+- **`ce.text.axis`.** Its tag is a dropdown of the axes the control's font has, each named with its
+  range and default, and its value a field over that range. The runtime held a number past the axis
+  to the axis's end without a word. It now says so once, in `textStyle.js`'s words.
+- **`ce.anim.play`'s animation** has Open. The Animation tab edits the panel, and a script tab has
+  no panel in front: `resolvedActivePanelId` is null there, so a tab armed from the script finds no
+  control and is let go of when the panel comes back. So Open goes to the panel first. Its tab comes
+  to the front with the control selected, and then the Animation tab is armed on the animation the
+  runtime plays for that name. An editor target can carry a `focus`, the thing to show first, which
+  the tab takes once (`editorTarget.js`).
+- **A colour built from numbers written out**, `ce.math.hex(r, g, b)` or `ce.math.fromHsl(h, s, l)`,
+  has a colour row of its own, first under the call. Its swatch is the colour the runtime makes of
+  the numbers: the runtime's `rgbToHex` and `hslToHex` moved into `scriptColours.js`, so the reader
+  builds with the same arithmetic. The row the call fills shows the colour too, still. The Colors
+  tab writes a colour back as the three numbers, each in the form it had, and keeps the call and the
+  text around the numbers in one edit (`builtColours.js`). Hue, saturation and lightness are written
+  to the fewest decimals that build the colour again. A grey keeps the hue written. There is no
+  alpha to take, so a colour that is not solid is refused.
+
+  The owner asked for it knowing it bends rule 6 of [the session rules](#rules-every-edit-session-follows),
+  and it keeps that rule's reason. That rule is there because a computed value comes from something the editor
+  cannot see, so an editor would have to overwrite the expression or edit nothing ([example
+  5](#5-a-computed-value-gets-no-editor)). Neither is so here. Every input is a number written out,
+  the arithmetic is the runtime's, so the colour is known before the script runs, and the edit
+  writes numbers where numbers were. A call with any part not written out is computed as before.
+  The three numbers themselves are still bare numbers with no field. The runtime holds an RGB part
+  to 0–255 without a word, and does something much less simple with an HSL part out of range, so a
+  range on those rows would say what the runtime does not.
+
+Checked in `test/lcdLines.test.js`, `presetWords.test.js`, `drawShapes.test.js`,
+`valueLearn.test.js`, `fontAxes.test.js`, `animationOpen.test.js` and `builtColours.test.js`. In the
+browser, `browser-checks/valuesSidebar.mjs` drives Learn, Send, the built colour, create's type, the
+LCD line and Open.
+
+Next, from the same list, held back by the owner for a step of their own: an arrangement's preview
+(`ce.panel.align`, `distribute`, `match` and `grid` drawing the named controls before and after in
+the row, since the canvas is not on screen while you script), and bit fields and dump offsets
+(`getBits`/`setBits` drawing the byte with the field marked, and `bytesRead(dump, 10, 12)` naming
+what the profile says lives there, if the profiles describe dumps by offset at all, which is not yet
+checked).
 
 ## Open questions for the owner
 

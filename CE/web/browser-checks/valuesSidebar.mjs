@@ -37,6 +37,12 @@
  *              below 0 is said in the runtime's words
  *   shape      a drawing call's shape is drawn under it on the outline of the control the script is
  *              on, and one wholly outside it is said in the runtime's words
+ *   paired     Learn on a sendCC row writes the controller the MIDI tab sees next; Send on a sendSysex
+ *              row puts its bytes in the Ports tab's box and sends nothing; a colour built from
+ *              numbers (ce.math.hex) has a swatch, and the Colors tab writes the numbers back;
+ *              ce.panel.create's type is a dropdown
+ *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
+ *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
  *              file are rows only, the whole file's at the line clicked
@@ -789,6 +795,109 @@ try {
       outside: { drawn: true, d: 'M5000 5000h10v10h-10Z', box: size, problem: `ce.draw.rect: the shape at 5000, 5000, 10 × 10 lies wholly outside the control, which is ${size.replace(' x ', ' × ')}, so none of it shows.` } },
     { inside, outside });
 
+  // ===============================================================================================
+  // WITH THE DISPLAY PANEL — Learn from the MIDI tab, Send from the Ports tab, a colour built from
+  // numbers, create's type.
+  // ===============================================================================================
+  const PAIR = `function onValueChanged(value) {
+  ce.midi.sendCC(1, 74, 64);
+  ce.midi.sendSysex("41 10 00 00 41 12 10 00 01 00 05 6A");
+  ce.draw.fill(ce.math.hex(255, 128, 0));
+  ce.panel.create("Knob", {});
+}
+`;
+  const foot = async () => (await page.locator('[data-testid="values-sidebar"] .vfoot').textContent()).trim();
+  await typeScript(PAIR);
+
+  // ---- learn -------------------------------------------------------------------------------------
+  await clickAt(PAIR.indexOf('74') + 1);
+  await waitHead('Line 2');
+  const learnButton = page.locator('.vrow[data-name="cc"] button.vlearn');
+  const hiddenForLearn = !(await displayShown());
+  await countInputs();
+  await learnButton.click();
+  await until(() => getComputedStyle(document.querySelector('.display-panel-area')).display !== 'none');
+  await kit.settle(300);
+  const listening = { shown: await displayShown(), tab: await activeDisplayTab(), label: (await learnButton.textContent()).trim() };
+  // A note brushed on the way is not a controller: the CC after it is the one taken.
+  await page.evaluate(async () => {
+    const { latestMidiInputMessage } = await import('/src/CE_Application/stores/deviceProfileStores.js');
+    latestMidiInputMessage.set({ hex: '92 3C 64', deviceRole: 'mainSynth' });
+    latestMidiInputMessage.set({ hex: 'B2 15 40', deviceRole: 'mainSynth' });
+  });
+  await until(() => document.querySelector('.bd-app .detail textarea.ce-ta').value.includes('sendCC(3, 21, 64)'));
+  await kit.settle(300);
+  const learnt = PAIR.replace('sendCC(1, 74, 64)', 'sendCC(3, 21, 64)');
+  led.check(S, 'Learn writes the controller that moved', 'Learn on sendCC\'s cc row shows the MIDI tab and listens; the first controller the MIDI input sees, CC 21 on channel 3 after a note, is written over the channel and the cc in one edit, the panel hidden again as it was, and the foot says what was learned',
+    { hiddenBefore: true, listening: { shown: true, tab: 'MIDI', label: 'Listening…' }, text: learnt, writes: 1, shown: false, foot: 'Learned CC 21 on channel 3.' },
+    { hiddenBefore: hiddenForLearn, listening, text: await editorText(), writes: await inputs(), shown: await displayShown(), foot: await foot() });
+
+  // ---- send --------------------------------------------------------------------------------------
+  await clickAt(learnt.indexOf('41 10') + 1);
+  await waitHead('Line 3');
+  await countInputs();
+  await page.locator('.vrow[data-name="bytes"] button.vsend').click();
+  await until(() => [...document.querySelectorAll('.display-panel-area textarea.val')].some((t) => t.value.startsWith('F0')));
+  await kit.settle(300);
+  const ports = await page.evaluate(() => {
+    const box = [...document.querySelectorAll('.display-panel-area textarea.val')].find((t) => t.value.startsWith('F0'));
+    const status = [...document.querySelectorAll('.display-panel-area .status')].map((n) => n.textContent.trim()).find((t) => t.includes('From')) ?? '';
+    return { hex: box?.value ?? '', note: status };
+  });
+  led.check(S, 'Send hands the bytes to the Ports tab', 'Send on sendSysex\'s bytes row shows the Ports tab with the bytes the runtime would send, wrapped in F0 … F7, in its Send raw MIDI box, says where they came from, and sends nothing; the script is not touched',
+    { tab: 'Ports', hex: 'F0 41 10 00 00 41 12 10 00 01 00 05 6A F7', from: true, writes: 0 },
+    { tab: await activeDisplayTab(), hex: ports.hex, from: /From script line 3\. Press Send to send it\./.test(ports.note), writes: await inputs() });
+  // Hidden again by the rail's Dock toggle, as a person would put it away.
+  await page.locator('.icon-panel-area button.rail-toggle', { hasText: 'Dock' }).click();
+  await until(() => getComputedStyle(document.querySelector('.display-panel-area')).display === 'none');
+
+  // ---- a colour built from numbers ---------------------------------------------------------------
+  await clickAt(learnt.indexOf('255, 128') + 1);
+  await waitHead('Line 4');
+  const BUILT = '.vrow[data-name="colour"][data-kind="colour"]';
+  const built = await page.evaluate((sel) => {
+    const row = document.querySelector(sel);
+    const filled = document.querySelector('.vrow[data-name="colour"][data-kind="computed"]');
+    return { text: row?.querySelector('.vtext')?.textContent ?? '', meaning: row?.querySelector('.vmeaning')?.textContent ?? '',
+      swatch: getComputedStyle(row.querySelector('button.vswatch')).getPropertyValue('--sw').trim(),
+      filled: getComputedStyle(filled.querySelector('.vswatch.still')).getPropertyValue('--sw').trim(),
+      filledLine: filled.querySelector('.vmeaning')?.textContent ?? '' };
+  }, BUILT);
+  led.check(S, 'a colour built from numbers has a swatch', 'ce.math.hex(255, 128, 0) has a colour row first under it, the colour the runtime makes of the numbers, and the colour row it fills shows it too, still',
+    { text: '#FF8000', meaning: '#FF8000, built from red 255, green 128, blue 0', swatch: '#FF8000', filled: '#FF8000', filledLine: 'made by the call below: a colour, #FF8000' },
+    built);
+  await countInputs();
+  await page.locator(`${BUILT} button.vswatch`).click();
+  await page.waitForSelector('.sv-square');
+  await kit.settle(300);
+  const builtLabel = (await page.locator('.context-label').first().textContent()).trim();
+  const builtDrag = await dragColour(10, 600, 0.3);
+  await until(() => window.__inputs.length > 0);
+  await kit.settle(500);
+  const builtText = await editorText();
+  const numbers = /ce\.draw\.fill\(ce\.math\.hex\((\d+), (\d+), (\d+)\)\);/.exec(builtText);
+  const shownHex = await page.locator(`${BUILT} .vtext`).textContent();
+  await page.locator('.context-done').first().click();
+  await until(() => getComputedStyle(document.querySelector('.display-panel-area')).display === 'none');
+  await kit.settle(300);
+  const asHex = numbers ? `#${numbers.slice(1).map((n) => Number(n).toString(16).toUpperCase().padStart(2, '0')).join('')}` : '';
+  led.check(S, 'the Colors tab writes the numbers back', 'the colour row\'s swatch opens the Colors tab on it; a drag writes once when let go, as the call\'s three numbers, the call and the rest of the line as they were, and the row shows the colour those numbers make',
+    { label: 'Editing: Script · ce.math.hex colour, line 4', during: 0, held: 0, writes: 1, form: true, otherLines: true, shows: true },
+    { label: builtLabel, during: builtDrag.during, held: builtDrag.held, writes: await inputs(), form: Boolean(numbers) && numbers[0] !== 'ce.draw.fill(ce.math.hex(255, 128, 0));',
+      otherLines: builtText.replace(numbers?.[0] ?? '', '') === learnt.replace('ce.draw.fill(ce.math.hex(255, 128, 0));', ''), shows: shownHex === asHex });
+
+  // ---- create's type -----------------------------------------------------------------------------
+  await clickAt(builtText.indexOf('"Knob"') + 2);
+  await waitHead('Line 5');
+  await countInputs();
+  const typeSelect = page.locator('.vrow[data-name="type"] select.vselect');
+  const typeChoices = await typeSelect.locator('option').allTextContents();
+  await typeSelect.selectOption('Slider');
+  await kit.settle(300);
+  led.check(S, 'create\'s type is a dropdown', 'ce.panel.create\'s type row lists the component types there are, and the one picked is written in its quotes, as one edit',
+    { offers: true, text: builtText.replace('create("Knob"', 'create("Slider"'), writes: 1 },
+    { offers: ['Knob', 'Slider', 'Label', 'LcdDisplay'].every((t) => typeChoices.includes(t)), text: await editorText(), writes: await inputs() });
+
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();
   await page.waitForSelector(`[data-control-id="${where.cutoff}"]`, { timeout: 30000 });
@@ -798,7 +907,75 @@ try {
     { tab: 'panel', selected: [where.cutoff], canvas: true, pick: null },
     { tab: onPanel.tab, selected: onPanel.selected,
       canvas: await page.locator(`[data-control-id="${where.cutoff}"].selected`).count() === 1, pick: onPanel.pick });
+  // An LCD to write a line to, and a keyframe animation on Cutoff to open, made here on the panel.
+  await kit.make('LcdDisplay', { 'Transform.x': 300, 'Transform.y': 110, 'Core.name': 'Lcd' });
+  await page.evaluate(async (id) => {
+    const { newAnimationShape, kindPatch } = await import('/src/CE_Application/utils/animationModel.js');
+    const { updateControlProperty } = await import('/src/CE_Application/stores/controls.js');
+    const pulse = newAnimationShape('Pulse');
+    updateControlProperty(id, 'Animations.Pulse', { ...pulse, ...kindPatch({ animation: pulse }, 'keyframes') });
+  }, where.cutoff);
+  await kit.settle(300);
+  await page.locator(`[data-control-id="${where.cutoff}"]`).click();
+  await kit.settle(300);
   // Back to the script editor, as a person goes there: the Look bar's Script Editor.
+  await page.locator('button.s-jump').click();
+  await page.waitForSelector('.bd-app', { timeout: 30000 });
+  await kit.settle(1200);
+  if (!(await page.locator(`${SCRIPT} textarea.ce-ta`).count())) {
+    await page.locator('.bd-app .titem').first().click();
+    await page.waitForSelector(`${SCRIPT} textarea.ce-ta`);
+    await kit.settle(500);
+  }
+
+  // ===============================================================================================
+  // LCD — a line drawn as the display shows it; OPEN — ce.anim.play's animation in the Animation tab.
+  // ===============================================================================================
+  const LONG = 'THIS LINE IS MUCH LONGER THAN SIXTEEN CHARACTERS';
+  const SHOWN = `function onValueChanged(value) {
+  ce.components.lcd.text("Lcd", 1, "${LONG}");
+  ce.anim.play("Cutoff", "pulse");
+}
+`;
+  await typeScript(SHOWN);
+  await clickAt(SHOWN.indexOf('THIS') + 2);
+  await waitHead('Line 2');
+  const lcdRow = await page.evaluate(() => {
+    const row = document.querySelector('.vrow[data-name="text"]');
+    const strip = row?.querySelector('.lcdline');
+    return { kind: row?.dataset.kind, strip: !!strip, cells: strip ? [...strip.querySelectorAll('.lscreen .lcell .lch')].map((n) => n.textContent).join('').replace(/\u00a0/g, ' ') : '',
+      past: strip?.querySelectorAll('.lpast.cut .lcell').length ?? 0,
+      meaning: row?.querySelector('.vmeaning')?.textContent ?? '', problem: row?.querySelector('.vproblem')?.textContent ?? '' };
+  });
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-lcd-line.png` });
+  led.check(S, 'an LCD line is drawn as the display shows it', 'lcd.text\'s line on a 16-character display that does not scroll is drawn in its row as its 16 cells, the other 32 marked cut, and the row says what the runtime says',
+    { kind: 'lcdLine', strip: true, cells: 'THIS LINE IS MUC', cut: 32, meaning: '16 of 48 characters show',
+      problem: `lcd Lcd: text(1, "${LONG}") — the display is 16 characters wide and does not scroll, so only "THIS LINE IS MUC" shows.` },
+    { kind: lcdRow.kind, strip: lcdRow.strip, cells: lcdRow.cells, cut: lcdRow.past, meaning: lcdRow.meaning, problem: lcdRow.problem });
+
+  await clickAt(SHOWN.indexOf('pulse') + 1);
+  await waitHead('Line 3');
+  const openButton = page.locator('.vrow[data-name="animation"] button.vopen');
+  const openOffered = { count: await openButton.count(), label: (await openButton.textContent()).trim() };
+  await openButton.click();
+  await page.waitForSelector(`[data-control-id="${where.cutoff}"]`, { timeout: 30000 });
+  await until(() => [...document.querySelectorAll('[aria-selected="true"]')].some((n) => n.textContent.includes('Pulse')));
+  await kit.settle(600);
+  const openedOn = await page.evaluate(async () => {
+    const { activeEditorTab, selectedComponentIds } = await import('/src/CE_Application/stores/panels.js');
+    const { editorTarget } = await import('/src/CE_Application/stores/editorTarget.js');
+    const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+    const target = get(editorTarget);
+    return { tab: get(activeEditorTab)?.type, selected: [...get(selectedComponentIds)], target: target ? [target.kind, target.controlId, target.focus ?? null] : null,
+      chosen: [...document.querySelectorAll('.display-panel-area [aria-selected="true"]')].map((n) => n.textContent.trim()).filter((t) => t.includes('Pulse')).length };
+  });
+  if (process.env.VALUES_SHOT_DIR) await page.screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-open-animation.png` });
+  led.check(S, 'Open shows the animation in the Animation tab', 'the row of ce.anim.play\'s "pulse" has Open; it goes to the panel, Cutoff selected, and the Animation tab open on Pulse, the animation the runtime plays for that name, the name taken once',
+    { offered: { count: 1, label: 'Open' }, tab: 'panel', selected: [where.cutoff], displayTab: 'Animation', target: ['animation', where.cutoff, null], chosen: true },
+    { offered: openOffered, tab: openedOn.tab, selected: openedOn.selected, displayTab: await activeDisplayTab(), target: openedOn.target, chosen: openedOn.chosen > 0 });
+  // Back to the script editor for the panel file, the dock put away first.
+  await page.locator('.icon-panel-area button.rail-toggle', { hasText: 'Dock' }).click();
+  await kit.settle(300);
   await page.locator('button.s-jump').click();
   await page.waitForSelector('.bd-app', { timeout: 30000 });
   await kit.settle(1200);

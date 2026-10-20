@@ -178,6 +178,7 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       parameter: null,
       label: midiControlParameterShape(descriptor).name,
       detail: `ch ${entry.channel}`,
+      channel: entry.channel,
       controller: null,
       numbered: descriptor,
       span: entry.max - entry.min,
@@ -199,6 +200,7 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       parameter,
       label: parameter?.name || raw,
       detail: parameter ? raw : `ch ${candidate.channel}`,
+      channel: candidate.channel,
       controller: candidate.kind === 'cc' ? candidate.cc : null,
       span: candidate.span,
       count: candidate.count,
@@ -231,10 +233,13 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
  */
 export function chipDragPayload(chip, deviceRole) {
   const role = String(deviceRole ?? '');
-  if (chip?.parameter?.id) {
-    return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role };
-  }
   const message = LEARNABLE.get(String(chip?.origin ?? ''));
+  if (chip?.parameter?.id) {
+    // The message it moved as rides along: a script's sendCC, dropped on, takes the CC the profile
+    // names, which a binding, taking the parameter, does not read.
+    const midi = message ? { message, controller: chip.controller ?? null, channel: chip.channel ?? null, ...(chip.numbered ?? {}) } : null;
+    return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role, ...(midi ? { midi } : {}) };
+  }
   if (!message) return null;
   if (message === 'cc' && !Number.isFinite(Number(chip?.controller))) return null;
   if ((message === 'nrpn' || message === 'rpn') && !chip?.numbered) return null;
@@ -246,6 +251,9 @@ export function chipDragPayload(chip, deviceRole) {
   return {
     kind: 'ceditor.midiControl',
     ...descriptor,
+    // The channel it moved on, which a script's sendCC writes (the Values tab's Learn); a binding
+    // takes its channel from the device's port and does not read it.
+    channel: chip?.channel ?? null,
     parameter: midiControlParameterShape(descriptor),
     deviceRole: role,
   };

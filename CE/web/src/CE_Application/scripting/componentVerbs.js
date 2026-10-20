@@ -575,7 +575,8 @@ export const COMPONENT_FAMILIES = [
     id: 'lcd', section: 'Display', prefix: 'lcd', label: 'LCD Display',
     summary: 'Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.',
     verbs: [
-      v('text', 'lines', LINE, { doc: 'Write one line. The row is 1-based, as the display shows it.' }),
+      v('text', 'lines', LINE, { valueKind: 'lcdLine',
+        doc: 'Write one line. The row is 1-based, as the display shows it. A line longer than the display is cut at its width unless the display scrolls, a character a segment or graphic display cannot draw leaves its cell blank, and a display with layouts shows their zones instead of its lines: the console says each once.' }),
       v('clear', 'lines', LINE, { clear: true, doc: 'Blank every line.' }),
       v('backlight', 'backlightOn', BOOL, { toggle: true }),
       v('brightness', 'brightness', NUM, { min: 0, max: 100 }),

@@ -2100,18 +2100,35 @@ private:
             // coming in) rather than by asking the instrument, which almost none can be asked.
             if (kind == "recallPreset")
             {
+                const auto slot = p != nullptr ? p->getProperty ("slot") : juce::var (0);
                 auto* request = new juce::DynamicObject();
                 request->setProperty ("deviceRole", role);
-                request->setProperty ("slot", p != nullptr ? p->getProperty ("slot") : juce::var (0));
+                request->setProperty ("slot", slot);
                 request->setProperty ("dryRun", false);
                 auto result = deviceService.compilePresetRecallAction (juce::var (request), true);
 
-                if (auto* answered = result.getDynamicObject())
-                    if (answered->getProperty ("ok").equals (juce::var (true)))
-                    {
-                        currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
-                        currentPresetSource[role] = "panel";
-                    }
+                auto* answered = result.getDynamicObject();
+                if (answered != nullptr && answered->getProperty ("ok").equals (juce::var (true)))
+                {
+                    currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
+                    currentPresetSource[role] = "panel";
+                    return result;
+                }
+
+                // A recall that recalled nothing answered { ok: false } without a word. Said as the
+                // editor says it (CE/web/.../presetWords.js and panelRuntime's recallPresetImpl):
+                // the slot as it reads it, a role with no profile, and else the engine's own reason,
+                // which is the editor's local engine's too.
+                const double asNumber = slot.isString() ? slot.toString().getDoubleValue() : static_cast<double> (slot);
+                const bool isNumber = slot.isInt() || slot.isInt64() || slot.isDouble() || (slot.isString() && slot.toString().trim().containsOnly ("0123456789.-+eE"));
+                if (! isNumber || ! std::isfinite (asNumber) || juce::roundToInt (asNumber) < 0)
+                    scriptLogLine ("[script] recallPreset(slot): slot must be an integer >= 0.");
+                else if (deviceService.engineForRole (role) == nullptr)
+                    scriptLogLine ("[script] recallPreset(" + juce::String (juce::roundToInt (asNumber)) + "): no device profile is chosen for "
+                                   + role + ", so nothing was recalled.");
+                else
+                    scriptLogLine ("[script] recallPreset(" + juce::String (juce::roundToInt (asNumber)) + "): "
+                                   + (answered != nullptr ? answered->getProperty ("error").toString() : juce::String ("nothing was recalled.")));
                 return result;
             }
 
