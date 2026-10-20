@@ -16,7 +16,7 @@
 
 import { readStatement, writeValue } from './scriptValues.js';
 import { tokenize } from './scriptValueScan.js';
-import { beatsText, panelControls } from './scriptValueKinds.js';
+import { beatsText, panelControls, pathSegmentChoices, controlNamed } from './scriptValueKinds.js';
 import { DIVISIONS, DIVISION_LABELS } from './timeTables.js';
 import { ALL_EVENTS } from './panelApi.js';
 import { argAtOffset, statementRows } from '../editor/valueRows.js';
@@ -68,6 +68,7 @@ export function valueCompletions(source, languageId, caret, context = {}, { forc
   }
   const arg = argAtOffset(statement, at);
   if (!arg?.literal || typeof arg.value !== 'string') return null;
+  if (arg.kind === 'path') return pathCompletions(src, languageId, at, arg, statement, context, force);
   const choices = arg.meaning?.choices;
   if (!Array.isArray(choices) || choices.length === 0) return null;
   // ce.draw.image takes the image's data, not its name, so a name offered there would be refused.
@@ -102,6 +103,54 @@ export function valueCompletions(source, languageId, caret, context = {}, { forc
       rows[index] = { ...rows[index], detail: rows[index].detail ? `now · ${rows[index].detail}` : 'now' };
       return { ...range, options: rows, selected: index };
     }
+    const some = filtered(rows, prefix);
+    return { ...range, options: some.length ? some : rows, selected: 0 };
+  }
+  return { ...range, options: filtered(rows, prefix), selected: 0 };
+}
+
+/* ------------------------------------------------------------------------------- a path */
+
+/**
+ * Inside a property path, the list is the segment under the caret: what can come after the
+ * segments before it ("Cutoff.Background." lists Background's sections and settings), and the one
+ * accepted replaces that segment alone, up to the next dot, so a path is built a segment at a time.
+ * After a dot, with nothing typed, the list opens (`openEmpty`), as member completion does after one.
+ */
+function pathCompletions(src, languageId, at, arg, statement, context, force) {
+  const inner = innerOf(arg, languageId);
+  if (!inner || at < inner.start || at > inner.end) return null;
+  const written = src.slice(inner.start, inner.end);
+  const before = written.slice(0, at - inner.start);
+  const dot = before.lastIndexOf('.');
+  const segFrom = inner.start + dot + 1;
+  const next = written.indexOf('.', at - inner.start);
+  const segTo = next < 0 ? inner.end : inner.start + next;
+  const prefix = before.slice(dot + 1);
+  const current = src.slice(segFrom, segTo);
+  const panel = context?.panel ?? null;
+  const controls = panel ? panelControls(panel) : [];
+  // A self.set path starts at the script's own control, as readPath reads it (the context's
+  // selfControl); with none known, there is nothing to list.
+  let self = null;
+  if (callOf(statement, arg)?.self) {
+    const own = context?.selfControl ?? null;
+    self = typeof own === 'string' ? controlNamed(controls, own) : own;
+    if (!self) return null;
+  }
+  const names = pathSegmentChoices(dot < 0 ? [] : before.slice(0, dot).split('.'), { panel, controls, self });
+  const rows = [];
+  const seen = new Set();
+  for (const { name, detail } of names) {
+    if (!name || seen.has(name.toLowerCase()) || !PLAIN.test(name) || name.includes('.')) continue;
+    seen.add(name.toLowerCase());
+    rows.push({ label: name, insert: name, kind: 'value', detail });
+  }
+  if (!rows.length) return null;
+  const range = { from: segFrom, to: segTo, current, openEmpty: dot >= 0 };
+  if (force) {
+    const index = rows.findIndex((row) => row.label.toLowerCase() === current.toLowerCase());
+    if (index >= 0) return { ...range, options: rows, selected: index };
     const some = filtered(rows, prefix);
     return { ...range, options: some.length ? some : rows, selected: 0 };
   }

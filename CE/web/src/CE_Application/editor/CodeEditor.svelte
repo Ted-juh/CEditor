@@ -416,8 +416,9 @@
     // text, not `value`, since the range found is the one an accept replaces.
     const choice = valueCompletions?.(taEl.value, language, caret, { force }) ?? null;
     if (choice) {
-      // The same rule as for words: typing opens the list once there is something typed in the value.
-      if ((!force && caret === choice.from) || choice.options.length === 0) { acOpen = false; return; }
+      // The same rule as for words: typing opens the list once there is something typed in the value,
+      // or, in a path, once a dot is (`openEmpty`), as member completion opens after one.
+      if ((!force && caret === choice.from && !choice.openEmpty) || choice.options.length === 0) { acOpen = false; return; }
       acOptions = choice.options;
       acFrom = choice.from;
       acTo = choice.to;

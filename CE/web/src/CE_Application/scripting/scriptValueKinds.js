@@ -781,6 +781,56 @@ export function readPath(value, { panel, controls, self }) {
   };
 }
 
+/**
+ * What can come next in a property path after the segments `before` (completion over a path, one
+ * segment at a time: scripting/valueCompletions.js), as readPath resolves one: `[{ name, detail }]`,
+ * in the order a list shows them, or [] where the path leads nowhere.
+ *
+ * At the start, the panel's controls and "panel" (relative to `self`, a self.set path starts at the
+ * control). After a control, its value's three forms, the shorthands, then its own sections. After
+ * a section, its sections and then its settings, each with its value now; a section the control has
+ * not made yet lists its template's. The panel lists its own settings.
+ */
+export function pathSegmentChoices(before, { panel, controls, self }) {
+  const segments = (Array.isArray(before) ? before : []).map(String);
+  const list = Array.isArray(controls) ? controls : [];
+  if (!self && segments.length === 0) {
+    const names = list.map((c) => ({ name: c?._children?.Core?.name, detail: c?._children?.Core?.controlType ?? 'control' })).filter((c) => c.name);
+    return panel ? [...names, { name: 'panel', detail: 'the panel' }] : names;
+  }
+  const [head, ...rest] = self ? [null, ...segments] : segments;
+  if (!self && String(head).toLowerCase() === 'panel') return panel ? keysOf(walk(panel, rest)) : [];
+  const control = self ?? controlNamed(list, head);
+  if (!control) return [];
+  if (rest.length === 0) {
+    const sections = Object.keys(control._children ?? {});
+    // A section the control has not made is a path too, as readPath reads one (the templates have
+    // it): listed after its own, so a knob's "Background" is there to pick.
+    const made = new Set(sections.map((k) => k.toLowerCase()));
+    const unmade = Object.keys(SECTION_DEFAULTS).filter((k) => !made.has(k.toLowerCase()));
+    return [
+      ...ACCESSORS.map((name) => ({ name, detail: name === 'value' ? 'its value' : `its value, as ${name}` })),
+      ...Object.entries(SHORTHANDS).filter(([name]) => !ACCESSORS.includes(name)).map(([name, path]) => ({ name, detail: path })),
+      ...sections.map((name) => ({ name, detail: 'section' })),
+      ...unmade.map((name) => ({ name, detail: 'section, not made yet' })),
+    ];
+  }
+  const node = walk(control, rest) ?? walk({ _children: SECTION_DEFAULTS }, rest);
+  return keysOf(node);
+}
+
+/** A node's sections, then its settings, each with what it holds now. */
+function keysOf(node) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return [];
+  const sections = Object.keys(node._children ?? {}).map((name) => ({ name, detail: 'section' }));
+  const settings = Object.keys(node).filter((k) => k !== '_children' && k !== '_type').map((name) => {
+    const v = node[name];
+    const detail = v === null || v === undefined ? '' : typeof v === 'object' ? (Array.isArray(v) ? 'list' : 'table') : shownValue(v);
+    return { name, detail };
+  });
+  return [...sections, ...settings];
+}
+
 /** A control's keyframe animation, checked as ce.anim.play checks it. */
 export function readAnimation(value, { panel, controls, controlName }) {
   const meaning = { name: value, control: controlName ?? null, found: null };

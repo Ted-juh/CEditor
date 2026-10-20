@@ -1120,6 +1120,17 @@ Values tab's first version was merged:
   preview, and answered false without a word in the plug-in: both now refuse it, nothing sent, in
   the same words. Checked by `test/deviceParameterTable.test.js`, which also holds the plug-in's
   sentence (`PluginProcessor.h`) to the editor's.
+- **Property paths, a segment at a time.** Inside a path's quotes completion lists the segment
+  under the caret, from what the segments before it lead to (`pathSegmentChoices` in
+  `scriptValueKinds.js`, walking as `readPath` resolves): at the start the panel's controls, each
+  with its type, and `panel`; after a control its value's three forms, the shorthands (`opacity`,
+  `x`…), its own sections and then the sections its templates have that it has not made (a knob
+  draws with parts, and `Cutoff.Background` is still a path); after a section its sections and its
+  settings, each with what it holds now. The one accepted replaces that segment alone, up to the
+  next dot, and after a dot the list opens with nothing typed, as member completion does after one.
+  A `self.set` path starts at the script's own control. Checked by `test/valueCompletions.test.js`
+  and a row of `browser-checks/valueCompletion.mjs` that builds `Cutoff.Transform.x` from the
+  keyboard.
 
 Still open: nothing from this record.
 

@@ -21,6 +21,8 @@
  *              to the last included; the keys keep the selection with the pointer resting on the
  *              list, and a pointer that moves still selects
  *   symbols    Go to symbol's list follows the arrow keys the same way
+ *   path       a property path is built a segment at a time: typing in the quotes lists the
+ *              controls, a dot opens the next segment's list by itself, Enter writes that segment
  *   js         the same in JavaScript, a choice picked with the mouse
  *
  * Text goes in with keyboard.insertText, as valuesSidebar.mjs does; keys that complete go in as keys.
@@ -328,6 +330,40 @@ try {
   led.check(S, 'Go to symbol follows the arrows', 'over sixty functions, more than the box shows, forty ArrowDowns select the forty-first, and the list scrolls to show it',
     { count: 60, scrolls: true, selected: 'step41', inView: true }, symbols);
   await page.keyboard.press('Escape');
+
+  // ===============================================================================================
+  // PATH — a property path, a segment at a time.
+  // ===============================================================================================
+  const PATH = 'set("", 1)\n';
+  await typeScript(PATH);
+  await clickAt(PATH.indexOf('""') + 1);
+  await page.keyboard.type('Cut');
+  await kit.settle(250);
+  const controlsList = await list();
+  await page.keyboard.press('Enter');
+  await kit.settle(150);
+  const afterControl = await editorText();
+  await page.keyboard.type('.');
+  await kit.settle(250);
+  const segmentList = await list();
+  await page.keyboard.type('Tran');
+  await kit.settle(200);
+  await page.keyboard.press('Enter');
+  await kit.settle(150);
+  const afterSection = await editorText();
+  await page.keyboard.type('.x');
+  await page.keyboard.press('Escape');
+  await kit.settle(150);
+  led.check(S, 'a path a segment at a time', 'typing "Cut" in set()\'s path lists Cutoff and Enter writes it; a dot opens the next list by itself, with its value and its sections, and "Tran" and Enter write Transform; the path reads Cutoff.Transform.x',
+    { controls: true, control: 'set("Cutoff", 1)\n', opened: true, sections: true, section: 'set("Cutoff.Transform", 1)\n', text: 'set("Cutoff.Transform.x", 1)\n' },
+    {
+      controls: controlsList?.kind === 'value' && controlsList.labels.includes('Cutoff'),
+      control: afterControl,
+      opened: segmentList?.kind === 'value',
+      sections: !!segmentList?.labels.includes('value') && !!segmentList?.labels.includes('Transform'),
+      section: afterSection,
+      text: await editorText(),
+    });
 
   // ===============================================================================================
   // JAVASCRIPT — the same, a choice picked with the mouse.

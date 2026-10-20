@@ -80,7 +80,9 @@ Three tools help you while you type:
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
   (or divisions, scales, events, your controls' names, your synth's parameters,
   fonts…) with yours selected,
-  and the one you pick replaces the whole value.
+  and the one you pick replaces the whole value. In a property path such as
+  `"Cutoff.Background.Fill.colour"` the list is one part of it at a time: your
+  controls, then after a dot what that control or section has.
 - **The problems list** checks as you type. It warns about a handler that will
   never be called because it does not match **Runs on** — if the script runs on
   `onClick` but defines no `onClick(mouse)`, you are told it will not fire — and
