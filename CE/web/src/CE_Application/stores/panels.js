@@ -457,14 +457,6 @@ export const deviceProfileTabs = writable([]);
 /** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile'|'component'|'script', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
-/** Editor split layout. Primary and secondary pin the two tabs shown in the split workspace. */
-export const editorSplitLayout = writable({
-  mode: 'single',
-  orientation: 'vertical',
-  primary: null,
-  secondary: null,
-});
-
 /** Per-panel Device Profile Designer companions keyed by panel id. */
 export const panelDesignerSplits = writable({});
 
@@ -632,7 +624,6 @@ export function openSettingsTab(section = 'general') {
   settingsSection.set(String(section || 'general'));
   settingsTabOpen.set(true);
   activeEditorTab.set({ type: 'settings', id: 'settings' });
-  editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
   clearSelection();
 }
 
@@ -640,7 +631,6 @@ export function openSettingsTab(section = 'general') {
 export function openInstrumentHostTab() {
   instrumentHostTabOpen.set(true);
   activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
-  editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'instrumentHost', id: 'instrumentHost' } } : layout);
   clearSelection();
 }
 
@@ -761,11 +751,6 @@ export function closeDeviceProfileTab(id) {
     }
     return next;
   });
-  editorSplitLayout.update((layout) => {
-    if (layout.primary?.type === 'deviceProfile' && layout.primary?.id === id) return { mode: 'single', orientation: 'vertical', primary: null, secondary: null };
-    if (layout.secondary?.type === 'deviceProfile' && layout.secondary?.id === id) return { ...layout, mode: 'single', secondary: null };
-    return layout;
-  });
 
   if (closingActive) {
     const panelId = get(activePanelId);
@@ -781,81 +766,36 @@ export function closeDeviceProfileTab(id) {
   }
 }
 
-export function openEditorSplit(primaryTab, secondaryTab) {
-  if (!primaryTab || !secondaryTab) return;
-  editorSplitLayout.set({
-    mode: 'split',
-    orientation: 'vertical',
-    primary: normalizeEditorTabDescriptor(primaryTab),
-    secondary: normalizeEditorTabDescriptor(secondaryTab),
-  });
-}
-
-export function closeEditorSplit() {
-  editorSplitLayout.set({
-    mode: 'single',
-    orientation: 'vertical',
-    primary: null,
-    secondary: null,
-  });
-}
-
 export function swapEditorSplit() {
   const activeTab = get(activeEditorTab);
   const panelId = activeTab?.type === 'panel' ? activeTab.id : get(activePanelId);
-  if (panelId != null) {
-    let didSwap = false;
-    panelDesignerSplits.update((splits) => {
-      const split = splits?.[panelId];
-      if (!split) return splits;
-      didSwap = true;
-      return {
-        ...splits,
-        [panelId]: {
-          ...split,
-          deviceOnLeft: !split.deviceOnLeft,
-        },
-      };
-    });
-    if (didSwap) return;
-  }
-
-  const layout = get(editorSplitLayout);
-  if (layout.mode !== 'split' || !layout.primary || !layout.secondary) return;
-
-  editorSplitLayout.set({
-    ...layout,
-    primary: layout.secondary,
-    secondary: layout.primary,
+  if (panelId == null) return;
+  panelDesignerSplits.update((splits) => {
+    const split = splits?.[panelId];
+    if (!split) return splits;
+    return {
+      ...splits,
+      [panelId]: {
+        ...split,
+        deviceOnLeft: !split.deviceOnLeft,
+      },
+    };
   });
-  setActiveEditorTab(layout.secondary);
 }
 
 export function toggleEditorSplitOrientation() {
   const activeTab = get(activeEditorTab);
   const panelId = activeTab?.type === 'panel' ? activeTab.id : get(activePanelId);
-  if (panelId != null) {
-    let didToggle = false;
-    panelDesignerSplits.update((splits) => {
-      const split = splits?.[panelId];
-      if (!split) return splits;
-      didToggle = true;
-      return {
-        ...splits,
-        [panelId]: {
-          ...split,
-          orientation: split.orientation === 'horizontal' ? 'vertical' : 'horizontal',
-        },
-      };
-    });
-    if (didToggle) return;
-  }
-
-  editorSplitLayout.update((layout) => {
-    if (layout.mode !== 'split') return layout;
+  if (panelId == null) return;
+  panelDesignerSplits.update((splits) => {
+    const split = splits?.[panelId];
+    if (!split) return splits;
     return {
-      ...layout,
-      orientation: layout.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+      ...splits,
+      [panelId]: {
+        ...split,
+        orientation: split.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+      },
     };
   });
 }
@@ -895,17 +835,10 @@ export function openTabToSide(tab) {
     }));
     activeEditorTab.set({ type: 'panel', id: panelId });
     clearSelection();
-    return;
   }
-  openEditorSplit(current, tab);
-}
-
-function normalizeEditorTabDescriptor(tab) {
-  if (!tab) return null;
-  return {
-    type: tab.type || tab.tabType || 'panel',
-    id: tab.id ?? null,
-  };
+  // Nothing else opens to the side: a device profile beside its panel is the one split there is.
+  // A general split of any two tabs was kept here as a layout nothing drew, so a script tab and
+  // its panel were never on screen together, whatever the script editor's comments said.
 }
 
 /** Close a CTRL49 Screen Builder tab. It asks first when the screen has changes: the Screen
@@ -1025,7 +958,6 @@ export function setActiveEditorTab(tab) {
 
   if (tab.tabType === 'settings' || tab.type === 'settings' || tab.id === 'settings') {
     openSettingsTab();
-    editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
     return;
   }
 
