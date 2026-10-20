@@ -39,7 +39,7 @@ import {
 } from './scriptColours.js';
 import { dashPattern } from './drawDash.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
-import { envelopeRefusal } from './animEnvelope.js';
+import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
 import { documentIcons } from '../utils/documentIcons.js';
 import { layoutModeForIcon } from '../utils/iconLayout.js';
@@ -1358,20 +1358,14 @@ function toBreakpoints(points) {
     : [];
   const out = [];
   for (const p of raw) {
-    let x, y;
-    if (Array.isArray(p)) { [x, y] = p; }
-    else if (p && typeof p === 'object') {
-      // A wasmoon array-of-pairs arrives as an object of objects, so try {x,y} then 1/2 then 0/1.
-      x = p.x ?? p[1] ?? p[0];
-      y = p.y ?? p[2] ?? p[1];
-    }
-    const nx = Number(x), ny = Number(y);
-    // A point may also carry the CURVE of the segment ending at it, the way an Envelope point and
-    // a Router breakpoint do. Straight lines are still the default, so a plain pair list is
-    // unchanged.
-    const shape = Array.isArray(p) ? p[2] : p?.curve;
-    const tension = Array.isArray(p) ? p[3] : p?.tension;
-    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, shape, tension]);
+    // A pair, or a table by its names or its numbered entries (animEnvelope.js says how they are
+    // counted). A point may also carry the CURVE of the segment ending at it, the way an Envelope
+    // point and a Router breakpoint do; straight lines are still the default, so a plain pair list
+    // is unchanged.
+    const parts = envelopePointParts(p);
+    if (!parts) continue;
+    const nx = Number(parts.x), ny = Number(parts.y);
+    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, parts.curve, parts.tension]);
   }
   return out.sort((p, q) => p[0] - q[0]);
 }

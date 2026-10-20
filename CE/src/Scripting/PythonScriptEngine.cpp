@@ -1111,11 +1111,9 @@ def animateEnvelope(path, points, opts=None):
     count = len(points)
     for i, p in enumerate(points):
         which = "point " + str(i + 1) + " of " + str(count)
-        if isinstance(p, (list, tuple)):
-            x = p[0] if len(p) > 0 else None
-            y = p[1] if len(p) > 1 else None
-        elif hasattr(p, "get"):
-            x, y = p.get("x"), p.get("y")
+        parts = __pointParts(p)
+        if parts is not None:
+            x, y = parts[0], parts[1]
         else:
             logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.")
             return False
@@ -1302,20 +1300,37 @@ def wrap(v, lo, hi):
         return a
     return a + (((n - a) % span) + span) % span
 
-# [[x, y], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel can write either.
+# A point's (x, y, curve, tension) as written, or None when it is no point: a pair is a list or a
+# tuple of them in that order; a mapping is read by its names, and failing those by its numbered
+# entries, counted from 0 when it has an entry 0 and from 1 when it does not. The WebView runtime
+# reads a point the same way (animEnvelope.js envelopePointParts), so it is one point in both.
+def __pointParts(p):
+    if isinstance(p, (list, tuple)):
+        return tuple(p[i] if len(p) > i else None for i in range(4))
+    if hasattr(p, "get"):
+        try:
+            start = 0 if 0 in p else 1
+        except TypeError:
+            start = 1
+        def named(key, at):
+            v = p.get(key)
+            return p.get(start + at) if v is None else v
+        return (named("x", 0), named("y", 1), named("curve", 2), named("tension", 3))
+    return None
+
+# [[x, y, curve, tension], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel
+# can write either; a point's curve shapes the segment that ends at it (mapCurve).
 def __points(points):
     out = []
     for p in (points or []):
-        x = y = None
-        if isinstance(p, (list, tuple)) and len(p) >= 2:
-            x, y = p[0], p[1]
-        elif hasattr(p, "get"):
-            x, y = p.get("x"), p.get("y")
+        parts = __pointParts(p)
+        if parts is None:
+            continue
         try:
-            x, y = float(x), float(y)
+            x, y = float(parts[0]), float(parts[1])
         except (TypeError, ValueError):
             continue
-        out.append((x, y))
+        out.append((x, y, parts[2], parts[3]))
     out.sort(key=lambda p: p[0])
     return out
 
@@ -1342,9 +1357,14 @@ def mapCurve(v, points):
     if n > lst[-1][0]:
         return lst[-1][1]
     for i in range(1, len(lst)):
-        x0, y0 = lst[i - 1]
-        x1, y1 = lst[i]
+        x0, y0 = lst[i - 1][0], lst[i - 1][1]
+        x1, y1 = lst[i][0], lst[i][1]
         if n < x1 and x1 != x0:
+            # The segment's own shape, from the point it ends at, as the WebView runtime's mapCurve
+            # and the Envelope component take it. Read for straight lines alone, a point's curve
+            # played as a line here and as a curve in the editor.
+            if lst[i][2] is not None:
+                return y0 + shapeCurve((n - x0) / (x1 - x0), lst[i][2], lst[i][3]) * (y1 - y0)
             return y0 + (n - x0) * (y1 - y0) / (x1 - x0)
     return lst[-1][1]
 

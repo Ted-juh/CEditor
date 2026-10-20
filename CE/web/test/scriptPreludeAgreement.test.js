@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { get } from 'svelte/store';
 
-import { resetScriptStateForTesting, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { resetScriptStateForTesting, sampleEnvelope, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import {
   MEMBER_BY_ID, memberRuntime, optionChecks, RUNTIME_WEBVIEW,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -194,6 +194,19 @@ const CASES = [
   ['checksum', ['roland', '40 00 7F 00']], ['checksum', ['roland', '0x40,0x00 7f 0']],
   ['checksum', ['40 00 7F 00']], ['checksum', ['xor-7bit', '01 02 03']],
   ['checksum', ['roland', '40007F00']],
+  // ce.math.map, which is also how ce.anim.envelope samples its points. Straight lines, a step and
+  // the held ends first; then a point's curve, which shapes the segment ending at it. The preludes
+  // read a point for its x and y alone, so an envelope with curves moved in straight lines in the
+  // plug-in with the window shut and along the curves in the editor.
+  ['mapCurve', [0.25, [[0, 0], [1, 10]]]], ['mapCurve', [-1, [[0, 2], [1, 10]]]],
+  ['mapCurve', [0.5, [[0, 0], [0.5, 0], [0.5, 1], [1, 1]]]], ['mapCurve', [0.7, [{ x: 1, y: 0 }, { x: 0, y: 1 }]]],
+  ['mapCurve', [0.5, [[0, 0], [1, 1, 'exp']]]], ['mapCurve', [0.5, [[0, 0], [1, 1, 'exp', 3]]]],
+  ['mapCurve', [0.25, [{ x: 0, y: 0 }, { x: 1, y: 1, curve: 'log', tension: 2 }]]],
+  ['mapCurve', [0.3, [[0, 0], [1, 1, 's']]]], ['mapCurve', [0.3, [[0, 0], [1, 1, 'scurve']]]],
+  ['mapCurve', [0.5, [[0, 0], [1, 1, 'hold']]]], ['mapCurve', [0.5, [[0, 0], [1, 1, 'bogus']]]],
+  // Tension 0 is the default, not a straight line: `tension || 1.6` in the app, as in shape().
+  ['mapCurve', [0.75, [[0, 0], [0.5, 1, 'exp', 0], [1, 0, 'log']]]],
+  ['mapCurve', [0.6, [[0, 0.2, 'exp'], [1, 0.8]]]],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
@@ -945,6 +958,80 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   });
   assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
   JSON.parse(run.stdout).forEach((answer, i) => assert.deepEqual(answer, want[i], `Python prelude ${label(i)}`));
+});
+
+// A point written by number rather than by name: { 0: x, 1: y } in JavaScript or Python, and in Lua
+// { x, y } (entries 1 and 2, as Lua counts) or { [0] = x, [1] = y }. The editor read entry 1 before
+// entry 0, so { 0: 0, 1: 0.2 } was a point at x 0.2, and the preludes read a table point by its
+// names alone. No JSON case can carry one to Python, whose keys arrive there as text, so each
+// language writes its own. And the samples ce.anim.envelope moves along are the same with curves in
+// them as without: the JS prelude's against the editor's, point for point.
+test('a point written by its numbered entries is the same point, curve and all, in every engine', async (t) => {
+  const want = 0.2 + 0.4 * 0.5 ** 2.6;
+  const close = (got, label) => assert.ok(Math.abs(Number(got) - want) < 1e-9, `${label}: ${got}, want ${want}`);
+  const numbered = [{ 0: 0, 1: 0.2 }, { 0: 1, 1: 0.6, 2: 'exp' }];
+  close(web.mapCurve(0.5, numbered), 'WebView, keyed from 0');
+  // How wasmoon hands the editor a Lua { 0, 0.2 }: an object keyed from 1.
+  close(web.mapCurve(0.5, [{ 1: 0, 2: 0.2 }, { 1: 1, 2: 0.6, 3: 'exp' }]), 'WebView, a Lua table');
+  close(web.mapCurve(0.5, [[0, 0.2], { x: 1, y: 0.6, curve: 'exp' }]), 'WebView, a pair and a named point');
+
+  const curved = [{ x: 0, y: 0 }, { x: 0.4, y: 1, curve: 'exp', tension: 3 }, { x: 1, y: 0.25, curve: 's' }];
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+  vm.createContext(sandbox);
+  vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+  close(sandbox.mapCurve(0.5, numbered), 'JS prelude, keyed from 0');
+  for (const points of [numbered, curved]) {
+    const editor = sampleEnvelope(points);
+    const plugin = sandbox.__animSample(points);
+    assert.equal(plugin.length, editor.length, 'one sample per step in both');
+    const apart = editor.findIndex((y, i) => Math.abs(y - plugin[i]) > 1e-9);
+    assert.equal(apart, -1, `JS prelude samples ${JSON.stringify(points)} apart from the editor at ${apart}`);
+  }
+
+  const { LuaFactory } = await import('wasmoon');
+  const lua = await new LuaFactory().createEngine();
+  try {
+    for (const name of ['log', 'logError', 'sendCC', 'on', 'startTimer', 'stopTimer']) lua.global.set(name, () => {});
+    await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+    const got = String(await lua.doString('return string.format("%.17g\\n%.17g", '
+      + 'mapCurve(0.5, {{[0] = 0, [1] = 0.2}, {[0] = 1, [1] = 0.6, [2] = "exp"}}), '
+      + 'mapCurve(0.5, {{0, 0.2}, {1, 0.6, "exp"}}))')).split('\n');
+    close(got[0], 'Lua prelude, keyed from 0');
+    close(got[1], 'Lua prelude, keyed from 1');
+  } finally {
+    lua.global.close();
+  }
+
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.diagnostic('Python 3 is not on this machine: its numbered points were not compared');
+    return;
+  }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+sys.stdout.write(json.dumps([
+    g["mapCurve"](0.5, [{0: 0, 1: 0.2}, {0: 1, 1: 0.6, 2: "exp"}]),
+    g["mapCurve"](0.5, [(0, 0.2), {"x": 1, "y": 0.6, "curve": "exp"}]),
+]))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  const [keyed, mixed] = JSON.parse(run.stdout);
+  close(keyed, 'Python prelude, keyed from 0');
+  close(mixed, 'Python prelude, a pair and a named point');
 });
 
 /* ------------------------------------------------- ce.math's colours, in CSS's short forms */

@@ -21,15 +21,27 @@ import { realNumber, unitProblem } from './scriptColours.js';
 export const ENVELOPE_TOO_FEW = 'ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.';
 
 /**
- * A point's x and y as written, unread, or null when it is not a point at all (a number, text,
- * nothing). A pair is a list; anything else that is a table is read by its keys, with Lua's numbered
- * entries for a table that has both (wasmoon hands `{ 0, 1, curve = "exp" }` over as an object with
- * keys "1", "2" and "curve"). The same reading as panelRuntime's toBreakpoints, which samples them.
+ * A point's x, y, curve and tension as written, unread, or null when it is not a point at all (a
+ * number, text, nothing). A pair is a list: x, y, then the curve and its tension. Anything else that
+ * is a table is read by its names, and failing those by its numbered entries, counted from 0 when it
+ * has an entry 0 (an object a JavaScript or Python script wrote that way) and from 1 when it does
+ * not (a Lua table: wasmoon hands `{ 0, 1, curve = "exp" }` over as an object with keys "1", "2"
+ * and "curve"). It read entry 1 before entry 0, so `{ 0: 0.2, 1: 0.8 }` was a point at x 0.8.
+ *
+ * The one reading of a point: panelRuntime's toBreakpoints samples by it (ce.anim.envelope and
+ * ce.math.map), and each prelude's own reader counts the same way (scriptPreludeAgreement.test.js).
  */
 export function envelopePointParts(point) {
-  if (Array.isArray(point)) return { x: point[0], y: point[1], pair: true };
+  if (Array.isArray(point)) return { x: point[0], y: point[1], curve: point[2], tension: point[3], pair: true };
   if (point && typeof point === 'object') {
-    return { x: point.x ?? point[1] ?? point[0], y: point.y ?? point[2] ?? point[1], pair: false };
+    const from = Object.prototype.hasOwnProperty.call(point, '0') ? 0 : 1;
+    return {
+      x: point.x ?? point[from],
+      y: point.y ?? point[from + 1],
+      curve: point.curve ?? point[from + 2],
+      tension: point.tension ?? point[from + 3],
+      pair: false,
+    };
   }
   return null;
 }

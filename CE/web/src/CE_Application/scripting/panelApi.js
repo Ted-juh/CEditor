@@ -3533,7 +3533,7 @@ export const HELPERS = [
   // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
   // either, since a property stores a constant. Breakpoints are the smallest thing that can.
   { id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
-    summary: 'Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point\'s y rather than continuing the line. Two points with the same x make a step, and the later one wins.' },
+    summary: 'Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point\'s y rather than continuing the line. Two points with the same x make a step, and the later one wins. A point can also bend the line that ends at it, the way an Envelope\'s point does: a third entry or `curve` names the shape, as `ce.math.shape()` does ("exp", "log", "s" or "hold"), and a fourth entry or `tension` says how far it bends, so {1, 1, "exp"} rises slowly and then fast.' },
   { id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
     summary: 'Snap a value to the nearest entry in a list: `ce.math.quantize(9, {0, 8, 16})` gives 8. When the value sits exactly halfway between two entries, the lower one wins. An empty list returns the value unchanged. For evenly spaced steps, use `ce.math.snap()`.' },
   { id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',
