@@ -916,8 +916,8 @@ const DEVICE_UNKNOWN = {
  * (editor/BehaviorDesigner.svelte): `roles` gives each mapped role's profile and its whole table of
  * parameters (stores/deviceParameterTable.js), null while it loads; `declared` the ids the panel's
  * scripts declare with ce.device.defineParameter, which no profile needs to have. A role nothing is
- * mapped to reads the main synth's profile, as the runtime's roleMapping does, except in a write,
- * which is sent to its own role's profile or not at all.
+ * mapped to reads the main synth's profile, as the runtime's roleMapping does, except in a write or
+ * a binding, which is sent to its own role's profile or not at all.
  *
  * Nothing is said of an id before the whole table is in: part of a table cannot say what is not in
  * it. With no profile chosen, write and bind say what they do, and a read or parameter() of one
@@ -925,11 +925,15 @@ const DEVICE_UNKNOWN = {
  */
 export function readDeviceParameter(value, { devices, role, memberId, control }) {
   const wanted = typeof role === 'string' && role ? role : 'mainSynth';
-  // A write is sent to its role's own profile and no other, as the runtime's is.
-  const device = devices?.roles?.[wanted] ?? (memberId === 'deviceWrite' ? null : devices?.roles?.mainSynth) ?? null;
+  // A write, and a binding's every move, is sent to its role's own profile and no other, as the
+  // runtime sends it.
+  const sends = memberId === 'deviceWrite' || memberId === 'deviceBind';
+  const device = devices?.roles?.[wanted] ?? (sends ? null : devices?.roles?.mainSynth) ?? null;
   const meaning = { id: value, role: wanted, profile: device?.profileName ?? null, parameter: null, found: null, loading: false, declared: false };
   if (typeof value !== 'string') return { meaning, problem: null };
-  const declared = Array.isArray(devices?.declared) && devices.declared.includes(value);
+  // Declared for this role, as the runtime keeps a declaration (or for any, when its role is built).
+  const declared = Array.isArray(devices?.declared)
+    && devices.declared.some((d) => d?.id === value && (d.role == null || d.role === wanted));
   if (!device?.profileId) {
     meaning.noProfile = true;
     // bind says so with no profile too: nothing then knows the id but a declaration. write refuses,

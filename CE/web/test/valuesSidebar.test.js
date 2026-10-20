@@ -538,6 +538,23 @@ test('an envelope\'s edit is one write, in the script\'s form, and the same poin
   assert.deepEqual([h.editor.writes.length, h.editor.text], [2, lua], 'Cancel puts the characters back, in one edit');
 });
 
+test('an envelope written by numbered keys is edited in place, where the runtime reads its x and y', () => {
+  // [language, source, the point as written, the point after the edit]
+  const cases = [
+    ['javascript', 'ce.anim.envelope("Cutoff.value", [{ 0: 0, 1: 0 }, { 0: 0.1, 1: 1 }, { 0: 1, 1: 0 }]);\n', '{ 0: 0.1, 1: 1 }', '{ 0: 0.3, 1: 0.8 }'],
+    ['lua', 'ce.anim.envelope("Cutoff.value", { { [0] = 0, [1] = 0 }, { [0] = 0.1, [1] = 1 }, { [0] = 1, [1] = 0 } })\n', '{ [0] = 0.1, [1] = 1 }', '{ [0] = 0.3, [1] = 0.8 }'],
+    ['python', 'ce.anim.envelope("Cutoff.value", [{0: 0, 1: 0}, {0: 0.1, 1: 1}, {0: 1, 1: 0}])\n', '{0: 0.1, 1: 1}', '{0: 0.3, 1: 0.8}'],
+    // With no entry 0 the count starts at 1, as a Lua table numbers itself.
+    ['lua', 'ce.anim.envelope("Cutoff.value", { { [1] = 0, [2] = 0 }, { [1] = 0.1, [2] = 1 }, { [1] = 1, [2] = 0 } })\n', '{ [1] = 0.1, [2] = 1 }', '{ [1] = 0.3, [2] = 0.8 }'],
+  ];
+  for (const [lang, src, was, now] of cases) {
+    const h = harness(src, lang, '0.1', { kind: 'envelope' });
+    assert.deepEqual(h.arg.meaning.points.map((p) => [p.x, p.y]), [[0, 0], [0.1, 1], [1, 0]], `${lang}: read as the runtime reads it`);
+    h.session.commit(movePoint(editablePoints(h.arg.meaning.points), 1, 0.3, 0.8));
+    assert.deepEqual([h.editor.writes.length, h.editor.text], [1, src.replace(was, now)], `${lang}: ${src}`);
+  }
+});
+
 /* ================================================================================== catalogues */
 
 test('the fonts are given by their stored value and by their name, and the images whole', () => {

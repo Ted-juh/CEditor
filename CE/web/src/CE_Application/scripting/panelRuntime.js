@@ -7600,7 +7600,10 @@ function deviceBindImpl(controlName, parameterId, opts = {}) {
   // The profile's knowledge is its whole table (stores/deviceParameterTable.js), asked for here when
   // it is not in. Asked of the Designer's page instead, this named parameters the profile has; before
   // the table arrives nothing knows the id yet, which is what the notice says.
-  const profileId = roleMapping(role)?.profileId;
+  // The role's OWN profile, as for a write: the binding's every move is sent to its role and no
+  // other (deviceMidiOps resolveParameterSend), so a role nothing is mapped to knows no id but a
+  // declared one, though a read of it takes the main synth's profile.
+  const profileId = get(deviceRoleMappings)?.[role]?.profileId;
   const table = profileId ? parameterTable(profileId) : null;
   if (profileId && !table) requestParameterTable(profileId, role);
   const known = hasDefinedParameter(role, key) || Boolean(table?.some((p) => String(p?.id ?? '') === key));

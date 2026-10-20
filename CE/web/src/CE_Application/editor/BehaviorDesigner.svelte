@@ -407,9 +407,9 @@
   let editorMarks = $state.raw([]);
   let editorFolded = $state(false);
   let tempo = $derived($transport.bpm);
-  // The ids the scripts declare, as one string, so the context below is new only when they change
-  // and not at every keystroke, which the Values tab's own edits are too.
-  let declaredParameterKey = $derived(declaredDeviceParameters(scripts).join('\n'));
+  // The parameters the scripts declare, as one string, so the context below is new only when they
+  // change and not at every keystroke, which the Values tab's own edits are too.
+  let declaredParameterKey = $derived(JSON.stringify(declaredDeviceParameters(scripts)));
   let scriptValueContext = $derived({
     panel,
     controlSet: panel ? controlSetForPanel(panel) : null,
@@ -419,7 +419,7 @@
     images: $valueCatalogueStore.images,
     devices: deviceValueContext({
       mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables,
-      declared: declaredParameterKey ? declaredParameterKey.split('\n') : [],
+      declared: JSON.parse(declaredParameterKey),
     }),
   });
   // A device parameter's id is read against its profile's whole table, which is asked for once a

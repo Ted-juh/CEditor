@@ -412,13 +412,20 @@ function tableText(value, w) {
 const spanOf = (w, a, b) => ({ s: w.toks[a].s, e: w.toks[b - 1].e });
 
 /** A point entry's x and y entries, where its reader finds them (animEnvelope's envelopePointParts):
- *  a pair's first two items, a table's x and y keys, else its numbered items (Lua's { 0, 1, curve = … }). */
+ *  a pair's first two items, a table's x and y keys, else its numbered items (Lua's { 0, 1, curve = … }),
+ *  else the entries it numbers itself, counted from 0 when it has an entry 0 and from 1 when it does
+ *  not ({ 0: 0, 1: 1 }, Lua's { [0] = 0, [1] = 1 }). Those were read as a point and found no entry
+ *  here, so the row offered them to edit and an edit wrote nothing. */
 function pointCoordinateEntries(entry) {
   const node = entry?.node;
   if (!node || (node.type !== 'list' && node.type !== 'table')) return null;
   const items = node.entries.filter((e) => e.key === null);
   const keyed = (k) => node.entries.find((e) => e.key === k) ?? null;
-  return { x: keyed('x') ?? items[0] ?? null, y: keyed('y') ?? items[1] ?? null };
+  const from = keyed('0') ? 0 : 1;
+  return {
+    x: keyed('x') ?? items[0] ?? keyed(String(from)) ?? null,
+    y: keyed('y') ?? items[1] ?? keyed(String(from + 1)) ?? null,
+  };
 }
 
 /** The text for one coordinate: the number in the form it was written in (text stays text). */

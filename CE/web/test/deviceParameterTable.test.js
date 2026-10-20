@@ -235,6 +235,11 @@ test('bind and parameters() read the whole table', () => {
     assert.deepEqual(unknown.lines, [deviceBindUnknownWords('Cutoff', 'cutof')]);
     assert.deepEqual(api.ce.device.parameters().map((p) => p.id), ['cutoff', 'resonance']);
     assert.equal(api.ce.device.parameter('resonance')?.name, 'Resonance');
+    // A binding to a role nothing is mapped to is sent to no profile, so nothing knows its id but a
+    // declaration, though a read of that role takes the main synth's profile.
+    assert.deepEqual(said(() => api.ce.device.bind('Cutoff', 'cutoff', { role: 'drums' })).lines.filter((l) => !l.startsWith('bind Cutoff')),
+      [deviceBindUnknownWords('Cutoff', 'cutoff')]);
+    assert.equal(api.ce.device.parameter('cutoff', 'drums')?.name, 'Cutoff');
   });
   withDevice(null, (api) => {
     // Before the table: nothing knows the id yet, which is what bind says; parameters() says the
@@ -283,8 +288,11 @@ test('a device parameter\'s row reads it against its profile, in the words of it
   assert.match(rowOf('ce.device.write("cutoff", 1, "drums")', 'lua', devices).problem.message, /of the drums profile/);
   assert.equal(rowOf('ce.device.bind("Cutoff", "kick", { role = "drums" })', 'lua', devices).problem, null);
   assert.equal(rowOf('ce.device.bind("Cutoff", "kick", { role: "drums" });', 'javascript', devices).problem, null);
-  // A role nothing is mapped to reads the main synth's profile, as the runtime does.
+  // A role nothing is mapped to reads the main synth's profile, as the runtime does; a binding to it
+  // is sent to no profile, and says so as bind does.
   assert.equal(rowOf('ce.device.read("cutoff", "bass")', 'lua', devices).problem, null);
+  assert.deepEqual(rowOf('ce.device.bind("Cutoff", "cutoff", { role = "bass" })', 'lua', devices).problem,
+    { severity: 'warning', message: deviceBindUnknownWords('Cutoff', 'cutoff') });
 });
 
 test('nothing is said before the table is in, with no profile, or of an id the scripts declare', () => {
@@ -310,7 +318,28 @@ test('nothing is said before the table is in, with no profile, or of an id the s
   assert.deepEqual(declaredDeviceParameters([
     { source: 'ce.device.defineParameter("a", {})\nce.device.DefineParameter(\'b\', {})' },
     { source: 'deviceDefineParameter(`c`, {}); ce.device.defineParameter(name, {})' },
-  ]), ['a', 'b', 'c']);
+  ]).map((d) => d.id), ['a', 'b', 'c']);
+});
+
+test('a declaration is for its role, as the runtime keeps it, and its row reads it so', () => {
+  const declared = declaredDeviceParameters([
+    { language: 'lua', source: 'ce.device.defineParameter("kick", {\n  cc = 36, -- the kick\n  range = { min = 0, max = 127 },\n}, "drums")\nce.device.defineParameter("mine", { cc = 20 })' },
+    { language: 'python', source: 'ce.device.defineParameter("snare", {"cc": 38}, role="drums")\nce.device.defineParameter("any", {}, which)' },
+  ]);
+  assert.deepEqual(declared, [{ id: 'kick', role: 'drums' }, { id: 'mine', role: 'mainSynth' },
+    { id: 'snare', role: 'drums' }, { id: 'any', role: null }], 'a role left out is the main synth\'s; one built from parts is any');
+  const devices = devicesWith(GAIA, declared);
+  // Declared for drums, which the GAIA does not have: a write to the main synth is refused as the
+  // runtime refuses it, and a write to drums is the script's.
+  assert.deepEqual(rowOf('ce.device.write("kick", 1)', 'lua', devices).problem?.message, deviceWriteUnknownWords('kick', 'mainSynth'));
+  assert.equal(rowOf('ce.device.write("kick", 1, "drums")', 'lua', devices).problem, null);
+  assert.equal(rowOf('ce.device.write("mine", 1)', 'lua', devices).problem, null);
+  assert.equal(rowOf('ce.device.write("any", 1, "drums")', 'lua', devices).problem, null);
+  // The runtime agrees: drums' declaration is not the main synth's.
+  withDevice(GAIA, (api) => {
+    api.ce.device.defineParameter('kick', { cc: 36 }, 'drums');
+    assert.deepEqual(runtimeLines(() => api.ce.device.write('kick', 1)).lines, [deviceWriteUnknownWords('kick', 'mainSynth')]);
+  });
 });
 
 test('the parameters are the completion list inside the id, each with its name', () => {
