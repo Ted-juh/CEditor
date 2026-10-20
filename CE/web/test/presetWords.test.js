@@ -128,6 +128,8 @@ test('the rows say which patch a slot, a program and a bank reach, and refuse in
   assert.equal(meaningLine(rowOf('ce.midi.sendProgramChange(1, 12, 87, 0)', 'program', devices)),
     'program 12, which a synth that counts from 1 shows as 13 · slot 12, User Patch 13 of 64');
   assert.equal(meaningLine(rowOf('ce.midi.sendProgramChange(1, 12, 87, 0)', 'bankMsb', devices)), 'bank 87/0 is User Patch');
+  // The channel is neither a program nor a bank, and says only its range.
+  assert.equal(meaningLine(rowOf('ce.midi.sendProgramChange(1, 12, 87, 0)', 'channel', devices)), '1 to 16');
   assert.equal(meaningLine(rowOf('ce.midi.sendProgramChange(1, 12)', 'program', devicesFor(null))),
     'program 12, which a synth that counts from 1 shows as 13', 'with no profile, the count from 1 is still said');
   // A bank select past 127 is refused as the runtime refuses it, with no bank claimed.

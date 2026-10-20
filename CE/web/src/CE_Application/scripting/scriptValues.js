@@ -596,8 +596,10 @@ function classify(arg, node, param, site, index) {
     }
     case 'number': {
       const read = readNumber(value, param, { tempo: site.env.ctx.tempo, site: numberSite(site, param) });
-      // A program number and a bank select, as the synth finds them (presetWords.js).
-      if (site.memberId === 'sendProgramChange' && !read.problem) {
+      // A program number and a bank select, as the synth finds them (presetWords.js). The channel
+      // is neither, and says only its range.
+      const bankByte = param.name === 'bankMsb' || param.name === 'bankLsb';
+      if (site.memberId === 'sendProgramChange' && !read.problem && (param.name === 'program' || bankByte)) {
         const synth = site.env.ctx.devices?.roles?.mainSynth;
         const msb = sibling(site, 'bankMsb');
         const lsb = sibling(site, 'bankLsb');
