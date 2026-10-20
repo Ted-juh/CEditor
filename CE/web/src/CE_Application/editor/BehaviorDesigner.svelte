@@ -12,6 +12,7 @@
   import { valueCatalogueStore, deviceValueContext, declaredDeviceParameters, declaredDeviceDumps } from './valuesContext.js';
   import { scriptNames } from '../scripting/scriptNames.js';
   import { deviceRoleMappings, deviceProfiles, profileSources } from '../stores/deviceProfiles.js';
+  import { presetLibrary } from '../stores/presetLibrarian.js';
   import { profileParameterTables, requestParameterTable } from '../stores/deviceParameterTable.js';
   import { transport } from '../stores/transport.js';
   import { panelSelectionPick, pickPanelSelection } from '../stores/panels.js';
@@ -425,7 +426,7 @@
     images: $valueCatalogueStore.images,
     devices: deviceValueContext({
       mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables, sources: $profileSources,
-      declared: JSON.parse(declaredParameterKey), declaredDumps: JSON.parse(declaredDumpKey),
+      declared: JSON.parse(declaredParameterKey), declaredDumps: JSON.parse(declaredDumpKey), library: $presetLibrary,
     }),
   });
   // A device parameter's id is read against its profile's whole table, which is asked for once a

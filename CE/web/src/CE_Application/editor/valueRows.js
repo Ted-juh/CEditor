@@ -227,7 +227,7 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
-    case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': return m.hint ?? '';
+    case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': case 'presetSlot': return m.hint ?? '';
     case 'noteList': return m.names?.length ? m.names.join(' ') : '';
     case 'lcdLine': {
       const l = m.lcd;

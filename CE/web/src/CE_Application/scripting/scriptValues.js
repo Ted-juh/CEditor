@@ -41,6 +41,7 @@ import { COMPONENT_VERBS } from './componentVerbs.js';
 import { TIME_NUMBERS } from './timeWords.js';
 import { octaveCount } from './noteLists.js';
 import { DRAW_SHAPES, drawNumber } from './drawShapes.js';
+import { readPresetSlot, programWords, bankWords } from './presetWords.js';
 import { componentClampWarning } from './componentVerbs.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
@@ -555,7 +556,26 @@ function classify(arg, node, param, site, index) {
     }
     case 'number': {
       const read = readNumber(value, param, { tempo: site.env.ctx.tempo, site: numberSite(site, param) });
+      // A program number and a bank select, as the synth finds them (presetWords.js).
+      if (site.memberId === 'sendProgramChange' && !read.problem) {
+        const synth = site.env.ctx.devices?.roles?.mainSynth;
+        const msb = sibling(site, 'bankMsb');
+        const lsb = sibling(site, 'bankLsb');
+        const said = param.name === 'program' ? programWords(value, { msb, lsb, presets: synth?.presets, library: synth?.library })
+          : bankWords(msb, lsb, synth?.presets);
+        if (said) read.meaning.hint = said;
+      }
       return setRead(arg, 'number', read, typeof value === 'number' ? 'number' : null);
+    }
+    // A preset slot, read against the role's profile's banks, as recallPreset recalls one.
+    case 'presetSlot': {
+      const devices = site.env.ctx.devices;
+      const role = sibling(site, 'opts')?.role ?? 'mainSynth';
+      const device = devices?.roles?.[role] ?? null;
+      const read = readPresetSlot(value, {
+        profile: device ? { presets: device.presets } : null, role, library: device?.library, known: Boolean(devices),
+      });
+      return setRead(arg, 'presetSlot', read, read.meaning.choices?.length ? 'choice' : typeof value === 'number' ? 'number' : null);
     }
     case 'control': {
       const read = readControl(value, site.env.ctx);

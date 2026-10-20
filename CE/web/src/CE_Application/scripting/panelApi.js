@@ -890,7 +890,7 @@ export const COMMANDS = [
     refusal: 'result',
     summary: 'Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank\'s first preset, whatever program number it uses.',
     params: [
-      { name: 'slot', type: 'number', required: true },
+      { name: 'slot', type: 'number', required: true, kind: 'presetSlot' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
           summary: 'Which device to recall on, when the panel names more than one.' },
@@ -3047,12 +3047,12 @@ export const COMMANDS = [
   },
   {
     id: 'sendProgramChange', category: 'Device / MIDI', signature: 'sendProgramChange(channel, program [, bankMsb, bankLsb])',
-    summary: 'Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first.',
+    summary: 'Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first. `program` is MIDI\'s number, 0 to 127; most synths show it counted from 1, so program 0 is the one they call 1.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
       { name: 'program', type: 'number', required: true, unit: '0 to 127' },
-      { name: 'bankMsb', type: 'number', required: false },
-      { name: 'bankLsb', type: 'number', required: false },
+      { name: 'bankMsb', type: 'number', required: false, unit: '0 to 127' },
+      { name: 'bankLsb', type: 'number', required: false, unit: '0 to 127' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendProgramChange(${1:1}, ${2:0})$0', javascript: 'sendProgramChange(${1:1}, ${2:0})$0' },

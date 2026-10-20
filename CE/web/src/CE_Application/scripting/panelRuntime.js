@@ -44,6 +44,7 @@ import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
+import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -7951,6 +7952,8 @@ function recallPresetImpl(slot, opts = {}) {
 
   const profile = deviceProfileSource(role);
   if (!profile) {
+    // It answered with this and said nothing; the plug-in says the same (presetWords.js).
+    addScriptTrace('error', '', recallNoProfileWords(number, role));
     return { ok: false, error: `No device profile for role "${role}".`, slot: number };
   }
 
