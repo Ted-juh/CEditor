@@ -28,6 +28,7 @@ import {
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, readNoteList, readDrawShape, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  readLcdLine,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -597,6 +598,13 @@ function classify(arg, node, param, site, index) {
         settings: site.env.ctx.panel?.scripting?.settings ?? null,
       });
       return setRead(arg, 'sharedName', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
+    }
+    // A line an LCD is given: the cells it shows of it, and what the runtime says of what it cannot.
+    case 'lcdLine': {
+      const target = sibling(site, 'target');
+      const control = typeof target === 'string' ? controlNamed(site.env.ctx.controls ?? [], target) : null;
+      const rest = site.args.filter((a) => a.param?.name !== 'target').map((a) => (a.literal ? a.value : undefined));
+      return setRead(arg, 'lcdLine', readLcdLine(value, { control, target: String(target ?? ''), args: rest }), null);
     }
     // A list of notes, named, and refused where the runtime refuses it.
     case 'noteList': return setRead(arg, 'noteList', readNoteList(value, { memberId: site.memberId, name: param.name }), null);

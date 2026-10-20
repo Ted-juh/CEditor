@@ -43,6 +43,7 @@ import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sec
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import { drawNumber, commandBounds, outsideWords } from './drawShapes.js';
+import { lcdLineWords } from './lcdLines.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -3425,6 +3426,7 @@ function componentVerbAction(verb, target, args) {
     // of the list is not, and used to be indistinguishable from both success and silence.
     if (componentRequestLegal(verb, cfg, args)) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
+      lcdLineSaid(verb, path, cfg, args, shown);
       return true;
     }
     // Said with why (componentVerbs.componentRefusalLine): the index that addresses nothing and
@@ -3434,7 +3436,21 @@ function componentVerbAction(verb, target, args) {
   }
   if (!writeComponentFields(verb, path, patch)) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
+  lcdLineSaid(verb, path, cfg, args, shown);
   return true;
+}
+
+// A line the LCD cannot show all of (cut at its width, a character it has no shape for, a display
+// showing its layouts instead) is said once per line and reason (lcdLines.js).
+const lcdLineWarned = new Set();   // resetScriptState clears it
+function lcdLineSaid(verb, path, display, args, shown) {
+  if (verb.family !== 'lcd' || verb.v !== 'text') return;
+  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, args[1])) {
+    const key = `${path}\u0000${args[0]}\u0000${reason}`;
+    if (lcdLineWarned.has(key)) continue;
+    lcdLineWarned.add(key);
+    addScriptTrace('warn', '', `${message} This is said only the first time.`);
+  }
 }
 
 
@@ -9797,6 +9813,7 @@ function resetScriptState() {
   drawStrokeWarned.clear();
   timeNumberWarned.clear();
   componentClampWarned.clear();
+  lcdLineWarned.clear();
   deviceOverrideWarned.clear();
   musicWarned.clear();
   drawWarned.clear();

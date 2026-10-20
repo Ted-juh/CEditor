@@ -47,6 +47,7 @@
   import EasingCurve from '../components/animation/EasingCurve.svelte';
   import BezierEditor from '../components/animation/BezierEditor.svelte';
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
+  import LcdLinePreview from './LcdLinePreview.svelte';
 
   let {
     source = '',
@@ -736,6 +737,10 @@
                   {@render valueEdit(row)}
                   {@render selectControl(arg)}
                 </div>
+                {#if arg.kind === 'lcdLine' && arg.meaning?.lcd?.cells && !arg.meaning.lcd.layouts}
+                  <!-- The line as the display shows it: what of it is cut, and the cells it cannot draw. -->
+                  <LcdLinePreview line={arg.meaning.lcd} />
+                {/if}
                 {#if line}<div class={['vmeaning', arg.kind === 'path' && arg.meaning?.found && 'found']}>{line}</div>{/if}
                 {#if arg.problem}<div class={['vproblem', arg.problem.severity]}>{arg.problem.message}</div>{/if}
                 {#if editingArg(arg) && sessView?.refused !== null && sessView?.refused !== undefined}

@@ -3304,6 +3304,8 @@ const PARAM_TYPE_FOR = {
  *  no argument's, and says both in the verb's summary instead. Only for the argument that IS the
  *  value — the last, when its kind is the verb's own (an addressed verb's index is not). */
 function verbValueTyping(verb, kind) {
+  // A value the spec names a kind for (the LCD's line, read against the display it is written to).
+  if (verb.valueKind && kind === 'str') return { kind: verb.valueKind };
   if (kind !== verb.k && kind !== verb.kind) return {};
   if (kind === 'enum' && Array.isArray(verb.values)) {
     const same = (list) => list.length === verb.values.length && list.every((x, i) => x === verb.values[i]);

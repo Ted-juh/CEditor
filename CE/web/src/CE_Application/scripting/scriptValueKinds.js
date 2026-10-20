@@ -48,6 +48,7 @@ import {
   deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, deviceSetNoProfileWords, dumpKindUnknownWords,
 } from './deviceWords.js';
 import { countRolesInControls } from '../utils/deviceRoles.js';
+import { lcdLine, lcdLineWords } from './lcdLines.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
@@ -1446,6 +1447,24 @@ export function readImage(value, { images, wantsData, path }) {
     return { meaning, problem: { severity: 'warning', message: `No image called "${value}" in the library or the panel.${didYouMean(value, meaning.choices)}` } };
   }
   return { meaning, problem: null };
+}
+
+/* ------------------------------------------------------------------------------ LCD lines */
+
+/**
+ * A line ce.components.lcd.text writes, read against the display it is written to: the cells the
+ * display shows of it, and what the runtime says of what it cannot show (lcdLines.js). `args` are
+ * the call's after the target, as the runtime shows them in its line.
+ */
+export function readLcdLine(value, { control, target, args = [] } = {}) {
+  const display = control?._children?.Display;
+  if (!display || typeof display !== 'object' || typeof value !== 'string') return { meaning: {}, problem: null };
+  const call = `lcd ${target}: text(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')})`;
+  const said = lcdLineWords(display, call, value);
+  return {
+    meaning: { lcd: lcdLine(display, value) },
+    problem: said.length ? { severity: 'warning', message: said.map((s) => s.message).join(' ') } : null,
+  };
 }
 
 /* ---------------------------------------------------------------------------------- dashes */
