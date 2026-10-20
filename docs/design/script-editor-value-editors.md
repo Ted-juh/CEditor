@@ -1105,8 +1105,9 @@ Values tab's first version was merged:
   the same. An id the profile does not have is said as its call does it: write refuses it, bind
   binds it anyway, each in its runtime's words (`scripting/deviceWords.js`), and read and parameter
   answer nothing. A row says nothing of an id while the table loads, which the tab has asked for,
-  or of one the panel's scripts declare with `defineParameter`; with no profile chosen only bind's
-  says anything, as bind does, since then nothing but a declaration knows the id.
+  or of one the panel's scripts declare with `defineParameter`; with no profile chosen bind's says
+  so, as bind does, since then nothing but a declaration knows the id, and write's says the write
+  is refused (below), and read's and parameter's say nothing.
 
   Reading it found the table it needs was never there. Every reader asked the Device Profile
   Designer's page: 160 parameters by default, and after a search in the Designer only what matched,
@@ -1177,7 +1178,8 @@ Values tab's first version was merged:
   the caret stays where it is and the text is not touched; a row's click still goes to its value,
   and a second Select takes the pick back. Checked in `test/panelSelectionScope.test.js`,
   `test/valuesSidebar.test.js` and `browser-checks/valuesSidebar.mjs`, which picks a control with a
-  colour open and finds it selected on the canvas.
+  colour open and finds it selected on the canvas. The Panel file screen picks the same way now
+  (below).
 - **A stroke's dash is drawn in its row.** `ce.draw.stroke`'s `opts.dash` has `kind: 'dash'`, read
   by the runtime's own reader (`scripting/drawDash.js`), which the WebView runtime now draws with.
   It is the only runtime with the call: the plug-in's window runs the same one, and the C++
@@ -1193,6 +1195,42 @@ Values tab's first version was merged:
   whose lengths are all 0, draw a solid line, as SVG's rule says; neither is a mistake. Checked in
   `test/scriptDraw.test.js`, in `test/scriptValues.test.js` against the runtime's console and the
   line it draws, and in `browser-checks/valuesSidebar.mjs`.
+
+Building those found five things wrong beyond them, each fixed on the owner's word the next day:
+
+- **An envelope's curves played in the plug-in.** `ce.math.map` and `ce.anim.envelope` take a
+  point's curve in the editor, the segment ending at a point with `"exp"` following that shape as an
+  Envelope's segment does, and the row draws it so. The three preludes read a point for its x and y
+  alone, so with the window shut the same envelope moved in straight lines, and `ce.math.map` gave
+  another number for the same points. Each prelude now shapes the segment with its own
+  `shapeCurve`, which `ce.math.shape` already matched to the editor, and the envelope's samples go
+  through it. `ce.math.map` was never compared across the runtimes at all; its straight, stepped and
+  curved cases are in `test/scriptPreludeAgreement.test.js` now, and its summary says a point can
+  bend.
+- **A point keyed by number was read from the wrong key.** The editor read entry 1 before entry 0, so
+  `{ 0: 0, 1: 0.2 }` was a point at x 0.2. Lua counts from 1 and the other languages from 0, so a
+  table point is counted from 0 when it has an entry 0 and from 1 when it does not, everywhere: one
+  reader in the editor (`envelopePointParts`, which sampling and the refusals both use) and a
+  `__pointParts` in each prelude that counts the same way. A test writes such points in each
+  language, since no JSON case can carry a numbered key to Python.
+- **`ce.device.write` with no profile chosen** answered false without a word in the plug-in, and in
+  the editor was sent to the host, whose "Not sent" went to the MIDI preview, and answered true. Both
+  refuse it now, nothing sent, in one sentence from `deviceWords.js` ("ce.device.write: no device
+  profile is chosen for mainSynth, so "cutoff" was not sent. …"), and its row says it. The check
+  reads the write's own role: a read of a role nothing is mapped to takes the main synth's profile,
+  but a send takes its role's mapping or none, in the editor and in the plug-in alike, so a write
+  there was checked against one profile and dropped for having none.
+- **`ce.draw.stroke`'s cap and join** drew the default for any word but their three, without a word,
+  so `cap = "sausage"` and `join = "Round"` drew square ends and sharp corners. The row said so, but
+  in the generic list reader's words, which no runtime says. `drawDash.js` reads them now
+  (`strokeEnd`), the runtime says an unknown one once, and the row says the same sentence. A call
+  with a refusal of its own has it said of a word in another case too, which corrects
+  `ce.draw.blend("Multiply")`'s row as well.
+- **The Panel file screen selected with the script tab in front**, so going back by the panel's tab
+  cleared the control it had open, and selecting let go of the display panel's targets. It picks
+  now, as the Values tab's Select does, and follows picks. Its header described a split that showed
+  the panel beside the script; the general split it meant was a layout nothing drew, and is removed.
+  `browser-checks/panelFile.mjs` goes back by the tab and finds the control selected.
 
 Still open: nothing from this record.
 
