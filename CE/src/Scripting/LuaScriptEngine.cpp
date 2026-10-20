@@ -3024,13 +3024,18 @@ function requestDump(kind, fn, opts)
   if type(fn) == "function" then
     local ms = 3000
     if opts ~= nil and tonumber(opts.timeout) ~= nil and tonumber(opts.timeout) > 0 then ms = tonumber(opts.timeout) end
-    local waiter = { kind = kind, fn = fn, done = false }
+    -- A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    -- so that is what the callback waits for; waiting for the request's own id, it heard only the
+    -- timeout.
+    local answer = __deviceQuery("answers", { role = "mainSynth", request = kind })
+    local waitFor = (type(answer) == "string" and answer ~= "") and answer or kind
+    local waiter = { kind = waitFor, fn = fn, done = false }
     table.insert(__dumpWaiters, waiter)
     -- Resolved rather than left hanging: a synth that is off, or that does not answer this
     -- request, is the common case and not the exotic one.
     after(ms, function()
       if waiter.done then return end
-      __resolveDumps(kind, "", nil, "no dump arrived within " .. tostring(math.floor(ms)) .. "ms")
+      __resolveDumps(waitFor, "", nil, "no dump arrived within " .. tostring(math.floor(ms)) .. "ms")
     end)
   end
   __requestDump(kind)

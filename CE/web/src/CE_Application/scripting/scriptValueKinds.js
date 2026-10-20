@@ -42,7 +42,10 @@ import { SCALES as CHORD_PAD_SCALES } from '../utils/chordPadLayout.js';
 import { elementSites } from '../utils/pixelElements.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
-import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
+import {
+  deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, deviceSetNoProfileWords, dumpKindUnknownWords,
+} from './deviceWords.js';
+import { countRolesInControls } from '../utils/deviceRoles.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
@@ -687,7 +690,7 @@ export const ENUM_REFUSALS = {
 };
 
 /** An event's name: an id ("valueChanged") or a handler name ("onValueChanged"). */
-export function readEvent(value, { anyTarget }) {
+export function readEvent(value, { anyTarget, names = null }) {
   const handlers = ALL_EVENTS.map((e) => e.fn);
   const meaning = { name: value, handler: null, id: null, found: false, choices: handlers };
   if (typeof value !== 'string') return { meaning, problem: null };
@@ -696,7 +699,16 @@ export function readEvent(value, { anyTarget }) {
     Object.assign(meaning, { handler: event.fn, id: event.id, found: true, summary: event.summary });
     return { meaning, problem: null };
   }
-  if (anyTarget) { meaning.custom = true; return { meaning, problem: null }; }
+  if (anyTarget) {
+    meaning.custom = true;
+    // A custom event is emit()'s, and only a script emits it (scriptNames.js).
+    meaning.choices = [...new Set([...(names?.emits ?? []).map((e) => e.name), ...handlers])];
+    const emitters = (names?.emits ?? []).filter((e) => e.name === value);
+    if (emitters.length) meaning.emittedBy = [...new Set(emitters.map((e) => names.scripts?.[e.scriptId]?.name ?? e.scriptId))];
+    if (!names || emitters.length || (names.computed ?? []).includes('emits')) return { meaning, problem: null };
+    const emitted = [...new Set((names.emits ?? []).map((e) => e.name))];
+    return { meaning, problem: { severity: 'warning', message: `no script emits "${value}", so this is never called.${didYouMean(value, emitted)}` } };
+  }
   return { meaning, problem: { severity: 'warning', message: `"${value}" is not an event the panel raises, so nothing will call this.${didYouMean(value, handlers)}` } };
 }
 
@@ -1008,6 +1020,148 @@ function parameterSummary(p) {
     range: Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null,
     choices,
   };
+}
+
+/* ------------------------------------------------------------------------ roles and dumps */
+
+// What a call does with a role no profile is chosen for, as the runtime does it: the parameter
+// lookups take the main synth's profile, in both runtimes (DeviceProfileService::engineForRole);
+// the profile's own readers answer from the role's own mapping, and so give nothing; and the two
+// overrides refuse it (deviceWords.js).
+const ROLE_USE = {
+  deviceParameter: 'mainSynth', deviceParameters: 'mainSynth',
+  deviceProfile: 'nothing', deviceVariables: 'nothing', deviceTiming: 'nothing', deviceCoverage: 'nothing', deviceRead: 'nothing',
+  deviceRecipes: 'an empty list', deviceRequests: 'an empty list', deviceConnected: 'false',
+  deviceSetVariable: 'setVariable', deviceSetTiming: 'setTiming',
+  deviceDefineParameter: 'declares', deviceDefineDump: 'declares',
+};
+
+/**
+ * A device role: the roles there are (the main synth, each one a profile is chosen for, and each one
+ * the panel's controls are bound to), the profile behind this one, and what the call does with one
+ * no profile is chosen for: the overrides' refusal in the runtime's words, and for a role nothing
+ * on the panel knows of, which is likelier a slip than a device, what the call gives back instead.
+ */
+export function readDeviceRole(value, { devices, memberId, controls }) {
+  const roles = devices?.roles ?? {};
+  const used = [...countRolesInControls(controls ?? []).keys()];
+  const choices = [...new Set(['mainSynth', ...Object.keys(roles), ...used])];
+  const meaning = { role: value, profile: null, choices };
+  if (typeof value !== 'string' || !value || !devices) return { meaning, problem: null };
+  const device = roles[value];
+  if (device) {
+    meaning.profile = device.profileName;
+    meaning.hint = memberId in ROLE_USE && ROLE_USE[memberId] === 'declares' ? `declared for ${value}, whose profile is ${device.profileName}` : device.profileName;
+    return { meaning, problem: null };
+  }
+  const use = ROLE_USE[memberId];
+  if (use === 'setVariable' || use === 'setTiming') {
+    return { meaning, problem: { severity: 'error', message: deviceSetNoProfileWords(use, value) } };
+  }
+  const main = roles.mainSynth;
+  meaning.hint = use === 'mainSynth' ? `no profile is chosen for ${value}, so this reads mainSynth's${main ? `, ${main.profileName}` : ', and none is chosen for that either'}`
+    : use === 'declares' ? `declared for ${value}, which no profile is chosen for yet`
+    : use ? `no profile is chosen for ${value}, so this gives ${use}` : `no profile is chosen for ${value}`;
+  if (use === 'declares' || value === 'mainSynth' || used.includes(value)) return { meaning, problem: null };
+  return {
+    meaning,
+    problem: { severity: 'warning', message: `"${value}" is not a device of this panel: no profile is chosen for it, and no control is bound to it.${didYouMean(value, choices)}` },
+  };
+}
+
+/**
+ * The kind of dump requestDump, sendDump and buildDump take: a dump the main synth's profile
+ * defines, by its id, or one the scripts declare with defineDump; for requestDump a request's own id
+ * as well, whose answer arrives under the dump it answers with. The runtime's refusal of a kind it
+ * has none of (deviceWords.js), once the profile's document is there to say so.
+ */
+export function readDumpKind(value, { devices, memberId }) {
+  const main = devices?.roles?.mainSynth ?? null;
+  const declared = (devices?.declaredDumps ?? []).filter((d) => d.role == null || d.role === 'mainSynth').map((d) => d.id);
+  const dumps = main?.dumps ?? null;
+  const meaning = { kind: value, choices: [...new Set([...(dumps ?? []).map((d) => d.id), ...declared])] };
+  meaning.choiceNames = Object.fromEntries((dumps ?? []).filter((d) => d.name && d.name !== d.id).map((d) => [d.id, d.name]));
+  if (typeof value !== 'string' || !value) return { meaning, problem: null };
+  if (declared.includes(value)) { meaning.hint = "declared by this panel's scripts"; return { meaning, problem: null }; }
+  if (!dumps) return { meaning, problem: null };
+  const dump = dumps.find((d) => d.id === value);
+  if (dump) { meaning.hint = dump.name && dump.name !== dump.id ? dump.name : `a dump of ${main.profileName}`; return { meaning, problem: null }; }
+  const request = memberId === 'requestDump' ? (main.requests ?? []).find((r) => r.id === value) : null;
+  if (request) {
+    meaning.hint = request.dump ? `the request for the "${request.dump}" dump` : 'a request of the profile';
+    return { meaning, problem: null };
+  }
+  const verb = memberId === 'buildDump' ? 'buildDump' : memberId === 'sendDump' ? 'sendDump' : 'requestDump';
+  const message = dumpKindUnknownWords(verb, value, 'mainSynth', dumps.map((d) => d.id), verb === 'buildDump' ? 'nothing was built' : undefined);
+  return { meaning, problem: { severity: 'error', message } };
+}
+
+/* ------------------------------------------------------------------------ names across scripts */
+
+// For each call that names something another script names too: which of scriptNames' lists holds
+// the other side, what this call does with a name nobody answers, and the sentence for it.
+const SHARED_NAMES = {
+  startTimer: { other: 'stops', role: 'start' }, syncTimer: { other: 'stops', role: 'start' },
+  stopTimer: { other: 'starts', role: 'stop', none: (n) => `no script starts a timer called "${n}", so this stops nothing.` },
+  saveSetting: { other: 'loads', role: 'save' },
+  loadSetting: { other: 'saves', role: 'read', none: (n, scope) => `no script saves "${n}"${scope === 'panel' ? '' : ` in the ${scope} scope`}, and the panel holds no setting by it, so this gives its fallback.` },
+  forgetSetting: { other: 'saves', role: 'read', none: (n, scope) => `no script saves "${n}"${scope === 'panel' ? '' : ` in the ${scope} scope`}, and the panel holds no setting by it, so this forgets nothing.` },
+  emit: { other: 'hears', role: 'emit', none: (n) => `no script listens for "${n}", so this reaches nothing.` },
+  defineAction: { other: 'runs', role: 'define' },
+  run: { other: 'defines', role: 'run' },
+};
+const SCRIPT_KEY_PREFIX = '\u0001script:';   // panelRuntime's storageKeyFor
+
+/**
+ * A name a call shares with the panel's other scripts (scriptNames.js): the names there are on the
+ * other side, which script answers this one, and, when none does and no call builds one from parts,
+ * what the call does instead. A setting the panel already holds answers a read; a function by the
+ * action's name answers run(), as the runtime's runAction finds one, and run of neither is refused in
+ * the runtime's words.
+ */
+export function readSharedName(value, { names, memberId, scriptId, scope = 'panel', settings }) {
+  const spec = SHARED_NAMES[memberId];
+  const meaning = { name: value, choices: [] };
+  if (!spec || !names) return { meaning, problem: null };
+  const scriptName = (id) => `'${names.scripts?.[id]?.name ?? id}'`;
+  const sameScope = (e) => (e.scope ?? 'panel') === scope && (scope !== 'script' || e.scriptId === scriptId);
+  let others = names[spec.other] ?? [];
+  if (spec.role === 'emit') others = [...others, ...(names.runsOn ?? [])];
+  if (spec.role === 'read' || spec.role === 'save') others = others.filter(sameScope);
+  if (spec.role === 'run') others = [...others, ...(names.functions ?? [])];
+  meaning.choices = [...new Set(others.map((e) => e.name))].sort();
+  if (typeof value !== 'string' || !value) return { meaning, problem: null };
+
+  if (spec.role === 'run') {
+    const dot = value.lastIndexOf('.');
+    const owner = dot > 0 ? value.slice(0, dot).toLowerCase() : '';
+    const action = dot > 0 ? value.slice(dot + 1) : value;
+    const defined = owner ? [] : (names.defines ?? []).filter((e) => e.name.toLowerCase() === action.toLowerCase());
+    const fns = (names.functions ?? []).filter((e) => e.name === action && (!owner || names.scripts?.[e.scriptId]?.target.toLowerCase() === owner));
+    const by = defined[0] ?? fns[0];
+    if (by) { meaning.hint = `${defined.length ? 'defined' : 'a function'} in ${scriptName(by.scriptId)}`; return { meaning, problem: null }; }
+    if ((names.computed ?? []).includes('defines')) return { meaning, problem: null };
+    const registered = [...new Set((names.defines ?? []).map((e) => e.name))];
+    return {
+      meaning,
+      problem: { severity: 'error', message: `run("${value}") found no loaded script defining ${action}()${registered.length ? `. Registered actions: ${registered.join(', ')}` : ''}` },
+    };
+  }
+
+  const answering = others.filter((e) => e.name === value);
+  // A read of a setting the panel already holds is answered by it, whoever saved it.
+  const storedKey = scope === 'script' ? `${SCRIPT_KEY_PREFIX}${scriptId ?? ''}:${value}` : value;
+  const held = spec.role === 'read' && scope !== 'local' && settings && typeof settings === 'object' && Object.hasOwn(settings, storedKey);
+  if (answering.length) {
+    const where = [...new Set(answering.map((e) => scriptName(e.scriptId)))].join(', ');
+    const verb = { start: 'stopped', stop: 'started', save: 'read', read: 'saved', emit: 'heard', define: 'run' }[spec.role];
+    meaning.hint = `${verb} in ${where}`;
+    return { meaning, problem: null };
+  }
+  if (held) { meaning.hint = `the panel holds ${shownValue(settings[storedKey])}`; return { meaning, problem: null }; }
+  meaning.hint = { start: 'no script stops it', save: 'no script reads it', define: 'no script runs it' }[spec.role] ?? null;
+  if (!spec.none || (names.computed ?? []).includes(spec.other) || scope === null) return { meaning, problem: null };
+  return { meaning, problem: { severity: 'warning', message: `${spec.none(value, scope)}${didYouMean(value, meaning.choices)}` } };
 }
 
 /* ------------------------------------------------------------------------ component indexes */

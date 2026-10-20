@@ -96,6 +96,35 @@ inline bool decimalTextValue (const juce::String& text, double& out)
     return std::isfinite (out);
 }
 
+/** ce.device.setVariable / setTiming's value, as the editor's runtime reads it (deviceWords.js,
+ *  deviceOverrideValue): a number, or text that is one, as the nearest whole number from lo to hi.
+ *  `refused` is the sentence for a value that is no number, `said` the one for a number not used as
+ *  given; test/deviceOverrides.test.js holds the two runtimes to the same words. */
+struct DeviceOverrideValue { bool ok = false; int value = 0; juce::String refused, said; };
+inline DeviceOverrideValue deviceOverrideValue (const juce::String& label, const juce::String& name,
+                                                const juce::var& v, int lo, int hi)
+{
+    DeviceOverrideValue out;
+    const auto call = "ce.device." + label + "(\"" + name + "\", " + shownScriptValue (v) + ")";
+    double d = 0.0;
+    const bool number = (v.isInt() || v.isInt64() || v.isDouble()) ? std::isfinite (d = static_cast<double> (v))
+                                                                   : v.isString() && decimalTextValue (v.toString(), d);
+    if (! number)
+    {
+        out.refused = call + ": " + shownScriptValue (v) + " is not a number, so nothing was changed.";
+        return out;
+    }
+    const auto whole = std::floor (d + 0.5);
+    out.ok = true;
+    out.value = static_cast<int> (juce::jlimit (static_cast<double> (lo), static_cast<double> (hi), whole));
+    if (static_cast<double> (out.value) != whole)
+        out.said = call + ": " + shownScriptValue (v) + " is outside " + juce::String (lo) + " to " + juce::String (hi)
+                 + ", so " + juce::String (out.value) + " was used.";
+    else if (whole != d)
+        out.said = call + ": " + shownScriptValue (v) + " is not a whole number, so " + juce::String (out.value) + " was used.";
+    return out;
+}
+
 /** One item of a script's list of bytes: a whole number from 0 to 255, or text that is one hex
  *  byte. -1 when it is neither. */
 inline int scriptListByte (const juce::var& v)
@@ -448,6 +477,7 @@ public:
                             "unasked.", juce::var());
             return;
         }
+        if (unknownDumpKind ("requestDump", kind, true)) return;
         if (callbacks.requestDump) callbacks.requestDump (kind);
     }
     void applyDump (const juce::var& bytes) override
@@ -458,7 +488,41 @@ public:
         if (! decodedMap && ! bytesFromScript ("applyDump", "nothing was decoded", dump)) return;
         if (callbacks.applyDump) callbacks.applyDump (dump);
     }
-    void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
+    void sendDump (const juce::String& kind) override
+    {
+        if (runtime == nullptr || ! runtime->hasDeviceDump (defaultDeviceRole, kind))
+            if (unknownDumpKind ("sendDump", kind, false)) return;
+        if (callbacks.sendDump) callbacks.sendDump (kind);
+    }
+    // A kind the main synth's profile has no dump by (nor, for requestDump, request) went to the
+    // service, which refused it where no script could see. Refused here, in the editor's words
+    // (deviceWords.js, dumpKindUnknownWords), while the profile's document is there to say so: the
+    // host's "dumps" query is void when there is none.
+    bool unknownDumpKind (const juce::String& verb, const juce::String& kind, bool requests)
+    {
+        if (kind.isEmpty() || ! callbacks.deviceQuery) return false;
+        auto* q = new juce::DynamicObject();
+        q->setProperty ("role", defaultDeviceRole);
+        const juce::var payload (q);
+        const auto dumpList = callbacks.deviceQuery ("dumps", payload);
+        auto* dumps = dumpList.getArray();
+        if (dumps == nullptr) return false;
+        juce::StringArray ids;
+        for (const auto& id : *dumps) ids.add (id.toString());
+        if (ids.contains (kind)) return false;
+        if (requests)
+        {
+            const auto requestList = callbacks.deviceQuery ("requests", payload);
+            if (auto* known = requestList.getArray())
+                for (const auto& id : *known)
+                    if (id.toString() == kind) return false;
+        }
+        logAt ("error", verb + "(\"" + kind + "\"): the " + defaultDeviceRole + " profile has no dump called \"" + kind
+                        + "\", so nothing was sent." + (ids.isEmpty() ? juce::String (" It defines none.")
+                                                                      : " One of: " + ids.joinIntoString (", ") + "."),
+               juce::var());
+        return true;
+    }
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
 
     /**

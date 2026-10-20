@@ -73,7 +73,10 @@ import {
 } from '../stores/deviceProfiles.js';
 import { profileSources } from '../stores/deviceProfileStores.js';
 import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
-import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
+import {
+  deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, DEVICE_OVERRIDES, deviceOverrideValue,
+  deviceSetNoNameWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
+} from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
@@ -3078,6 +3081,11 @@ const midiApi = {
   // sendDump builds the dump from the device profile and sends it (host-side bulk send).
   sendDump: (kind) => {
     const role = DEFAULT_ROLE;
+    const refused = dumpKindRefusal('sendDump', kind);
+    if (refused) {
+      addScriptTrace('error', '', refused);
+      return;
+    }
     if (isJuceAvailable()) {
       startBulkDumpSend({ deviceRole: role, expectedDumpId: String(kind ?? ''), dryRun: false });
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) → bulk send requested`);
@@ -3096,6 +3104,11 @@ const midiApi = {
   // The error is at ERROR level, not 'midi': it used to be the latter, which reads as ordinary
   // chatter, so a script got a quiet null and no indication anything was wrong.
   buildDump: (kind, values) => {
+    const refused = dumpKindRefusal('buildDump', kind, { outcome: 'nothing was built' });
+    if (refused) {
+      addScriptTrace('error', '', refused);
+      return null;
+    }
     const built = buildRuntimeDump(DEFAULT_ROLE, String(kind ?? ''), values ?? {});
     if (built === null) {
       addScriptTrace('error', '',
@@ -7305,6 +7318,17 @@ function roleMapping(role) {
 }
 
 /**
+ * The mapping a role has of its OWN, or null. profile, variables, timing, coverage, recipes and
+ * requests answer from it, as the plug-in answers them, from the role's own session record. They
+ * answered from roleMapping, which falls back to the main synth, so a role nothing is mapped to read
+ * as the main synth window-open and as nothing window-closed. parameter() and parameters() still
+ * fall back, in both: the plug-in's engine does (DeviceProfileService::engineForRole).
+ */
+function ownRoleMapping(role) {
+  return (get(deviceRoleMappings) ?? {})[role] ?? null;
+}
+
+/**
  * The profile SOURCE behind a role — the authored JSON, not the catalogue entry.
  *
  * profile() has always answered from the catalogue listing (id, name) and the live session, which
@@ -7312,8 +7336,8 @@ function roleMapping(role) {
  * document: what variables the recipes interpolate, what the profile claims it can do, what
  * messages it can build.
  */
-function deviceProfileSource(role = DEFAULT_ROLE) {
-  const profileId = roleMapping(role)?.profileId;
+function deviceProfileSource(role = DEFAULT_ROLE, { own = false } = {}) {
+  const profileId = (own ? ownRoleMapping(role) : roleMapping(role))?.profileId;
   if (!profileId) return null;
   const text = (get(profileSources) ?? {})[profileId]?.source ?? '';
   if (!text) return null;
@@ -7335,8 +7359,8 @@ function deviceProfileSource(role = DEFAULT_ROLE) {
  * of the same synth must be able to sit on different device ids without editing it.
  */
 function deviceVariablesRead(role = DEFAULT_ROLE) {
-  const profile = deviceProfileSource(role);
-  const mapping = roleMapping(role);
+  const profile = deviceProfileSource(role, { own: true });
+  const mapping = ownRoleMapping(role);
   if (!profile && !mapping) return null;
   return {
     ...(profile?.variables && typeof profile.variables === 'object' ? profile.variables : {}),
@@ -7345,8 +7369,8 @@ function deviceVariablesRead(role = DEFAULT_ROLE) {
 }
 
 function deviceTimingRead(role = DEFAULT_ROLE) {
-  const profile = deviceProfileSource(role);
-  const mapping = roleMapping(role);
+  const profile = deviceProfileSource(role, { own: true });
+  const mapping = ownRoleMapping(role);
   if (!profile && !mapping) return null;
   return {
     ...(profile?.timing && typeof profile.timing === 'object' ? profile.timing : {}),
@@ -7354,24 +7378,38 @@ function deviceTimingRead(role = DEFAULT_ROLE) {
   };
 }
 
-/** One override written onto the role mapping, through the app's own writer so it persists. */
-function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
+/**
+ * One override written onto the role mapping, through the app's own writer so it persists.
+ *
+ * The role's OWN mapping, not roleMapping's: a read of a role nothing is mapped to takes the main
+ * synth's profile, and this took it too, and wrote it back as a new mapping for that role, so a
+ * misspelt role became a second device on the main synth's profile. It is refused, as the plug-in
+ * refuses it, and both say so in deviceWords.js's words, as they say a value used as the nearest
+ * whole number in range, once per name.
+ */
+const deviceOverrideWarned = new Set();   // label, role and name of each override that has said so; resetScriptState clears it
+function deviceOverrideWrite(kind, name, value, role) {
+  const { label, min, max } = DEVICE_OVERRIDES[kind];
   const key = String(name ?? '').trim();
   if (!key) {
-    addScriptTrace('error', '', `ce.device.${label}: a name is required.`);
+    addScriptTrace('error', '', deviceSetNoNameWords(label));
     return false;
   }
-  const mapping = roleMapping(role);
+  const mapping = (get(deviceRoleMappings) ?? {})[role];
   if (!mapping?.profileId) {
-    addScriptTrace('error', '', `ce.device.${label}: no device profile is mapped to "${role}".`);
+    addScriptTrace('error', '', deviceSetNoProfileWords(label, role));
     return false;
   }
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    addScriptTrace('error', '', `ce.device.${label}("${key}"): needs a number.`);
+  const { n: next, refused, said } = deviceOverrideValue(label, key, value, min, max);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return false;
   }
-  const next = Math.min(max, Math.max(min, Math.round(n)));
+  const warnedAs = `${label}\u0000${role}\u0000${key}`;
+  if (said && !deviceOverrideWarned.has(warnedAs)) {
+    deviceOverrideWarned.add(warnedAs);
+    addScriptTrace('warn', '', `${said} This is said only the first time.`);
+  }
   const current = (mapping[kind] && typeof mapping[kind] === 'object' ? mapping[kind] : {});
   if (current[key] === next) {
     addScriptTrace('log', '', `ce.device.${label}("${key}", ${next}) — already that way`);
@@ -7392,7 +7430,7 @@ function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
  * about; the ones that mean "no" are spelled that way.
  */
 function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
-  const coverage = deviceProfileSource(role)?.coverage;
+  const coverage = deviceProfileSource(role, { own: true })?.coverage;
   if (!coverage || typeof coverage !== 'object') return feature ? undefined : null;
   if (feature === undefined || feature === null || feature === '') return { ...coverage };
   const wanted = String(feature);
@@ -7402,18 +7440,18 @@ function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
 
 /** The ids of the messages a profile can build, and of the requests it can send. */
 function deviceListRead(role, field) {
-  const list = deviceProfileSource(role)?.[field];
+  const list = deviceProfileSource(role, { own: true })?.[field];
   if (!Array.isArray(list)) return [];
   return list.map((entry) => String(entry?.id ?? '')).filter(Boolean);
 }
 
 function deviceProfileRead(role = DEFAULT_ROLE) {
-  const mapping = roleMapping(role);
+  const mapping = ownRoleMapping(role);
   const profileId = mapping?.profileId;
   if (!profileId) return null;
   const listed = (get(deviceProfiles) ?? []).find((p) => String(p?.id) === String(profileId)) ?? null;
   const session = (get(deviceSessionState) ?? {})[role] ?? null;
-  const source = deviceProfileSource(role);
+  const source = deviceProfileSource(role, { own: true });
   return {
     id: profileId,
     name: listed?.name ?? profileId,
@@ -7871,13 +7909,17 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
 
   if (typeof fn === 'function') {
     const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
-    const waiter = { kind: key, fn, scriptId, timerId: null, done: false };
+    // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    // so that is what the callback waits for, in every runtime; waiting for the request's own id,
+    // it heard only the timeout.
+    const waitFor = requestAnswer(role, key) ?? key;
+    const waiter = { kind: waitFor, fn, scriptId, timerId: null, done: false };
     dumpWaiters.push(waiter);
     // A one-shot the RUNTIME owns rather than one the script asked for, so a script cannot cancel
     // somebody else's timeout by id, and stopAllTimers on panel close takes it with the panel.
     waiter.timerId = scheduleOneShot(ms, () => {
       if (waiter.done) return;
-      resolveDumpWaiters(key, role, undefined, `no dump arrived within ${ms}ms`);
+      resolveDumpWaiters(waitFor, role, undefined, `no dump arrived within ${ms}ms`);
     });
   }
 
@@ -7895,6 +7937,11 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
     return true;
   }
 
+  const refused = dumpKindRefusal('requestDump', key, { requests: true });
+  if (refused) {
+    addScriptTrace('error', '', refused);
+    return false;
+  }
   if (isJuceAvailable()) {
     startDeviceSync({ deviceRole: role, request: key });
     addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) → device sync requested`);
@@ -7902,6 +7949,29 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   }
   addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) — no device host`);
   return false;
+}
+
+/** The dump a request of the role's profile answers with, or null (the plug-in's "answers" query). */
+function requestAnswer(role, kind) {
+  const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
+  const dump = String(request?.response?.dump ?? request?.expectedDump ?? '');
+  return dump || null;
+}
+
+/**
+ * What requestDump, sendDump and buildDump say of a kind the main synth's profile has no dump by
+ * (deviceWords.js), or null: for no kind, a dump the script declared, one the profile defines (or,
+ * for requestDump, a request it can send), and while the profile's document has not arrived, when
+ * the host is the one to know.
+ */
+function dumpKindRefusal(verb, kind, { requests = false, outcome } = {}) {
+  const key = String(kind ?? '');
+  if (!key || hasDefinedDump(DEFAULT_ROLE, key)) return null;
+  const profile = deviceProfileSource(DEFAULT_ROLE);
+  if (!profile) return null;
+  const known = profileDumpKinds(profile);
+  if (known.dumps.includes(key) || (requests && known.requests.includes(key))) return null;
+  return dumpKindUnknownWords(verb, key, DEFAULT_ROLE, known.dumps, outcome);
 }
 
 /** Drop every runtime declaration. Called wherever generated controls are cleared, for the same
@@ -8704,13 +8774,9 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
     devicePorts: (opts) => devicePortsRead(opts ?? {}),
     deviceVariables: (role) => deviceVariablesRead(role || DEFAULT_ROLE),
-    deviceSetVariable: (name, value, role) => deviceOverrideWrite(
-      'variables', name, value, role || DEFAULT_ROLE,
-      { min: 0, max: 127, label: 'setVariable' }),
+    deviceSetVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
     deviceTiming: (role) => deviceTimingRead(role || DEFAULT_ROLE),
-    deviceSetTiming: (name, ms, role) => deviceOverrideWrite(
-      'timingOverrides', name, ms, role || DEFAULT_ROLE,
-      { min: 0, max: 60000, label: 'setTiming' }),
+    deviceSetTiming: (name, ms, role) => deviceOverrideWrite('timingOverrides', name, ms, role || DEFAULT_ROLE),
     deviceCoverage: (feature, role) => deviceCoverageRead(role || DEFAULT_ROLE, feature),
     deviceRecipes: (role) => deviceListRead(role || DEFAULT_ROLE, 'messageRecipes'),
     deviceRequests: (role) => deviceListRead(role || DEFAULT_ROLE, 'requests'),
@@ -9675,6 +9741,7 @@ function resetScriptState() {
   drawStrokeWarned.clear();
   timeNumberWarned.clear();
   componentClampWarned.clear();
+  deviceOverrideWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

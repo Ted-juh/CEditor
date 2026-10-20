@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  checksumOf, readSysexTemplate, parameterSpecRefusal, readComponentIndex, readDeviceRole, readDumpKind, readSharedName, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -211,6 +211,9 @@ function contextOf(context = {}) {
     images: context?.images ?? null,
     // Each device role's profile and its whole parameter table (readDeviceParameter).
     devices: context?.devices ?? null,
+    // The names the panel's scripts share (scriptNames.js), and which script this one is.
+    names: context?.names ?? null,
+    scriptId: context?.scriptId ?? null,
     resolvesToken: (name) => (set ? resolveToken(name, set) !== undefined : false),
     resolve: (value) => (set ? resolveToken(tokenNameOf(value), set) : undefined),
   };
@@ -476,6 +479,7 @@ function kindOfParam(param) {
   if (param.type === 'targetRef') return 'control';
   if (param.type === 'eventName') return 'event';
   if (param.type === 'bytes') return 'bytes';
+  if (param.type === 'dumpKind') return 'dumpKind';
   if (Array.isArray(param.fields) && param.fields.length) return 'options';
   if (param.type === 'object') return 'options';
   if (Array.isArray(param.values) && param.values.length) return 'enum';
@@ -551,7 +555,7 @@ function classify(arg, node, param, site, index) {
     }
     case 'event': {
       const target = site.args.find((a) => a !== arg && (a.param?.type === 'targetRef' || a.param?.kind === 'control'));
-      return setRead(arg, 'event', readEvent(value, { anyTarget: target?.literal && target.value === '*' }), 'choice');
+      return setRead(arg, 'event', readEvent(value, { anyTarget: target?.literal && target.value === '*', names: site.env.ctx.names }), 'choice');
     }
     case 'animation': {
       const read = readAnimation(value, { ...site.env.ctx, controlName: sibling(site, 'control') });
@@ -569,6 +573,27 @@ function classify(arg, node, param, site, index) {
       });
       const editable = typeof value === 'number' ? 'number' : (typeof value === 'string' && read.meaning.choices?.length ? 'choice' : null);
       return setRead(arg, kind, read, editable);
+    }
+    // A device role, read against the roles there are; a dump's kind, against the main synth's
+    // profile and the scripts' own declarations.
+    // A timer, a setting, a custom event or an action another script names too.
+    case 'sharedName': {
+      const opts = site.args.find((a) => a !== arg && a.param?.name === 'opts');
+      const scope = !opts ? 'panel' : !opts.literal ? null
+        : typeof opts.value === 'string' ? opts.value : (opts.value?.scope ?? 'panel');
+      const read = readSharedName(value, {
+        names: site.env.ctx.names, memberId: site.memberId, scriptId: site.env.ctx.scriptId, scope,
+        settings: site.env.ctx.panel?.scripting?.settings ?? null,
+      });
+      return setRead(arg, 'sharedName', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
+    }
+    case 'deviceRole': {
+      const read = readDeviceRole(value, { devices: site.env.ctx.devices, memberId: site.memberId, controls: site.env.ctx.controls });
+      return setRead(arg, 'deviceRole', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
+    }
+    case 'dumpKind': {
+      const read = readDumpKind(value, { devices: site.env.ctx.devices, memberId: site.memberId });
+      return setRead(arg, 'dumpKind', read, typeof value === 'string' && read.meaning.choices.length ? 'choice' : null);
     }
     case 'deviceParameter': {
       // The device is the call's own: read's and parameter's second argument, write's third, bind's

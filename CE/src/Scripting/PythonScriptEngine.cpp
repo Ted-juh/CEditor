@@ -3472,13 +3472,18 @@ def requestDump(kind, fn=None, opts=None):
         ms = 3000
         if opts is not None and opts.get("timeout") is not None and float(opts.get("timeout")) > 0:
             ms = float(opts.get("timeout"))
-        waiter = { "kind": kind, "fn": fn, "done": False }
+        # A request's answer arrives under the dump it answers with ("requestSystem" brings
+        # "system"), so that is what the callback waits for; waiting for the request's own id, it
+        # heard only the timeout.
+        answer = __deviceQuery("answers", { "role": "mainSynth", "request": kind })
+        waitFor = answer if isinstance(answer, str) and answer else kind
+        waiter = { "kind": waitFor, "fn": fn, "done": False }
         __dumpWaiters.append(waiter)
         # Resolved rather than left hanging: a synth that is off, or that does not answer this
         # request, is the common case and not the exotic one.
         def __timeout():
             if waiter["done"]: return
-            __resolveDumps(kind, "", None, "no dump arrived within " + str(int(ms)) + "ms")
+            __resolveDumps(waitFor, "", None, "no dump arrived within " + str(int(ms)) + "ms")
         after(ms, __timeout)
     return __api.requestDump(kind)
 

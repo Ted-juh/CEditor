@@ -548,6 +548,53 @@ int main()
         check (devRequests.contains ("patch"), "requestDump falls through when no layout is declared");
     }
 
+    // setVariable / setTiming's value and requestDump / sendDump's kind, read and said as the
+    // editor's runtime does (deviceWords.js; test/deviceOverrides.test.js holds the words). The
+    // plug-in's cb.deviceSet says the first two through deviceOverrideValue; the host refuses a
+    // kind the profile has no dump by, while the profile's document is there to say so.
+    {
+        const auto refused = deviceOverrideValue ("setVariable", "deviceId", juce::var ("seventeen"), 0, 127);
+        check (! refused.ok && refused.refused == "ce.device.setVariable(\"deviceId\", \"seventeen\"): \"seventeen\" is not a number, so nothing was changed.",
+               "a value that is no number is refused in the editor's words (got " + refused.refused + ")");
+        const auto outside = deviceOverrideValue ("setVariable", "deviceId", juce::var (999), 0, 127);
+        check (outside.ok && outside.value == 127
+                   && outside.said == "ce.device.setVariable(\"deviceId\", 999): 999 is outside 0 to 127, so 127 was used.",
+               "a number past the range is used as its end, and said (got " + outside.said + ")");
+        const auto half = deviceOverrideValue ("setTiming", "gap", juce::var ("17.5"), 0, 60000);
+        check (half.ok && half.value == 18
+                   && half.said == "ce.device.setTiming(\"gap\", \"17.5\"): \"17.5\" is not a whole number, so 18 was used.",
+               "text that is a number is read as one, rounded as the editor rounds it (got " + half.said + ")");
+        check (deviceOverrideValue ("setVariable", "deviceId", juce::var (true), 0, 127).refused.isNotEmpty(),
+               "true is no number, as the editor reads it");
+        const auto plain = deviceOverrideValue ("setVariable", "deviceId", juce::var (17), 0, 127);
+        check (plain.ok && plain.value == 17 && plain.said.isEmpty(), "a number in range says nothing");
+
+        juce::StringArray kindLogs, asked, sent;
+        BridgeScriptHost::Callbacks kcb;
+        kcb.log = [&kindLogs] (const juce::String& m, const juce::var&) { kindLogs.add (m); };
+        kcb.requestDump = [&asked] (const juce::String& kind) { asked.add (kind); };
+        kcb.sendDump = [&sent] (const juce::String& kind) { sent.add (kind); };
+        kcb.deviceQuery = [] (const juce::String& kind, const juce::var&) -> juce::var
+        {
+            if (kind == "dumps") return juce::var (juce::Array<juce::var> { "system", "common" });
+            if (kind == "requests") return juce::var (juce::Array<juce::var> { "requestSystem" });
+            return {};
+        };
+        BridgeScriptHost kindHost (std::move (kcb));
+        kindHost.requestDump ("system");
+        kindHost.requestDump ("requestSystem");
+        kindHost.sendDump ("system");
+        check (asked == juce::StringArray { "system", "requestSystem" } && sent == juce::StringArray { "system" } && kindLogs.isEmpty(),
+               "a dump's id, and for requestDump a request's, go to the host as they did");
+        kindHost.requestDump ("patch");
+        kindHost.sendDump ("requestSystem");
+        check (asked.size() == 2 && sent.size() == 1, "a kind the profile has no dump by reaches no host");
+        check (kindLogs == juce::StringArray {
+                   "requestDump(\"patch\"): the mainSynth profile has no dump called \"patch\", so nothing was sent. One of: system, common.",
+                   "sendDump(\"requestSystem\"): the mainSynth profile has no dump called \"requestSystem\", so nothing was sent. One of: system, common." },
+               "…and is said in the editor's words (got " + kindLogs.joinIntoString (" | ") + ")");
+    }
+
     // A set() that writes nothing has to be observable window-closed too (design doc §31).
     //
     // PluginProcessor's cb.setValue logs when this returns false. What is pinned here is the

@@ -1389,7 +1389,7 @@ Working with the synth through its device profile — the description of the syn
 
 #### `ce.device.requestDump(kind [, fn [, opts]])`
 
-Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile knows, such as "patch" or "global", or one declared with defineDump. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).
+Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, by its id, such as "system" or "tone1", and the request that asks for it is sent; or one declared with defineDump. The id of a request itself, such as "requestSystem", sends that request, and `fn` waits for the dump it answers with. A kind the profile has no dump or request by is refused and nothing is sent. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).
 
 *Short name: `requestDump`.*
 
@@ -1455,7 +1455,7 @@ ce.device.applyDump(bytes)
 
 #### `ce.device.sendDump(kind)`
 
-Build a dump from the panel's current values and send it to the synth.
+Build a dump from the panel's current values and send it to the synth. `kind` is a dump the device profile defines, by its id, as requestDump takes it; a kind the profile has no dump by is refused and nothing is sent.
 
 *Short name: `sendDump`.*
 
@@ -1465,7 +1465,7 @@ ce.device.sendDump("patch")
 
 #### `ce.device.buildDump(kind)`
 
-Build a dump from the panel's current values and return its bytes without sending them — for example to store it or change it first.
+Build a dump from the panel's current values and return its bytes without sending them — for example to store it or change it first. `kind` is a dump the device profile defines, by its id, or one declared with defineDump; a kind it has no dump by is refused and nothing comes back.
 
 *Short name: `buildDump`.*
 
@@ -1742,7 +1742,7 @@ log(`device id ${ce.device.variables().deviceId}`);
 
 #### `ce.device.setVariable(name, value [, role]) -> boolean`
 
-Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16).
+Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16). A number is used as the nearest whole number from 0 to 127, which is said the first time it is not the number given; text that is not a number is refused. Refused too, and nothing is changed, for a device no profile is chosen for.
 
 *Short name: `deviceSetVariable`.*
 
@@ -1772,7 +1772,7 @@ log(`gap ${ce.device.timing().minDelayBetweenMessagesMs} ms`);
 
 #### `ce.device.setTiming(name, ms [, role]) -> boolean`
 
-Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself.
+Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself, uses the nearest whole number in range, and is refused for a device no profile is chosen for.
 
 *Short name: `deviceSetTiming`.*
 

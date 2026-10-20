@@ -222,12 +222,12 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return `${where}${segs}${now}`;
     }
     case 'event': {
-      if (m.custom) return 'a name of its own: the target is any control';
+      if (m.custom) return m.emittedBy ? `a custom event, emitted in ${m.emittedBy.map((n) => `'${n}'`).join(', ')}` : 'a name of its own: the target is any control';
       if (!m.found) return '';
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
-    case 'componentIndex': case 'componentWord': return m.hint ?? '';
+    case 'componentIndex': case 'componentWord': case 'deviceRole': case 'dumpKind': case 'sharedName': return m.hint ?? '';
     case 'deviceParameter': {
       if (m.noProfile) return `no profile is chosen for ${m.role}`;
       if (m.declared) return 'declared by this panel\'s scripts';

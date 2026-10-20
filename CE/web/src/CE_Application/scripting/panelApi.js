@@ -392,7 +392,7 @@ const SHARED_OPTION_FIELDS = {
 
   /* --- devices ------------------------------------------------------------ */
   role: {
-    name: 'role', type: 'text', default: 'the panel\'s current device',
+    name: 'role', type: 'text', kind: 'deviceRole', default: 'the panel\'s current device',
     sample: '"main"',
     summary: 'Which configured device to use, when the panel is set up for more than one.',
   },
@@ -799,7 +799,7 @@ export const COMMANDS = [
     id: 'defineAction', category: 'Events & Flow', signature: 'defineAction(name, fn)',
     summary: 'Give a function a name so other scripts can call it. Any script, in any language, can then run it with run("name"), and the panel offers it wherever controls can be set to trigger an action.',
     params: [
-      { name: 'name', type: 'string', required: true },
+      { name: 'name', type: 'string', required: true, kind: 'sharedName' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -812,7 +812,7 @@ export const COMMANDS = [
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
     summary: 'Announce a custom event by name, optionally with some data. Every script listening for it with on("*", name, fn) is called. The announcing script does not wait for an answer; use run when you need one.',
     params: [
-      { name: 'name', type: 'string', required: true },
+      { name: 'name', type: 'string', required: true, kind: 'sharedName' },
       { name: 'data', type: 'value', required: false },
     ],
     scopes: 'any',
@@ -822,7 +822,7 @@ export const COMMANDS = [
     id: 'run', category: 'Events & Flow', signature: 'run(target.action [, args])',
     summary: 'Call an action that another script has defined, and get its result back. Name it as "action", or as "control.action" to call the function of that name in a particular control\'s script. It works across languages, so only plain data — numbers, text, true/false, lists and tables — can be passed in and returned.',
     params: [
-      { name: 'action', type: 'scriptRef', required: true },
+      { name: 'action', type: 'scriptRef', required: true, kind: 'sharedName' },
       { name: 'args', type: 'value', required: false },
     ],
     scopes: 'any',
@@ -837,7 +837,7 @@ export const COMMANDS = [
     id: 'startTimer', category: 'Events & Flow', signature: 'startTimer(id, ms)',
     summary: 'Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.',
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'sharedName' },
       { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
     ],
     scopes: 'any',
@@ -859,7 +859,7 @@ export const COMMANDS = [
   {
     id: 'stopTimer', category: 'Events & Flow', signature: 'stopTimer(id)',
     summary: 'Stop a timer started with `ce.time.startTimer()` or `ce.time.syncTimer()`, or cancel a `ce.time.after()` before it runs. Stopping an id that is not running does nothing and is not an error.',
-    params: [{ name: 'id', type: 'string', required: true }],
+    params: [{ name: 'id', type: 'string', required: true, kind: 'sharedName' }],
     scopes: 'any',
     snippet: { lua: 'stopTimer("${1:id}")$0', javascript: 'stopTimer("${1:id}")$0' },
   },
@@ -868,7 +868,7 @@ export const COMMANDS = [
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
     refusal: 'false',
-    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile knows, such as "patch" or "global", or one declared with defineDump. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).',
+    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, by its id, such as "system" or "tone1", and the request that asks for it is sent; or one declared with defineDump. The id of a request itself, such as "requestSystem", sends that request, and `fn` waits for the dump it answers with. A kind the profile has no dump or request by is refused and nothing is sent. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise).',
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
       { name: 'fn', type: 'function', required: false },
@@ -891,7 +891,7 @@ export const COMMANDS = [
     params: [
       { name: 'slot', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'role', type: 'string', default: '"mainSynth"',
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
           summary: 'Which device to recall on, when the panel names more than one.' },
       ]) },
     ],
@@ -901,7 +901,7 @@ export const COMMANDS = [
   {
     id: 'preset', category: 'Device / MIDI', signature: 'preset([role])',
     summary: 'Describe the preset that is loaded now: { slot, program, name, category, bankId, bankLabel, writable, source }. Most synths do not announce their preset when they connect and cannot be asked, so this reports what the panel has seen — a Program Change arriving or a recallPreset going out. Until then `slot` is -1.',
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: { lua: 'local p = preset()$0', javascript: 'const p = preset();$0' },
   },
@@ -914,14 +914,14 @@ export const COMMANDS = [
   },
   {
     id: 'sendDump', category: 'Device / MIDI', signature: 'sendDump(kind)',
-    summary: 'Build a dump from the panel\'s current values and send it to the synth.',
+    summary: 'Build a dump from the panel\'s current values and send it to the synth. `kind` is a dump the device profile defines, by its id, as requestDump takes it; a kind the profile has no dump by is refused and nothing is sent.',
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendDump("${1:patch}")$0', javascript: 'sendDump("${1:patch}")$0' },
   },
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
-    summary: 'Build a dump from the panel\'s current values and return its bytes without sending them — for example to store it or change it first.',
+    summary: 'Build a dump from the panel\'s current values and return its bytes without sending them — for example to store it or change it first. `kind` is a dump the device profile defines, by its id, or one declared with defineDump; a kind it has no dump by is refused and nothing comes back.',
     requiresDeviceHost: true,
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
@@ -2394,7 +2394,7 @@ export const COMMANDS = [
     id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
     summary: 'Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division\'s name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.',
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'sharedName' },
       { name: 'beats', type: 'number or division', required: true, kind: 'division' },
       // Typed 'table' with no fields, so the one option the summary describes was unchecked.
       { name: 'opts', type: 'object', required: false, fields: optionFields([
@@ -2543,7 +2543,7 @@ export const COMMANDS = [
     id: 'deviceProfile', category: 'Device / MIDI', signature: 'deviceProfile([role])',
     summary: 'Describe the device profile in use for a device: { id, name, role, connected, ... }. Returns nothing when no profile is chosen. `role` names the device and defaults to "mainSynth".',
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'local p = deviceProfile()\nif p then log("device " .. p.name) end$0',
@@ -2581,7 +2581,7 @@ export const COMMANDS = [
     requiresDeviceHost: true,
     params: [
       { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2598,7 +2598,7 @@ export const COMMANDS = [
     requiresDeviceHost: true,
     params: [
       { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2613,7 +2613,7 @@ export const COMMANDS = [
     params: [
       { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'value', type: 'value', required: true },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2625,7 +2625,7 @@ export const COMMANDS = [
     id: 'deviceConnected', category: 'Device / MIDI', signature: 'deviceConnected([role])',
     summary: 'Check whether a device is connected and ready. It is quick to call, and the right thing to check before asking for a dump.',
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'if deviceConnected() then requestDump("patch") end$0',
@@ -2723,7 +2723,7 @@ export const COMMANDS = [
           summary: 'For a text parameter, the character code that fills it out to `length` (32 is '
             + 'a space).' },
       ]) },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2772,7 +2772,7 @@ export const COMMANDS = [
             + 'value. Every parameter must already be declared with defineParameter; an unknown '
             + 'name is refused.' },
       ]) },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2836,7 +2836,7 @@ export const COMMANDS = [
     id: 'deviceVariables', category: 'Device / MIDI', signature: 'deviceVariables([role]) -> table',
     summary: 'The values the device profile fills into its messages — `channel`, `deviceId` and any others the profile has — with this project\'s own settings applied. Returns nothing when no profile is chosen for the device.',
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'log("device id " .. tostring(ce.device.variables().deviceId))$0',
@@ -2846,12 +2846,12 @@ export const COMMANDS = [
   {
     id: 'deviceSetVariable', category: 'Device / MIDI',
     signature: 'deviceSetVariable(name, value [, role]) -> boolean',
-    summary: 'Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16).',
+    summary: 'Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16). A number is used as the nearest whole number from 0 to 127, which is said the first time it is not the number given; text that is not a number is refused. Refused too, and nothing is changed, for a device no profile is chosen for.',
     requiresDeviceHost: true,
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'value', type: 'number', required: true },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2863,7 +2863,7 @@ export const COMMANDS = [
     id: 'deviceTiming', category: 'Device / MIDI', signature: 'deviceTiming([role]) -> table',
     summary: 'How fast the panel may send to this device: `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project\'s own settings applied.',
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'log("gap " .. tostring(ce.device.timing().minDelayBetweenMessagesMs) .. " ms")$0',
@@ -2873,12 +2873,12 @@ export const COMMANDS = [
   {
     id: 'deviceSetTiming', category: 'Device / MIDI',
     signature: 'deviceSetTiming(name, ms [, role]) -> boolean',
-    summary: 'Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself.',
+    summary: 'Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself, uses the nearest whole number in range, and is refused for a device no profile is chosen for.',
     requiresDeviceHost: true,
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'ms', type: 'number', required: true },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2893,7 +2893,7 @@ export const COMMANDS = [
     requiresDeviceHost: true,
     params: [
       { name: 'feature', type: 'string', required: false },
-      { name: 'role', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2905,7 +2905,7 @@ export const COMMANDS = [
     id: 'deviceRecipes', category: 'Device / MIDI', signature: 'deviceRecipes([role]) -> list',
     summary: 'The names of the message templates this device profile can build — the formats its parameters are sent in. An empty list when no profile is chosen.',
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'for _, id in ipairs(ce.device.recipes()) do log(id) end$0',
@@ -2916,7 +2916,7 @@ export const COMMANDS = [
     id: 'deviceRequests', category: 'Device / MIDI', signature: 'deviceRequests([role]) -> list',
     summary: 'The names of the requests this device profile can send, such as an identity request or an edit-buffer request. Check here before assuming a synth supports one.',
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false }],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'for _, id in ipairs(ce.device.requests()) do log(id) end$0',
@@ -3024,7 +3024,7 @@ export const COMMANDS = [
     id: 'routeMidi', category: 'Device / MIDI', signature: 'routeMidi(role, fn)',
     summary: 'Send everything the code inside `fn` sends to another device, named by its `role`, instead of the main synth. It works like noTransmit: only the block is affected.',
     params: [
-      { name: 'role', type: 'string', required: true },
+      { name: 'role', type: 'string', required: true, kind: 'deviceRole' },
       { name: 'fn', type: 'function', required: true },
     ],
     scopes: 'any',
@@ -3144,7 +3144,7 @@ export const COMMANDS = [
     id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
     summary: 'Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel; in an exported plugin, only this instance of it). Returns false if the value could not be saved, for example because storage is not available.',
     params: [
-      { name: 'key', type: 'string', required: true },
+      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
       { name: 'value', type: 'value', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
     ],
@@ -3155,7 +3155,7 @@ export const COMMANDS = [
     id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback [, opts]])',
     summary: 'Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if nothing has been saved under `key` (or nothing, if you did not give a fallback). `opts.scope` must match the scope the value was saved in — the same key in two scopes holds two separate values.',
     params: [
-      { name: 'key', type: 'string', required: true },
+      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
       { name: 'fallback', type: 'value', required: false },
       { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
     ],
@@ -3175,7 +3175,7 @@ export const COMMANDS = [
     id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key [, opts]) -> boolean',
     summary: 'Delete a saved setting. Returns true if there was a value to delete and false if there was not. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`.',
     params: [
-      { name: 'key', type: 'string', required: true },
+      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
       { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
     ], scopes: 'any',
     snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },

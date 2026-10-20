@@ -2907,13 +2907,18 @@ function requestDump(kind, fn, opts) {
   kind = String(kind === undefined || kind === null ? "" : kind);
   if (typeof fn === "function") {
     var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout) : 3000;
-    var waiter = { kind: kind, fn: fn, done: false };
+    // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    // so that is what the callback waits for; waiting for the request's own id, it heard only the
+    // timeout.
+    var answer = __deviceQuery("answers", { role: "mainSynth", request: kind });
+    var waitFor = typeof answer === "string" && answer ? answer : kind;
+    var waiter = { kind: waitFor, fn: fn, done: false };
     __dumpWaiters.push(waiter);
     // Resolved rather than left hanging: a synth that is off, or that does not answer this
     // request, is the common case and not the exotic one.
     after(ms, function() {
       if (waiter.done) return;
-      __resolveDumps(kind, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
+      __resolveDumps(waitFor, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
     });
   }
   return __api.requestDump(kind);

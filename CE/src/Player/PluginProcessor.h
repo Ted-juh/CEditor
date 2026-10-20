@@ -1356,6 +1356,7 @@ private:
     std::map<juce::String, float> lastCapturedValue;
     bool dumpCaptureBuilt = false;                 // refreshCapturedDumps has reached a profile
     std::set<juce::String> loggedSkippedDumps;     // dumps already reported as not captured
+    std::set<juce::String> deviceOverrideWarned;   // setVariable / setTiming names that have said a value was not used as given
 
     // S4. The bank is baked at export and never changes — the host caches getNumPrograms() the
     // moment it loads us. `programChangePending` is atomic because setCurrentProgram can arrive on
@@ -1939,13 +1940,24 @@ private:
         // the profile's defaults on the way to every recipe — a profile is a shared document and
         // two panels driving two units of the same synth must not have to edit it to disagree
         // about a device id.
-        cb.deviceSet = [this] (const juce::String& kind, const juce::String& name,
+        //
+        // A name left out, a role no profile is chosen for, a value that is no number, and a number
+        // used as the nearest whole one in range each answered false or was stored without a word,
+        // text and all. Each is said now, in the editor's runtime's words and order (deviceWords.js;
+        // test/deviceOverrides.test.js holds the two to them), the last once per name.
+        cb.deviceSet = [this] (const juce::String& kind, const juce::String& nameIn,
                                const juce::var& value, const juce::String& roleIn) -> bool
         {
-            if (name.isEmpty()) return false;
             const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
             const bool wantVars = kind == "variable";
             if (! wantVars && kind != "timing") return false;
+            const juce::String label = wantVars ? "setVariable" : "setTiming";
+            const auto name = nameIn.trim();
+            if (name.isEmpty())
+            {
+                scriptLogLine ("[script] ce.device." + label + ": a name is required, so nothing was changed.");
+                return false;
+            }
 
             const auto session = deviceService.getSessionState();
             auto* sessionObj = session.getDynamicObject();
@@ -1953,7 +1965,20 @@ private:
             auto* recordObj = record.getDynamicObject();
             const auto profileId = recordObj != nullptr ? recordObj->getProperty ("profileId").toString()
                                                         : juce::String();
-            if (profileId.isEmpty()) return false;   // nothing mapped — say so rather than pretend
+            if (profileId.isEmpty())
+            {
+                scriptLogLine ("[script] ce.device." + label + ": no device profile is chosen for " + role
+                               + ", so nothing was changed.");
+                return false;
+            }
+            const auto read = deviceOverrideValue (label, name, value, 0, wantVars ? 127 : 60000);
+            if (! read.ok)
+            {
+                scriptLogLine ("[script] " + read.refused);
+                return false;
+            }
+            if (read.said.isNotEmpty() && deviceOverrideWarned.insert (label + "/" + role + "/" + name).second)
+                scriptLogLine ("[script] " + read.said + " This is said only the first time.");
 
             // Carried forward whole: setDeviceRoleMapping replaces the mapping, so dropping the
             // ports here would silently unplug the device this call is about.
@@ -1970,7 +1995,7 @@ private:
                 if (auto* existing = recordObj->getProperty (slot).getDynamicObject())
                     for (const auto& e : existing->getProperties())
                         merged->setProperty (e.name, e.value);
-            merged->setProperty (juce::Identifier (name), value);
+            merged->setProperty (juce::Identifier (name), read.value);
             req->setProperty (slot, juce::var (merged));
             if (recordObj != nullptr)
                 req->setProperty (wantVars ? "timingOverrides" : "variables",
@@ -2205,6 +2230,42 @@ private:
             }
 
             // The ids of what a profile can build or ask for.
+            // The dumps the profile defines, by id: what requestDump, sendDump and buildDump take
+            // (BridgeScriptHost::unknownDumpKind). Void, not empty, when there is no document to
+            // say, so a kind is not refused for want of one.
+            if (kind == "dumps")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr) return {};
+                juce::Array<juce::var> out;
+                if (auto* arr = docObj->getProperty ("dumpDefinitions").getArray())
+                    for (const auto& item : *arr)
+                        if (auto* o = item.getDynamicObject())
+                            if (const auto id = o->getProperty ("id").toString(); id.isNotEmpty())
+                                out.add (juce::var (id));
+                return juce::var (out);
+            }
+
+            // The dump a request answers with: requestDump(kind, fn) waits for it under that id,
+            // which is the one its answer arrives under. Void for a kind that is no request.
+            if (kind == "answers")
+            {
+                const auto wanted = p != nullptr ? p->getProperty ("request").toString() : juce::String();
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    if (auto* arr = docObj->getProperty ("requests").getArray())
+                        for (const auto& item : *arr)
+                            if (auto* o = item.getDynamicObject(); o != nullptr && o->getProperty ("id").toString() == wanted)
+                            {
+                                auto* response = o->getProperty ("response").getDynamicObject();
+                                const auto dump = response != nullptr ? response->getProperty ("dump").toString()
+                                                                      : o->getProperty ("expectedDump").toString();
+                                return dump.isNotEmpty() ? juce::var (dump) : juce::var();
+                            }
+                return {};
+            }
+
             if (kind == "recipes" || kind == "requests")
             {
                 const auto doc = profileDocument();

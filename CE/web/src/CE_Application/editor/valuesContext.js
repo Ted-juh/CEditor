@@ -35,31 +35,57 @@ export const valueCatalogueStore = derived([availableFonts, storedIcons, documen
 });
 
 /**
- * What the core reads a device parameter's id against (readDeviceParameter): each mapped role's
- * profile, by id and name, with its whole table of parameters (stores/deviceParameterTable.js), null
- * while the table loads; and `declared`, the parameters the scripts declare with
- * ce.device.defineParameter (declaredDeviceParameters), which no profile needs to have, each as
- * { id, role } (a bare id is declared for any role). `mappings`, `profiles` and `tables` are the
- * device stores' values.
+ * What the core reads a device parameter's id, a role and a dump's kind against
+ * (readDeviceParameter, readDeviceRole, readDumpKind): each mapped role's profile, by id and name,
+ * with its whole table of parameters (stores/deviceParameterTable.js), null while the table loads,
+ * and the dumps and requests its document defines, null while the document loads; `declared`, the
+ * parameters the scripts declare with ce.device.defineParameter (declaredDeviceParameters), which no
+ * profile needs to have, each as { id, role } (a bare id is declared for any role); and
+ * `declaredDumps`, the dumps they declare with ce.device.defineDump, the same way. `mappings`,
+ * `profiles`, `tables` and `sources` are the device stores' values.
  */
-export function deviceValueContext({ mappings = {}, profiles = [], tables = {}, declared = [] } = {}) {
+export function deviceValueContext({ mappings = {}, profiles = [], tables = {}, sources = {}, declared = [], declaredDumps = [] } = {}) {
   const roles = {};
   for (const [role, mapping] of Object.entries(mappings ?? {})) {
     const profileId = String(mapping?.profileId ?? '');
     if (!profileId) continue;
     const listed = (Array.isArray(profiles) ? profiles : []).find((p) => String(p?.id ?? '') === profileId);
     const table = tables?.[profileId];
-    roles[role] = { profileId, profileName: String(listed?.name ?? profileId), parameters: table?.complete ? table.parameters : null };
+    const kinds = dumpKindsOf(sources?.[profileId]?.source);
+    roles[role] = {
+      profileId, profileName: String(listed?.name ?? profileId), parameters: table?.complete ? table.parameters : null,
+      dumps: kinds?.dumps ?? null, requests: kinds?.requests ?? null,
+    };
   }
-  const list = (Array.isArray(declared) ? declared : [])
+  const asDeclared = (list) => (Array.isArray(list) ? list : [])
     .map((d) => (typeof d === 'string' ? { id: d, role: null } : d))
     .filter((d) => typeof d?.id === 'string');
-  return { roles, declared: list };
+  return { roles, declared: asDeclared(declared), declaredDumps: asDeclared(declaredDumps) };
 }
 
-// defineParameter(id, spec [, role]) however it is reached (ce.device.defineParameter,
-// deviceDefineParameter, a C# DefineParameter): each spelling ends in the word, in some case.
-const DECLARES = new Set(['defineparameter', 'devicedefineparameter']);
+// A profile document's dumps ({ id, name }) and requests ({ id, dump }, the dump each answers with),
+// read once per text: the context is rebuilt at every edit of the panel, and a document is large.
+const kindsByText = new Map();
+function dumpKindsOf(text) {
+  if (typeof text !== 'string' || !text.trim()) return null;
+  if (kindsByText.has(text)) return kindsByText.get(text);
+  let doc = null;
+  try { doc = JSON.parse(text); } catch { doc = null; }
+  const list = (x) => (Array.isArray(x) ? x : []).filter((e) => e && typeof e.id === 'string' && e.id);
+  const kinds = doc && typeof doc === 'object' ? {
+    dumps: list(doc.dumpDefinitions).map((d) => ({ id: d.id, name: String(d.name ?? '') })),
+    requests: list(doc.requests).map((r) => ({ id: r.id, dump: String(r.response?.dump ?? r.expectedDump ?? '') })),
+  } : null;
+  kindsByText.set(text, kinds);
+  if (kindsByText.size > 8) kindsByText.delete(kindsByText.keys().next().value);
+  return kinds;
+}
+
+// defineParameter(id, spec [, role]) and defineDump(kind, spec [, role]) however they are reached
+// (ce.device.defineParameter, deviceDefineParameter, a C# DefineParameter): each spelling ends in
+// the word, in some case.
+const DECLARES_PARAMETER = new Set(['defineparameter', 'devicedefineparameter']);
+const DECLARES_DUMP = new Set(['definedump', 'devicedefinedump']);
 const DEFAULT_ROLE = 'mainSynth';
 
 /**
@@ -71,10 +97,19 @@ const DEFAULT_ROLE = 'mainSynth';
  * built from parts is not known until it runs and is left out.
  */
 export function declaredDeviceParameters(scripts) {
+  return declaredBy(scripts, DECLARES_PARAMETER, 'id');
+}
+
+/** …and the dumps they declare with defineDump, the same way: [{ id: kind, role }]. */
+export function declaredDeviceDumps(scripts) {
+  return declaredBy(scripts, DECLARES_DUMP, 'kind');
+}
+
+function declaredBy(scripts, verbs, idName) {
   const out = new Map();
   for (const script of Array.isArray(scripts) ? scripts : []) {
     const source = String(script?.source ?? '');
-    if (!/defineparameter/i.test(source)) continue;
+    if (!/define(parameter|dump)/i.test(source)) continue;
     const fam = familyOf(script?.language);
     const tokens = tokenize(source, script?.language);
     const match = matchBrackets(tokens);
@@ -86,9 +121,9 @@ export function declaredDeviceParameters(scripts) {
     const visit = (calls) => {
       for (const call of calls) {
         visit(call.calls);
-        if (!DECLARES.has(String(call.callee.split('.').pop()).toLowerCase())) continue;
+        if (!verbs.has(String(call.callee.split('.').pop()).toLowerCase())) continue;
         const positional = call.args.filter((a) => !a.keyword);
-        const id = textOf(call.args.find((a) => a.keyword === 'id') ?? positional[0]);
+        const id = textOf(call.args.find((a) => a.keyword === idName) ?? positional[0]);
         if (typeof id !== 'string' || !id) continue;
         const written = textOf(call.args.find((a) => a.keyword === 'role') ?? positional[2]);
         const role = written === undefined || written === null || written === '' ? DEFAULT_ROLE

@@ -1732,3 +1732,80 @@ test('the three preludes derive the same private key for the same script, or sco
     'script scope is a prefix on the panel store, not a store of its own');
   assert.equal(sandbox.__storageStore('local'), 'local');
 });
+
+// requestDump's callback is matched against the id a dump arrives under, which is the dump's own
+// ("system"), and a request ("requestSystem") is not one. Each runtime asks the host which dump a
+// request answers with (the plug-in's "answers" query; the WebView reads the profile itself) and
+// waits for that, so a callback for a request hears the dump instead of only its timeout.
+test('a callback for a request waits for the dump it answers with, in every prelude', async (t) => {
+  const answers = (kind, payload) => (kind === 'answers' && payload?.request === 'requestSystem' ? 'system' : undefined);
+  const want = [['system', true], ['common', true]];
+  // JavaScript, under node:vm.
+  {
+    const heard = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, { get: (_t, prop) => (prop === 'deviceQuery' ? answers : () => undefined) });
+    sandbox.requestDump('requestSystem', (values, info) => heard.push([info.kind, info.ok]));
+    sandbox.requestDump('common', (values, info) => heard.push([info.kind, info.ok]));
+    sandbox.__resolveDumps('system', 'mainSynth', {}, '');
+    sandbox.__resolveDumps('common', 'mainSynth', {}, '');
+    assert.deepEqual(heard, want, 'JS prelude');
+  }
+  // Lua, under wasmoon: the prelude's own onDumpReceived handler is how a dump reaches the waiters.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'startTimer', 'stopTimer', '__transportState', '__requestDump']) {
+        lua.global.set(name, () => {});
+      }
+      let onDump = null;
+      lua.global.set('on', (_target, event, fn) => { if (event === 'onDumpReceived') onDump = fn; });
+      lua.global.set('__deviceQuery', (kind, payload) => answers(kind, payload));
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      await lua.doString(`__heard = {}
+requestDump("requestSystem", function(values, info) __heard[#__heard + 1] = info.kind end)
+requestDump("common", function(values, info) __heard[#__heard + 1] = info.kind end)`);
+      assert.equal(typeof onDump, 'function', 'the prelude registers its onDumpReceived handler');
+      onDump({ kind: 'system', role: 'mainSynth', values: {} });
+      onDump({ kind: 'common', role: 'mainSynth', values: {} });
+      const heard = String(await lua.doString('return table.concat(__heard, ",")'));
+      assert.deepEqual(heard.split(','), want.map(([kind]) => kind), 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its waiters were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name):
+        if name == "deviceQuery":
+            return lambda kind, payload=None: "system" if kind == "answers" and (payload or {}).get("request") == "requestSystem" else None
+        return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "logWarn", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+heard = []
+g["requestDump"]("requestSystem", lambda values, info: heard.append([info["kind"], info["ok"]]))
+g["requestDump"]("common", lambda values, info: heard.append([info["kind"], info["ok"]]))
+g["__resolveDumps"]("system", "mainSynth", {}, None)
+g["__resolveDumps"]("common", "mainSynth", {}, None)
+sys.stdout.write(json.dumps(heard))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
