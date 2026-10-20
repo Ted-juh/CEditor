@@ -37,7 +37,9 @@ import {
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
+import { dashPattern, strokeEnd } from './drawDash.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
+import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
 import { documentIcons } from '../utils/documentIcons.js';
 import { layoutModeForIcon } from '../utils/iconLayout.js';
@@ -63,10 +65,12 @@ import {
 import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
-  deviceProfiles, deviceRoleMappings, profileParameters, refreshProfileParameters,
+  deviceProfiles, deviceRoleMappings,
   midiInputs, midiDestinations,
 } from '../stores/deviceProfiles.js';
 import { profileSources } from '../stores/deviceProfileStores.js';
+import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
+import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
@@ -1354,20 +1358,14 @@ function toBreakpoints(points) {
     : [];
   const out = [];
   for (const p of raw) {
-    let x, y;
-    if (Array.isArray(p)) { [x, y] = p; }
-    else if (p && typeof p === 'object') {
-      // A wasmoon array-of-pairs arrives as an object of objects, so try {x,y} then 1/2 then 0/1.
-      x = p.x ?? p[1] ?? p[0];
-      y = p.y ?? p[2] ?? p[1];
-    }
-    const nx = Number(x), ny = Number(y);
-    // A point may also carry the CURVE of the segment ending at it, the way an Envelope point and
-    // a Router breakpoint do. Straight lines are still the default, so a plain pair list is
-    // unchanged.
-    const shape = Array.isArray(p) ? p[2] : p?.curve;
-    const tension = Array.isArray(p) ? p[3] : p?.tension;
-    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, shape, tension]);
+    // A pair, or a table by its names or its numbered entries (animEnvelope.js says how they are
+    // counted). A point may also carry the CURVE of the segment ending at it, the way an Envelope
+    // point and a Router breakpoint do; straight lines are still the default, so a plain pair list
+    // is unchanged.
+    const parts = envelopePointParts(p);
+    if (!parts) continue;
+    const nx = Number(parts.x), ny = Number(parts.y);
+    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, parts.curve, parts.tension]);
   }
   return out.sort((p, q) => p[0] - q[0]);
 }
@@ -4212,8 +4210,10 @@ function runScriptCallback(scriptId, label, fn) {
 export const ANIM_SAMPLES = 1024;
 
 /** Sample a { x, y, curve } point list into a flat table of y values, using ce.math.map — which IS
- *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. */
-function sampleEnvelope(points) {
+ *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. The
+ *  script editor's Values tab draws an envelope's shape under its row from it, so what it shows is
+ *  what moves. */
+export function sampleEnvelope(points) {
   const out = [];
   for (let i = 0; i <= ANIM_SAMPLES; i += 1) {
     const y = Number(mapCurveImpl(i / ANIM_SAMPLES, points));
@@ -4540,17 +4540,19 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
  *  and the lookup is ce.math.map, which IS envValueAt, so a script's sweep and the Envelope drawn
  *  beside it trace the same line. */
 function startEnvelopeImpl(scriptId, path, points, opts = {}) {
-  const list = Array.isArray(points) ? points : null;
-  if (!list || list.length < 2) {
-    addScriptTrace('log', scriptId,
-      'ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.');
+  // Fewer than two points is a note, as it always was; a point that is not one, or whose x is not
+  // from 0 to 1, is refused (animEnvelope.js says why each used to pass without a word). The
+  // preludes' animateEnvelope check the same, in the same words.
+  const refused = envelopeRefusal(points);
+  if (refused) {
+    addScriptTrace(refused.note ? 'log' : 'error', scriptId, refused.message);
     return false;
   }
   const lo = opts?.from != null ? Number(opts.from) : 0;
   const hi = opts?.to != null ? Number(opts.to) : 1;
   return startAnimationImpl(scriptId, 'envelope', path, hi, {
     ...opts,
-    samples: sampleEnvelope(list),
+    samples: sampleEnvelope(points),
     from: Number.isFinite(lo) ? lo : 0,
   });
 }
@@ -4862,6 +4864,16 @@ function drawPaint(call, what, colour) {
   if ('css' in read) return read.css;
   addScriptTrace('error', '', `${call}: ${read.why}, so ${what} stays as it was. ${DRAW_COLOUR_FORMS}${read.hint}`);
   return undefined;
+}
+
+// What ce.draw.stroke made of a dash, a cap or a join it could not draw as written (drawDash.js),
+// said once per message: a stroke is set on every redraw, and a message per frame would bury the
+// console. resetScriptState clears what has been said.
+const drawStrokeWarned = new Set();
+function warnDrawStroke(problem) {
+  if (drawStrokeWarned.has(problem.message)) return;
+  drawStrokeWarned.add(problem.message);
+  addScriptTrace(problem.severity === 'error' ? 'error' : 'warn', '', `${problem.message} This is said only the first time.`);
 }
 
 // ce.draw.text's alignments, read without regard to case. The app spells centre three ways (ce.text.style
@@ -7239,7 +7251,6 @@ function runningTimersRead() {
 // call is complete — which is the best a synchronous verb can do over an asynchronous source, and
 // far better than returning an empty list that looks like "this synth has no parameters".
 
-const parameterRequests = new Set();   // profileIds we have already asked for, to not spam the bridge
 const deviceSourceCache = new Map();
 
 function roleMapping(role) {
@@ -7417,6 +7428,26 @@ function deviceValueWrite(id, value, role) {
     sendRawMidi(encoded.bytes, `param_${key}`);
     return true;
   }
+  // A parameter the profile does not have is refused, once the profile's whole table is in: nothing
+  // is sent, the answer is false, and the console says so in the words the plug-in says it in
+  // (deviceWords.js). It was logged as written and answered true, and the host's "Not sent" went to
+  // the MIDI preview, which no script reads; the plug-in answered false without a word. While the
+  // table is on its way, the write goes to the host as it did, which drops what it cannot encode.
+  // With no profile chosen there is nothing to encode it, and that is said the same way. The role's
+  // OWN mapping: a send takes no other (deviceMidiOps resolveParameterSend, and the plug-in's
+  // service), so a role nothing is mapped to has no profile here, where a read takes the main
+  // synth's (roleMapping).
+  const profileId = get(deviceRoleMappings)?.[role]?.profileId;
+  if (!profileId) {
+    addScriptTrace('error', '', deviceWriteNoProfileWords(key, role));
+    return false;
+  }
+  const table = parameterTable(profileId);
+  if (!table) requestParameterTable(profileId, role);
+  else if (!table.some((p) => String(p?.id ?? '') === key)) {
+    addScriptTrace('error', '', deviceWriteUnknownWords(key, role));
+    return false;
+  }
   if (!isJuceAvailable()) {
     addScriptTrace('error', '',
       `deviceWrite(${JSON.stringify(key)}) needs the device host — encoding a parameter is the device `
@@ -7443,17 +7474,18 @@ function deviceParametersRead(opts = {}) {
 
   let fromProfile = [];
   if (profileId) {
-    const cached = (get(profileParameters) ?? {})[profileId];
-    if (Array.isArray(cached) && cached.length) {
-      fromProfile = cached;
+    // The profile's whole table (stores/deviceParameterTable.js). This read used the Device
+    // Profile Designer's page, which is 160 parameters by default and what the Designer's search
+    // matched, and asked for it with one object where the request takes the id and the role, so a
+    // profile the Designer had not listed was never loaded at all.
+    const table = parameterTable(profileId);
+    if (table) {
+      fromProfile = table;
     } else {
-      // Cold cache. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
+      // Cold. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
       // different thing from "this synth has no parameters", and a script that cannot tell them
       // apart will draw the wrong conclusion silently.
-      if (!parameterRequests.has(profileId)) {
-        parameterRequests.add(profileId);
-        try { refreshProfileParameters({ profileId, deviceRole: role }); } catch { /* no bridge */ }
-      }
+      requestParameterTable(profileId, role);
       addScriptTrace('log', '',
         `deviceParameters(): the parameter table for "${profileId}" has not been loaded yet — `
         + 'requesting it now. Call again from a later handler (onTimer is the usual place). '
@@ -7495,9 +7527,6 @@ function deviceParameterRead(id, role = DEFAULT_ROLE) {
   const all = deviceParametersRead({ role });
   return all.find((p) => String(p?.id) === wanted) ?? null;
 }
-
-/** Forget which profiles we have asked for — used when the device session is torn down. */
-export function resetDeviceReadCache() { parameterRequests.clear(); }
 
 /* ------------------------------------------------- ce.device: declaring what the app does not know */
 // Everything above READS a device profile the app was shipped with. That is a hard ceiling: a panel
@@ -7567,13 +7596,18 @@ function deviceBindImpl(controlName, parameterId, opts = {}) {
   // The profile is only consulted when there IS one. Asking otherwise would emit "no profile is
   // mapped" from the read — true, and completely beside the point when the panel is deliberately
   // driving a synth that has none.
-  const known = hasDefinedParameter(role, key)
-    || (roleMapping(role)?.profileId ? deviceParameterRead(key, role) != null : false);
-  if (!known) {
-    addScriptTrace('log', '',
-      `bind("${name}", "${key}"): neither the profile nor this panel's declarations know "${key}" yet. `
-      + 'The binding is made anyway — it works if the parameter arrives — but check the id if the control stays dead.');
-  }
+  //
+  // The profile's knowledge is its whole table (stores/deviceParameterTable.js), asked for here when
+  // it is not in. Asked of the Designer's page instead, this named parameters the profile has; before
+  // the table arrives nothing knows the id yet, which is what the notice says.
+  // The role's OWN profile, as for a write: the binding's every move is sent to its role and no
+  // other (deviceMidiOps resolveParameterSend), so a role nothing is mapped to knows no id but a
+  // declared one, though a read of it takes the main synth's profile.
+  const profileId = get(deviceRoleMappings)?.[role]?.profileId;
+  const table = profileId ? parameterTable(profileId) : null;
+  if (profileId && !table) requestParameterTable(profileId, role);
+  const known = hasDefinedParameter(role, key) || Boolean(table?.some((p) => String(p?.id ?? '') === key));
+  if (!known) addScriptTrace('log', '', deviceBindUnknownWords(name, key));
 
   const port = String(opts?.port ?? 'value');
   const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)
@@ -8377,14 +8411,18 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
       // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
-      // probe link) are "3 3" and "2 3".
-      const dash = opts?.dash;
-      const dashList = Array.isArray(dash) ? dash : (dash == null ? null : Object.values(dash));
-      drawState.dash = dashList && dashList.length
-        ? dashList.map((n) => Math.max(0, Number(n) || 0)).join(' ')
-        : (typeof dash === 'string' && dash ? dash : null);
-      drawState.cap = ['butt', 'round', 'square'].includes(opts?.cap) ? opts.cap : null;
-      drawState.join = ['miter', 'round', 'bevel'].includes(opts?.join) ? opts.join : null;
+      // probe link) are "3 3" and "2 3". drawDash.js reads it, for this and for the script editor's
+      // Values tab: a length below 0 or not a number is drawn as 0, and a dash that is not a list
+      // is none, each said once in the words the Values tab says it in. So is a cap or a join that
+      // is not one of its three words, which draws the default.
+      const dash = dashPattern(opts?.dash);
+      if (dash.problem) warnDrawStroke(dash.problem);
+      drawState.dash = dash.dasharray;
+      const cap = strokeEnd('cap', opts?.cap);
+      const join = strokeEnd('join', opts?.join);
+      for (const said of [cap.problem, join.problem]) if (said) warnDrawStroke(said);
+      drawState.cap = cap.value;
+      drawState.join = join.value;
       // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
       // which is how a panel shows "this is recording" without redrawing the shape (§49).
       drawState.dashOffset = Number.isFinite(Number(opts?.dashOffset)) ? Number(opts.dashOffset) : null;
@@ -9588,6 +9626,7 @@ function resetScriptState() {
   executionEpoch += 1;
   edgeWarned.clear();
   animTimingWarned.clear();
+  drawStrokeWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

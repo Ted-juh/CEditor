@@ -1093,10 +1093,40 @@ def animateSpring(path, target, opts=None):
 # envelope(path, points, opts) - drive a value THROUGH a shape rather than between two numbers.
 # `to` has one destination; an envelope goes up before it comes down, which is the single most
 # obvious thing a synth panel animates and the one thing `to` cannot express.
+#
+# A point is { "x": , "y": } or the two as a pair, each a number or text that is one. One that is
+# not, or whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView
+# runtime's envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler
+# dropped a point it could not read, and never reached one whose x is past 0 to 1, both without a
+# word. A y past 0 to 1 is a level past `from` or `to`, and is read as it is.
 def animateEnvelope(path, points, opts=None):
     if not isinstance(points, (list, tuple)) or len(points) < 2:
-        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 - nothing was started.")
+        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
         return False
+    def written(v):
+        if v is None: return "none was given"
+        if isinstance(v, str): return '"' + v + '" is not'
+        if isinstance(v, (int, float)) and __realNumber(v) is not None: return __cshown(v) + " is not"
+        return "the value given is not"
+    count = len(points)
+    for i, p in enumerate(points):
+        which = "point " + str(i + 1) + " of " + str(count)
+        parts = __pointParts(p)
+        if parts is not None:
+            x, y = parts[0], parts[1]
+        else:
+            logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.")
+            return False
+        nx = __realNumber(x)
+        if nx is None or nx < 0 or nx > 1:
+            hint = ""
+            if nx is not None and 0 <= nx / 100 <= 1:
+                hint = " If you meant " + __cshown(nx) + " out of 100, write " + __cfour(nx / 100) + "."
+            logError("ce.anim.envelope: the x of " + which + " is a number from 0 to 1, and " + written(x) + ", so nothing was started." + hint)
+            return False
+        if __realNumber(y) is None:
+            logError("ce.anim.envelope: the y of " + which + " is a number, and " + written(y) + ", so nothing was started.")
+            return False
     o = dict(opts or {})
     o["samples"] = __animSample(points)
     o["from"] = float(o.get("from") or 0)
@@ -1270,20 +1300,37 @@ def wrap(v, lo, hi):
         return a
     return a + (((n - a) % span) + span) % span
 
-# [[x, y], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel can write either.
+# A point's (x, y, curve, tension) as written, or None when it is no point: a pair is a list or a
+# tuple of them in that order; a mapping is read by its names, and failing those by its numbered
+# entries, counted from 0 when it has an entry 0 and from 1 when it does not. The WebView runtime
+# reads a point the same way (animEnvelope.js envelopePointParts), so it is one point in both.
+def __pointParts(p):
+    if isinstance(p, (list, tuple)):
+        return tuple(p[i] if len(p) > i else None for i in range(4))
+    if hasattr(p, "get"):
+        try:
+            start = 0 if 0 in p else 1
+        except TypeError:
+            start = 1
+        def named(key, at):
+            v = p.get(key)
+            return p.get(start + at) if v is None else v
+        return (named("x", 0), named("y", 1), named("curve", 2), named("tension", 3))
+    return None
+
+# [[x, y, curve, tension], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel
+# can write either; a point's curve shapes the segment that ends at it (mapCurve).
 def __points(points):
     out = []
     for p in (points or []):
-        x = y = None
-        if isinstance(p, (list, tuple)) and len(p) >= 2:
-            x, y = p[0], p[1]
-        elif hasattr(p, "get"):
-            x, y = p.get("x"), p.get("y")
+        parts = __pointParts(p)
+        if parts is None:
+            continue
         try:
-            x, y = float(x), float(y)
+            x, y = float(parts[0]), float(parts[1])
         except (TypeError, ValueError):
             continue
-        out.append((x, y))
+        out.append((x, y, parts[2], parts[3]))
     out.sort(key=lambda p: p[0])
     return out
 
@@ -1310,9 +1357,14 @@ def mapCurve(v, points):
     if n > lst[-1][0]:
         return lst[-1][1]
     for i in range(1, len(lst)):
-        x0, y0 = lst[i - 1]
-        x1, y1 = lst[i]
+        x0, y0 = lst[i - 1][0], lst[i - 1][1]
+        x1, y1 = lst[i][0], lst[i][1]
         if n < x1 and x1 != x0:
+            # The segment's own shape, from the point it ends at, as the WebView runtime's mapCurve
+            # and the Envelope component take it. Read for straight lines alone, a point's curve
+            # played as a line here and as a curve in the editor.
+            if lst[i][2] is not None:
+                return y0 + shapeCurve((n - x0) / (x1 - x0), lst[i][2], lst[i][3]) * (y1 - y0)
             return y0 + (n - x0) * (y1 - y0) / (x1 - x0)
     return lst[-1][1]
 

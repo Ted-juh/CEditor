@@ -9,8 +9,11 @@
   import PanelFileView from './PanelFileView.svelte';
   import ScriptConsole from './ScriptConsole.svelte';
   import { readDockTab, writeDockTab } from './dockTabMemory.js';
-  import { valueCatalogueStore } from './valuesContext.js';
+  import { valueCatalogueStore, deviceValueContext, declaredDeviceParameters } from './valuesContext.js';
+  import { deviceRoleMappings, deviceProfiles } from '../stores/deviceProfiles.js';
+  import { profileParameterTables, requestParameterTable } from '../stores/deviceParameterTable.js';
   import { transport } from '../stores/transport.js';
+  import { panelSelectionPick, pickPanelSelection } from '../stores/panels.js';
   import { controlSetForPanel } from '../models/controlSets.js';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
@@ -404,6 +407,9 @@
   let editorMarks = $state.raw([]);
   let editorFolded = $state(false);
   let tempo = $derived($transport.bpm);
+  // The parameters the scripts declare, as one string, so the context below is new only when they
+  // change and not at every keystroke, which the Values tab's own edits are too.
+  let declaredParameterKey = $derived(JSON.stringify(declaredDeviceParameters(scripts)));
   let scriptValueContext = $derived({
     panel,
     controlSet: panel ? controlSetForPanel(panel) : null,
@@ -411,7 +417,24 @@
     selfControl: selected?.scope === 'component' && targetValue !== '*' ? targetValue : null,
     fonts: $valueCatalogueStore.fonts,
     images: $valueCatalogueStore.images,
+    devices: deviceValueContext({
+      mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables,
+      declared: JSON.parse(declaredParameterKey),
+    }),
   });
+  // A device parameter's id is read against its profile's whole table, which is asked for once a
+  // script is open, for each role a profile is chosen for (stores/deviceParameterTable.js asks once).
+  $effect(() => {
+    if (!selected) return;
+    for (const [role, mapping] of Object.entries($deviceRoleMappings ?? {})) {
+      if (mapping?.profileId) untrack(() => requestParameterTable(mapping.profileId, role));
+    }
+  });
+  // A row that names a control picks it to be the panel's selection, selected once the panel's tab
+  // is in front again (stores/panels.js, panelSelectionPick). The debug route has no panel, so no pick.
+  let pickedControl = $derived($panelSelectionPick && panelId != null && String($panelSelectionPick.panelId) === String(panelId)
+    ? $panelSelectionPick.id : null);
+  const pickControl = (id) => pickPanelSelection(panelId, id);
   // The panel file view's text, caret and editor, which it reports (PanelFileView's onvalues).
   let fileValues = $state.raw(null);
   let fileMarks = $state.raw([]);
@@ -906,6 +929,7 @@
       {#key selectedId}
         <ValuesSidebar source={selected.source} language={selected.language} caret={caretOffset} context={scriptValueContext}
           editor={codeEditor} folded={editorFolded} docKey={`script:${selectedId}`} labelPrefix="Script"
+          {pickedControl} onpickcontrol={panelId != null ? pickControl : null}
           onmarks={(m) => editorMarks = m} />
       {/key}
     {/await}

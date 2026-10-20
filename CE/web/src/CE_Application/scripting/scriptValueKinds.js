@@ -3,9 +3,10 @@
 //
 // Each reader here is the runtime's own, imported, not a second opinion: a colour is read by
 // scriptColours (panelColour for a property, drawColour for a drawing, storedColour for ce.math), a
-// note by musicTheory, a division by timeTables, a curve by easingTables, a SysEx template by
-// deviceDefinitions. What a reader refuses is said in the words the runtime says it in, where it
-// has words; scriptValues.test.js calls the runtime and compares.
+// note by musicTheory, a division by timeTables, a curve by easingTables, an envelope's points by
+// animEnvelope, a SysEx template by deviceDefinitions, a stroke's dash by drawDash. What a reader
+// refuses is said in the words the runtime says it in, where it has words; scriptValues.test.js
+// calls the runtime and compares.
 //
 // Pure functions. Nothing here reads a store; whatever is known about the panel arrives as plain
 // data in `context` (see scriptValues.readStatement).
@@ -20,11 +21,14 @@ import {
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, divisionIdOf } from './timeTables.js';
 import { ANIM_CURVE_NAMES, EASING_BEZIERS, bezierOf } from './easingTables.js';
+import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
+import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
+import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
 
@@ -325,6 +329,35 @@ export function readCurve(value) {
   return { meaning, problem: null };
 }
 
+/* ------------------------------------------------------------------------------- envelopes */
+
+/**
+ * ce.anim.envelope's points, read by the runtime's own reader (animEnvelope.js): each point's x and
+ * y in the order they are written, null where one cannot be read, and what the runtime refuses, in
+ * its words. `complete` when the runtime would start the move: only then is there a shape to draw
+ * and to edit. `sorted` is false when the points are not written in order of x, which the runtime
+ * sorts them by; `low` and `high` are the lowest and highest levels, which may pass 0 and 1.
+ */
+export function readEnvelope(value) {
+  const list = Array.isArray(value) ? value : [];
+  const points = list.map((p, index) => {
+    const parts = envelopePointParts(p);
+    return { index, x: realNumber(parts?.x) ?? null, y: realNumber(parts?.y) ?? null, pair: parts?.pair ?? null };
+  });
+  const refusal = envelopeRefusal(value);
+  const levels = points.map((p) => p.y).filter((y) => y !== null);
+  const meaning = {
+    points,
+    count: points.length,
+    complete: !refusal,
+    sorted: points.every((p, i) => i === 0 || p.x === null || points[i - 1].x === null || p.x >= points[i - 1].x),
+    low: levels.length ? Math.min(...levels) : null,
+    high: levels.length ? Math.max(...levels) : null,
+  };
+  // Too few points is a note in the console, and a refusal all the same: nothing starts.
+  return { meaning, problem: refusal ? { severity: 'error', message: refusal.message } : null };
+}
+
 /* ------------------------------------------------------------------------- music and time */
 
 /** The pitch-class names a key spells a run of notes with, as the Chord Pad spells them. */
@@ -591,24 +624,33 @@ export const OPACITY_SCALE_WARNINGS = {
 
 /* --------------------------------------------------------------------- lists of names */
 
-/** A value from a closed list. `refusal(value, list)` gives the runtime's own sentence where it has one. */
+/**
+ * A value from a closed list. `refusal(value, list, name)` gives the runtime's own sentence where it
+ * has one, and then it is said of a word in another case too: a call with a sentence of its own
+ * reads only its spelling (ce.draw.blend, ce.draw.stroke's cap and join), and refuses "Multiply" in
+ * the words it refuses "sausage" in, with the spelling it wanted as the "Did you mean".
+ */
 export function readEnum(value, values, { path, name, refusal } = {}) {
   const meaning = { choices: values.map(String) };
   if (value === undefined || value === null) return { meaning, problem: null };
   if (values.some((v) => v === value)) return { meaning, problem: null };
   const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.toLowerCase()) : undefined;
-  if (exactish !== undefined) {
+  if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };
   }
   const message = refusal
-    ? refusal(value, values)
+    ? refusal(value, values, name)
     : `${path ? `${path}: ` : ''}${typeof value === 'string' ? `"${value}"` : String(value)} is not one of the values ${name} takes. They are ${words(quoted(values))}.`;
+  // A refusal with nothing to say takes the value: ce.draw.stroke's `false` is no cap.
+  if (!message) return { meaning, problem: null };
   return { meaning, problem: { severity: 'error', message: `${message}${typeof value === 'string' ? didYouMean(value, values.map(String)) : ''}` } };
 }
 
 /** The runtime's own sentences for a value not in a list, where a member has one. */
 export const ENUM_REFUSALS = {
   drawBlend: (value, list) => `ce.draw.blend("${value}"): not a blend mode. One of: ${list.join(', ')}.`,
+  // Its two lists are cap's and join's; drawDash.js says both, as the runtime draws them.
+  drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
 };
 
 /** An event's name: an id ("valueChanged") or a handler name ("onValueChanged"). */
@@ -707,7 +749,8 @@ function controlValue(control) {
 
 /**
  * A property path ("Cutoff.Background.Fill.colour", "panel.bgColour"), resolved on the panel the way
- * set() and get() resolve one. `self` is the control a self.set path is relative to.
+ * set() and get() resolve one. `self` is the control a self.set path is relative to. `meaning.id` is
+ * the id of the control it names, when the panel has it.
  */
 export function readPath(value, { panel, controls, self }) {
   const meaning = { control: null, type: null, segments: [], value: undefined, found: null };
@@ -737,6 +780,9 @@ export function readPath(value, { panel, controls, self }) {
     return { meaning, problem: { severity: 'warning', message: `No control named "${name}" on this panel.${didYouMean(name, names)}` } };
   }
   meaning.type = control._children.Core.controlType ?? null;
+  // The control's id, which its row selects on the panel by: the path names the control even when
+  // the rest of it leads nowhere.
+  meaning.id = control._children.Core.id ?? null;
   if (!segments.length || (segments.length === 1 && segments[0].toLowerCase() === 'value')) {
     meaning.found = true;
     meaning.value = controlValue(control);
@@ -780,6 +826,56 @@ export function readPath(value, { panel, controls, self }) {
   };
 }
 
+/**
+ * What can come next in a property path after the segments `before` (completion over a path, one
+ * segment at a time: scripting/valueCompletions.js), as readPath resolves one: `[{ name, detail }]`,
+ * in the order a list shows them, or [] where the path leads nowhere.
+ *
+ * At the start, the panel's controls and "panel" (relative to `self`, a self.set path starts at the
+ * control). After a control, its value's three forms, the shorthands, then its own sections. After
+ * a section, its sections and then its settings, each with its value now; a section the control has
+ * not made yet lists its template's. The panel lists its own settings.
+ */
+export function pathSegmentChoices(before, { panel, controls, self }) {
+  const segments = (Array.isArray(before) ? before : []).map(String);
+  const list = Array.isArray(controls) ? controls : [];
+  if (!self && segments.length === 0) {
+    const names = list.map((c) => ({ name: c?._children?.Core?.name, detail: c?._children?.Core?.controlType ?? 'control' })).filter((c) => c.name);
+    return panel ? [...names, { name: 'panel', detail: 'the panel' }] : names;
+  }
+  const [head, ...rest] = self ? [null, ...segments] : segments;
+  if (!self && String(head).toLowerCase() === 'panel') return panel ? keysOf(walk(panel, rest)) : [];
+  const control = self ?? controlNamed(list, head);
+  if (!control) return [];
+  if (rest.length === 0) {
+    const sections = Object.keys(control._children ?? {});
+    // A section the control has not made is a path too, as readPath reads one (the templates have
+    // it): listed after its own, so a knob's "Background" is there to pick.
+    const made = new Set(sections.map((k) => k.toLowerCase()));
+    const unmade = Object.keys(SECTION_DEFAULTS).filter((k) => !made.has(k.toLowerCase()));
+    return [
+      ...ACCESSORS.map((name) => ({ name, detail: name === 'value' ? 'its value' : `its value, as ${name}` })),
+      ...Object.entries(SHORTHANDS).filter(([name]) => !ACCESSORS.includes(name)).map(([name, path]) => ({ name, detail: path })),
+      ...sections.map((name) => ({ name, detail: 'section' })),
+      ...unmade.map((name) => ({ name, detail: 'section, not made yet' })),
+    ];
+  }
+  const node = walk(control, rest) ?? walk({ _children: SECTION_DEFAULTS }, rest);
+  return keysOf(node);
+}
+
+/** A node's sections, then its settings, each with what it holds now. */
+function keysOf(node) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return [];
+  const sections = Object.keys(node._children ?? {}).map((name) => ({ name, detail: 'section' }));
+  const settings = Object.keys(node).filter((k) => k !== '_children' && k !== '_type').map((name) => {
+    const v = node[name];
+    const detail = v === null || v === undefined ? '' : typeof v === 'object' ? (Array.isArray(v) ? 'list' : 'table') : shownValue(v);
+    return { name, detail };
+  });
+  return [...sections, ...settings];
+}
+
 /** A control's keyframe animation, checked as ce.anim.play checks it. */
 export function readAnimation(value, { panel, controls, controlName }) {
   const meaning = { name: value, control: controlName ?? null, found: null };
@@ -800,6 +896,84 @@ export function readAnimation(value, { panel, controls, controlName }) {
       severity: 'error',
       message: `ce.anim.play: ${why}. ${playable.length ? `Its keyframe animations: ${playable.join(', ')}.` : 'It has no keyframe animations — make one in the Animation tab.'}${node ? '' : didYouMean(value, playable)}`,
     },
+  };
+}
+
+/* ------------------------------------------------------------------------ device parameters */
+
+// What a call does with an id the profile does not have, said as the call does it: write and bind
+// in their runtime's words (deviceWords.js), read and parameter, which are questions, by what they
+// answer.
+const DEVICE_UNKNOWN = {
+  deviceWrite: (id, role) => ({ severity: 'error', message: deviceWriteUnknownWords(id, role) }),
+  deviceBind: (id, role, control) => ({ severity: 'warning', message: deviceBindUnknownWords(control, id) }),
+  deviceRead: (id, role) => ({ severity: 'warning', message: `"${id}" is not a parameter of the ${role} profile, so ce.device.read answers nothing.` }),
+  deviceParameter: (id, role) => ({ severity: 'warning', message: `"${id}" is not a parameter of the ${role} profile, so ce.device.parameter answers nothing.` }),
+};
+
+/**
+ * A device parameter's id, read against the profile behind its role. `devices` is the context's
+ * (editor/BehaviorDesigner.svelte): `roles` gives each mapped role's profile and its whole table of
+ * parameters (stores/deviceParameterTable.js), null while it loads; `declared` the ids the panel's
+ * scripts declare with ce.device.defineParameter, which no profile needs to have. A role nothing is
+ * mapped to reads the main synth's profile, as the runtime's roleMapping does, except in a write or
+ * a binding, which is sent to its own role's profile or not at all.
+ *
+ * Nothing is said of an id before the whole table is in: part of a table cannot say what is not in
+ * it. With no profile chosen, write and bind say what they do, and a read or parameter() of one
+ * answers nothing, which is not wrong of a script that drives a synth with no profile at all.
+ */
+export function readDeviceParameter(value, { devices, role, memberId, control }) {
+  const wanted = typeof role === 'string' && role ? role : 'mainSynth';
+  // A write, and a binding's every move, is sent to its role's own profile and no other, as the
+  // runtime sends it.
+  const sends = memberId === 'deviceWrite' || memberId === 'deviceBind';
+  const device = devices?.roles?.[wanted] ?? (sends ? null : devices?.roles?.mainSynth) ?? null;
+  const meaning = { id: value, role: wanted, profile: device?.profileName ?? null, parameter: null, found: null, loading: false, declared: false };
+  if (typeof value !== 'string') return { meaning, problem: null };
+  // Declared for this role, as the runtime keeps a declaration (or for any, when its role is built).
+  const declared = Array.isArray(devices?.declared)
+    && devices.declared.some((d) => d?.id === value && (d.role == null || d.role === wanted));
+  if (!device?.profileId) {
+    meaning.noProfile = true;
+    // bind says so with no profile too: nothing then knows the id but a declaration. write refuses,
+    // as the runtime and the plug-in do: nothing is there to encode it.
+    if (!declared && devices && memberId === 'deviceBind') return { meaning, problem: DEVICE_UNKNOWN.deviceBind(value, wanted, control ?? '') };
+    if (!declared && devices && memberId === 'deviceWrite') return { meaning, problem: { severity: 'error', message: deviceWriteNoProfileWords(value, wanted) } };
+    return { meaning, problem: null };
+  }
+  const table = Array.isArray(device.parameters) ? device.parameters : null;
+  if (table) {
+    const ids = table.map((p) => String(p?.id ?? '')).filter(Boolean);
+    meaning.choices = ids;
+    meaning.choiceNames = Object.fromEntries(table.filter((p) => p?.id && p?.name && p.name !== p.id).map((p) => [p.id, String(p.name)]));
+  } else {
+    meaning.loading = true;
+  }
+  if (declared) { meaning.declared = true; meaning.found = true; return { meaning, problem: null }; }
+  if (!table) return { meaning, problem: null };
+  const parameter = table.find((p) => String(p?.id ?? '') === value) ?? null;
+  meaning.found = Boolean(parameter);
+  if (parameter) {
+    meaning.parameter = parameterSummary(parameter);
+    return { meaning, problem: null };
+  }
+  const said = (DEVICE_UNKNOWN[memberId] ?? DEVICE_UNKNOWN.deviceParameter)(value, wanted, control ?? '');
+  return { meaning, problem: { ...said, message: `${said.message}${didYouMean(value, meaning.choices)}` } };
+}
+
+/** What a row says of a parameter: its name, group and range, as the profile gives them. */
+function parameterSummary(p) {
+  const range = p?.range && typeof p.range === 'object' ? p.range : null;
+  const min = Number(range?.min ?? p?.min);
+  const max = Number(range?.max ?? p?.max);
+  const choices = Array.isArray(p?.choices) ? p.choices.length : 0;
+  return {
+    name: String(p?.name ?? ''),
+    group: String(p?.group ?? ''),
+    type: String(p?.type ?? ''),
+    range: Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null,
+    choices,
   };
 }
 
@@ -849,6 +1023,36 @@ export function readImage(value, { images, wantsData, path }) {
     return { meaning, problem: { severity: 'warning', message: `No image called "${value}" in the library or the panel.${didYouMean(value, meaning.choices)}` } };
   }
   return { meaning, problem: null };
+}
+
+/* ---------------------------------------------------------------------------------- dashes */
+
+/**
+ * ce.draw.stroke's `opts.dash`, read by the runtime's own reader (drawDash.js), with the line's `cap`
+ * when the same options give one. `dasharray` is what the drawing is handed, which the row's line
+ * is drawn with; `lengths` the lengths drawn, one the runtime makes 0 already 0; `odd` says an odd
+ * list is drawn twice over to make it even; `drawn` and `skipped` are what one round of it draws and
+ * skips, in pixels. Nothing skipped is a solid line, and so is nothing at all (SVG's rule); nothing
+ * drawn shows only as the caps, a dot for each dash, which the default cap does not draw.
+ */
+export function readDash(value, { cap } = {}) {
+  const read = dashPattern(value);
+  const lengths = read.lengths ?? [];
+  const odd = lengths.length % 2 === 1;
+  const round = odd ? [...lengths, ...lengths] : lengths;
+  const sum = (from) => round.reduce((total, n, i) => (i % 2 === from ? total + n : total), 0);
+  return {
+    meaning: {
+      dasharray: read.dasharray,
+      lengths: read.lengths,
+      odd,
+      drawn: sum(0),
+      skipped: sum(1),
+      // The runtime takes a cap it knows and draws the default for any other.
+      cap: strokeEnd('cap', cap).value ?? STROKE_ENDS.cap.otherwise,
+    },
+    problem: read.problem,
+  };
 }
 
 /* ---------------------------------------------------------------------------------- bytes */

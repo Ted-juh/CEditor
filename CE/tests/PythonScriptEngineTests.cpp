@@ -529,6 +529,28 @@ int main()
         check (std::abs ((double) animHost.values["e"]) < 0.5, "ce.anim.envelope: …and comes back down to 0");
         check (animErrors.isEmpty(), "ce.anim.envelope: no script raised");
 
+        // A point the sampler cannot place starts nothing, in the WebView runtime's words: an x
+        // written out of 100 was never reached, and a y that is not a number was dropped, both
+        // without a word. Too few points is the note it always was, in those words too.
+        juce::Array<juce::var> refusedScripts;
+        refusedScripts.add (makeScript ("pyEnvelopeRefused", "onRefused", "*",
+            "def onRefused(value=None):\n"
+            "    a = ce.anim.envelope('e', [{ 'x': 0, 'y': 0 }, { 'x': 50, 'y': 1 }])\n"
+            "    b = ce.anim.envelope('e', [(0, 0), (1, 'high')])\n"
+            "    c = ce.anim.envelope('e', [(0, 0)])\n"
+            "    log('answers ' + str(a) + ' ' + str(b) + ' ' + str(c))\n"));
+        anim.loadScripts (juce::var (refusedScripts));
+        animHost.logs.clear();
+        anim.dispatchEvent ("onRefused", "panel", juce::var());
+        const auto refused = steps();
+        check (refused == "ce.anim.envelope: the x of point 2 of 2 is a number from 0 to 1, and 50 is not, so nothing was started. "
+                          "If you meant 50 out of 100, write 0.5. | "
+                          "ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started. | "
+                          "ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started. | "
+                          "answers False False False",
+               "ce.anim.envelope: a point it cannot place is refused in the WebView's words (got " + refused + ")");
+        check (! anim.animationRunning ("e") && animErrors.isEmpty(), "ce.anim.envelope: …nothing started, and nothing raised");
+
         // A list with a colour property in it is refused whole, in every verb: each colour named in
         // the words one path is refused in, nothing started, the list's done never called, and the
         // call answers False, as it does for a target that is not a number. The colour alone was

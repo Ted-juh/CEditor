@@ -16,6 +16,13 @@
   // again when the edit ends, so a later drag in the chooser with no target cannot repaint the
   // panel's background, which is what the chooser does when nothing is targeted.
   //
+  // A row that names a control on the panel (a control's name, or the control a path names) has a
+  // Select beside it, which picks that control to be the panel's selection. The script workspace
+  // shows no canvas, so it is selected there when the panel's tab is next in front
+  // (stores/panels.js, panelSelectionPick). Select is a button of its own: it does not go to the
+  // value, so the caret stays, the text is not touched, and an edit open in the display panel stays
+  // open, since nothing about the selection changes while the script tab is in front.
+  //
   // The same component serves the panel file view, over its JSON (readJsonValues), where an edit
   // becomes the item's draft as typing would; read-only there (Every field, the whole file) the rows
   // are to read.
@@ -28,7 +35,7 @@
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import {
     statementRows, argAtOffset, findArg, editLabel, meaningLine, madeByChild, unitLabel, swatchHex, cssOfHex,
-    gradientStrip, shownNumber, plainSummary,
+    gradientStrip, shownNumber, plainSummary, controlToSelect,
   } from './valueRows.js';
   import { createEditSession, extentOf } from './valueEditSession.js';
   import { colorTarget, activateColorTarget, clearColorTarget } from '../stores/colorTarget.js';
@@ -39,6 +46,7 @@
   import { showDisplayPanelInScript as scriptDisplay } from '../stores/panelVisibility.js';
   import EasingCurve from '../components/animation/EasingCurve.svelte';
   import BezierEditor from '../components/animation/BezierEditor.svelte';
+  import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
 
   let {
     source = '',
@@ -53,6 +61,8 @@
     itemName = '',           // the panel file view's item, for that name
     onmarks = null,          // (marks) → the editor draws them
     onreveal = null,         // (start, end) → a view with no editor (the whole file) goes there
+    pickedControl = null,    // the id of the control picked to be the panel's selection, or null
+    onpickcontrol = null,    // (id) → pick it, (null) → take the pick back; null: no Select at all
   } = $props();
 
   const READ_EVERY_MS = 60;
@@ -160,6 +170,19 @@
     const choices = arg.meaning?.choices;
     return (arg.editable === 'choice' || (arg.editable === 'curve' && typeof arg.value === 'string'))
       && Array.isArray(choices) && choices.length > 0;
+  }
+
+  /* ------------------------------------------------------------- a control, on the panel */
+
+  /** The id of the control a row's Select picks, or null for a row with none. */
+  const selectable = (arg) => (onpickcontrol && !readOnly && !isJson ? controlToSelect(arg) : null);
+  /** The control's name as the script writes it: the name itself, or a path's first segment. */
+  const controlNameOf = (arg) => String((arg.kind === 'control' ? arg.value : arg.meaning?.control) ?? '');
+
+  /** Pick the row's control to be the panel's selection, or take back the pick it already is. */
+  function pickControl(arg) {
+    const id = selectable(arg);
+    if (id) onpickcontrol(pickedControl === id ? null : id);
   }
 
   /* -------------------------------------------------------------------------------- sessions */
@@ -376,6 +399,20 @@
   const drawnCurve = (arg) => !readOnly && arg.kind === 'curve' && arg.literal && arg.value !== null
     && typeof arg.value === 'object' && Array.isArray(arg.meaning?.bezier);
 
+  /** ce.anim.envelope's points, from their editor under the row: written once a point is let go,
+   *  added, taken out or typed in, one edit each time, every point in the form it was written in and
+   *  only the x and y of the ones that moved changed (writeValue's envelope). */
+  function commitEnvelope(arg, points) {
+    if (readOnly || !Array.isArray(points) || points.length < 2) return;
+    const s = openInRow(arg, 'envelope');
+    if (!s) return;
+    s.commit(points.map((p) => ({ x: p.x, y: p.y, from: p.from })));
+    s.done();
+  }
+
+  /** Points written out that the runtime would play: the editor goes under the row. */
+  const drawnEnvelope = (arg) => !readOnly && arg.kind === 'envelope' && arg.literal && arg.editable === 'envelope';
+
   function choiceCurrent(arg) {
     return typeof arg.value === 'string' ? arg.value : arg.value === undefined ? arg.text : String(arg.value);
   }
@@ -497,6 +534,8 @@
       return `Done or Cancel in the display panel ends the edit. Cancel puts ${was.length > 48 ? 'what was written' : was} back exactly.`;
     }
     if (sessView?.kind === 'number') return 'Enter or leaving the field writes the number; Escape puts it back.';
+    const picked = pickedControl ? rows.find((r) => r.type === 'arg' && selectable(r.arg) === pickedControl) : null;
+    if (picked) return `${controlNameOf(picked.arg)} will be selected on the panel when you go back to it.`;
     if (nested) return 'A call inside another has rows of its own, under the call it sits in.';
     return 'Click a row to go to its value in the code.';
   });
@@ -531,6 +570,13 @@
     {:else if m.name}
       <EasingCurve fn={curveFn(m.name)} width={52} height={26} label={`${m.name} curve`} />
     {/if}
+  {:else if arg.kind === 'dash'}
+    <!-- The line drawn with what the drawing is handed, and the cap the options give it, at the
+         script's own pixels: solid where the runtime draws it solid. -->
+    <svg class="vdash" width="64" height="8" viewBox="0 0 64 8" aria-hidden="true">
+      <line x1="2" y1="4" x2="62" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap={m.cap}
+        stroke-dasharray={m.dasharray ?? undefined} />
+    </svg>
   {:else if arg.kind === 'font' && typeof arg.value === 'string'}
     <span class="vfont" style:font-family={fontCss(arg.value)} title={`Aa in ${arg.value}`}>Aa</span>
   {:else if arg.kind === 'image'}
@@ -561,8 +607,22 @@
       onchange={(e) => pickChoice(arg, e.currentTarget.value)}
       onblur={closeInRow}>
       {#if !m.choices.includes(current)}<option value={current} disabled>{current}</option>{/if}
-      {#each m.choices as choice, i (i)}<option value={choice}>{choice}</option>{/each}
+      <!-- A choice can carry a name (a device parameter's, beside its id); the value is the choice. -->
+      {#each m.choices as choice, i (i)}<option value={choice}>{m.choiceNames?.[choice] ? `${choice} · ${m.choiceNames[choice]}` : choice}</option>{/each}
     </select>
+  {/if}
+{/snippet}
+
+{#snippet selectControl(arg)}
+  {@const id = selectable(arg)}
+  {#if id}
+    {@const name = controlNameOf(arg)}
+    {@const on = pickedControl === id}
+    <!-- Its own button: the row's click goes to the value, and this must leave the caret where it is. -->
+    <button class={['vpick', on && 'on']} aria-pressed={on} aria-label={`Select ${name} on the panel`}
+      title={on ? `${name} will be selected on the panel when you go back to it. Click again to take that back.`
+        : `Select ${name} on the panel, to find it selected there when you go back. The code is not touched.`}
+      onclick={(e) => { e.stopPropagation(); pickControl(arg); }}>{on ? 'Selected' : 'Select'}</button>
   {/if}
 {/snippet}
 
@@ -618,10 +678,11 @@
               <div class="vbody">
                 <div class="vline">
                   {@render valueControl(row)}
-                  {#if !hasEditor(arg) && !drawnCurve(arg) && arg.kind !== 'gradient'}
+                  {#if !hasEditor(arg) && !drawnCurve(arg) && !drawnEnvelope(arg) && arg.kind !== 'gradient'}
                     <code class="vtext">{@html shownText(arg)}</code>
                   {/if}
                   {@render valueEdit(row)}
+                  {@render selectControl(arg)}
                 </div>
                 {#if line}<div class={['vmeaning', arg.kind === 'path' && arg.meaning?.found && 'found']}>{line}</div>{/if}
                 {#if arg.problem}<div class={['vproblem', arg.problem.severity]}>{arg.problem.message}</div>{/if}
@@ -634,6 +695,13 @@
                 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
                 <div class="vbezier" onclick={(e) => e.stopPropagation()}>
                   <BezierEditor points={arg.meaning.bezier} width={248} height={140} onchange={(points) => commitCurve(arg, points)} />
+                </div>
+              {:else if drawnEnvelope(arg)}
+                <!-- The shape the runtime plays, under the row at its whole width, its points to drag. -->
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                <div class="vbezier venvelope" onclick={(e) => e.stopPropagation()}>
+                  <EnvelopePointsEditor written={arg.value} points={arg.meaning.points} width={248} height={128}
+                    onchange={(points) => commitEnvelope(arg, points)} />
                 </div>
               {/if}
             {/if}
@@ -722,6 +790,7 @@
   .vstrip:hover, .vstrip:focus-visible { border-color: var(--txt-dim); outline: none; }
   .vstrip.on { box-shadow: 0 0 0 1.5px #6aa8ff; }
   .vstrip.still { cursor: default; }
+  .vdash { flex-shrink: 0; color: var(--txt); }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {
@@ -736,5 +805,11 @@
     color: var(--txt); font-family: var(--mono); font-size: 12px;
   }
   .vselect:focus { border-color: #6aa8ff; outline: none; }
+  .vpick {
+    background: none; border: 1px solid var(--line-2); border-radius: 5px; padding: 2px 7px; cursor: pointer;
+    font-family: inherit; font-size: 11.5px; line-height: 1.3; color: var(--txt-dim); flex-shrink: 0;
+  }
+  .vpick:hover, .vpick:focus-visible { color: var(--txt); border-color: var(--txt-dim); outline: none; }
+  .vpick.on { color: var(--accent); border-color: var(--accent); }
   .vfoot { margin: 10px 2px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--txt-faint); line-height: 1.45; }
 </style>

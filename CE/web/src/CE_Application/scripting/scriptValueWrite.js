@@ -5,7 +5,8 @@
 
 import { tokenize, matchBrackets, literalOf, isLiteral, valueOf, familyOf } from './scriptValueScan.js';
 import { colourForm, panelParts, cssParts } from './scriptValueKinds.js';
-import { CSS_NAMED_COLOURS, storedColour } from './scriptColours.js';
+import { CSS_NAMED_COLOURS, storedColour, realNumber } from './scriptColours.js';
+import { envelopePointParts } from './animEnvelope.js';
 import { formatJson } from '../utils/jsonText.js';
 
 const LANGUAGE_ALIASES = { ts: 'typescript', 'c++': 'cpp', cs: 'csharp', js: 'javascript' };
@@ -38,6 +39,14 @@ const JS_IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
  *    the replacement may run past arg.range to the end of the angle.
  *  - number: integer stays integer, decimals keep their count where the new value fits it, hex stays
  *    hex for a whole number.
+ *  - envelope (ce.anim.envelope's points): `newValue` is the points in the order they are to be
+ *    written, each { x, y, from }, where `from` is the index of the written point it is: only that
+ *    point's x and y are written, as numbers in the form they had, and everything else about it (its
+ *    braces or brackets, its keys, a curve it carries, the comments and the lines around it) stays.
+ *    A point with no `from` is new, written as a copy of the point after it (the last one's of the
+ *    point before), so it takes the curve of the segment it splits, as the Envelope component's
+ *    added nodes do; a point left out is taken out with its separator. Plain points ({ x, y } or a
+ *    pair) are taken too, by place when there are as many as were written.
  *  - anything else: strings keep their quotes; lists and tables are written in the language's syntax
  *    (Lua { }, JavaScript [ ] and { k: v }, Python [ ] and { "k": v }), their entries edited in place
  *    when only values change, so the layout and comments around them stay.
@@ -64,6 +73,7 @@ export function writeValue(source, languageId, arg, newValue) {
   if (arg.kind === 'gradient') return arg.meaning?.stored ? writeStoredGradient(src, arg, newValue, w) : writeDrawGradient(src, arg, newValue, w);
   let text;
   if (arg.kind === 'colour') text = writeColour(arg, newValue, w);
+  else if (arg.kind === 'envelope') text = writeEnvelope(newValue, w);
   else text = writeLiteral(newValue, w);
   return text === null ? null : { start, end, text };
 }
@@ -394,6 +404,106 @@ function tableText(value, w) {
   if (items.some((x) => x === null)) return null;
   const p = items.length ? pad : '';
   return `${prefix}{${p}${items.join(', ')}${p}}`;
+}
+
+/* --------------------------------------------------------------------------- write: envelopes */
+
+/** The text range of tokens [a, b) of the old literal, as offsets into w.old. */
+const spanOf = (w, a, b) => ({ s: w.toks[a].s, e: w.toks[b - 1].e });
+
+/** A point entry's x and y entries, where its reader finds them (animEnvelope's envelopePointParts):
+ *  a pair's first two items, a table's x and y keys, else its numbered items (Lua's { 0, 1, curve = … }),
+ *  else the entries it numbers itself, counted from 0 when it has an entry 0 and from 1 when it does
+ *  not ({ 0: 0, 1: 1 }, Lua's { [0] = 0, [1] = 1 }). Those were read as a point and found no entry
+ *  here, so the row offered them to edit and an edit wrote nothing. */
+function pointCoordinateEntries(entry) {
+  const node = entry?.node;
+  if (!node || (node.type !== 'list' && node.type !== 'table')) return null;
+  const items = node.entries.filter((e) => e.key === null);
+  const keyed = (k) => node.entries.find((e) => e.key === k) ?? null;
+  const from = keyed('0') ? 0 : 1;
+  return {
+    x: keyed('x') ?? items[0] ?? keyed(String(from)) ?? null,
+    y: keyed('y') ?? items[1] ?? keyed(String(from + 1)) ?? null,
+  };
+}
+
+/** The text for one coordinate: the number in the form it was written in (text stays text). */
+function coordinateText(w, entry, value) {
+  const { node } = entry;
+  const span = spanOf(w, entry.a, entry.b);
+  const old = w.old.slice(span.s, span.e);
+  if (node.type === 'number') return node.value === value ? old : numberText(value, node.raw, w.fam);
+  if (node.type === 'string') {
+    const was = Number(node.value);
+    return was === value ? old : quoteLike(numberText(value, node.value.trim(), w.fam), w.toks[node.tok], w.fam);
+  }
+  return numberText(value, '', w.fam);
+}
+
+/** The text of point `entry` with its x and y written as `x` and `y`, the rest of it as it was. */
+function pointText(w, entry, x, y) {
+  const span = spanOf(w, entry.a, entry.b);
+  const coords = pointCoordinateEntries(entry);
+  if (!coords?.x || !coords?.y) return null;
+  const edits = [[coords.x, x], [coords.y, y]].map(([e, v]) => ({ ...spanOf(w, e.a, e.b), text: coordinateText(w, e, v) }))
+    .sort((p, q) => p.s - q.s);
+  let out = '';
+  let at = span.s;
+  for (const edit of edits) { out += w.old.slice(at, edit.s) + edit.text; at = edit.e; }
+  return out + w.old.slice(at, span.e);
+}
+
+function writeEnvelope(newValue, w) {
+  const { node } = w;
+  if (!Array.isArray(newValue) || (node.type !== 'list' && node.type !== 'table')) return null;
+  const entries = node.entries.filter((e) => e.key === null);
+  if (!entries.length) return null;
+  const sameCount = newValue.length === entries.length;
+  const next = [];
+  for (const [k, item] of newValue.entries()) {
+    const parts = envelopePointParts(item);
+    const x = realNumber(parts?.x);
+    const y = realNumber(parts?.y);
+    if (x === undefined || y === undefined) return null;
+    const from = !parts.pair && Number.isInteger(item.from) ? item.from : (sameCount ? k : null);
+    if (from !== null && (from < 0 || from >= entries.length)) return null;
+    next.push({ x, y, from });
+  }
+  // A new point is a copy of the written point after it, or of the last one when it is last.
+  const texts = next.map((p, k) => {
+    if (p.from !== null) return pointText(w, entries[p.from], p.x, p.y);
+    const after = next.slice(k + 1).find((q) => q.from !== null);
+    const before = [...next.slice(0, k)].reverse().find((q) => q.from !== null);
+    const like = entries[(after ?? before)?.from ?? entries.length - 1];
+    return pointText(w, like, p.x, p.y);
+  });
+  if (texts.some((t) => t === null)) return null;
+  const first = spanOf(w, entries[0].a, entries[0].b);
+  const last = spanOf(w, entries[entries.length - 1].a, entries[entries.length - 1].b);
+  // What stood between each written point and the next: a comma, the spaces, a comment, a line
+  // break and its indent. Each point keeps the one that followed it, so a comment stays with the
+  // point it was written after, and goes with it. A point that had none (the last, or a new one)
+  // takes the first one's comma and line break without its comment.
+  const seps = entries.slice(0, -1).map((e, i) => w.old.slice(spanOf(w, e.a, e.b).e, spanOf(w, entries[i + 1].a, entries[i + 1].b).s));
+  const lineBreak = (sep) => sep.lastIndexOf('\n');
+  const plain = seps.length ? (lineBreak(seps[0]) >= 0 ? `,${seps[0].slice(lineBreak(seps[0]))}` : seps[0]) : ', ';
+  let out = w.old.slice(0, first.s) + texts[0];
+  for (let k = 1; k < texts.length; k += 1) {
+    const prev = next[k - 1].from;
+    out += (prev !== null && prev < seps.length ? seps[prev] : plain) + texts[k];
+  }
+  let tail = w.old.slice(last.e);
+  // The last point taken out, from a list written a point a line: the one now last keeps the
+  // comment on its line, and the line break before the closing bracket is the old last point's.
+  // A comma after the last point stays where the list had one, and is not added where it had none.
+  const nowLast = next[next.length - 1].from;
+  if (nowLast !== null && nowLast < seps.length && lineBreak(seps[nowLast]) >= 0) {
+    const head = seps[nowLast].slice(0, lineBreak(seps[nowLast]));
+    const trailing = /^[ \t]*,/;
+    if (trailing.test(tail)) { out += head; tail = tail.replace(trailing, ''); } else out += head.replace(/^([ \t]*),/, '$1');
+  }
+  return out + tail;
 }
 
 /* --------------------------------------------------------------------------- write: gradients */

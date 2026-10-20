@@ -168,18 +168,33 @@ function wrap(v, lo, hi)
   if not (span > 0) then return a end
   return a + (((n - a) % span) + span) % span
 end
+-- A point's x, y, curve and tension as written: by its names, and failing those by its numbered
+-- entries, counted from 1 as Lua counts, or from 0 when the table has an entry 0. The WebView
+-- runtime counts the same way (animEnvelope.js envelopePointParts), so a point is the same point
+-- in the editor and here.
+local function __pointParts(p)
+  local from = 1
+  if p[0] ~= nil then from = 0 end
+  local x, y, c, t = p.x, p.y, p.curve, p.tension
+  if x == nil then x = p[from] end
+  if y == nil then y = p[from + 1] end
+  if c == nil then c = p[from + 2] end
+  if t == nil then t = p[from + 3] end
+  return x, y, c, t
+end
 -- {{x, y}, …} sorted by x. Accepts pairs and {x=, y=} tables, so a panel can write either.
 local function __points(points)
   local out = {}
   if type(points) == "table" then
     for _, p in ipairs(points) do
-      local x, y
-      if type(p) == "table" then x = p.x or p[1] y = p.y or p[2] end
+      local x, y, c, t
+      if type(p) == "table" then x, y, c, t = __pointParts(p) end
       x, y = tonumber(x), tonumber(y)
       -- The third element is the arrival index: table.sort is UNSTABLE (unlike JS sort), and a
       -- step curve's two points at the same x must keep their written order or the "steps TO"
-      -- rule reads the wrong side. mapCurve only looks at [1] and [2].
-      if x ~= nil and y ~= nil then out[#out + 1] = { x, y, #out + 1 } end
+      -- rule reads the wrong side. The fourth and fifth are the curve of the segment that ends at
+      -- the point, and its tension.
+      if x ~= nil and y ~= nil then out[#out + 1] = { x, y, #out + 1, c, t } end
     end
   end
   table.sort(out, function(p, q)
@@ -207,7 +222,15 @@ function mapCurve(v, points)
   for i = 2, #list do
     local x0, y0 = list[i - 1][1], list[i - 1][2]
     local x1, y1 = list[i][1], list[i][2]
-    if n < x1 and x1 ~= x0 then return y0 + (n - x0) * (y1 - y0) / (x1 - x0) end
+    if n < x1 and x1 ~= x0 then
+      -- The segment's own shape, from the point it ends at, as the WebView runtime's mapCurve and
+      -- the Envelope component take it. Read for straight lines alone, a point's curve played as a
+      -- line here and as a curve in the editor.
+      if list[i][4] ~= nil then
+        return y0 + shapeCurve((n - x0) / (x1 - x0), list[i][4], list[i][5]) * (y1 - y0)
+      end
+      return y0 + (n - x0) * (y1 - y0) / (x1 - x0)
+    end
   end
   return last[2]
 end
@@ -2753,10 +2776,44 @@ end
 -- envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 -- `to` has one destination; an envelope goes up before it comes down, which is the single most
 -- obvious thing a synth panel animates and the one thing `to` cannot express.
+--
+-- A point is { x = , y = } or the two as a pair, each a number or text that is one. One that is not,
+-- or whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView runtime's
+-- envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler dropped a point
+-- it could not read, and never reached one whose x is past 0 to 1, both without a word. A y past 0
+-- to 1 is a level past `from` or `to`, and is read as it is.
 function animateEnvelope(path, points, opts)
   if type(points) ~= "table" or #points < 2 then
-    log("ce.anim.envelope(path, points): needs at least two points, each { x = , y = } in 0..1 — nothing was started.")
+    log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
     return false
+  end
+  local function written(v)
+    if v == nil then return "none was given" end
+    if type(v) == "string" then return '"' .. v .. '" is not' end
+    if type(v) == "number" and __realNumber(v) ~= nil then return __cshown(v) .. " is not" end
+    return "the value given is not"
+  end
+  local count = #points
+  for i = 1, count do
+    local p, which = points[i], "point " .. i .. " of " .. count
+    if type(p) ~= "table" then
+      logError("ce.anim.envelope: " .. which .. " is { x, y } or the two as a pair, and " .. written(p) .. ", so nothing was started.")
+      return false
+    end
+    local x, y = __pointParts(p)
+    local nx = __realNumber(x)
+    if nx == nil or nx < 0 or nx > 1 then
+      local hint = ""
+      if nx ~= nil and nx / 100 >= 0 and nx / 100 <= 1 then
+        hint = " If you meant " .. __cshown(nx) .. " out of 100, write " .. __cfour(nx / 100) .. "."
+      end
+      logError("ce.anim.envelope: the x of " .. which .. " is a number from 0 to 1, and " .. written(x) .. ", so nothing was started." .. hint)
+      return false
+    end
+    if __realNumber(y) == nil then
+      logError("ce.anim.envelope: the y of " .. which .. " is a number, and " .. written(y) .. ", so nothing was started.")
+      return false
+    end
   end
   local o = {}
   if opts ~= nil then for k, v in pairs(opts) do o[k] = v end end

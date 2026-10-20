@@ -227,7 +227,6 @@ test('outside a known value there is nothing, so the editor completes words', ()
   const quoted = src.indexOf('"outBack"');
   const none = [
     ['the call\'s name', src.indexOf('anim')],
-    ['a path, which has no list of choices', src.indexOf('Cutoff') + 2],
     ['a number', src.indexOf('100') + 1],
     ['the option\'s key', src.indexOf('curve') + 2],
     ['before the opening quote', quoted],
@@ -305,4 +304,73 @@ test('a read stays well under what a keystroke allows, and a keystroke outside a
   // Generous bounds, as the core's own timing test has them, so a slow runner does not fail it.
   assert.ok(each < 250, `${each.toFixed(1)} ms a read of a 400-line script`);
   assert.ok(outside < 2, `${outside.toFixed(3)} ms a keystroke outside any string`);
+});
+
+/* ============================================================================== a property path */
+// Inside a path, completion lists the segment under the caret, from what the segments before it
+// lead to, and an accepted one replaces that segment alone: a path is built a segment at a time.
+
+test('a path is completed a segment at a time, from the panel', () => {
+  const start = 'set("", 1)';
+  const first = forced(start, 'lua', 5);
+  assert.deepEqual(labels(first), ['Cutoff', 'Title', 'Resonance', 'panel']);
+  assert.equal(first.options[0].detail, 'Knob');
+  assert.equal(first.openEmpty, false, 'nothing opens by itself on an empty path');
+
+  // After "Cutoff." the list is open with nothing typed: the value's forms, the shorthands, the sections.
+  const src = 'set("Cutoff.", 1)';
+  const second = typed(src, 'lua', src.indexOf('.') + 1);
+  assert.equal(second.openEmpty, true);
+  assert.deepEqual(labels(second).slice(0, 3), ['value', 'normalizedValue', 'midiValue']);
+  assert.ok(labels(second).includes('opacity'), 'a shorthand');
+  assert.equal(second.options.find((o) => o.label === 'Parts').detail, 'section', 'a section the knob has');
+  // A knob draws with parts and has made no Background; a path into it is still one, from the templates.
+  assert.equal(second.options.find((o) => o.label === 'Background').detail, 'section, not made yet');
+  assert.ok(labels(second).indexOf('Parts') < labels(second).indexOf('Background'), 'its own sections first');
+
+  // Typed, the list narrows; accepted, the segment alone is written.
+  const partial = 'set("Cutoff.Backg", 1)';
+  const narrowed = typed(partial, 'lua', partial.indexOf('Backg') + 5);
+  assert.deepEqual(labels(narrowed), ['Background']);
+  assert.equal(accept(partial, narrowed, 'Background'), 'set("Cutoff.Background", 1)');
+
+  // Deeper, a section's sections and settings, each with its value now.
+  const deep = 'set("Cutoff.Background.", 1)';
+  const third = typed(deep, 'lua', deep.lastIndexOf('.') + 1);
+  assert.ok(labels(third).includes('Fill'), labels(third).join(', '));
+  const fill = 'set("Cutoff.Background.Fill.", 1)';
+  const fourth = typed(fill, 'lua', fill.lastIndexOf('.') + 1);
+  const colour = fourth.options.find((o) => o.label === 'colour');
+  assert.ok(colour, labels(fourth).join(', '));
+  assert.match(colour.detail, /^"/, 'a setting shows what it holds');
+});
+
+test('a segment in the middle is replaced up to its dot, and the one written is selected', () => {
+  const src = 'set("Cutoff.Backgound.Fill.colour", "red")';
+  const at = src.indexOf('Backgound') + 4;
+  const r = forced(src, 'lua', at);
+  assert.equal(src.slice(r.from, r.to), 'Backgound', 'the segment under the caret, not the rest of the path');
+  assert.equal(accept(src, r, 'Background'), 'set("Cutoff.Background.Fill.colour", "red")');
+  const right = 'set("Cutoff.Background.Fill.colour", "red")';
+  const sel = forced(right, 'lua', right.indexOf('Fill') + 2);
+  assert.equal(selectedLabel(sel), 'Fill');
+  // The panel's own settings, and get(), ce.anim.to and JavaScript the same.
+  const panel = 'set("panel.", 1)';
+  assert.ok(labels(typed(panel, 'lua', panel.indexOf('.') + 1)).length > 0);
+  const js = 'ce.anim.to("Resonance.", 1);';
+  assert.ok(labels(typed(js, 'javascript', js.indexOf('.', js.indexOf('Resonance')) + 1)).includes('value'));
+  const get = 'local v = get("Title.T")';
+  assert.ok(labels(typed(get, 'lua', get.indexOf('.T') + 2)).includes('Text'), 'a label has a Text section');
+});
+
+test('a self.set path starts at the script\'s own control, and an unknown one lists nothing', () => {
+  // Its first segment is the control's: a form of its value, a shorthand or a section.
+  const src = 'self.set("", 1)';
+  const own = forced(src, 'lua', src.indexOf('"') + 1, { ...CONTEXT(), selfControl: 'Cutoff' });
+  assert.ok(own && labels(own).includes('Parts') && labels(own).includes('value'), own && labels(own).join(', '));
+  const deeper = 'self.set("Transform.", 1)';
+  assert.ok(labels(typed(deeper, 'lua', deeper.indexOf('.', 12) + 1, { ...CONTEXT(), selfControl: 'Cutoff' })).includes('x'));
+  assert.equal(forced(src, 'lua', src.indexOf('"') + 1, CONTEXT()), null, 'no control is known for self');
+  const nowhere = 'set("Nobody.", 1)';
+  assert.equal(typed(nowhere, 'lua', nowhere.indexOf('.') + 1), null);
 });

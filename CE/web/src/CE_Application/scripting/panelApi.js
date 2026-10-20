@@ -1118,10 +1118,12 @@ export const COMMANDS = [
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
     refusal: 'false',
-    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.',
+    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points, or pairs, as the Envelope component has them: x, from 0 to 1, is how far through the animation, and y is the level, where 0 means `opts.from` (default 0) and 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. With fewer than two points, or a point that is not one or whose x is outside 0 to 1, nothing starts and the console says why. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it.',
     params: [
       { name: 'path', type: 'path', required: true },
-      { name: 'points', type: 'list', required: true },
+      // The Values tab draws the shape and, for points written out, edits them (scriptValueKinds'
+      // readEnvelope, which reads them as the runtime does: scripting/animEnvelope.js).
+      { name: 'points', type: 'list', required: true, kind: 'envelope' },
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { name: 'from', type: 'number', default: '0',
@@ -1384,16 +1386,17 @@ export const COMMANDS = [
       { name: 'colour', type: 'value', required: false, kind: 'colour' },
       { name: 'width', type: 'number', required: false, unit: 'pixels' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'dash', type: 'list of numbers', default: 'a solid line',
+        { name: 'dash', type: 'list of numbers', default: 'a solid line', kind: 'dash',
           summary: 'Alternating on and off lengths in pixels. The panel\'s own beat marks are '
-            + '{ 3, 3 } — three pixels drawn, three skipped.' },
+            + '{ 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a '
+            + 'number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so.' },
         { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
           summary: 'How far into the dash pattern to start. Advance it on a timer and the dashes '
             + 'march along the line.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'The shape a line ends in.' },
+          summary: 'The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
-          summary: 'How two line segments meet at a corner.' },
+          summary: 'How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so.' },
       ]) },
     ],
     scopes: 'any',
@@ -2576,7 +2579,7 @@ export const COMMANDS = [
     summary: 'Describe one of the synth\'s parameters by its id, or return nothing if the device profile has no such parameter. Use it to check whether a synth has something before you try to change it.',
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'role', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2593,7 +2596,7 @@ export const COMMANDS = [
     summary: 'The last value the synth reported for a parameter, from a dump or a parameter message. Not a live query of the synth: it does not ask the synth anything. Returns nothing if the synth has never reported that parameter, which is different from 0.',
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'role', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2604,10 +2607,10 @@ export const COMMANDS = [
   },
   {
     id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
-    summary: 'Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter\'s own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it.',
+    summary: 'Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter\'s own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent; so is any id the panel did not declare when no device profile is chosen for `role`.',
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'value', type: 'value', required: true },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2785,7 +2788,7 @@ export const COMMANDS = [
     summary: 'Connect a control to a synth parameter from your script, so moving the control changes the parameter. It replaces any existing connection on the same port rather than adding a second one, and switches the control\'s device binding back on if it was off. The port defaults to "value".',
     params: [
       { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'parameterId', type: 'string', required: true },
+      { name: 'parameterId', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'role',
         { name: 'port', type: 'text', default: '"value"',
@@ -3530,7 +3533,7 @@ export const HELPERS = [
   // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
   // either, since a property stores a constant. Breakpoints are the smallest thing that can.
   { id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
-    summary: 'Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point\'s y rather than continuing the line. Two points with the same x make a step, and the later one wins.' },
+    summary: 'Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point\'s y rather than continuing the line. Two points with the same x make a step, and the later one wins. A point can also bend the line that ends at it, the way an Envelope\'s point does: a third entry or `curve` names the shape, as `ce.math.shape()` does ("exp", "log", "s" or "hold"), and a fourth entry or `tension` says how far it bends, so {1, 1, "exp"} rises slowly and then fast.' },
   { id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
     summary: 'Snap a value to the nearest entry in a list: `ce.math.quantize(9, {0, 8, 16})` gives 8. When the value sits exactly halfway between two entries, the lower one wins. An empty list returns the value unchanged. For evenly spaced steps, use `ce.math.snap()`.' },
   { id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',

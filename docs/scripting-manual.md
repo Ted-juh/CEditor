@@ -1559,7 +1559,7 @@ if (v !== undefined) {  }
 
 #### `ce.device.write(id, value [, role]) -> boolean`
 
-Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter's own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it.
+Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter's own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent; so is any id the panel did not declare when no device profile is chosen for `role`.
 
 *Short name: `deviceWrite`.*
 
@@ -2209,7 +2209,7 @@ Build a colour from hue (0 to 360), saturation and lightness (0 to 100) and retu
 | `ce.math.curve(v, shape)` | Bend a 0 to 1 value with a named response curve: "linear", "exp", "log" or "s". An unknown name prints a note to the console and is treated as "linear". For a curve of your own, use `ce.math.map()`; for the curves the panel's Envelopes use, use `ce.math.shape()`. Short name: `curve`. |
 | `ce.math.lerp(a, b, t)` | Blend between two numbers: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the point halfway between. `t` is not held inside 0 to 1, so values beyond either end carry on past `a` or `b`. For whole lists of numbers, use `ce.math.blend()`. Short name: `lerp`. |
 | `ce.math.wrap(v, lo, hi)` | Wrap a value round into a range, so that going past the top starts again from the bottom: `ce.math.wrap(12, 0, 12)` gives 0 and `ce.math.wrap(-1, 0, 12)` gives 11. The result can equal `lo` but never `hi`. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator, which treats negative numbers differently from language to language: the same expression gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
-| `ce.math.map(v, points)` | Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point's y rather than continuing the line. Two points with the same x make a step, and the later one wins. Short name: `mapCurve`. |
+| `ce.math.map(v, points)` | Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point's y rather than continuing the line. Two points with the same x make a step, and the later one wins. A point can also bend the line that ends at it, the way an Envelope's point does: a third entry or `curve` names the shape, as `ce.math.shape()` does ("exp", "log", "s" or "hold"), and a fourth entry or `tension` says how far it bends, so {1, 1, "exp"} rises slowly and then fast. Short name: `mapCurve`. |
 | `ce.math.quantize(v, values)` | Snap a value to the nearest entry in a list: `ce.math.quantize(9, {0, 8, 16})` gives 8. When the value sits exactly halfway between two entries, the lower one wins. An empty list returns the value unchanged. For evenly spaced steps, use `ce.math.snap()`. Short name: `quantizeTo`. |
 | `ce.math.choice(values [, weights])` | Pick one entry from a list at random, using the script's seeded random numbers. With `weights`, each entry's chance is its weight divided by the total, so weights of {3, 1} make the first entry three times as likely as the second. A missing or negative weight counts as zero, and if every weight is zero each entry is equally likely. It uses exactly one random number either way, so adding weights does not change what later random calls return. Returns nothing for an empty list. Short name: `randomChoice`. |
 | `ce.math.dbToGain(db)` | Convert decibels to a linear gain: 0 dB gives 1, and -6 dB gives about 0.5. Short name: `dbToGain`. |
@@ -2353,7 +2353,7 @@ if (!ce.anim.running("cutoff")) {  }
 
 #### `ce.anim.envelope(path, points [, opts])`
 
-Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points from 0 to 1, the same form the Envelope component uses: x is how far through the animation, y is the level. y = 0 means `opts.from` (default 0) and y = 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. It needs at least two points; with fewer, nothing starts and a note is written to the script console. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it, and nothing starts.
+Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points, or pairs, as the Envelope component has them: x, from 0 to 1, is how far through the animation, and y is the level, where 0 means `opts.from` (default 0) and 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. With fewer than two points, or a point that is not one or whose x is outside 0 to 1, nothing starts and the console says why. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it.
 
 *Short name: `animateEnvelope`.*
 
@@ -3046,10 +3046,10 @@ Set the line colour and thickness for the shapes drawn after this. `width` defau
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `dash` | list of numbers | a solid line | Alternating on and off lengths in pixels. The panel's own beat marks are { 3, 3 } — three pixels drawn, three skipped. |
+| `dash` | list of numbers | a solid line | Alternating on and off lengths in pixels. The panel's own beat marks are { 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so. |
 | `dashOffset` | number (pixels) | 0 | How far into the dash pattern to start. Advance it on a timer and the dashes march along the line. |
-| `cap` | text | "butt" | The shape a line ends in. One of "butt", "round" or "square". |
-| `join` | text | "miter" | How two line segments meet at a corner. One of "miter", "round" or "bevel". |
+| `cap` | text | "butt" | The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so. One of "butt", "round" or "square". |
+| `join` | text | "miter" | How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so. One of "miter", "round" or "bevel". |
 
 ```lua
 -- Lua

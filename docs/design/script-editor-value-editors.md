@@ -403,15 +403,15 @@ One table, then notes on the kinds where there is something more to say.
 | Fixed list | `"multiply"`, `"round"`, `"cover"` | the 16 `values` lists | the value | a dropdown | a value not in the list |
 | Font family | `"Inter Tight"` | `textStyle`, `drawMeasure`, `textFont` | "Aa" in that face | Text tab's `TypeFamilies` | a family that is not available, which `textStyle` refuses |
 | Image | `ce.image.asset("knob-cap")` | `imageAsset`, `imageSet`, `drawImage` | thumbnail | Assets tab | a name not in the library; an asset's name passed as `src`, which draws nothing |
-| Control | `ce.anim.play("Cutoff", …)`, `on("Cutoff", …)` | `targetRef` and `control` parameters | its type and current value | a dropdown of the panel's controls; a click selects it on the canvas | no control of that name |
-| Property path | `"Cutoff.Background.Fill.colour"` | the 13 `path` parameters | the current value | completion one segment at a time | a path that leads nowhere |
+| Control | `ce.anim.play("Cutoff", …)`, `on("Cutoff", …)` | `targetRef` and `control` parameters | its type and current value | a dropdown of the panel's controls; Select picks it to be the panel's selection, selected on the canvas once the panel is back in front | no control of that name |
+| Property path | `"Cutoff.Background.Fill.colour"` | the 13 `path` parameters | the current value | completion one segment at a time; Select, as for a control | a path that leads nowhere |
 | Animation | `ce.anim.play("Cutoff", "Pulse")` | that control's keyframe animations | the value | a dropdown of that control's | not one of its keyframe animations (the runtime returns false and logs the list) |
 | Event | `on(target, "valueChanged", fn)` | `eventName` parameters | the value | a dropdown | an unknown event |
 | Number with a unit | angle `180`, `ms` `250`, opacity `0.5` | the parameter's `unit` and range | the unit and range | a field, written on Enter | out of range |
-| Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line | none | negative lengths, which are clamped to 0 |
+| Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line, drawn as the drawing is handed it, and its lengths in words | none | a length below 0 or not a number, drawn as 0; a dash that is not a list, drawn solid |
 | SysEx | `sendSysex("F0 41 10 42 F7")` | `bytes` parameters | byte count, checksum | none | a wrong checksum (`computeChecksum`), a missing `F0` or `F7` |
-| Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `parameterId` | range and CC | a dropdown from the device profile | a parameter the profile does not have |
-| Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points` from 0 to 1 | the shape | a polyline editor like `EnvelopeDesigner`'s | points outside 0 to 1 |
+| Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `bind`'s `parameterId`, the `id` of `write`, `read` and `parameter` | name, group and range (a profile's parameter has no CC of its own: that is its recipe's) | a dropdown from the device profile | a parameter the profile does not have |
+| Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points`, typed `envelope` | the shape, as the runtime samples it | a point editor under the row: drag a point, add one, take one out | fewer than two points, a point that is not one, an x outside 0 to 1 (a y past 0 to 1 is a level past `from` or `to`) |
 
 ### Notes
 
@@ -968,8 +968,10 @@ context.
   caret is in, its calls, and for each argument and option what kind of value it is, what it means,
   and what the runtime would refuse, in the runtime's words. `readJsonValues` does the same for the
   panel file view's object, and `writeValue` gives the characters for a new value, spelled as the
-  language spells it. 94 parameters in `panelApi.js` carry a `kind` (step zero). For each refusal,
-  `test/scriptValues.test.js` calls the runtime and compares what it writes to the console.
+  language spells it. 94 parameters in `panelApi.js` carried a `kind` at step zero, and 106
+  parameters and options do now; `scriptValues.test.js` holds each to a reader the core has. For
+  each refusal, `test/scriptValues.test.js` calls the runtime and compares what it writes to the
+  console.
 - **The tab** (`editor/ValuesSidebar.svelte`, rows laid out by `editor/valueRows.js`). The dock's
   fourth tab, loaded the first time it is shown. A header names the lines, the call as written and
   its summary. Rows follow the call's order, an options table's keys sit under `opts`, and a call
@@ -1091,6 +1093,144 @@ And on the owner's word on 2026-10-20, the two things the review of the above le
   entered, and a row took the selection on mouseenter, so fifteen ArrowDowns moved seven rows. A
   row now takes it on a move with a distance, which a scroll has none of. Checked in
   `browser-checks/valueCompletion.mjs`.
+
+Then, on the owner's word the same day, the kinds the table above still had unbuilt, after the
+Values tab's first version was merged:
+
+- **Device parameters.** The `id` of `ce.device.write`, `read` and `parameter`, and `bind`'s
+  `parameterId`, are read against the profile behind the call's device (read's and parameter's
+  second argument, write's third, bind's `opts.role`; a role nothing is mapped to reads the main
+  synth's, as the runtime does). The row names the parameter, its group and its range, and is a
+  dropdown of the profile's parameters, each by its id and name; completion inside the quotes lists
+  the same. An id the profile does not have is said as its call does it: write refuses it, bind
+  binds it anyway, each in its runtime's words (`scripting/deviceWords.js`), and read and parameter
+  answer nothing. A row says nothing of an id while the table loads, which the tab has asked for,
+  or of one the panel's scripts declare with `defineParameter`; with no profile chosen bind's says
+  so, as bind does, since then nothing but a declaration knows the id, and write's says the write
+  is refused (below), and read's and parameter's say nothing.
+
+  Reading it found the table it needs was never there. Every reader asked the Device Profile
+  Designer's page: 160 parameters by default, and after a search in the Designer only what matched,
+  with nothing more to load. So on a profile longer than a page, or one searched in the Designer, a
+  send to a parameter that was there was refused as "not in profile", `ce.device.parameter()`
+  answered nothing for it, and `bind` called it unknown; and the script runtime asked the host for
+  the list with one object where the request takes the id and the role, so a profile the Designer
+  had not listed was never loaded for a script at all. `stores/deviceParameterTable.js` now loads a
+  profile's whole table, 500 a page with no filter, under requests of its own the Designer's page
+  never sees, and forgets it when the profile's source is saved; the send check, `parameters()`,
+  `parameter()`, `bind`, `write` and the rows all ask it. And `ce.device.write` of an id the profile
+  lacks was logged as sent and answered true in the editor, the host's "Not sent" going to the MIDI
+  preview, and answered false without a word in the plug-in: both now refuse it, nothing sent, in
+  the same words. Checked by `test/deviceParameterTable.test.js`, which also holds the plug-in's
+  sentence (`PluginProcessor.h`) to the editor's.
+- **Property paths, a segment at a time.** Inside a path's quotes completion lists the segment
+  under the caret, from what the segments before it lead to (`pathSegmentChoices` in
+  `scriptValueKinds.js`, walking as `readPath` resolves): at the start the panel's controls, each
+  with its type, and `panel`; after a control its value's three forms, the shorthands (`opacity`,
+  `x`…), its own sections and then the sections its templates have that it has not made (a knob
+  draws with parts, and `Cutoff.Background` is still a path); after a section its sections and its
+  settings, each with what it holds now. The one accepted replaces that segment alone, up to the
+  next dot, and after a dot the list opens with nothing typed, as member completion does after one.
+  A `self.set` path starts at the script's own control. Checked by `test/valueCompletions.test.js`
+  and a row of `browser-checks/valueCompletion.mjs` that builds `Cutoff.Transform.x` from the
+  keyboard.
+- **An envelope's points have an editor.** `ce.anim.envelope`'s `points` is typed `envelope`, read
+  by the runtime's own reader (`scripting/animEnvelope.js`, through `scriptValueKinds`'
+  `readEnvelope`). Points written out that the runtime would play have the shape under their row,
+  at its whole width, drawn by the runtime's own sampling (`sampleEnvelope`), so a curve a point
+  carries bends the line there as it bends the move. A point is dragged, added with a double-click
+  on the shape's ground and taken out with Remove, and the selected one's x and y have fields; each
+  is written once, when the drag is let go or the field written, as one undo step. Only the x and y
+  of the point that moved change, as numbers in the form they had: a pair stays a pair, a key stays
+  where it was, a curve and the comments around it stay, and a point added is a copy of the one
+  after it, taking the curve of the segment it splits, as the Envelope component's added nodes do.
+  A point stays between the two either side of it in x, and in 0 to 1. `EnvelopeDesigner` was not
+  used: it edits a control's points through the store, with a sustain node and presets a script's
+  envelope does not have. The editor is `editor/EnvelopePointsEditor.svelte`, over the pure
+  `editor/envelopePointEdit.js`, and the write is `writeValue`'s envelope.
+- **A point the runtimes could not place now starts nothing, and says why.** Every runtime dropped
+  a point it could not read (a y left out, text that is not a number) without a word; with fewer
+  than two left the move was a flat line, and with none a straight ramp from `from` to `to`. A point
+  whose x is outside 0 to 1 was never reached, since the shape is sampled from 0 to 1: written in
+  milliseconds or out of 100, the move played a sliver of the shape written. Each of these is now
+  refused in the WebView and in the Lua, JavaScript and Python preludes, in the same words: "the x
+  of point 2 of 3 is a number from 0 to 1, and 50 is not, so nothing was started. If you meant 50
+  out of 100, write 0.5." A y past 0 to 1 is read as it is, a level past `to` above 1 and past
+  `from` below 0, as a target past a control's range is for `ce.anim.to`, and an overshoot is a
+  shape someone may mean; the row's line says so. The note for fewer than two points was spelled
+  three ways (Lua's `{ x = , y = }`, Python's hyphen), and is one now; the JavaScript prelude read
+  text as a list of its characters, and takes a list alone, as the WebView does. The plug-in's
+  `ScriptRuntime` is given the samples alone, and is unchanged. Checked in every engine by
+  `test/scriptPreludeAgreement.test.js` (and the real ones by `ScriptRuntimeTests.cpp` and
+  `PythonScriptEngineTests.cpp`), the row's words against the runtime's by
+  `test/scriptValues.test.js`, and the editor driven by `browser-checks/valuesSidebar.mjs`.
+- **A control's row selects it on the panel.** The table promised that a click selects the control
+  on the canvas, but the script workspace shows no canvas: no preview of the panel sits beside the
+  script, and the display panel's own panel tabs read no panel while a script tab is in front.
+  Every tab switch clears the selection, too, so one made there was gone by the time the panel was
+  back. So a row whose value names a control the panel has, by its name (`ce.anim.play("Cutoff",
+  …)`, `on("Cutoff", …)`) or as the first part of a path, has **Select** beside it, which picks that
+  control to be the panel's selection (`stores/panels.js`, `panelSelectionPick`). It is selected,
+  on the canvas too, once the panel's tab is in front again, by the tab bar or by closing the
+  script tab, and the Panel file screen opens on it meanwhile. Nothing is selected while the script
+  tab is in front: a change of selection lets go of the display panel's colour and gradient
+  targets, and would end an edit the Values tab has open there. Select is a button of its own, so
+  the caret stays where it is and the text is not touched; a row's click still goes to its value,
+  and a second Select takes the pick back. Checked in `test/panelSelectionScope.test.js`,
+  `test/valuesSidebar.test.js` and `browser-checks/valuesSidebar.mjs`, which picks a control with a
+  colour open and finds it selected on the canvas. The Panel file screen picks the same way now
+  (below).
+- **A stroke's dash is drawn in its row.** `ce.draw.stroke`'s `opts.dash` has `kind: 'dash'`, read
+  by the runtime's own reader (`scripting/drawDash.js`), which the WebView runtime now draws with.
+  It is the only runtime with the call: the plug-in's window runs the same one, and the C++
+  preludes answer `ce.draw` with their webview-only stub. The row draws a short line with the
+  `stroke-dasharray` the overlay is handed and the cap the options give, and says in pixels what is
+  drawn and what skipped (an odd list twice over, as SVG repeats it), or why the line is solid, or
+  shows only its caps. Three things went wrong without a word, and are said now, once each, in the
+  same words in the row: a length below 0 or not a number was drawn as 0, so `{ 3, -3 }` drew a
+  solid line, and still is drawn as 0 ("ce.draw.stroke: length 2 of the dash is -3, which is less
+  than 0, so 0 was used."); a number in place of the list was dropped ("ce.draw.stroke: the dash is
+  3, not a list of lengths, so the line is solid. …"); and text was taken apart a character at a
+  time, so `"3 3"` drew 6 and skipped 6, and is refused in the same words. An empty list, and one
+  whose lengths are all 0, draw a solid line, as SVG's rule says; neither is a mistake. Checked in
+  `test/scriptDraw.test.js`, in `test/scriptValues.test.js` against the runtime's console and the
+  line it draws, and in `browser-checks/valuesSidebar.mjs`.
+
+Building those found five things wrong beyond them, each fixed on the owner's word the next day:
+
+- **An envelope's curves played in the plug-in.** `ce.math.map` and `ce.anim.envelope` take a
+  point's curve in the editor, the segment ending at a point with `"exp"` following that shape as an
+  Envelope's segment does, and the row draws it so. The three preludes read a point for its x and y
+  alone, so with the window shut the same envelope moved in straight lines, and `ce.math.map` gave
+  another number for the same points. Each prelude now shapes the segment with its own
+  `shapeCurve`, which `ce.math.shape` already matched to the editor, and the envelope's samples go
+  through it. `ce.math.map` was never compared across the runtimes at all; its straight, stepped and
+  curved cases are in `test/scriptPreludeAgreement.test.js` now, and its summary says a point can
+  bend.
+- **A point keyed by number was read from the wrong key.** The editor read entry 1 before entry 0, so
+  `{ 0: 0, 1: 0.2 }` was a point at x 0.2. Lua counts from 1 and the other languages from 0, so a
+  table point is counted from 0 when it has an entry 0 and from 1 when it does not, everywhere: one
+  reader in the editor (`envelopePointParts`, which sampling and the refusals both use) and a
+  `__pointParts` in each prelude that counts the same way. A test writes such points in each
+  language, since no JSON case can carry a numbered key to Python.
+- **`ce.device.write` with no profile chosen** answered false without a word in the plug-in, and in
+  the editor was sent to the host, whose "Not sent" went to the MIDI preview, and answered true. Both
+  refuse it now, nothing sent, in one sentence from `deviceWords.js` ("ce.device.write: no device
+  profile is chosen for mainSynth, so "cutoff" was not sent. …"), and its row says it. The check
+  reads the write's own role: a read of a role nothing is mapped to takes the main synth's profile,
+  but a send takes its role's mapping or none, in the editor and in the plug-in alike, so a write
+  there was checked against one profile and dropped for having none.
+- **`ce.draw.stroke`'s cap and join** drew the default for any word but their three, without a word,
+  so `cap = "sausage"` and `join = "Round"` drew square ends and sharp corners. The row said so, but
+  in the generic list reader's words, which no runtime says. `drawDash.js` reads them now
+  (`strokeEnd`), the runtime says an unknown one once, and the row says the same sentence. A call
+  with a refusal of its own has it said of a word in another case too, which corrects
+  `ce.draw.blend("Multiply")`'s row as well.
+- **The Panel file screen selected with the script tab in front**, so going back by the panel's tab
+  cleared the control it had open, and selecting let go of the display panel's targets. It picks
+  now, as the Values tab's Select does, and follows picks. Its header described a split that showed
+  the panel beside the script; the general split it meant was a layout nothing drew, and is removed.
+  `browser-checks/panelFile.mjs` goes back by the tab and finds the control selected.
 
 Still open: nothing from this record.
 

@@ -12,9 +12,10 @@
  *             the misspelling is warned about and kept
  *   refuse    broken JSON and a changed type are refused on screen, and the panel is left alone
  *   settings  the panel's own settings edit the same way
- *   follow    selecting another control (as on the canvas) opens it here
+ *   follow    another control picked for the panel (as the Values tab's Select does) opens it here
  *   show      "Show on the panel" goes back to the panel with that control selected
  *   undo      back on the panel, one Undo takes the control edit back, named after the control
+ *   way back  a control opened here is selected when the panel is next in front by its tab, too
  *
  * Then the whole file, on GAIA (71,000 lines), which is what it is for:
  *   whole     "Whole file" shows the file as Save writes it, at the control selected, in well under
@@ -149,9 +150,15 @@ try {
     { hasGuid: true, width: 777 }, { hasGuid: typeof settings.panelGuid === 'string', width: await panelField('width') });
 
   // ---- follow ------------------------------------------------------------------------------------
-  await store(async (id) => { const { selectComponent } = await import('/src/CE_Application/stores/panels.js'); selectComponent(id); }, label);
+  // The canvas is never on screen with the script tab, so what the screen follows is a pick: the
+  // control picked to be the panel's selection, as the Values tab's Select picks one.
+  await store(async (id) => {
+    const { pickPanelSelection, selectionBeforeScriptTab } = await import('/src/CE_Application/stores/panels.js');
+    let before; selectionBeforeScriptTab.subscribe((v) => { before = v; })();
+    pickPanelSelection(before.panelId, id);
+  }, label);
   await kit.settle(500);
-  led.check(S, 'it follows the selection', 'selecting another control, as clicking it on the canvas does, opens that control here', 'Title',
+  led.check(S, 'it follows a pick', 'a control picked to be the panel\'s selection, as the Values tab\'s Select picks one, opens here', 'Title',
     JSON.parse(await editorText())._children.Core.name);
 
   // ---- show --------------------------------------------------------------------------------------
@@ -180,6 +187,35 @@ try {
     { namedControl: true, namedSettings: true, x: 70, width: 600 },
     { namedControl: undone.includes('Edit Cutoff as text'), namedSettings: undone.includes('Edit panel settings as text'),
       x: (await control(cutoff))._children.Transform.x, width: await panelField('width') });
+
+  // ---- the way back ------------------------------------------------------------------------------
+  // A control opened here is the panel's selection once the panel is in front, by its tab as well as
+  // by "Show on the panel". It was selected while the script tab was in front, and the tab switch
+  // back to the panel cleared it.
+  // In by the slider (a Label has no Scripts section, so no Script Editor button), out on the Label.
+  const sliderBox = await kit.box(cutoff);
+  await kit.page.mouse.click(sliderBox.x + sliderBox.w / 2, sliderBox.y + sliderBox.h / 2);
+  await kit.settle(500);
+  await kit.page.locator('button.s-jump').click();
+  await kit.settle(2000);
+  await kit.page.locator('.bd-app .tnode', { hasText: 'Panel file' }).click();
+  await kit.settle(800);
+  await kit.page.locator('.pf .pf-row', { hasText: 'Title' }).click();
+  await kit.settle(500);
+  const panelName = await store(async () => {
+    const { panels } = await import('/src/CE_Application/stores/panels.js');
+    let list; panels.subscribe((v) => { list = v; })();
+    return list[0].name;
+  });
+  await kit.page.locator('.tabs .tab:not(.active)', { hasText: panelName }).first().click();
+  await kit.settle(1200);
+  const back = await store(async () => {
+    const { activeEditorTab, selectedComponentIds } = await import('/src/CE_Application/stores/panels.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    return { tab: get(activeEditorTab)?.type, selected: [...get(selectedComponentIds)] };
+  });
+  led.check(S, 'the way back', 'a control opened on the panel file screen is selected when the panel\'s tab is clicked, not only by "Show on the panel"',
+    { tab: 'panel', selected: [label] }, back);
 
   // ---- whole file (GAIA) ---------------------------------------------------------------------------
   const gaia = await readFile(new URL('../../panels/Roland GAIA SH-01.cepanel', import.meta.url), 'utf8');
@@ -287,7 +323,11 @@ try {
     (await kit.page.locator('.pf .pf-head .lang').textContent()).trim());
 
   // ---- the every-field reference of a long control ------------------------------------------------
-  await store(async () => { (await import('/src/CE_Application/stores/panels.js')).selectComponent('gaia_tone1_osc_wave_317'); });
+  await store(async () => {
+    const { pickPanelSelection, selectionBeforeScriptTab } = await import('/src/CE_Application/stores/panels.js');
+    let before; selectionBeforeScriptTab.subscribe((v) => { before = v; })();
+    pickPanelSelection(before.panelId, 'gaia_tone1_osc_wave_317');
+  });
   await kit.settle(500);
   await kit.page.locator('.pf label', { hasText: 'Every field' }).locator('input').check();
   await kit.settle(800);

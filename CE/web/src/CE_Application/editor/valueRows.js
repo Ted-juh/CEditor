@@ -182,6 +182,17 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (m.name && m.bezier) return `cubic-bezier ${m.bezier.map(shownNumber).join(', ')}`;
       return m.name ? `${m.name}` : '';
     }
+    case 'envelope': {
+      if (!m.count) return '';
+      const parts = [`${m.count} point${m.count === 1 ? '' : 's'}`];
+      if (Number.isFinite(m.low) && Number.isFinite(m.high)) parts.push(`levels ${shownNumber(m.low)} to ${shownNumber(m.high)}`);
+      if (m.complete && !m.sorted) parts.push('played in order of x');
+      // A level past 0 to 1 is read as it is: past `to` above 1, past `from` below 0.
+      if (m.complete && (m.high > 1 || m.low < 0)) {
+        parts.push(m.high > 1 && m.low < 0 ? 'past from and to' : m.high > 1 ? 'above 1 goes past to' : 'below 0 goes past from');
+      }
+      return parts.join(' · ');
+    }
     case 'division': return m.label ? `${m.label}${Number.isFinite(m.beats) ? `, ${beatsText(m.beats)}` : ''}` : '';
     case 'scale': case 'chord': return m.notes ? m.notes.join(' ') : (m.label ?? '');
     case 'note': {
@@ -216,6 +227,16 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
+    case 'deviceParameter': {
+      if (m.noProfile) return `no profile is chosen for ${m.role}`;
+      if (m.declared) return 'declared by this panel\'s scripts';
+      if (m.loading) return `${m.profile ?? m.role}: its parameters are loading`;
+      if (!m.found || !m.parameter) return '';
+      const p = m.parameter;
+      const range = p.range ? `${shownNumber(p.range.min)} to ${shownNumber(p.range.max)}` : '';
+      const choices = p.choices ? `${p.choices} choices` : '';
+      return [p.name, p.group, choices || range].filter(Boolean).join(' · ');
+    }
     case 'font': return m.found === true ? 'an available font' : '';
     case 'image': {
       if (m.dataUrl) return 'image data';
@@ -232,13 +253,44 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (m.checksum) parts.push(`${m.checksum.type} checksum ${m.checksum.hex}`);
       return parts.join(' · ');
     }
+    case 'dash': {
+      // No list at all is the runtime's refusal, which the problem says.
+      if (!m.lengths) return '';
+      if (!m.lengths.length) return 'no lengths, so the line is solid';
+      if (m.drawn + m.skipped === 0) return 'every length is 0, so the line is solid';
+      if (m.skipped === 0) return 'nothing is skipped, so the line is solid';
+      if (m.drawn === 0) {
+        return m.cap === 'butt' ? 'nothing is drawn: a dash of 0 shows only with a round or square cap, as a dot'
+          : `each dash is 0, so the ${m.cap} cap draws it as a dot`;
+      }
+      // An odd list is drawn twice over, so a length is drawn the first time and skipped the next.
+      const steps = (m.odd ? [...m.lengths, ...m.lengths] : m.lengths)
+        .map((n, i) => `${shownNumber(n)} ${i % 2 ? 'skipped' : 'drawn'}`);
+      const shown = steps.length > 8 ? `${steps.slice(0, 8).join(', ')}, …` : steps.join(', ');
+      return `in pixels${m.odd ? ', an odd list twice over' : ''}: ${shown}`;
+    }
     case 'computed': {
-      if (madeBelow) return `made by the call below${m.expects ? `: a ${m.expects}` : ''}`;
-      return `worked out when the script runs${m.expects ? `: a ${m.expects}` : ''}, so there is nothing to edit here`;
+      // "an envelope", "an image", "an event": the article the kind's name takes.
+      const what = m.expects ? `: ${/^[aeiou]/i.test(m.expects) ? 'an' : 'a'} ${m.expects}` : '';
+      if (madeBelow) return `made by the call below${what}`;
+      return `worked out when the script runs${what}, so there is nothing to edit here`;
     }
     case 'enum': return '';
     default: return '';
   }
+}
+
+/**
+ * The id of the control a row can select on the panel: a control's name, or the control a property
+ * path names, when the panel has it. Null for anything else, for the panel itself and for `"*"`, any
+ * control, which no one selection is.
+ */
+export function controlToSelect(arg) {
+  if (arg?.kind !== 'control' && arg?.kind !== 'path') return null;
+  const m = arg.meaning ?? {};
+  if (m.any || m.panel || m.type === 'panel') return null;
+  if (arg.kind === 'control' && m.found !== true) return null;
+  return typeof m.id === 'string' && m.id ? m.id : null;
 }
 
 /** True when a computed argument is exactly a call listed under its own (it gets that call's rows). */

@@ -433,16 +433,27 @@ function wrap(v, lo, hi) {
   if (!(span > 0)) return a;
   return a + (((n - a) % span) + span) % span;
 }
-// [[x, y], …] sorted by x. Accepts pairs and { x: , y: } objects, so a panel can write either.
+// A point's [x, y, curve, tension] as written, or null when it is no point: a pair is a list of
+// them in that order; an object is read by its names, and failing those by its numbered entries,
+// counted from 0 when it has an entry 0 and from 1 when it does not. The WebView runtime reads a
+// point the same way (animEnvelope.js envelopePointParts), so it is one point in both.
+function __pointParts(p) {
+  if (p === null || typeof p !== "object") return null;
+  if (p.length !== undefined) return [p[0], p[1], p[2], p[3]];
+  var from = Object.prototype.hasOwnProperty.call(p, "0") ? 0 : 1;
+  var named = function (key, at) { return p[key] !== undefined && p[key] !== null ? p[key] : p[from + at]; };
+  return [named("x", 0), named("y", 1), named("curve", 2), named("tension", 3)];
+}
+// [[x, y, curve, tension], …] sorted by x. Accepts pairs and { x: , y: } objects, so a panel can
+// write either; a point's curve shapes the segment that ends at it (mapCurve).
 function __points(points) {
   var out = [];
   if (points && points.length !== undefined) {
     for (var i = 0; i < points.length; i++) {
-      var p = points[i], x, y;
-      if (p && p.length !== undefined) { x = p[0]; y = p[1]; }
-      else if (p) { x = p.x; y = p.y; }
-      x = Number(x); y = Number(y);
-      if (isFinite(x) && isFinite(y)) out.push([x, y]);
+      var parts = __pointParts(points[i]);
+      if (!parts) continue;
+      var x = Number(parts[0]), y = Number(parts[1]);
+      if (isFinite(x) && isFinite(y)) out.push([x, y, parts[2], parts[3]]);
     }
   }
   out.sort(function(p, q) { return p[0] - q[0]; });
@@ -466,7 +477,15 @@ function mapCurve(v, points) {
   if (n > last[0]) return last[1];
   for (var i = 1; i < list.length; i++) {
     var x0 = list[i - 1][0], y0 = list[i - 1][1], x1 = list[i][0], y1 = list[i][1];
-    if (n < x1 && x1 !== x0) return y0 + (n - x0) * (y1 - y0) / (x1 - x0);
+    if (n < x1 && x1 !== x0) {
+      // The segment's own shape, from the point it ends at, as the WebView runtime's mapCurve and
+      // the Envelope component take it. Read for straight lines alone, a point's curve played as a
+      // line here and as a curve in the editor.
+      if (list[i][2] !== undefined && list[i][2] !== null) {
+        return y0 + shapeCurve((n - x0) / (x1 - x0), list[i][2], list[i][3]) * (y1 - y0);
+      }
+      return y0 + (n - x0) * (y1 - y0) / (x1 - x0);
+    }
   }
   return last[1];
 }
@@ -2639,10 +2658,42 @@ function animateSpring(path, target, opts) {
 // envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 // `to` has one destination; an envelope goes up before it comes down, which is the single most
 // obvious thing a synth panel animates and the one thing `to` cannot express.
+//
+// A point is { x, y } or the two as a pair, each a number or text that is one. One that is not, or
+// whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView runtime's
+// envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler dropped a point
+// it could not read, and never reached one whose x is past 0 to 1, both without a word. A y past 0
+// to 1 is a level past `from` or `to`, and is read as it is. The points are a list, as there: text
+// has a length too, and was read as a list of its characters.
 function animateEnvelope(path, points, opts) {
-  if (!points || points.length === undefined || points.length < 2) {
+  if (!Array.isArray(points) || points.length < 2) {
     log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
     return false;
+  }
+  var written = function (v) {
+    if (v === undefined || v === null) return "none was given";
+    if (typeof v === "string") return '"' + v + '" is not';
+    if (typeof v === "number" && isFinite(v)) return String(v) + " is not";
+    return "the value given is not";
+  };
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i], which = "point " + (i + 1) + " of " + points.length;
+    if (p === null || typeof p !== "object") {
+      logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.");
+      return false;
+    }
+    var parts = __pointParts(p), x = parts[0], y = parts[1];
+    var nx = __realNumber(x);
+    if (nx === undefined || nx < 0 || nx > 1) {
+      var hint = nx !== undefined && nx / 100 >= 0 && nx / 100 <= 1
+        ? " If you meant " + String(nx) + " out of 100, write " + String(Number((nx / 100).toFixed(4))) + "." : "";
+      logError("ce.anim.envelope: the x of " + which + " is a number from 0 to 1, and " + written(x) + ", so nothing was started." + hint);
+      return false;
+    }
+    if (__realNumber(y) === undefined) {
+      logError("ce.anim.envelope: the y of " + which + " is a number, and " + written(y) + ", so nothing was started.");
+      return false;
+    }
   }
   var o = {}, k;
   if (opts) for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
