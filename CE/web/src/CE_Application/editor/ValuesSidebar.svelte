@@ -23,6 +23,10 @@
   // value, so the caret stays, the text is not touched, and an edit open in the display panel stays
   // open, since nothing about the selection changes while the script tab is in front.
   //
+  // A ce.anim.play row whose control is on the panel has Open: the Animation tab edits the panel,
+  // which a script tab does not have in front, so Open goes to the panel's tab with the control
+  // selected and the Animation tab on the animation the row names, where it previews.
+  //
   // A row that can take a control moved on the instrument (sendCC's controller, sendNRPN's and
   // sendRPN's numbers, a device parameter's id) has Learn: it shows the display panel's MIDI tab and
   // writes the first such control the tab's learn chips see, in one edit, and a chip dragged from
@@ -73,6 +77,7 @@
     onreveal = null,         // (start, end) → a view with no editor (the whole file) goes there
     pickedControl = null,    // the id of the control picked to be the panel's selection, or null
     onpickcontrol = null,    // (id) → pick it, (null) → take the pick back; null: no Select at all
+    onopenanimation = null,  // (controlId, name) → the panel, its Animation tab on it; null: no Open
   } = $props();
 
   const READ_EVERY_MS = 60;
@@ -271,6 +276,17 @@
     rawMidiDraft.set({ hex, role: 'mainSynth', from: `${labelPrefix.toLowerCase()} line ${lineNo(row.arg.range.start)}` });
     scriptDisplay.set(true);
     displayTabRequest.set({ tab: 'ports' });
+  }
+
+  /** Go to the panel, a ce.anim.play row's control selected and the Animation tab open on its
+   *  animation, where it previews; on the control's animations when it has none of that name, to
+   *  make one. An edit open here is ended first; the code is not touched. */
+  function openAnimation(arg) {
+    const m = arg.meaning ?? {};
+    if (!m.controlId || !onopenanimation) return;
+    stopLearn({ restore: false });
+    session?.done();
+    onopenanimation(m.controlId, m.key ?? null);
   }
 
   /* -------------------------------------------------------------------------------- sessions */
@@ -751,6 +767,17 @@
   {/if}
 {/snippet}
 
+{#snippet openAnimationTab(arg)}
+  {@const m = arg.meaning ?? {}}
+  {#if arg.kind === 'animation' && m.controlId && onopenanimation}
+    <!-- The Animation tab edits the panel, and a script tab has none in front: Open goes to it. -->
+    <button class="vpick vopen" aria-label={m.key ? `Open ${m.key} in the Animation tab` : `Open ${m.control}'s animations in the Animation tab`}
+      title={m.key ? `Go to the panel with ${m.control} selected and the Animation tab open on "${m.key}", where it previews. The script stays open in its tab.`
+        : `${m.control} has no animation called "${arg.value}". Go to the panel with ${m.control} selected and the Animation tab open, where one can be made.`}
+      onclick={(e) => { e.stopPropagation(); openAnimation(arg); }}>Open</button>
+  {/if}
+{/snippet}
+
 {#snippet learnAndSend(row)}
   {@const spec = learnable(row)}
   {@const hex = !readOnly && !isJson ? sendableHex(row.call, row.arg) : null}
@@ -848,6 +875,7 @@
                   {/if}
                   {@render valueEdit(row)}
                   {@render selectControl(arg)}
+                  {@render openAnimationTab(arg)}
                   {@render learnAndSend(row)}
                 </div>
                 {#if arg.kind === 'lcdLine' && arg.meaning?.lcd?.cells && !arg.meaning.lcd.layouts}

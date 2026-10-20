@@ -953,11 +953,14 @@ export function readAnimation(value, { panel, controls, controlName }) {
   if (typeof value !== 'string' || !panel || typeof controlName !== 'string') return { meaning, problem: null };
   const control = controlNamed(controls, controlName);
   if (!control) return { meaning, problem: null };
+  // The control's id and the animation's own key, for the row's Open (the Animation tab, on it).
+  meaning.controlId = control._children?.Core?.id ?? null;
   const all = control._children?.Animations?._children ?? {};
   const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
   meaning.choices = playable;
   const key = Object.keys(all).find((k) => k.toLowerCase() === value.toLowerCase());
   const node = key === undefined ? null : all[key];
+  meaning.key = key ?? null;
   if (node && String(node.kind ?? '') === 'keyframes') { meaning.found = true; return { meaning, problem: null }; }
   meaning.found = false;
   const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${value}"`;

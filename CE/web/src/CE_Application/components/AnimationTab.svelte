@@ -39,7 +39,7 @@
    * sprite sheet on a dot-matrix screen — and have nothing to do with this one. The candidate list
    * grouped them by name.
    */
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import Plus from 'lucide-svelte/icons/plus';
   import Play from 'lucide-svelte/icons/play';
   import Square from 'lucide-svelte/icons/square';
@@ -74,6 +74,7 @@
     armEditorTargetIfIdle,
     clearEditorTarget,
     targetOfKind,
+    takeEditorTargetFocus,
   } from '../stores/editorTarget.js';
   import {
     readAnimations,
@@ -254,6 +255,12 @@ onMount(() => {
     : []);
   let playhead = $state(0);
   let selectedKeyframe = $state(null); // { track, index }
+  // An opener can name the animation to show: the Values tab's Open on a ce.anim.play row does.
+  $effect(() => {
+    if (!mine?.focus) return;
+    const name = takeEditorTargetFocus();
+    if (name) untrack(() => { wantedName = name; rawTargetIndex = -1; selectedKeyframe = null; });
+  });
   let keyframeAt = $derived.by(() => {
     if (!sequence || !selectedKeyframe) return null;
     const target = selected.targets[selectedKeyframe.track];
