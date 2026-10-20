@@ -22,6 +22,11 @@ export function recallNoProfileWords(slot, role) {
 const banksOf = (presets) => (Array.isArray(presets?.banks) ? presets.banks : []);
 const intOr = (v, fallback) => (Number.isInteger(Number(v)) ? Number(v) : fallback);
 
+// A bank select byte a call sends: one written out. The runtime sends CC 0 only when bankMsb is
+// given and CC 32 only when bankLsb is, so a byte left out is whatever the synth last had.
+const sent = (n) => n !== undefined && n !== null && Number.isFinite(Number(n));
+const selectedBySelect = (b) => b?.bankMsb !== undefined || b?.bankLsb !== undefined;
+
 /** The name a slot has: the profile's catalogue's, which recallPreset answers with, else the one the
  *  user's library keeps for it (`library`: slot → name). */
 function slotName(info, slot, library) {
@@ -92,15 +97,14 @@ export function programWords(program, { msb, lsb, presets = null, library = null
   const p = Math.round(Number(program));
   if (!Number.isFinite(p) || p < 0 || p > 127) return null;
   const counted = `program ${p}, which a synth that counts from 1 shows as ${p + 1}`;
-  const hasBank = Number.isFinite(Number(msb)) || Number.isFinite(Number(lsb));
+  const hasBank = sent(msb) || sent(lsb);
   const reaches = banksOf(presets).filter((b) => {
     const base = intOr(b?.programBase, 0);
     if (p < base || p >= base + intOr(b?.slotCount, 0)) return false;
     // A bank the profile selects with bank select is reached only by its own; one with none by a
     // program change alone.
-    const selects = b?.bankMsb !== undefined || b?.bankLsb !== undefined;
-    if (!hasBank) return !selects;
-    return intOr(b?.bankMsb, 0) === intOr(msb, 0) && intOr(b?.bankLsb, 0) === intOr(lsb, 0);
+    if (!hasBank) return !selectedBySelect(b);
+    return selectsBank(b, msb, lsb);
   });
   if (reaches.length !== 1) return counted;
   const bank = reaches[0];
@@ -108,10 +112,28 @@ export function programWords(program, { msb, lsb, presets = null, library = null
   return `${counted} · slot ${slot}, ${slotWords(presetSlotInfo({ presets }, slot), presets, slot, library)}`;
 }
 
-/** The bank a bankMsb and bankLsb select on the role's profile, or null. */
+/**
+ * The bank a bankMsb and bankLsb select on the role's profile, or null. With one of them left out
+ * and a bank of the profile's told apart by it, what the synth does instead: it keeps the one it
+ * last had, so which bank is not known here.
+ */
 export function bankWords(msb, lsb, presets) {
-  if (!Number.isFinite(Number(msb)) && !Number.isFinite(Number(lsb))) return null;
-  const bank = banksOf(presets).find((b) => (b?.bankMsb !== undefined || b?.bankLsb !== undefined)
-    && intOr(b?.bankMsb, 0) === intOr(msb, 0) && intOr(b?.bankLsb, 0) === intOr(lsb, 0));
-  return bank ? `bank ${intOr(msb, 0)}/${intOr(lsb, 0)} is ${String(bank.label ?? bank.id ?? '')}` : null;
+  if (!sent(msb) && !sent(lsb)) return null;
+  const banks = banksOf(presets);
+  const bank = banks.find((b) => selectsBank(b, msb, lsb));
+  if (bank) return `bank ${[msb, lsb].filter(sent).map((n) => intOr(n, 0)).join('/')} is ${String(bank.label ?? bank.id ?? '')}`;
+  const missing = !sent(msb) ? 'bankMsb' : !sent(lsb) ? 'bankLsb' : null;
+  const needs = missing === 'bankMsb' ? (b) => b?.bankMsb !== undefined : (b) => b?.bankLsb !== undefined;
+  if (missing && banks.some((b) => selectedBySelect(b) && needs(b))) {
+    return `${missing} is not sent, so the synth keeps the one it last had, and which bank this selects is not known here`;
+  }
+  return null;
+}
+
+/** Whether the bank select bytes a call sends reach profile bank `b`: each byte the bank names must
+ *  be sent and match, since one left out is not known; a byte the bank does not name is 0 to it. */
+function selectsBank(b, msb, lsb) {
+  if (!selectedBySelect(b)) return false;
+  if ((b.bankMsb !== undefined && !sent(msb)) || (b.bankLsb !== undefined && !sent(lsb))) return false;
+  return (!sent(msb) || intOr(b.bankMsb, 0) === intOr(msb, 0)) && (!sent(lsb) || intOr(b.bankLsb, 0) === intOr(lsb, 0));
 }

@@ -94,6 +94,17 @@ test('a program number says how a synth counting from 1 shows it, and the slot i
   assert.equal(programWords(200, { presets }), null);
   assert.equal(bankWords(87, 32, presets), 'bank 87/32 is USB Memory Patch');
   assert.equal(bankWords(1, 1, presets), null);
+  // A bank select byte left out is not sent, so the synth keeps the one it had: a bank told apart by
+  // it is not named, by the bank's row or the program's.
+  const kept = 'bankLsb is not sent, so the synth keeps the one it last had, and which bank this selects is not known here';
+  assert.equal(bankWords(87, undefined, presets), kept);
+  assert.equal(bankWords(87, null, presets), kept);
+  assert.equal(bankWords(undefined, 64, presets), kept.replace('bankLsb', 'bankMsb'));
+  assert.equal(programWords(12, { msb: 87, presets }), 'program 12, which a synth that counts from 1 shows as 13');
+  // A bank the profile selects by its MSB alone is reached by the MSB alone.
+  const byMsb = { banks: [{ id: 'a', label: 'Bank A', bankMsb: 1, programBase: 0, slotCount: 128, startSlot: 0 }] };
+  assert.equal(bankWords(1, undefined, byMsb), 'bank 1 is Bank A');
+  assert.match(programWords(5, { msb: 1, presets: byMsb }), / · slot 5, /);
 });
 
 test('recallPreset says it recalled nothing for a role with no profile, and recalls a slot that is one', () => {
