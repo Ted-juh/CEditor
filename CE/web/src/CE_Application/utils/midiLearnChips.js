@@ -233,10 +233,13 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
  */
 export function chipDragPayload(chip, deviceRole) {
   const role = String(deviceRole ?? '');
-  if (chip?.parameter?.id) {
-    return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role };
-  }
   const message = LEARNABLE.get(String(chip?.origin ?? ''));
+  if (chip?.parameter?.id) {
+    // The message it moved as rides along: a script's sendCC, dropped on, takes the CC the profile
+    // names, which a binding, taking the parameter, does not read.
+    const midi = message ? { message, controller: chip.controller ?? null, channel: chip.channel ?? null, ...(chip.numbered ?? {}) } : null;
+    return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role, ...(midi ? { midi } : {}) };
+  }
   if (!message) return null;
   if (message === 'cc' && !Number.isFinite(Number(chip?.controller))) return null;
   if ((message === 'nrpn' || message === 'rpn') && !chip?.numbered) return null;

@@ -88,6 +88,29 @@ test('a device parameter\'s row learns the parameter the profile names for what 
   assert.equal(learnWords(spec, payload), 'Learned "tone1.osc.wave".');
 });
 
+test('a CC the profile names is still the CC that moved, for a sendCC row, learned or dragged', () => {
+  profileSources.set({ [GAIA.id]: { profileId: GAIA.id, source: JSON.stringify(GAIA) } });
+  const src = 'ce.midi.sendCC(1, 74, 64)';
+  const row = rowOf(src, 'cc');
+  const spec = learnFor(row.call, row.arg);
+  // The GAIA names CC 7 as its master volume: the chip is that parameter and still CC 7 on channel 2.
+  const chip = learnFrom(spec, ['B1 07 40'], GAIA.id);
+  assert.ok(chip, 'a CC the profile names is not passed over');
+  assert.deepEqual([chip.parameterId, chip.controller, chip.channel], ['master.volume', 7, 2]);
+  assert.equal(apply(src, learnedEdit(src, spec, chip, text(src))), 'ce.midi.sendCC(2, 7, 64)');
+  assert.equal(learnWords(spec, chip), 'Learned CC 7 on channel 2.');
+  // Dragged from the MIDI tab, its payload is the parameter and carries the CC it moved as.
+  const payload = chipDragPayload(chip, 'mainSynth');
+  assert.equal(payload.kind, 'ceditor.deviceParameter');
+  assert.equal(apply(src, learnedEdit(src, spec, payload, text(src))), 'ce.midi.sendCC(2, 7, 64)');
+  // …and a device parameter's row takes the same chip by its name.
+  const id = rowOf('ce.device.write("filter.cutoff", 64)', 'id');
+  const byName = learnFor(id.call, id.arg);
+  assert.equal(learnTakes(byName, payload), true);
+  assert.equal(learnWords(byName, payload), 'Learned "master.volume".');
+  profileSources.set({});
+});
+
 test('a dragged CC chip carries the channel it moved on, which a sendCC row writes', () => {
   const src = 'ce.midi.sendCC(1, 74, 64)';
   const row = rowOf(src, 'cc');
