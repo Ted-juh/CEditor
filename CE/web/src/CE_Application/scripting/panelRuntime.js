@@ -38,6 +38,7 @@ import {
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
+import { timeNumber } from './timeWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -2204,14 +2205,19 @@ const helpers = {
   // Where a beat position falls, musically — for ANY position, not only the one the transport is
   // at. `text` is the Transport's own readout ("3.2.00"), so a script's label and the component's
   // agree character for character. Ticks are 24 PPQN, the MIDI clock resolution.
+  //
+  // Their numbers are read as the transport reads them, and one not used as written is said once
+  // (timeArg): a position before the start is the start, and text that is not a number is the
+  // argument's default.
   barBeatAt: (beats, beatsPerBar) => {
-    const signature = { beats: beatsPerBar == null ? 4 : beatsPerBar, unit: 4 };
-    return { ...panelBarBeat(beats, signature), text: panelFormatBarBeat(beats, signature) };
+    const b = timeArg('barBeatAt', 'beats', beats);
+    const signature = { beats: timeArg('barBeatAt', 'beatsPerBar', beatsPerBar), unit: 4 };
+    return { ...panelBarBeat(b, signature), text: panelFormatBarBeat(b, signature) };
   },
   // Which step of the grid a position is on, counting from 0 at the transport origin.
   stepAt: (beats, division) => {
     const id = divisionId('ce.time.step', division);
-    return id === undefined ? undefined : panelStepAtBeat(beats, id);
+    return id === undefined ? undefined : panelStepAtBeat(timeArg('stepAt', 'beats', beats), id);
   },
   // The step boundaries crossed between two readings — the never-lose-an-event rule every synced
   // follower in the panel runs on. A stalled frame must FIRE the steps it slept through rather than
@@ -2221,34 +2227,43 @@ const helpers = {
   // more than replaying where you were.
   stepsBetween: (fromBeats, toBeats, division, max) => {
     const id = divisionId('ce.time.steps', division);
-    return id === undefined ? undefined : panelCrossedSteps(fromBeats, toBeats, id, max == null ? 16 : max);
+    if (id === undefined) return undefined;
+    const from = timeArg('stepsBetween', 'from', fromBeats);
+    const to = timeArg('stepsBetween', 'to', toBeats);
+    return panelCrossedSteps(from, to, id, timeArg('stepsBetween', 'max', max));
   },
   // The panel's shuffle: every odd step pushed later by up to half a step. In BEATS, to add to a
   // step's position. Two sequencers at "the same" swing really are the same swing only if they
   // compute it the same way, which is why this is the transport's function and not a second one.
   swingOffset: (step, amount, division) => {
     const id = divisionId('ce.time.swing', division);
-    return id === undefined ? undefined : panelSwungBeatOffset(step, amount, id);
+    if (id === undefined) return undefined;
+    const s = timeArg('swingOffset', 'step', step);
+    return panelSwungBeatOffset(s, timeArg('swingOffset', 'amount', amount), id);
   },
   // For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep.
   // Derived from the position, never accumulated, so a cycle running for an hour is still exactly
   // on the bar line. `length` is the cycle in beats; `count` is how many have completed.
   cycleAt: (beats, bars, beatsPerBar) => {
-    const perBar = beatsPerBar == null ? 4 : beatsPerBar;
+    const b = timeArg('cycleAt', 'beats', beats);
+    const n = timeArg('cycleAt', 'bars', bars);
+    const perBar = timeArg('cycleAt', 'beatsPerBar', beatsPerBar);
     return {
-      phase: panelCyclePhaseAt(beats, bars, perBar),
-      count: panelCycleCountAt(beats, bars, perBar),
-      length: panelCycleBeats(bars, perBar),
+      phase: panelCyclePhaseAt(b, n, perBar),
+      count: panelCycleCountAt(b, n, perBar),
+      length: panelCycleBeats(n, perBar),
     };
   },
   // Fold a timeline position into a loop. Before the loop start the position is untouched — you can
   // run IN to a loop from earlier in the song, which is what every DAW does and what a count-in
   // needs. `pass` is which time round you are, and -1 before the loop has been reached; a script
   // watching it for CHANGES knows a wrap happened without a wrap handler that can miss one.
-  loopedBeats: (beats, startBeats, lengthBeats) => ({
-    beats: panelLoopedBeats(beats, startBeats, lengthBeats),
-    pass: panelLoopCycleIndex(beats, startBeats, lengthBeats),
-  }),
+  loopedBeats: (beats, startBeats, lengthBeats) => {
+    const b = timeArg('loopedBeats', 'beats', beats);
+    const start = timeArg('loopedBeats', 'startBeats', startBeats);
+    const length = timeArg('loopedBeats', 'lengthBeats', lengthBeats);
+    return { beats: panelLoopedBeats(b, start, length), pass: panelLoopCycleIndex(b, start, length) };
+  },
   // Tempo from tap times, in the milliseconds nowMs() reports. Taps more than `resetMs` apart start
   // a NEW measurement rather than averaging across the pause — otherwise the first tap after a
   // break poisons it, which is what every hand-rolled tap tempo gets wrong. Nothing comes back from
@@ -4866,6 +4881,20 @@ function drawPaint(call, what, colour) {
   return undefined;
 }
 
+// ce.time's number arguments as the transport reads them (timeWords.js), with one not used as
+// written said once per call and argument: these run on every frame, and a line per frame would
+// bury the console. resetScriptState clears what has been said.
+const timeNumberWarned = new Set();
+function timeArg(memberId, name, value) {
+  const { n, said } = timeNumber(memberId, name, value);
+  const key = `${memberId} ${name}`;
+  if (said && !timeNumberWarned.has(key)) {
+    timeNumberWarned.add(key);
+    addScriptTrace('warn', '', `${said} This is said only the first time.`);
+  }
+  return n;
+}
+
 // What ce.draw.stroke made of a dash, a cap or a join it could not draw as written (drawDash.js),
 // said once per message: a stroke is set on every redraw, and a message per frame would bury the
 // console. resetScriptState clears what has been said.
@@ -7132,16 +7161,19 @@ function transportInfoRead() {
 const tempoRead = () => transportSnapshot().bpm;
 const isPlayingRead = () => transportSnapshot().playing;
 
+// A bpm that is not above 0, or not a number, is the transport's tempo, and says so (timeArg).
 function beatsToMsRead(beats, bpm) {
-  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  const b = timeArg('beatsToMs', 'beats', beats);
+  const rate = timeArg('beatsToMs', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
-  return (Number(beats) || 0) * 60000 / rate;
+  return b * 60000 / rate;
 }
 
 function msToBeatsRead(ms, bpm) {
-  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  const m = timeArg('msToBeats', 'ms', ms);
+  const rate = timeArg('msToBeats', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
-  return (Number(ms) || 0) * rate / 60000;
+  return m * rate / 60000;
 }
 
 /**
@@ -9627,6 +9659,7 @@ function resetScriptState() {
   edgeWarned.clear();
   animTimingWarned.clear();
   drawStrokeWarned.clear();
+  timeNumberWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

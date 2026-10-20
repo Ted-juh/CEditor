@@ -2373,8 +2373,8 @@ export const COMMANDS = [
     id: 'beatsToMs', category: 'Time', signature: 'beatsToMs(beats [, bpm])',
     summary: 'Convert a number of beats to milliseconds at the current tempo, or at `bpm` if you give one. Returns nothing if there is no tempo to work from.',
     params: [
-      { name: 'beats', type: 'number', required: true },
-      { name: 'bpm', type: 'number', required: false },
+      { name: 'beats', type: 'number', required: true, unit: 'beats' },
+      { name: 'bpm', type: 'number', required: false, unit: 'BPM' },
     ],
     scopes: 'any',
     snippet: { lua: 'set("delayTime", beatsToMs(0.75))$0', javascript: 'set("delayTime", beatsToMs(0.75));$0' },
@@ -2383,8 +2383,8 @@ export const COMMANDS = [
     id: 'msToBeats', category: 'Time', signature: 'msToBeats(ms [, bpm])',
     summary: 'Convert a length of time in milliseconds to beats (quarter notes) at the current tempo, or at `bpm` if you give one — the reverse of `ce.time.beatsToMs()`. Returns nothing if there is no tempo to work from.',
     params: [
-      { name: 'ms', type: 'number', required: true },
-      { name: 'bpm', type: 'number', required: false },
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
+      { name: 'bpm', type: 'number', required: false, unit: 'BPM' },
     ],
     scopes: 'any',
     snippet: { lua: 'local beats = msToBeats(${1:500})$0', javascript: 'const beats = msToBeats(${1:500});$0' },
@@ -2458,8 +2458,8 @@ export const COMMANDS = [
     id: 'barBeatAt', category: 'Time', signature: 'barBeatAt(beats [, beatsPerBar]) -> table',
     summary: 'Turn a position in beats into bars, beats and ticks — for any position, not only where the transport is now. Returns `bar`, `beat`, `tick` and `text`. Bars and beats count from 1, and `tick` splits each beat into 24 parts (0 to 23), the same resolution as MIDI clock. `text` is written the way the Transport component displays it, such as "3.2.00". `beatsPerBar` defaults to 4.',
     params: [
-      { name: 'beats', type: 'number', required: true },
-      { name: 'beatsPerBar', type: 'number', required: false },
+      { name: 'beats', type: 'number', required: true, unit: 'beats' },
+      { name: 'beatsPerBar', type: 'number', required: false, unit: 'beats' },
     ],
     scopes: 'any',
     snippet: { lua: 'log(barBeatAt(transportInfo().beats).text)$0', javascript: 'log(barBeatAt(transportInfo().beats).text);$0' },
@@ -2468,7 +2468,7 @@ export const COMMANDS = [
     id: 'stepAt', category: 'Time', signature: 'stepAt(beats, division) -> number',
     summary: 'Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Capitals in `division` do not matter; a name it does not recognise returns nothing and writes a message.',
     params: [
-      { name: 'beats', type: 'number', required: true },
+      { name: 'beats', type: 'number', required: true, unit: 'beats' },
       { name: 'division', type: 'string', required: true, kind: 'division' },
     ],
     scopes: 'any',
@@ -2477,10 +2477,10 @@ export const COMMANDS = [
     id: 'stepsBetween', category: 'Time', signature: 'stepsBetween(from, to, division [, max]) -> table',
     summary: 'Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. An unknown division returns nothing and writes a message.',
     params: [
-      { name: 'from', type: 'number', required: true },
-      { name: 'to', type: 'number', required: true },
+      { name: 'from', type: 'number', required: true, unit: 'beats' },
+      { name: 'to', type: 'number', required: true, unit: 'beats' },
       { name: 'division', type: 'string', required: true, kind: 'division' },
-      { name: 'max', type: 'number', required: false },
+      { name: 'max', type: 'number', required: false, unit: 'steps' },
     ],
     scopes: 'any',
   },
@@ -2488,7 +2488,7 @@ export const COMMANDS = [
     id: 'swingOffset', category: 'Time', signature: 'swingOffset(step, amount, division) -> number',
     summary: 'Return how far to delay a step to give it swing, in beats — add it to the step\'s position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport\'s swing setting holds. It uses the Transport\'s own swing calculation, so your timing matches the panel\'s sequencers. An unknown division returns nothing and writes a message.',
     params: [
-      { name: 'step', type: 'number', required: true },
+      { name: 'step', type: 'number', required: true, unit: 'steps' },
       { name: 'amount', type: 'number', required: true, unit: '0 to 1' },
       { name: 'division', type: 'string', required: true, kind: 'division' },
     ],
@@ -2498,9 +2498,9 @@ export const COMMANDS = [
     id: 'cycleAt', category: 'Time', signature: 'cycleAt(beats, bars [, beatsPerBar]) -> table',
     summary: 'Find where a position falls within a cycle that repeats every `bars` bars (0.25 to 64). Returns `phase`, how far through the current cycle you are, from 0 to 1; `count`, how many whole cycles have finished; and `length`, the cycle\'s length in beats. It is worked out fresh from the position each time rather than added up as it goes, so it does not drift, even after hours.',
     params: [
-      { name: 'beats', type: 'number', required: true },
-      { name: 'bars', type: 'number', required: true },
-      { name: 'beatsPerBar', type: 'number', required: false },
+      { name: 'beats', type: 'number', required: true, unit: 'beats' },
+      { name: 'bars', type: 'number', required: true, unit: 'bars' },
+      { name: 'beatsPerBar', type: 'number', required: false, unit: 'beats' },
     ],
     scopes: 'any',
   },
@@ -2508,9 +2508,9 @@ export const COMMANDS = [
     id: 'loopedBeats', category: 'Time', signature: 'loopedBeats(beats, startBeats, lengthBeats) -> table',
     summary: 'Map a position on the timeline into a loop that starts at `startBeats` and lasts `lengthBeats`. Returns `beats`, the position inside the loop, and `pass`, which time round the loop you are on, counting from 0. Positions before the loop start come back unchanged with `pass` set to -1, so a count-in or lead-in works. When `pass` changes, the loop has just wrapped round. Like `ce.time.cycle()`, it is worked out fresh from the position each time, so it does not drift over long runs.',
     params: [
-      { name: 'beats', type: 'number', required: true },
-      { name: 'startBeats', type: 'number', required: true },
-      { name: 'lengthBeats', type: 'number', required: true },
+      { name: 'beats', type: 'number', required: true, unit: 'beats' },
+      { name: 'startBeats', type: 'number', required: true, unit: 'beats' },
+      { name: 'lengthBeats', type: 'number', required: true, unit: 'beats' },
     ],
     scopes: 'any',
   },
@@ -2678,15 +2678,15 @@ export const COMMANDS = [
           summary: 'What a boolean sends when it is on.' },
         { name: 'falseValue', type: 'number', default: '0',
           summary: 'What a boolean sends when it is off.' },
-        { name: 'cc', type: 'number', sample: '74', group: 'how it reaches the synth — pick one',
+        { name: 'cc', type: 'number', unit: '0 to 127', sample: '74', group: 'how it reaches the synth — pick one',
           summary: 'Send it as this CC number, 0 to 127. The simplest of the three wire formats.' },
         // `fields` here are msb and lsb, which the check of option keys reads one level down, in
         // every runtime: { mbs = 1 } was accepted and sent MSB 0.
         { name: 'nrpn', type: 'object', group: 'how it reaches the synth — pick one',
           summary: 'Send it as an NRPN, as { msb, lsb } or the two numbers as a list.',
           fields: [
-            { name: 'msb', type: 'number', summary: 'The parameter number\'s high byte (CC 99).' },
-            { name: 'lsb', type: 'number', summary: 'The parameter number\'s low byte (CC 98).' },
+            { name: 'msb', type: 'number', unit: '0 to 127', summary: 'The parameter number\'s high byte (CC 99).' },
+            { name: 'lsb', type: 'number', unit: '0 to 127', summary: 'The parameter number\'s low byte (CC 98).' },
           ] },
         { name: 'sysex', type: 'text or list', group: 'how it reaches the synth — pick one', kind: 'bytes', template: true,
           summary: 'Send it as a SysEx message built from this template, a list or text such as '
@@ -2696,7 +2696,7 @@ export const COMMANDS = [
             + 'else is refused. The checksum covers everything after F0 unless $checksumStart says '
             + 'where it begins. A Roland checksum covers only the address and the data, so a Roland '
             + 'template (41 after F0) with $checksum and no $checksumStart is defined with a warning.' },
-        { name: 'channel', type: 'number', default: '1',
+        { name: 'channel', type: 'number', unit: '1 to 16', default: '1',
           summary: 'The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel '
             + 'puts there.' },
         { name: 'encoding', type: 'text', default: '"u7"', sample: '"to14bit"',
@@ -2940,8 +2940,8 @@ export const COMMANDS = [
     summary: 'Send an NRPN (Non-Registered Parameter Number) message: `msb` and `lsb` pick the parameter and `value` runs from 0 to 16383. Many synths use NRPNs for parameters that need more than 128 steps.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
-      { name: 'msb', type: 'number', required: true },
-      { name: 'lsb', type: 'number', required: true },
+      { name: 'msb', type: 'number', required: true, unit: '0 to 127' },
+      { name: 'lsb', type: 'number', required: true, unit: '0 to 127' },
       { name: 'value', type: 'value', required: true, unit: '0 to 16383' },
     ],
     scopes: 'any',
@@ -2952,8 +2952,8 @@ export const COMMANDS = [
     summary: 'Send an RPN (Registered Parameter Number) message — the standard way to set pitch-bend range (0, 0), fine tuning (0, 1) and coarse tuning (0, 2). It works like sendNRPN, but uses controllers 101 and 100 instead of 99 and 98.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
-      { name: 'msb', type: 'number', required: true },
-      { name: 'lsb', type: 'number', required: true },
+      { name: 'msb', type: 'number', required: true, unit: '0 to 127' },
+      { name: 'lsb', type: 'number', required: true, unit: '0 to 127' },
       { name: 'value', type: 'value', required: true, unit: '0 to 16383' },
     ],
     scopes: 'any',
@@ -3118,7 +3118,7 @@ export const COMMANDS = [
     id: 'panic', category: 'Device / MIDI', signature: 'panic([opts])',
     summary: 'Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`, a number from 1 to 16 (anything else, such as "all", is refused and nothing is sent); set `opts.resetControllers` to false to leave controllers alone.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
-      { name: 'channel', type: 'number', default: 'all sixteen channels', sample: '1',
+      { name: 'channel', type: 'number', unit: '1 to 16', default: 'all sixteen channels', sample: '1',
         summary: 'Silence one channel instead of every one.' },
       { name: 'resetControllers', type: 'true or false', default: 'true',
         summary: 'Whether to send Reset All Controllers (121) as well as the two note-off '

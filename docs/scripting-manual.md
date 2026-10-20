@@ -1346,7 +1346,7 @@ Silence everything: sends All Sound Off (controller 120), All Notes Off (123) an
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `channel` | number | all sixteen channels | Silence one channel instead of every one. |
+| `channel` | number (1 to 16) | all sixteen channels | Silence one channel instead of every one. |
 | `resetControllers` | true or false | true | Whether to send Reset All Controllers (121) as well as the two note-off messages. Set false to leave pitch bend and modulation where they are. |
 
 ```lua
@@ -1606,10 +1606,10 @@ Describe a synth parameter from your script, for a synth that has no device prof
 | `choices` | list of text | — | The settings, in order, when the parameter is a choice: their names, each worth its position plus `min` (so { "LP", "HP", "BP" } sends 0, 1 and 2), or { id, value } pairs. write() takes a name in any case, or the number itself; another name is refused, with the choices listed. |
 | `trueValue` | number | 1 | What a boolean sends when it is on. |
 | `falseValue` | number | 0 | What a boolean sends when it is off. |
-| `cc` | number | — | Send it as this CC number, 0 to 127. The simplest of the three wire formats. |
+| `cc` | number (0 to 127) | — | Send it as this CC number, 0 to 127. The simplest of the three wire formats. |
 | `nrpn` | object | — | Send it as an NRPN, as { msb, lsb } or the two numbers as a list. |
 | `sysex` | text or list | — | Send it as a SysEx message built from this template, a list or text such as "F0 41 10 $value F7". Each entry is one byte, a number from 0 to 255 or one or two hex digits, or one of the tokens $value, $deviceId (16 unless `variables` says otherwise), $channel, $checksumStart, $checksum, or any $name you listed in `variables`. Anything else is refused. The checksum covers everything after F0 unless $checksumStart says where it begins. A Roland checksum covers only the address and the data, so a Roland template (41 after F0) with $checksum and no $checksumStart is defined with a warning. |
-| `channel` | number | 1 | The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel puts there. |
+| `channel` | number (1 to 16) | 1 | The MIDI channel to send on, 1 to 16. In a SysEx template it is what $channel puts there. |
 | `encoding` | text | "u7" | How the number is packed into a SysEx template's $value: "u7" is one byte, "u14" two, most significant first, as ce.midi.to14bit gives them ("to14bit" is read as the same), and "nibbled" is `nibbles` 4-bit nibbles, most significant first. "boolean-u7", the device profiles' name for a switch's byte, is one byte too. Any case is read; another name is refused. |
 | `nibbles` | number | 2 | How many nibbles a "nibbled" value takes, 1 to 8. |
 | `checksum` | text | "roland" | Which checksum $checksum puts in the template: any of ce.midi.checksum's names, in any case, computed the same way. One wider than a byte, such as a CRC, takes as many bytes as it needs. An unknown name is refused, with the names listed. |

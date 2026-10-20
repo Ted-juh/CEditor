@@ -771,17 +771,23 @@ def tempo():
 def isPlaying():
     return __transport().get("playing") is True
 
+# A bpm that is not above 0, or not a number, is the transport's tempo, and says so (__tread). It
+# gave nothing here, where the WebView used the tempo, and "fast" raised a TypeError.
 def beatsToMs(beats, bpm=None):
-    bpm = bpm or tempo()
-    if not bpm or bpm <= 0:
+    b = __tread("beatsToMs", "beats", beats)
+    rate = __tread("beatsToMs", "bpm", bpm)
+    if rate is None: rate = tempo()
+    if not rate or rate <= 0:
         return None
-    return (float(beats) if beats is not None else 0.0) * 60000.0 / bpm
+    return b * 60000.0 / rate
 
 def msToBeats(ms, bpm=None):
-    bpm = bpm or tempo()
-    if not bpm or bpm <= 0:
+    m = __tread("msToBeats", "ms", ms)
+    rate = __tread("msToBeats", "bpm", bpm)
+    if rate is None: rate = tempo()
+    if not rate or rate <= 0:
         return None
-    return (float(ms) if ms is not None else 0.0) * bpm / 60000.0
+    return m * rate / 60000.0
 
 # syncTimer(id, beats [, opts]) - a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
 # The first version computed the interval once and then kept firing at the old rate forever; a verb
@@ -880,6 +886,53 @@ def __tclamp(v, lo, hi):
     n = __tnum(v, lo)
     return lo if n < lo else (hi if n > hi else n)
 
+# A helper's number argument as the transport reads it, with one not used as written said once per
+# helper and argument, in the words of the WebView runtime's timeWords.js. A position before the
+# start is the start, a bar of no beats is a bar of one, and text that is not a number is the
+# argument's default; each gave an answer for a number nobody wrote, without a word. For each
+# argument: what is used for one that is not a number, the least and the most it is read as, and
+# whether it is rounded first; a bpm falls back to the transport's tempo.
+__TIME_NUMBERS = {
+    "barBeatAt": ("ce.time.position", { "beats": { "fallback": 0, "min": 0 }, "beatsPerBar": { "fallback": 4, "min": 1 } }),
+    "stepAt": ("ce.time.step", { "beats": { "fallback": 0, "min": 0 } }),
+    "stepsBetween": ("ce.time.steps", { "from": { "fallback": 0, "min": 0 }, "to": { "fallback": 0, "min": 0 }, "max": { "fallback": 16, "min": 1, "round": True } }),
+    "swingOffset": ("ce.time.swing", { "step": { "fallback": 0 }, "amount": { "fallback": 0, "min": 0, "max": 1 } }),
+    "cycleAt": ("ce.time.cycle", { "beats": { "fallback": 0, "min": 0 }, "bars": { "fallback": 0.25, "min": 0.25, "max": 64 }, "beatsPerBar": { "fallback": 4, "min": 1 } }),
+    "loopedBeats": ("ce.time.looped", { "beats": { "fallback": 0, "min": 0 }, "startBeats": { "fallback": 0, "min": 0 }, "lengthBeats": { "fallback": 0.01, "min": 0.01 } }),
+    "beatsToMs": ("ce.time.beatsToMs", { "beats": { "fallback": 0 }, "bpm": { "tempo": True } }),
+    "msToBeats": ("ce.time.msToBeats", { "ms": { "fallback": 0 }, "bpm": { "tempo": True } }),
+}
+# A dict, not a set: the prelude's own set(path, value) is the name `set` here.
+__timeWarned = {}
+def __tread(fn, name, v):
+    import math
+    verb, args = __TIME_NUMBERS[fn]
+    s = args[name]
+    if v is None:
+        return None if s.get("tempo") else s["fallback"]
+    read = __realNumber(v)
+    n = None
+    if s.get("tempo"):
+        if read is not None and read > 0: return read
+        why = "not a number" if read is None else "not above 0"
+        used = "the transport's tempo"
+    elif read is None:
+        why = "not a number"; n = s["fallback"]; used = __shown(n)
+    else:
+        n = math.floor(read + 0.5) if s.get("round") else read
+        if "min" in s and n < s["min"]:
+            why = "less than " + __shown(s["min"]); n = s["min"]; used = __shown(n)
+        elif "max" in s and n > s["max"]:
+            why = "more than " + __shown(s["max"]); n = s["max"]; used = __shown(n)
+        else:
+            return n
+    key = fn + " " + name
+    if key not in __timeWarned:
+        __timeWarned[key] = True
+        logWarn(verb + ": " + name + " is " + __shownValue(v) + ", which is " + why + ", so " + used
+                + " was used. This is said only the first time.")
+    return n
+
 # A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and only
 # DIFFERENCES mean anything, so a machine syncing its clock cannot corrupt an interval.
 def nowMs():
@@ -908,10 +961,8 @@ def divisionNames():
 # count from 1 as musicians do; `text` is the Transport component's own readout.
 def barBeatAt(beats, beatsPerBar=None):
     import math
-    perBar = __tnum(beatsPerBar, 4)
-    if perBar < 1: perBar = 1
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
+    b = __tread("barBeatAt", "beats", beats)
+    perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar)
     bar = math.floor(b / perBar) + 1
     beat = math.floor(b % perBar) + 1
     tick = math.floor((b % 1) * __CE_TIME["ppqn"])
@@ -922,9 +973,7 @@ def stepAt(beats=None, division=None):
     import math
     per = __division("ce.time.step", division)
     if per is None: return None
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
-    return math.floor(b / per)
+    return math.floor(__tread("stepAt", "beats", beats) / per)
 
 # The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
 # through rather than drop them - the difference between a stutter and a hole in the bar. Capped so
@@ -934,17 +983,14 @@ def stepsBetween(fromBeats=None, toBeats=None, division=None, maxSteps=None):
     import math
     per = __division("ce.time.steps", division)
     if per is None: return None
-    frm = __tnum(fromBeats, 0)
-    if frm < 0: frm = 0
-    to = __tnum(toBeats, 0)
-    if to < 0: to = 0
+    frm = __tread("stepsBetween", "from", fromBeats)
+    to = __tread("stepsBetween", "to", toBeats)
+    cap = __tread("stepsBetween", "max", maxSteps)
     if to <= frm: return { "steps": [], "dropped": 0 }
     first = math.floor(frm / per) + 1
     last = math.floor(to / per)
     if last < first: return { "steps": [], "dropped": 0 }
     total = last - first + 1
-    cap = int(__tnum(maxSteps, 16) + 0.5)
-    if cap < 1: cap = 1
     kept = total if total < cap else cap
     return { "steps": list(range(last - kept + 1, last + 1)), "dropped": total - kept }
 
@@ -954,22 +1000,18 @@ def swingOffset(step=None, amount=None, division=None):
     import math
     per = __division("ce.time.swing", division)
     if per is None: return None
-    s = __tclamp(amount, 0, 1)
-    idx = math.floor(__tnum(step, 0) + 0.5)
+    idx = math.floor(__tread("swingOffset", "step", step) + 0.5)
+    s = __tread("swingOffset", "amount", amount)
     return s * 0.5 * per if abs(idx) % 2 == 1 else 0
 
 # For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
 # never accumulated, so a cycle running for an hour is still exactly on the bar line.
-def __cycleBeats(bars, beatsPerBar):
-    perBar = __tnum(beatsPerBar, 4)
-    if perBar < 1: perBar = 1
-    length = __tclamp(bars, 0.25, 64) * perBar
-    return 0.01 if length < 0.01 else length
 def cycleAt(beats, bars, beatsPerBar=None):
     import math
-    length = __cycleBeats(bars, beatsPerBar)
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
+    b = __tread("cycleAt", "beats", beats)
+    n = __tread("cycleAt", "bars", bars)
+    length = n * __tread("cycleAt", "beatsPerBar", beatsPerBar)
+    if length < 0.01: length = 0.01
     return { "phase": ((b / length) % 1 + 1) % 1, "count": math.floor(b / length), "length": length }
 
 # Fold a timeline position into a loop. Before the loop start the position is untouched - you can
@@ -977,12 +1019,9 @@ def cycleAt(beats, bars, beatsPerBar=None):
 # reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 def loopedBeats(beats, startBeats, lengthBeats):
     import math
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
-    st = __tnum(startBeats, 0)
-    if st < 0: st = 0
-    length = __tnum(lengthBeats, 0.01)
-    if length < 0.01: length = 0.01
+    b = __tread("loopedBeats", "beats", beats)
+    st = __tread("loopedBeats", "startBeats", startBeats)
+    length = __tread("loopedBeats", "lengthBeats", lengthBeats)
     if b < st: return { "beats": b, "pass": -1 }
     return { "beats": st + ((b - st) % length), "pass": math.floor((b - st) / length) }
 

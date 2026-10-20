@@ -207,6 +207,11 @@ const CASES = [
   // Tension 0 is the default, not a straight line: `tension || 1.6` in the app, as in shape().
   ['mapCurve', [0.75, [[0, 0], [0.5, 1, 'exp', 0], [1, 0, 'log']]]],
   ['mapCurve', [0.6, [[0, 0.2, 'exp'], [1, 0.8]]]],
+  // ce.time's numbers read as the transport reads them, where one is not used as written (the words
+  // are compared in their own test below). A boolean is no number: it was 1 in three runtimes and
+  // the default in Lua.
+  ['stepAt', ['x', '1/16']], ['stepAt', ['2.5', '1/8']], ['swingOffset', [true, 2, '1/16']],
+  ['beatsToMs', ['x', 120]], ['beatsToMs', ['2', 120]], ['msToBeats', [true, 60]], ['beatsToMs', [true, 120]],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
@@ -265,6 +270,9 @@ const STRUCT_CASES = [
   ['cycleAt', [6, 0]], ['cycleAt', [6, 1000]], ['cycleAt', [-3, 2]],
   ['loopedBeats', [0, 4, 8]], ['loopedBeats', [4, 4, 8]], ['loopedBeats', [13, 4, 8]],
   ['loopedBeats', [20, 4, 8]], ['loopedBeats', [20, 4, 0]],
+  ['barBeatAt', [-1, 0]], ['barBeatAt', ['8', null]], ['barBeatAt', [true]], ['stepsBetween', [0, 4, '1/4', 0.4]],
+  ['stepsBetween', [-2, 'soon', '1/4']], ['cycleAt', ['x', 100, 0]], ['cycleAt', [4, 0.1, 'three']],
+  ['loopedBeats', [-3, -1, 0]],
   // Byte lists that come back as lists: a field written across a byte boundary, a write that grows
   // the list, the empty slice, and base64 with and without padding and with whitespace in it.
   ['setBits', [[0, 180], 12, 3, 5]], ['setBits', ['00 00', 7, 2, 3]], ['setBits', [[255], 0, 8, 0]],
@@ -401,6 +409,7 @@ test('the Lua engine prelude computes what the WebView runtime computes', async 
     // helper being tested — it fails the whole prelude, before any of them are defined.
     lua.global.set('log', () => {});
     lua.global.set('logError', () => {});
+    lua.global.set('logWarn', () => {});
     lua.global.set('sendCC', () => {});
     lua.global.set('on', () => {});
     lua.global.set('startTimer', () => {});
@@ -1346,6 +1355,106 @@ sys.stdout.write(json.dumps(warns, ensure_ascii=False))
 `;
   const run = spawnSync(python, ['-c', driver], {
     input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: EDGE_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
+/* ------------------------------------------------- ce.time's numbers, as the transport reads them */
+
+// A number ce.time's helpers cannot use as written is said, once per helper and argument, in the
+// same words in every engine (timeWords.js). The second barBeatAt and the second cycleAt's bars say
+// nothing; text that is a number, and an argument left out, say nothing at all.
+const TIME_CALLS = [
+  ['barBeatAt', [-1, 0]], ['barBeatAt', [-2, 0]], ['stepAt', ['x', '1/16']], ['stepsBetween', [0, 4, '1/4', 0.4]],
+  ['stepsBetween', [-2, 'soon', '1/4']], ['swingOffset', [true, 2, '1/16']], ['cycleAt', ['x', 100, 0]],
+  ['cycleAt', [4, 0.1]], ['loopedBeats', [-3, -1, 0]], ['beatsToMs', ['x', 120]], ['beatsToMs', [1, -5]],
+  ['msToBeats', [true, 'fast']], ['barBeatAt', ['8', null]], ['stepAt', ['2.5', '1/8']],
+];
+
+test('ce.time\'s helpers say a number they cannot use as written, once, in the same words everywhere', async (t) => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  for (const [fn, args] of TIME_CALLS) web[fn](...args);
+  const want = get(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+  const said = (text) => `${text} This is said only the first time.`;
+  assert.deepEqual(want, [
+    said('ce.time.position: beats is -1, which is less than 0, so 0 was used.'),
+    said('ce.time.position: beatsPerBar is 0, which is less than 1, so 1 was used.'),
+    said('ce.time.step: beats is "x", which is not a number, so 0 was used.'),
+    said('ce.time.steps: max is 0.4, which is less than 1, so 1 was used.'),
+    said('ce.time.steps: from is -2, which is less than 0, so 0 was used.'),
+    said('ce.time.steps: to is "soon", which is not a number, so 0 was used.'),
+    said('ce.time.swing: step is true, which is not a number, so 0 was used.'),
+    said('ce.time.swing: amount is 2, which is more than 1, so 1 was used.'),
+    said('ce.time.cycle: beats is "x", which is not a number, so 0 was used.'),
+    said('ce.time.cycle: bars is 100, which is more than 64, so 64 was used.'),
+    said('ce.time.cycle: beatsPerBar is 0, which is less than 1, so 1 was used.'),
+    said('ce.time.looped: beats is -3, which is less than 0, so 0 was used.'),
+    said('ce.time.looped: startBeats is -1, which is less than 0, so 0 was used.'),
+    said('ce.time.looped: lengthBeats is 0, which is less than 0.01, so 0.01 was used.'),
+    said('ce.time.beatsToMs: beats is "x", which is not a number, so 0 was used.'),
+    said('ce.time.beatsToMs: bpm is -5, which is not above 0, so the transport\'s tempo was used.'),
+    said('ce.time.msToBeats: ms is true, which is not a number, so 0 was used.'),
+    said('ce.time.msToBeats: bpm is "fast", which is not a number, so the transport\'s tempo was used.'),
+  ]);
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
+  resetScriptStateForTesting();
+
+  // JavaScript, under node:vm.
+  {
+    const warns = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'warn') warns.push(String(m)); } : () => undefined),
+    });
+    for (const [fn, args] of TIME_CALLS) sandbox[fn](...args);
+    assert.deepEqual(warns, want, 'JS prelude');
+  }
+  // Lua, under wasmoon.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      // __transportState answers nothing, as a host with no transport does: a bpm the helpers cannot
+      // use falls back to a tempo there is none of.
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = TIME_CALLS.map(([fn, args]) => `${fn}(${args.map(luaLiteral).join(', ')})`).join('\n');
+      const got = String(await lua.doString(`local w = {}\nlogWarn = function(m) w[#w + 1] = tostring(m) end\n${calls}\nreturn table.concat(w, "\\n")`));
+      assert.deepEqual(got.split('\n'), want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its warnings were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+warns = []
+g["logWarn"] = lambda m, *rest: warns.append(str(m))
+for fn, args in payload["calls"]:
+    g[fn](*args)
+sys.stdout.write(json.dumps(warns, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: TIME_CALLS }),
     encoding: 'utf8',
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
   });

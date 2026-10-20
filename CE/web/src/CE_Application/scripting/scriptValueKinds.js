@@ -26,6 +26,7 @@ import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
+import { timeNumber } from './timeWords.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
 import { deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords } from './deviceWords.js';
@@ -488,7 +489,8 @@ export function timeRefusal(value, { call, unit, what, positive, outcome }) {
  * milliseconds are counted in. The two opacity scales (record example 12) warn in the words the
  * runtime warns in, given `site.scaleWarning`.
  */
-export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
+export function readNumber(value, param, { tempo: contextTempo = 120, site = {} } = {}) {
+  const tempo = site.tempo ?? contextTempo;
   const unit = param.unit ?? null;
   const range = rangeOfUnit(unit);
   // `min: null` in the contract: a unit with no floor (ce.ui.notify's 0 or less keeps a message up).
@@ -501,6 +503,12 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     if (refused) return { meaning, problem: { severity: 'error', message: refused } };
   }
   const n = typeof value === 'number' ? value : realNumber(value);
+  // ce.time's helpers (timeWords.js): what the helper does with a number it cannot use as written,
+  // in its words, and nothing of a range besides, since the helper reads its own.
+  if (site.timeNumber && value !== undefined && value !== null) {
+    const { said } = timeNumber(site.timeNumber.memberId, site.timeNumber.name, value);
+    if (said) return { meaning, problem: { severity: 'warning', message: said } };
+  }
   // sendNote's length (panelRuntime's noteLength): text that is a number is read, and it must be
   // above 0, or the note is not sent at all.
   if (site.noteLength && value !== undefined && value !== null && (n === undefined || !(n > 0))) {
@@ -561,7 +569,8 @@ export function readNumber(value, param, { tempo = 120, site = {} } = {}) {
     return { meaning, problem: null };
   }
   // ce.anim's timing has said above all the runtime says of it: a stagger below 0 is used as it is.
-  if (site.animTiming) return { meaning, problem: null };
+  // So have ce.time's helpers.
+  if (site.animTiming || site.timeNumber) return { meaning, problem: null };
   if ((min !== null && n < min) || (max !== null && n > max)) {
     if (unit === '0 to 1' && site.unitWhat) {
       const p = unitProblem(site.unitWhat, value);
@@ -1145,6 +1154,17 @@ export function readSysexTemplate(spec, id) {
   const list = Array.isArray(spec.sysex) ? spec.sysex : hexTokens(String(spec.sysex ?? ''));
   meaning.hex = list.map((t) => (typeof t === 'number' ? hex2(t) : String(t))).join(' ');
   return { meaning, problem: defined.warning ? { severity: 'warning', message: defined.warning } : null };
+}
+
+/**
+ * ce.device.defineParameter's spec as the runtime defines it (deviceDefinitions.defineParameter):
+ * its refusal, or null. The definition checks every field in its own words and stops at the first
+ * it cannot use, so the row of that field says it, and no other row says another sentence.
+ */
+export function parameterSpecRefusal(spec, id) {
+  if (!spec || typeof spec !== 'object') return null;
+  const defined = defineParameter(TEMPLATE_ROLE, typeof id === 'string' && id ? id : 'parameter', spec);
+  return defined.ok ? null : defined.error;
 }
 
 /* ------------------------------------------------------------------------------- sections */

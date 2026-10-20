@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, SECTION_NAMES, didYouMean, midiArgOf, readDash,
+  checksumOf, readSysexTemplate, parameterSpecRefusal, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -37,6 +37,7 @@ import { colourFieldAt, panelColourFieldAt, realNumber } from './scriptColours.j
 import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
 import { tokenNameOf, resolveToken, controlSetForPanel } from '../models/controlSets.js';
 import { COMPONENT_VERBS } from './componentVerbs.js';
+import { TIME_NUMBERS } from './timeWords.js';
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
 
 export { writeValue, colourText, colourToWrite, numberText } from './scriptValueWrite.js';
@@ -660,6 +661,11 @@ function numberSite(site, param) {
   if (site.memberId && module === 'ce.midi') out.path = site.memberId;
   out.time = timeSpec(site, param);
   if (site.memberId === 'sendNote' && param.name === 'ms') out.noteLength = 'sendNote';
+  // ce.time's helpers, which read every number they are given (timeWords.js).
+  if (TIME_NUMBERS[site.memberId]?.args?.[param.name]) out.timeNumber = { memberId: site.memberId, name: param.name };
+  // beatsToMs and msToBeats convert at their own bpm when it is one, and so does the row's hint.
+  const bpm = (site.memberId === 'beatsToMs' || site.memberId === 'msToBeats') && param.name !== 'bpm' ? realNumber(sibling(site, 'bpm')) : undefined;
+  if (bpm > 0) out.tempo = bpm;
   // ce.anim's duration, delay and beats, as the moves read them (panelRuntime's animTiming).
   if (ANIM_VERBS[site.memberId] && ['duration', 'delay', 'beats', 'stagger', 'damping', 'frequency'].includes(param.name)) {
     const fallback = { duration: 300, damping: 6, frequency: 12 }[param.name] ?? 0;
@@ -743,6 +749,32 @@ function optionsArg(arg, node, param, site, parent = '') {
     classify(row, entry.node, field, optionSite);
   }
   arg.options = rows;
+  if (site.memberId === 'deviceDefineParameter' && param?.name === 'spec' && !parent) specRefusalRow(arg, site);
+}
+
+/**
+ * defineParameter's spec, refused as the runtime refuses it (parameterSpecRefusal): on the row of
+ * the field the refusal names ("channel is 20, …", "nrpn.msb is 200, …"), else on the spec's own.
+ * The definition says only the first field it cannot use, so the rows say only that one: a number
+ * row's own range sentence is not the runtime's, and is dropped for it.
+ */
+function specRefusalRow(arg, site) {
+  const flat = [];
+  const walk = (rows, at) => {
+    for (const row of rows ?? []) {
+      const path = at ? `${at}.${row.name}` : String(row.name);
+      flat.push({ row, path });
+      walk(row.options, path);
+    }
+  };
+  walk(arg.options, '');
+  for (const { row } of flat) if (row.kind === 'number') row.problem = null;
+  const error = arg.literal ? parameterSpecRefusal(arg.value, sibling(site, 'id')) : null;
+  if (!error) return;
+  const said = error.slice(error.indexOf('): ') + 3);
+  const target = flat.find(({ path }) => said.startsWith(`${path} is `) || said.startsWith(`the ${path} is `))?.row ?? arg;
+  for (const { row } of flat) if (row !== target && row.problem?.message === error) row.problem = null;
+  if (!target.problem) target.problem = { severity: 'error', message: error };
 }
 
 /** create's and clone's `<section>`: a section's settings, typed by the templates (or the clone's control). */

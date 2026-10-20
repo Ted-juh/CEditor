@@ -2363,15 +2363,66 @@ function transportInfo()
 end
 function tempo() local t = __transport() if t.bpm and t.bpm > 0 then return t.bpm end return nil end
 function isPlaying() return __transport().playing == true end
+-- A helper's number argument as the transport reads it, with one not used as written said once
+-- per helper and argument, in the words of the WebView runtime's timeWords.js. A position before
+-- the start is the start, a bar of no beats is a bar of one, and text that is not a number is the
+-- argument's default; each gave an answer for a number nobody wrote, without a word. For each
+-- argument: what is used for one that is not a number, the least and the most it is read as, and
+-- whether it is rounded first; a bpm falls back to the transport's tempo.
+local __TIME_NUMBERS = {
+  barBeatAt = { "ce.time.position", { beats = { fallback = 0, min = 0 }, beatsPerBar = { fallback = 4, min = 1 } } },
+  stepAt = { "ce.time.step", { beats = { fallback = 0, min = 0 } } },
+  stepsBetween = { "ce.time.steps", { from = { fallback = 0, min = 0 }, to = { fallback = 0, min = 0 }, max = { fallback = 16, min = 1, round = true } } },
+  swingOffset = { "ce.time.swing", { step = { fallback = 0 }, amount = { fallback = 0, min = 0, max = 1 } } },
+  cycleAt = { "ce.time.cycle", { beats = { fallback = 0, min = 0 }, bars = { fallback = 0.25, min = 0.25, max = 64 }, beatsPerBar = { fallback = 4, min = 1 } } },
+  loopedBeats = { "ce.time.looped", { beats = { fallback = 0, min = 0 }, startBeats = { fallback = 0, min = 0 }, lengthBeats = { fallback = 0.01, min = 0.01 } } },
+  beatsToMs = { "ce.time.beatsToMs", { beats = { fallback = 0 }, bpm = { tempo = true } } },
+  msToBeats = { "ce.time.msToBeats", { ms = { fallback = 0 }, bpm = { tempo = true } } },
+}
+local __timeWarned = {}
+local function __tread(fn, name, v)
+  local helper = __TIME_NUMBERS[fn]
+  local s = helper[2][name]
+  if v == nil then
+    if s.tempo then return nil end
+    return s.fallback
+  end
+  local read = __realNumber(v)
+  local n, why, used
+  if s.tempo then
+    if read ~= nil and read > 0 then return read end
+    why = read == nil and "not a number" or "not above 0"
+    used = "the transport's tempo"
+  elseif read == nil then
+    why = "not a number"; n = s.fallback; used = __shown(n)
+  else
+    n = read
+    if s.round then n = math.floor(read + 0.5) end
+    if s.min ~= nil and n < s.min then why = "less than " .. __shown(s.min); n = s.min; used = __shown(n)
+    elseif s.max ~= nil and n > s.max then why = "more than " .. __shown(s.max); n = s.max; used = __shown(n)
+    else return n end
+  end
+  local key = fn .. " " .. name
+  if not __timeWarned[key] then
+    __timeWarned[key] = true
+    logWarn(helper[1] .. ": " .. name .. " is " .. __shownValue(v) .. ", which is " .. why .. ", so " .. used
+      .. " was used. This is said only the first time.")
+  end
+  return n
+end
+-- A bpm that is not above 0, or not a number, is the transport's tempo, and says so (__tread). It
+-- gave nothing here, where the WebView used the tempo, and "fast" raised an error.
 function beatsToMs(beats, bpm)
-  bpm = bpm or tempo()
-  if bpm == nil or bpm <= 0 then return nil end
-  return (tonumber(beats) or 0) * 60000 / bpm
+  local b = __tread("beatsToMs", "beats", beats)
+  local rate = __tread("beatsToMs", "bpm", bpm) or tempo()
+  if rate == nil or rate <= 0 then return nil end
+  return b * 60000 / rate
 end
 function msToBeats(ms, bpm)
-  bpm = bpm or tempo()
-  if bpm == nil or bpm <= 0 then return nil end
-  return (tonumber(ms) or 0) * bpm / 60000
+  local m = __tread("msToBeats", "ms", ms)
+  local rate = __tread("msToBeats", "bpm", bpm) or tempo()
+  if rate == nil or rate <= 0 then return nil end
+  return m * rate / 60000
 end
 
 -- startTimer / stopTimer are HOST bindings; these wrap them so the prelude knows which timers
@@ -2583,8 +2634,8 @@ end
 -- Where a beat position falls musically — for ANY position, not only the transport's. Bars and
 -- beats count from 1 as musicians do; `text` is the Transport component's own readout.
 function barBeatAt(beats, beatsPerBar)
-  local perBar = __tnum(beatsPerBar, 4); if perBar < 1 then perBar = 1 end
-  local b = __tnum(beats, 0); if b < 0 then b = 0 end
+  local b = __tread("barBeatAt", "beats", beats)
+  local perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar)
   local bar = math.floor(b / perBar) + 1
   local beat = math.floor(b % perBar) + 1
   local tick = math.floor((b % 1) * __CE_TIME.ppqn)
@@ -2595,8 +2646,7 @@ end
 function stepAt(beats, division)
   local per = __division("ce.time.step", division)
   if per == nil then return nil end
-  local b = __tnum(beats, 0); if b < 0 then b = 0 end
-  return math.floor(b / per)
+  return math.floor(__tread("stepAt", "beats", beats) / per)
 end
 
 -- The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
@@ -2606,14 +2656,14 @@ end
 function stepsBetween(fromBeats, toBeats, division, maxSteps)
   local per = __division("ce.time.steps", division)
   if per == nil then return nil end
-  local from = __tnum(fromBeats, 0); if from < 0 then from = 0 end
-  local to = __tnum(toBeats, 0); if to < 0 then to = 0 end
+  local from = __tread("stepsBetween", "from", fromBeats)
+  local to = __tread("stepsBetween", "to", toBeats)
+  local cap = __tread("stepsBetween", "max", maxSteps)
   if to <= from then return { steps = {}, dropped = 0 } end
   local first = math.floor(from / per) + 1
   local last = math.floor(to / per)
   if last < first then return { steps = {}, dropped = 0 } end
   local total = last - first + 1
-  local cap = math.floor(__tnum(maxSteps, 16) + 0.5); if cap < 1 then cap = 1 end
   local kept = total < cap and total or cap
   local steps = {}
   for i = last - kept + 1, last do steps[#steps + 1] = i end
@@ -2625,22 +2675,19 @@ end
 function swingOffset(step, amount, division)
   local per = __division("ce.time.swing", division)
   if per == nil then return nil end
-  local s = __tclamp(amount, 0, 1)
-  if math.abs(math.floor(__tnum(step, 0) + 0.5)) % 2 == 1 then return s * 0.5 * per end
+  local n = __tread("swingOffset", "step", step)
+  local s = __tread("swingOffset", "amount", amount)
+  if math.abs(math.floor(n + 0.5)) % 2 == 1 then return s * 0.5 * per end
   return 0
 end
 
 -- For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
 -- never accumulated, so a cycle running for an hour is still exactly on the bar line.
-local function __cycleBeats(bars, beatsPerBar)
-  local perBar = __tnum(beatsPerBar, 4); if perBar < 1 then perBar = 1 end
-  local len = __tclamp(bars, 0.25, 64) * perBar
-  if len < 0.01 then return 0.01 end
-  return len
-end
 function cycleAt(beats, bars, beatsPerBar)
-  local len = __cycleBeats(bars, beatsPerBar)
-  local b = __tnum(beats, 0); if b < 0 then b = 0 end
+  local b = __tread("cycleAt", "beats", beats)
+  local n = __tread("cycleAt", "bars", bars)
+  local len = n * __tread("cycleAt", "beatsPerBar", beatsPerBar)
+  if len < 0.01 then len = 0.01 end
   return { phase = ((b / len) % 1 + 1) % 1, count = math.floor(b / len), length = len }
 end
 
@@ -2648,9 +2695,9 @@ end
 -- run IN to a loop from earlier in the song. `pass` is which time round, -1 before the loop is
 -- reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 function loopedBeats(beats, startBeats, lengthBeats)
-  local b = __tnum(beats, 0); if b < 0 then b = 0 end
-  local st = __tnum(startBeats, 0); if st < 0 then st = 0 end
-  local len = __tnum(lengthBeats, 0.01); if len < 0.01 then len = 0.01 end
+  local b = __tread("loopedBeats", "beats", beats)
+  local st = __tread("loopedBeats", "startBeats", startBeats)
+  local len = __tread("loopedBeats", "lengthBeats", lengthBeats)
   if b < st then return { beats = b, pass = -1 } end
   return { beats = st + ((b - st) % len), pass = math.floor((b - st) / len) }
 end
