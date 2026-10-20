@@ -26,7 +26,7 @@ import {
 import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
-  readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readFont, readImage, readBytes,
+  readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
   checksumOf, readSysexTemplate, SECTION_NAMES, didYouMean, midiArgOf,
 } from './scriptValueKinds.js';
 import {
@@ -205,6 +205,8 @@ function contextOf(context = {}) {
     self: self && typeof self === 'object' ? self : null,
     fonts: context?.fonts ?? null,
     images: context?.images ?? null,
+    // Each device role's profile and its whole parameter table (readDeviceParameter).
+    devices: context?.devices ?? null,
     resolvesToken: (name) => (set ? resolveToken(name, set) !== undefined : false),
     resolve: (value) => (set ? resolveToken(tokenNameOf(value), set) : undefined),
   };
@@ -541,6 +543,13 @@ function classify(arg, node, param, site, index) {
     case 'animation': {
       const read = readAnimation(value, { ...site.env.ctx, controlName: sibling(site, 'control') });
       return setRead(arg, 'animation', read, read.meaning.choices ? 'choice' : null);
+    }
+    case 'deviceParameter': {
+      // The device is the call's own: read's and parameter's second argument, write's third, bind's
+      // opts.role, each the main synth when it is not given.
+      const role = site.memberId === 'deviceBind' ? sibling(site, 'opts')?.role : sibling(site, 'role');
+      const read = readDeviceParameter(value, { devices: site.env.ctx.devices, role, memberId: site.memberId, control: sibling(site, 'control') });
+      return setRead(arg, 'deviceParameter', read, read.meaning.choices ? 'choice' : null);
     }
     case 'font': return setRead(arg, 'font', readFont(value, { fonts: site.env.ctx.fonts, path: site.path }), 'font');
     case 'image': return setRead(arg, 'image', readImage(value, { images: site.env.ctx.images, wantsData: site.memberId === 'drawImage', path: site.path }), 'image');

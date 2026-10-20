@@ -1916,7 +1916,15 @@ private:
             req->setProperty ("dryRun", false);      // actually send it
             const auto result = deviceService.compileParameterMessage (juce::var (req), true);
             auto* obj = result.getDynamicObject();
-            return obj != nullptr && (bool) obj->getProperty ("ok");
+            if (obj != nullptr && (bool) obj->getProperty ("ok")) return true;
+            // A parameter the profile does not have answered false without a word. It is said, in
+            // the words the editor's runtime says it in (CE/web/src/CE_Application/scripting/
+            // deviceWords.js; test/deviceParameterTable.test.js holds the two to one text).
+            if (obj != nullptr && obj->getProperty ("error").toString().startsWith ("Unknown parameter: "))
+                scriptLogLine ("[script] ce.device.write: \"" + parameterId + "\" is not a parameter of the "
+                               + (roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn)
+                               + " profile, so nothing was sent.");
+            return false;
         };
 
         // setVariable / setTiming. The override goes onto this project's ROLE MAPPING, merged over

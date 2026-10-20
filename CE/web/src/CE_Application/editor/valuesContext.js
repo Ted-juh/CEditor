@@ -32,3 +32,35 @@ export const valueCatalogueStore = derived([availableFonts, storedIcons, documen
   try { carriedFonts = currentDocumentFonts() ?? []; } catch { carriedFonts = []; }
   return valueCatalogues({ fonts: $fonts, carriedFonts, icons: $icons, carriedIcons: $carried });
 });
+
+/**
+ * What the core reads a device parameter's id against (readDeviceParameter): each mapped role's
+ * profile, by id and name, with its whole table of parameters (stores/deviceParameterTable.js), null
+ * while the table loads; and `declared`, the ids the scripts declare with ce.device.defineParameter
+ * (declaredDeviceParameters), which no profile needs to have. `mappings`, `profiles` and `tables` are
+ * the device stores' values.
+ */
+export function deviceValueContext({ mappings = {}, profiles = [], tables = {}, declared = [] } = {}) {
+  const roles = {};
+  for (const [role, mapping] of Object.entries(mappings ?? {})) {
+    const profileId = String(mapping?.profileId ?? '');
+    if (!profileId) continue;
+    const listed = (Array.isArray(profiles) ? profiles : []).find((p) => String(p?.id ?? '') === profileId);
+    const table = tables?.[profileId];
+    roles[role] = { profileId, profileName: String(listed?.name ?? profileId), parameters: table?.complete ? table.parameters : null };
+  }
+  return { roles, declared: Array.isArray(declared) ? declared : [] };
+}
+
+// defineParameter("id", …) however it is reached (ce.device.defineParameter, deviceDefineParameter,
+// a C# DefineParameter): each spelling holds the word, in some case.
+const DECLARED = /defineparameter\s*\(\s*["'`]([^"'`\n]+)["'`]/gi;
+
+/** The ids the scripts declare, written out; one built from parts is not known until it runs. */
+export function declaredDeviceParameters(scripts) {
+  const ids = new Set();
+  for (const script of Array.isArray(scripts) ? scripts : []) {
+    for (const match of String(script?.source ?? '').matchAll(DECLARED)) ids.add(match[1]);
+  }
+  return [...ids];
+}

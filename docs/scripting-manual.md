@@ -1559,7 +1559,7 @@ if (v !== undefined) {  }
 
 #### `ce.device.write(id, value [, role]) -> boolean`
 
-Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter's own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it.
+Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter's own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent.
 
 *Short name: `deviceWrite`.*
 

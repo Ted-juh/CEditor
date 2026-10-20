@@ -221,6 +221,7 @@ function detailOf(arg, label, context) {
     }
     case 'control': return controlTypes(context?.panel).get(label) ?? 'control';
     case 'enum': return arg.name ?? '';
+    case 'deviceParameter': return arg.meaning?.choiceNames?.[label] ?? 'parameter';
     default: return KIND_WORDS[arg.kind] ?? '';
   }
 }

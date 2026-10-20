@@ -63,10 +63,12 @@ import {
 import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
-  deviceProfiles, deviceRoleMappings, profileParameters, refreshProfileParameters,
+  deviceProfiles, deviceRoleMappings,
   midiInputs, midiDestinations,
 } from '../stores/deviceProfiles.js';
 import { profileSources } from '../stores/deviceProfileStores.js';
+import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
+import { deviceWriteUnknownWords, deviceBindUnknownWords } from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
@@ -7239,7 +7241,6 @@ function runningTimersRead() {
 // call is complete — which is the best a synchronous verb can do over an asynchronous source, and
 // far better than returning an empty list that looks like "this synth has no parameters".
 
-const parameterRequests = new Set();   // profileIds we have already asked for, to not spam the bridge
 const deviceSourceCache = new Map();
 
 function roleMapping(role) {
@@ -7417,6 +7418,20 @@ function deviceValueWrite(id, value, role) {
     sendRawMidi(encoded.bytes, `param_${key}`);
     return true;
   }
+  // A parameter the profile does not have is refused, once the profile's whole table is in: nothing
+  // is sent, the answer is false, and the console says so in the words the plug-in says it in
+  // (deviceWords.js). It was logged as written and answered true, and the host's "Not sent" went to
+  // the MIDI preview, which no script reads; the plug-in answered false without a word. While the
+  // table is on its way, the write goes to the host as it did, which drops what it cannot encode.
+  const profileId = roleMapping(role)?.profileId;
+  if (profileId) {
+    const table = parameterTable(profileId);
+    if (!table) requestParameterTable(profileId, role);
+    else if (!table.some((p) => String(p?.id ?? '') === key)) {
+      addScriptTrace('error', '', deviceWriteUnknownWords(key, role));
+      return false;
+    }
+  }
   if (!isJuceAvailable()) {
     addScriptTrace('error', '',
       `deviceWrite(${JSON.stringify(key)}) needs the device host — encoding a parameter is the device `
@@ -7443,17 +7458,18 @@ function deviceParametersRead(opts = {}) {
 
   let fromProfile = [];
   if (profileId) {
-    const cached = (get(profileParameters) ?? {})[profileId];
-    if (Array.isArray(cached) && cached.length) {
-      fromProfile = cached;
+    // The profile's whole table (stores/deviceParameterTable.js). This read used the Device
+    // Profile Designer's page, which is 160 parameters by default and what the Designer's search
+    // matched, and asked for it with one object where the request takes the id and the role, so a
+    // profile the Designer had not listed was never loaded at all.
+    const table = parameterTable(profileId);
+    if (table) {
+      fromProfile = table;
     } else {
-      // Cold cache. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
+      // Cold. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
       // different thing from "this synth has no parameters", and a script that cannot tell them
       // apart will draw the wrong conclusion silently.
-      if (!parameterRequests.has(profileId)) {
-        parameterRequests.add(profileId);
-        try { refreshProfileParameters({ profileId, deviceRole: role }); } catch { /* no bridge */ }
-      }
+      requestParameterTable(profileId, role);
       addScriptTrace('log', '',
         `deviceParameters(): the parameter table for "${profileId}" has not been loaded yet — `
         + 'requesting it now. Call again from a later handler (onTimer is the usual place). '
@@ -7495,9 +7511,6 @@ function deviceParameterRead(id, role = DEFAULT_ROLE) {
   const all = deviceParametersRead({ role });
   return all.find((p) => String(p?.id) === wanted) ?? null;
 }
-
-/** Forget which profiles we have asked for — used when the device session is torn down. */
-export function resetDeviceReadCache() { parameterRequests.clear(); }
 
 /* ------------------------------------------------- ce.device: declaring what the app does not know */
 // Everything above READS a device profile the app was shipped with. That is a hard ceiling: a panel
@@ -7567,13 +7580,15 @@ function deviceBindImpl(controlName, parameterId, opts = {}) {
   // The profile is only consulted when there IS one. Asking otherwise would emit "no profile is
   // mapped" from the read — true, and completely beside the point when the panel is deliberately
   // driving a synth that has none.
-  const known = hasDefinedParameter(role, key)
-    || (roleMapping(role)?.profileId ? deviceParameterRead(key, role) != null : false);
-  if (!known) {
-    addScriptTrace('log', '',
-      `bind("${name}", "${key}"): neither the profile nor this panel's declarations know "${key}" yet. `
-      + 'The binding is made anyway — it works if the parameter arrives — but check the id if the control stays dead.');
-  }
+  //
+  // The profile's knowledge is its whole table (stores/deviceParameterTable.js), asked for here when
+  // it is not in. Asked of the Designer's page instead, this named parameters the profile has; before
+  // the table arrives nothing knows the id yet, which is what the notice says.
+  const profileId = roleMapping(role)?.profileId;
+  const table = profileId ? parameterTable(profileId) : null;
+  if (profileId && !table) requestParameterTable(profileId, role);
+  const known = hasDefinedParameter(role, key) || Boolean(table?.some((p) => String(p?.id ?? '') === key));
+  if (!known) addScriptTrace('log', '', deviceBindUnknownWords(name, key));
 
   const port = String(opts?.port ?? 'value');
   const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)

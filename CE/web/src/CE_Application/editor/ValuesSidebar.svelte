@@ -561,7 +561,8 @@
       onchange={(e) => pickChoice(arg, e.currentTarget.value)}
       onblur={closeInRow}>
       {#if !m.choices.includes(current)}<option value={current} disabled>{current}</option>{/if}
-      {#each m.choices as choice, i (i)}<option value={choice}>{choice}</option>{/each}
+      <!-- A choice can carry a name (a device parameter's, beside its id); the value is the choice. -->
+      {#each m.choices as choice, i (i)}<option value={choice}>{m.choiceNames?.[choice] ? `${choice} · ${m.choiceNames[choice]}` : choice}</option>{/each}
     </select>
   {/if}
 {/snippet}

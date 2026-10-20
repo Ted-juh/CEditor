@@ -493,26 +493,27 @@ test('with no panel at all, nothing is gated', () => {
 // and asynchronously filled here, so a cold first call says so instead of returning a bare [].
 
 import {
-  deviceProfiles, deviceRoleMappings, profileParameters, deviceSessionState,
+  deviceProfiles, deviceRoleMappings, deviceSessionState,
 } from '../src/CE_Application/stores/deviceProfiles.js';
-import { resetDeviceReadCache } from '../src/CE_Application/scripting/panelRuntime.js';
+// The reads ask a profile's whole table (stores/deviceParameterTable.js), not the Designer's page.
+import { profileParameterTables, setParameterTableRequesterForTest } from '../src/CE_Application/stores/deviceParameterTable.js';
 
 function withDevice({ profiles = [], mappings = {}, params = {}, session = {} }, fn) {
   const before = {
     profiles: get(deviceProfiles), mappings: get(deviceRoleMappings),
-    params: get(profileParameters), session: get(deviceSessionState),
+    tables: get(profileParameterTables), session: get(deviceSessionState),
   };
   deviceProfiles.set(profiles);
   deviceRoleMappings.set(mappings);
-  profileParameters.set(params);
+  profileParameterTables.set(Object.fromEntries(Object.entries(params).map(([id, parameters]) => [id, { parameters, complete: true }])));
   deviceSessionState.set(session);
-  resetDeviceReadCache();
+  setParameterTableRequesterForTest(() => {});
   try { return fn(); } finally {
     deviceProfiles.set(before.profiles);
     deviceRoleMappings.set(before.mappings);
-    profileParameters.set(before.params);
+    profileParameterTables.set(before.tables);
     deviceSessionState.set(before.session);
-    resetDeviceReadCache();
+    setParameterTableRequesterForTest(null);
   }
 }
 

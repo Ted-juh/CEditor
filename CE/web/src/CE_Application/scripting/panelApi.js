@@ -2576,7 +2576,7 @@ export const COMMANDS = [
     summary: 'Describe one of the synth\'s parameters by its id, or return nothing if the device profile has no such parameter. Use it to check whether a synth has something before you try to change it.',
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'role', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2593,7 +2593,7 @@ export const COMMANDS = [
     summary: 'The last value the synth reported for a parameter, from a dump or a parameter message. Not a live query of the synth: it does not ask the synth anything. Returns nothing if the synth has never reported that parameter, which is different from 0.',
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'role', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2604,10 +2604,10 @@ export const COMMANDS = [
   },
   {
     id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
-    summary: 'Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter\'s own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it.',
+    summary: 'Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter\'s own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent.',
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true },
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'value', type: 'value', required: true },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2785,7 +2785,7 @@ export const COMMANDS = [
     summary: 'Connect a control to a synth parameter from your script, so moving the control changes the parameter. It replaces any existing connection on the same port rather than adding a second one, and switches the control\'s device binding back on if it was off. The port defaults to "value".',
     params: [
       { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'parameterId', type: 'string', required: true },
+      { name: 'parameterId', type: 'string', required: true, kind: 'deviceParameter' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'role',
         { name: 'port', type: 'text', default: '"value"',

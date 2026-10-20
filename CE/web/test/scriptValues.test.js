@@ -139,7 +139,7 @@ test('a call is known by every name the contract gives it', () => {
 });
 
 test('every kind the contract gives a parameter or an option is one the sidebar reads, and its type is kept', () => {
-  const READ = new Set(['colour', 'gradient', 'curve', 'division', 'scale', 'chord', 'enum', 'number', 'control', 'path',
+  const READ = new Set(['colour', 'gradient', 'curve', 'division', 'scale', 'chord', 'enum', 'number', 'control', 'path', 'deviceParameter',
     'note', 'event', 'animation', 'font', 'image', 'bytes', 'options', 'patch']);
   let count = 0;
   for (const member of ALL_MEMBERS) {

@@ -410,7 +410,7 @@ One table, then notes on the kinds where there is something more to say.
 | Number with a unit | angle `180`, `ms` `250`, opacity `0.5` | the parameter's `unit` and range | the unit and range | a field, written on Enter | out of range |
 | Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line | none | negative lengths, which are clamped to 0 |
 | SysEx | `sendSysex("F0 41 10 42 F7")` | `bytes` parameters | byte count, checksum | none | a wrong checksum (`computeChecksum`), a missing `F0` or `F7` |
-| Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `parameterId` | range and CC | a dropdown from the device profile | a parameter the profile does not have |
+| Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `bind`'s `parameterId`, the `id` of `write`, `read` and `parameter` | name, group and range (a profile's parameter has no CC of its own: that is its recipe's) | a dropdown from the device profile | a parameter the profile does not have |
 | Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points` from 0 to 1 | the shape | a polyline editor like `EnvelopeDesigner`'s | points outside 0 to 1 |
 
 ### Notes
@@ -1091,6 +1091,35 @@ And on the owner's word on 2026-10-20, the two things the review of the above le
   entered, and a row took the selection on mouseenter, so fifteen ArrowDowns moved seven rows. A
   row now takes it on a move with a distance, which a scroll has none of. Checked in
   `browser-checks/valueCompletion.mjs`.
+
+Then, on the owner's word the same day, the kinds the table above still had unbuilt, after the
+Values tab's first version was merged:
+
+- **Device parameters.** The `id` of `ce.device.write`, `read` and `parameter`, and `bind`'s
+  `parameterId`, are read against the profile behind the call's device (read's and parameter's
+  second argument, write's third, bind's `opts.role`; a role nothing is mapped to reads the main
+  synth's, as the runtime does). The row names the parameter, its group and its range, and is a
+  dropdown of the profile's parameters, each by its id and name; completion inside the quotes lists
+  the same. An id the profile does not have is said as its call does it: write refuses it, bind
+  binds it anyway, each in its runtime's words (`scripting/deviceWords.js`), and read and parameter
+  answer nothing. A row says nothing of an id while the table loads, which the tab has asked for,
+  or of one the panel's scripts declare with `defineParameter`; with no profile chosen only bind's
+  says anything, as bind does, since then nothing but a declaration knows the id.
+
+  Reading it found the table it needs was never there. Every reader asked the Device Profile
+  Designer's page: 160 parameters by default, and after a search in the Designer only what matched,
+  with nothing more to load. So on a profile longer than a page, or one searched in the Designer, a
+  send to a parameter that was there was refused as "not in profile", `ce.device.parameter()`
+  answered nothing for it, and `bind` called it unknown; and the script runtime asked the host for
+  the list with one object where the request takes the id and the role, so a profile the Designer
+  had not listed was never loaded for a script at all. `stores/deviceParameterTable.js` now loads a
+  profile's whole table, 500 a page with no filter, under requests of its own the Designer's page
+  never sees, and forgets it when the profile's source is saved; the send check, `parameters()`,
+  `parameter()`, `bind`, `write` and the rows all ask it. And `ce.device.write` of an id the profile
+  lacks was logged as sent and answered true in the editor, the host's "Not sent" going to the MIDI
+  preview, and answered false without a word in the plug-in: both now refuse it, nothing sent, in
+  the same words. Checked by `test/deviceParameterTable.test.js`, which also holds the plug-in's
+  sentence (`PluginProcessor.h`) to the editor's.
 
 Still open: nothing from this record.
 

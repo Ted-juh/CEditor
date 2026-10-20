@@ -3,6 +3,7 @@
 // engine when the JUCE bridge is unavailable or a draft source is being edited.
 import { get } from 'svelte/store';
 import { recordDeviceParameterValue } from './deviceParameterValues.js';
+import { parameterTable, requestParameterTable } from './deviceParameterTable.js';
 import {
   compileParameterMessage,
   getDeviceDiagnostics,
@@ -63,9 +64,17 @@ function profileExists(profileId) {
   return catalog.some((profile) => String(profile?.id ?? '') === id);
 }
 
-function knownParameterMap(profileId) {
+function knownParameterMap(profileId, deviceRole) {
+  // The profile's whole table once it is in (deviceParameterTable.js), and it is asked for here.
+  const table = parameterTable(profileId);
+  if (table) return new Map(table.map((parameter) => [String(parameter?.id ?? ''), parameter]));
+  requestParameterTable(profileId, deviceRole);
+  // Until then the Designer's page, and only when it is the whole profile. A search there leaves a
+  // page of what matched with nothing more to load, and every other parameter of the profile was
+  // refused as "not in profile" until the search was cleared.
   const pageMeta = get(profileParameterPages)?.[profileId];
   if (pageMeta?.hasMore === true || Number(pageMeta?.total ?? 0) > Number(pageMeta?.loaded ?? 0)) return null;
+  if ([pageMeta?.query, pageMeta?.group, pageMeta?.type, pageMeta?.access].some((filter) => String(filter ?? '').trim())) return null;
   const parametersByProfile = get(profileParameters) ?? {};
   if (!Object.prototype.hasOwnProperty.call(parametersByProfile, profileId)) return null;
   const parameters = parametersByProfile[profileId];
@@ -86,7 +95,7 @@ function resolveParameterSend(payload) {
     };
   }
 
-  const parameterMap = knownParameterMap(profileId);
+  const parameterMap = knownParameterMap(profileId, role);
   if (parameterMap && !parameterMap.has(parameterId)) {
     return {
       ok: false,

@@ -72,12 +72,14 @@ Three tools help you while you type:
   the **Colors** tab of the display panel, and a gradient's strip its **Gradient**
   tab: the new colour is written into your code when you let go, and **Cancel**
   puts back exactly what you had written. A value chosen from a list has a dropdown
-  (a curve, a division, a font, an image…), a number with a unit has a field, written
+  (a curve, a division, a font, an image, a parameter of your synth's device profile…),
+  a number with a unit has a field, written
   when you press Enter or leave it, and a curve drawn as four numbers has the curve
   editor under its row.
   The dock opens on the tab you used last. The same lists are in the code too: with
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
-  (or divisions, scales, events, your controls' names, fonts…) with yours selected,
+  (or divisions, scales, events, your controls' names, your synth's parameters,
+  fonts…) with yours selected,
   and the one you pick replaces the whole value.
 - **The problems list** checks as you type. It warns about a handler that will
   never be called because it does not match **Runs on** — if the script runs on

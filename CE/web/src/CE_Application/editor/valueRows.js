@@ -216,6 +216,16 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       return m.summary ? `${m.handler}: ${m.summary}` : m.handler;
     }
     case 'animation': return m.found ? `a keyframe animation of ${m.control}` : '';
+    case 'deviceParameter': {
+      if (m.noProfile) return `no profile is chosen for ${m.role}`;
+      if (m.declared) return 'declared by this panel\'s scripts';
+      if (m.loading) return `${m.profile ?? m.role}: its parameters are loading`;
+      if (!m.found || !m.parameter) return '';
+      const p = m.parameter;
+      const range = p.range ? `${shownNumber(p.range.min)} to ${shownNumber(p.range.max)}` : '';
+      const choices = p.choices ? `${p.choices} choices` : '';
+      return [p.name, p.group, choices || range].filter(Boolean).join(' · ');
+    }
     case 'font': return m.found === true ? 'an available font' : '';
     case 'image': {
       if (m.dataUrl) return 'image data';

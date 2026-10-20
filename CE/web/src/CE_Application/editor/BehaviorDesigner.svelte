@@ -9,7 +9,9 @@
   import PanelFileView from './PanelFileView.svelte';
   import ScriptConsole from './ScriptConsole.svelte';
   import { readDockTab, writeDockTab } from './dockTabMemory.js';
-  import { valueCatalogueStore } from './valuesContext.js';
+  import { valueCatalogueStore, deviceValueContext, declaredDeviceParameters } from './valuesContext.js';
+  import { deviceRoleMappings, deviceProfiles } from '../stores/deviceProfiles.js';
+  import { profileParameterTables, requestParameterTable } from '../stores/deviceParameterTable.js';
   import { transport } from '../stores/transport.js';
   import { controlSetForPanel } from '../models/controlSets.js';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
@@ -404,6 +406,9 @@
   let editorMarks = $state.raw([]);
   let editorFolded = $state(false);
   let tempo = $derived($transport.bpm);
+  // The ids the scripts declare, as one string, so the context below is new only when they change
+  // and not at every keystroke, which the Values tab's own edits are too.
+  let declaredParameterKey = $derived(declaredDeviceParameters(scripts).join('\n'));
   let scriptValueContext = $derived({
     panel,
     controlSet: panel ? controlSetForPanel(panel) : null,
@@ -411,6 +416,18 @@
     selfControl: selected?.scope === 'component' && targetValue !== '*' ? targetValue : null,
     fonts: $valueCatalogueStore.fonts,
     images: $valueCatalogueStore.images,
+    devices: deviceValueContext({
+      mappings: $deviceRoleMappings, profiles: $deviceProfiles, tables: $profileParameterTables,
+      declared: declaredParameterKey ? declaredParameterKey.split('\n') : [],
+    }),
+  });
+  // A device parameter's id is read against its profile's whole table, which is asked for once a
+  // script is open, for each role a profile is chosen for (stores/deviceParameterTable.js asks once).
+  $effect(() => {
+    if (!selected) return;
+    for (const [role, mapping] of Object.entries($deviceRoleMappings ?? {})) {
+      if (mapping?.profileId) untrack(() => requestParameterTable(mapping.profileId, role));
+    }
   });
   // The panel file view's text, caret and editor, which it reports (PanelFileView's onvalues).
   let fileValues = $state.raw(null);
