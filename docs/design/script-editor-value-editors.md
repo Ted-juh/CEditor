@@ -1,9 +1,9 @@
 # Editing values in place in the script editor
 
 Status: **the Values sidebar is built**, 2026-10-19: steps 0 to 7 of the order of work, in the
-script editor and the panel file view ([Built](#built), with what is still open). The record was a
+script editor and the panel file view ([Built](#built)). The record was a
 proposal on 2026-10-18. The silent failures it found, and four more found on the way, were then
-fixed in the script runtimes; [Fixed since, and still open](#fixed-since-and-still-open) lists them.
+fixed in the script runtimes; [Fixed since, and decided](#fixed-since-and-decided) lists them.
 The edit surface was decided on 2026-10-19: a Values sidebar
 ([Decided](#decided-a-values-sidebar-is-where-values-are-shown-and-edited)).
 
@@ -167,7 +167,7 @@ no unit or range.
 1. **The checks may matter more than the editors.** Several mistakes in a script failed with no
    error at all. Each of these was traced through the WebView runtime (`panelRuntime.js`) on this
    date. All five were then fixed in the runtimes (see
-   [Fixed since, and still open](#fixed-since-and-still-open)):
+   [Fixed since, and decided](#fixed-since-and-decided)):
    - `ce.midi.sendNote(1, "c4", 100)` played note 0, C-1. The name parser wants a capital letter,
      and `sendNote` turned a name it could not read into 0.
    - `ce.midi.sendSysex("F0411000")` sent `F0 FF F7`. Hex text is split on spaces and commas, so
@@ -349,7 +349,7 @@ swatch, which is the trap the `colourAlpha` documentation warns about, caught as
 
 Both readers have since changed: `ce.draw` now paints the panel's own forms, and a property writes
 CSS's short forms out in full and refuses what it cannot read.
-[Fixed since, and still open](#fixed-since-and-still-open) has the detail. The
+[Fixed since, and decided](#fixed-since-and-decided) has the detail. The
 eight-digit trap itself remains, because each reader keeps its own meaning for `#` with eight digits.
 
 ### Claiming
@@ -686,7 +686,7 @@ ce.device.defineParameter("level", {
   does not say where its checksum starts. So the editor shows the bytes as sent and leaves the
   checksum alone. The template form is the one that says.
 
-## Fixed since, and still open
+## Fixed since, and decided
 
 Eight silent failures were fixed in the script runtimes on 2026-10-18: the four this record found,
 then the four it first left open as decisions. Two smaller gaps followed, and then the rest of the
@@ -764,7 +764,7 @@ And the options, timers and panel commands:
 | `ce.panel.define` checked a state's keys and no other section's: `{ durration = 400 }` made a 120 ms animation, and define answered true | every section refuses a key its entries do not have, in the unknown-option words with the call before them, defines nothing and answers false. What a section takes is read off the entry the app makes for it, plus what its readers read beyond that, listed with the reader; keys are matched with their capitals, as stored | WebView runtime (define is panel-window only) |
 | `get(path, form)` and `set(path, value, form)` dropped a form that is not one, so `get("cutoff", "normalisedValue")` answered the raw value; in the player set's text form never reached the host, right or wrong | text that is not a form refuses the call, names the three, and names the one meant when it is a form written another way ("Write normalizedValue."); a right text form now works in the player's set as in the editor's, and Lua's `self.set` passes its options on instead of dropping them; a table or a number is still not a form | WebView runtime; `BridgeScriptHost`, so every player engine and a native handler |
 
-Still open, for the owner:
+For the owner to decide, and each decided since:
 
 - ~~**Values at the edge of their range**~~ *Decided: clamp, and say so once.* A CC value of 128
   goes out as 127, a velocity of 200 as 127, a bend of -1 as 0, as before, and the first time for
