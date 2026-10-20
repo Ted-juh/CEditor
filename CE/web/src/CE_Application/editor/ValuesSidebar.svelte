@@ -570,6 +570,13 @@
     {:else if m.name}
       <EasingCurve fn={curveFn(m.name)} width={52} height={26} label={`${m.name} curve`} />
     {/if}
+  {:else if arg.kind === 'dash'}
+    <!-- The line drawn with what the drawing is handed, and the cap the options give it, at the
+         script's own pixels: solid where the runtime draws it solid. -->
+    <svg class="vdash" width="64" height="8" viewBox="0 0 64 8" aria-hidden="true">
+      <line x1="2" y1="4" x2="62" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap={m.cap}
+        stroke-dasharray={m.dasharray ?? undefined} />
+    </svg>
   {:else if arg.kind === 'font' && typeof arg.value === 'string'}
     <span class="vfont" style:font-family={fontCss(arg.value)} title={`Aa in ${arg.value}`}>Aa</span>
   {:else if arg.kind === 'image'}
@@ -783,6 +790,7 @@
   .vstrip:hover, .vstrip:focus-visible { border-color: var(--txt-dim); outline: none; }
   .vstrip.on { box-shadow: 0 0 0 1.5px #6aa8ff; }
   .vstrip.still { cursor: default; }
+  .vdash { flex-shrink: 0; color: var(--txt); }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {

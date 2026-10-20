@@ -4,8 +4,9 @@
 // Each reader here is the runtime's own, imported, not a second opinion: a colour is read by
 // scriptColours (panelColour for a property, drawColour for a drawing, storedColour for ce.math), a
 // note by musicTheory, a division by timeTables, a curve by easingTables, an envelope's points by
-// animEnvelope, a SysEx template by deviceDefinitions. What a reader refuses is said in the words the runtime says it in, where it
-// has words; scriptValues.test.js calls the runtime and compares.
+// animEnvelope, a SysEx template by deviceDefinitions, a stroke's dash by drawDash. What a reader
+// refuses is said in the words the runtime says it in, where it has words; scriptValues.test.js
+// calls the runtime and compares.
 //
 // Pure functions. Nothing here reads a store; whatever is known about the panel arrives as plain
 // data in `context` (see scriptValues.readStatement).
@@ -24,6 +25,7 @@ import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
+import { dashPattern } from './drawDash.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { closest } from './closestWord.js';
 import { deviceWriteUnknownWords, deviceBindUnknownWords } from './deviceWords.js';
@@ -1003,6 +1005,36 @@ export function readImage(value, { images, wantsData, path }) {
     return { meaning, problem: { severity: 'warning', message: `No image called "${value}" in the library or the panel.${didYouMean(value, meaning.choices)}` } };
   }
   return { meaning, problem: null };
+}
+
+/* ---------------------------------------------------------------------------------- dashes */
+
+/**
+ * ce.draw.stroke's `opts.dash`, read by the runtime's own reader (drawDash.js), with the line's `cap`
+ * when the same options give one. `dasharray` is what the drawing is handed, which the row's line
+ * is drawn with; `lengths` the lengths drawn, one the runtime makes 0 already 0; `odd` says an odd
+ * list is drawn twice over to make it even; `drawn` and `skipped` are what one round of it draws and
+ * skips, in pixels. Nothing skipped is a solid line, and so is nothing at all (SVG's rule); nothing
+ * drawn shows only as the caps, a dot for each dash, which the default cap does not draw.
+ */
+export function readDash(value, { cap } = {}) {
+  const read = dashPattern(value);
+  const lengths = read.lengths ?? [];
+  const odd = lengths.length % 2 === 1;
+  const round = odd ? [...lengths, ...lengths] : lengths;
+  const sum = (from) => round.reduce((total, n, i) => (i % 2 === from ? total + n : total), 0);
+  return {
+    meaning: {
+      dasharray: read.dasharray,
+      lengths: read.lengths,
+      odd,
+      drawn: sum(0),
+      skipped: sum(1),
+      // The runtime takes a cap it knows and draws the default for any other.
+      cap: ['butt', 'round', 'square'].includes(cap) ? cap : 'butt',
+    },
+    problem: read.problem,
+  };
 }
 
 /* ---------------------------------------------------------------------------------- bytes */

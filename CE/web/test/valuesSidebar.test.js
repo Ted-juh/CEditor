@@ -446,6 +446,20 @@ test('the line under a value is the core\'s meaning, put into words', () => {
   assert.equal(meaningLine(computed), 'worked out when the script runs: a colour, so there is nothing to edit here');
 });
 
+test('a dash says what it draws and skips, in pixels, and when the line is solid or only its caps show', () => {
+  const dashOf = (opts) => everyArg(readStatement(`ce.draw.stroke("#FFF", 1, { ${opts} })`, 'lua', 3, {})).find((a) => a.name === 'dash');
+  assert.equal(meaningLine(dashOf('dash = { 3, 3 }')), 'in pixels: 3 drawn, 3 skipped');
+  assert.equal(meaningLine(dashOf('dash = { 3, 2, 1 }')),
+    'in pixels, an odd list twice over: 3 drawn, 2 skipped, 1 drawn, 3 skipped, 2 drawn, 1 skipped');
+  assert.equal(meaningLine(dashOf('dash = {}')), 'no lengths, so the line is solid');
+  assert.equal(meaningLine(dashOf('dash = { 0, 0 }')), 'every length is 0, so the line is solid');
+  assert.equal(meaningLine(dashOf('dash = { 3, -3 }')), 'nothing is skipped, so the line is solid', 'the -3 drawn as 0, which its problem says');
+  assert.equal(meaningLine(dashOf('dash = { 0, 4 }')), 'nothing is drawn: a dash of 0 shows only with a round or square cap, as a dot');
+  assert.equal(meaningLine(dashOf('dash = { 0, 4 }, cap = "round"')), 'each dash is 0, so the round cap draws it as a dot');
+  assert.equal(meaningLine(dashOf('dash = 3')), '', 'refused, which its problem says');
+  assert.match(meaningLine(dashOf('dash = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }')), /^in pixels: 1 drawn, 2 skipped, .*8 skipped, …$/);
+});
+
 test('swatches, strips, units and numbers as a row shows them', () => {
   assert.equal(swatchHex({ swatch: { rgb: '4682B4', alpha: 1 } }), 'FF4682B4');
   assert.equal(swatchHex({ swatch: { rgb: '5b9bd5', alpha: 0.5 } }), '805B9BD5');

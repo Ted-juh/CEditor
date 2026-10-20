@@ -683,7 +683,7 @@ you let go of a handle; and the points of an envelope (`ce.anim.envelope`) have 
 their row, with each point to drag, a double-click to add one and **Remove** to take one out,
 written when you let go. A row that names one of the panel's controls, by its name or in a path,
 has **Select**: the control is selected on the panel when you go back to its tab, and the code is
-left as it is.
+left as it is. A stroke's dash is drawn in its row as the line it makes.
 The lists are in the code as well: with the caret inside a
 value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
 selected, and the one you choose replaces the whole value. A property path is completed one part

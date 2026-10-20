@@ -27,7 +27,7 @@ import {
   readColour, colourRefusals, readDrawGradient, readStoredGradient, readCurve, readEnvelope,
   readNote, readScaleOrChord, readDivision, readNumber, OPACITY_SCALE_WARNINGS, readEnum, ENUM_REFUSALS,
   readEvent, panelControls, controlNamed, readControl, readPath, readAnimation, readDeviceParameter, readFont, readImage, readBytes,
-  checksumOf, readSysexTemplate, SECTION_NAMES, didYouMean, midiArgOf,
+  checksumOf, readSysexTemplate, SECTION_NAMES, didYouMean, midiArgOf, readDash,
 } from './scriptValueKinds.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
@@ -232,7 +232,8 @@ function contextOf(context = {}) {
  * @property {boolean} literal  True when every part of it is written out.
  * @property {*} [value]  The literal's value: strings unquoted, numbers, booleans, null, arrays, objects.
  * @property {string} kind  colour | gradient | curve | envelope | division | scale | chord | enum | number |
- *   control | path | note | event | animation | font | image | bytes | options | text | computed | unknown.
+ *   control | path | deviceParameter | note | event | animation | font | image | bytes | dash | options |
+ *   text | computed | unknown.
  * @property {object} meaning  Kind by kind, as scriptValueKinds' readers document it; `meaning.choices`
  *   lists the alternatives for a choice. A colour's is { reader ('property' | 'stop' | 'drawing' |
  *   'math'), claimedBy ('schema' | 'path' | 'key' | 'form'), form, stored, css, swatch { rgb, alpha },
@@ -559,6 +560,9 @@ function classify(arg, node, param, site, index) {
       const read = readDeviceParameter(value, { devices: site.env.ctx.devices, role, memberId: site.memberId, control: sibling(site, 'control') });
       return setRead(arg, 'deviceParameter', read, read.meaning.choices ? 'choice' : null);
     }
+    // A stroke's dash: shown as the line it draws, with the cap the same options give it, and
+    // nothing to edit it with.
+    case 'dash': return setRead(arg, 'dash', readDash(value, { cap: sibling(site, 'opts')?.cap }), null);
     case 'font': return setRead(arg, 'font', readFont(value, { fonts: site.env.ctx.fonts, path: site.path }), 'font');
     case 'image': return setRead(arg, 'image', readImage(value, { images: site.env.ctx.images, wantsData: site.memberId === 'drawImage', path: site.path }), 'image');
     case 'bytes': {

@@ -37,6 +37,7 @@ import {
   mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS,
 } from './scriptColours.js';
+import { dashPattern } from './drawDash.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -4871,6 +4872,16 @@ function drawPaint(call, what, colour) {
   return undefined;
 }
 
+// What ce.draw.stroke made of a dash it could not draw as written (drawDash.js), said once per
+// message: a stroke is set on every redraw, and a message per frame would bury the console.
+// resetScriptState clears what has been said.
+const drawDashWarned = new Set();
+function warnDrawDash(problem) {
+  if (drawDashWarned.has(problem.message)) return;
+  drawDashWarned.add(problem.message);
+  addScriptTrace(problem.severity === 'error' ? 'error' : 'warn', '', `${problem.message} This is said only the first time.`);
+}
+
 // ce.draw.text's alignments, read without regard to case. The app spells centre three ways (ce.text.style
 // says "centred", an image's alignment "center", this call "middle"), and "center" written here used
 // to draw left-aligned without a word. All of them are the middle here.
@@ -8397,12 +8408,12 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
       // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
-      // probe link) are "3 3" and "2 3".
-      const dash = opts?.dash;
-      const dashList = Array.isArray(dash) ? dash : (dash == null ? null : Object.values(dash));
-      drawState.dash = dashList && dashList.length
-        ? dashList.map((n) => Math.max(0, Number(n) || 0)).join(' ')
-        : (typeof dash === 'string' && dash ? dash : null);
+      // probe link) are "3 3" and "2 3". drawDash.js reads it, for this and for the script editor's
+      // Values tab: a length below 0 or not a number is drawn as 0, and a dash that is not a list
+      // is none, each said once in the words the Values tab says it in.
+      const dash = dashPattern(opts?.dash);
+      if (dash.problem) warnDrawDash(dash.problem);
+      drawState.dash = dash.dasharray;
       drawState.cap = ['butt', 'round', 'square'].includes(opts?.cap) ? opts.cap : null;
       drawState.join = ['miter', 'round', 'bevel'].includes(opts?.join) ? opts.join : null;
       // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
@@ -9608,6 +9619,7 @@ function resetScriptState() {
   executionEpoch += 1;
   edgeWarned.clear();
   animTimingWarned.clear();
+  drawDashWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

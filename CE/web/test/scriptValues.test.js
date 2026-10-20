@@ -25,7 +25,7 @@ import {
 } from '../src/CE_Application/scripting/scriptValues.js';
 import { MEMBER_BY_ID, ALL_MEMBERS, allModules, memberMapFor } from '../src/CE_Application/scripting/panelApi.js';
 import {
-  resetScriptStateForTesting, scriptApiForTesting, setRuntimeHost, clearDeviceRuntimeDefinitions,
+  resetScriptStateForTesting, scriptApiForTesting, setRuntimeHost, clearDeviceRuntimeDefinitions, drawCommandsFor, clearAllDrawings,
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -140,7 +140,7 @@ test('a call is known by every name the contract gives it', () => {
 
 test('every kind the contract gives a parameter or an option is one the sidebar reads, and its type is kept', () => {
   const READ = new Set(['colour', 'gradient', 'curve', 'envelope', 'division', 'scale', 'chord', 'enum', 'number', 'control',
-    'path', 'deviceParameter', 'note', 'event', 'animation', 'font', 'image', 'bytes', 'options', 'patch']);
+    'path', 'deviceParameter', 'note', 'event', 'animation', 'font', 'image', 'bytes', 'dash', 'options', 'patch']);
   let count = 0;
   for (const member of ALL_MEMBERS) {
     for (const p of member.params ?? []) {
@@ -430,6 +430,9 @@ const KIND_CASES = [
   ['ce.music.chord("C4", "maj7")', null, null, 'ce.music.chord', 'type', 'chord', 'choice',
     (m) => assert.deepEqual(m.notes, ['C', 'E', 'G', 'B'])],
   ['ce.draw.blend("multiply")', null, null, 'ce.draw.blend', 'mode', 'enum', 'choice', (m) => assert.equal(m.choices.length, 12)],
+  ['ce.draw.stroke("#FFF", 1, { dash = { 3, 3 }, cap = "round" })', 'ce.draw.stroke("#FFF", 1, { dash: [3, 3], cap: "round" })', 'ce.draw.stroke("#FFF", 1, {"dash": [3, 3], "cap": "round"})',
+    'ce.draw.stroke', 'opts.dash', 'dash', null,
+    (m) => assert.deepEqual([m.dasharray, m.lengths, m.odd, m.drawn, m.skipped, m.cap], ['3 3', [3, 3], false, 3, 3, 'round'])],
   ['ce.anim.to("cutoff", 1, { duration = 250 })', 'ce.anim.to("cutoff", 1, { duration: 250 })', 'ce.anim.to("cutoff", 1, {"duration": 250})',
     'ce.anim.to', 'opts.duration', 'number', 'number', (m) => assert.deepEqual([m.unit, m.min, m.hint], ['milliseconds', 0, '250 ms is half a beat at 120 BPM'])],
   ['ce.draw.arc(30, 30, 24, -135, 135)', null, null, 'ce.draw.arc', 'from', 'number', 'number',
@@ -680,6 +683,41 @@ test('a refusal is said in the words the runtime says it in', () => {
     const said = lines[0].replace(/ This is said only the first time\.$/, '');
     assert.ok(row.problem.message.startsWith(said), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${said}`);
   }
+});
+
+test('a dash is read as ce.draw.stroke reads it: the line its row draws is the runtime\'s, and what it says is in its words', () => {
+  const panel = { id: 'p', name: 'P', width: 400, height: 200, scripting: { modules: ['ce.draw'] },
+    controls: [createControl('Background', { name: 'screen' })] };
+  /** What the runtime draws for `dash`, and what it writes to the console. */
+  const drawn = (dash) => {
+    resetScriptStateForTesting();
+    setRuntimeHost({ panel });
+    try {
+      const api = scriptApiForTesting('screen', 'values-probe');
+      clearScriptTrace();
+      clearAllDrawings();
+      api.ce.draw.stroke('#FFF', 1, { dash });
+      api.ce.draw.line(0, 0, 10, 10);
+      return { dash: drawCommandsFor('screen')[0]?.dash, said: get(scriptTrace).filter((t) => t.kind === 'warn' || t.kind === 'error') };
+    } finally { clearAllDrawings(); setRuntimeHost(null); }
+  };
+  const cases = [
+    // [the dash in Lua, the same as the runtime is given it]
+    ['{ 3, 3 }', [3, 3]], ['{ 3, -3 }', [3, -3]], ['{ "x", 3 }', ['x', 3]], ['{ 3, true }', [3, true]], ['{ "4", 2.5 }', ['4', 2.5]],
+    ['3', 3], ['"3 3"', '3 3'], ['{ 3, 2, 1 }', [3, 2, 1]], ['{}', []], ['{ 0, 0 }', [0, 0]], ['{ 0, 4 }', [0, 4]],
+  ];
+  for (const [lua, dash] of cases) {
+    const src = `ce.draw.stroke("#FFF", 1, { dash = ${lua} })`;
+    const row = optOf(argOf(callOf(readStatement(src, 'lua', 3, {})), 'opts'), 'dash');
+    const runtime = drawn(dash);
+    assert.equal(row.kind, 'dash', src);
+    assert.equal(row.meaning.dasharray, runtime.dash ?? null, `${src}: the row's line is drawn with what the overlay is handed`);
+    assert.equal(runtime.said.length, row.problem ? 1 : 0, `${src}: ${JSON.stringify(runtime.said.map((t) => t.message))}`);
+    if (!row.problem) continue;
+    assert.equal(runtime.said[0].message, `${row.problem.message} This is said only the first time.`, src);
+    assert.equal(runtime.said[0].kind, row.problem.severity === 'error' ? 'error' : 'warn', src);
+  }
+  resetScriptStateForTesting();
 });
 
 test('ce.anim\'s duration, delay and beats are said in the words the move says them in, once', () => {

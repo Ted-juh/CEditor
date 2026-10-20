@@ -33,6 +33,8 @@
  *              to be the panel's selection without moving the caret, touching the text or ending a
  *              colour edit open in the display panel; the Panel file screen opens on it, and the
  *              panel shows it selected on the canvas once its tab is in front again
+ *   dash       a stroke's dash is drawn in its row as the line the drawing is handed, and a length
+ *              below 0 is said in the runtime's words
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
  *              file are rows only, the whole file's at the line clicked
@@ -652,11 +654,13 @@ try {
       edits: await inputs(), back: (await editorText()) === more });
 
   // ===============================================================================================
-  // SELECT — a row naming a control picks it to be the panel's selection.
+  // SELECT — a row naming a control picks it to be the panel's selection; DASH — a stroke's dash.
   // ===============================================================================================
   const PICK = `function onValueChanged(value) {
   ce.core.set("Title.Text.Fill.colour", "SteelBlue");
   ce.anim.play("Cutoff", "Pulse");
+  ce.draw.stroke("#5B9BD5", 2, { dash: [3, 3] });
+  ce.draw.stroke("#5B9BD5", 2, { dash: [4, -2] });
 }
 `;
   // The panel's tab by a name no other open tab has, to go back to it as a person does.
@@ -723,6 +727,27 @@ try {
     { fileOpens: 'Title', pick: where.cutoff, selected: [], caret: caretOnName, text: PICK, foot: 'Cutoff will be selected on the panel when you go back to it.' },
     { fileOpens, pick: byKeys.pick, selected: byKeys.selected, caret: await caretAt(), text: await editorText(),
       foot: (await page.locator('[data-testid="values-sidebar"] .vfoot').textContent()).trim() });
+
+  // ---- dash --------------------------------------------------------------------------------------
+  await clickAt(PICK.indexOf('[3, 3]') + 1);
+  await waitHead('Line 4');
+  const dashRow = await page.evaluate(() => {
+    const row = document.querySelector('.vrow[data-name="dash"]');
+    const line = row?.querySelector('svg.vdash line');
+    const box = row?.querySelector('svg.vdash')?.getBoundingClientRect();
+    return { kind: row?.dataset.kind, dasharray: line?.getAttribute('stroke-dasharray') ?? null, drawn: (box?.width ?? 0) > 40 && (box?.height ?? 0) > 4,
+      text: row?.querySelector('.vtext')?.textContent ?? '', meaning: row?.querySelector('.vmeaning')?.textContent ?? '' };
+  });
+  await clickAt(PICK.indexOf('[4, -2]') + 1);
+  await waitHead('Line 5');
+  const clamped = await page.evaluate(() => {
+    const row = document.querySelector('.vrow[data-name="dash"]');
+    return { dasharray: row?.querySelector('svg.vdash line')?.getAttribute('stroke-dasharray'), problem: row?.querySelector('.vproblem')?.textContent ?? '' };
+  });
+  led.check(S, 'a dash is drawn in its row', 'ce.draw.stroke\'s dash: [3, 3] has a short line drawn in its row with stroke-dasharray "3 3", what the drawing is handed, and says so in words; [4, -2] is drawn as the runtime draws it, "4 0", and the row says why in the runtime\'s words',
+    { row: { kind: 'dash', dasharray: '3 3', drawn: true, text: '[3, 3]', meaning: 'in pixels: 3 drawn, 3 skipped' },
+      clamped: { dasharray: '4 0', problem: 'ce.draw.stroke: length 2 of the dash is -2, which is less than 0, so 0 was used.' } },
+    { row: dashRow, clamped });
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();

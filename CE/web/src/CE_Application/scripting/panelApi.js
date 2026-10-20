@@ -1386,9 +1386,10 @@ export const COMMANDS = [
       { name: 'colour', type: 'value', required: false, kind: 'colour' },
       { name: 'width', type: 'number', required: false, unit: 'pixels' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'dash', type: 'list of numbers', default: 'a solid line',
+        { name: 'dash', type: 'list of numbers', default: 'a solid line', kind: 'dash',
           summary: 'Alternating on and off lengths in pixels. The panel\'s own beat marks are '
-            + '{ 3, 3 } — three pixels drawn, three skipped.' },
+            + '{ 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a '
+            + 'number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so.' },
         { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
           summary: 'How far into the dash pattern to start. Advance it on a timer and the dashes '
             + 'march along the line.' },

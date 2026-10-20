@@ -77,7 +77,8 @@ Three tools help you while you type:
   when you press Enter or leave it, a curve drawn as four numbers has the curve
   editor under its row, and an envelope's points have its shape there, each point
   to drag, written when you let go. A row naming one of your controls has
-  **Select**, which selects that control on the panel for when you go back there.
+  **Select**, which selects that control on the panel for when you go back there,
+  and a stroke's dash is drawn as the line it makes.
   The dock opens on the tab you used last. The same lists are in the code too: with
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
   (or divisions, scales, events, your controls' names, your synth's parameters,

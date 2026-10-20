@@ -253,6 +253,22 @@ export function meaningLine(arg, { madeBelow = false } = {}) {
       if (m.checksum) parts.push(`${m.checksum.type} checksum ${m.checksum.hex}`);
       return parts.join(' · ');
     }
+    case 'dash': {
+      // No list at all is the runtime's refusal, which the problem says.
+      if (!m.lengths) return '';
+      if (!m.lengths.length) return 'no lengths, so the line is solid';
+      if (m.drawn + m.skipped === 0) return 'every length is 0, so the line is solid';
+      if (m.skipped === 0) return 'nothing is skipped, so the line is solid';
+      if (m.drawn === 0) {
+        return m.cap === 'butt' ? 'nothing is drawn: a dash of 0 shows only with a round or square cap, as a dot'
+          : `each dash is 0, so the ${m.cap} cap draws it as a dot`;
+      }
+      // An odd list is drawn twice over, so a length is drawn the first time and skipped the next.
+      const steps = (m.odd ? [...m.lengths, ...m.lengths] : m.lengths)
+        .map((n, i) => `${shownNumber(n)} ${i % 2 ? 'skipped' : 'drawn'}`);
+      const shown = steps.length > 8 ? `${steps.slice(0, 8).join(', ')}, …` : steps.join(', ');
+      return `in pixels${m.odd ? ', an odd list twice over' : ''}: ${shown}`;
+    }
     case 'computed': {
       // "an envelope", "an image", "an event": the article the kind's name takes.
       const what = m.expects ? `: ${/^[aeiou]/i.test(m.expects) ? 'an' : 'a'} ${m.expects}` : '';

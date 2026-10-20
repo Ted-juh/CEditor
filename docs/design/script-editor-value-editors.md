@@ -408,7 +408,7 @@ One table, then notes on the kinds where there is something more to say.
 | Animation | `ce.anim.play("Cutoff", "Pulse")` | that control's keyframe animations | the value | a dropdown of that control's | not one of its keyframe animations (the runtime returns false and logs the list) |
 | Event | `on(target, "valueChanged", fn)` | `eventName` parameters | the value | a dropdown | an unknown event |
 | Number with a unit | angle `180`, `ms` `250`, opacity `0.5` | the parameter's `unit` and range | the unit and range | a field, written on Enter | out of range |
-| Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line | none | negative lengths, which are clamped to 0 |
+| Dash | `dash = { 3, 3 }` | `ce.draw.stroke`'s `opts.dash` | a dashed line, drawn as the drawing is handed it, and its lengths in words | none | a length below 0 or not a number, drawn as 0; a dash that is not a list, drawn solid |
 | SysEx | `sendSysex("F0 41 10 42 F7")` | `bytes` parameters | byte count, checksum | none | a wrong checksum (`computeChecksum`), a missing `F0` or `F7` |
 | Device parameter | `ce.device.bind("Cutoff", "cutoff")` | `bind`'s `parameterId`, the `id` of `write`, `read` and `parameter` | name, group and range (a profile's parameter has no CC of its own: that is its recipe's) | a dropdown from the device profile | a parameter the profile does not have |
 | Envelope | `ce.anim.envelope(path, { {x=0,y=0}, … })` | `points`, typed `envelope` | the shape, as the runtime samples it | a point editor under the row: drag a point, add one, take one out | fewer than two points, a point that is not one, an x outside 0 to 1 (a y past 0 to 1 is a level past `from` or `to`) |
@@ -1176,6 +1176,21 @@ Values tab's first version was merged:
   and a second Select takes the pick back. Checked in `test/panelSelectionScope.test.js`,
   `test/valuesSidebar.test.js` and `browser-checks/valuesSidebar.mjs`, which picks a control with a
   colour open and finds it selected on the canvas.
+- **A stroke's dash is drawn in its row.** `ce.draw.stroke`'s `opts.dash` has `kind: 'dash'`, read
+  by the runtime's own reader (`scripting/drawDash.js`), which the WebView runtime now draws with.
+  It is the only runtime with the call: the plug-in's window runs the same one, and the C++
+  preludes answer `ce.draw` with their webview-only stub. The row draws a short line with the
+  `stroke-dasharray` the overlay is handed and the cap the options give, and says in pixels what is
+  drawn and what skipped (an odd list twice over, as SVG repeats it), or why the line is solid, or
+  shows only its caps. Three things went wrong without a word, and are said now, once each, in the
+  same words in the row: a length below 0 or not a number was drawn as 0, so `{ 3, -3 }` drew a
+  solid line, and still is drawn as 0 ("ce.draw.stroke: length 2 of the dash is -3, which is less
+  than 0, so 0 was used."); a number in place of the list was dropped ("ce.draw.stroke: the dash is
+  3, not a list of lengths, so the line is solid. …"); and text was taken apart a character at a
+  time, so `"3 3"` drew 6 and skipped 6, and is refused in the same words. An empty list, and one
+  whose lengths are all 0, draw a solid line, as SVG's rule says; neither is a mistake. Checked in
+  `test/scriptDraw.test.js`, in `test/scriptValues.test.js` against the runtime's console and the
+  line it draws, and in `browser-checks/valuesSidebar.mjs`.
 
 Still open: nothing from this record.
 
