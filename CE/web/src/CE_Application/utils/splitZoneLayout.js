@@ -564,9 +564,17 @@ export function scriptApplyPreset(zones, presetId, lowNote = 36, highNote = 96) 
 // working when the zones are reordered, which an index does not.
 export function zoneIndexOf(zones, which) {
   const list = Array.isArray(zones) ? zones : [];
-  if (typeof which === 'number') return which >= 0 && which < list.length ? which : -1;
+  if (typeof which === 'number') return Number.isInteger(which) && which >= 0 && which < list.length ? which : -1;
   const name = String(which ?? '').toLowerCase();
   return list.findIndex((z) => String(z?.label ?? '').toLowerCase() === name);
+}
+// A script names a zone by its number counted from 1, as the panel labels it ("Zone 1"), or by its
+// label; the functions here index from 0. This is the one place a script's zone becomes an index,
+// and -1 for one that is not a zone.
+export function scriptZoneIndex(zones, which) {
+  const list = Array.isArray(zones) ? zones : [];
+  if (typeof which === 'number') return Number.isInteger(which) && which >= 1 && which <= list.length ? which - 1 : -1;
+  return zoneIndexOf(list, which);
 }
 export function scriptPatchZone(zones, which, patch) {
   const list = (Array.isArray(zones) ? zones : []).map((z) => ({ ...z }));

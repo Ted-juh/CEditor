@@ -70,18 +70,27 @@ test('a hand-written verb refuses an element it has no such one of, and says whi
   const zone = run((api) => api.splitMute('Split', 9, false));
   assert.equal(zone.result, false);
   assert.deepEqual(zone.lines, ['split Split: mute {"zone":9,"enabled":false} — refused, nothing changed. There is no zone 9: '
-    + 'a zone is its number counted from 0, here 0 to 1, or its name, "Bass", "Lead".']);
+    + 'a zone is its number from 1 to 2, or its name, "Bass", "Lead".']);
   assert.equal(zone.controls[7]._children.SplitZone.zones.every((z) => z.enabled !== false), true, 'nothing was written');
   assert.match(run((api) => api.splitChannel('Split', 'Bas', 3)).lines[0], /There is no zone "Bas": /);
-  // A zone number counts from 0, as it always did: zone 1 is the second, "Lead".
-  const lead = run((api) => api.splitMute('Split', 1, false));
+  // A zone number counts from 1, as the panel labels it: zone 2 is "Lead". It counted from 0, so a
+  // script written that way reaches the zone before the one it meant, and its zone 0 is refused.
+  const lead = run((api) => api.splitMute('Split', 2, false));
   assert.deepEqual([lead.result, lead.lines], [true, []]);
   assert.deepEqual(lead.controls[7]._children.SplitZone.zones.map((z) => z.enabled !== false), [true, false]);
+  const moved = run((api) => api.splitPoint('Split', 1, 55)).controls[7]._children.SplitZone.zones;
+  assert.deepEqual([moved[0].highNote, moved[1].lowNote], [55, 56], 'zone 1 ends at the point, and zone 2 starts after it');
+  assert.match(run((api) => api.splitMute('Split', 0, false)).lines[0], /There is no zone 0: a zone is its number from 1 to 2, /);
+  assert.match(run((api) => api.splitMute('Split', 1.5, false)).lines[0], /There is no zone 1\.5: /, 'a part of a zone is none');
 
   const cell = run((api) => api.phraseCell('Phr', 20, 1, true));
   assert.equal(cell.result, false);
-  assert.deepEqual(cell.lines, ['phrase Phr: cell {"step":20,"row":1,"on":true} — refused, nothing changed. There is no step 20: the steps are 0 to 15, counted from 0.']);
-  assert.match(run((api) => api.phraseCell('Phr', 1, 8, true)).lines[0], /There is no row 8: the rows are 0 to 7, counted from 0\.$/);
+  assert.deepEqual(cell.lines, ['phrase Phr: cell {"step":20,"row":1,"on":true} — refused, nothing changed. There is no step 20: the steps are 1 to 16.']);
+  assert.match(run((api) => api.phraseCell('Phr', 1, 9, true)).lines[0], /There is no row 9: the rows are 1 to 8\.$/);
+  assert.match(run((api) => api.phraseCell('Phr', 0, 1, true)).lines[0], /There is no step 0: the steps are 1 to 16\.$/);
+  // Step 1, row 1 is the grid's first cell, and step 16, row 8 its last.
+  const first = run((api) => { api.phraseClear('Phr'); api.phraseCell('Phr', 1, 1, true); api.phraseCell('Phr', 16, 8, true); });
+  assert.deepEqual([first.lines, Object.keys(first.controls[8]._children.Phrase.pattern).sort()], [[], ['0:0', '15:7']]);
 
   assert.deepEqual(run((api) => api.recorderLoad('Rec', 2)).lines,
     ['recorder Rec: load {"slot":2} — refused, nothing changed. There is no take in slot 2: no slot holds one yet.']);
@@ -126,9 +135,11 @@ test('the rows say what an index addresses, and the refusal in the console\'s wo
   // What a good index addresses, now.
   assert.equal(meaningLine(rowNamed('ce.components.drumpads.note("Pads", 3, 40)', 'index')), 'pad 3 of 16 · note now 38');
   assert.equal(meaningLine(rowNamed('ce.components.lcd.text("Lcd", 1, "hi")', 'row')), 'line 1 of 2 · now "PATCH:INIT VOICE"');
-  assert.equal(meaningLine(rowNamed('splitMute("Split", 1, false)', 'zone')), 'zone 1 is "Lead", the 2nd zone: a zone number counts from 0');
-  assert.equal(meaningLine(rowNamed('splitChannel("Split", "Bass", 3)', 'zone')), '"Bass" is zone 0, counted from 0');
-  assert.equal(meaningLine(rowNamed('phraseCell("Phr", 3, 1, true)', 'step')), 'step 3: the steps are 0 to 15, counted from 0');
+  assert.equal(meaningLine(rowNamed('splitMute("Split", 2, false)', 'zone')), 'zone 2 is "Lead"');
+  assert.equal(meaningLine(rowNamed('splitChannel("Split", "Bass", 3)', 'zone')), 'zone 1 of 2');
+  assert.deepEqual(['min', 'max'].map((k) => rowNamed('splitMute("Split", 2, false)', 'zone').meaning[k]), [1, 2]);
+  assert.equal(meaningLine(rowNamed('phraseCell("Phr", 3, 1, true)', 'step')), 'step 3 of 16');
+  assert.deepEqual(['min', 'max'].map((k) => rowNamed('phraseCell("Phr", 3, 1, true)', 'row').meaning[k]), [1, 8]);
   assert.equal(meaningLine(rowNamed('recorderStore("Rec", 3)', 'slot')), 'slot 3 of 8 · empty');
   // A good index says nothing wrong; a phrase cell's row says nothing of its step.
   for (const [src, name] of [['ce.components.drumpads.note("Pads", 3, 40)', 'index'], ['phraseCell("Phr", 20, 1, true)', 'row'],

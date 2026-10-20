@@ -3332,15 +3332,15 @@ export const PANEL_COMMANDS = [
     `Apply a split layout — ${oneOf(HAND_WRITTEN_VALUES['split.preset'])} — optionally bounding the key range.`,
     [T, { name: 'preset', type: 'string', required: true, kind: 'componentWord' },
      { name: 'lowNote', type: 'number', required: false, kind: 'note' }, { name: 'highNote', type: 'number', required: false, kind: 'note' }]),
-  // A zone is its number counted from 0, or its label ("Bass"). The panel labels them from 1, so the
-  // Values tab says which zone a number reaches (handWrittenVerbs.js).
-  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone. A zone is its number counted from 0, or its name.',
+  // A zone is its number counted from 1, as the panel labels it ("Zone 1"), or its label ("Bass").
+  // It was counted from 0, so zone 1 was the one labelled "Zone 2" (handWrittenVerbs.js).
+  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone. A zone is its number counted from 1, or its name.',
     [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
-  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel. A zone is its number counted from 0, or its name.',
+  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel. A zone is its number counted from 1, or its name.',
     [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone. A zone is its number counted from 0, or its name.',
+  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone. A zone is its number counted from 1, or its name.',
     [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the split point between two zones. A zone is its number counted from 0, or its name.',
+  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the top note of a zone, and with it the bottom of a zone that starts just above it. A zone is its number counted from 1, or its name.',
     [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
 
   // --- Phrase Sequencer ---
@@ -3358,7 +3358,7 @@ export const PANEL_COMMANDS = [
     [T, { name: 'direction', type: 'string', required: true, kind: 'componentWord' }]),
   panelVerb('phraseRun', 'phraseRun(target, running)', 'Start or stop the sequencer.',
     [T, { name: 'running', type: 'boolean', required: true }]),
-  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off. Steps and rows are counted from 0.',
+  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off. Steps and rows are counted from 1.',
     [T, { name: 'step', type: 'number', required: true, kind: 'componentIndex' }, { name: 'row', type: 'number', required: true, kind: 'componentIndex' },
      { name: 'on', type: 'boolean', required: true }]),
 

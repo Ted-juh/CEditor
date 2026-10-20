@@ -13,11 +13,12 @@
 //     unknown word, a slot with no take in it, a degree past the scale or a scene they do not have,
 //     without saying which there are.
 //
-// A zone and a phrase cell are counted from 0, and a slot, a degree and a scene from 1, as each
-// reducer always counted them; the sentences say so, because the panel labels its zones "Zone 1",
-// "Zone 2", and the zone 1 a script names is the second of them.
+// A zone, a phrase cell, a slot, a degree and a scene are all counted from 1, as the panel labels
+// them. A zone and a phrase cell were counted from 0, as their reducers index them, so the zone 1 a
+// script named was the one the panel labels "Zone 2"; reducerArgs is now the one place a script's
+// number becomes the reducer's index.
 
-import { zoneIndexOf, SPLIT_PRESETS } from '../utils/splitZoneLayout.js';
+import { scriptZoneIndex, SPLIT_PRESETS } from '../utils/splitZoneLayout.js';
 import { MAX_SLOTS, RECORDER_SOURCES, isRecordingState } from '../utils/noteRecorderLayout.js';
 import { MIN_STEPS, MAX_STEPS, MIN_ROWS, MAX_ROWS, PHRASE_SEEDS, PHRASE_DIRECTIONS } from '../utils/phraseLayout.js';
 import { HARMONY_MODES, VOICINGS, OUT_OF_KEY, VOICE_LEADING, MEMORY_PRESETS } from '../utils/harmoniserLayout.js';
@@ -86,22 +87,20 @@ export function phraseGrid(cfg) {
   return { steps: clampInt(c.steps ?? 16, MIN_STEPS, MAX_STEPS, 16), rows: clampInt(c.rows ?? 8, MIN_ROWS, MAX_ROWS, 8) };
 }
 
-/** The Zone Splitter's zone `which` (its number from 0, or its name), or why there is none. */
+/** The Zone Splitter's zone `which` (its number from 1, or its name), or why there is none. */
 export function splitZoneRefusal(zones, which) {
   const list = Array.isArray(zones) ? zones : [];
-  if (zoneIndexOf(list, which) >= 0) return null;
+  if (scriptZoneIndex(list, which) >= 0) return null;
   if (!list.length) return 'It has no zones.';
   const names = list.map((z, i) => String(z?.label ?? `Zone ${i + 1}`));
-  return `There is no zone ${shownValue(which)}: a zone is its number counted from 0, here 0 to ${list.length - 1}, `
-    + `or its name, ${quoted(names)}.`;
+  return `There is no zone ${shownValue(which)}: a zone is its number from 1 to ${list.length}, or its name, ${quoted(names)}.`;
 }
 
 function phraseCellRefusal(cfg, step, row) {
   const { steps, rows } = phraseGrid(cfg);
   const off = (value, count, word) => {
     const n = Math.round(Number(value));
-    return Number.isFinite(n) && n >= 0 && n < count ? null
-      : `There is no ${word} ${shownValue(value)}: the ${word}s are 0 to ${count - 1}, counted from 0.`;
+    return Number.isFinite(n) && n >= 1 && n <= count ? null : `There is no ${word} ${shownValue(value)}: the ${word}s are 1 to ${count}.`;
   };
   const s = off(step, steps, 'step');
   if (s) return { at: 0, reason: s };
@@ -166,6 +165,15 @@ export function handWrittenRefusal(family, action, cfg, args) {
     return r ? { at: 0, reason: r } : null;
   }
   return null;
+}
+
+/** A hand-written verb's `args`, once handWrittenRefusal has passed them, as its reducer indexes
+ *  them: a script's zone and phrase cell count from 1, and the reducers' from 0. */
+export function reducerArgs(family, action, cfg, args) {
+  const a = args && typeof args === 'object' ? args : {};
+  if (family === 'split' && 'zone' in a) return { ...a, zone: scriptZoneIndex(cfg?.zones, a.zone) };
+  if (family === 'phrase' && action === 'cell') return { ...a, step: Math.round(Number(a.step)) - 1, row: Math.round(Number(a.row)) - 1 };
+  return a;
 }
 
 // The hand-written families' read(field): the field names their section has, in any case, and what

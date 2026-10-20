@@ -38,7 +38,7 @@ import {
   HAND_WRITTEN, READ_FIELDS, handWrittenRefusal, handWrittenWords, phraseGrid, sectionFieldRefusal, sectionFields, sectionRefusalLine,
 } from './handWrittenVerbs.js';
 import { MAX_SLOTS } from '../utils/noteRecorderLayout.js';
-import { zoneIndexOf } from '../utils/splitZoneLayout.js';
+import { scriptZoneIndex } from '../utils/splitZoneLayout.js';
 import { setlistScenes } from '../utils/setlistLayout.js';
 import { SCALES as CHORD_PAD_SCALES } from '../utils/chordPadLayout.js';
 import { elementSites } from '../utils/pixelElements.js';
@@ -1309,20 +1309,17 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     const zones = Array.isArray(cfg.zones) ? cfg.zones : [];
     const names = zones.map((z, i) => String(z?.label ?? `Zone ${i + 1}`));
     meaning.choices = names;
-    Object.assign(meaning, { min: zones.length ? 0 : null, max: zones.length ? zones.length - 1 : null });
-    const i = zoneIndexOf(zones, value);
-    if (i >= 0) {
-      meaning.hint = typeof value === 'number' ? `zone ${value} is "${names[i]}", the ${ordinal(i + 1)} zone: a zone number counts from 0`
-        : `"${names[i]}" is zone ${i}, counted from 0`;
-    }
+    Object.assign(meaning, { min: zones.length ? 1 : null, max: zones.length || null });
+    const i = scriptZoneIndex(zones, value);
+    if (i >= 0) meaning.hint = typeof value === 'number' ? `zone ${value} is "${names[i]}"` : `zone ${i + 1} of ${zones.length}`;
     return { meaning, problem };
   }
   if (spec.family === 'phrase') {
     const { steps, rows } = phraseGrid(cfg);
     const count = at === 0 ? steps : rows;
-    Object.assign(meaning, { min: 0, max: count - 1 });
+    Object.assign(meaning, { min: 1, max: count });
     const n = Math.round(Number(value));
-    if (!problem && Number.isFinite(n)) meaning.hint = `${at === 0 ? 'step' : 'row'} ${n}: the ${at === 0 ? 'steps' : 'rows'} are 0 to ${count - 1}, counted from 0`;
+    if (!problem && Number.isFinite(n)) meaning.hint = `${at === 0 ? 'step' : 'row'} ${n} of ${count}`;
     return { meaning, problem };
   }
   if (spec.family === 'setlist') {
@@ -1402,7 +1399,6 @@ function readSectionField(value, { section, label }, control) {
 }
 
 const PITCH_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
-const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
 /* ------------------------------------------------------------------------ fonts and images */
 
