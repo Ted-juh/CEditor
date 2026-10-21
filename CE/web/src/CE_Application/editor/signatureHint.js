@@ -8,8 +8,9 @@
 //           it at the end of the line the caret is on.
 //   above   when the line's end and the hint do not fit in the text's visible width (a long line, or
 //           one scrolled sideways): a box over the line before, at the caret, kept inside the editor.
-//   below   the same box under the line, when the caret is on the editor's top visible line and
-//           there is no room above it.
+//           It is one line tall, in the code's own size, so it covers that line and no other.
+//   below   the same box over the line after, when the caret is on the editor's top visible line
+//           and there is no line above it to cover.
 //
 // A box wider than the editor folds the parameters but the one being typed to "…", as in
 // "sendCC(…, cc, …)", and is cut at the editor's width with an ellipsis if even that is too wide.
@@ -19,12 +20,8 @@
 
 export const HINT = Object.freeze({
   gapChars: 2,          // between the end of the line and an inline hint
-  inlinePadX: 6,        // an inline hint's padding either side
-  boxPadX: 9,           // a box's padding either side, and above and below
-  boxPadY: 5,
-  boxBorder: 1,
-  boxFontSize: 12,      // a box is drawn at 12px, the code at the editor's size
-  boxLineHeight: 16,
+  padX: 6,              // either side, inline or a box; both are a line tall, in the code's size
+  boxBorder: 1,         // a box's border, inside its line's height
   margin: 4,            // kept clear of the text area's edges
 });
 
@@ -63,25 +60,23 @@ export function hintLength(name, parts) {
  *             the caret is among them), both it and caretX by the columns the editor draws
  *             (visualColumn), not the characters
  *   caretX, lineTop, lineHeight
- *   charWidth, fontSize   the code's
+ *   charWidth   the code's
  *   box       { left, right, top, bottom }: the text's visible area
  */
-export function placeSignatureHint({ name, params, active, lineEndX, caretX, lineTop, lineHeight, charWidth, fontSize, box }) {
+export function placeSignatureHint({ name, params, active, lineEndX, caretX, lineTop, lineHeight, charWidth, box }) {
   if (!box || !(charWidth > 0) || lineTop + lineHeight <= box.top || lineTop >= box.bottom) return null;
   const all = hintParts(params, active);
-  const inlineWidth = hintLength(name, all) * charWidth + 2 * HINT.inlinePadX;
+  const inlineWidth = hintLength(name, all) * charWidth + 2 * HINT.padX;
   const inlineX = lineEndX + HINT.gapChars * charWidth;
   if (inlineX >= box.left + HINT.margin && inlineX + inlineWidth <= box.right - HINT.margin) {
     return { mode: 'inline', x: inlineX, y: lineTop, width: Math.ceil(inlineWidth), parts: all };
   }
-  const boxChar = charWidth * HINT.boxFontSize / (fontSize > 0 ? fontSize : HINT.boxFontSize);
-  const boxWidth = (parts) => hintLength(name, parts) * boxChar + 2 * (HINT.boxPadX + HINT.boxBorder);
+  const boxWidth = (parts) => hintLength(name, parts) * charWidth + 2 * (HINT.padX + HINT.boxBorder);
   const room = Math.max(0, box.right - box.left - 2 * HINT.margin);
   const parts = boxWidth(all) > room ? hintParts(params, active, true) : all;
   const width = Math.min(Math.ceil(boxWidth(parts)), Math.floor(room));
   const x = Math.max(box.left + HINT.margin, Math.min(caretX, box.right - HINT.margin - width));
-  const height = HINT.boxLineHeight + 2 * (HINT.boxPadY + HINT.boxBorder);
-  const aboveY = lineTop - height - 2;
-  if (aboveY >= box.top) return { mode: 'above', x, y: aboveY, width, parts };
-  return { mode: 'below', x, y: lineTop + lineHeight + 2, width, parts };
+  // Exactly over the line before, or the one after: the box is a line tall.
+  if (lineTop - lineHeight >= box.top) return { mode: 'above', x, y: lineTop - lineHeight, width, parts };
+  return { mode: 'below', x, y: lineTop + lineHeight, width, parts };
 }

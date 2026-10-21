@@ -24,8 +24,9 @@
  *   path       a property path is built a segment at a time: typing in the quotes lists the
  *              controls, a dot opens the next segment's list by itself, Enter writes that segment
  *   hint       the signature hint sits after the end of the caret's line when it fits there, else in
- *              a box above the line (below it on the top visible line); it and the completion list
- *              are drawn on their own background, though they are moved to <body>
+ *              a box a line tall exactly over the line before (after, on the top visible line); it
+ *              and the completion list are drawn on their own background, though they are moved to
+ *              <body>; the caret's line has a bar in the accent colour
  *   js         the same in JavaScript, a choice picked with the mouse
  *
  * Text goes in with keyboard.insertText, as valuesSidebar.mjs does; keys that complete go in as keys.
@@ -396,28 +397,38 @@ end
       const r = n.getBoundingClientRect();
       const s = getComputedStyle(n);
       const ta = document.querySelector('.bd-app .detail textarea.ce-ta').getBoundingClientRect();
+      // The caret's line: its band, and the bar at its left edge in the accent colour.
+      const active = document.querySelector('.bd-app .detail .ce-activeline');
+      const a = active.getBoundingClientRect();
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--accent)';
+      active.parentElement.appendChild(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      // A character's box is its glyph's; the line's box is the textarea's line height around it.
+      const lh = parseFloat(getComputedStyle(document.querySelector('.bd-app .detail textarea.ce-ta')).lineHeight);
+      const top = row.top - (lh - row.height) / 2;
       return { mode: n.dataset.mode, parent: n.parentElement.tagName, text: n.textContent.replace(/\s+/g, ' ').trim(),
         opaque: s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent', border: s.borderTopStyle,
-        onLine: Math.abs(r.top - row.top) <= 2, after: end ? r.left >= end.left + end.width : null,
-        clearAbove: r.bottom <= row.top, clearBelow: r.top >= row.top + row.height, inside: r.left >= ta.left && r.right <= ta.right };
+        onLine: Math.abs(r.top - top) <= 1, after: end ? r.left >= end.left + end.width : null,
+        oneLine: Math.abs(r.height - lh) <= 1,
+        overPrev: Math.abs(r.top - (top - lh)) <= 1 && r.bottom <= top + 0.5,
+        overNext: Math.abs(r.top - (top + lh)) <= 1,
+        inside: r.left >= ta.left && r.right <= ta.right,
+        bar: Math.abs(a.top - top) <= 1 && getComputedStyle(active).boxShadow.includes(accent) && getComputedStyle(active).boxShadow.includes('inset') };
     }, { row, end });
   };
   const inline = await hintAt(3);
   const above = await hintAt(4);
   const below = await hintAt(1);
-  if (process.env.HINT_SHOT_DIR) {
-    await hintAt(3);
-    await page.screenshot({ path: `${process.env.HINT_SHOT_DIR}/hint-inline.png`, clip: { x: 340, y: 280, width: 900, height: 200 } });
-    await hintAt(4);
-    await page.screenshot({ path: `${process.env.HINT_SHOT_DIR}/hint-above.png`, clip: { x: 340, y: 280, width: 900, height: 200 } });
-  }
-  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC written with tabs, the hint is on that line after its last character as drawn, in the code\'s own line, over no code, and drawn on a background of its own though it is moved to <body>',
-    { mode: 'inline', parent: 'BODY', text: 'sendCC(channel, cc, value)', opaque: true, onLine: true, after: true, inside: true },
-    { mode: inline.mode, parent: inline.parent, text: inline.text, opaque: inline.opaque, onLine: inline.onLine, after: inline.after, inside: inline.inside });
-  led.check(S, 'no room after the line', 'on a line too long for it, the hint is a box above the line, clear of it, with a border and a background, inside the editor; on the top visible line, below it',
-    { above: { mode: 'above', opaque: true, border: 'solid', clearAbove: true, inside: true }, below: { mode: 'below', clearBelow: true, inside: true } },
-    { above: { mode: above.mode, opaque: above.opaque, border: above.border, clearAbove: above.clearAbove, inside: above.inside },
-      below: { mode: below.mode, clearBelow: below.clearBelow, inside: below.inside } });
+  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC written with tabs, the hint is on that line after its last character as drawn, a line tall, over no code, and drawn on a background of its own though it is moved to <body>; the line carries the accent bar the caret\'s line has',
+    { mode: 'inline', parent: 'BODY', text: 'sendCC(channel, cc, value)', opaque: true, onLine: true, after: true, oneLine: true, inside: true, bar: true },
+    { mode: inline.mode, parent: inline.parent, text: inline.text, opaque: inline.opaque, onLine: inline.onLine, after: inline.after, oneLine: inline.oneLine,
+      inside: inline.inside, bar: inline.bar });
+  led.check(S, 'no room after the line', 'on a line too long for it, the hint is a box a line tall exactly over the line before, so it covers that line and no other, with a border and a background, inside the editor; on the top visible line, exactly over the line after',
+    { above: { mode: 'above', opaque: true, border: 'solid', oneLine: true, overPrev: true, inside: true, bar: true }, below: { mode: 'below', oneLine: true, overNext: true, inside: true } },
+    { above: { mode: above.mode, opaque: above.opaque, border: above.border, oneLine: above.oneLine, overPrev: above.overPrev, inside: above.inside, bar: above.bar },
+      below: { mode: below.mode, oneLine: below.oneLine, overNext: below.overNext, inside: below.inside } });
   // The completion list is moved to <body> the same way, and is drawn as a box too.
   await clickAt(lineOf(5));
   await page.keyboard.press('Home');

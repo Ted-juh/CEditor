@@ -416,7 +416,7 @@
     return placeSignatureHint({
       name: signature.name, params: signature.params, active: signature.activeParam,
       lineEndX: x0 + endCol * charWidth, caretX: x0 + visualColumn(line, caretCol) * charWidth,
-      lineTop: r.top + PAD_TOP + caretLine * lineHeight - scrollTop, lineHeight, charWidth, fontSize,
+      lineTop: r.top + PAD_TOP + caretLine * lineHeight - scrollTop, lineHeight, charWidth,
       box: { left: r.left, right: r.left + taEl.clientWidth, top: r.top, bottom: r.top + taEl.clientHeight },
     });
   });
@@ -1086,7 +1086,6 @@
   </div>
 
   <div class="ce-area">
-    <div class="ce-activeline" style="top:{PAD_TOP + caretLine * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {#each markList as b (b.key)}
       {#if b.band}
         <div class="ce-mark ce-mark-statement" data-mark="statement" data-line={b.line + 1}
@@ -1096,6 +1095,8 @@
           style="left:{PAD_L + b.col * charWidth - scrollLeft - 1}px; top:{PAD_TOP + b.line * lineHeight - scrollTop}px; width:{b.width * charWidth + 2}px; height:{lineHeight}px"></div>
       {/if}
     {/each}
+    <!-- After the marks: its bar is drawn over a statement band's, so the caret's line in it shows. -->
+    <div class="ce-activeline" style="top:{PAD_TOP + caretLine * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {#each occurrences as o (o.start)}
       {@const p = posOf(o.start)}
       <div class="ce-occ"
@@ -1212,12 +1213,12 @@
   {/if}
 
   {#if signature && sigPlace && !acOpen}
-    <!-- Inline, it is on the caret's line in the code's own size; a box is cut at the editor's width. -->
+    <!-- A line tall, in the code's own size: inline on the caret's line, or a box over the line
+         before or after it, cut at the editor's width. -->
     <div class={['ce-sig', sigPlace.mode]} data-mode={sigPlace.mode} use:portal
       style:left="{sigPlace.x}px" style:top="{sigPlace.y}px"
-      style:height={sigPlace.mode === 'inline' ? `${lineHeight}px` : null}
-      style:line-height={sigPlace.mode === 'inline' ? `${lineHeight}px` : null}
-      style:font-size={sigPlace.mode === 'inline' ? `${fontSize}px` : null}
+      style:height="{lineHeight}px" style:line-height="{sigPlace.mode === 'inline' ? lineHeight : lineHeight - 2}px"
+      style:font-size="{fontSize}px"
       style:max-width={sigPlace.mode === 'inline' ? null : `${sigPlace.width}px`}>
       <span class="ce-sig-name">{signature.name}</span>(<!--
         -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active']}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
@@ -1364,10 +1365,13 @@
 
   .ce-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
 
+  /* The caret's line: a faint band, and a bar at its left edge as the Values tab's statement band
+     has, in the accent colour, so the line the caret is on reads at a glance. */
   .ce-activeline {
     position: absolute;
     left: 0; right: 0;
     background: var(--ce-active);
+    box-shadow: inset 2px 0 0 var(--accent);
     pointer-events: none;
     z-index: 0;
   }
@@ -1650,20 +1654,19 @@
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
 
-  /* signature help: a box above or below the line, or inline after its end (signatureHint.js, whose
-     HINT holds these sizes) */
+  /* signature help: inline after the end of the caret's line, or a box over the line before or after
+     it; a line tall either way, its size set where it is placed (signatureHint.js, whose HINT holds
+     the padding and border) */
   .ce-sig {
     position: fixed;
     z-index: 59;
     box-sizing: border-box;
     background: var(--panel-2);
     border: 1px solid var(--line-2);
-    border-radius: 6px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-    padding: 5px 9px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    padding: 0 6px;
     font-family: var(--mono);
-    font-size: 12px;
-    line-height: 16px;
     color: var(--txt-dim);
     white-space: nowrap;
     overflow: hidden;
@@ -1672,9 +1675,7 @@
   }
   .ce-sig.inline {
     border: none;
-    border-radius: 4px;
     box-shadow: none;
-    padding: 0 6px;
   }
   .ce-sig-name { color: var(--blue); }
   .ce-sig-param { color: var(--txt-faint); }
