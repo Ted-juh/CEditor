@@ -297,9 +297,13 @@ export function colourFromRgb(r, g, b) {
 
 /** ce.math.hslToHex: "#RRGGBB" from hue 0-360, saturation and lightness 0-100. */
 export function colourFromHsl(hue, sat, light) {
-  const h = Number(hue) || 0;
-  const s = (Number(sat) || 0) / 100;
-  const l = (Number(light) || 0) / 100;
+  // A hue goes round: -120 is 240 and 480 is 120. JavaScript's % keeps the sign, so a negative hue
+  // gave the wrong colour here while Lua and Python, whose % does not, gave the right one. The
+  // saturation and the lightness are held at 0 and 100 both ways: -10 gave a teal grey.
+  const raw = Number(hue) || 0;
+  const h = raw - 360 * Math.floor(raw / 360);
+  const s = Math.min(100, Math.max(0, Number(sat) || 0)) / 100;
+  const l = Math.min(100, Math.max(0, Number(light) || 0)) / 100;
   const k = (n) => (n + h / 30) % 12;
   const a = s * Math.min(l, 1 - l);
   const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));

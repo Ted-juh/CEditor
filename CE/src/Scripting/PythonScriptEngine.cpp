@@ -1310,9 +1310,20 @@ def round(v, ndigits=None):
     return math.floor(v + 0.5)
 def scale(v, inLo, inHi, outLo, outHi):
     return outLo if inHi == inLo else outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)
-def snap(v, step):
-    return v if step == 0 else round(v / step) * step
-def lerp(a, b, t): return a + (b - a) * t
+def snap(v=None, step=None):
+    n = __mnum("ce.math.snap", "the value", v)
+    if n is None: return None
+    s = __mnum("ce.math.snap", "the step", step)
+    if s is None: return None
+    return n if s == 0 else round(n / s) * s
+def lerp(a=None, b=None, t=None):
+    x = __mnum("ce.math.lerp", "a", a)
+    if x is None: return None
+    y = __mnum("ce.math.lerp", "b", b)
+    if y is None: return None
+    f = __mnum("ce.math.lerp", "t", t)
+    if f is None: return None
+    return x + (y - x) * f
 def curve(v, shape="linear"):
     import math
     if shape == "exp": return v * v
@@ -1562,8 +1573,10 @@ def blend(a, b, t):
 
 # Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
 # them a panel used.
-def randomFloat(lo, hi):
-    a, b = __num(lo), __num(hi, 1)
+def randomFloat(lo=None, hi=None):
+    # One number alone is the top of a range from 0, not the bottom of one up to 1.
+    if hi is None: a, b = 0.0, __num(lo, 1)
+    else: a, b = __num(lo), __num(hi)
     return a + random() * (b - a)
 
 # A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
@@ -1614,6 +1627,8 @@ def distance(x1, y1, x2, y2):
 def angleOf(x1, y1, x2, y2):
     import math
     dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+    # The same point twice has no direction: 0, in every runtime.
+    if dx == 0 and dy == 0: return 0
     a = toDegrees(math.atan2(dx, -dy))
     return a + 360 if a < 0 else a
 
@@ -1782,9 +1797,16 @@ def random(lo=None, hi=None):
     __rndStates[__streamOverride[0]] = x
     r = x / 4294967296.0
     if lo is None or hi is None: return r
-    a, b = math.floor(lo or 0), math.floor(hi or 0)
-    low, high = min(a, b), max(a, b)
-    # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+    a = __mnum("ce.math.random", "lo", lo)
+    if a is None: return None
+    b = __mnum("ce.math.random", "hi", hi)
+    if b is None: return None
+    # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+    # only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+    low, high = math.ceil(min(a, b)), math.floor(max(a, b))
+    if high < low:
+        logError("ce.math.random: there is no whole number from " + __shownValue(a) + " to " + __shownValue(b) + ", so there is no answer.")
+        return None
     return low + math.floor(r * (high - low + 1))
 
 # Draws inside the block come from a generator of their own. A block rather than a name argument on
@@ -1929,6 +1951,15 @@ def __realNumber(v):
     if not __re.fullmatch(r"\s*[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\s*", v): return None
     n = float(v)
     return n if math.isfinite(n) else None
+# A number a ce.math command was given, or None after an error in the console. Left out, it is the
+# fallback when there is one. The WebView runtime's mathNumber, word for word.
+def __mnum(verb, what, v, fallback=None):
+    if v is None and fallback is not None: return fallback
+    n = __realNumber(v)
+    if n is not None: return n
+    if v is None: logError(verb + ": " + what + " is a number, and none was given, so there is no answer.")
+    else: logError(verb + ": " + what + " is a number, and " + __shownValue(v) + " is not, so there is no answer.")
+    return None
 def __cunit(verb, what, v, fallback=None):
     if v is None and fallback is not None: return fallback
     n = __realNumber(v)
@@ -2039,8 +2070,14 @@ def __cbyte(v):
     import math
     n = math.floor((float(v) if isinstance(v, (int, float)) else 0) + 0.5)
     return 0 if n < 0 else (255 if n > 255 else n)
-def rgbToHex(r, g, b):
-    return ("#%02x%02x%02x" % (__cbyte(r), __cbyte(g), __cbyte(b))).upper()
+def rgbToHex(r=None, g=None, b=None):
+    rr = __mnum("ce.math.hex", "the red part", r, 0)
+    if rr is None: return None
+    gg = __mnum("ce.math.hex", "the green part", g, 0)
+    if gg is None: return None
+    bb = __mnum("ce.math.hex", "the blue part", b, 0)
+    if bb is None: return None
+    return ("#%02x%02x%02x" % (__cbyte(rr), __cbyte(gg), __cbyte(bb))).upper()
 def hexToRgb(hex_):
     c = __cchan("ce.math.rgb", hex_)
     return None if c is None else { "r": c[0], "g": c[1], "b": c[2] }
@@ -2057,12 +2094,13 @@ def darken(hex_, amount=None):
     if f is None: return None
     return rgbToHex(c[0] * f, c[1] * f, c[2] * f)
 # NOT an app algorithm, and said so: lerp() per channel in plain RGB.
-def mixColour(a, b, t):
+def mixColour(a=None, b=None, t=None):
     x = __cchan("ce.math.mix", a)
     if x is None: return None
     y = __cchan("ce.math.mix", b)
     if y is None: return None
-    f = float(t) if isinstance(t, (int, float)) else 0.0
+    f = __mnum("ce.math.mix", "t", t, 0)
+    if f is None: return None
     f = 0.0 if f < 0 else (1.0 if f > 1 else f)
     return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f)
 # The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
@@ -2115,10 +2153,18 @@ def hexToHsl(hex_):
         elif mx == g: h = ((b - r) / d + 2) * 60
         else: h = ((r - g) / d + 4) * 60
     return { "h": h, "s": s * 100, "l": l * 100 }
-def hslToHex(hue, sat, light):
-    h = float(hue) if isinstance(hue, (int, float)) else 0.0
-    s = (float(sat) if isinstance(sat, (int, float)) else 0.0) / 100
-    l = (float(light) if isinstance(light, (int, float)) else 0.0) / 100
+def hslToHex(hue=None, sat=None, light=None):
+    import math
+    h = __mnum("ce.math.fromHsl", "the hue", hue, 0)
+    if h is None: return None
+    s = __mnum("ce.math.fromHsl", "the saturation", sat, 0)
+    if s is None: return None
+    l = __mnum("ce.math.fromHsl", "the lightness", light, 0)
+    if l is None: return None
+    # A hue goes round (-120 is 240); the saturation and the lightness are held at 0 and 100.
+    h = h - 360 * math.floor(h / 360)
+    s = max(0, min(100, s)) / 100
+    l = max(0, min(100, l)) / 100
     a = s * min(l, 1 - l)
     def f(n):
         k = (n + h / 30) % 12

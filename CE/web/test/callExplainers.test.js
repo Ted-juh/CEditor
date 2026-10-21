@@ -306,12 +306,12 @@ test('a description with its detail moved out keeps every fact somewhere a reade
   assert.match(words('clamp'), /Must be below hi/);
   assert.match(words('round'), /-2\.5 gives -2/);
   assert.match(words('snap'), /0 leaves the value unchanged/);
-  assert.match(words('snap'), /Must be given/);
+  assert.match(words('snap'), /Left out: an error in the console/);
   assert.match(words('curve'), /"linear"/);
   assert.match(words('curve'), /ce\.math\.map/);
   assert.match(words('curve'), /not held at 0 or 1/);
   assert.match(words('lerp'), /not held at 0 or 1/);
-  assert.match(words('lerp'), /Must be given/);
+  assert.match(words('lerp'), /Left out: an error in the console/);
   assert.match(words('wrap'), /11 in Lua and -1 in JavaScript/);
   assert.match(words('wrap'), /never equals hi/);
   assert.match(words('mapCurve'), /later one wins/);
@@ -384,6 +384,7 @@ test('a description with its detail moved out keeps every fact somewhere a reade
   assert.match(words('unshape'), /no exact reverse/);
   assert.match(words('unshape'), /taper/);
   assert.match(words('random'), /whole number/);
+  assert.match(words('random'), /random\(1\.5, 3\.5\) gives 2 or 3/);
   assert.match(words('random'), /never 1/);
   assert.match(words('randomSeed'), /0 uses the default/);
   assert.match(words('randomSeed'), /never affects another script/);

@@ -43,6 +43,18 @@ counts, so zone 1 is the one labelled "Zone 1". They counted from 0, so a script
 step or a row by number now reaches the one before the one it meant: add 1 to each. Zone 0 and step
 0 are refused, and the console says the range. A zone named by its label works as it did.
 
+**Scripts written for an earlier build: some `ce.math` answers have changed.**
+
+- `randomFloat(5)` gives a number from 0 up to 5. It was between 1 and 5.
+- `random` gives only whole numbers inside its range: `random(1.5, 3.5)` gives 2 or 3, where it
+  could give 1. A range with no whole number in it, such as 1.2 to 1.8, is refused.
+- `hslToHex` with a negative hue gave the wrong colour in the editor and in JavaScript scripts; -120
+  is blue now, as it was in Lua and Python. A saturation or lightness below 0 is held at 0.
+- `angleOf` of the same point twice is 0. It was 180 in the editor and in JavaScript scripts.
+- A number written as text, such as "128", is read as one in every language (Python read it as 0).
+  A value that is not a number is refused in `rgbToHex`, `hslToHex`, `mixColour`, `snap` and `lerp`,
+  where it was read as 0 or gave NaN, and the console says which one.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

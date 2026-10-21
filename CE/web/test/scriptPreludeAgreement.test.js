@@ -212,6 +212,20 @@ const CASES = [
   // the default in Lua.
   ['stepAt', ['x', '1/16']], ['stepAt', ['2.5', '1/8']], ['swingOffset', [true, 2, '1/16']],
   ['beatsToMs', ['x', 120]], ['beatsToMs', ['2', 120]], ['msToBeats', [true, 60]], ['beatsToMs', [true, 120]],
+  // ce.math's numbers. A negative hue goes round: it gave the wrong colour in the two JavaScript
+  // runtimes and the right one in Lua and Python, whose % does not keep the sign. Saturation and
+  // lightness are held at 0 and 100 both ways. A colour's part left out is 0, and text that is a
+  // number is read as one (Python read "128" as 0). The same point twice is at angle 0, not 180.
+  ['hslToHex', [-120, 100, 50]], ['hslToHex', [480, 100, 50]], ['hslToHex', [0, -10, 50]],
+  ['hslToHex', [0, 150, 150]], ['hslToHex', [120]], ['hslToHex', ['120', '100', '50']],
+  ['rgbToHex', [255]], ['rgbToHex', ['128', 0, 0]], ['mixColour', ['000000', 'FFFFFF']],
+  ['mixColour', ['000000', 'FFFFFF', '0.5']], ['snap', ['37', 10]], ['lerp', ['10', 20, 0.5]],
+  ['angleOf', [5, 5, 5, 5]], ['angleOf', [0, 0, 0, -10]],
+  // Whole numbers inside the range only: the ends were floored, so random(1.5, 3.5) could give 1.
+  // randomFloat with one number is the top of a range from 0; it was the bottom of one up to 1.
+  // Seeded first, so every runtime draws the same numbers.
+  ['randomSeed', [7]], ...Array.from({ length: 12 }, () => ['random', [1.5, 3.5]]),
+  ['random', [-3.5, 2]], ['random', [6, 1]], ['randomFloat', [5]], ['randomFloat', []], ['randomFloat', [2, 4]],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
@@ -771,6 +785,13 @@ const REFUSAL_CASES = [
   // Not options tables, so nothing to refuse: a list, numbered keys, and no table at all.
   ['bytesRead', [[1, 2], 0, 2, [8]]], ['bytesRead', [[1, 2], 0, 2, { 1: 8 }]], ['bytesRead', [[1, 2], 0, 2, 'lsb']],
   ['bytesWrite', [[1, 2], 0, 2, 300, [8]]], ['bytesWrite', [[1, 2], 0, 2, 300, { 1: 8 }]],
+  // ce.math's numbers: a value that is not a number is refused, where it was read as 0 or as NaN in
+  // silence. Left out is 0 for a colour's parts and for mix's t, and a refusal for snap and lerp.
+  // random has no answer when no whole number lies in its range.
+  ['rgbToHex', ['x', 0, 0]], ['rgbToHex', [255, true, 0]], ['rgbToHex', [255]],
+  ['hslToHex', [0, 'x', 50]], ['hslToHex', [NaN, 100, 50]], ['mixColour', ['000000', 'FFFFFF', 'x']],
+  ['snap', [37]], ['snap', ['x', 10]], ['lerp', [10, 20]], ['lerp', [10, 'x', 0.5]],
+  ['random', [1.2, 1.8]], ['random', ['x', 6]], ['random', [1, 6]],
 ];
 
 /** The case's arguments with FN made a function in this realm. */

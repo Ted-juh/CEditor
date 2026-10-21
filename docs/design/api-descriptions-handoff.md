@@ -297,14 +297,25 @@ the way, for the modules after it:
   range, or a range given the wrong way round. Where the result is meaningless (NaN), the parameter
   says it must be given.
 
-Found on the way and left for the owner, since it is behaviour:
+Found on the way and fixed at the owner's word, in all four runtimes (the WebView's and the Lua,
+JavaScript and Python preludes), with a case for each in `scriptPreludeAgreement.test.js` and the
+right answer pinned in `scriptMath.test.js`:
 
-- `hslToHex` with a negative hue gives the wrong colour (-120 gives "#FF00FF", not "#0000FF"), and a
-  negative saturation is not held at 0 (-10 gives "#738C8C").
-- `random(1.5, 3.5)` can return 1, below lo. `randomFloat` with one number is between it and 1.
-- `angleOf` of the same point twice gives 180.
-- `mixColour`, `rgbToHex` and `hslToHex` read a value that is not a number as 0, without an error.
-- `snap` without a step and `lerp` without t return NaN, without an error.
+- `hslToHex` with a negative hue gave the wrong colour in the two JavaScript runtimes (-120 gave
+  "#FF00FF", not "#0000FF"): their % keeps the sign, Lua's and Python's do not, so the runtimes
+  disagreed. A negative saturation or lightness was not held at 0 (-10 gave "#738C8C").
+- `random(1.5, 3.5)` could return 1, below lo: the ends were floored. Only whole numbers inside the
+  range now, and a range with none (1.2 to 1.8) is refused.
+- `randomFloat` with one number was between it and 1. It is now the top of a range from 0.
+- `angleOf` of the same point twice gave 180 in JavaScript and 0 in Lua. It is 0.
+- `mixColour`, `rgbToHex` and `hslToHex` read a value that is not a number as 0, and Python read
+  "128" as 0 where the others read 128. Text that is a number is read as one everywhere, and
+  anything else is refused. Left out is still 0.
+- `snap` without a step and `lerp` without t returned NaN here and raised a Lua error there. They
+  are refused, as is any of their numbers that is not one.
+
+The refusals share one helper per runtime (`mathNumber` here, `__mnum` in each prelude), worded
+"ce.math.hex: the red part is a number, and "x" is not, so there is no answer."
 
 Next: `ce.anim`, the same way: one command at a time.
 

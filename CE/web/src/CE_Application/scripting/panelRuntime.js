@@ -1042,6 +1042,42 @@ function colourUnit(verb, what, value, fallback) {
   return undefined;
 }
 
+/** A number a ce.math command was given, or undefined after an error in the console. Left out, it
+ *  is `fallback` when there is one; text that is a number is read as one. Anything else used to be
+ *  read as 0, or as NaN, in silence, and differently in each runtime: Python read "128" as 0 where
+ *  the others read 128. The preludes' __mnum is its twin, word for word. */
+function mathNumber(verb, what, value, fallback) {
+  if ((value === undefined || value === null) && fallback !== undefined) return fallback;
+  const n = realNumber(value);
+  if (n !== undefined) return n;
+  addScriptTrace('error', '', value === undefined || value === null
+    ? `${verb}: ${what} is a number, and none was given, so there is no answer.`
+    : `${verb}: ${what} is a number, and ${shownValue(value)} is not, so there is no answer.`);
+  return undefined;
+}
+
+/** ce.math.hex: each part left out is 0, and one that is not a number is refused. */
+function colourFromParts(r, g, b) {
+  const parts = [];
+  for (const [v, what] of [[r, 'the red part'], [g, 'the green part'], [b, 'the blue part']]) {
+    const n = mathNumber('ce.math.hex', what, v, 0);
+    if (n === undefined) return undefined;
+    parts.push(n);
+  }
+  return colourFromRgb(...parts);
+}
+
+/** ce.math.fromHsl: the same, for hue, saturation and lightness. */
+function colourFromHslParts(h, s, l) {
+  const parts = [];
+  for (const [v, what] of [[h, 'the hue'], [s, 'the saturation'], [l, 'the lightness']]) {
+    const n = mathNumber('ce.math.fromHsl', what, v, 0);
+    if (n === undefined) return undefined;
+    parts.push(n);
+  }
+  return colourFromHsl(...parts);
+}
+
 function colourToRgb(hex) {
   const rgb = colourChannels('ce.math.rgb', hex);
   return rgb ? { r: rgb[0], g: rgb[1], b: rgb[2] } : undefined;
@@ -1073,7 +1109,9 @@ function colourMix(a, b, t) {
   if (!x) return undefined;
   const y = colourChannels('ce.math.mix', b);
   if (!y) return undefined;
-  const f = Math.min(1, Math.max(0, Number(t) || 0));
+  const n = mathNumber('ce.math.mix', 't', t, 0);
+  if (n === undefined) return undefined;
+  const f = Math.min(1, Math.max(0, n));
   return colourFromRgb(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
 
@@ -1324,10 +1362,17 @@ function resetRandomStreams() { randomStates.clear(); streamOverride = null; }
 function randomImpl(scriptId, lo, hi) {
   const r = randomNext(scriptId);
   if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
-  const a = Math.floor(Number(lo)), b = Math.floor(Number(hi));
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return r;
-  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
-  const low = Math.min(a, b), high = Math.max(a, b);
+  const a = mathNumber('ce.math.random', 'lo', lo);
+  if (a === undefined) return undefined;
+  const b = mathNumber('ce.math.random', 'hi', hi);
+  if (b === undefined) return undefined;
+  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+  // only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+  const low = Math.ceil(Math.min(a, b)), high = Math.floor(Math.max(a, b));
+  if (high < low) {
+    addScriptTrace('error', '', `ce.math.random: there is no whole number from ${shownValue(a)} to ${shownValue(b)}, so there is no answer.`);
+    return undefined;
+  }
   return low + Math.floor(r * (high - low + 1));
 }
 
@@ -1630,7 +1675,10 @@ function blendImpl(a, b, t) {
 
 /** The seeded float in a range — random(lo, hi) returns whole numbers, so this did not exist. */
 function randomFloatImpl(scriptId, lo, hi) {
-  const a = num(lo), b = num(hi, 1);
+  // One number alone is the top of a range from 0. It used to be the bottom of a range up to 1, so
+  // randomFloat(5) was between 1 and 5.
+  const alone = hi === undefined || hi === null;
+  const a = alone ? 0 : num(lo), b = alone ? num(lo, 1) : num(hi);
   return a + randomNext(scriptId) * (b - a);
 }
 
@@ -1688,6 +1736,8 @@ function distanceImpl(x1, y1, x2, y2) {
 function angleOfImpl(x1, y1, x2, y2) {
   const dx = num(x2) - num(x1);
   const dy = num(y2) - num(y1);
+  // The same point twice has no direction. atan2 answered 180 for it here and 0 in Lua.
+  if (dx === 0 && dy === 0) return 0;
   const a = degImpl(Math.atan2(dx, -dy));
   return a < 0 ? a + 360 : a;
 }
@@ -1935,8 +1985,23 @@ const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
   scale: (v, inLo, inHi, outLo, outHi) => (inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)),
-  snap: (v, step) => (step === 0 ? v : Math.round(v / step) * step),
-  lerp: (a, b, t) => a + (b - a) * t,
+  // A step or t left out gave NaN in silence here and a Lua error in the other runtime.
+  snap: (v, step) => {
+    const n = mathNumber('ce.math.snap', 'the value', v);
+    if (n === undefined) return undefined;
+    const s = mathNumber('ce.math.snap', 'the step', step);
+    if (s === undefined) return undefined;
+    return s === 0 ? n : Math.round(n / s) * s;
+  },
+  lerp: (a, b, t) => {
+    const x = mathNumber('ce.math.lerp', 'a', a);
+    if (x === undefined) return undefined;
+    const y = mathNumber('ce.math.lerp', 'b', b);
+    if (y === undefined) return undefined;
+    const f = mathNumber('ce.math.lerp', 't', t);
+    if (f === undefined) return undefined;
+    return x + (y - x) * f;
+  },
   // A shape the list does not have used to return v in silence, which reads as a curve that does
   // nothing rather than as a name that was never applied.
   curve: (v, shape) => {
@@ -1976,9 +2041,9 @@ const helpers = {
   mixColour: (a, b, t) => colourMix(a, b, t),
   colourAlpha: (hex, a) => colourWithAlpha(hex, a),
   hexToRgb: (hex) => colourToRgb(hex),
-  rgbToHex: (r, g, b) => colourFromRgb(r, g, b),
+  rgbToHex: (r, g, b) => colourFromParts(r, g, b),
   hexToHsl: (hex) => colourToHsl(hex),
-  hslToHex: (h, sat, l) => colourFromHsl(h, sat, l),
+  hslToHex: (h, sat, l) => colourFromHslParts(h, sat, l),
   colourFromArgb: (colour) => colourFromOrder('ce.math.fromARGB', 'argb', colour),
   colourFromRgba: (colour) => colourFromOrder('ce.math.fromRGBA', 'rgba', colour),
   quantizeTo: (v, values) => quantizeToImpl(v, values),

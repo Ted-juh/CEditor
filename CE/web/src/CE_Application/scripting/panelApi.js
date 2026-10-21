@@ -976,7 +976,7 @@ export const COMMANDS = [
     params: [
       { name: 'a', type: 'string', required: true, kind: 'colour', summary: 'The first colour, in any form a colour property takes.' },
       { name: 'b', type: 'string', required: true, kind: 'colour', summary: 'The second colour, in any form a colour property takes.' },
-      { name: 't', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway. Left out: 0. Outside the range: held at 0 or 1.' },
+      { name: 't', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway. Left out: 0. Outside the range: held at 0 or 1. Not a number: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -1008,9 +1008,9 @@ export const COMMANDS = [
     summary: 'Build a colour from red, green and blue parts.',
     example: '`rgbToHex(255, 128, 0)` gives "#FF8000".',
     params: [
-      { name: 'r', type: 'number', required: true, summary: 'Red. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.' },
-      { name: 'g', type: 'number', required: true, summary: 'Green. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.' },
-      { name: 'b', type: 'number', required: true, summary: 'Blue. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.' },
+      { name: 'r', type: 'number', required: true, summary: 'Red. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.' },
+      { name: 'g', type: 'number', required: true, summary: 'Green. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.' },
+      { name: 'b', type: 'number', required: true, summary: 'Blue. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -1053,9 +1053,9 @@ export const COMMANDS = [
     example: '`hslToHex(120, 100, 50)` gives "#00FF00".',
     notes: ['The reverse of `ce.math.hsl`.'],
     params: [
-      { name: 'h', type: 'number', required: true, summary: 'Hue. Range: 0 ↔ 360. Left out: 0. Above 360: wraps round, so 480 is 120.' },
-      { name: 's', type: 'number', required: true, summary: 'Saturation. Range: 0 ↔ 100. Left out: 0. Above 100: held at 100.' },
-      { name: 'l', type: 'number', required: true, summary: 'Lightness. Range: 0 ↔ 100. Left out: 0. Above 100: held at 100.' },
+      { name: 'h', type: 'number', required: true, summary: 'Hue. Range: 0 ↔ 360. Left out: 0. Outside the range: wraps round, so -120 is 240 and 480 is 120. Not a number: an error in the console and no result.' },
+      { name: 's', type: 'number', required: true, summary: 'Saturation. Range: 0 ↔ 100. Left out: 0. Outside the range: held at 0 or 100. Not a number: an error in the console and no result.' },
+      { name: 'l', type: 'number', required: true, summary: 'Lightness. Range: 0 ↔ 100. Left out: 0. Outside the range: held at 0 or 100. Not a number: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -3664,7 +3664,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'v', type: 'value', required: true, summary: 'The value to round.' },
-      { name: 'step', type: 'value', required: true, summary: 'The size of the steps, such as 10 or 0.25. Must be given. 0 leaves the value unchanged.' },
+      { name: 'step', type: 'value', required: true, summary: 'The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged. Left out: an error in the console and no result.' },
     ],
   },
   {
@@ -3685,7 +3685,7 @@ export const HELPERS = [
     params: [
       { name: 'a', type: 'value', required: true, summary: 'The first number.' },
       { name: 'b', type: 'value', required: true, summary: 'The second number.' },
-      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway. Must be given. Outside the range: not held at 0 or 1, so the result goes past a or b.' },
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway. Left out: an error in the console and no result. Outside the range: not held at 0 or 1, so the result goes past a or b.' },
     ],
   },
   // wrap, and why it is not `%`. The five runtimes DISAGREE about the sign of a modulo: (-1) % 12
@@ -3927,7 +3927,7 @@ export const HELPERS = [
     example: '`randomFloat(0.5, 2)` gives a number from 0.5 up to, but not including, 2.',
     notes: ['`ce.math.random` with two numbers gives whole numbers; use this one for fractions.'],
     params: [
-      { name: 'lo', type: 'value', required: false, summary: 'The bottom of the range. Both left out: 0 ↔ 1. Given alone: between lo and 1, so randomFloat(5) is between 1 and 5.' },
+      { name: 'lo', type: 'value', required: false, summary: 'The bottom of the range. Both left out: 0 ↔ 1. Given alone: the top of a range from 0, so randomFloat(5) is from 0 up to 5.' },
       { name: 'hi', type: 'value', required: false, summary: 'The top of the range, which it never reaches. It may be below lo.' },
     ],
   },
@@ -4010,7 +4010,7 @@ export const HELPERS = [
     notes: [
       'It returns degrees in the range 0 ↔ 360: 0 at twelve o\'clock, increasing clockwise, as ce.draw measures them.',
       'y counts downwards, as on screen, so a point straight above gives 0.',
-      'The same point twice gives 180.',
+      'The same point twice gives 0.',
     ],
     params: [
       { name: 'x1', type: 'value', required: true, summary: 'The first point\'s x.' },
@@ -4183,6 +4183,7 @@ export const HELPERS = [
     id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
     summary: 'Get a random number.',
     example: '`random(1, 6)` gives a whole number from 1 to 6, as a die does.',
+    notes: ['Only whole numbers inside the range: random(1.5, 3.5) gives 2 or 3. With none inside, such as random(1.2, 1.8): an error in the console and no result.'],
     params: [
       { name: 'lo', type: 'value', required: false, summary: 'The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1.' },
       { name: 'hi', type: 'value', required: false, summary: 'The highest whole number it can return. It may be below lo.' },
