@@ -92,7 +92,7 @@ test('sendRPN uses CC 101/100, where sendNRPN uses 99/98', () => {
   // The difference between the two is exactly those two CC numbers, and getting it wrong sends a
   // perfectly valid message to the wrong parameter — silent, and audible only later.
   withApi(panelWith(), (api) => {
-    api.sendRPN(1, 0, 0, 2);          // pitch-bend range, 2 semitones
+    api.sendRPN(1, 0, 0, 2);          // pitch-bend range, 2 cents: the semitones are value / 128
     const midi = traced().filter((t) => t.kind === 'midi').map((t) => t.message).join('\n');
     assert.match(midi, /B0 65 00/, 'CC 101 = 0x65 carries the msb');
     assert.match(midi, /B0 64 00/, 'CC 100 = 0x64 carries the lsb');

@@ -1099,9 +1099,21 @@ MIDI in and out, the connected device, music theory, and musical time.
 
 Sending MIDI yourself, and catching MIDI on its way in or out. Most panels do not need these, because a control bound to a synth parameter sends its own MIDI. Reach for them for messages the device profile does not cover: notes, program changes, clock, hand-built SysEx. Channels are always counted 1 to 16. The last part of this chapter is a set of helper functions for packing values into SysEx bytes.
 
+Every send command reads its numbers the same way. A channel, controller or note outside its range, or anything that is not a number, is refused with a message and nothing is sent. A value past the end of its range is sent as the nearest end, and the first time a warning says so. Text that is a number is read as one, and a fraction is rounded.
+
 #### `ce.midi.sendCC(channel, cc, value)`
 
-Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127. A channel or controller number outside its range, or anything that is not a number, is refused with a message and nothing is sent, in every send command; a value past the end of its range is sent as the nearest end, and the first time for each command a warning says so. Text that is a number is read as one, and a fraction is rounded.
+Send a CC message.
+
+Example: `sendCC(1, 74, 100)` sets controller 74 to 100 on channel 1.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `cc`: The controller number, from 0 to 127.
+- `value`: The new value, from 0 to 127.
+
+Good to know:
+
+- CC means Control Change.
 
 *Short name: `sendCC`.*
 
@@ -1132,22 +1144,42 @@ ce.midi.sendNRPN(channel, msb, lsb, value)
 
 #### `ce.midi.sendRPN(channel, msb, lsb, value)`
 
-Send an RPN (Registered Parameter Number) message — the standard way to set pitch-bend range (0, 0), fine tuning (0, 1) and coarse tuning (0, 2). It works like sendNRPN, but uses controllers 101 and 100 instead of 99 and 98.
+Set the pitch-bend range or the tuning with an RPN message.
+
+Example: `sendRPN(1, 0, 0, 12 * 128)` sets the pitch-bend range on channel 1 to 12 semitones.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `msb`: The first half of the parameter number, from 0 to 127.
+- `lsb`: The second half of the parameter number, from 0 to 127. With msb 0, 0 is the pitch-bend range, 1 fine tuning and 2 coarse tuning.
+- `value`: The new value, from 0 to 16383. For the pitch-bend range it is the semitones × 128, plus cents.
+
+Good to know:
+
+- RPN means Registered Parameter Number: its numbers mean the same on every synth.
+- It is sent on controllers 101 and 100, where sendNRPN uses 99 and 98.
 
 *Short name: `sendRPN`.*
 
 ```lua
 -- Lua
-ce.midi.sendRPN(1, 0, 0, 2)  -- pitch-bend range
+ce.midi.sendRPN(1, 0, 0, 2 * 128)  -- pitch-bend range, 2 semitones
 ```
 ```js
 // JavaScript
-ce.midi.sendRPN(1, 0, 0, 2);  // pitch-bend range
+ce.midi.sendRPN(1, 0, 0, 2 * 128);  // pitch-bend range, 2 semitones
 ```
 
 #### `ce.midi.sendSongPosition(beats)`
 
-Send a Song Position Pointer, which tells a sequencer where to resume when it next receives start or continue. `beats` is in MIDI beats: one MIDI beat is six clock ticks, a sixteenth note.
+Tell a sequencer where in the song to continue from.
+
+Example: `sendSongPosition(16)` is the start of bar 2 in 4/4.
+
+- `beats`: The position from the start of the song, in sixteenth notes, from 0 to 16383. One sixteenth note is six clock ticks.
+
+Good to know:
+
+- This sends a Song Position Pointer. The sequencer plays from there when it gets Continue; Start always plays from the beginning.
 
 *Short name: `sendSongPosition`.*
 
@@ -1162,7 +1194,15 @@ ce.midi.sendSongPosition(0);
 
 #### `ce.midi.sendMidi(bytes)`
 
-Send MIDI bytes exactly as you give them, with nothing added or changed. All the other send commands are built on this one, so use one of those when it fits. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.
+Send MIDI bytes exactly as written.
+
+Example: `sendMidi("90 3C 64")` starts note 60 on channel 1.
+
+- `bytes`: A list of bytes from 0 to 255, or hex text such as "90 3C 64": one or two digits a byte, with spaces or commas between. Text with a longer run, such as "903C64", is refused with a message and nothing is sent.
+
+Good to know:
+
+- Nothing is added or changed. When another send command does what you need, use that one.
 
 *Short name: `sendMidi`.*
 
@@ -1177,7 +1217,14 @@ ce.midi.sendMidi([0x90, 60, 100])
 
 #### `ce.midi.sendNote(channel, note, velocity [, ms])`
 
-Play a note. `note` is a MIDI note number from 0 to 127 or a name such as "C3": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, a note outside 0 to 127 ("C10"), or a note left out is refused with a message and nothing is sent, in sendNoteOff and sendAftertouch too. The velocity must be given; 0 means note off. Give `ms`, a number above 0, and the matching note off is sent for you after that many milliseconds.
+Play a note.
+
+Example: `sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `note`: A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `velocity`: How hard the note is played, from 0 to 127. It must be given, and 0 means note off.
+- `ms`: How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.
 
 *Short name: `sendNote`.*
 
@@ -1254,7 +1301,15 @@ ce.midi.interceptOut((bytes) => {
 
 #### `ce.midi.feed(bytes)`
 
-Pretend a MIDI message arrived from the synth. The panel's controls, note input and transport react to it exactly as they would to the real thing, and any interceptMidiIn filters see it first. The bytes can be a list of numbers or hex text such as "90 3C 64": each byte one or two digits, with spaces or commas between the bytes. Text with a longer run, or a list item that is not a byte from 0 to 255, is refused with a message.
+Act as if a MIDI message came from the synth.
+
+Example: `feedMidi("B0 4A 40")` gives the controls on CC 74, channel 1, the value 64.
+
+- `bytes`: A list of bytes from 0 to 255, or hex text such as "90 3C 64": one or two digits a byte, with spaces or commas between. Text with a longer run, such as "903C64", is refused with a message and nothing is sent.
+
+Good to know:
+
+- The controls, the note input and the transport react as they would to the synth. interceptMidiIn sees the message first.
 
 *Short name: `feedMidi`.*
 
@@ -1269,7 +1324,10 @@ ce.midi.feed([0x90, 60, 100])
 
 #### `ce.midi.route(role, fn)`
 
-Send everything the code inside `fn` sends to another device, named by its `role`, instead of the main synth. It works like noTransmit: only the block is affected.
+Send everything a block of code sends to another device instead of the main synth.
+
+- `role`: The device's role, such as "drums". The MIDI settings give each role its output.
+- `fn`: The code whose MIDI goes to that device. Only what it sends is affected, as with noTransmit.
 
 *Short name: `routeMidi`.*
 
@@ -1288,7 +1346,17 @@ ce.midi.route("aux", () => {
 
 #### `ce.midi.sendNoteOff(channel, note [, velocity])`
 
-Release a note. The release velocity defaults to 0. Nothing does this for you: every note you start with sendNote (without `ms`) needs its own note off.
+Release a note.
+
+Example: `sendNoteOff(1, "C3")` releases C3 on channel 1.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `note`: A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `velocity`: The release velocity, from 0 to 127. It is 0 when left out.
+
+Good to know:
+
+- Every note started with sendNote without a length needs its own note off.
 
 *Short name: `sendNoteOff`.*
 
@@ -1298,7 +1366,14 @@ ce.midi.sendNoteOff(1, 60)
 
 #### `ce.midi.sendProgramChange(channel, program [, bankMsb, bankLsb])`
 
-Send a Program Change to switch the synth to another sound. Give `bankMsb` and `bankLsb` and a Bank Select (controllers 0 and 32) is sent first. `program` is MIDI's number, 0 to 127; most synths show it counted from 1, so program 0 is the one they call 1.
+Switch the synth to another sound with a Program Change.
+
+Example: `sendProgramChange(1, 0)` picks the sound most synths call 1.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `program`: The program number, from 0 to 127. Most synths count from 1, so 0 is the one they call 1.
+- `bankMsb`: The first half of the bank number, from 0 to 127. Given, a Bank Select is sent before the Program Change: controller 0, and controller 32 when bankLsb is given too.
+- `bankLsb`: The second half of the bank number, from 0 to 127.
 
 *Short name: `sendProgramChange`.*
 
@@ -1308,7 +1383,16 @@ ce.midi.sendProgramChange(1, 0)
 
 #### `ce.midi.sendPitchBend(channel, value)`
 
-Send pitch bend as a 14-bit number from 0 to 16383, where 8192 is the centre (no bend). Left out, the bend centres; anything that is not a number is refused with a message. How many semitones the full range covers is set on the synth.
+Send pitch bend.
+
+Example: `sendPitchBend(1, 8192)` is no bend on channel 1.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `value`: From 0, all the way down, to 16383, all the way up; 8192 is the centre. Left out, the bend goes back to the centre.
+
+Good to know:
+
+- The synth decides how many semitones a full bend is. sendRPN can set it.
 
 *Short name: `sendPitchBend`.*
 
@@ -1318,7 +1402,13 @@ ce.midi.sendPitchBend(1, 8192)
 
 #### `ce.midi.sendAftertouch(channel, pressure [, note])`
 
-Send aftertouch (key pressure) for the whole channel, or for one note when `note` is given (polyphonic aftertouch). Leaving the note out means channel pressure; the pressure itself must be given.
+Send aftertouch, the pressure on keys while they are held.
+
+Example: `sendAftertouch(1, 80)` sends pressure 80 for the whole of channel 1.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `pressure`: How hard, from 0 to 127. It must be given.
+- `note`: One note, for polyphonic aftertouch, as a number or a name as for sendNote. Left out, the pressure is for the whole channel: channel pressure.
 
 *Short name: `sendAftertouch`.*
 
@@ -1328,7 +1418,11 @@ ce.midi.sendAftertouch(1, 64)
 
 #### `ce.midi.sendClock()`
 
-Send one MIDI clock tick (`0xF8`). There are 24 ticks per quarter note, so call it from a timer.
+Send one MIDI clock tick.
+
+Good to know:
+
+- There are 24 ticks to a quarter note, so call it from a timer.
 
 *Short name: `sendClock`.*
 
@@ -1338,7 +1432,11 @@ ce.midi.sendClock()
 
 #### `ce.midi.sendTransport(action)`
 
-Start, continue or stop a connected sequencer or drum machine: `action` is "start" (`0xFA`), "continue" (`0xFB`) or "stop" (`0xFC`), in any case. Any other action, or none, is refused with a message and nothing is sent.
+Start, continue or stop a connected sequencer or drum machine.
+
+Example: `sendTransport("start")` starts it from the beginning.
+
+- `action`: "start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.
 
 *Short name: `sendTransport`.*
 
@@ -1348,7 +1446,16 @@ ce.midi.sendTransport("start")
 
 #### `ce.midi.sendSysex(bytes)`
 
-Send a System Exclusive (SysEx) message, given as a list of bytes or as hex text such as "F0 41 10 42 F7". In hex text each byte is one or two digits, with spaces or commas between the bytes; text with a longer run, such as "F04110", is refused with a message and nothing is sent. In a list each byte is a whole number from 0 to 255, or text that is one hex byte ("F7"); anything else, such as 300, is refused the same way.
+Send a SysEx message.
+
+Example: `sendSysex("F0 7E 7F 06 01 F7")` asks the synth what model it is.
+
+- `bytes`: A list of bytes, or hex text such as "F0 41 10 42 F7": one or two digits a byte, with spaces or commas between. In a list, a byte is a whole number from 0 to 255 or text that is one hex byte, such as "F7". Anything else, such as "F04110" or 300, is refused with a message and nothing is sent.
+
+Good to know:
+
+- SysEx means System Exclusive: messages each manufacturer defines for its own synths.
+- F0 at the start and F7 at the end are added when they are missing.
 
 *Short name: `sendSysex`.*
 
@@ -1383,7 +1490,11 @@ ce.midi.checksum("roland", bytes)
 
 #### `ce.midi.panic([opts])`
 
-Silence everything: sends All Sound Off (controller 120), All Notes Off (123) and Reset All Controllers (121). It covers all 16 channels unless you name one with `opts.channel`, a number from 1 to 16 (anything else, such as "all", is refused and nothing is sent); set `opts.resetControllers` to false to leave controllers alone.
+Stop every note and sound on every channel.
+
+Good to know:
+
+- It sends All Sound Off, All Notes Off and Reset All Controllers.
 
 *Short name: `panic`.*
 
@@ -1391,7 +1502,7 @@ Silence everything: sends All Sound Off (controller 120), All Notes Off (123) an
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `channel` | number (1 to 16) | all sixteen channels | Silence one channel instead of every one. |
+| `channel` | number (1 to 16) | all sixteen channels | Silence one channel instead of every one, from 1 to 16. Anything else, such as "all", is refused and nothing is sent. |
 | `resetControllers` | true or false | true | Whether to send Reset All Controllers (121) as well as the two note-off messages. Set false to leave pitch bend and modulation where they are. |
 
 ```lua
@@ -1403,30 +1514,30 @@ ce.midi.panic()
 | Function | What it does |
 |---|---|
 | `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v`: The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count`: How many bytes of 7 bits to make. Two when it is left out. `order`: Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `to7bit`. |
-| `ce.midi.from7bit(bytes, order)` | Join 7-bit bytes back into one number — the reverse of to7bit. `order` is "msb" (the default) or "lsb". Short name: `from7bit`. |
-| `ce.midi.to14bit(v)` | Split a value from 0 to 16383 into its two 7-bit halves, returned as { msb, lsb }. Short name: `to14bit`. |
-| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves, `msb` and `lsb`, back into one value from 0 to 16383. Short name: `from14bit`. |
-| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Short name: `toNibbles`. |
-| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves, `hi` and `lo`, back into one byte. Short name: `fromNibbles`. |
-| `ce.midi.nibblize(bytes)` | Split a whole list of bytes into nibbles, high half first, so the list comes back twice as long. Short name: `nibblize`. |
-| `ce.midi.denibblize(bytes)` | Join a list of nibbles (high half first) back into bytes, so the list comes back half as long. Short name: `denibblize`. |
-| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into a list of character codes. Give `length` and the list is padded with spaces up to that length. Short name: `toAscii`. |
-| `ce.midi.fromAscii(bytes)` | Turn a list of character codes back into text — for example a patch name read from a dump. Short name: `fromAscii`. |
-| `ce.midi.toOffset(v, center)` | Encode a value that can go below zero by adding `center` to it — for example -64 to +63 sent as 0 to 127 with a centre of 64. Short name: `toOffset`. |
-| `ce.midi.fromOffset(b, center)` | Decode an offset value by subtracting `center` — the reverse of toOffset. Short name: `fromOffset`. |
-| `ce.midi.toSigned(v, bits)` | Turn a negative number into the form a synth uses for a signed value of `bits` bits (two's complement). Positive numbers come back unchanged. Use fromSigned to read one back. Short name: `toSigned`. |
-| `ce.midi.fromSigned(b, bits)` | Read a signed value of `bits` bits (two's complement) back into an ordinary number, which may be negative. The reverse of toSigned. Short name: `fromSigned`. |
+| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes`: The 7-bit bytes, as a list of numbers. `order`: Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `from7bit`. |
+| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v`: The number, from 0 to 16383. Short name: `to14bit`. |
+| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb`: The high half, from 0 to 127. `lsb`: The low half, from 0 to 127. Short name: `from14bit`. |
+| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte`: A byte, from 0 to 255. Short name: `toNibbles`. |
+| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi`: The high half, from 0 to 15. `lo`: The low half, from 0 to 15. Short name: `fromNibbles`. |
+| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes`: The bytes, as a list. The high half comes first, so the list comes back twice as long. Short name: `nibblize`. |
+| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes`: Pairs of 4-bit halves, the high half first. The list comes back half as long. Short name: `denibblize`. |
+| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str`: The text to turn into codes. `length`: The length to fill out to with spaces. Longer text is not cut. Short name: `toAscii`. |
+| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes`: The character codes, as a list. Short name: `fromAscii`. |
+| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v`: The value, which may be negative. `center`: The number that stands for zero, often 64. Short name: `toOffset`. |
+| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b`: The byte, as the synth sends it. `center`: The number that stands for zero, often 64. Short name: `fromOffset`. |
+| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v`: The number. A positive number comes back unchanged. `bits`: How many bits the synth uses for it, such as 7 or 8. This is called two's complement. fromSigned reads it back. Short name: `toSigned`. |
+| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b`: The stored value, as the synth sends it. `bits`: How many bits the synth uses for it, such as 7 or 8. This reads two's complement, as toSigned writes it. Short name: `fromSigned`. |
 | `ce.midi.getBits(value, start, count) -> number` | Read a setting from a byte. Example: `getBits(0xB4, 4, 3)` gives 3. `value`: A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message. `start`: The first bit of the setting, counted from 0 at the right, the lowest bit. `count`: How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0. Short name: `getBits`. |
 | `ce.midi.setBits(value, start, count, bits) -> number\|list` | Change a setting in a byte. Example: `setBits(0xB4, 4, 3, 5)` gives 0xD4. `value`: A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed. `start`: The first bit of the setting, counted from 0 at the right, the lowest bit. `count`: How many bits the setting has, from 1 to 32. `bits`: The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit. Short name: `setBits`. |
 | `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read a number from a SysEx message. Example: `bytesRead(msg, 6, 2)` reads bytes 6 and 7. `bytes`: The message, as a list of bytes or as hex text. `offset`: Where the number starts, counted from 0. `count`: How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. By default the bytes are SysEx's 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise. Short name: `bytesRead`. |
-| `ce.midi.write(bytes, offset, count, value [, opts]) -> list` | Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` takes the same `bits` and `order` as bytesRead's; any other key is refused with a message, and nothing comes back. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message. Short name: `bytesWrite`. |
-| `ce.midi.slice(bytes, offset [, count]) -> list` | Copy `count` bytes starting at `offset` (counted from 0) into a new list, or every byte from `offset` to the end when `count` is left out. For a patch name, `fromAscii(bytesSlice(dump, 10, 12))`. Bytes past the end are refused with a message. Short name: `bytesSlice`. |
-| `ce.midi.put(bytes, offset, values) -> list` | Write the bytes in `values` into a copy of `bytes`, starting at `offset` (counted from 0), and return it. The write may run past the end and the list grows, but it cannot start past the end. For a patch name, `bytesPut(dump, 10, toAscii("Lead", 12))`. Short name: `bytesPut`. |
-| `ce.midi.find(bytes, pattern [, from]) -> number` | Find where `pattern` (a list of bytes, or hex text) first occurs in `bytes`, at or after `from` (0 by default), and return its offset, counted from 0. Returns nothing when it does not occur, which is an answer rather than a mistake, so nothing is written to the console. Use it to find each patch's header inside a bulk dump. Short name: `bytesFind`. |
-| `ce.midi.toHex(bytes) -> string` | Write bytes as hex text, two uppercase digits a byte with one space between, "F0 41 10 F7": the form the console shows MIDI in, and the form every send reads back. Short name: `bytesToHex`. |
-| `ce.midi.fromHex(text) -> list` | Read hex text into a list of bytes, by the rule every send uses: one or two digits a byte, with or without 0x, with spaces or commas between. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text. Short name: `bytesFromHex`. |
-| `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, the standard alphabet with = padding: about a third shorter than hex, for keeping a dump in a setting or in state. Short name: `bytesToBase64`. |
-| `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
+| `ce.midi.write(bytes, offset, count, value [, opts]) -> list` | Write a number into a SysEx message. Example: `bytesWrite(msg, 6, 2, 1000)` writes 1000 into bytes 6 and 7. `bytes`: The message, as a list of bytes or as hex text. It is not changed: a new list comes back. `offset`: Where the number starts, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end. `count`: How many bytes the number takes, from 1 to 4. `value`: The number to write. A number that does not fit in the bytes is refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. An option other than bits and order is refused with a message, and nothing comes back. Short name: `bytesWrite`. |
+| `ce.midi.slice(bytes, offset [, count]) -> list` | Copy part of a list of bytes into a new list. Example: `fromAscii(bytesSlice(dump, 10, 12))` reads the 12-letter name at byte 10. `bytes`: The list, or hex text. `offset`: Where to start copying, counted from 0. `count`: How many bytes to copy. Left out, every byte to the end. Bytes past the end are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. Short name: `bytesSlice`. |
+| `ce.midi.put(bytes, offset, values) -> list` | Write a run of bytes into a copy of a list. Example: `bytesPut(dump, 10, toAscii("Lead", 12))` writes a patch name from byte 10. `bytes`: The list, or hex text. It is not changed: a new list comes back. `offset`: Where to start writing, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end. `values`: The bytes to write, as a list or as hex text. Offsets count from 0 in every language, Lua included, as dump layouts count them. Short name: `bytesPut`. |
+| `ce.midi.find(bytes, pattern [, from]) -> number` | Find where a run of bytes first appears in a list, such as a patch's header in a bulk dump. Example: `bytesFind(dump, "F0 41")` gives the offset of the first F0 41. `bytes`: The list to search, or hex text. `pattern`: The bytes to find, as a list or as hex text. `from`: Where to start looking, counted from 0. It is 0 when left out. When the bytes are not there it gives nothing, without a message. Short name: `bytesFind`. |
+| `ce.midi.toHex(bytes) -> string` | Write bytes as hex text. Example: `bytesToHex({240, 65, 16, 247})` gives "F0 41 10 F7". `bytes`: The bytes, as a list. It is the form the console shows MIDI in, and the form every send reads. Short name: `bytesToHex`. |
+| `ce.midi.fromHex(text) -> list` | Read hex text into a list of bytes. Example: `bytesFromHex("F0 41 10 F7")` gives {240, 65, 16, 247}. `text`: One or two digits a byte, with or without 0x, with spaces or commas between, as every send reads it. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text. Short name: `bytesFromHex`. |
+| `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, to keep a dump in a setting or in state. Example: `bytesToBase64({240, 65, 16, 247})` gives "8EEQ9w==". `bytes`: The bytes, as a list. Base64 is about a third shorter than hex. It uses the standard alphabet, with = padding. Short name: `bytesToBase64`. |
+| `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Example: `bytesFromBase64("8EEQ9w==")` gives {240, 65, 16, 247}. `text`: The base64 text. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
 
 ### ce.device: your synth
 
