@@ -132,14 +132,55 @@ local function __shownValue(v)
   if t == "function" then return "a function" end
   return "a list"
 end
+-- A number as a script may write it: a finite number, or text that is one ("64", from a label say).
+local function __realNumber(v)
+  if type(v) == "number" then
+    if v ~= v or v == math.huge or v == -math.huge then return nil end
+    return v
+  end
+  if type(v) ~= "string" then return nil end
+  local t = string.match(v, "^%s*(.-)%s*$")
+  local mantissa = string.match(t, "^(.-)[eE][+-]?%d+$") or t
+  if string.match(mantissa, "^[+-]?%d+%.?%d*$") == nil and string.match(mantissa, "^[+-]?%.%d+$") == nil then
+    return nil
+  end
+  local n = tonumber(t)
+  if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
+  return n
+end
+-- A number a ce.math command was given, or nil after an error in the console. Left out, it is the
+-- fallback when there is one. The WebView runtime's mathNumber, word for word.
+local function __mnum(verb, what, v, fallback)
+  if v == nil and fallback ~= nil then return fallback end
+  local n = __realNumber(v)
+  if n ~= nil then return n end
+  if v == nil then logError(verb .. ": " .. what .. " is a number, and none was given, so there is no answer.")
+  else logError(verb .. ": " .. what .. " is a number, and " .. __shownValue(v) .. " is not, so there is no answer.") end
+  return nil
+end
 function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi else return v end end
 function round(v) return math.floor(v + 0.5) end
 function scale(v, inLo, inHi, outLo, outHi)
   if inHi == inLo then return outLo end
   return outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)
 end
-function snap(v, step) if step == 0 then return v end return round(v / step) * step end
-function lerp(a, b, t) return a + (b - a) * t end
+function snap(v, step)
+  local n = __mnum("ce.math.snap", "the value", v)
+  if n == nil then return nil end
+  local s = __mnum("ce.math.snap", "the step", step)
+  if s == nil then return nil end
+  if s == 0 then return n end
+  return round(n / s) * s
+end
+function lerp(a, b, t)
+  local x = __mnum("ce.math.lerp", "a", a)
+  if x == nil then return nil end
+  local y = __mnum("ce.math.lerp", "b", b)
+  if y == nil then return nil end
+  local f = __mnum("ce.math.lerp", "t", t)
+  if f == nil then return nil end
+  return x + (y - x) * f
+end
 function curve(v, shape)
   shape = shape or "linear"
   if shape == "exp" then return v * v
@@ -392,7 +433,9 @@ end
 -- Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
 -- them a panel used.
 function randomFloat(lo, hi)
-  local a, b = __num(lo), __num(hi, 1)
+  -- One number alone is the top of a range from 0, not the bottom of one up to 1.
+  local a, b
+  if hi == nil then a, b = 0, __num(lo, 1) else a, b = __num(lo), __num(hi) end
   return a + random() * (b - a)
 end
 -- A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
@@ -433,6 +476,8 @@ function distance(x1, y1, x2, y2)
 end
 function angleOf(x1, y1, x2, y2)
   local dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+  -- The same point twice has no direction: 0, in every runtime.
+  if dx == 0 and dy == 0 then return 0 end
   local a = toDegrees(math.atan(dx, -dy))
   if a < 0 then return a + 360 end
   return a
@@ -647,9 +692,17 @@ function random(lo, hi)
   __rndStates[key] = x
   local r = x / 4294967296.0
   if lo == nil or hi == nil then return r end
-  local a, b = math.floor(tonumber(lo) or 0), math.floor(tonumber(hi) or 0)
-  local low, high = math.min(a, b), math.max(a, b)
-  -- Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+  local a = __mnum("ce.math.random", "lo", lo)
+  if a == nil then return nil end
+  local b = __mnum("ce.math.random", "hi", hi)
+  if b == nil then return nil end
+  -- Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+  -- only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+  local low, high = math.ceil(math.min(a, b)), math.floor(math.max(a, b))
+  if high < low then
+    logError("ce.math.random: there is no whole number from " .. __shownValue(a) .. " to " .. __shownValue(b) .. ", so there is no answer.")
+    return nil
+  end
   return low + math.floor(r * (high - low + 1))
 end
 -- randomChoice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
@@ -768,21 +821,6 @@ local function __chint(v)
   local function two(i) local c = string.sub(d, i, i) return c .. c end
   if #d == 3 then return ' Write "' .. p .. two(1) .. two(2) .. two(3) .. '".' end
   return ' Write "' .. two(4) .. two(1) .. two(2) .. two(3) .. '".'
-end
-local function __realNumber(v)
-  if type(v) == "number" then
-    if v ~= v or v == math.huge or v == -math.huge then return nil end
-    return v
-  end
-  if type(v) ~= "string" then return nil end
-  local t = string.match(v, "^%s*(.-)%s*$")
-  local mantissa = string.match(t, "^(.-)[eE][+-]?%d+$") or t
-  if string.match(mantissa, "^[+-]?%d+%.?%d*$") == nil and string.match(mantissa, "^[+-]?%.%d+$") == nil then
-    return nil
-  end
-  local n = tonumber(t)
-  if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
-  return n
 end
 local function __cunit(verb, what, v, fallback)
   if v == nil and fallback ~= nil then return fallback end
@@ -987,7 +1025,13 @@ local function __cbyte(v)
   return n
 end
 function rgbToHex(r, g, b)
-  return string.upper(string.format("#%02x%02x%02x", __cbyte(r), __cbyte(g), __cbyte(b)))
+  local rr = __mnum("ce.math.hex", "the red part", r, 0)
+  if rr == nil then return nil end
+  local gg = __mnum("ce.math.hex", "the green part", g, 0)
+  if gg == nil then return nil end
+  local bb = __mnum("ce.math.hex", "the blue part", b, 0)
+  if bb == nil then return nil end
+  return string.upper(string.format("#%02x%02x%02x", __cbyte(rr), __cbyte(gg), __cbyte(bb)))
 end
 function hexToRgb(hex)
   local r, g, b = __cchan("ce.math.rgb", hex)
@@ -1014,7 +1058,8 @@ function mixColour(a, b, t)
   if r1 == nil then return nil end
   local r2, g2, b2 = __cchan("ce.math.mix", b)
   if r2 == nil then return nil end
-  local f = tonumber(t) or 0
+  local f = __mnum("ce.math.mix", "t", t, 0)
+  if f == nil then return nil end
   if f < 0 then f = 0 elseif f > 1 then f = 1 end
   return rgbToHex(r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f)
 end
@@ -1080,9 +1125,16 @@ function hexToHsl(hex)
   return { h = h, s = s * 100, l = l * 100 }
 end
 function hslToHex(hue, sat, light)
-  local h = tonumber(hue) or 0
-  local s = (tonumber(sat) or 0) / 100
-  local l = (tonumber(light) or 0) / 100
+  local h = __mnum("ce.math.fromHsl", "the hue", hue, 0)
+  if h == nil then return nil end
+  local s = __mnum("ce.math.fromHsl", "the saturation", sat, 0)
+  if s == nil then return nil end
+  local l = __mnum("ce.math.fromHsl", "the lightness", light, 0)
+  if l == nil then return nil end
+  -- A hue goes round (-120 is 240); the saturation and the lightness are held at 0 and 100.
+  h = h - 360 * math.floor(h / 360)
+  s = math.max(0, math.min(100, s)) / 100
+  l = math.max(0, math.min(100, l)) / 100
   local a = s * math.min(l, 1 - l)
   local function f(n)
     local k = (n + h / 30) % 12

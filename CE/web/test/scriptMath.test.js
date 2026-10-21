@@ -381,6 +381,59 @@ test('randomFloat is the seeded float that did not exist', () => {
   assert.equal(api.randomFloat(0, 10), f);
 });
 
+test('a fraction in random()\'s range is not one of its whole numbers', () => {
+  // The ends were floored, so random(1.5, 3.5) could give 1, below the range. Only whole numbers
+  // inside it now, and a range with none in it is refused rather than answered with one outside.
+  api.randomSeed(5);
+  const seen = new Set(Array.from({ length: 400 }, () => api.random(1.5, 3.5)));
+  assert.deepEqual([...seen].sort(), [2, 3]);
+  assert.deepEqual([...new Set(Array.from({ length: 400 }, () => api.random(-3.5, 2)))].sort((x, y) => x - y), [-3, -2, -1, 0, 1, 2]);
+  clearScriptTrace();
+  assert.equal(api.random(1.2, 1.8), undefined);
+  assert.match(get(scriptTrace).at(-1).message, /there is no whole number from 1\.2 to 1\.8, so there is no answer/);
+});
+
+test('randomFloat with one number is the top of a range from 0', () => {
+  // It was the bottom of a range up to 1, so randomFloat(5) was between 1 and 5.
+  api.randomSeed(6);
+  const xs = Array.from({ length: 2000 }, () => api.randomFloat(5));
+  assert.ok(xs.every((x) => x >= 0 && x < 5));
+  assert.ok(xs.some((x) => x < 1), 'below 1 too');
+  assert.ok(Array.from({ length: 200 }, () => api.randomFloat()).every((x) => x >= 0 && x < 1));
+});
+
+test('a colour built from numbers goes round the hue and holds the rest', () => {
+  // A negative hue gave the wrong colour in the JavaScript runtimes (their % keeps the sign), and a
+  // negative saturation was not held at 0.
+  assert.equal(api.hslToHex(-120, 100, 50), '#0000FF');
+  assert.equal(api.hslToHex(480, 100, 50), api.hslToHex(120, 100, 50));
+  assert.equal(api.hslToHex(0, -10, 50), '#808080');
+  assert.equal(api.hslToHex(0, 100, -10), '#000000');
+  assert.equal(api.rgbToHex('128', 0, 0), '#800000', 'text that is a number is read as one');
+  assert.equal(api.rgbToHex(255), '#FF0000', 'a part left out is 0');
+});
+
+test('a ce.math number that is not one is refused, not read as 0 or NaN', () => {
+  const refused = (call, words) => {
+    clearScriptTrace();
+    assert.equal(call(), undefined);
+    assert.match(get(scriptTrace).at(-1).message, words);
+  };
+  refused(() => api.rgbToHex('x', 0, 0), /ce\.math\.hex: the red part is a number, and "x" is not, so there is no answer/);
+  refused(() => api.hslToHex(0, 'x', 50), /ce\.math\.fromHsl: the saturation is a number, and "x" is not/);
+  refused(() => api.mixColour('#000000', '#FFFFFF', 'x'), /ce\.math\.mix: t is a number, and "x" is not/);
+  refused(() => api.snap(37), /ce\.math\.snap: the step is a number, and none was given/);
+  refused(() => api.lerp(10, 20), /ce\.math\.lerp: t is a number, and none was given/);
+  assert.equal(api.snap('37', 10), 40);
+  assert.equal(api.lerp('10', 20, 0.5), 15);
+});
+
+test('the same point twice is at angle 0', () => {
+  // It has no direction. atan2 answered 180 for it in JavaScript and 0 in Lua.
+  assert.equal(api.angleOf(5, 5, 5, 5), 0);
+  assert.equal(api.angleOf(0, 0, 0, -10), 0, 'and straight up is still 0');
+});
+
 test('gaussian clusters near the mean and always draws exactly twice', () => {
   api.randomSeed(21);
   const values = Array.from({ length: 400 }, () => api.randomGaussian(0, 1));
@@ -701,11 +754,10 @@ test('unshape says the honest thing about hold, which has no true inverse', () =
 
 test('shape() reproduces the Macro family too, at tension 1', () => {
   // The doc gap this closes: all three curve families in the app are reachable, but nothing said
-  // that a Macro slot's curve is shape(v, curve, 1). What is pinned is that FACT — the summary
-  // must still say Macro and still show the call — not the wording, which was in capitals and has
-  // since been rewritten to read like the rest of the manual.
-  assert.match(MEMBER_BY_ID.shapeCurve.summary, /Macro/i);
-  assert.match(MEMBER_BY_ID.shapeCurve.summary, /shape\(v, curve, 1\)/);
+  // that a Macro slot's curve is shape(v, curve, 1). What is pinned is that FACT, not the wording:
+  // it is said where the reader looks for it, on the tension that gives it.
+  const tension = MEMBER_BY_ID.shapeCurve.params.find((p) => p.name === 'tension').summary;
+  assert.match(tension, /At 1 it matches the curve a Macro slot uses/);
 });
 
 /* ==========================================================================================

@@ -406,8 +406,22 @@ function transmit(fn) { __api.beginTransmit(true); try { fn(); } finally { __api
 function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function round(v) { return Math.round(v); }
 function scale(v, inLo, inHi, outLo, outHi) { return inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo); }
-function snap(v, step) { return step === 0 ? v : Math.round(v / step) * step; }
-function lerp(a, b, t) { return a + (b - a) * t; }
+function snap(v, step) {
+  var n = __mnum("ce.math.snap", "the value", v);
+  if (n === undefined) return undefined;
+  var s = __mnum("ce.math.snap", "the step", step);
+  if (s === undefined) return undefined;
+  return s === 0 ? n : Math.round(n / s) * s;
+}
+function lerp(a, b, t) {
+  var x = __mnum("ce.math.lerp", "a", a);
+  if (x === undefined) return undefined;
+  var y = __mnum("ce.math.lerp", "b", b);
+  if (y === undefined) return undefined;
+  var f = __mnum("ce.math.lerp", "t", t);
+  if (f === undefined) return undefined;
+  return x + (y - x) * f;
+}
 function curve(v, shape) {
   shape = shape || "linear";
   if (shape === "exp") return v * v;
@@ -635,7 +649,9 @@ function blend(a, b, t) {
 // Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
 // them a panel used.
 function randomFloat(lo, hi) {
-  var a = __num(lo), b = __num(hi, 1);
+  // One number alone is the top of a range from 0, not the bottom of one up to 1.
+  var alone = hi === undefined || hi === null;
+  var a = alone ? 0 : __num(lo), b = alone ? __num(lo, 1) : __num(hi);
   return a + random() * (b - a);
 }
 // A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
@@ -674,6 +690,8 @@ function distance(x1, y1, x2, y2) {
 }
 function angleOf(x1, y1, x2, y2) {
   var dx = __num(x2) - __num(x1), dy = __num(y2) - __num(y1);
+  // The same point twice has no direction: 0, in every runtime. atan2 answered 180 for it here.
+  if (dx === 0 && dy === 0) return 0;
   var a = toDegrees(Math.atan2(dx, -dy));
   return a < 0 ? a + 360 : a;
 }
@@ -841,9 +859,17 @@ function random(lo, hi) {
   __rndStates[__streamOverride] = x;
   var r = x / 4294967296;
   if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
-  var a = Math.floor(Number(lo) || 0), b = Math.floor(Number(hi) || 0);
-  var low = Math.min(a, b), high = Math.max(a, b);
-  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+  var a = __mnum("ce.math.random", "lo", lo);
+  if (a === undefined) return undefined;
+  var b = __mnum("ce.math.random", "hi", hi);
+  if (b === undefined) return undefined;
+  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+  // only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+  var low = Math.ceil(Math.min(a, b)), high = Math.floor(Math.max(a, b));
+  if (high < low) {
+    logError("ce.math.random: there is no whole number from " + __shownValue(a) + " to " + __shownValue(b) + ", so there is no answer.");
+    return undefined;
+  }
   return low + Math.floor(r * (high - low + 1));
 }
 // randomChoice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
@@ -952,6 +978,17 @@ function __realNumber(v) {
   var n = Number(v);
   return isFinite(n) ? n : undefined;
 }
+// A number a ce.math command was given, or undefined after an error in the console. Left out, it
+// is the fallback when there is one. The WebView runtime's mathNumber, word for word.
+function __mnum(verb, what, v, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  var n = __realNumber(v);
+  if (n !== undefined) return n;
+  logError(v === undefined || v === null
+    ? verb + ": " + what + " is a number, and none was given, so there is no answer."
+    : verb + ": " + what + " is a number, and " + __shownValue(v) + " is not, so there is no answer.");
+  return undefined;
+}
 function __cunit(verb, what, v, fallback) {
   if ((v === undefined || v === null) && fallback !== undefined) return fallback;
   var n = __realNumber(v);
@@ -1056,8 +1093,14 @@ function __cbyte(v) {
   return n < 0 ? 0 : (n > 255 ? 255 : n);
 }
 function rgbToHex(r, g, b) {
+  var rr = __mnum("ce.math.hex", "the red part", r, 0);
+  if (rr === undefined) return undefined;
+  var gg = __mnum("ce.math.hex", "the green part", g, 0);
+  if (gg === undefined) return undefined;
+  var bb = __mnum("ce.math.hex", "the blue part", b, 0);
+  if (bb === undefined) return undefined;
   var c = function (v) { var s = __cbyte(v).toString(16); return s.length < 2 ? "0" + s : s; };
-  return ("#" + c(r) + c(g) + c(b)).toUpperCase();
+  return ("#" + c(rr) + c(gg) + c(bb)).toUpperCase();
 }
 function hexToRgb(hex) {
   var c = __cchan("ce.math.rgb", hex);
@@ -1083,7 +1126,9 @@ function mixColour(a, b, t) {
   if (x === null) return undefined;
   var y = __cchan("ce.math.mix", b);
   if (y === null) return undefined;
-  var f = Math.min(1, Math.max(0, Number(t) || 0));
+  var n = __mnum("ce.math.mix", "t", t, 0);
+  if (n === undefined) return undefined;
+  var f = Math.min(1, Math.max(0, n));
   return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
 // The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
@@ -1138,7 +1183,18 @@ function hexToHsl(hex) {
   return { h: h, s: s * 100, l: l * 100 };
 }
 function hslToHex(hue, sat, light) {
-  var h = Number(hue) || 0, s = (Number(sat) || 0) / 100, l = (Number(light) || 0) / 100;
+  var h = __mnum("ce.math.fromHsl", "the hue", hue, 0);
+  if (h === undefined) return undefined;
+  var s = __mnum("ce.math.fromHsl", "the saturation", sat, 0);
+  if (s === undefined) return undefined;
+  var l = __mnum("ce.math.fromHsl", "the lightness", light, 0);
+  if (l === undefined) return undefined;
+  // A hue goes round: -120 is 240. JavaScript's % keeps the sign, so a negative hue gave the wrong
+  // colour here and the right one in Lua and Python. The saturation and the lightness are held at 0
+  // and 100.
+  h = h - 360 * Math.floor(h / 360);
+  s = Math.max(0, Math.min(100, s)) / 100;
+  l = Math.max(0, Math.min(100, l)) / 100;
   var a = s * Math.min(l, 1 - l);
   var f = function (n) {
     var k = (n + h / 30) % 12;
