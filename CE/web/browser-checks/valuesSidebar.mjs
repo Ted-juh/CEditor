@@ -43,6 +43,7 @@
  *              ce.panel.create's type is a dropdown
  *   arrange    ce.panel.grid and align draw the named controls where they are and where they go,
  *              align its edge, and a `to` not in the list is said in the runtime's words
+ *   bytes      getBits and setBits draw the byte with the field marked
  *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
  *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
@@ -958,6 +959,33 @@ try {
     { line: [c.y, c.y], titleAfterY: c.y, said: 'Moves 1 of 2; "Cutoff" stays where it is.',
       to: 'ce.panel.align: "Fader" is not one of the names given, so nothing was moved.', refusedSaid: 'Nothing moves.' },
     { line: aligned.line, titleAfterY: aligned.title.after?.[1], said: aligned.said, to: refusedTo.to, refusedSaid: refusedTo.said });
+
+  // ---- bit fields ---------------------------------------------------------------------------------
+  const BYTES = `function onMidiIn(midi) {
+  const wave = ce.midi.getBits(0xB4, 4, 3);
+  const packed = ce.midi.setBits(0xB4, 4, 3, 5);
+}
+`;
+  await typeScript(BYTES);
+  const bitsShown = () => page.evaluate(() => {
+    const side = document.querySelector('[data-testid="values-sidebar"]');
+    const cells = [...side.querySelectorAll('.vbits .vbit')];
+    return { digits: cells.map((c) => c.textContent).join(''), field: cells.filter((c) => c.classList.contains('field')).map((c) => Number(c.dataset.bit)),
+      changed: cells.filter((c) => c.classList.contains('changed')).map((c) => Number(c.dataset.bit)),
+      wide: (side.querySelector('.vbits')?.getBoundingClientRect().width ?? 0) > 80, said: side.querySelector('.vbits-said')?.textContent.trim() ?? '' };
+  });
+  await clickAt(BYTES.indexOf('getBits') + 2);
+  await waitHead('Line 2');
+  const bitsRead = await bitsShown();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-bits-get.png` });
+  await clickAt(BYTES.indexOf('setBits') + 2);
+  await waitHead('Line 3');
+  const bitsWritten = await bitsShown();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-bits-set.png` });
+  led.check(S, 'a bit field is drawn on its byte', 'getBits(0xB4, 4, 3) draws 0xB4 a bit to a cell, highest first, bits 6 to 4 marked, and says what they read; setBits(0xB4, 4, 3, 5) draws the byte as written, the two bits that change in bold, and the value it makes',
+    { read: { digits: '10110100', field: [6, 5, 4], changed: [], wide: true, said: 'Bits 4 to 6 are 011, which is 3.' },
+      written: { digits: '11010100', field: [6, 5, 4], changed: [6, 5], wide: true, said: 'Bits 4 to 6 go from 011 to 101: 0xB4 becomes 0xD4.' } },
+    { read: bitsRead, written: bitsWritten });
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();

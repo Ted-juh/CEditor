@@ -831,7 +831,7 @@
         {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
-    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange)}
+    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.bits)}
       <p class="vempty">Nothing in this {isJson ? 'object' : 'statement'} that the editor can read.</p>
     {/if}
     <div class="vlist" bind:this={listEl}>
@@ -903,6 +903,29 @@
               <span class="varr-text">{arrange.said}</span>
               {#if arrange.moved}<span class="varr-key"><i class="now"></i>now <i class="then"></i>after</span>{/if}
             </div>
+          {/if}
+          {#if row.call.bits?.groups.length}
+            {@const bits = row.call.bits}
+            <!-- The byte a bit to a cell, its highest bit first, the field marked and its ends numbered. -->
+            <div class="vbits" style:--depth={row.depth} role="img" aria-label={bits.said}>
+              {#each bits.groups as group, g (g)}
+                <div class="vbyte">
+                  {#if group.label}<span class="vbyte-label">{group.label}</span>{/if}
+                  <span class="vbyte-cells">
+                    {#each group.cells as cell (cell.bit)}
+                      <span class={['vbit', cell.field && 'field', cell.was !== undefined && cell.was !== null && cell.was !== cell.v && 'changed']}
+                        data-bit={cell.bit} title={`bit ${cell.bit}${cell.was !== undefined && cell.was !== null ? `, ${cell.was} before` : ''}`}>{cell.v ?? ''}</span>
+                    {/each}
+                  </span>
+                  <span class="vbyte-ends">
+                    {#each group.cells as cell (cell.bit)}
+                      <span>{cell.field && (cell.bit === bits.start || cell.bit === bits.start + bits.count - 1) ? cell.bit : ''}</span>
+                    {/each}
+                  </span>
+                </div>
+              {/each}
+            </div>
+            {#if bits.said}<div class="vbits-said" style:--depth={row.depth}>{bits.said}</div>{/if}
           {/if}
         {:else if row.type === 'loose'}
           <div class="vcall" style:--depth={0}><div class="vsum">Values outside any call</div></div>
@@ -1066,6 +1089,16 @@
   .varr-key i { display: inline-block; width: 12px; height: 8px; box-sizing: border-box; }
   .varr-key i.now { border: 1px dashed var(--txt-faint); }
   .varr-key i.then { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); margin-left: 4px; }
+  .vbits { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 8px 2px calc(8px + var(--depth, 0) * 14px); }
+  .vbyte { display: grid; grid-template-columns: auto; gap: 1px; }
+  .vbyte-label { color: var(--txt-faint); font-size: 10px; }
+  .vbyte-cells, .vbyte-ends { display: grid; grid-template-columns: repeat(8, 17px); gap: 2px; }
+  .vbit { height: 20px; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: 3px; color: var(--txt-dim);
+    font-family: var(--mono); font-size: 12px; line-height: 18px; text-align: center; }
+  .vbit.field { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--txt); }
+  .vbit.changed { font-weight: 700; }
+  .vbyte-ends span { color: var(--txt-faint); font-family: var(--mono); font-size: 9px; text-align: center; }
+  .vbits-said { margin: 0 8px 4px calc(8px + var(--depth, 0) * 14px); color: var(--txt-dim); font-size: 11px; }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {
