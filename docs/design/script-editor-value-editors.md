@@ -981,9 +981,12 @@ context.
   each refusal, `test/scriptValues.test.js` calls the runtime and compares what it writes to the
   console.
 - **The tab** (`editor/ValuesSidebar.svelte`, rows laid out by `editor/valueRows.js`). The dock's
-  fourth tab, loaded the first time it is shown. A header names the lines, the call as written and
-  its summary. Rows follow the call's order, an options table's keys sit under `opts`, and a call
-  inside another is indented under it. Each row shows the value in the editor's colours, what it
+  fourth tab, loaded the first time it is shown. A header names the lines and the call as written.
+  It showed the call's summary too, with its code marks stripped, until the owner found it read as
+  clutter ("Write bits into the count bits starting at bit start"). What a call does is for the
+  picker and the hover card to say, and the summaries are to be rewritten
+  ([api-descriptions-handoff.md](api-descriptions-handoff.md)). Rows follow the call's order, an options table's keys sit
+  under `opts`, and a call inside another is indented under it. Each row shows the value in the editor's colours, what it
   means, its problem, and its editor. While an edit is open the tab stays on that statement rather
   than following the caret.
 - **The highlights** (`editor/codeMarks.js`, CodeEditor's `marks`): the statement band with its bar
@@ -1371,12 +1374,49 @@ Checked in `test/lcdLines.test.js`, `presetWords.test.js`, `drawShapes.test.js`,
 browser, `browser-checks/valuesSidebar.mjs` drives Learn, Send, the built colour, create's type, the
 LCD line and Open.
 
-Next, from the same list, held back by the owner for a step of their own: an arrangement's preview
-(`ce.panel.align`, `distribute`, `match` and `grid` drawing the named controls before and after in
-the row, since the canvas is not on screen while you script), and bit fields and dump offsets
-(`getBits`/`setBits` drawing the byte with the field marked, and `bytesRead(dump, 10, 12)` naming
-what the profile says lives there, if the profiles describe dumps by offset at all, which is not yet
-checked).
+Then the last two from the same list, which the owner had held back for a step of their own:
+
+- **An arrangement, drawn before and after.** The canvas is not on screen while a script is
+  written, and `ce.panel.distribute(pads, "hSpacing")` says nothing of what it will look like. A
+  call to `align`, `distribute`, `match`, `grid`, `circle` or `flip` now has a map under it
+  (`arrangePreview.js`). The named controls are drawn dashed where they are and solid where the verb
+  puts them, among the panel's other controls. Align's edge is drawn as a line, and the control a
+  `to` names is outlined. The row says how many move, which stay, or that nothing does. What the
+  map shows is the verb's own plan. Each verb's decision moved out of `panelRuntime.js` into
+  `utils/arrangement.js`'s `arrangementPlan`, which the runtime applies and the row draws. The
+  arithmetic moved there too, from `stores/alignment.js`, which imported the stores and still
+  re-exports it. A name that is not a control, and a `to` that is not one of the names, are said in
+  the runtime's words. A list the script builds is not known until it runs, and draws nothing.
+- **A bit field, on its byte.** `getBits(b, 4, 3)` is a field of a packed byte, and nothing in the
+  call says which bits those are. The row draws the byte a bit to a cell, highest bit first, the
+  field marked and its ends numbered (`bitFields.js`). With the value written out, it says what the
+  field reads. For `setBits` it shows the bits as written, the ones that change in bold, and the
+  value that results. A list's bytes are drawn in list order, its bits running on from one byte into
+  the next, as the runtime counts them. Without the value, the field is drawn on empty cells, which
+  is still where it is. The runtime's refusals are said in its words: a range, bits past the end, a
+  value that does not fit. The row reasons as `bytesGetBits` and `bytesSetBits` do, and
+  `bitFields.test.js` holds the two equal over a sweep of values, ranges and bits.
+- **What a dump holds at an offset.** The profiles do describe dumps by offset, which was the open
+  question. Each dump has `payload.offset`, where its values start in the message, and `mappings`,
+  one `{ parameter, offset }` a value from there. That is how the engine decodes a dump. So
+  `ce.midi.read(msg, 23, 1)`, `write`, `slice` and `put` name what the mapped profile's dumps hold
+  at those bytes, counting from F0, as `onMidiIn` hands a script the message (`dumpOffsets.js`).
+  Each field is as wide as its parameter's encoding (`parameterValueWidth`, the engine's own). A
+  field the call reads only part of is said to be part of one. A header byte is named, `$deviceId`
+  as the device id, and the checksum and the closing F7 are named too. Which dump the bytes are is
+  not known from the call, so every dump with something there is said. Dumps that hold the same
+  thing share a line (the GAIA's three tones have FILTER Cutoff at byte 23), four lines at most.
+  Bytes written out are matched to the dump they are. A packed payload (8 bits to 7) is one run: its
+  mappings count unpacked bytes, so no byte of it is one value. `dumpOffsets.test.js` holds each
+  layout to the engine's own dumps. One value is changed and the dump rebuilt, and every byte that
+  changes lies in that field's place: over 800 fields in the four test profiles. A dump a script
+  declares with `defineDump` is not read yet, only the profiles'.
+
+Found on the way and not changed here: the local profile engine (`deviceProfileLocalEngine.js`)
+encodes an `s7` parameter as a plain 0–127 number, without its signed offset, while its decoder
+takes the offset off. A pan of 0 goes out as byte 0 and reads back as −64; 10 reads back as −54;
+anything below 0 goes out as 0. It matters only where the web engine builds a dump or a message,
+in the editor with no C++ host.
 
 ## Open questions for the owner
 

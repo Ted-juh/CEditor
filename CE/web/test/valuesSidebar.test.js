@@ -17,7 +17,7 @@ import { createEditSession, extentOf, SETTLE_MS } from '../src/CE_Application/ed
 import { readDockTab, writeDockTab, DOCK_TAB_KEY, DOCK_TABS } from '../src/CE_Application/editor/dockTabMemory.js';
 import {
   statementRows, everyArg, argAtOffset, findArg, editLabel, spokenPath, meaningLine, madeByChild, swatchHex, cssOfHex,
-  gradientStrip, unitLabel, plainSummary, shownNumber, hasRows, controlToSelect,
+  gradientStrip, unitLabel, shownNumber, hasRows, controlToSelect,
 } from '../src/CE_Application/editor/valueRows.js';
 import { valueCatalogues } from '../src/CE_Application/editor/valuesContext.js';
 import {
@@ -468,7 +468,6 @@ test('swatches, strips, units and numbers as a row shows them', () => {
   assert.equal(gradientStrip({ stops: [{ css: '#000000', at: 0 }, { css: '#FFFFFF', at: 1 }] }), 'linear-gradient(90deg, #000000 0%, #FFFFFF 100%)');
   assert.equal(gradientStrip({ stops: [{ css: '#000000', at: 0 }] }), null);
   assert.deepEqual(['milliseconds', 'degrees', 'pixels', '0 to 127', '0 to 1', undefined].map(unitLabel), ['ms', 'degrees', 'px', '', '', '']);
-  assert.equal(plainSummary('Move a value smoothly to `target` over time.'), 'Move a value smoothly to target over time.');
   assert.deepEqual([shownNumber(0.4200001), shownNumber(3), shownNumber(NaN)], ['0.42', '3', 'NaN']);
 });
 

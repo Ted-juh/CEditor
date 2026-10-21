@@ -41,6 +41,10 @@
  *              row puts its bytes in the Ports tab's box and sends nothing; a colour built from
  *              numbers (ce.math.hex) has a swatch, and the Colors tab writes the numbers back;
  *              ce.panel.create's type is a dropdown
+ *   arrange    ce.panel.grid and align draw the named controls where they are and where they go,
+ *              align its edge, and a `to` not in the list is said in the runtime's words
+ *   bytes      getBits and setBits draw the byte with the field marked; ce.midi.read names what the
+ *              mapped profile's dumps hold at its byte
  *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
  *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
@@ -51,6 +55,7 @@
  * are typed. The caret is put in place with a click on the character, measured from the text.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { boot, Ledger } from './behaviourKit.mjs';
 
 const kit = await boot({ width: 1600, height: 1000 });
@@ -259,10 +264,10 @@ try {
   await waitHead('Lines 4');
   const luaRows = await rows();
   const luaHead = await head();
-  led.check(S, 'a statement over five lines', 'with the caret in the options table, the whole ce.anim.to call is listed: its header names the lines, the call and its summary; its arguments in order; its options under opts',
-    { where: 'Statement · Lines 4–8', path: 'ce.anim.to', sum: true,
+  led.check(S, 'a statement over five lines', 'with the caret in the options table, the whole ce.anim.to call is listed: its header names the lines and the call, and no description; its arguments in order; its options under opts',
+    { where: 'Statement · Lines 4–8', path: 'ce.anim.to', sum: undefined,
       names: ['path', 'target', 'opts', 'duration', 'curve', 'easing'], depths: [0, 0, 0, 1, 1, 1] },
-    { where: luaHead.where, path: luaHead.path, sum: /^Move a value smoothly to target/.test(luaHead.sum),
+    { where: luaHead.where, path: luaHead.path, sum: luaHead.sum,
       names: luaRows.map((r) => r.name), depths: luaRows.map((r) => r.depth) });
   const byName = (list, name) => list.find((r) => r.name === name);
   // A Knob's document holds no value of its own until one is set (its value is the preview's), so
@@ -897,6 +902,126 @@ try {
   led.check(S, 'create\'s type is a dropdown', 'ce.panel.create\'s type row lists the component types there are, and the one picked is written in its quotes, as one edit',
     { offers: true, text: builtText.replace('create("Knob"', 'create("Slider"'), writes: 1 },
     { offers: ['Knob', 'Slider', 'Label', 'LcdDisplay'].every((t) => typeChoices.includes(t)), text: await editorText(), writes: await inputs() });
+
+  // ---- an arrangement ----------------------------------------------------------------------------
+  // The canvas is not on screen while a script is written: the row draws the named controls where
+  // they are and where the verb puts them, by the verb's own plan.
+  const ARRANGE = `function onValueChanged(value) {
+  ce.panel.grid(["Cutoff", "Title"], { columns: 2, gapX: 12 });
+  ce.panel.align(["Cutoff", "Title"], "top");
+  ce.panel.align(["Cutoff", "Title"], "left", { to: "Fader" });
+}
+`;
+  await typeScript(ARRANGE);
+  const transformsNow = () => page.evaluate(async () => {
+    const { panels, scriptRuntimePanelId } = await import('/src/CE_Application/stores/panels.js');
+    const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+    const panel = get(panels).find((p) => p.id === get(scriptRuntimePanelId));
+    const of = (name) => { const t = panel.controls.find((c) => c._children.Core.name === name)._children.Transform; return { x: t.x, y: t.y, w: t.width, h: t.height }; };
+    return { cutoff: of('Cutoff'), title: of('Title') };
+  });
+  const arrangeOf = () => page.evaluate(() => {
+    const side = document.querySelector('[data-testid="values-sidebar"]');
+    const svg = side.querySelector('svg.varrange');
+    const r = svg?.getBoundingClientRect();
+    const rect = (el) => (el ? ['x', 'y', 'width', 'height'].map((k) => Number(el.getAttribute(k))) : null);
+    const after = (name) => svg?.querySelector(`rect.varr-after[data-name="${name}"]`);
+    const line = svg?.querySelector('line.varr-line');
+    return {
+      drawn: !!svg && (r?.width ?? 0) > 60 && (r?.height ?? 0) > 20,
+      title: { after: rect(after('Title')), moved: after('Title')?.classList.contains('moved') ?? null,
+        before: rect(svg?.querySelector('rect.varr-before')) },
+      cutoff: { after: rect(after('Cutoff')), still: after('Cutoff')?.classList.contains('still') ?? null },
+      line: line ? [line.getAttribute('y1'), line.getAttribute('y2')].map(Number) : null,
+      said: side.querySelector('.varr-said .varr-text')?.textContent.trim() ?? '',
+      to: side.querySelector('.vrow[data-name="to"] .vproblem')?.textContent ?? '',
+    };
+  });
+  const now = await transformsNow();
+  await clickAt(ARRANGE.indexOf('grid(') + 2);
+  await waitHead('Line 2');
+  const gridded = await arrangeOf();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-arrange-grid.png` });
+  const cell = Math.max(now.cutoff.w, now.title.w);
+  const t = now.title;
+  const c = now.cutoff;
+  // Reading order puts Cutoff first, above Title: Title goes into the second cell of the row.
+  led.check(S, 'a grid is drawn before and after', 'ce.panel.grid(["Cutoff", "Title"], { columns: 2, gapX: 12 }) draws a map under its call: Title dashed where it is and solid in the second cell, one cell width and 12 px on from Cutoff, and Cutoff where it stays; the row says so',
+    { drawn: true, title: { after: [c.x + cell + 12, c.y, t.w, t.h], moved: true, before: [t.x, t.y, t.w, t.h] },
+      cutoff: { after: [c.x, c.y, c.w, c.h], still: true }, line: null, said: 'Moves 1 of 2; "Cutoff" stays where it is.', to: '' },
+    gridded);
+  await clickAt(ARRANGE.indexOf('"top"') + 2);
+  await waitHead('Line 3');
+  const aligned = await arrangeOf();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-arrange-align.png` });
+  await clickAt(ARRANGE.indexOf('"Fader"') + 2);
+  await waitHead('Line 4');
+  const refusedTo = await arrangeOf();
+  led.check(S, 'align draws the edge it lines up on, and says a `to` it refuses', 'ce.panel.align(…, "top") draws the line along the group\'s top and Title moved up to it; with { to: "Fader" }, a name not in the list, the `to` row says the runtime\'s refusal and the map says nothing moves',
+    { line: [c.y, c.y], titleAfterY: c.y, said: 'Moves 1 of 2; "Cutoff" stays where it is.',
+      to: 'ce.panel.align: "Fader" is not one of the names given, so nothing was moved.', refusedSaid: 'Nothing moves.' },
+    { line: aligned.line, titleAfterY: aligned.title.after?.[1], said: aligned.said, to: refusedTo.to, refusedSaid: refusedTo.said });
+
+  // ---- bit fields and dump offsets ---------------------------------------------------------------
+  // The GAIA's test profile chosen for the main synth, as the device stores hold a choice; put back
+  // as it was afterwards.
+  const gaiaText = readFileSync(new URL('../../profiles/test/roland-gaia-sh01.ceditor-device.json', import.meta.url), 'utf8');
+  await page.evaluate(async (text) => {
+    const st = await import('/src/CE_Application/stores/deviceProfileStores.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    window.__keptDevices = { mappings: get(st.deviceRoleMappings), profiles: get(st.deviceProfiles), sources: get(st.profileSources) };
+    st.deviceProfiles.update((list) => [...list, { id: 'values-gaia', name: 'Roland GAIA SH-01' }]);
+    st.profileSources.update((all) => ({ ...all, 'values-gaia': { source: text } }));
+    st.deviceRoleMappings.update((m) => ({ ...m, mainSynth: { ...m.mainSynth, profileId: 'values-gaia' } }));
+  }, gaiaText);
+  const BYTES = `function onMidiIn(midi) {
+  const wave = ce.midi.getBits(0xB4, 4, 3);
+  const packed = ce.midi.setBits(0xB4, 4, 3, 5);
+  const level = ce.midi.read(midi.bytes, 23, 1);
+}
+`;
+  await typeScript(BYTES);
+  const bitsShown = () => page.evaluate(() => {
+    const side = document.querySelector('[data-testid="values-sidebar"]');
+    const cells = [...side.querySelectorAll('.vbits .vbit')];
+    return { digits: cells.map((c) => c.textContent).join(''), field: cells.filter((c) => c.classList.contains('field')).map((c) => Number(c.dataset.bit)),
+      changed: cells.filter((c) => c.classList.contains('changed')).map((c) => Number(c.dataset.bit)),
+      wide: (side.querySelector('.vbits')?.getBoundingClientRect().width ?? 0) > 80, said: side.querySelector('.vbits-said')?.textContent.trim() ?? '' };
+  });
+  await clickAt(BYTES.indexOf('getBits') + 2);
+  await waitHead('Line 2');
+  const bitsRead = await bitsShown();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-bits-get.png` });
+  await clickAt(BYTES.indexOf('setBits') + 2);
+  await waitHead('Line 3');
+  const bitsWritten = await bitsShown();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-bits-set.png` });
+  led.check(S, 'a bit field is drawn on its byte', 'getBits(0xB4, 4, 3) draws 0xB4 a bit to a cell, highest first, bits 6 to 4 marked, and says what they read; setBits(0xB4, 4, 3, 5) draws the byte as written, the two bits that change in bold, and the value it makes',
+    { read: { digits: '10110100', field: [6, 5, 4], changed: [], wide: true, said: 'Bits 4 to 6 are 011, which is 3.' },
+      written: { digits: '11010100', field: [6, 5, 4], changed: [6, 5], wide: true, said: 'Bits 4 to 6 go from 011 to 101: 0xB4 becomes 0xD4.' } },
+    { read: bitsRead, written: bitsWritten });
+  await clickAt(BYTES.indexOf('23, 1') + 1);
+  await waitHead('Line 4');
+  await until(() => document.querySelector('[data-testid="values-sidebar"] .vdump') !== null);
+  const dump = await page.evaluate(() => {
+    const box = document.querySelector('[data-testid="values-sidebar"] .vdump');
+    return { head: box.querySelector('.vdump-head').textContent.trim(),
+      lines: [...box.querySelectorAll('.vdump-line')].map((l) => [l.querySelector('.vdump-who').textContent.trim(), l.querySelector('.vdump-what').textContent.trim()]),
+      more: box.querySelector('.vdump-more')?.textContent.trim() ?? '' };
+  });
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-dump-offset.png` });
+  led.check(S, 'a read names what the dumps hold at its byte', 'with the GAIA\'s profile on the main synth, ce.midi.read(midi.bytes, 23, 1) says byte 23 counting from F0 is Patch Level in a Patch Common dump and FILTER Cutoff in the three tones, on one line, and how many other dumps it leaves out',
+    { head: 'Byte 23, counting from F0, in a Roland GAIA SH-01 dump:', common: ['Patch Common', 'Patch Level'],
+      tones: ['Patch Tone 1, Patch Tone 2 and Patch Tone 3', 'FILTER Cutoff'], lines: 4, more: true },
+    { head: dump.head, common: dump.lines.find((l) => l[0] === 'Patch Common') ?? null, tones: dump.lines.find((l) => l[1] === 'FILTER Cutoff') ?? null,
+      lines: dump.lines.length, more: /^…and \d+ other dumps$/.test(dump.more) });
+  await page.evaluate(async () => {
+    const st = await import('/src/CE_Application/stores/deviceProfileStores.js');
+    const kept = window.__keptDevices;
+    st.deviceRoleMappings.set(kept.mappings);
+    st.deviceProfiles.set(kept.profiles);
+    st.profileSources.set(kept.sources);
+  });
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();

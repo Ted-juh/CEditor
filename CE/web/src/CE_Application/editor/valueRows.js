@@ -100,11 +100,6 @@ export function editLabel({ call = null, arg, line, prefix = 'Script', where = '
   return `${prefix} · ${what}${Number.isFinite(line) ? `, line ${line}` : ''}`;
 }
 
-/** A contract summary as plain text: its `code` marks dropped, the words kept. */
-export function plainSummary(text) {
-  return String(text ?? '').replace(/`([^`]*)`/g, '$1');
-}
-
 /** A number as a row shows it: whole, or to three places. */
 export function shownNumber(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);

@@ -136,9 +136,8 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 // The arrangement maths — pure, and the SAME functions the canvas context menu runs. Two
 // implementations of "distribute six things evenly" would drift the first time one was touched.
-import {
-  boundsOf, alignPatch, distributePatches, matchPatch, gridPatches, circlePatches, flipPatches,
-} from '../stores/alignment.js';
+// arrangementPlan is each verb's decision on top of them, which the Values tab draws too.
+import { boundsOf, arrangementPlan } from '../utils/arrangement.js';
 import { pushSnapshot } from '../stores/history.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
@@ -6327,32 +6326,24 @@ function panelApplyPatches(transforms, patches) {
 }
 
 // The words each arrangement verb takes, and its sentence for one it does not, are layoutWords.js's,
-// which the Values tab reads too.
+// which the Values tab reads too; what each verb then moves, and what of its options it refuses, is
+// arrangementPlan's (utils/arrangement.js), which the Values tab draws.
+function panelArrange(memberId, transforms, which, opts) {
+  const plan = arrangementPlan(memberId, transforms, which, opts);
+  if (plan.refused) {
+    addScriptTrace('error', '', plan.refused);
+    return 0;
+  }
+  return panelApplyPatches(transforms, plan.patches);
+}
+
 function panelAlignImpl(names, edge, opts) {
   const { which, refused } = layoutWord('panelAlign', edge);
   if (refused) {
     addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'align');
-  if (!transforms.length) return 0;
-  // The reference is the group's own bounds, or one named control — "align these to that one",
-  // which is what the canvas calls a key object.
-  const keyName = opts?.to != null ? String(opts.to) : null;
-  const key = keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null;
-  // Refused rather than lining up on the group instead: "line these up on that one" done against
-  // something else is a layout the script did not ask for, and it would have to undo it by hand.
-  if (keyName && !key) {
-    addScriptTrace('error', '', `ce.panel.align: "${keyName}" is not one of the names given, so nothing was moved.`);
-    return 0;
-  }
-  const ref = key ? { x: key.x, y: key.y, width: key.width, height: key.height } : boundsOf(transforms);
-  const patches = new Map();
-  for (const t of transforms) {
-    const patch = alignPatch(t, which, ref);
-    if (patch) patches.set(t.id, patch);
-  }
-  return panelApplyPatches(transforms, patches);
+  return panelArrange('panelAlign', panelTransforms(names, 'align'), which, opts);
 }
 
 function panelDistributeImpl(names, what, opts) {
@@ -6361,11 +6352,7 @@ function panelDistributeImpl(names, what, opts) {
     addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'distribute');
-  if (transforms.length < 2) return 0;
-  const gap = Number(opts?.gap);
-  return panelApplyPatches(transforms, distributePatches(
-    transforms, which, Number.isFinite(gap) ? gap : null, opts?.align === true));
+  return panelArrange('panelDistribute', panelTransforms(names, 'distribute'), which, opts);
 }
 
 function panelMatchImpl(names, what, opts) {
@@ -6374,43 +6361,15 @@ function panelMatchImpl(names, what, opts) {
     addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'match');
-  if (transforms.length < 2) return 0;
-  // The first name is the reference unless one is named, which is the canvas's rule too. A name that
-  // is not in the list used to fall back to the first, silently, and every other control took the
-  // wrong size; it is refused, in align's words.
-  const keyName = opts?.to != null ? String(opts.to) : null;
-  const named = keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null;
-  if (keyName && !named) {
-    addScriptTrace('error', '', `ce.panel.match: "${keyName}" is not one of the names given, so nothing was resized.`);
-    return 0;
-  }
-  const key = named ?? transforms[0];
-  const patches = new Map();
-  for (const t of transforms) {
-    if (t.id === key.id) continue;                       // the reference does not resize itself
-    patches.set(t.id, matchPatch(key, which));
-  }
-  return panelApplyPatches(transforms, patches);
+  return panelArrange('panelMatch', panelTransforms(names, 'match'), which, opts);
 }
 
 function panelGridImpl(names, opts) {
-  const transforms = panelTransforms(names, 'grid');
-  if (transforms.length < 2) return 0;
-  return panelApplyPatches(transforms, gridPatches(
-    transforms,
-    Number.isFinite(Number(opts?.columns)) ? Number(opts.columns) : 3,
-    Number.isFinite(Number(opts?.gapX)) ? Number(opts.gapX) : 10,
-    Number.isFinite(Number(opts?.gapY)) ? Number(opts.gapY) : 10));
+  return panelArrange('panelGrid', panelTransforms(names, 'grid'), null, opts);
 }
 
 function panelCircleImpl(names, opts) {
-  const transforms = panelTransforms(names, 'circle');
-  if (transforms.length < 2) return 0;
-  return panelApplyPatches(transforms, circlePatches(
-    transforms,
-    Number.isFinite(Number(opts?.radius)) ? Number(opts.radius) : 100,
-    Number.isFinite(Number(opts?.startAngle)) ? Number(opts.startAngle) : 0));
+  return panelArrange('panelCircle', panelTransforms(names, 'circle'), null, opts);
 }
 
 function panelFlipImpl(names, axis) {
@@ -6419,9 +6378,7 @@ function panelFlipImpl(names, axis) {
     addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'flip');
-  if (transforms.length < 2) return 0;
-  return panelApplyPatches(transforms, flipPatches(transforms, which));
+  return panelArrange('panelFlip', panelTransforms(names, 'flip'), which, undefined);
 }
 
 /**

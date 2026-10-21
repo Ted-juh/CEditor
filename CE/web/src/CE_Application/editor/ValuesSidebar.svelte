@@ -45,7 +45,7 @@
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import {
     statementRows, argAtOffset, findArg, editLabel, meaningLine, madeByChild, unitLabel, swatchHex, cssOfHex,
-    gradientStrip, shownNumber, plainSummary, controlToSelect,
+    gradientStrip, shownNumber, controlToSelect,
   } from './valueRows.js';
   import { createEditSession, extentOf } from './valueEditSession.js';
   import { colorTarget, activateColorTarget, clearColorTarget } from '../stores/colorTarget.js';
@@ -58,6 +58,8 @@
   import BezierEditor from '../components/animation/BezierEditor.svelte';
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
   import LcdLinePreview from './LcdLinePreview.svelte';
+  import { arrangementView, labelFits } from '../scripting/arrangePreview.js';
+  import { dumpRangeSaid } from '../scripting/dumpOffsets.js';
   import { learnFor, learnTakes, learnedEdit, learnWords, sendableHex } from './valueLearn.js';
   import { learnNext } from '../stores/midiLearnTap.js';
   import { rawMidiDraft } from '../stores/rawMidiDraft.js';
@@ -827,10 +829,9 @@
         <div class="vsum">{statement.item?.kind === 'panel' ? 'The panel\'s own settings' : statement.item?.controlType ?? ''}</div>
       {:else if firstCall}
         <div class="vpath">{callName(firstCall)}</div>
-        {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
-    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem)}
+    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.bits || c.dumpAt)}
       <p class="vempty">Nothing in this {isJson ? 'object' : 'statement'} that the editor can read.</p>
     {/if}
     <div class="vlist" bind:this={listEl}>
@@ -839,7 +840,6 @@
           {#if row.depth > 0 || row.call !== firstCall}
             <div class="vcall" style:--depth={row.depth}>
               <div class="vpath">{callName(row.call)}</div>
-              {#if row.call.summary}<div class="vsum" title={plainSummary(row.call.summary)}>{plainSummary(row.call.summary)}</div>{/if}
             </div>
           {/if}
           {#if row.call.problem}
@@ -867,6 +867,76 @@
                 <path class="vshape-in" d={shape.d} vector-effect="non-scaling-stroke" />
               {/if}
             </svg>
+          {/if}
+          {#if row.call.arrange}
+            {@const arrange = row.call.arrange}
+            {@const view = arrangementView(arrange)}
+            {#if view}
+              <!-- The named controls where they are, dashed, and where the verb puts them, solid, among
+                   the panel's other controls: the canvas is not on screen while the script is. -->
+              <svg class="varrange" style:--depth={row.depth} width={view.width} height={view.height} viewBox={view.viewBox}
+                role="img" aria-label={`${arrange.verb}: the controls where they are, dashed, and where it puts them, solid`}>
+                {#each view.others as other, i (i)}
+                  <rect class="varr-other" x={other.x} y={other.y} width={other.w} height={other.h} vector-effect="non-scaling-stroke" />
+                {/each}
+                {#if view.line}
+                  <line class="varr-line" x1={view.line.x1} y1={view.line.y1} x2={view.line.x2} y2={view.line.y2} vector-effect="non-scaling-stroke" />
+                {/if}
+                {#each arrange.items as item, i (i)}
+                  {#if item.moved}
+                    <rect class="varr-before" x={item.before.x} y={item.before.y} width={item.before.w} height={item.before.h} vector-effect="non-scaling-stroke" />
+                    <line class="varr-move" x1={item.before.x + item.before.w / 2} y1={item.before.y + item.before.h / 2}
+                      x2={item.after.x + item.after.w / 2} y2={item.after.y + item.after.h / 2} vector-effect="non-scaling-stroke" />
+                  {/if}
+                {/each}
+                {#each arrange.items as item, i (i)}
+                  <rect class={['varr-after', item.moved ? 'moved' : 'still', item.key && 'key']} data-name={item.name}
+                    x={item.after.x} y={item.after.y} width={item.after.w} height={item.after.h} vector-effect="non-scaling-stroke" />
+                  {#if labelFits(item.name, item.after, view.scale)}
+                    <text class="varr-label" x={item.after.x + item.after.w / 2} y={item.after.y + item.after.h / 2} font-size={view.labelSize}>{item.name}</text>
+                  {/if}
+                {/each}
+              </svg>
+            {/if}
+            <div class="varr-said" style:--depth={row.depth}>
+              <span class="varr-text">{arrange.said}</span>
+              {#if arrange.moved}<span class="varr-key"><i class="now"></i>now <i class="then"></i>after</span>{/if}
+            </div>
+          {/if}
+          {#if row.call.bits?.groups.length}
+            {@const bits = row.call.bits}
+            <!-- The byte a bit to a cell, its highest bit first, the field marked and its ends numbered. -->
+            <div class="vbits" style:--depth={row.depth} role="img" aria-label={bits.said}>
+              {#each bits.groups as group, g (g)}
+                <div class="vbyte">
+                  {#if group.label}<span class="vbyte-label">{group.label}</span>{/if}
+                  <span class="vbyte-cells">
+                    {#each group.cells as cell (cell.bit)}
+                      <span class={['vbit', cell.field && 'field', cell.was !== undefined && cell.was !== null && cell.was !== cell.v && 'changed']}
+                        data-bit={cell.bit} title={`bit ${cell.bit}${cell.was !== undefined && cell.was !== null ? `, ${cell.was} before` : ''}`}>{cell.v ?? ''}</span>
+                    {/each}
+                  </span>
+                  <span class="vbyte-ends">
+                    {#each group.cells as cell (cell.bit)}
+                      <span>{cell.field && (cell.bit === bits.start || cell.bit === bits.start + bits.count - 1) ? cell.bit : ''}</span>
+                    {/each}
+                  </span>
+                </div>
+              {/each}
+            </div>
+            {#if bits.said}<div class="vbits-said" style:--depth={row.depth}>{bits.said}</div>{/if}
+          {/if}
+          {#if row.call.dumpAt}
+            {@const at = row.call.dumpAt}
+            {@const profiles = [...new Set(at.lines.map((l) => l.profile))]}
+            <!-- What the profile's dumps hold at the bytes the call reads or writes. -->
+            <div class="vdump" style:--depth={row.depth}>
+              <div class="vdump-head">{dumpRangeSaid(at)}{profiles.length === 1 && profiles[0] ? `, in a ${profiles[0]} dump` : ''}:</div>
+              {#each at.lines as line, i (i)}
+                <div class="vdump-line"><span class="vdump-who">{profiles.length > 1 && line.profile ? `${line.profile} · ` : ''}{line.who}</span>: <span class="vdump-what">{line.text}</span></div>
+              {/each}
+              {#if at.more}<div class="vdump-more">…and {at.more} other dump{at.more === 1 ? '' : 's'}</div>{/if}
+            </div>
           {/if}
         {:else if row.type === 'loose'}
           <div class="vcall" style:--depth={0}><div class="vsum">Values outside any call</div></div>
@@ -936,7 +1006,7 @@
   .vhead { padding: 2px 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
   .vwhere { font-size: 10px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--txt-faint); }
   .vpath { font-family: var(--mono); font-size: 13px; color: var(--txt); margin-top: 6px; word-break: break-all; }
-  /* A summary is the contract's first sentence; three lines of it, the rest on hover. */
+  /* What the panel file view's object is; three lines of it at most. */
   .vsum {
     font-size: 12px; color: var(--txt-dim); margin-top: 3px; line-height: 1.4;
     display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
@@ -1014,6 +1084,38 @@
   .vshape-in { fill: none; stroke: currentColor; stroke-width: 1.5; }
   .vshape-toward { stroke: #e7c489; stroke-width: 1.25; stroke-dasharray: 2 2; }
   .vshape-toward-end { fill: #e7c489; }
+  .varrange { display: block; margin: 2px 8px 2px calc(8px + var(--depth, 0) * 14px); }
+  .varr-other { fill: none; stroke: var(--line-2); stroke-width: 1; }
+  .varr-line { stroke: #e7c489; stroke-width: 1; stroke-dasharray: 3 2; }
+  .varr-before { fill: none; stroke: var(--txt-faint); stroke-width: 1; stroke-dasharray: 3 2; }
+  .varr-move { stroke: var(--txt-faint); stroke-width: 1; }
+  .varr-after { stroke-width: 1.25; }
+  .varr-after.moved { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: var(--accent); }
+  .varr-after.still { fill: color-mix(in srgb, var(--txt) 8%, transparent); stroke: var(--txt-dim); }
+  .varr-after.key { stroke: #e7c489; stroke-width: 2; }
+  .varr-label { fill: var(--txt); font-family: var(--mono); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .varr-said { margin: 0 8px 4px calc(8px + var(--depth, 0) * 14px); color: var(--txt-dim); font-size: 11px;
+    display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+  .varr-key { color: var(--txt-faint); display: inline-flex; align-items: center; gap: 4px; }
+  .varr-key i { display: inline-block; width: 12px; height: 8px; box-sizing: border-box; }
+  .varr-key i.now { border: 1px dashed var(--txt-faint); }
+  .varr-key i.then { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); margin-left: 4px; }
+  .vbits { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 8px 2px calc(8px + var(--depth, 0) * 14px); }
+  .vbyte { display: grid; grid-template-columns: auto; gap: 1px; }
+  .vbyte-label { color: var(--txt-faint); font-size: 10px; }
+  .vbyte-cells, .vbyte-ends { display: grid; grid-template-columns: repeat(8, 17px); gap: 2px; }
+  .vbit { height: 20px; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: 3px; color: var(--txt-dim);
+    font-family: var(--mono); font-size: 12px; line-height: 18px; text-align: center; }
+  .vbit.field { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--txt); }
+  .vbit.changed { font-weight: 700; }
+  .vbyte-ends span { color: var(--txt-faint); font-family: var(--mono); font-size: 9px; text-align: center; }
+  .vbits-said { margin: 0 8px 4px calc(8px + var(--depth, 0) * 14px); color: var(--txt-dim); font-size: 11px; }
+  .vdump { margin: 4px 8px 4px calc(8px + var(--depth, 0) * 14px); font-size: 11px; color: var(--txt-dim); }
+  .vdump-head { color: var(--txt-faint); margin-bottom: 2px; }
+  .vdump-line { padding: 1px 0 1px 10px; text-indent: -10px; overflow-wrap: anywhere; }
+  .vdump-who { color: var(--txt-dim); }
+  .vdump-what { color: var(--txt); }
+  .vdump-more { color: var(--txt-faint); }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {

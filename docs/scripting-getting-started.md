@@ -78,7 +78,12 @@ Three tools help you while you type:
   editor under its row, and an envelope's points have its shape there, each point
   to drag, written when you let go. A row naming one of your controls has
   **Select**, which selects that control on the panel for when you go back there,
-  and a stroke's dash is drawn as the line it makes.
+  and a stroke's dash is drawn as the line it makes. An arrangement
+  (`ce.panel.align`, `distribute`, `match`, `grid`, `circle`, `flip`) has a small
+  map: the controls it names dashed where they are and solid where it puts them.
+  `getBits` and `setBits` draw the byte a bit to a cell with the field marked, and
+  `ce.midi.read`, `write`, `slice` and `put` say what your synth's dumps hold at
+  that byte, counting from F0.
   The dock opens on the tab you used last. The same lists are in the code too: with
   the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
   (or divisions, scales, events, your controls' names, your synth's parameters,

@@ -45,6 +45,10 @@ import { DRAW_SHAPES, drawNumber, curveTension } from './drawShapes.js';
 import { readPresetSlot, programWords, bankWords } from './presetWords.js';
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { componentClampWarning } from './componentVerbs.js';
+import { ARRANGE_VERBS } from '../utils/arrangement.js';
+import { readArrangement } from './arrangePreview.js';
+import { readBitField } from './bitFields.js';
+import { readDumpOffset } from './dumpOffsets.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
@@ -185,14 +189,6 @@ function paramsOf(member) {
   return out;
 }
 
-/** A summary's first sentence, for a row's header. */
-function firstSentence(text) {
-  const s = String(text ?? '').trim();
-  const m = /^([\s\S]*?[.!?])(?=\s+[A-Z`"(]|\s*$)/.exec(s);
-  const sentence = (m ? m[1] : s).replace(/\s+/g, ' ');
-  return sentence.length > 180 ? `${sentence.slice(0, 177)}…` : sentence;
-}
-
 /* ------------------------------------------------------------------------------ the context */
 
 const controlsByPanel = new WeakMap();
@@ -266,7 +262,6 @@ function contextOf(context = {}) {
  * @typedef {object} Call
  * @property {string|null} memberId  The contract id, or null for a call that is not the API.
  * @property {string} path  How the contract names it ('ce.anim.to', 'set'), or the callee as written.
- * @property {string} summary  The contract's summary, first sentence.
  * @property {Range} range  The whole call.
  * @property {Range} nameRange  Its callee.
  * @property {Arg[]} args  One per argument written, mapped to the contract's params.
@@ -392,7 +387,6 @@ function buildCall(raw, env) {
   const call = {
     memberId: member?.id ?? null,
     path,
-    summary: member ? firstSentence(member.summary) : '',
     range: { start: stream[raw.calleeA].s, end: (raw.close >= 0 ? stream[raw.close] : stream[stream.length - 1]).e },
     nameRange: { start: stream[raw.calleeA].s, end: stream[raw.calleeB - 1].e },
     args,
@@ -427,6 +421,37 @@ function buildCall(raw, env) {
         : args.find((a) => a.param?.name === name);
       if (at && !at.problem) at.problem = { severity: 'warning', message };
     }
+  }
+  // An arrangement's controls where they are and where it puts them, by the verb's own plan
+  // (arrangePreview.js), and what the runtime says of a name that is not a control and of a `to`
+  // that is not one of the names.
+  if (member && ARRANGE_VERBS[member.id]) {
+    const arrange = readArrangement(member.id, args, env.ctx);
+    if (arrange) {
+      call.arrange = arrange;
+      const to = args.find((a) => a.param?.name === 'opts')?.options?.find((o) => o.name === 'to');
+      if (arrange.refused) {
+        if (to && !to.problem) to.problem = { severity: 'error', message: arrange.refused };
+        else if (!call.problem) call.problem = { severity: 'error', message: arrange.refused };
+      }
+      if (arrange.missing.length && !call.problem) {
+        call.problem = { severity: 'warning', message: arrange.missing.map((m) => m.message).join(' ') };
+      }
+    }
+  }
+  // A bit field drawn on its byte, with the bits read or written and the runtime's sentence for a call
+  // it answers nothing to (bitFields.js); and what the profiles' dumps hold at the bytes a byte-list
+  // call reads or writes (dumpOffsets.js).
+  if (member && (member.id === 'getBits' || member.id === 'setBits')) {
+    const bits = readBitField(member.id, args);
+    if (bits) {
+      call.bits = bits;
+      if (bits.refused && !call.problem) call.problem = { severity: 'error', message: bits.refused };
+    }
+  }
+  if (member) {
+    const dumpAt = readDumpOffset(member.id, args, env.ctx.devices);
+    if (dumpAt) call.dumpAt = dumpAt;
   }
   // A colour built from numbers written out has a row of its own, the colour it makes, which the
   // Colors tab edits by writing the numbers back (builtColours.js); where the call is an argument,
