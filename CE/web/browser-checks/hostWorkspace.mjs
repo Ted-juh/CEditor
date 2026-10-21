@@ -106,6 +106,10 @@ try {
   await page.mouse.down();
   await page.mouse.move(cbox.x + cbox.width / 2 + cbox.width * 0.3, cbox.y + cbox.height / 2, { steps: 6 });
   await page.mouse.up();
+  // Let go, the bar shows the value the host answers with (ParamBar's `value`), not its own: until
+  // the answer comes it reads the old one, which on a loaded machine is still there when read.
+  await page.waitForFunction((el) => Number(el.getAttribute('aria-valuenow')) > 0.7, await cutoff.elementHandle(), { timeout: 5000 })
+    .catch(() => {});
   const moved = Number(await cutoff.getAttribute('aria-valuenow'));
   assert.ok(moved > 0.7, `dragging the bar right raises the value (${moved})`);
   await cutoff.dblclick();
