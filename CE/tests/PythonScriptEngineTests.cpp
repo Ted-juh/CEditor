@@ -168,6 +168,19 @@ int main()
     runtime.dispatchEvent ("onAfter", "panel", juce::var());
     check (host.logs.contains ("after ok"), "Guard: next dispatch runs clean after a watchdog trip");
 
+    // A script's top-level statements are on the clock too, so a runaway one is stopped as it loads.
+    // The app's prelude before them is not (loadScript says why), so it cannot use up their time.
+    {
+        errors.clear();
+        juce::Array<juce::var> topLevel;
+        topLevel.add (makeScript ("pyTop", "onTop", "*", "while True:\n    pass\n"));
+        runtime.loadScripts (juce::var (topLevel));
+        const auto said = errors.joinIntoString ("\n");
+        check (said.contains ("pyTop") && said.contains ("load error") && said.contains ("script stopped"),
+               "Guard: a runaway top-level loop is stopped as the script loads, as a load error");
+        runtime.loadScripts (juce::var (guardScripts));
+    }
+
     // A note name the senders cannot read is refused, not sent as note 0 (C-1). The Lua and JS
     // preludes and the WebView runtime refuse it in the same words.
     {
