@@ -981,12 +981,17 @@ try {
 }
 `;
   await typeScript(BYTES);
+  // The byte as it is (its field outlined), setBits' new bits under the field, and the byte that
+  // comes out: getBits' setting moved down to bit 0, or setBits' new byte. Each row labelled with
+  // its hex; the sentence is the drawing's label for a screen reader.
   const bitsShown = () => page.evaluate(() => {
     const side = document.querySelector('[data-testid="values-sidebar"]');
-    const cells = [...side.querySelectorAll('.vbits .vbit')];
-    return { digits: cells.map((c) => c.textContent).join(''), field: cells.filter((c) => c.classList.contains('field')).map((c) => Number(c.dataset.bit)),
-      changed: cells.filter((c) => c.classList.contains('changed')).map((c) => Number(c.dataset.bit)),
-      wide: (side.querySelector('.vbits')?.getBoundingClientRect().width ?? 0) > 80, said: side.querySelector('.vbits-said')?.textContent.trim() ?? '' };
+    const row = (sel) => [...side.querySelectorAll(`.vbits ${sel} .vbit`)];
+    const value = row('.vvalue');
+    const labels = [...side.querySelectorAll('.vbits .vlab')].map((l) => l.textContent.trim()).filter(Boolean);
+    return { digits: value.map((c) => c.textContent).join(''), field: value.filter((c) => c.classList.contains('field')).map((c) => Number(c.dataset.bit)),
+      put: row('.vput').map((c) => c.textContent).join(''), result: row('.vresult').map((c) => c.textContent).join(''), labels,
+      wide: (side.querySelector('.vbits')?.getBoundingClientRect().width ?? 0) > 80, said: side.querySelector('.vbits')?.getAttribute('aria-label') ?? '' };
   });
   await clickAt(BYTES.indexOf('getBits') + 2);
   await waitHead('Line 2');
@@ -996,9 +1001,9 @@ try {
   await waitHead('Line 3');
   const bitsWritten = await bitsShown();
   if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-bits-set.png` });
-  led.check(S, 'a bit field is drawn on its byte', 'getBits(0xB4, 4, 3) draws 0xB4 a bit to a cell, highest first, bits 6 to 4 marked, and says what they read; setBits(0xB4, 4, 3, 5) draws the byte as written, the two bits that change in bold, and the value it makes',
-    { read: { digits: '10110100', field: [6, 5, 4], changed: [], wide: true, said: 'Bits 4 to 6 are 011, which is 3.' },
-      written: { digits: '11010100', field: [6, 5, 4], changed: [6, 5], wide: true, said: 'Bits 4 to 6 go from 011 to 101: 0xB4 becomes 0xD4.' } },
+  led.check(S, 'a bit field is drawn on its byte', 'getBits(0xB4, 4, 3) draws 0xB4 a bit to a cell, highest first, bits 6 to 4 outlined, and under it the setting read, moved down to bit 0, as 0x03; setBits(0xB4, 4, 3, 5) draws the byte as it is, 5 (101) under the field, and the byte it makes, 0xD4',
+    { read: { digits: '10110100', field: [6, 5, 4], put: '', result: '00000011', labels: ['0xB4', 'bit', '0x03'], wide: true, said: 'Bits 4 to 6 are 011, which is 3.' },
+      written: { digits: '10110100', field: [6, 5, 4], put: '101', result: '11010100', labels: ['0xB4', 'bit', '0x05', '0xD4'], wide: true, said: 'Bits 4 to 6 go from 011 to 101: 0xB4 becomes 0xD4.' } },
     { read: bitsRead, written: bitsWritten });
   await clickAt(BYTES.indexOf('23, 1') + 1);
   await waitHead('Line 4');

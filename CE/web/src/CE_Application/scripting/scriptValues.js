@@ -48,6 +48,8 @@ import { componentClampWarning } from './componentVerbs.js';
 import { ARRANGE_VERBS } from '../utils/arrangement.js';
 import { readArrangement } from './arrangePreview.js';
 import { readBitField } from './bitFields.js';
+import { explainCall, returnLines, callNotes } from './callExplainers.js';
+import { paramColours } from './paramColours.js';
 import { readDumpOffset } from './dumpOffsets.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
@@ -325,7 +327,7 @@ export function readStatement(source, languageId, caret, context = {}) {
     for (const seg of segments) { start = Math.min(start, seg.s); end = Math.max(end, seg.e); }
     info.match ??= matchBrackets(info.stream);
     info.calls ??= scanCalls(info.stream, 0, info.stream.length, doc.fam, info.match);
-    const env = { doc, info, ctx };
+    const env = { doc, info, ctx, language };
     const taken = [];
     for (const raw of info.calls) {
       const last = raw.close >= 0 ? raw.close : info.stream.length - 1;
@@ -452,6 +454,29 @@ function buildCall(raw, env) {
   if (member) {
     const dumpAt = readDumpOffset(member.id, args, env.ctx.devices);
     if (dumpAt) call.dumpAt = dumpAt;
+  }
+  // The command's own words for the sidebar's head: its parameters, coloured as the hint colours
+  // them (paramColours.js), its description, and under its rows what it does with these values
+  // (callExplainers.js), the lines of a function written here that give each answer it chooses
+  // from, and its "Good to know" lines, checked against this script where a check can see it.
+  if (member) {
+    const names = params.map((p) => p.name);
+    call.doc = {
+      id: member.id,
+      params: params.map((p) => ({ name: p.name, optional: !p.required, summary: p.summary ?? '' })),
+      colours: paramColours(member.id, names),
+      summary: member.summary ?? '',
+      returns: member.returns ?? null,
+    };
+    const explain = explainCall(member.id, args, { language: env.language });
+    if (explain) call.explain = explain;
+    if (member.returns) {
+      const fn = args.find((a) => a.param?.type === 'function' || a.param?.name === 'fn');
+      const lines = fn ? returnLines(fn, (offset) => lineAt(doc.starts, offset), env.language) : null;
+      call.returns = member.returns.map((r) => ({ ...r, lines: lines?.[r.key] ?? [] }));
+    }
+    const notes = callNotes(member, call, args, { language: env.language });
+    if (notes.length) call.notes = notes;
   }
   // A colour built from numbers written out has a row of its own, the colour it makes, which the
   // Colors tab edits by writing the numbers back (builtColours.js); where the call is an argument,

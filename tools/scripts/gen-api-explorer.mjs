@@ -278,6 +278,17 @@ function validateExamples(examples) {
   return problems;
 }
 
+/** A member's text: its description, then its example, what each parameter is and its "Good to
+ *  know" notes, which hold what the description no longer says (docs/design/api-descriptions-
+ *  handoff.md, "The fields"). */
+function docOf(member) {
+  if (!member) return '';
+  const params = (member.params ?? []).filter((p) => p.summary && !p.fields?.length).map((p) => `${p.name}: ${p.summary}`);
+  const returns = (member.returns ?? []).map((r) => `Returning ${r.when}: ${r.then}`);
+  const notes = (member.notes ?? []).map((n) => (typeof n === 'string' ? n : n?.text)).filter(Boolean);
+  return [member.summary, member.example ? `Example: ${member.example}` : '', ...params, ...returns, ...notes].filter(Boolean).join(' ');
+}
+
 /** One declared argument, with any object it carries written out.
  *
  *  `given` marks the objects a handler is HANDED rather than ones a caller builds — onError's
@@ -310,7 +321,7 @@ function contract() {
         flat: memberId,                        // …and its global alias
         path: memberPath(memberId),            // ce.<module>.<name>
         sig: member?.signature ?? memberId,
-        doc: member?.summary ?? '',
+        doc: docOf(member),
         value: isValueMember(member),          // `state` is a table, not a call
         rt: memberRuntime(member),
         // The declared arguments. A signature says `opts` and stops; animateTo's opts has TEN
@@ -362,7 +373,7 @@ function contract() {
       })),
     })),
     hooks: LIFECYCLE_HOOKS.map((h) => ({
-      id: h.id, sig: h.signature, doc: h.summary, rt: memberRuntime(h),
+      id: h.id, sig: h.signature, doc: docOf(h), rt: memberRuntime(h),
       // What the hook is handed. onPanelReady(info) told a reader `info` existed and left
       // `info.firstTime` — the whole reason to take the argument — to the summary prose.
       args: (h.params ?? []).map((p) => describeArg(p, true)),

@@ -1111,7 +1111,18 @@ ce.midi.sendCC(channel, cc, value)
 
 #### `ce.midi.sendNRPN(channel, msb, lsb, value)`
 
-Send an NRPN (Non-Registered Parameter Number) message: `msb` and `lsb` pick the parameter and `value` runs from 0 to 16383. Many synths use NRPNs for parameters that need more than 128 steps.
+Send an NRPN message.
+
+Example: `sendNRPN(1, 0, 5, 9000)` sets parameter 0 / 5 to 9000 on channel 1.
+
+- `channel`: The MIDI channel, from 1 to 16.
+- `msb`: The first half of the parameter number, from 0 to 127.
+- `lsb`: The second half of the parameter number, from 0 to 127.
+- `value`: The new value, from 0 to 16383. It is sent as two 7-bit halves.
+
+Good to know:
+
+- NRPN means Non-Registered Parameter Number. Many synths use NRPNs for settings that need more than 128 steps.
 
 *Short name: `sendNRPN`.*
 
@@ -1176,7 +1187,19 @@ ce.midi.sendNote(1, 60, 100)
 
 #### `ce.midi.interceptIn(fn)`
 
-See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.
+See every MIDI message from the synth before the panel uses it.
+
+- `fn`: Called with the bytes of each message. What it returns decides what happens to the message.
+
+| What `fn` returns | What happens |
+|---|---|
+| other bytes | The message is changed. |
+| false | The message is dropped. |
+| nothing | It goes through as it is. |
+
+Good to know:
+
+- Returned bytes are read as a send reads them. If they are not bytes, the message is dropped and the console says why.
 
 *Short name: `interceptMidiIn`.*
 
@@ -1197,7 +1220,20 @@ ce.midi.interceptIn((bytes) => {
 
 #### `ce.midi.interceptOut(fn)`
 
-See every MIDI message the panel sends — from a script or from a control's own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.
+See every MIDI message the panel sends before it goes out.
+
+- `fn`: Called with the bytes of each message. What it returns decides what happens to the message.
+
+| What `fn` returns | What happens |
+|---|---|
+| other bytes | The message is changed. |
+| false | The message is dropped. |
+| nothing | It goes out as it is. |
+
+Good to know:
+
+- It sees what a control sends by its own MIDI setting too, not only what scripts send.
+- Returned bytes are read as a send reads them. If they are not bytes, the message is dropped and the console says why.
 
 *Short name: `interceptMidiOut`.*
 
@@ -1322,7 +1358,16 @@ ce.midi.sendSysex(bytes)
 
 #### `ce.midi.checksum(type, bytes [, opts]) -> number`
 
-Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts, and so do bytes that are not bytes. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.
+Work out the checksum a synth expects at the end of a SysEx message.
+
+Example: `checksum("roland", {0x40, 0x00, 0x7F, 0x00})` gives 0x41.
+
+- `type`: How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.
+- `bytes`: The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.
+
+Good to know:
+
+- The 7-bit types fit in one SysEx byte. The CRC types do not: split their result into bytes with to7bit before sending.
 
 *Short name: `checksum`.*
 
@@ -1357,7 +1402,7 @@ ce.midi.panic()
 
 | Function | What it does |
 |---|---|
-| `ce.midi.to7bit(v, count, order)` | Split a number into `count` bytes of 7 bits each, the way SysEx carries large values: 2 bytes for values up to 16383, 3 for 21 bits, 4 for 28. `order` is "msb" (most significant byte first, the default) or "lsb". Short name: `to7bit`. |
+| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v`: The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count`: How many bytes of 7 bits to make. Two when it is left out. `order`: Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `to7bit`. |
 | `ce.midi.from7bit(bytes, order)` | Join 7-bit bytes back into one number — the reverse of to7bit. `order` is "msb" (the default) or "lsb". Short name: `from7bit`. |
 | `ce.midi.to14bit(v)` | Split a value from 0 to 16383 into its two 7-bit halves, returned as { msb, lsb }. Short name: `to14bit`. |
 | `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves, `msb` and `lsb`, back into one value from 0 to 16383. Short name: `from14bit`. |
@@ -1371,9 +1416,9 @@ ce.midi.panic()
 | `ce.midi.fromOffset(b, center)` | Decode an offset value by subtracting `center` — the reverse of toOffset. Short name: `fromOffset`. |
 | `ce.midi.toSigned(v, bits)` | Turn a negative number into the form a synth uses for a signed value of `bits` bits (two's complement). Positive numbers come back unchanged. Use fromSigned to read one back. Short name: `toSigned`. |
 | `ce.midi.fromSigned(b, bits)` | Read a signed value of `bits` bits (two's complement) back into an ordinary number, which may be negative. The reverse of toSigned. Short name: `fromSigned`. |
-| `ce.midi.getBits(value, start, count) -> number` | Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0, and so is a list item that is not a byte from 0 to 255. Short name: `getBits`. |
-| `ce.midi.setBits(value, start, count, bits) -> number\|list` | Write `bits` into the `count` bits starting at bit `start`, and return the result: a number for a number, a new list for a list (the one passed in is not changed). The reverse of getBits: `setBits(0xB4, 4, 3, 5)` is 0xD4. A value that does not fit in `count` bits is refused with a message rather than cut down to fit. Short name: `setBits`. |
-| `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read the number stored in `count` bytes (1 to 4) starting at `offset`, which counts from 0 in every language, as dump layouts do. By default the bytes are SysEx's 7-bit bytes, most significant first, the way to7bit writes them; `opts` can say otherwise. Bytes past the end of the list are refused with a message. Short name: `bytesRead`. |
+| `ce.midi.getBits(value, start, count) -> number` | Read a setting from a byte. Example: `getBits(0xB4, 4, 3)` gives 3. `value`: A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message. `start`: The first bit of the setting, counted from 0 at the right, the lowest bit. `count`: How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0. Short name: `getBits`. |
+| `ce.midi.setBits(value, start, count, bits) -> number\|list` | Change a setting in a byte. Example: `setBits(0xB4, 4, 3, 5)` gives 0xD4. `value`: A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed. `start`: The first bit of the setting, counted from 0 at the right, the lowest bit. `count`: How many bits the setting has, from 1 to 32. `bits`: The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit. Short name: `setBits`. |
+| `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read a number from a SysEx message. Example: `bytesRead(msg, 6, 2)` reads bytes 6 and 7. `bytes`: The message, as a list of bytes or as hex text. `offset`: Where the number starts, counted from 0. `count`: How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. By default the bytes are SysEx's 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise. Short name: `bytesRead`. |
 | `ce.midi.write(bytes, offset, count, value [, opts]) -> list` | Write `value` into `count` bytes (1 to 4) starting at `offset`, and return the new list; the one passed in is not changed. `opts` takes the same `bits` and `order` as bytesRead's; any other key is refused with a message, and nothing comes back. The write may run past the end and the list grows, which is how a message is built, but it cannot start past the end. A value that does not fit in the bytes is refused with a message. Short name: `bytesWrite`. |
 | `ce.midi.slice(bytes, offset [, count]) -> list` | Copy `count` bytes starting at `offset` (counted from 0) into a new list, or every byte from `offset` to the end when `count` is left out. For a patch name, `fromAscii(bytesSlice(dump, 10, 12))`. Bytes past the end are refused with a message. Short name: `bytesSlice`. |
 | `ce.midi.put(bytes, offset, values) -> list` | Write the bytes in `values` into a copy of `bytes`, starting at `offset` (counted from 0), and return it. The write may run past the end and the list grows, but it cannot start past the end. For a patch name, `bytesPut(dump, 10, toAscii("Lead", 12))`. Short name: `bytesPut`. |
@@ -2030,7 +2075,12 @@ for (const id of ce.time.timers()) log(id);
 
 #### `ce.time.now() -> number`
 
-Return a clock reading in milliseconds, for timing things. A single reading means nothing on its own: subtract an earlier reading to find how much time has passed. It is not the time of day or a date, and it does not jump when the computer's clock is changed.
+A clock in milliseconds, for measuring how long something takes.
+
+Good to know:
+
+- One reading alone means nothing: subtract an earlier reading to find how much time has passed.
+- It is not the time of day or a date, and it does not jump when the computer's clock is changed.
 
 *Short name: `nowMs`.*
 
@@ -2202,7 +2252,7 @@ Build a colour from hue (0 to 360), saturation and lightness (0 to 100) and retu
 
 | Function | What it does |
 |---|---|
-| `ce.math.scale(v, inLo, inHi, outLo, outHi)` | Map a value from one range to another: `v` at `inLo` gives `outLo`, at `inHi` gives `outHi`, and everything between follows a straight line. It does not clamp, so a value outside the input range lands outside the output range; use `ce.math.norm()` and `ce.math.denorm()` when the result must stay inside. If `inLo` equals `inHi`, it returns `outLo`. Short name: `scale`. |
+| `ce.math.scale(v, inLo, inHi, outLo, outHi)` | Move a value from one range to another. Example: `scale(64, 0, 127, 0, 100)` gives about 50. `v`: The value to move. `inLo`: The low end of the range the value is in. `inHi`: The high end of the range the value is in. If it equals the low end, the result is the new range's low end. `outLo`: The low end of the range to move it to. `outHi`: The high end of the range to move it to. The result is not kept inside the new range: a value outside the first range lands outside the second. Use `ce.math.norm()` and `ce.math.denorm()` when it must stay inside. Short name: `scale`. |
 | `ce.math.clamp(v, lo, hi)` | Keep a value inside a range: anything below `lo` becomes `lo`, anything above `hi` becomes `hi`, and anything in between comes back unchanged. Short name: `clamp`. |
 | `ce.math.round(v)` | Round to the nearest whole number. A half rounds up, so 2.5 gives 3 and -2.5 gives -2. To keep some decimal places, use `ce.math.roundTo()`. Short name: `round`. |
 | `ce.math.snap(v, step)` | Round a value to the nearest multiple of `step`: `ce.math.snap(37, 10)` gives 40. A `step` of 0 leaves the value unchanged. For steps that are not evenly spaced, use `ce.math.quantize()`. Short name: `snap`. |
@@ -2323,7 +2373,14 @@ ce.anim.spring("cutoff", 127);
 
 #### `ce.anim.stop([path])`
 
-Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback is called with false. To jump to the end instead, use `ce.anim.finish()`.
+Stop an animation where it is.
+
+- `path`: The value being animated. Leave it out to stop every animation on the panel.
+
+Good to know:
+
+- The animation's `done` function is called with false.
+- To jump to the end instead, use `ce.anim.finish()`.
 
 *Short name: `animateStop`.*
 
@@ -2675,7 +2732,15 @@ Change which controls are drawn on top of which: "front", "forward", "backward" 
 
 #### `ce.panel.batch(fn) -> boolean`
 
-Run `fn` so that everything it changes is undone in a single step, which is useful when a script builds or rearranges a whole page. The changes appear together when `fn` finishes, though code inside `fn` already sees its own earlier changes. The undo step is closed even if `fn` fails with an error. `fn` must not wait: anything after an `await` is not part of the batch. In the exported plugin there is no undo, and `fn` simply runs.
+Make a set of changes count as one step, so one undo takes them all back.
+
+- `fn`: The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.
+
+Good to know:
+
+- Code after an `await` in the function is not part of the batch.
+- The panel shows the changes together when the function ends. Code inside it already sees its own earlier changes.
+- The exported plugin has no undo: there the function just runs.
 
 *Short name: `panelBatch` · Panel window only.*
 

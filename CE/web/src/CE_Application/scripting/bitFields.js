@@ -27,14 +27,15 @@ const VERBS = { getBits: 'ce.midi.getBits', setBits: 'ce.midi.setBits' };
  * A getBits or setBits call's field, or null when it is neither or its start or count is not
  * written out:
  *
- *   { verb, start, count, groups: [{ label, cells: [{ bit, v, was, field }] }], read, result, said,
+ *   { verb, start, count, groups: [{ label, cells: [{ bit, v, was, field }] }], read, result, bits, said,
  *     refused }
  *
  * Each group is a byte, drawn highest bit first; a cell's `v` is its bit (0 or 1) — after setBits
  * writes, when it does — and `was` the bit before (setBits' field only), both null when the value is
  * not known. `read` is what getBits answers and `result` what setBits does, each null when it is not
- * known or the call is refused; `refused` is the runtime's sentence for a call it answers nothing
- * to, and `said` what the row says of the field.
+ * known or the call is refused; `bits` is setBits' new setting when it is written out and fits;
+ * `refused` is the runtime's sentence for a call it answers nothing to, and `said` what the row says
+ * of the field.
  */
 export function readBitField(memberId, args) {
   const verb = VERBS[memberId];
@@ -46,7 +47,7 @@ export function readBitField(memberId, args) {
   const start = startArg.value;
   const count = countArg.value;
   const refuse = (why) => `${verb}: ${why}, so there is no answer.`;
-  const out = { verb, start, count, groups: [], read: null, result: null, said: '', refused: null };
+  const out = { verb, start, count, groups: [], read: null, result: null, bits: null, said: '', refused: null };
   if (!isWhole(start) || start < 0 || !isWhole(count) || count < 1 || count > 32) {
     out.refused = refuse(BIT_RANGE);
     return out;
@@ -63,7 +64,7 @@ export function readBitField(memberId, args) {
         : !isWhole(v) ? `${shown(v)} is not a whole number`
           : v < 0 || v >= 2 ** count ? `${v} does not fit in ${plural(count, 'bit')}` : '';
       if (unfit) out.refused = refuse(unfit);
-      else bits = v;
+      else { bits = v; out.bits = v; }
     }
   }
 

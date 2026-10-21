@@ -38,8 +38,12 @@ the kind of sentence to aim for.
    the good ones already use: "Send…", "Read…", "Draw…".
 2. **Do not build that sentence out of parameter names.** "the `count` bits starting at bit `start`"
    means nothing to someone who has not read the signature yet.
-3. **Give one example with its result when it says more than words would.**
-   `setBits(0xB4, 4, 3, 5)` gives 0xD4 is clearer than any sentence about bit positions.
+3. **A fixed example goes in `example`, not in the description.** `setBits(0xB4, 4, 3, 5)` gives
+   0xD4 is clearer than any sentence about bit positions, but only where there is no script to
+   show: the Insert picker, the hover card, the manual and the API explorer. The Values sidebar
+   shows the script's own values instead, and the owner does not want an example there that has
+   nothing to do with the script. So the description has no example, and the member's `example`
+   field holds it (see [The fields](#the-fields)).
 4. **Move the detail to the parameters.** Ranges, counting from 0 or 1, defaults, what is refused
    and what comes back on a refusal belong in each parameter's or option's own description. Most of
    that is already written there. Check before you delete a fact from a description, and move it if
@@ -54,22 +58,125 @@ the kind of sentence to aim for.
    (`ScriptPicker.svelte`), so "SysEx", "CC", "NRPN", "LFO" and so on should stay where they are
    the point.
 
-### Before and after
+9. **Short and clear, not childish.** The reader is a musician who scripts a little: they know what
+   a CC is and what a byte is, and may not know two's complement. Encourage them with the purpose
+   and the script's own values, not with friendly words. Never "simply", "just", "easy", "don't
+   worry", "think of it as…", exclamation marks or metaphors.
+10. **Plain English for readers who learned it as a second language.** No idioms: not "a hair
+    apart", "carry on", "set aside", "take care". Use the plain word.
 
-| Command | Now | Plainer |
+### Approved descriptions
+
+The owner approved these on 2026-10-21, with the sidebar and hint format below. They are the model
+for the rest.
+
+| Command | Description | `example` |
 | --- | --- | --- |
-| `ce.midi.setBits` | Write `bits` into the `count` bits starting at bit `start`, and return the result: a number for a number, a new list for a list (the one passed in is not changed). | Replace some of the bits in a byte. `setBits(0xB4, 4, 3, 5)` puts 5 into bits 4–6 and gives 0xD4. |
-| `ce.midi.getBits` | Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. | Read a group of bits from a byte. `getBits(0xB4, 4, 3)` reads bits 4–6 and gives 3. |
-| `ce.midi.read` | Read the number stored in `count` bytes (1 to 4) starting at `offset`, which counts from 0 in every language, as dump layouts do. … | Read a number from a SysEx message. `ce.midi.read(msg, 23, 1)` reads byte 23. |
-| `ce.math.clamp` | Keep a value inside a range: anything below `lo` becomes `lo`, anything above `hi` becomes `hi`, and anything in between comes back unchanged. | Keep a value inside a range. `clamp(140, 0, 127)` gives 127. |
-| `ce.panel.batch` | Run `fn` so that everything it changes is undone in a single step, which is useful when a script builds or rearranges a whole page. The changes appear together when `fn` finishes, though code inside `fn` already sees its own earlier changes. … (five sentences) | Make a set of changes count as one step, so a single undo takes them all back. Useful when a script builds or rearranges a whole page. |
+| `ce.midi.setBits` | Change a setting in a byte. | `setBits(0xB4, 4, 3, 5)` gives 0xD4. |
+| `ce.midi.getBits` | Read a setting from a byte. | `getBits(0xB4, 4, 3)` gives 3. |
+| `ce.midi.to7bit` | Split a number into SysEx bytes. | `to7bit(1000, 2)` gives {7, 104}. |
+| `ce.midi.read` | Read a number from a SysEx message. | `bytesRead(msg, 6, 2)` reads bytes 6 and 7. |
+| `ce.midi.sendNRPN` | Send an NRPN message. | `sendNRPN(1, 0, 5, 9000)` |
+| `ce.midi.checksum` | Work out the checksum a synth expects at the end of a SysEx message. | |
+| `ce.math.scale` | Move a value from one range to another. | `scale(64, 0, 127, 0, 100)` gives about 50. |
+| `ce.panel.batch` | Make a set of changes count as one step, so one undo takes them all back. | |
+| `ce.midi.interceptIn` | See every MIDI message from the synth before the panel uses it. | |
+| `ce.anim.stop` | Stop an animation where it is. | |
+| `ce.time.now` | A clock in milliseconds, for measuring how long something takes. | |
 
-These are proposals, not final text: the first batch goes to the owner before the rest is done.
-Where a rewrite drops a fact, the fact moves to a parameter. `ce.panel.batch`'s "`fn` must not
-wait" and "the exported plugin has no undo" go to `fn`'s description, for example.
+Where a rewrite drops a fact, the fact moves to a parameter's `summary`, to `notes` or to
+`returns` (see [The fields](#the-fields)). `ce.panel.batch`'s "the exported plugin has no undo"
+becomes a note, for example.
 
 Already fine, leave alone: `ce.midi.checksum`, `ce.panel.grid` ("Arrange controls in a grid of equal
 cells, each as big as the largest control."), `ce.device.write`, `ce.midi.toNibbles`.
+
+## The fields
+
+A command's text is spread over these fields of its entry in `panelApi.js`. All but `summary` are
+optional.
+
+| Field | What it holds | Shown in |
+| --- | --- | --- |
+| `summary` | The one plain sentence (two or three at most). No example, no parameter names. | Everywhere |
+| `example` | One call with fixed values and what it gives: "`getBits(0xB4, 4, 3)` gives 3." | Insert picker, hover card, manual, API explorer. Never the sidebar. |
+| `params[].summary` | A parameter's facts: its range, counting from 0 or 1, its default, what is refused. A full sentence, capital first, full stop at the end, three words or more, not repeating the name. | Hover card, manual, sidebar row (as the row's tooltip) |
+| `returns` | A choice the command makes from what a function gives back: `[{ when, then }]`, e.g. `{ when: 'false', then: 'The message is dropped.' }`. | Manual, sidebar ("What fn returns") |
+| `notes` | "Good to know": at most three short sentences that change what you write. | Manual, hover card, sidebar |
+
+## The Values sidebar and the hint
+
+Approved by the owner on 2026-10-21 from mockups. The sidebar explains the statement the caret is
+in, using the script's own values. Nothing in it is a fixed example.
+
+**The hint.** The code editor's signature hint (`editor/signatureHint.js`) sits against the right
+edge of the script page, on the caret's line, as long as it does not cover code; otherwise it goes
+above or below the line, as before. Its parameter names are coloured. The same colours are used for
+the arguments in the code (an underline, drawn as a mark: `editor/codeMarks.js`), for the hint at
+the top of the sidebar and for the values in the sidebar's rows, so the colour says which value is
+which parameter.
+
+**Colours.** Three colour groups at most: blue, amber and green (`--blue`, `--amber`, `--accent`).
+Parameters that work together share a colour, such as `start` and `count` in `getBits`. The rest
+are grey. Colour is never the only clue: the names are always in the hint and in the rows. The
+groups are in `scripting/paramColours.js`; a command not listed there gets the three colours in the
+order of its parameters.
+
+**The sidebar, top to bottom:**
+
+1. `Line 12`, then the hint (the call's name as it is typed in a script, its parameters coloured,
+   the one at the caret underlined), then the description.
+2. The value rows, as before.
+3. Under the rows, what the call does with these values, when that can be drawn
+   (`scripting/callExplainers.js`):
+   - **Bits** (`getBits`, `setBits`): the byte in binary with the bit numbers under it, counted from
+     the right; the field marked, with an arrow from the start bit for the count; for `setBits` the
+     new bits under the field and the new byte; the hex value of each row at its left.
+   - **7-bit bytes** (`to7bit`): the number in binary, split into groups of 7, and the bytes they
+     become.
+   - **Bytes in a message** (`bytesRead`): the message as hex cells numbered from 0, the bytes read
+     marked with an arrow to the right, and how they make the number.
+   - **The messages a command sends** (`sendNRPN`, `sendRPN`): each message as bytes, with what it
+     is.
+   - **A checksum** (`checksum`): the bytes added up and the steps to the checksum byte.
+   - **Two ranges** (`scale`): two number lines with the value on one and the result on the other.
+4. Text, only when a drawing cannot say it:
+   - A fact about one parameter goes in that parameter's row.
+   - A choice becomes a small table: "What fn returns", with the lines of the script's own function
+     that give each answer.
+   - A difference with another command becomes a small picture (`animateStop` and `animateFinish`).
+   - "Good to know": at most three short lines. A line with ✓ is about this script and was checked
+     (`panelBatch`: nothing in the function waits). A failed check is an amber warning in the same
+     place. A line with a dot is a general fact.
+
+## Edge cases
+
+| Case | What the sidebar does |
+| --- | --- |
+| A value only exists when the script runs (`msg`, a knob's value) | The drawing has empty cells where the value goes; the field and the arrow still show. |
+| Start or count is a variable | No drawing, only the rows. |
+| A call the runtime refuses (`wave` does not fit in 3 bits, a read past the end) | No result row; the runtime's own sentence is shown, as before. |
+| A long bulk dump | A window of bytes around the offset, with "…" before and after. |
+| `setBits` on a list of bytes | The field can cross from one byte into the next; both bytes are drawn. |
+| Input written as text (`"F0 41 10"`), in decimal or as a note name | The row shows it as written; the drawing is always in hex. |
+| Lua counts lists from 1 | A Lua script gets a note on `bytesRead`: offset 6 is `msg[7]`. |
+| A call inside another call | The header explains the call the caret is in; the drawing is under that call's rows. |
+| More than three parameters | Three colour groups at most; the rest are grey. |
+| A ✓ check that cannot see the code (a function passed by name) | A dot, never an unchecked ✓. |
+| Places with no script (picker, manual, API explorer) | The description and `example`. That is the only place for a fixed example. |
+
+Not done yet, and worth doing next:
+
+- **A variable set earlier to a literal** (`local wave = 0x05`, then `setBits(byte, 4, 3, wave)`):
+  the sidebar only knows values written in the call itself. Following a local set once, above the
+  call, in the same function, would make most drawings show real values.
+- **The last value from a Test run**, labelled "last run", for values that only exist when the
+  script runs.
+- **More drawings**, by the same pattern: `from7bit`, `to14bit` and `from14bit`, `nibblize`,
+  `toSigned` and `toOffset` (a number line from −64 to +63 above 0 to 127), `bytesWrite`,
+  `bytesSlice`, `bytesPut` and `bytesFind` (as `bytesRead`), `wrap`, `fold`, `clamp`, `snap` and
+  `quantize` (a number line or a ring of steps), `sendProgramChange` (program 0 is "1" on the
+  synth), `sendPitchBend` (8192 is the centre) and `syncTimer` (ticks on a beat grid).
 
 ## Where the text lives
 
@@ -109,11 +216,16 @@ To find which file holds one: `git grep -n -F "the first few words"` from the re
 
 One source; every one of these reads it:
 
-- **The Insert picker** (`editor/ScriptPicker.svelte`): the whole description under each command, and
-  its search.
-- **The hover card and completion** (`scripting/languageService.js`): the whole description.
+- **The Insert picker** (`editor/ScriptPicker.svelte`): the description and the example under each
+  command; its search reads the notes too, so a word moved into a note is still found.
+- **The hover card and completion** (`scripting/languageService.js`): the description, the example
+  and the notes.
+- **The Values sidebar** (`editor/ValuesSidebar.svelte`, from `scripting/scriptValues.js`'s
+  `call.doc`, `call.explain`, `call.returns` and `call.notes`): the description, the returns table
+  and the notes, never the example.
 - **The scripting manual**, `docs/scripting-manual.md`, generated by `npm run docs:manual` (in
-  `CE/web`). `test/scriptingManual.test.js` fails when it is stale.
+  `CE/web`), with the example, the parameters, the returns table and the notes under the
+  description. `test/scriptingManual.test.js` fails when it is stale.
 - **The app's Help**, `src/CE_Application/generated/helpDocs.js`, which bundles the manual, generated
   by `npm run docs:help`. `test/helpDocs.test.js` fails when it is stale.
 - **The API explorer**, `docs/api-explorer.html`, generated from the repository root by
@@ -137,9 +249,15 @@ have three words or more and not repeat the option's name), `presetRecallApi.tes
 
 ## Order of work
 
-One module per commit, with the before and after in the commit message. The first module, `ce.midi`,
-goes to the owner as a before/after table before anything else is changed; their answer may change
-the rules above.
+One module per commit, with the before and after in the commit message.
+
+**Done on 2026-10-21, with the sidebar and the hint:** the first batch, the commands in [Approved
+descriptions](#approved-descriptions) (`getBits`, `setBits`, `to7bit`, `bytesRead`, `sendNRPN`,
+`checksum`, `scale`, `panelBatch`, `interceptMidiIn` and `interceptMidiOut`, `animateStop`,
+`nowMs`). The owner approved the format and these texts, so the rest of `ce.midi` no longer needs a
+before/after table first: go on module by module, and show the owner the table for each module
+before it is committed. `test/callExplainers.test.js` checks that the facts the old descriptions
+held are still said somewhere; add each rewritten command to its list.
 
 How many descriptions each module has, and how many need the most work (first sentence built on
 parameter names, with a bracketed aside, or over 25 words):
@@ -205,8 +323,8 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it. Rewrite the scripting API's command
-descriptions in plain language by its rules, starting with ce.midi only. Before changing any file,
-show me a before/after table for every ce.midi command, with anything you would move to a
-parameter's description marked, and wait for my answer.
+Read docs/design/api-descriptions-handoff.md and follow it. The first batch is done; rewrite the
+rest of the ce.midi descriptions by its rules and fields (summary, example, params[].summary,
+returns, notes). Before changing any file, show me a before/after table for the ce.midi commands
+still to do, with what moves to a parameter, a note or the example marked, and wait for my answer.
 ```

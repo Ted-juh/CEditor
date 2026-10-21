@@ -22,7 +22,7 @@ import {
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, divisionIdOf } from './timeTables.js';
 import { ANIM_CURVE_NAMES, EASING_BEZIERS, bezierOf } from './easingTables.js';
 import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
-import { checksumAlgorithm, computeChecksum } from '../utils/checksums.js';
+import { checksumAlgorithm, checksumNames, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
 import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
@@ -703,6 +703,11 @@ export const ENUM_REFUSALS = {
   // ce.music's two words are not refused: one there is none of is the default, said once.
   voiceLead: (value) => ({ severity: 'warning', message: voiceLeadMode(value).said }),
   arpOrder: (value) => ({ severity: 'warning', message: arpOrderPattern(value).said }),
+  // The list is the canonical names; the runtime takes their other spellings too ("roland" for
+  // "roland-7bit", the one its own snippet writes), and refuses the rest in its own words
+  // (panelRuntime.js, checksumOf).
+  checksum: (value) => (typeof value === 'string' && checksumAlgorithm(value) ? null
+    : `ce.midi.checksum(${typeof value === 'string' ? `"${value}"` : String(value)}): no such algorithm. One of: ${checksumNames().join(', ')}.`),
 };
 
 /**

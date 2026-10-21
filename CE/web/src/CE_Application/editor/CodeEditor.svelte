@@ -35,6 +35,7 @@
   import { floating } from '../utils/floatingUi.js';
   import { carryPopupTheme } from './popupTheme.js';
   import { placeSignatureHint, visualColumn } from './signatureHint.js';
+  import { paramColours } from '../scripting/paramColours.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import { markBoxes } from './codeMarks.js';
 
@@ -401,7 +402,10 @@
     if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
     return getSignatureHelp(value, language, caretPos);
   });
-  // At the end of the caret's line when it fits there, else a box above it or below (signatureHint.js).
+  // Each parameter's colour, the one it has under its argument and in the Values sidebar.
+  let sigColours = $derived(signature ? paramColours(signature.id, signature.params) : []);
+  // At the right edge of the caret's line when it clears the code, else a box above it or below
+  // (signatureHint.js).
   let sigPlace = $derived.by(() => {
     if (!signature || !taEl) return null;
     const r = taEl.getBoundingClientRect();
@@ -1091,7 +1095,7 @@
         <div class="ce-mark ce-mark-statement" data-mark="statement" data-line={b.line + 1}
           style="top:{PAD_TOP + b.line * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
       {:else}
-        <div class={['ce-mark', `ce-mark-${b.kind}`]} data-mark={b.kind} data-line={b.line + 1}
+        <div class={['ce-mark', `ce-mark-${b.kind}`, b.colour && `c-${b.colour}`]} data-mark={b.kind} data-line={b.line + 1}
           style="left:{PAD_L + b.col * charWidth - scrollLeft - 1}px; top:{PAD_TOP + b.line * lineHeight - scrollTop}px; width:{b.width * charWidth + 2}px; height:{lineHeight}px"></div>
       {/if}
     {/each}
@@ -1221,7 +1225,7 @@
       style:font-size="{fontSize}px"
       style:max-width={sigPlace.mode === 'inline' ? null : `${sigPlace.width}px`}>
       <span class="ce-sig-name">{signature.name}</span>(<!--
-        -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active']}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
+        -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active', sigColours[p.index] && `c-${sigColours[p.index]}`]}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
       -->)
     </div>
   {/if}
@@ -1389,6 +1393,11 @@
     box-sizing: border-box;
   }
   .ce-mark-statement { left: 0; right: 0; background: var(--ce-stmt); box-shadow: inset 2px 0 0 var(--ce-stmt-bar); }
+  /* An argument's parameter colour, as a line under it: the colour it has in the hint and the sidebar. */
+  .ce-mark-param { box-shadow: inset 0 -2px 0 var(--ce-param, var(--txt-faint)); border-radius: 0; }
+  .ce-mark-param.c-blue { --ce-param: var(--blue); }
+  .ce-mark-param.c-amber { --ce-param: var(--amber); }
+  .ce-mark-param.c-green { --ce-param: var(--accent); }
   .ce-mark-hover { background: var(--ce-hov); box-shadow: 0 0 0 1px var(--ce-hov-ring); border-radius: 3px; }
   .ce-mark-edit { background: var(--ce-edit); box-shadow: 0 0 0 1.5px var(--ce-edit-ring); border-radius: 3px; }
   .ce-mcaret {
@@ -1677,9 +1686,16 @@
     border: none;
     box-shadow: none;
   }
-  .ce-sig-name { color: var(--blue); }
+  /* The name in the text's own colour, so blue is free for a parameter; each parameter in the colour
+     it has under its argument and in the Values sidebar (scripting/paramColours.js), grey when it
+     has none; the one being typed underlined. */
+  .ce-sig-name { color: var(--txt); }
   .ce-sig-param { color: var(--txt-faint); }
-  .ce-sig-param.active { color: var(--accent); font-weight: 700; text-decoration: underline; }
+  .ce-sig-param.c-blue { color: var(--blue); }
+  .ce-sig-param.c-amber { color: var(--amber); }
+  .ce-sig-param.c-green { color: var(--accent); }
+  .ce-sig-param.active { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .ce-sig-param.active:not([class*='c-']) { color: var(--txt); }
 
   /* autocomplete popup */
   .ce-ac {

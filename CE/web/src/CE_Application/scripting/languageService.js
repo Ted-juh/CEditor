@@ -32,11 +32,15 @@ import { jsonFoldRegions, jsonSyntaxError } from '../utils/jsonText.js';
 // completion, no hover and no signature help at all. componentSchema answers that now.
 const ALL_API = [...COMMANDS, ...PANEL_COMMANDS, ...HELPERS];
 
+// The hover card's text: the description, then the example and the "Good to know" notes, which
+// hold what the description no longer says (docs/design/api-descriptions-handoff.md, "The fields").
+const hoverDoc = (m) => [m.summary, m.example, ...(m.notes ?? []).map((n) => (typeof n === 'string' ? n : n?.text))]
+  .filter(Boolean).join(' ');
 const API_FUNCTIONS = ALL_API.map((m) => ({
   label: m.id,
   kind: 'function',
   detail: m.signature || `${m.id}(…)`,
-  doc: m.summary || '',
+  doc: hoverDoc(m),
 }));
 const API_BY_NAME = Object.fromEntries(API_FUNCTIONS.map((f) => [f.label, f]));
 
@@ -408,7 +412,10 @@ export function getSignatureHelp(source, languageId, caret) {
     if (fn) info = { name: w.word, params: paramsFromSignature(fn.detail), signature: fn.detail };
   }
   if (!info || info.params.length === 0) return null;
-  return { name: info.name, params: info.params, activeParam: Math.min(commas, info.params.length - 1), signature: info.signature };
+  // `id`: the API command's, which picks the parameters' colours (paramColours.js); null for a
+  // function the script declares.
+  return { name: info.name, params: info.params, activeParam: Math.min(commas, info.params.length - 1), signature: info.signature,
+    id: API_PARAMS[w.word] === info ? info.name : null };
 }
 
 /** Source offset where the identifier at `index` is declared → { index, line, col } or null. */

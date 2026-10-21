@@ -60,10 +60,12 @@ test('marks are drawn in their order, placed only in the window drawn, and not a
     { start: starts[2], end: starts[8], kind: 'statement' },
     { start: starts[5] + 8, end: starts[5] + 11, kind: 'edit' },
     { start: starts[5] + 8, end: starts[5] + 11, kind: 'hover' },
+    { start: starts[5] + 8, end: starts[5] + 11, kind: 'param', colour: 'amber' },
   ];
   assert.deepEqual(boxes(all, text).map((b) => b.split('@')[0]).filter((k, i, a) => a.indexOf(k) === i), MARK_KINDS,
-    'statement, then hover, then edit on top');
-  assert.deepEqual(boxes(all, text, { first: 4, last: 6 }), ['statement@4', 'statement@5', 'hover@5:8+3', 'edit@5:8+3']);
+    'statement, then a parameter\'s line, then hover, then edit on top');
+  assert.deepEqual(boxes(all, text, { first: 4, last: 6 }), ['statement@4', 'statement@5', 'param@5:8+3', 'hover@5:8+3', 'edit@5:8+3']);
+  assert.equal(markBoxes(all, text, starts).find((b) => b.kind === 'param').colour, 'amber', 'a parameter\'s line keeps its colour');
   assert.deepEqual(boxes(all, text, { folded: true }), []);
   assert.deepEqual(boxes([{ start: 4, end: 4, kind: 'hover' }, { start: -5, end: 3, kind: 'edit' }, { start: 0, end: 3, kind: 'nope' }], text),
     ['edit@0:0+3'], 'an empty range is nothing, a range is clamped to the text, an unknown kind is not drawn');
