@@ -259,12 +259,32 @@ before/after table first: go on module by module, and show the owner the table f
 before it is committed. `test/callExplainers.test.js` checks that the facts the old descriptions
 held are still said somewhere; add each rewritten command to its list.
 
+**Done on 2026-10-21, the rest of `ce.midi`:** its other 36 commands, approved by the owner as a
+table. `ce.midi` is finished. Decided with it, and to follow in the modules after it:
+
+- **Rules a whole module shares are said once, in the manual.** What every send refuses, rounds and
+  sends as the nearest end is a paragraph in the `ce.midi` chapter's introduction (`MODULE_INTROS`
+  in `scripts/generate-scripting-manual.mjs`), not a sentence on each of fifteen parameters.
+- **A long name goes in a note.** "CC means Control Change", "SysEx means System Exclusive", as
+  NRPN's does. The picker searches notes, so the long name still finds the command.
+- **A helper with only a signature gets a parameter list**, type `value`, as `to7bit`'s, so its
+  parameters can be described. Thirteen in `ce.midi` had none.
+
+Found on the way and left for the owner, since it is behaviour: the older helpers give an answer
+without a message where the byte-list helpers refuse. `to7bit(20000, 2)`, `to14bit(20000)`,
+`from14bit(128, 0)` and `fromNibbles(16, 0)` answer outside their range, `nibblize({300})` gives
+`{2, 12}`, `denibblize` drops an odd last half, `toSigned(-200, 8)` gives 56, `from7bit("02 2C")`
+gives the text "41943296C", and `toAscii` does not cut text longer than its length. Their
+parameters say the ranges, not that a value outside them goes unnoticed.
+
+Next: `ce.math`, the same way: a table for the owner first.
+
 How many descriptions each module has, and how many need the most work (first sentence built on
 parameter names, with a bracketed aside, or over 25 words):
 
 | Module | Descriptions | Need most work |
 | --- | --- | --- |
-| ce.midi | 44 | 29 |
+| ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35 |
 | ce.anim | 12 | 12 |
 | ce.draw | 27 | 18 |
@@ -323,8 +343,8 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it. The first batch is done; rewrite the
-rest of the ce.midi descriptions by its rules and fields (summary, example, params[].summary,
-returns, notes). Before changing any file, show me a before/after table for the ce.midi commands
-still to do, with what moves to a parameter, a note or the example marked, and wait for my answer.
+Read docs/design/api-descriptions-handoff.md and follow it. The first batch and ce.midi are done;
+rewrite the ce.math descriptions by its rules and fields (summary, example, params[].summary,
+returns, notes). Before changing any file, show me a before/after table for the ce.math commands,
+with what moves to a parameter, a note or the example marked, and wait for my answer.
 ```

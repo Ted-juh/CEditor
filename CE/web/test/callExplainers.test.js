@@ -239,8 +239,55 @@ test('a description with its detail moved out keeps every fact somewhere a reade
   assert.match(words('sendNRPN'), /Non-Registered Parameter Number/);
   assert.match(words('sendNRPN'), /16383/);
   assert.match(words('to7bit'), /16383/);
+  assert.match(words('sendCC'), /Control Change/);
+  assert.match(words('sendRPN'), /101 and 100/);
+  assert.match(words('sendRPN'), /fine tuning and 2 coarse tuning/);
+  assert.match(words('sendSongPosition'), /Song Position Pointer/);
+  assert.match(words('sendSongPosition'), /six clock ticks/);
+  assert.match(words('sendMidi'), /longer run/);
+  assert.match(words('sendMidi'), /Nothing is added or changed/);
+  assert.match(words('sendNote'), /capital letter/);
+  assert.match(words('sendNote'), /0 means note off/);
+  assert.match(words('sendNote'), /until sendNoteOff/);
+  assert.match(words('feedMidi'), /interceptMidiIn sees the message first/);
+  assert.match(words('routeMidi'), /noTransmit/);
+  assert.match(words('sendNoteOff'), /0 when left out/);
+  assert.match(words('sendNoteOff'), /its own note off/);
+  assert.match(words('sendProgramChange'), /Bank Select/);
+  assert.match(words('sendProgramChange'), /count from 1/);
+  assert.match(words('sendPitchBend'), /8192 is the centre/);
+  assert.match(words('sendPitchBend'), /back to the centre/);
+  assert.match(words('sendAftertouch'), /polyphonic aftertouch/);
+  assert.match(words('sendAftertouch'), /channel pressure/);
+  assert.match(words('sendClock'), /24 ticks/);
+  assert.match(words('sendTransport'), /upper or lower case/);
+  assert.match(words('sendSysex'), /System Exclusive/);
+  assert.match(words('sendSysex'), /F04110/);
+  assert.match(words('panic'), /All Sound Off/);
+  assert.match(MEMBER_BY_ID.panic.params[0].fields.find((f) => f.name === 'channel').summary, /"all"/);
+  assert.match(words('from7bit'), /"lsb"/);
+  assert.match(words('to14bit'), /16383/);
+  assert.match(words('toAscii'), /spaces/);
+  assert.match(words('toSigned'), /two's complement/);
+  assert.match(words('toSigned'), /unchanged/);
+  assert.match(words('bytesWrite'), /not changed/);
+  assert.match(words('bytesWrite'), /list grows/);
+  assert.match(words('bytesWrite'), /does not fit/);
+  assert.match(words('bytesWrite'), /other than bits and order/);
+  assert.match(words('bytesSlice'), /to the end/);
+  assert.match(words('bytesPut'), /cannot start past the end/);
+  assert.match(words('bytesFind'), /without a message/);
+  assert.match(words('bytesToHex'), /console/);
+  assert.match(words('bytesFromHex'), /0x/);
+  assert.match(words('bytesToBase64'), /= padding/);
+  assert.match(words('bytesFromBase64'), /line breaks are ignored/);
   // And the descriptions themselves are the one plain sentence: no example, no parameter names.
-  for (const id of ['getBits', 'setBits', 'bytesRead', 'to7bit', 'sendNRPN', 'scale', 'panelBatch', 'interceptMidiIn', 'animateStop', 'nowMs']) {
+  const midiRest = ['sendCC', 'sendRPN', 'sendSongPosition', 'sendMidi', 'sendNote', 'feedMidi', 'routeMidi', 'sendNoteOff',
+    'sendProgramChange', 'sendPitchBend', 'sendAftertouch', 'sendClock', 'sendTransport', 'sendSysex', 'panic', 'from7bit',
+    'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize', 'denibblize', 'toAscii', 'fromAscii', 'toOffset',
+    'fromOffset', 'toSigned', 'fromSigned', 'bytesWrite', 'bytesSlice', 'bytesPut', 'bytesFind', 'bytesToHex', 'bytesFromHex',
+    'bytesToBase64', 'bytesFromBase64'];
+  for (const id of ['getBits', 'setBits', 'bytesRead', 'to7bit', 'sendNRPN', 'scale', 'panelBatch', 'interceptMidiIn', 'animateStop', 'nowMs', ...midiRest]) {
     const s = MEMBER_BY_ID[id].summary;
     assert.ok(!s.includes('`'), `${id}: no code in the description`);
     assert.ok(s.split(/(?<=\.)\s/).length <= 2, `${id}: two sentences at most`);

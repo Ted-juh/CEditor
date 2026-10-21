@@ -36,6 +36,7 @@
   import { carryPopupTheme } from './popupTheme.js';
   import { placeSignatureHint } from './signatureHint.js';
   import { visualColumn, indexAtColumn } from './textColumns.js';
+  import { codeParts } from './explainViews.js';
   import { paramColours } from '../scripting/paramColours.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import { markBoxes } from './codeMarks.js';
@@ -1223,7 +1224,8 @@
   {#if hover}
     <div class="ce-hover" use:portal use:floating={{ anchor: { x: hover.cx, y: hover.cy }, placement: 'bottom-start', offset: { mainAxis: 16, crossAxis: 6 }, fallbackPlacements: ['top-start'], track: false }}>
       <div class="ce-hover-title">{hover.title}</div>
-      {#if hover.doc}<div class="ce-hover-doc">{hover.doc}</div>{/if}
+      <!-- The description and its example mark code with backticks: drawn as code, not shown as backticks. -->
+      {#if hover.doc}<div class="ce-hover-doc">{#each codeParts(hover.doc) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</div>{/if}
     </div>
   {/if}
 
@@ -1673,6 +1675,7 @@
   }
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
+  .ce-hover-doc code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
 
   /* signature help: inline after the end of the caret's line, or a box over the line before or after
      it; a line tall either way, its size set where it is placed (signatureHint.js, whose HINT holds
