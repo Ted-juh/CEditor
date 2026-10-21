@@ -981,9 +981,12 @@ context.
   each refusal, `test/scriptValues.test.js` calls the runtime and compares what it writes to the
   console.
 - **The tab** (`editor/ValuesSidebar.svelte`, rows laid out by `editor/valueRows.js`). The dock's
-  fourth tab, loaded the first time it is shown. A header names the lines, the call as written and
-  its summary. Rows follow the call's order, an options table's keys sit under `opts`, and a call
-  inside another is indented under it. Each row shows the value in the editor's colours, what it
+  fourth tab, loaded the first time it is shown. A header names the lines and the call as written.
+  It showed the call's summary too, with its code marks stripped, until the owner found it read as
+  clutter ("Write bits into the count bits starting at bit start"). What a call does is for the
+  picker and the hover card to say, and the summaries are to be rewritten
+  ([api-descriptions-handoff.md](api-descriptions-handoff.md)). Rows follow the call's order, an options table's keys sit
+  under `opts`, and a call inside another is indented under it. Each row shows the value in the editor's colours, what it
   means, its problem, and its editor. While an edit is open the tab stays on that statement rather
   than following the caret.
 - **The highlights** (`editor/codeMarks.js`, CodeEditor's `marks`): the statement band with its bar

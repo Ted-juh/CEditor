@@ -160,8 +160,7 @@ test('ce.anim.to( resolves, where signature help stops at the word before the br
   const src = 'ce.anim.to("cutoff", 127, { duration = 500 })';
   const call = callOf(read(src, 'lua', 'ce.anim'));
   assert.deepEqual([call.memberId, call.path], ['animateTo', 'ce.anim.to']);
-  assert.match(call.summary, /^Move a value smoothly to `target`/);
-  assert.ok(!call.summary.includes('Pass a list'), 'one sentence');
+  assert.equal(call.summary, undefined, 'what the call does is the picker\'s and the hover card\'s to say, not the Values tab\'s');
   assert.deepEqual(call.nameRange, { start: 0, end: 'ce.anim.to'.length });
   assert.deepEqual(call.range, { start: 0, end: src.length });
 });

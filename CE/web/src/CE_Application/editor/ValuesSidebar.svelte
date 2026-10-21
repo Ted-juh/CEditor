@@ -45,7 +45,7 @@
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import {
     statementRows, argAtOffset, findArg, editLabel, meaningLine, madeByChild, unitLabel, swatchHex, cssOfHex,
-    gradientStrip, shownNumber, plainSummary, controlToSelect,
+    gradientStrip, shownNumber, controlToSelect,
   } from './valueRows.js';
   import { createEditSession, extentOf } from './valueEditSession.js';
   import { colorTarget, activateColorTarget, clearColorTarget } from '../stores/colorTarget.js';
@@ -829,7 +829,6 @@
         <div class="vsum">{statement.item?.kind === 'panel' ? 'The panel\'s own settings' : statement.item?.controlType ?? ''}</div>
       {:else if firstCall}
         <div class="vpath">{callName(firstCall)}</div>
-        {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
     {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.bits || c.dumpAt)}
@@ -841,7 +840,6 @@
           {#if row.depth > 0 || row.call !== firstCall}
             <div class="vcall" style:--depth={row.depth}>
               <div class="vpath">{callName(row.call)}</div>
-              {#if row.call.summary}<div class="vsum" title={plainSummary(row.call.summary)}>{plainSummary(row.call.summary)}</div>{/if}
             </div>
           {/if}
           {#if row.call.problem}
@@ -1008,7 +1006,7 @@
   .vhead { padding: 2px 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
   .vwhere { font-size: 10px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--txt-faint); }
   .vpath { font-family: var(--mono); font-size: 13px; color: var(--txt); margin-top: 6px; word-break: break-all; }
-  /* A summary is the contract's first sentence; three lines of it, the rest on hover. */
+  /* What the panel file view's object is; three lines of it at most. */
   .vsum {
     font-size: 12px; color: var(--txt-dim); margin-top: 3px; line-height: 1.4;
     display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;

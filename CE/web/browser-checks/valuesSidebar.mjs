@@ -264,10 +264,10 @@ try {
   await waitHead('Lines 4');
   const luaRows = await rows();
   const luaHead = await head();
-  led.check(S, 'a statement over five lines', 'with the caret in the options table, the whole ce.anim.to call is listed: its header names the lines, the call and its summary; its arguments in order; its options under opts',
-    { where: 'Statement · Lines 4–8', path: 'ce.anim.to', sum: true,
+  led.check(S, 'a statement over five lines', 'with the caret in the options table, the whole ce.anim.to call is listed: its header names the lines and the call, and no description; its arguments in order; its options under opts',
+    { where: 'Statement · Lines 4–8', path: 'ce.anim.to', sum: undefined,
       names: ['path', 'target', 'opts', 'duration', 'curve', 'easing'], depths: [0, 0, 0, 1, 1, 1] },
-    { where: luaHead.where, path: luaHead.path, sum: /^Move a value smoothly to target/.test(luaHead.sum),
+    { where: luaHead.where, path: luaHead.path, sum: luaHead.sum,
       names: luaRows.map((r) => r.name), depths: luaRows.map((r) => r.depth) });
   const byName = (list, name) => list.find((r) => r.name === name);
   // A Knob's document holds no value of its own until one is set (its value is the preview's), so
