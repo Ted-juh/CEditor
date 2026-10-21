@@ -59,6 +59,7 @@
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
   import LcdLinePreview from './LcdLinePreview.svelte';
   import { arrangementView, labelFits } from '../scripting/arrangePreview.js';
+  import { dumpRangeSaid } from '../scripting/dumpOffsets.js';
   import { learnFor, learnTakes, learnedEdit, learnWords, sendableHex } from './valueLearn.js';
   import { learnNext } from '../stores/midiLearnTap.js';
   import { rawMidiDraft } from '../stores/rawMidiDraft.js';
@@ -831,7 +832,7 @@
         {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
-    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.bits)}
+    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.bits || c.dumpAt)}
       <p class="vempty">Nothing in this {isJson ? 'object' : 'statement'} that the editor can read.</p>
     {/if}
     <div class="vlist" bind:this={listEl}>
@@ -926,6 +927,18 @@
               {/each}
             </div>
             {#if bits.said}<div class="vbits-said" style:--depth={row.depth}>{bits.said}</div>{/if}
+          {/if}
+          {#if row.call.dumpAt}
+            {@const at = row.call.dumpAt}
+            {@const profiles = [...new Set(at.lines.map((l) => l.profile))]}
+            <!-- What the profile's dumps hold at the bytes the call reads or writes. -->
+            <div class="vdump" style:--depth={row.depth}>
+              <div class="vdump-head">{dumpRangeSaid(at)}{profiles.length === 1 && profiles[0] ? `, in a ${profiles[0]} dump` : ''}:</div>
+              {#each at.lines as line, i (i)}
+                <div class="vdump-line"><span class="vdump-who">{profiles.length > 1 && line.profile ? `${line.profile} · ` : ''}{line.who}</span>: <span class="vdump-what">{line.text}</span></div>
+              {/each}
+              {#if at.more}<div class="vdump-more">…and {at.more} other dump{at.more === 1 ? '' : 's'}</div>{/if}
+            </div>
           {/if}
         {:else if row.type === 'loose'}
           <div class="vcall" style:--depth={0}><div class="vsum">Values outside any call</div></div>
@@ -1099,6 +1112,12 @@
   .vbit.changed { font-weight: 700; }
   .vbyte-ends span { color: var(--txt-faint); font-family: var(--mono); font-size: 9px; text-align: center; }
   .vbits-said { margin: 0 8px 4px calc(8px + var(--depth, 0) * 14px); color: var(--txt-dim); font-size: 11px; }
+  .vdump { margin: 4px 8px 4px calc(8px + var(--depth, 0) * 14px); font-size: 11px; color: var(--txt-dim); }
+  .vdump-head { color: var(--txt-faint); margin-bottom: 2px; }
+  .vdump-line { padding: 1px 0 1px 10px; text-indent: -10px; overflow-wrap: anywhere; }
+  .vdump-who { color: var(--txt-dim); }
+  .vdump-what { color: var(--txt); }
+  .vdump-more { color: var(--txt-faint); }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {

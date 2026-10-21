@@ -43,7 +43,8 @@
  *              ce.panel.create's type is a dropdown
  *   arrange    ce.panel.grid and align draw the named controls where they are and where they go,
  *              align its edge, and a `to` not in the list is said in the runtime's words
- *   bytes      getBits and setBits draw the byte with the field marked
+ *   bytes      getBits and setBits draw the byte with the field marked; ce.midi.read names what the
+ *              mapped profile's dumps hold at its byte
  *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
  *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
@@ -54,6 +55,7 @@
  * are typed. The caret is put in place with a click on the character, measured from the text.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { boot, Ledger } from './behaviourKit.mjs';
 
 const kit = await boot({ width: 1600, height: 1000 });
@@ -960,10 +962,22 @@ try {
       to: 'ce.panel.align: "Fader" is not one of the names given, so nothing was moved.', refusedSaid: 'Nothing moves.' },
     { line: aligned.line, titleAfterY: aligned.title.after?.[1], said: aligned.said, to: refusedTo.to, refusedSaid: refusedTo.said });
 
-  // ---- bit fields ---------------------------------------------------------------------------------
+  // ---- bit fields and dump offsets ---------------------------------------------------------------
+  // The GAIA's test profile chosen for the main synth, as the device stores hold a choice; put back
+  // as it was afterwards.
+  const gaiaText = readFileSync(new URL('../../profiles/test/roland-gaia-sh01.ceditor-device.json', import.meta.url), 'utf8');
+  await page.evaluate(async (text) => {
+    const st = await import('/src/CE_Application/stores/deviceProfileStores.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    window.__keptDevices = { mappings: get(st.deviceRoleMappings), profiles: get(st.deviceProfiles), sources: get(st.profileSources) };
+    st.deviceProfiles.update((list) => [...list, { id: 'values-gaia', name: 'Roland GAIA SH-01' }]);
+    st.profileSources.update((all) => ({ ...all, 'values-gaia': { source: text } }));
+    st.deviceRoleMappings.update((m) => ({ ...m, mainSynth: { ...m.mainSynth, profileId: 'values-gaia' } }));
+  }, gaiaText);
   const BYTES = `function onMidiIn(midi) {
   const wave = ce.midi.getBits(0xB4, 4, 3);
   const packed = ce.midi.setBits(0xB4, 4, 3, 5);
+  const level = ce.midi.read(midi.bytes, 23, 1);
 }
 `;
   await typeScript(BYTES);
@@ -986,6 +1000,28 @@ try {
     { read: { digits: '10110100', field: [6, 5, 4], changed: [], wide: true, said: 'Bits 4 to 6 are 011, which is 3.' },
       written: { digits: '11010100', field: [6, 5, 4], changed: [6, 5], wide: true, said: 'Bits 4 to 6 go from 011 to 101: 0xB4 becomes 0xD4.' } },
     { read: bitsRead, written: bitsWritten });
+  await clickAt(BYTES.indexOf('23, 1') + 1);
+  await waitHead('Line 4');
+  await until(() => document.querySelector('[data-testid="values-sidebar"] .vdump') !== null);
+  const dump = await page.evaluate(() => {
+    const box = document.querySelector('[data-testid="values-sidebar"] .vdump');
+    return { head: box.querySelector('.vdump-head').textContent.trim(),
+      lines: [...box.querySelectorAll('.vdump-line')].map((l) => [l.querySelector('.vdump-who').textContent.trim(), l.querySelector('.vdump-what').textContent.trim()]),
+      more: box.querySelector('.vdump-more')?.textContent.trim() ?? '' };
+  });
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-dump-offset.png` });
+  led.check(S, 'a read names what the dumps hold at its byte', 'with the GAIA\'s profile on the main synth, ce.midi.read(midi.bytes, 23, 1) says byte 23 counting from F0 is Patch Level in a Patch Common dump and FILTER Cutoff in the three tones, on one line, and how many other dumps it leaves out',
+    { head: 'Byte 23, counting from F0, in a Roland GAIA SH-01 dump:', common: ['Patch Common', 'Patch Level'],
+      tones: ['Patch Tone 1, Patch Tone 2 and Patch Tone 3', 'FILTER Cutoff'], lines: 4, more: true },
+    { head: dump.head, common: dump.lines.find((l) => l[0] === 'Patch Common') ?? null, tones: dump.lines.find((l) => l[1] === 'FILTER Cutoff') ?? null,
+      lines: dump.lines.length, more: /^…and \d+ other dumps$/.test(dump.more) });
+  await page.evaluate(async () => {
+    const st = await import('/src/CE_Application/stores/deviceProfileStores.js');
+    const kept = window.__keptDevices;
+    st.deviceRoleMappings.set(kept.mappings);
+    st.deviceProfiles.set(kept.profiles);
+    st.profileSources.set(kept.sources);
+  });
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();

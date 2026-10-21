@@ -48,6 +48,7 @@ import { componentClampWarning } from './componentVerbs.js';
 import { ARRANGE_VERBS } from '../utils/arrangement.js';
 import { readArrangement } from './arrangePreview.js';
 import { readBitField } from './bitFields.js';
+import { readDumpOffset } from './dumpOffsets.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
@@ -449,13 +450,18 @@ function buildCall(raw, env) {
     }
   }
   // A bit field drawn on its byte, with the bits read or written and the runtime's sentence for a call
-  // it answers nothing to (bitFields.js).
+  // it answers nothing to (bitFields.js); and what the profiles' dumps hold at the bytes a byte-list
+  // call reads or writes (dumpOffsets.js).
   if (member && (member.id === 'getBits' || member.id === 'setBits')) {
     const bits = readBitField(member.id, args);
     if (bits) {
       call.bits = bits;
       if (bits.refused && !call.problem) call.problem = { severity: 'error', message: bits.refused };
     }
+  }
+  if (member) {
+    const dumpAt = readDumpOffset(member.id, args, env.ctx.devices);
+    if (dumpAt) call.dumpAt = dumpAt;
   }
   // A colour built from numbers written out has a row of its own, the colour it makes, which the
   // Colors tab edits by writing the numbers back (builtColours.js); where the call is an argument,

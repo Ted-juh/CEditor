@@ -12,6 +12,7 @@ import { currentDocumentFonts } from '../utils/fontSources.js';
 import { fontCatalogue } from '../scripting/textStyle.js';
 import { assetCatalogue } from '../utils/imageLayers.js';
 import { familyOf, literalOf, matchBrackets, scanCalls, tokenize } from '../scripting/scriptValueScan.js';
+import { parameterValueWidth } from '../stores/deviceProfileLocalEngine.js';
 
 /**
  * The fonts and images a script can name, as readStatement takes them: every family by its stored
@@ -69,9 +70,9 @@ export function deviceValueContext({ mappings = {}, profiles = [], tables = {}, 
   return { roles, declared: asDeclared(declared), declaredDumps: asDeclared(declaredDumps) };
 }
 
-// A profile document's dumps ({ id, name }), requests ({ id, dump }, the dump each answers with) and
-// preset model (its `presets` block, or false), read once per text: the context is rebuilt at every
-// edit of the panel, and a document is large.
+// A profile document's dumps ({ id, name, layout }), requests ({ id, dump }, the dump each answers
+// with) and preset model (its `presets` block, or false), read once per text: the context is rebuilt
+// at every edit of the panel, and a document is large.
 const factsByText = new Map();
 function profileFactsOf(text) {
   if (typeof text !== 'string' || !text.trim()) return null;
@@ -79,14 +80,65 @@ function profileFactsOf(text) {
   let doc = null;
   try { doc = JSON.parse(text); } catch { doc = null; }
   const list = (x) => (Array.isArray(x) ? x : []).filter((e) => e && typeof e.id === 'string' && e.id);
+  const parameters = doc && typeof doc === 'object' ? new Map(list(doc.parameters).map((p) => [p.id, p])) : new Map();
   const facts = doc && typeof doc === 'object' ? {
-    dumps: list(doc.dumpDefinitions).map((d) => ({ id: d.id, name: String(d.name ?? '') })),
+    dumps: list(doc.dumpDefinitions).map((d) => ({ id: d.id, name: String(d.name ?? ''), layout: dumpLayout(d, parameters) })),
     requests: list(doc.requests).map((r) => ({ id: r.id, dump: String(r.response?.dump ?? r.expectedDump ?? '') })),
     presets: doc.presets && typeof doc.presets === 'object' ? doc.presets : false,
   } : null;
   factsByText.set(text, facts);
   if (factsByText.size > 8) factsByText.delete(factsByText.keys().next().value);
   return facts;
+}
+
+/**
+ * Where a dump's values lie in the message it arrives as, counted from F0, as a script reading it
+ * has the bytes (scripting/dumpOffsets.js): { payload, prefix, fields: [{ parameter, name, start,
+ * width }], packed: { from, to, type } | null, checksum: { at, count } | null, length | null }, or
+ * null for a dump with no payload offset. A field is at the payload's offset plus its mapping's, as the engine decodes it
+ * (deviceProfileLocalEngine's dump decoder), and as wide as its parameter's encoding
+ * (parameterValueWidth), or the codec its mapping gives instead (dumpFieldParameter).
+ */
+export function dumpLayout(dump, parameters) {
+  const payload = Number(dump?.payload?.offset);
+  if (!Number.isInteger(payload) || payload < 0) return null;
+  const fields = [];
+  // A packed payload's mappings count its bytes once unpacked, which are not the message's: no field
+  // has a place in the message, only the packed run as a whole.
+  const pack = dump?.payload?.pack;
+  for (const mapping of pack ? [] : Array.isArray(dump?.mappings) ? dump.mappings : []) {
+    const parameter = parameters.get(String(mapping?.parameter ?? ''));
+    const offset = Number(mapping?.offset ?? 0);
+    if (!parameter || !Number.isInteger(offset)) continue;
+    fields.push({ parameter: parameter.id, name: String(parameter.name || parameter.id), start: payload + offset,
+      width: Math.max(1, parameterValueWidth(dumpFieldParameter(parameter, mapping))) });
+  }
+  const length = Number(dump?.completion?.expectedBytes);
+  const sum = dump?.checksum;
+  const at = Number(sum?.byteOffset ?? (Number.isInteger(length) ? length - 2 : NaN));
+  const checksum = sum && Number.isInteger(at) ? { at, count: Math.max(1, Number(sum.byteCount ?? 1) || 1) } : null;
+  const whole = Number.isInteger(length) && length > 0 ? length : null;
+  let packed = null;
+  if (pack) {
+    // Eight bytes go out as seven and a byte of high bits; any other packing, up to what the message's
+    // end leaves.
+    const size = Number(dump?.payload?.size);
+    const last = String(pack?.type ?? '') === 'packed8to7' && Number.isInteger(size) && size > 0
+      ? payload + size + Math.ceil(size / 7) - 1
+      : whole ? whole - 2 - (checksum?.count ?? 0) : null;
+    if (last !== null && last >= payload) packed = { from: payload, to: last, type: String(pack?.type ?? '') };
+  }
+  return {
+    payload, prefix: Array.isArray(dump?.matcher?.prefix) ? dump.matcher.prefix.map(String) : [], fields,
+    packed, checksum, length: whole,
+  };
+}
+
+/** A dump field's parameter as the engine decodes it: a mapping's codec, when it gives one as an
+ *  encoding (an object), in place of the parameter's own; a codec given as a bare word is not read. */
+export function dumpFieldParameter(parameter, mapping) {
+  const codec = mapping?.codec ?? mapping?.nameCodec ?? null;
+  return codec && typeof codec === 'object' ? { ...parameter, encoding: codec } : parameter;
 }
 
 /** The names a profile's preset library keeps, slot → name, the first of its banks to name a slot. */
