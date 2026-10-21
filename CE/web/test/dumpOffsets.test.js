@@ -110,6 +110,8 @@ test('bytes written out are matched to the dump they are', () => {
 test('write and put name the bytes they write; nothing is said without a profile or a written offset', () => {
   assert.equal(dumpAt('ce.midi.write(msg, 23, 1, 100)').lines[1].text, 'Patch Level');
   assert.equal(dumpAt('ce.midi.put(msg, 23, { 100, 64 })').lines[1].text, 'Patch Level; part of Patch Tempo, which is bytes 24–26');
+  assert.equal(dumpAt('ce.midi.put(msg, 23, values)'), undefined, 'bytes not known until it runs: how many is not known');
+  assert.equal(dumpAt('ce.midi.put(msg, 23, {})'), undefined, 'no bytes, nothing written');
   assert.equal(dumpAt('ce.midi.read(msg, at, 1)'), undefined);
   assert.equal(dumpAt('ce.midi.read(msg, 23, 5)'), undefined, 'a count the runtime refuses');
   assert.equal(readStatement('ce.midi.read(msg, 23, 1)', 'lua', 3, {}).calls[0].dumpAt, undefined);

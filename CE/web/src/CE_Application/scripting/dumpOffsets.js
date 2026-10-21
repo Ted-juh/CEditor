@@ -54,9 +54,11 @@ export function readDumpOffset(memberId, args, devices) {
     else if (!c.literal || !isWhole(c.value) || c.value < 1) return null;
     else to = from + c.value - 1;
   } else {
+    // put writes as many bytes as it is given: not known, or none, and there is no range to name.
     const v = arg('values');
     const read = v?.literal ? readBytes(v.value, { verb }).meaning.bytes : null;
-    to = Array.isArray(read) && read.length ? from + read.length - 1 : from;
+    if (!Array.isArray(read) || !read.length) return null;
+    to = from + read.length - 1;
   }
   // Bytes written out are matched against each dump's start, its variables matching any byte.
   const bytesArg = arg('bytes');
