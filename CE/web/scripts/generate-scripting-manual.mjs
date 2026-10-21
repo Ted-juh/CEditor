@@ -183,14 +183,47 @@ function headingSignature(member) {
   return sig.startsWith(member.id) ? path + sig.slice(member.id.length) : sig;
 }
 
+// A command's text beyond its description (docs/design/api-descriptions-handoff.md, "The fields"):
+// its example, what each parameter is, the choice a function's answer makes, and "Good to know".
+const noteText = (note) => (typeof note === 'string' ? note : note?.text ?? '');
+const described = (member) => (member.params ?? []).filter((p) => p.summary && !p.fields?.length);
+const fnName = (member) => (member.params ?? []).find((p) => p.type === 'function')?.name ?? 'fn';
+
+/** Under a heading: the example, the parameters as a list, the answers as a table, the notes as a list. */
+function memberDetails(member) {
+  let out = '';
+  if (member.example) out += `\nExample: ${member.example}\n`;
+  const params = described(member);
+  if (params.length) out += `\n${params.map((p) => `- \`${p.name}\`: ${p.summary}`).join('\n')}\n`;
+  if (member.returns?.length) {
+    out += `\n| What \`${fnName(member)}\` returns | What happens |\n|---|---|\n`
+      + `${member.returns.map((r) => `| ${cell(r.when)} | ${cell(r.then)} |`).join('\n')}\n`;
+  }
+  const notes = (member.notes ?? []).map(noteText).filter(Boolean);
+  if (notes.length) out += `\nGood to know:\n\n${notes.map((n) => `- ${n}`).join('\n')}\n`;
+  return out;
+}
+
+/** The same, run together for one cell of a table. */
+function memberDetailsInline(member) {
+  const parts = [];
+  if (member.example) parts.push(`Example: ${member.example}`);
+  for (const p of described(member)) parts.push(`\`${p.name}\`: ${p.summary}`);
+  if (member.returns?.length) {
+    parts.push(`What \`${fnName(member)}\` returns: ${member.returns.map((r) => `${r.when}, ${r.then.charAt(0).toLowerCase()}${r.then.slice(1).replace(/\.$/, '')}`).join('; ')}.`);
+  }
+  for (const n of (member.notes ?? []).map(noteText).filter(Boolean)) parts.push(n);
+  return parts.length ? ` ${parts.join(' ')}` : '';
+}
+
 function memberEntry(member, level, opts) {
-  return `${'#'.repeat(level)} \`${headingSignature(member)}\`\n\n${member.summary}\n${notesLine(member, opts)}${fieldTables(member)}${codeBlocks(member)}`;
+  return `${'#'.repeat(level)} \`${headingSignature(member)}\`\n\n${member.summary}\n${memberDetails(member)}${notesLine(member, opts)}${fieldTables(member)}${codeBlocks(member)}`;
 }
 
 function helperTable(helpers) {
   const rows = helpers.map((h) => {
     const short = memberPath(h.id) !== h.id ? ` Short name: \`${h.id}\`.` : '';
-    return `| \`${cell(headingSignature(h))}\` | ${cell(h.summary)}${short} |`;
+    return `| \`${cell(headingSignature(h))}\` | ${cell(h.summary)}${cell(memberDetailsInline(h))}${short} |`;
   });
   return ['| Function | What it does |', '|---|---|', ...rows].join('\n');
 }

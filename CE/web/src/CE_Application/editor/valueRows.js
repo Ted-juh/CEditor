@@ -11,9 +11,11 @@ import { beatsText } from '../scripting/scriptValueKinds.js';
 /**
  * The rows for a statement (readStatement) or a panel file object (readJsonValues), in order.
  *
- * @returns {{ key: string, type: 'call'|'arg'|'loose', depth: number, call?: object, arg?: object }[]}
+ * @returns {{ key: string, type: 'call'|'arg'|'explain'|'loose', depth: number, call?: object, arg?: object }[]}
  *   A 'call' row heads a call's arguments; an 'arg' row is one argument, option key or stop, `depth`
- *   deeper for each table or call it sits in; a 'loose' row heads the values outside any call.
+ *   deeper for each table or call it sits in; an 'explain' row follows a call's arguments when there
+ *   is something to show of what the call does with them (its bits, a drawing, the answers its
+ *   function chooses from, "Good to know"); a 'loose' row heads the values outside any call.
  */
 export function statementRows(statement) {
   const rows = [];
@@ -27,6 +29,7 @@ export function statementRows(statement) {
     // The colour a call builds from numbers written out, first under it (scriptValues' builtColourArg).
     if (call.built) pushArg(call.built, depth, call);
     for (const arg of call.args ?? []) pushArg(arg, depth, call);
+    if (explains(call)) rows.push({ key: `x:${call.range.start}:${call.nameRange.end}:${call.path}`, type: 'explain', depth, call });
     for (const child of call.children ?? []) pushCall(child, depth + 1);
   };
   for (const call of statement.calls ?? []) pushCall(call, 0);
@@ -36,6 +39,33 @@ export function statementRows(statement) {
     for (const arg of loose) pushArg(arg, 0, null);
   }
   return rows;
+}
+
+/** Whether a call has anything to show under its rows (scriptValues.js: bits, explain, returns, notes). */
+export function explains(call) {
+  return Boolean(call?.bits?.groups?.length || call?.explain || call?.returns?.length || call?.notes?.length);
+}
+
+/** The colour of an argument's parameter in its call ('blue', 'amber', 'green'), or null: the colour
+ *  it has in the hint and under it in the code (scripting/paramColours.js). An option key has none. */
+export function argColour(call, arg) {
+  const name = arg?.param?.name;
+  if (!name || !call?.doc || !call.args?.includes(arg)) return null;
+  const i = call.doc.params.findIndex((p) => p.name === name);
+  return i < 0 ? null : call.doc.colours[i] ?? null;
+}
+
+/** The innermost call whose characters hold `offset`, or the statement's first call. */
+export function callAt(statement, offset) {
+  let best = null;
+  const visit = (calls) => {
+    for (const call of calls ?? []) {
+      if (offset >= call.range.start && offset <= call.range.end) best = call;
+      visit(call.children);
+    }
+  };
+  visit(statement?.calls);
+  return best ?? statement?.calls?.[0] ?? null;
 }
 
 /** Every Arg of a statement, options and stops included, depth first. */

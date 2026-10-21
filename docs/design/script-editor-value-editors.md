@@ -1410,13 +1410,26 @@ Then the last two from the same list, which the owner had held back for a step o
   mappings count unpacked bytes, so no byte of it is one value. `dumpOffsets.test.js` holds each
   layout to the engine's own dumps. One value is changed and the dump rebuilt, and every byte that
   changes lies in that field's place: over 800 fields in the four test profiles. A dump a script
-  declares with `defineDump` is not read yet, only the profiles'.
+  declares with `defineDump` is read the same way, and said first, since a script reading bytes
+  beside its own `defineDump` is most likely reading that dump. It is laid out by the runtime's own
+  `defineParameter` and `defineDump`, run on a role of their own (`declaredProfile` in
+  `deviceDefinitions.js`), so what the runtime refuses, such as a field naming a parameter nobody
+  defined, is not laid out either. What decides a place or a width has to be written out: an offset
+  built as the script runs would read as 0 and put the field at the wrong byte. How a parameter
+  reaches the synth is no part of a dump, so a SysEx template built from parts does not stop it.
 
-Found on the way and not changed here: the local profile engine (`deviceProfileLocalEngine.js`)
-encodes an `s7` parameter as a plain 0–127 number, without its signed offset, while its decoder
-takes the offset off. A pan of 0 goes out as byte 0 and reads back as −64; 10 reads back as −54;
-anything below 0 goes out as 0. It matters only where the web engine builds a dump or a message,
-in the editor with no C++ host.
+Found on the way, and fixed after in a change of its own: a signed (`s7`) parameter was not
+written right by either engine. The web engine (`deviceProfileLocalEngine.js`) encoded it as a plain
+0–127 number, without its bias, while its decoder took the bias off: a pan of 0 went out as byte 0
+and read back as −64, and anything below 0 went out as 0. Its dump decoder had no `s7` branch, so a
+dump's pan of −10 read as 54. The C++ engine decoded `s7` but had no encoder for it, so every write
+of one, as a message or in a dump, was refused as "Unsupported numeric encoder: s7". Both engines
+now write the value plus its bias and read the byte less it, as the DPD's `codecs.mjs` does
+(`test/s7Encoding.test.js`, and `DeviceProfileEngineTests.cpp`'s dump shape test). A 14-bit value
+kept least significant byte first (`u14-lsb-msb`) had the same gap: neither engine wrote it, and the
+web dump decoder read only its first byte. Both write it now, an NRPN still sending the MSB on CC 6,
+and both engines' dump builders use the codec a dump's mapping gives, as their parsers do, rather
+than the parameter's own encoding (`test/lsbFirstEncoding.test.js`).
 
 ## Open questions for the owner
 

@@ -737,10 +737,33 @@ export function decodeDump(role, hex) {
 export function buildDump(role, kind, values = {}) {
   const s = slot(role);
   if (s.dumps.size === 0) return null;
-  // Built, the checksum goes straight after the payload, which is just before the suffix.
-  const profile = profileWithChecksums(role, (e) => placedChecksum(e,
-    Math.max(e.dump.matcher.prefix.length, e.dump.payload.offset) + e.dump.payload.size));
-  return localBuildDumpMessage(profile, kind, values);
+  return localBuildDumpMessage(profileWithChecksums(role, builtChecksum), kind, values);
+}
+
+/** Built, the checksum goes straight after the payload, which is just before the suffix. */
+const builtChecksum = (e) => placedChecksum(e, Math.max(e.dump.matcher.prefix.length, e.dump.payload.offset) + e.dump.payload.size);
+
+// A role of its own, so what declaredProfile reads never touches what a running script defined.
+const DECLARED_ROLE = '\u0000declared-profile';
+
+/**
+ * The profile a list of definitions makes, without defining anything: [{ verb: 'parameter' | 'dump',
+ * id, spec }], each checked by defineParameter or defineDump as a running script's is, in that
+ * order, and one they refuse left out. The script editor lays out the dumps a script declares by it
+ * (editor/valuesContext.js) before the script runs. A checksum is where a built dump has it, after
+ * the payload; a dump with no size and no checksum.byteOffset has it wherever the message ends, so
+ * none is placed.
+ */
+export function declaredProfile(definitions) {
+  byRole.delete(DECLARED_ROLE);
+  for (const d of Array.isArray(definitions) ? definitions : []) {
+    if (d?.verb === 'parameter') defineParameter(DECLARED_ROLE, d.id, d.spec);
+    else if (d?.verb === 'dump') defineDump(DECLARED_ROLE, d.id, d.spec);
+  }
+  const placed = (e) => (e.checksum.byteOffset != null || e.dump.payload.size > 0 ? builtChecksum(e) : undefined);
+  const profile = profileWithChecksums(DECLARED_ROLE, placed);
+  byRole.delete(DECLARED_ROLE);
+  return profile;
 }
 
 /** Drop every definition. Called when the panel is rebuilt, for the reason onPanelBuild exists. */

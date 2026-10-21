@@ -4290,7 +4290,7 @@ public:
     {
         if (! interpreterTried) { interpreterTried = true; createInterpreter(); }
         if (! interpreterOk) { onError (def.id, initInfo.isNotEmpty() ? initInfo : juce::String ("Python interpreter failed to initialize")); return false; }
-        const Entry entry (*this); // module-level statements obey the execution budget too
+        const Entry entry (*this, false); // the clock starts below, after the prelude
 
         // Fresh namespace dict per script (isolation). Seed builtins + owner, then prelude + source.
         PyObject* ns = PyDict_New();
@@ -4312,10 +4312,21 @@ public:
         // Prelude, then the module gate, then the user source — the gate has to be in place before
         // any top-level statement runs. Each script gets its own namespace dict, so the gate is
         // applied per script here rather than once for the language (as Lua can).
-        const bool preludeOk = exec (kPrelude, ns)
-                             && exec (extensionBoot().toRawUTF8(), ns)
-                             && exec (moduleGateCall().toRawUTF8(), ns);
-        const bool sourceOk  = preludeOk && exec (def.source.toRawUTF8(), ns);
+        //
+        // The prelude is the app's own code and the same for every script, so it is not on the
+        // script's clock. Compiling it is most of a load, and on a slow machine it took longer than
+        // the two seconds a script gets: the watchdog stopped it before the script had run a line
+        // ("prelude error: script stopped: it ran for more than 2 s"), as a Windows CI runner did.
+        // What a panel brings, its extension modules and its script, still runs on the clock.
+        bool preludeOk = exec (kPrelude, ns);
+        bool sourceOk = false;
+        {
+            const Entry timedEntry (*this); // module-level statements obey the execution budget
+            preludeOk = preludeOk
+                     && exec (extensionBoot().toRawUTF8(), ns)
+                     && exec (moduleGateCall().toRawUTF8(), ns);
+            sourceOk = preludeOk && exec (def.source.toRawUTF8(), ns);
+        }
         currentScriptId = {};
         if (! preludeOk) { onError (def.id, "prelude error: " + pyError()); Py_DECREF (ns); return false; }
         if (! sourceOk)  { onError (def.id, "load error: " + pyError()); Py_DECREF (ns); return false; }

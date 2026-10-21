@@ -34,7 +34,9 @@
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
   import { carryPopupTheme } from './popupTheme.js';
-  import { placeSignatureHint, visualColumn } from './signatureHint.js';
+  import { placeSignatureHint } from './signatureHint.js';
+  import { visualColumn, indexAtColumn } from './textColumns.js';
+  import { paramColours } from '../scripting/paramColours.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import { markBoxes } from './codeMarks.js';
 
@@ -153,10 +155,14 @@
   // Each diagnostic, resolved to the on-screen token it underlines.
   // Squiggle overlay positions are in full-source space; suppress while folded
   // (the gutter error tint still shows via errorLines, keyed by full line number).
+  // Columns as drawn (textColumns.js): the diagnostic's own column and its word's length count
+  // characters, and a tab before it put the underline under the wrong text.
   let diagSpans = $derived(isFolded ? [] : diagnostics.map((d) => {
     const w = wordAt(analyzedSource, d.index) || wordAt(analyzedSource, d.index - 1);
     const len = w ? w.word.length : 1;
-    return { line: d.line, col: d.col, len, message: d.message };
+    const text = analyzedSource.split('\n')[d.line - 1] ?? '';
+    const col = visualColumn(text, d.col);
+    return { line: d.line, col, len: visualColumn(text, d.col + len) - col, message: d.message };
   }));
   $effect(() => { ondiagnostics?.(diagnostics); });
 
@@ -351,10 +357,18 @@
     return () => observer.disconnect();
   });
 
-  // line/column (0-based) of a character offset.
+  // The text of line `line` (from 0).
+  function lineTextOf(line) {
+    const start = valueStarts[line] ?? 0;
+    return value.slice(start, line + 1 < valueStarts.length ? valueStarts[line + 1] - 1 : value.length);
+  }
+  // line/column (0-based) of a character offset, the column as the editor draws it, a tab to its next
+  // stop (textColumns.js). Counted in characters, every box placed by it (the completion list, the
+  // rename box, the occurrence marks) sat left of its text on a line with tabs.
   function posOf(index) {
-    const line = lineAt(valueStarts, Math.min(index, value.length));
-    return { line, col: index - valueStarts[line] };
+    const at = Math.min(index, value.length);
+    const line = lineAt(valueStarts, at);
+    return { line, col: visualColumn(lineTextOf(line), at - valueStarts[line]) };
   }
   // Content-space pixel (pre-scroll) for a line/col.
   function xyOf(line, col) {
@@ -369,9 +383,7 @@
     const line = Math.max(0, Math.floor(ly / lineHeight));
     const col = Math.max(0, Math.round(lx / charWidth));
     if (line >= valueStarts.length) return value.length;
-    const base = valueStarts[line];
-    const end = line + 1 < valueStarts.length ? valueStarts[line + 1] - 1 : value.length;
-    return base + Math.min(col, end - base);
+    return valueStarts[line] + indexAtColumn(lineTextOf(line), col);
   }
 
   // ----- autocomplete -----
@@ -401,7 +413,10 @@
     if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
     return getSignatureHelp(value, language, caretPos);
   });
-  // At the end of the caret's line when it fits there, else a box above it or below (signatureHint.js).
+  // Each parameter's colour, the one it has under its argument and in the Values sidebar.
+  let sigColours = $derived(signature ? paramColours(signature.id, signature.params) : []);
+  // At the right edge of the caret's line when it clears the code, else a box above it or below
+  // (signatureHint.js).
   let sigPlace = $derived.by(() => {
     if (!signature || !taEl) return null;
     const r = taEl.getBoundingClientRect();
@@ -1091,7 +1106,7 @@
         <div class="ce-mark ce-mark-statement" data-mark="statement" data-line={b.line + 1}
           style="top:{PAD_TOP + b.line * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
       {:else}
-        <div class={['ce-mark', `ce-mark-${b.kind}`]} data-mark={b.kind} data-line={b.line + 1}
+        <div class={['ce-mark', `ce-mark-${b.kind}`, b.colour && `c-${b.colour}`]} data-mark={b.kind} data-line={b.line + 1}
           style="left:{PAD_L + b.col * charWidth - scrollLeft - 1}px; top:{PAD_TOP + b.line * lineHeight - scrollTop}px; width:{b.width * charWidth + 2}px; height:{lineHeight}px"></div>
       {/if}
     {/each}
@@ -1100,11 +1115,11 @@
     {#each occurrences as o (o.start)}
       {@const p = posOf(o.start)}
       <div class="ce-occ"
-        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(o.end - o.start) * charWidth}px; height:{lineHeight}px"></div>
+        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(posOf(o.end).col - p.col) * charWidth}px; height:{lineHeight}px"></div>
     {/each}
     {#each columnCaretLines as ln (ln)}
       <div class="ce-mcaret"
-        style="left:{PAD_L + column.col * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+        style="left:{PAD_L + visualColumn(lineTextOf(ln), column.col) * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {/each}
     <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {firstRow * lineHeight - scrollTop}px)">{@html highlightedSafe}</pre>
     <textarea
@@ -1221,7 +1236,7 @@
       style:font-size="{fontSize}px"
       style:max-width={sigPlace.mode === 'inline' ? null : `${sigPlace.width}px`}>
       <span class="ce-sig-name">{signature.name}</span>(<!--
-        -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active']}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
+        -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active', sigColours[p.index] && `c-${sigColours[p.index]}`]}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
       -->)
     </div>
   {/if}
@@ -1389,6 +1404,11 @@
     box-sizing: border-box;
   }
   .ce-mark-statement { left: 0; right: 0; background: var(--ce-stmt); box-shadow: inset 2px 0 0 var(--ce-stmt-bar); }
+  /* An argument's parameter colour, as a line under it: the colour it has in the hint and the sidebar. */
+  .ce-mark-param { box-shadow: inset 0 -2px 0 var(--ce-param, var(--txt-faint)); border-radius: 0; }
+  .ce-mark-param.c-blue { --ce-param: var(--blue); }
+  .ce-mark-param.c-amber { --ce-param: var(--amber); }
+  .ce-mark-param.c-green { --ce-param: var(--accent); }
   .ce-mark-hover { background: var(--ce-hov); box-shadow: 0 0 0 1px var(--ce-hov-ring); border-radius: 3px; }
   .ce-mark-edit { background: var(--ce-edit); box-shadow: 0 0 0 1.5px var(--ce-edit-ring); border-radius: 3px; }
   .ce-mcaret {
@@ -1677,9 +1697,16 @@
     border: none;
     box-shadow: none;
   }
-  .ce-sig-name { color: var(--blue); }
+  /* The name in the text's own colour, so blue is free for a parameter; each parameter in the colour
+     it has under its argument and in the Values sidebar (scripting/paramColours.js), grey when it
+     has none; the one being typed underlined. */
+  .ce-sig-name { color: var(--txt); }
   .ce-sig-param { color: var(--txt-faint); }
-  .ce-sig-param.active { color: var(--accent); font-weight: 700; text-decoration: underline; }
+  .ce-sig-param.c-blue { color: var(--blue); }
+  .ce-sig-param.c-amber { color: var(--amber); }
+  .ce-sig-param.c-green { color: var(--accent); }
+  .ce-sig-param.active { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .ce-sig-param.active:not([class*='c-']) { color: var(--txt); }
 
   /* autocomplete popup */
   .ce-ac {

@@ -9,9 +9,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { readStatement } from '../src/CE_Application/scripting/scriptValues.js';
-import { deviceValueContext, dumpLayout } from '../src/CE_Application/editor/valuesContext.js';
+import { deviceValueContext, dumpLayout, declaredDeviceDumps } from '../src/CE_Application/editor/valuesContext.js';
 import { localBuildDumpMessage } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
-import { dumpRangeSaid, dumpNamesSaid } from '../src/CE_Application/scripting/dumpOffsets.js';
+import { dumpRangeSaid, dumpNamesSaid, dumpHeadSaid, dumpLineWho } from '../src/CE_Application/scripting/dumpOffsets.js';
+import {
+  defineParameter, defineDump, buildDump, clearDeviceDefinitions, definedDumpKinds,
+} from '../src/CE_Application/scripting/deviceDefinitions.js';
 
 const profileText = (file) => readFileSync(fileURLToPath(new URL(`../../profiles/test/${file}`, import.meta.url)), 'utf8');
 const GAIA = profileText('roland-gaia-sh01.ceditor-device.json');
@@ -27,8 +30,7 @@ test('every field of every dump is where the engine puts it, as wide as it write
     if (p.type === 'text') return ['A'.repeat(32), 'B'.repeat(32)].map((t) => t.slice(0, Number(p.encoding?.length ?? 1)));
     const choices = Array.isArray(p.choices) ? p.choices : Array.isArray(p.options) ? p.options : [];
     if (choices.length > 1) return [choices[0].value, choices[1].value];
-    // From 0 up: the local encoder writes a signed (s7) value as it is, clamped to 0–127.
-    const lo = Math.max(0, Number(p.range?.min ?? 0));
+    const lo = Number(p.range?.min ?? 0);
     return [lo, lo + 1];
   };
   let fieldsChecked = 0;
@@ -74,7 +76,8 @@ test('every field of every dump is where the engine puts it, as wide as it write
 test('a read names what is at its byte in every dump, the dumps holding the same thing on one line', () => {
   const at = dumpAt('ce.midi.read(msg, 23, 1)');
   assert.equal(dumpRangeSaid(at), 'Byte 23, counting from F0');
-  assert.deepEqual(at.lines[1], { profile: 'Roland GAIA SH-01', dumps: ['Patch Common'], who: 'Patch Common', text: 'Patch Level' });
+  assert.deepEqual(at.lines[1], { profile: 'Roland GAIA SH-01', declared: false, dumps: ['Patch Common'], who: 'Patch Common', text: 'Patch Level' });
+  assert.equal(dumpHeadSaid(at), 'Byte 23, counting from F0, in a Roland GAIA SH-01 dump:');
   assert.deepEqual(at.lines[2].dumps, ['Patch Tone 1', 'Patch Tone 2', 'Patch Tone 3']);
   assert.equal(at.lines[2].text, 'FILTER Cutoff');
   assert.equal(at.lines[0].text, 'part of System Tempo, which is bytes 21–23', 'a field the read starts inside');
@@ -119,4 +122,115 @@ test('write and put name the bytes they write; nothing is said without a profile
   assert.equal(dumpAt('ce.midi.read(msg, 23, 1);', devicesFor(GAIA), 'javascript').lines[1].text, 'Patch Level');
   assert.equal(dumpNamesSaid(['A', 'B']), 'A and B');
   assert.equal(dumpNamesSaid(['A', 'B', 'C']), 'A, B and C');
+});
+
+// A dump the script declares, in Lua as a panel writes one: a 14-bit value, a four-nibble one, a
+// name, a switch, and a Roland checksum after the payload.
+const DECLARED = `
+ce.device.defineParameter("cutoff", { sysex = "F0 41 10 $value F7", encoding = "u14" })
+ce.device.defineParameter("tune", { sysex = "F0 41 10 $value F7", encoding = "nibbled", nibbles = 4 })
+ce.device.defineParameter("title", { sysex = "F0 41 10 $value F7", type = "text", length = 6 })
+ce.device.defineParameter("hold", { cc = 64, type = "boolean" })
+ce.device.defineDump("patch", {
+  name = "My Patch",
+  match = { prefix = { "F0", "41", "$deviceId", "12" }, suffix = { "F7" } },
+  offset = 5, size = 13, checksum = "roland",
+  fields = { { parameter = "cutoff", offset = 0 }, { parameter = "tune", offset = 2 },
+             { parameter = "title", offset = 6 }, { parameter = "hold", offset = 12 } },
+})`;
+const declaredContext = (source, extra = {}) => deviceValueContext({
+  declaredDumps: declaredDeviceDumps([{ language: 'lua', source }]), ...extra,
+});
+
+test('a dump the script declares is laid out where the runtime builds it, each field as wide as it writes it', () => {
+  const [declared] = declaredDeviceDumps([{ language: 'lua', source: DECLARED }]);
+  assert.equal(declared.id, 'patch');
+  assert.equal(declared.name, 'My Patch');
+  assert.deepEqual(declared.layout.fields.map((f) => [f.parameter, f.start, f.width]),
+    [['cutoff', 5, 2], ['tune', 7, 4], ['title', 11, 6], ['hold', 17, 1]]);
+  assert.deepEqual(declared.layout.checksum, { at: 18, count: 1 });
+
+  // Held to the runtime: the same declarations, built twice with one value changed.
+  clearDeviceDefinitions();
+  const role = 'layoutCheck';
+  for (const [id, spec] of [['cutoff', { sysex: 'F0 41 10 $value F7', encoding: 'u14' }],
+    ['tune', { sysex: 'F0 41 10 $value F7', encoding: 'nibbled', nibbles: 4 }],
+    ['title', { sysex: 'F0 41 10 $value F7', type: 'text', length: 6 }], ['hold', { cc: 64, type: 'boolean' }]]) {
+    assert.equal(defineParameter(role, id, spec).ok, true, id);
+  }
+  assert.equal(defineDump(role, 'patch', {
+    match: { prefix: ['F0', '41', '$deviceId', '12'], suffix: ['F7'] }, offset: 5, size: 13, checksum: 'roland',
+    fields: declared.layout.fields.map((f) => ({ parameter: f.parameter, offset: f.start - 5 })),
+  }).ok, true);
+  const base = { cutoff: 0, tune: 0, title: 'AAAAAA', hold: false };
+  const pairs = { cutoff: [0, 200], tune: [0, 300], title: ['AAAAAA', 'BBBBBB'], hold: [false, true] };
+  for (const field of declared.layout.fields) {
+    const [one, two] = pairs[field.parameter];
+    const before = buildDump(role, 'patch', { ...base, [field.parameter]: one });
+    const after = buildDump(role, 'patch', { ...base, [field.parameter]: two });
+    assert.equal(before.ok && after.ok, true, before.error ?? after.error);
+    const changed = after.bytes.map((b, i) => (b !== before.bytes[i] && i !== declared.layout.checksum.at ? i : -1)).filter((i) => i >= 0);
+    assert.ok(changed.length > 0, `${field.parameter}: nothing changed`);
+    assert.ok(changed.every((i) => i >= field.start && i < field.start + field.width), `${field.parameter}: bytes ${changed} changed`);
+  }
+  assert.equal(buildDump(role, 'patch', base).bytes.length - 2, declared.layout.checksum.at, 'the checksum, then F7');
+  clearDeviceDefinitions();
+});
+
+test('a read of a declared dump names its field, and the row says whose dump it is', () => {
+  const devices = declaredContext(DECLARED);
+  const at = dumpAt('ce.midi.read(msg, 7, 2)', devices);
+  assert.deepEqual(at.lines.map((l) => [l.who, l.text]), [['My Patch', 'part of tune, which is bytes 7–10']]);
+  assert.equal(dumpHeadSaid(at), 'Bytes 7 to 8, counting from F0, in a dump the scripts declare:');
+  assert.equal(dumpAt('ce.midi.read(msg, 5, 2)', devices).lines[0].text, 'cutoff, bytes 5–6');
+  assert.equal(dumpAt('ce.midi.read(msg, 2, 1)', devices).lines[0].text, 'header byte 2: the device id');
+  assert.equal(dumpAt('ce.midi.read(msg, 18, 1)', devices).lines[0].text, 'the checksum');
+  assert.equal(dumpAt('ce.midi.read("F0 43 10 12 00 01 02", 5, 1)', devices), undefined, 'bytes that are not the dump');
+
+  // Beside a profile's dumps, each line says whose.
+  const both = declaredContext(DECLARED, {
+    mappings: { mainSynth: { profileId: 'p' } }, profiles: [{ id: 'p', name: 'Roland GAIA SH-01' }], sources: { p: { source: GAIA } },
+  });
+  const mixed = dumpAt('ce.midi.read(msg, 17, 1)', both);
+  assert.equal(dumpHeadSaid(mixed), 'Byte 17, counting from F0:');
+  const mine = mixed.lines[0];
+  assert.equal(mine.declared, true, 'the script\'s own dump first');
+  assert.equal(dumpLineWho(mixed, mine), 'Declared · My Patch');
+  assert.equal(mine.text, 'hold');
+  assert.match(dumpLineWho(mixed, mixed.lines.find((l) => !l.declared)), /^Roland GAIA SH-01 · /);
+});
+
+test('a declared dump is laid out in the other languages, and its role is its own', () => {
+  const js = declaredDeviceDumps([{ language: 'javascript', source: `
+    ce.device.defineParameter("cutoff", { cc: 74 });
+    ce.device.defineDump("tone", { match: { prefix: "F0 43 10" }, offset: 4, fields: [{ parameter: "cutoff", offset: 3 }] }, "drums");` }]);
+  assert.equal(js[0].role, 'drums');
+  assert.equal(js[0].layout, undefined, 'the parameter is the main synth\'s, not the drums\'');
+  const py = declaredDeviceDumps([{ language: 'python', source: `
+ce.device.defineParameter("cutoff", {"cc": 74}, "drums")
+ce.device.defineDump("tone", {"match": {"prefix": "F0 43 10"}, "offset": 4, "fields": [{"parameter": "cutoff", "offset": 3}]}, "drums")` }]);
+  assert.deepEqual(py[0].layout.fields.map((f) => [f.parameter, f.start, f.width]), [['cutoff', 7, 1]]);
+  assert.equal(py[0].layout.checksum, null, 'no checksum asked for');
+});
+
+test('what the runtime would refuse, or builds as it runs, is not laid out as if it were written', () => {
+  const layoutOf = (source) => declaredDeviceDumps([{ language: 'lua', source }])[0];
+  const param = 'ce.device.defineParameter("cutoff", { cc = 74 })\n';
+  // An offset built as it runs would read as 0, and the field at the wrong byte.
+  assert.equal(layoutOf(`${param}ce.device.defineDump("d", { match = { prefix = "F0 43" }, fields = { { parameter = "cutoff", offset = base + 1 } } })`).layout, undefined);
+  assert.equal(layoutOf(`${param}ce.device.defineDump("d", { match = { prefix = header }, fields = { { parameter = "cutoff" } } })`).layout, undefined);
+  // The runtime refuses a field naming a parameter nobody defined, and a dump with no prefix.
+  assert.equal(layoutOf('ce.device.defineDump("d", { match = { prefix = "F0 43" }, fields = { { parameter = "cutoff" } } })').layout, undefined);
+  assert.equal(layoutOf(`${param}ce.device.defineDump("d", { fields = { { parameter = "cutoff" } } })`).layout, undefined);
+  // A value's width built as it runs is not known; its wire is no part of the dump.
+  assert.equal(layoutOf(`ce.device.defineParameter("cutoff", { sysex = "F0 41 10 $value F7", encoding = pick })
+ce.device.defineDump("d", { match = { prefix = "F0 43" }, fields = { { parameter = "cutoff", offset = 1 } } })`).layout, undefined);
+  const built = layoutOf(`ce.device.defineParameter("cutoff", { sysex = head .. " $value F7", encoding = "u14", name = label })
+ce.device.defineDump("d", { name = title, match = { prefix = "F0 43" }, offset = 2, fields = { { parameter = "cutoff", offset = 1 } } })`);
+  assert.deepEqual(built.layout.fields.map((f) => [f.parameter, f.start, f.width]), [['cutoff', 3, 2]]);
+  assert.equal(built.name, 'd', 'a name built as it runs is the kind, as when none is given');
+  // Nothing the editor reads is left among what the running script defined.
+  clearDeviceDefinitions();
+  declaredDeviceDumps([{ language: 'lua', source: DECLARED }]);
+  assert.deepEqual(definedDumpKinds('mainSynth'), []);
 });

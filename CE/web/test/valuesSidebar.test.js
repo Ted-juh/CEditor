@@ -42,6 +42,16 @@ test('a statement is a band over every line it covers, and nothing changes a cha
   assert.deepEqual([band.band, band.col, band.width], [true, 0, 0], 'a band is the whole width, not a box of characters');
 });
 
+test('a box on a line with tabs is placed by the columns the editor draws', () => {
+  // Two tabs are four columns, so "250" starts at column 15, not 13; the tab inside is two wide.
+  const text = 'ce.anim.to("x", 1, {\n\t\tduration = 250,\n\t\tcurve =\t"outBack" })';
+  const at = text.indexOf('250');
+  assert.deepEqual(boxes([{ start: at, end: at + 3, kind: 'hover' }], text), ['hover@1:15+3']);
+  const value = text.indexOf('"outBack"');
+  assert.deepEqual(boxes([{ start: value, end: value + 9, kind: 'edit' }], text), ['edit@2:12+9'],
+    'after "\t\tcurve =" (11 columns) the tab runs to 12');
+});
+
 test('a value over several lines gets one box per line: from its start, from each indent, to its end', () => {
   const text = 'x({\n    a = 1,\n\n    b = 2 })\n';
   const start = text.indexOf('{');
@@ -60,10 +70,12 @@ test('marks are drawn in their order, placed only in the window drawn, and not a
     { start: starts[2], end: starts[8], kind: 'statement' },
     { start: starts[5] + 8, end: starts[5] + 11, kind: 'edit' },
     { start: starts[5] + 8, end: starts[5] + 11, kind: 'hover' },
+    { start: starts[5] + 8, end: starts[5] + 11, kind: 'param', colour: 'amber' },
   ];
   assert.deepEqual(boxes(all, text).map((b) => b.split('@')[0]).filter((k, i, a) => a.indexOf(k) === i), MARK_KINDS,
-    'statement, then hover, then edit on top');
-  assert.deepEqual(boxes(all, text, { first: 4, last: 6 }), ['statement@4', 'statement@5', 'hover@5:8+3', 'edit@5:8+3']);
+    'statement, then a parameter\'s line, then hover, then edit on top');
+  assert.deepEqual(boxes(all, text, { first: 4, last: 6 }), ['statement@4', 'statement@5', 'param@5:8+3', 'hover@5:8+3', 'edit@5:8+3']);
+  assert.equal(markBoxes(all, text, starts).find((b) => b.kind === 'param').colour, 'amber', 'a parameter\'s line keeps its colour');
   assert.deepEqual(boxes(all, text, { folded: true }), []);
   assert.deepEqual(boxes([{ start: 4, end: 4, kind: 'hover' }, { start: -5, end: 3, kind: 'edit' }, { start: 0, end: 3, kind: 'nope' }], text),
     ['edit@0:0+3'], 'an empty range is nothing, a range is clamped to the text, an unknown kind is not drawn');

@@ -1245,6 +1245,56 @@ int runNrpnTimingTests (const juce::File& file)
     return 0;
 }
 
+// A 14-bit parameter kept least significant byte first. The encoder wrote only MSB first, so such a
+// parameter could be read and never written. Its own bytes are LSB first; an NRPN's data entry is
+// still the MSB on CC 6 and the LSB on CC 38, so it sends exactly what the MSB-first one sends.
+int runLsbFirstEncodingTests (const juce::File& nrpnFile)
+{
+    juce::String error;
+    ceditor::device::DeviceProfileEngine msbFirst;
+    if (! msbFirst.loadFromFile (nrpnFile, error))
+    {
+        std::cerr << "[FAIL] LSB-first: could not load " << nrpnFile.getFileName() << ": " << error << "\n";
+        return 1;
+    }
+    auto profile = juce::JSON::parse (nrpnFile.loadFileAsString());
+    if (auto* parameters = profile.getProperty ("parameters", {}).getArray())
+        for (const auto& parameter : *parameters)
+            if (parameter.getProperty ("id", {}).toString() == "osc.pitch")
+                if (auto* encoding = parameter.getProperty ("encoding", {}).getDynamicObject())
+                    encoding->setProperty ("type", "u14-lsb-msb");
+    ceditor::device::DeviceProfileEngine lsbFirst;
+    if (! lsbFirst.loadFromJson (juce::JSON::toString (profile), error))
+    {
+        std::cerr << "[FAIL] LSB-first: the edited profile did not load: " << error << "\n";
+        return 1;
+    }
+
+    const auto a = msbFirst.compileSetParameter ("mainSynth", "osc.pitch", 12345, true);
+    const auto b = lsbFirst.compileSetParameter ("mainSynth", "osc.pitch", 12345, true);
+    if (! a.ok || ! b.ok)
+    {
+        std::cerr << "[FAIL] LSB-first: osc.pitch 12345 did not compile: " << (a.ok ? b.error : a.error) << "\n";
+        return 1;
+    }
+    if (b.transaction.encodedValueHex != "39 60")
+    {
+        std::cerr << "[FAIL] LSB-first: 12345 should encode as 39 60, got " << b.transaction.encodedValueHex << "\n";
+        return 1;
+    }
+    auto same = a.transaction.messages.size() == b.transaction.messages.size();
+    for (int i = 0; same && i < a.transaction.messages.size(); ++i)
+        same = a.transaction.messages[i].bytes == b.transaction.messages[i].bytes;
+    if (! same)
+    {
+        std::cerr << "[FAIL] LSB-first: the NRPN should send the MSB on CC 6 and the LSB on CC 38, as MSB-first does\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] test-nrpn-synth :: u14-lsb-msb encodes LSB first, and an NRPN still sends MSB on CC 6\n";
+    return 0;
+}
+
 int runDumpShapeAndCodecTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -1338,6 +1388,56 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         || (int) signedValues->getProperty ("lfo.pan") != -10)
     {
         std::cerr << "[FAIL] dump shape s7 dump field did not decode to the signed value -10\n";
+        return 1;
+    }
+
+    // ...and written: the value plus the bias, the reverse of the decode above. The encoder had no s7
+    // branch, so every write of lfo.pan, as a message or in a dump, was refused as
+    // "Unsupported numeric encoder: s7".
+    struct SignedCase { int value; const char* hex; };
+    for (const auto& c : { SignedCase { -64, "00" }, SignedCase { -10, "36" }, SignedCase { 0, "40" }, SignedCase { 63, "7F" } })
+    {
+        const auto set = engine.compileSetParameter ("mainSynth", "lfo.pan", c.value, true);
+        if (! set.ok || set.transaction.encodedValueHex != c.hex)
+        {
+            std::cerr << "[FAIL] dump shape s7 write: lfo.pan " << c.value << " should encode as " << c.hex
+                      << ", got " << (set.ok ? set.transaction.encodedValueHex : "!" + set.error) << "\n";
+            return 1;
+        }
+    }
+    auto* signedWanted = new juce::DynamicObject();
+    signedWanted->setProperty ("lfo.pan", -10);
+    const auto signedBuilt = engine.buildDumpMessage ("s7PatchDump", juce::var (signedWanted));
+    if (! signedBuilt.ok || signedBuilt.hex != "F0 7D 10 0A 36 F7")
+    {
+        std::cerr << "[FAIL] dump shape s7 dump should build as F0 7D 10 0A 36 F7, got "
+                  << (signedBuilt.ok ? signedBuilt.hex : "!" + signedBuilt.error) << "\n";
+        return 1;
+    }
+    const auto signedBack = engine.parseDumpMessage (signedBuilt.hex);
+    auto* signedBackValues = signedBack.values.getDynamicObject();
+    if (! signedBack.ok || signedBackValues == nullptr || (int) signedBackValues->getProperty ("lfo.pan") != -10)
+    {
+        std::cerr << "[FAIL] dump shape s7 dump did not read its own -10 back\n";
+        return 1;
+    }
+
+    // ...and a dump whose mapping gives a codec is built with it: mod.depth is u7 on its own and
+    // LSB-first in u14LsbDump. Built with the parameter's own encoding, 200 was refused as a u7.
+    auto* lsbWanted = new juce::DynamicObject();
+    lsbWanted->setProperty ("mod.depth", 200);
+    const auto lsbBuilt = engine.buildDumpMessage ("u14LsbDump", juce::var (lsbWanted));
+    if (! lsbBuilt.ok || lsbBuilt.hex != "F0 7D 10 0B 48 01 F7")
+    {
+        std::cerr << "[FAIL] dump shape u14LsbDump should build 200 as F0 7D 10 0B 48 01 F7, got "
+                  << (lsbBuilt.ok ? lsbBuilt.hex : "!" + lsbBuilt.error) << "\n";
+        return 1;
+    }
+    const auto lsbBack = engine.parseDumpMessage (lsbBuilt.hex);
+    auto* lsbBackValues = lsbBack.values.getDynamicObject();
+    if (! lsbBack.ok || lsbBackValues == nullptr || (int) lsbBackValues->getProperty ("mod.depth") != 200)
+    {
+        std::cerr << "[FAIL] dump shape u14LsbDump did not read its own 200 back\n";
         return 1;
     }
 
@@ -3043,6 +3143,7 @@ int main (int argc, char** argv)
 
     failures += runPolicyTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
+    failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runMonitorClearTests();

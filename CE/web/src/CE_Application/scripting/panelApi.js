@@ -1096,8 +1096,12 @@ export const COMMANDS = [
   },
   {
     id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
-    summary: 'Stop the animation on `path` and leave the value wherever it has got to. With no `path`, every animation on the panel stops. Any `done` callback is called with false. To jump to the end instead, use `ce.anim.finish()`.',
-    params: [{ name: 'path', type: 'path', required: false }],
+    summary: 'Stop an animation where it is.',
+    notes: [
+      'The animation\'s `done` function is called with false.',
+      'To jump to the end instead, use `ce.anim.finish()`.',
+    ],
+    params: [{ name: 'path', type: 'path', required: false, summary: 'The value being animated. Leave it out to stop every animation on the panel.' }],
     scopes: 'any',
     snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
   },
@@ -2245,9 +2249,14 @@ export const COMMANDS = [
   },
   {
     id: 'panelBatch', category: 'Panel structure', signature: 'panelBatch(fn) -> boolean',
-    summary: 'Run `fn` so that everything it changes is undone in a single step, which is useful when a script builds or rearranges a whole page. The changes appear together when `fn` finishes, though code inside `fn` already sees its own earlier changes. The undo step is closed even if `fn` fails with an error. `fn` must not wait: anything after an `await` is not part of the batch. In the exported plugin there is no undo, and `fn` simply runs.',
+    summary: 'Make a set of changes count as one step, so one undo takes them all back.',
+    notes: [
+      { text: 'Code after an `await` in the function is not part of the batch.', check: 'noAwait' },
+      'The panel shows the changes together when the function ends. Code inside it already sees its own earlier changes.',
+      'The exported plugin has no undo: there the function just runs.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'fn', type: 'function', required: true }],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.' }],
     scopes: 'any',
     snippet: {
       lua: 'ce.panel.batch(function()\n  $0\nend)',
@@ -2439,7 +2448,11 @@ export const COMMANDS = [
      component's grid are the same grid. */
   {
     id: 'nowMs', category: 'Time', signature: 'nowMs() -> number',
-    summary: 'Return a clock reading in milliseconds, for timing things. A single reading means nothing on its own: subtract an earlier reading to find how much time has passed. It is not the time of day or a date, and it does not jump when the computer\'s clock is changed.',
+    summary: 'A clock in milliseconds, for measuring how long something takes.',
+    notes: [
+      'One reading alone means nothing: subtract an earlier reading to find how much time has passed.',
+      'It is not the time of day or a date, and it does not jump when the computer\'s clock is changed.',
+    ],
     scopes: 'any',
     snippet: { lua: 'local t0 = nowMs()$0', javascript: 'const t0 = nowMs();$0' },
   },
@@ -2939,12 +2952,14 @@ export const COMMANDS = [
   },
   {
     id: 'sendNRPN', category: 'Device / MIDI', signature: 'sendNRPN(channel, msb, lsb, value)',
-    summary: 'Send an NRPN (Non-Registered Parameter Number) message: `msb` and `lsb` pick the parameter and `value` runs from 0 to 16383. Many synths use NRPNs for parameters that need more than 128 steps.',
+    summary: 'Send an NRPN message.',
+    example: '`sendNRPN(1, 0, 5, 9000)` sets parameter 0 / 5 to 9000 on channel 1.',
+    notes: ['NRPN means Non-Registered Parameter Number. Many synths use NRPNs for settings that need more than 128 steps.'],
     params: [
-      { name: 'channel', type: 'number', required: true, unit: '1 to 16' },
-      { name: 'msb', type: 'number', required: true, unit: '0 to 127' },
-      { name: 'lsb', type: 'number', required: true, unit: '0 to 127' },
-      { name: 'value', type: 'value', required: true, unit: '0 to 16383' },
+      { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
+      { name: 'msb', type: 'number', required: true, unit: '0 to 127', summary: 'The first half of the parameter number, from 0 to 127.' },
+      { name: 'lsb', type: 'number', required: true, unit: '0 to 127', summary: 'The second half of the parameter number, from 0 to 127.' },
+      { name: 'value', type: 'value', required: true, unit: '0 to 16383', summary: 'The new value, from 0 to 16383. It is sent as two 7-bit halves.' },
     ],
     scopes: 'any',
     snippet: { lua: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0', javascript: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0' },
@@ -2996,8 +3011,14 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiIn', category: 'Device / MIDI', signature: 'interceptMidiIn(fn)',
-    summary: 'See every MIDI message from the synth before the panel acts on it. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.',
-    params: [{ name: 'fn', type: 'function', required: true }],
+    summary: 'See every MIDI message from the synth before the panel uses it.',
+    returns: [
+      { key: 'bytes', when: 'other bytes', then: 'The message is changed.' },
+      { key: 'false', when: 'false', then: 'The message is dropped.' },
+      { key: 'nothing', when: 'nothing', then: 'It goes through as it is.' },
+    ],
+    notes: ['Returned bytes are read as a send reads them. If they are not bytes, the message is dropped and the console says why.'],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'Called with the bytes of each message. What it returns decides what happens to the message.' }],
     scopes: 'any',
     snippet: {
       lua: 'interceptMidiIn(function(${1:bytes})\n  $0\n  return ${1:bytes}\nend)',
@@ -3006,8 +3027,17 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiOut', category: 'Device / MIDI', signature: 'interceptMidiOut(fn)',
-    summary: 'See every MIDI message the panel sends — from a script or from a control\'s own MIDI setting — before it goes out. `fn(bytes)` can return different bytes to change the message, false to drop it, or nothing to let it through unchanged. Returned bytes are read as a send reads them; if they are not bytes, the message goes nowhere and the console says why.',
-    params: [{ name: 'fn', type: 'function', required: true }],
+    summary: 'See every MIDI message the panel sends before it goes out.',
+    returns: [
+      { key: 'bytes', when: 'other bytes', then: 'The message is changed.' },
+      { key: 'false', when: 'false', then: 'The message is dropped.' },
+      { key: 'nothing', when: 'nothing', then: 'It goes out as it is.' },
+    ],
+    notes: [
+      'It sees what a control sends by its own MIDI setting too, not only what scripts send.',
+      'Returned bytes are read as a send reads them. If they are not bytes, the message is dropped and the console says why.',
+    ],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'Called with the bytes of each message. What it returns decides what happens to the message.' }],
     scopes: 'any',
     snippet: {
       lua: 'interceptMidiOut(function(${1:bytes})\n  $0\n  return ${1:bytes}\nend)',
@@ -3101,12 +3131,15 @@ export const COMMANDS = [
   },
   {
     id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes [, opts]) -> number',
-    summary: 'Work out the checksum a synth expects at the end of a SysEx message. `type` is one of "sum-7bit", "roland-7bit" (also accepted as "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts, and so do bytes that are not bytes. The 7-bit types fit in one SysEx byte; the CRC types do not, so split their result into bytes with to7bit before sending.',
+    summary: 'Work out the checksum a synth expects at the end of a SysEx message.',
+    example: '`checksum("roland", {0x40, 0x00, 0x7F, 0x00})` gives 0x41.',
+    notes: ['The 7-bit types fit in one SysEx byte. The CRC types do not: split their result into bytes with to7bit before sending.'],
     params: [
       { name: 'type', type: 'string', required: true,
+        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.',
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
           'sum-8bit', 'twos-complement-8bit', 'crc8', 'crc16-ccitt', 'crc16-modbus', 'crc32'] },
-      { name: 'bytes', type: 'bytes', required: true },
+      { name: 'bytes', type: 'bytes', required: true, summary: 'The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.' },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'offset', type: 'number', default: '0',
           summary: 'The constant the "offset-7bit" method subtracts from. Only that method reads '
@@ -3527,7 +3560,19 @@ export const PANEL_COMMANDS = [
 
 export const HELPERS = [
   // value / range
-  { id: 'scale', category: 'Value / range', signature: 'scale(v, inLo, inHi, outLo, outHi)', summary: 'Map a value from one range to another: `v` at `inLo` gives `outLo`, at `inHi` gives `outHi`, and everything between follows a straight line. It does not clamp, so a value outside the input range lands outside the output range; use `ce.math.norm()` and `ce.math.denorm()` when the result must stay inside. If `inLo` equals `inHi`, it returns `outLo`.' },
+  {
+    id: 'scale', category: 'Value / range', signature: 'scale(v, inLo, inHi, outLo, outHi)',
+    summary: 'Move a value from one range to another.',
+    example: '`scale(64, 0, 127, 0, 100)` gives about 50.',
+    notes: ['The result is not kept inside the new range: a value outside the first range lands outside the second. Use `ce.math.norm()` and `ce.math.denorm()` when it must stay inside.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value to move.' },
+      { name: 'inLo', type: 'value', required: true, summary: 'The low end of the range the value is in.' },
+      { name: 'inHi', type: 'value', required: true, summary: 'The high end of the range the value is in. If it equals the low end, the result is the new range\'s low end.' },
+      { name: 'outLo', type: 'value', required: true, summary: 'The low end of the range to move it to.' },
+      { name: 'outHi', type: 'value', required: true, summary: 'The high end of the range to move it to.' },
+    ],
+  },
   { id: 'clamp', category: 'Value / range', signature: 'clamp(v, lo, hi)', summary: 'Keep a value inside a range: anything below `lo` becomes `lo`, anything above `hi` becomes `hi`, and anything in between comes back unchanged.' },
   { id: 'round', category: 'Value / range', signature: 'round(v)', summary: 'Round to the nearest whole number. A half rounds up, so 2.5 gives 3 and -2.5 gives -2. To keep some decimal places, use `ce.math.roundTo()`.' },
   { id: 'snap', category: 'Value / range', signature: 'snap(v, step)', summary: 'Round a value to the nearest multiple of `step`: `ce.math.snap(37, 10)` gives 40. A `step` of 0 leaves the value unchanged. For steps that are not evenly spaced, use `ce.math.quantize()`.' },
@@ -3770,7 +3815,16 @@ export const HELPERS = [
     ],
   },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
-  { id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)', summary: 'Split a number into `count` bytes of 7 bits each, the way SysEx carries large values: 2 bytes for values up to 16383, 3 for 21 bits, 4 for 28. `order` is "msb" (most significant byte first, the default) or "lsb".' },
+  {
+    id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)',
+    summary: 'Split a number into SysEx bytes.',
+    example: '`to7bit(1000, 2)` gives {7, 104}.',
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455.' },
+      { name: 'count', type: 'value', required: false, summary: 'How many bytes of 7 bits to make. Two when it is left out.' },
+      { name: 'order', type: 'value', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+    ],
+  },
   { id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)', summary: 'Join 7-bit bytes back into one number — the reverse of to7bit. `order` is "msb" (the default) or "lsb".' },
   // `to14Bit` is the spelling the WebView runtime shipped with before the contract was
   // enforced. Kept as an alias so panels written against it keep working; `to14bit` (matching
@@ -3795,30 +3849,37 @@ export const HELPERS = [
   // every list that comes back is new.
   {
     id: 'getBits', category: 'MIDI encoding', signature: 'getBits(value, start, count) -> number',
-    summary: 'Read `count` bits starting at bit `start` (counted from 0, lowest bit first), the way synths pack several settings into one byte: `getBits(0xB4, 4, 3)` is 3. `value` is a number (up to 32 bits) or a list of bytes, where the bits run on from one byte into the next, eight to a byte. `count` runs from 1 to 32. Bits past the end of the value are refused with a message rather than read as 0, and so is a list item that is not a byte from 0 to 255.',
+    summary: 'Read a setting from a byte.',
+    example: '`getBits(0xB4, 4, 3)` gives 3.',
     params: [
-      { name: 'value', type: 'value', required: true },
-      { name: 'start', type: 'number', required: true },
-      { name: 'count', type: 'number', required: true },
+      { name: 'value', type: 'value', required: true, summary: 'A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message.' },
+      { name: 'start', type: 'number', required: true, summary: 'The first bit of the setting, counted from 0 at the right, the lowest bit.' },
+      { name: 'count', type: 'number', required: true, summary: 'How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0.' },
     ],
   },
   {
     id: 'setBits', category: 'MIDI encoding', signature: 'setBits(value, start, count, bits) -> number|list',
-    summary: 'Write `bits` into the `count` bits starting at bit `start`, and return the result: a number for a number, a new list for a list (the one passed in is not changed). The reverse of getBits: `setBits(0xB4, 4, 3, 5)` is 0xD4. A value that does not fit in `count` bits is refused with a message rather than cut down to fit.',
+    summary: 'Change a setting in a byte.',
+    example: '`setBits(0xB4, 4, 3, 5)` gives 0xD4.',
     params: [
-      { name: 'value', type: 'value', required: true },
-      { name: 'start', type: 'number', required: true },
-      { name: 'count', type: 'number', required: true },
-      { name: 'bits', type: 'number', required: true },
+      { name: 'value', type: 'value', required: true, summary: 'A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed.' },
+      { name: 'start', type: 'number', required: true, summary: 'The first bit of the setting, counted from 0 at the right, the lowest bit.' },
+      { name: 'count', type: 'number', required: true, summary: 'How many bits the setting has, from 1 to 32.' },
+      { name: 'bits', type: 'number', required: true, summary: 'The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit.' },
     ],
   },
   {
     id: 'bytesRead', category: 'MIDI encoding', signature: 'bytesRead(bytes, offset, count [, opts]) -> number',
-    summary: 'Read the number stored in `count` bytes (1 to 4) starting at `offset`, which counts from 0 in every language, as dump layouts do. By default the bytes are SysEx\'s 7-bit bytes, most significant first, the way to7bit writes them; `opts` can say otherwise. Bytes past the end of the list are refused with a message.',
+    summary: 'Read a number from a SysEx message.',
+    example: '`bytesRead(msg, 6, 2)` reads bytes 6 and 7.',
+    notes: [
+      { text: 'Offsets count from 0 in every language, Lua included, as dump layouts count them.', check: 'luaOffset' },
+      'By default the bytes are SysEx\'s 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise.',
+    ],
     params: [
-      { name: 'bytes', type: 'bytes', required: true },
-      { name: 'offset', type: 'number', required: true },
-      { name: 'count', type: 'number', required: true },
+      { name: 'bytes', type: 'bytes', required: true, summary: 'The message, as a list of bytes or as hex text.' },
+      { name: 'offset', type: 'number', required: true, summary: 'Where the number starts, counted from 0.' },
+      { name: 'count', type: 'number', required: true, summary: 'How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message.' },
       { name: 'opts', type: 'object', required: false, fields: optionFields(['bytesBits', 'bytesOrder']) },
     ],
   },

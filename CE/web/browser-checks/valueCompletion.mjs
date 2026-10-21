@@ -445,6 +445,33 @@ end
     { opaque: true, border: 'solid' }, acPaint);
 
   // ===============================================================================================
+  // TABS — what the editor draws by column over a line with tabs sits over its text: the completion
+  // list at the value it completes, a diagnostic's underline under its token, the Values tab's mark
+  // on its value, and a click on a character puts the caret before it.
+  // ===============================================================================================
+  const TABBED = `function onValueChanged(value)
+\t\tce.anim.to("Cutoff.value", 100, {\tcurve = "outBack" })
+\t\tlocal x = = 1
+end
+`;
+  await typeScript(TABBED);
+  const tabCurveAt = TABBED.indexOf('outBack');
+  await clickAt(tabCurveAt + 3);
+  const clicked = await caretAt();
+  const tabList = await forceValueList();
+  const listLeft = await page.evaluate(() => document.querySelector('.ce-ac')?.getBoundingClientRect().left ?? null);
+  const valueChar = await charRect(tabCurveAt);
+  await page.keyboard.press('Escape');
+  const errorAt = TABBED.indexOf('= 1');
+  await until(() => document.querySelector('.bd-app .detail .ce-squiggle'));
+  const squiggle = await page.evaluate(() => document.querySelector('.bd-app .detail .ce-squiggle').getBoundingClientRect().left);
+  const errorChar = await charRect(errorAt);
+  led.check(S, 'a line with tabs', 'on a line indented with tabs and with a tab inside the call, a click on a character puts the caret before it, the completion list opens at the value it completes, and the underline of a syntax error sits under the token, each by the columns the editor draws',
+    { caret: tabCurveAt + 3, list: 'value', listAtValue: true, underlineAtToken: true },
+    { caret: clicked, list: tabList?.kind ?? null, listAtValue: listLeft !== null && Math.abs(listLeft - valueChar.left) <= 2,
+      underlineAtToken: Math.abs(squiggle - errorChar.left) <= 2 });
+
+  // ===============================================================================================
   // JAVASCRIPT — the same, a choice picked with the mouse.
   // ===============================================================================================
   page.on('dialog', (d) => d.accept());

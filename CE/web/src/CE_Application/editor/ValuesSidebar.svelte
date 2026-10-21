@@ -45,7 +45,7 @@
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import {
     statementRows, argAtOffset, findArg, editLabel, meaningLine, madeByChild, unitLabel, swatchHex, cssOfHex,
-    gradientStrip, shownNumber, controlToSelect,
+    gradientStrip, shownNumber, controlToSelect, argColour, callAt,
   } from './valueRows.js';
   import { createEditSession, extentOf } from './valueEditSession.js';
   import { colorTarget, activateColorTarget, clearColorTarget } from '../stores/colorTarget.js';
@@ -59,7 +59,8 @@
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
   import LcdLinePreview from './LcdLinePreview.svelte';
   import { arrangementView, labelFits } from '../scripting/arrangePreview.js';
-  import { dumpRangeSaid } from '../scripting/dumpOffsets.js';
+  import { dumpHeadSaid, dumpLineWho } from '../scripting/dumpOffsets.js';
+  import { bitRows, cellCentre, hex2, rangeLines, listText, codeParts } from './explainViews.js';
   import { learnFor, learnTakes, learnedEdit, learnWords, sendableHex } from './valueLearn.js';
   import { learnNext } from '../stores/midiLearnTap.js';
   import { rawMidiDraft } from '../stores/rawMidiDraft.js';
@@ -141,6 +142,10 @@
 
   let caretArg = $derived(argAtOffset(statement, caret));
   let caretKey = $derived(caretArg ? keyOf(caretArg) : null);
+  // The call the head explains: the innermost one the caret is in, so in a call inside another it is
+  // the inner one; the statement's first call when the caret is between calls.
+  let headCall = $derived(statement ? callAt(statement, readPoint) : null);
+  let headParam = $derived(caretArg?.param?.name ?? null);
   // By where a value starts, not where it ends: a write that changes its length keeps its row (and a
   // field being typed in keeps its focus).
   function keyOf(arg) { return `${arg.range.start}:${arg.kind}:${arg.name ?? ''}`; }
@@ -158,6 +163,14 @@
   let marks = $derived.by(() => {
     const out = [];
     if (statement?.range) out.push({ start: statement.range.start, end: statement.range.end, kind: 'statement' });
+    // A line under each argument of the call the head explains, in its parameter's colour: the colour
+    // it has in the hint above and on its row (scripting/paramColours.js).
+    if (!isJson) {
+      for (const arg of headCall?.args ?? []) {
+        const colour = argColour(headCall, arg);
+        if (colour) out.push({ start: arg.range.start, end: arg.range.end, kind: 'param', colour });
+      }
+    }
     const hover = hoverArg ? extentOf(hoverArg) : null;
     if (hover) out.push({ ...hover, kind: 'hover' });
     if (sessView?.range) out.push({ start: sessView.range.start, end: sessView.range.end, kind: 'edit' });
@@ -818,6 +831,213 @@
   {/if}
 {/snippet}
 
+{#snippet explainCall(row)}
+  {@const call = row.call}
+  {@const ex = call.explain}
+  <!-- What the call does with these values (scripting/callExplainers.js, bitFields.js), drawn under
+       its rows: the script's own values, never a fixed example. Colours are the parameters'. -->
+  <div class="vexplain" style:--depth={row.depth}>
+    {#if call.bits?.groups.length}
+      {@const view = bitRows(call.bits)}
+      <div class="vbits" role="img" aria-label={call.bits.said}>
+        {#each view.groups as group, g (g)}
+          <div class="vbyte">
+            {#if group.label}<span class="vbyte-label">{group.label}</span>{/if}
+            <span class="vlab c-blue">{group.beforeHex}</span>
+            <span class="vcells vvalue">
+              {#each group.cells as cell (cell.bit)}
+                <span class={['vbit', cell.field && 'field']} data-bit={cell.bit}>{cell.before ?? ''}</span>
+              {/each}
+            </span>
+            <span class="vlab vlab-faint">bit</span>
+            <span class="vcells vnums">
+              {#each group.cells as cell (cell.bit)}<span class={[cell.field && 'infield']}>{cell.bit}</span>{/each}
+            </span>
+            {#if group.arrow}
+              {@const x1 = cellCentre(group.arrow.right, 22, 2)}
+              {@const x0 = cellCentre(group.arrow.left, 22, 2)}
+              <span></span>
+              <svg class="varrow" width={8 * 22 + 7 * 2} height="12" aria-hidden="true">
+                <line x1={x1} y1="6" x2={x0 - (group.arrow.head ? 7 : 0)} y2="6" />
+                {#if group.arrow.dot}<circle cx={x1} cy="6" r="3" />{/if}
+                {#if group.arrow.head}<path d={`M${x0 - 1} 6 L${x0 + 5} 2 M${x0 - 1} 6 L${x0 + 5} 10`} />{/if}
+              </svg>
+            {/if}
+            {#if view.verb === 'set' && group.hasPut}
+              <span class="vlab c-green">{view.bitsHex}</span>
+              <span class="vcells vput">
+                {#each group.cells as cell (cell.bit)}
+                  <span class={['vbit', cell.put === null ? 'blank' : 'put']} data-bit={cell.bit}>{cell.put ?? ''}</span>
+                {/each}
+              </span>
+            {/if}
+            {#if view.verb === 'set' && view.result}
+              <span class="vlab vlab-strong">{group.afterHex}</span>
+              <span class="vcells vresult">
+                {#each group.cells as cell (cell.bit)}
+                  <span class={['vbit', cell.field && 'made']} data-bit={cell.bit}>{cell.after ?? ''}</span>
+                {/each}
+              </span>
+            {/if}
+          </div>
+        {/each}
+        {#if view.readCells}
+          <div class="vbyte">
+            <span class="vlab vlab-strong">{view.read.hex}</span>
+            <span class="vcells vresult">
+              {#each view.readCells as cell (cell.bit)}<span class={['vbit', cell.field && 'made']}>{cell.v}</span>{/each}
+            </span>
+          </div>
+        {:else if view.read}
+          <div class="vsum-line"><span class="vlab-strong">= {view.read.value}</span></div>
+        {/if}
+      </div>
+    {/if}
+
+    {#if ex?.kind === 'sevenBit'}
+      <div class="vseven" role="img" aria-label={ex.value === null ? `Split into ${ex.count} bytes of 7 bits` : `${ex.value} split into ${ex.count} bytes of 7 bits: ${ex.bytes.map((b) => b.byte).join(', ')}`}>
+        <div class="vseven-row">
+          <span class="vlab c-blue">{ex.value ?? ''}</span>
+          <span class="vseven-groups">
+            {#each ex.groups as group, g (g)}
+              <span class="vseven-group">
+                <span class="vcells small">{#each Array.from({ length: 7 }, (_, i) => group.bits?.[i] ?? '') as d, i (i)}<span class="vbit field">{d}</span>{/each}</span>
+                <span class="vseven-name">{group.label}</span>
+              </span>
+            {/each}
+          </span>
+        </div>
+        {#each ex.bytes as b, i (i)}
+          <div class="vseven-row">
+            <span class="vlab vlab-strong">{b.byte === null ? '' : hex2(b.byte)}</span>
+            <span class="vcells"><span class="vbit blank">0</span>{#each Array.from({ length: 7 }, (_, k) => b.bits?.[k] ?? '') as d, k (k)}<span class="vbit made">{d}</span>{/each}</span>
+            <span class="vseven-name">{b.label}</span>
+          </div>
+        {/each}
+        {#if ex.value !== null}<div class="vsum-line"><span class="vlab-strong">= {listText(ex.bytes.map((b) => b.byte), language)}</span></div>{/if}
+      </div>
+    {/if}
+
+    {#if ex?.kind === 'bytes'}
+      {@const first = ex.cells.findIndex((c) => c.field)}
+      {@const last = ex.cells.findLastIndex((c) => c.field)}
+      {@const lead = ex.before ? 1 : 0}
+      <div class="vmsg" role="img" aria-label={`Bytes ${ex.offset} to ${ex.offset + ex.count - 1}, counted from 0${ex.value === null ? '' : `: ${ex.value}`}`}>
+        <div class="vmsg-cells">
+          {#if ex.before}<span class="vmsg-col"><span class="vbyte-cell more">…</span><span></span></span>{/if}
+          {#each ex.cells as c (c.index)}
+            <span class="vmsg-col"><span class={['vbyte-cell', c.field && 'infield']}>{c.hex ?? ''}</span><span class={['vmsg-index', c.field && 'infield']}>{c.index}</span></span>
+          {/each}
+          {#if ex.after}<span class="vmsg-col"><span class="vbyte-cell more">…</span><span></span></span>{/if}
+        </div>
+        {#if first >= 0}
+          {@const x0 = cellCentre(first + lead, 26, 3)}
+          {@const x1 = cellCentre(last + lead, 26, 3) + 10}
+          <svg class="varrow" width={(ex.cells.length + lead + (ex.after ? 1 : 0)) * 29} height="12" aria-hidden="true">
+            <circle cx={x0} cy="6" r="3" />
+            <line x1={x0} y1="6" x2={x1 - 1} y2="6" />
+            <path d={`M${x1} 6 L${x1 - 6} 2 M${x1} 6 L${x1 - 6} 10`} />
+          </svg>
+        {/if}
+        {#if ex.value !== null}
+          <div class="vsum-line">
+            {#each ex.cells.filter((c) => c.field) as c (c.index)}<span class="vbyte-cell made">{c.hex}</span>{/each}
+            {#if ex.formula}<span class="vlab-faint">{ex.formula}</span>{/if}
+            <span class="vlab-strong">= {ex.value}</span>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    {#if ex?.kind === 'messages'}
+      <div class="vsends" role="img" aria-label={`Sends four Control Change messages on channel ${ex.channel}`}>
+        <span class="vhd">status</span><span class="vhd">CC</span><span class="vhd">value</span><span></span>
+        {#each ex.lines as line, i (i)}
+          {#each line.bytes as b, k (k)}<span class={['vbyte-cell', k > 0 && (line.part === 'number' ? 'c-amber' : 'c-blue')]}>{b}</span>{/each}
+          <span class={['vsend-what', line.part === 'number' ? 'c-amber' : 'c-blue']}>CC {line.cc} = {line.value}</span>
+        {/each}
+      </div>
+      <div class="vsum-line"><span class="vlab-faint">{ex.hi} × 128 + {ex.lo}</span><span class="vlab-strong c-blue">= {ex.value}</span></div>
+      <div class="vfine">{ex.status} is a Control Change on channel {ex.channel}.</div>
+    {/if}
+
+    {#if ex?.kind === 'checksum'}
+      <div class="vmsg-cells" role="img" aria-label={`The checksum of ${ex.bytes.length} bytes is ${ex.result}`}>
+        {#each ex.bytes as b, i (i)}<span class="vbyte-cell c-green field-green">{b}</span>{/each}
+        <span class="vbyte-cell made">{ex.resultHex}</span>
+      </div>
+      {#if ex.steps.length}
+        <!-- The steps to it, the last one ending in the checksum byte as it is sent. -->
+        <div class="vsteps">
+          {#each ex.steps as s, i (i)}
+            {@const last = i === ex.steps.length - 1}
+            <span class={[i === 0 && 'c-green']}>{s.left}</span><span class={[last && 'vlab-strong']}>{s.right}{last ? ` = 0x${ex.resultHex}` : ''}</span>
+          {/each}
+        </div>
+      {:else}
+        <div class="vsum-line"><span class="vlab-strong">= {ex.result} = 0x{ex.resultHex}</span></div>
+      {/if}
+    {/if}
+
+    {#if ex?.kind === 'ranges'}
+      {@const v = rangeLines(ex)}
+      <svg class="vranges" width={v.width} height="100" role="img"
+        aria-label={v.x === null ? `From ${v.from.join(' to ')} to ${v.to.join(' to ')}` : `${v.value} on ${v.from.join(' to ')} lands at ${v.result} on ${v.to.join(' to ')}`}>
+        <g class="vr-in">
+          <line x1={v.pad} y1="24" x2={v.width - v.pad} y2="24" /><line x1={v.pad} y1="19" x2={v.pad} y2="29" /><line x1={v.width - v.pad} y1="19" x2={v.width - v.pad} y2="29" />
+          <text x={v.pad} y="12">{v.from[0]}</text><text x={v.width - v.pad} y="12">{v.from[1]}</text>
+        </g>
+        <line class="vr-dash" x1={v.pad} y1="30" x2={v.pad} y2="70" /><line class="vr-dash" x1={v.width - v.pad} y1="30" x2={v.width - v.pad} y2="70" />
+        <g class="vr-out">
+          <line x1={v.pad} y1="76" x2={v.width - v.pad} y2="76" /><line x1={v.pad} y1="71" x2={v.pad} y2="81" /><line x1={v.width - v.pad} y1="71" x2={v.width - v.pad} y2="81" />
+          <text x={v.pad} y="96">{v.to[0]}</text><text x={v.width - v.pad} y="96">{v.to[1]}</text>
+        </g>
+        {#if v.x !== null}
+          <g class="vr-value">
+            <line x1={v.x} y1="24" x2={v.x} y2="70" /><path d={`M${v.x - 4} 64 L${v.x} 71 L${v.x + 4} 64`} />
+            <circle cx={v.x} cy="24" r="4" />
+            <text x={v.x + 8} y="14" text-anchor="start">{v.value}</text>
+          </g>
+          <circle class="vr-result" cx={v.x} cy="76" r="4" />
+          <text class="vr-result-text" x={v.x} y="96">{v.result}</text>
+        {/if}
+      </svg>
+      {#if v.outside}<div class="vfine warn">{v.value} is outside {v.from.join(' to ')}, so the result is outside {v.to.join(' to ')}.</div>{/if}
+    {/if}
+
+    {#if ex?.kind === 'stopOrFinish'}
+      <div class="vhd-block">Stop or finish</div>
+      <div class="vcompare">
+        <span class={['mono', ex.verb === 'stop' ? 'now' : 'other']}>stop</span>
+        <span class="vbar"><span class={ex.verb === 'stop' ? 'now' : 'other'} style:width="60%"></span></span>
+        <span class={ex.verb === 'stop' ? 'now' : 'other'}>stays where it is</span>
+        <span class={['mono', ex.verb === 'finish' ? 'now' : 'other']}>finish</span>
+        <span class="vbar"><span class={ex.verb === 'finish' ? 'now' : 'other'} style:width="100%"></span></span>
+        <span class={ex.verb === 'finish' ? 'now' : 'other'}>jumps to the end</span>
+      </div>
+    {/if}
+
+    {#if call.returns?.length}
+      {@const fn = call.doc?.params.find((p) => p.name === 'fn')?.name ?? 'fn'}
+      <div class="vhd-block">What {fn} returns</div>
+      <div class="vreturns">
+        {#each call.returns as r (r.key)}
+          <span class="mono">{r.when}</span><span>{r.then}</span><span class="vreturn-lines">{r.lines.length ? `line${r.lines.length > 1 ? 's' : ''} ${r.lines.join(', ')}` : ''}</span>
+        {/each}
+      </div>
+    {/if}
+
+    {#if call.notes?.length}
+      <div class="vhd-block">Good to know</div>
+      <ul class="vnotes">
+        {#each call.notes as note, i (i)}
+          <li class={note.mark}><span class="vnote-mark" aria-hidden="true">{note.mark === 'ok' ? '✓' : note.mark === 'warn' ? '⚠' : '•'}</span><span>{#each codeParts(note.text) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</span></li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="values" data-testid="values-sidebar">
   {#if !statement}
     <p class="vempty">Put the caret in a statement: the values in it that the editor can read are listed here.</p>
@@ -827,17 +1047,25 @@
       {#if isJson}
         <div class="vpath">{objectPath || (statement.item?.kind === 'panel' ? 'panel settings' : itemName)}</div>
         <div class="vsum">{statement.item?.kind === 'panel' ? 'The panel\'s own settings' : statement.item?.controlType ?? ''}</div>
-      {:else if firstCall}
-        <div class="vpath">{callName(firstCall)}</div>
+      {:else if headCall}
+        <!-- The call as the hint in the code shows it: its name as written, its parameters in the
+             colours they have under their values, the one the caret is in underlined; then what the
+             command does, in one plain sentence. -->
+        <div class="vsig">
+          <span class="vpath">{callName(headCall)}</span>{#if headCall.doc}(<!--
+          -->{#each headCall.doc.params as p, i (p.name)}<span class={['vsig-param', headCall.doc.colours[i] && `c-${headCall.doc.colours[i]}`, p.name === headParam && 'active']}>{p.optional ? `[${p.name}]` : p.name}</span>{#if i < headCall.doc.params.length - 1}{', '}{/if}{/each}<!--
+          -->){/if}
+        </div>
+        {#if headCall.doc?.summary}<div class="vdesc">{#each codeParts(headCall.doc.summary) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</div>{/if}
       {/if}
     </div>
-    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.bits || c.dumpAt)}
+    {#if !rows.some((r) => r.type === 'arg' || r.type === 'explain') && !(statement.calls ?? []).some((c) => c.problem || c.arrange || c.dumpAt)}
       <p class="vempty">Nothing in this {isJson ? 'object' : 'statement'} that the editor can read.</p>
     {/if}
     <div class="vlist" bind:this={listEl}>
       {#each rows as row (row.key)}
         {#if row.type === 'call'}
-          {#if row.depth > 0 || row.call !== firstCall}
+          {#if row.depth > 0 || row.call !== headCall}
             <div class="vcall" style:--depth={row.depth}>
               <div class="vpath">{callName(row.call)}</div>
             </div>
@@ -903,41 +1131,19 @@
               {#if arrange.moved}<span class="varr-key"><i class="now"></i>now <i class="then"></i>after</span>{/if}
             </div>
           {/if}
-          {#if row.call.bits?.groups.length}
-            {@const bits = row.call.bits}
-            <!-- The byte a bit to a cell, its highest bit first, the field marked and its ends numbered. -->
-            <div class="vbits" style:--depth={row.depth} role="img" aria-label={bits.said}>
-              {#each bits.groups as group, g (g)}
-                <div class="vbyte">
-                  {#if group.label}<span class="vbyte-label">{group.label}</span>{/if}
-                  <span class="vbyte-cells">
-                    {#each group.cells as cell (cell.bit)}
-                      <span class={['vbit', cell.field && 'field', cell.was !== undefined && cell.was !== null && cell.was !== cell.v && 'changed']}
-                        data-bit={cell.bit} title={`bit ${cell.bit}${cell.was !== undefined && cell.was !== null ? `, ${cell.was} before` : ''}`}>{cell.v ?? ''}</span>
-                    {/each}
-                  </span>
-                  <span class="vbyte-ends">
-                    {#each group.cells as cell (cell.bit)}
-                      <span>{cell.field && (cell.bit === bits.start || cell.bit === bits.start + bits.count - 1) ? cell.bit : ''}</span>
-                    {/each}
-                  </span>
-                </div>
-              {/each}
-            </div>
-            {#if bits.said}<div class="vbits-said" style:--depth={row.depth}>{bits.said}</div>{/if}
-          {/if}
           {#if row.call.dumpAt}
             {@const at = row.call.dumpAt}
-            {@const profiles = [...new Set(at.lines.map((l) => l.profile))]}
-            <!-- What the profile's dumps hold at the bytes the call reads or writes. -->
+            <!-- What the profiles' dumps, and the scripts' own, hold at the bytes the call reads or writes. -->
             <div class="vdump" style:--depth={row.depth}>
-              <div class="vdump-head">{dumpRangeSaid(at)}{profiles.length === 1 && profiles[0] ? `, in a ${profiles[0]} dump` : ''}:</div>
+              <div class="vdump-head">{dumpHeadSaid(at)}</div>
               {#each at.lines as line, i (i)}
-                <div class="vdump-line"><span class="vdump-who">{profiles.length > 1 && line.profile ? `${line.profile} · ` : ''}{line.who}</span>: <span class="vdump-what">{line.text}</span></div>
+                <div class="vdump-line"><span class="vdump-who">{dumpLineWho(at, line)}</span>: <span class="vdump-what">{line.text}</span></div>
               {/each}
               {#if at.more}<div class="vdump-more">…and {at.more} other dump{at.more === 1 ? '' : 's'}</div>{/if}
             </div>
           {/if}
+        {:else if row.type === 'explain'}
+          {@render explainCall(row)}
         {:else if row.type === 'loose'}
           <div class="vcall" style:--depth={0}><div class="vsum">Values outside any call</div></div>
         {:else}
@@ -953,14 +1159,14 @@
             onpointerenter={() => hoverKey = key} onpointerleave={() => { if (hoverKey === key) hoverKey = null; }}
             onfocusin={() => hoverKey = key} onfocusout={() => { if (hoverKey === key) hoverKey = null; }}
             onclick={() => revealArg(arg)}>
-            <button class="vname" title={`Go to ${arg.name ?? 'this value'} in the ${isJson ? 'text' : 'code'}`}
+            <button class={['vname', argColour(row.call, arg) && `c-${argColour(row.call, arg)}`]} title={`Go to ${arg.name ?? 'this value'} in the ${isJson ? 'text' : 'code'}`}
               onclick={(e) => { e.stopPropagation(); revealArg(arg); }}>{#if arg.problem?.severity === 'error' && !arg.param && !group}<span class="vwarn" aria-hidden="true">⚠</span>{/if}{arg.name ?? '·'}</button>
             {#if !group}
               <div class="vbody">
                 <div class="vline">
                   {@render valueControl(row)}
                   {#if !hasEditor(arg) && !drawnCurve(arg) && !drawnEnvelope(arg) && arg.kind !== 'gradient'}
-                    <code class="vtext">{@html shownText(arg)}</code>
+                    <code class={['vtext', argColour(row.call, arg) && `c-${argColour(row.call, arg)}`]}>{@html shownText(arg)}</code>
                   {/if}
                   {@render valueEdit(row)}
                   {@render selectControl(arg)}
@@ -1050,6 +1256,8 @@
   .vtext :global(.tok-kw), .vtext :global(.tok-key) { color: #5a9bf0; }
   .vtext :global(.tok-lit) { color: #c98be0; }
   .vtext :global(.tok-bi) { color: #4dd6a0; }
+  /* A value in its parameter's colour, over the code's own colours: the colour says which parameter. */
+  .vtext[class*='c-'] :global(span) { color: inherit; }
   .vmeaning { font-size: 11.5px; color: var(--txt-dim); line-height: 1.4; overflow-wrap: anywhere; }
   .vmeaning.found::before {
     content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
@@ -1100,16 +1308,93 @@
   .varr-key i { display: inline-block; width: 12px; height: 8px; box-sizing: border-box; }
   .varr-key i.now { border: 1px dashed var(--txt-faint); }
   .varr-key i.then { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); margin-left: 4px; }
-  .vbits { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 8px 2px calc(8px + var(--depth, 0) * 14px); }
-  .vbyte { display: grid; grid-template-columns: auto; gap: 1px; }
-  .vbyte-label { color: var(--txt-faint); font-size: 10px; }
-  .vbyte-cells, .vbyte-ends { display: grid; grid-template-columns: repeat(8, 17px); gap: 2px; }
-  .vbit { height: 20px; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: 3px; color: var(--txt-dim);
-    font-family: var(--mono); font-size: 12px; line-height: 18px; text-align: center; }
-  .vbit.field { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--txt); }
-  .vbit.changed { font-weight: 700; }
-  .vbyte-ends span { color: var(--txt-faint); font-family: var(--mono); font-size: 9px; text-align: center; }
-  .vbits-said { margin: 0 8px 4px calc(8px + var(--depth, 0) * 14px); color: var(--txt-dim); font-size: 11px; }
+  /* The head: the call as the hint shows it, then what it does. */
+  .vsig { font-family: var(--mono); font-size: 13px; color: var(--txt-faint); margin-top: 6px; line-height: 1.5; overflow-wrap: anywhere; }
+  .vsig .vpath { margin-top: 0; display: inline; color: var(--txt); }
+  .vsig-param { color: var(--txt-faint); }
+  .vsig-param.active { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .vdesc { font-size: 12.5px; color: var(--txt); margin-top: 5px; line-height: 1.45; }
+  /* A parameter's colour, the same in the hint, on the row's name and under the value in the code. */
+  .c-blue { color: var(--blue) !important; }
+  .c-amber { color: var(--amber) !important; }
+  .c-green { color: var(--accent) !important; }
+
+  /* Under a call's rows: what it does with these values. */
+  .vexplain { margin: 6px 6px 4px calc(6px + var(--depth, 0) * 14px); padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .vlab { font-family: var(--mono); font-size: 11.5px; align-self: center; }
+  .vlab-faint { font-family: var(--mono); font-size: 11.5px; color: var(--txt-dim); }
+  .vlab-strong { font-family: var(--mono); font-size: 12px; color: var(--txt); font-weight: 700; }
+  .vbits { display: flex; flex-direction: column; gap: 10px; }
+  .vbyte { display: grid; grid-template-columns: 44px auto; gap: 4px 6px; align-items: center; }
+  .vbyte-label { grid-column: 1 / -1; color: var(--txt-faint); font-size: 10px; }
+  .vcells { display: grid; grid-template-columns: repeat(8, 22px); gap: 2px; }
+  .vcells.small { grid-template-columns: repeat(7, 14px); }
+  .vbit { height: 22px; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: 3px; color: var(--txt-dim);
+    font-family: var(--mono); font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .vcells.small .vbit { height: 20px; font-size: 11px; }
+  .vcells.small .vbit.field { border-width: 1.5px; }
+  /* margin: the script editor's own `.field` (behaviorDesigner.css) would push the cell down. */
+  .vbit.field { border: 2px solid var(--amber); color: var(--txt); margin: 0; }
+  .vbit.put { border: 2px solid var(--accent); color: var(--accent); font-weight: 700; }
+  .vbit.blank { border-style: dashed; border-color: var(--line); color: var(--txt-faint); }
+  .vbit.made { border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--txt); font-weight: 700; }
+  .vresult .vbit:not(.made) { color: var(--txt); }
+  .vnums span { text-align: center; font-family: var(--mono); font-size: 10px; color: var(--txt-faint); }
+  .vnums span.infield { color: var(--amber); font-weight: 700; }
+  .varrow { overflow: visible; }
+  .varrow line, .varrow path { stroke: var(--amber); stroke-width: 2; fill: none; }
+  .varrow circle { fill: var(--amber); }
+  .vsum-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .vseven { display: flex; flex-direction: column; gap: 6px; }
+  .vseven-row { display: grid; grid-template-columns: 44px auto auto; gap: 6px; align-items: center; justify-content: start; }
+  .vseven-groups { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vseven-group { display: flex; flex-direction: column; gap: 2px; }
+  .vseven-name { font-size: 10.5px; color: var(--amber); text-align: center; }
+  .vmsg { display: flex; flex-direction: column; gap: 4px; overflow-x: auto; }
+  .vmsg-cells { display: flex; gap: 3px; flex-wrap: wrap; }
+  .vmsg-col { display: flex; flex-direction: column; gap: 2px; width: 26px; }
+  .vbyte-cell { min-width: 26px; height: 24px; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: 4px; padding: 0 3px;
+    display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11.5px; color: var(--txt-dim); }
+  .vbyte-cell.infield { border: 2px solid var(--amber); color: var(--txt); }
+  .vbyte-cell.field-green { border: 2px solid var(--accent); }
+  .vbyte-cell.made { border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--txt); font-weight: 700; }
+  .vbyte-cell.more { border-color: transparent; color: var(--txt-faint); }
+  .vmsg-index { text-align: center; font-family: var(--mono); font-size: 10px; color: var(--txt-faint); }
+  .vmsg-index.infield { color: var(--amber); font-weight: 700; }
+  .vsends { display: grid; grid-template-columns: repeat(3, auto) minmax(0, 1fr); gap: 4px 3px; align-items: center; justify-content: start; }
+  .vhd { font-size: 10px; color: var(--txt-faint); text-align: center; }
+  .vsend-what { font-family: var(--mono); font-size: 11.5px; padding-left: 8px; }
+  .vfine { font-size: 11px; color: var(--txt-faint); line-height: 1.4; }
+  .vfine.warn { color: #e7c489; }
+  .vsteps { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 12px; font-family: var(--mono); font-size: 11.5px; color: var(--txt-dim); }
+  .vranges { overflow: visible; }
+  .vranges text { font-family: var(--mono); font-size: 10.5px; text-anchor: middle; }
+  .vr-in line { stroke: var(--amber); stroke-width: 2; } .vr-in text { fill: var(--amber); }
+  .vr-out line { stroke: var(--accent); stroke-width: 2; } .vr-out text { fill: var(--accent); }
+  .vr-dash { stroke: var(--line-2); stroke-dasharray: 3 3; }
+  .vr-value line, .vr-value path { stroke: var(--blue); stroke-width: 2; fill: none; }
+  .vr-value circle { fill: var(--blue); } .vr-value text { fill: var(--blue); font-weight: 700; }
+  .vr-result { fill: var(--txt); }
+  .vr-result-text { fill: var(--txt); font-weight: 700; }
+  .vhd-block { font-size: 10px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--txt-faint); margin-top: 2px; }
+  .vcompare { display: grid; grid-template-columns: auto 90px auto; gap: 7px 10px; align-items: center; justify-content: start; font-size: 11.5px; }
+  .vcompare .mono { font-family: var(--mono); }
+  .vcompare .now { color: var(--txt); }
+  .vcompare .other { color: var(--txt-faint); }
+  .vbar { height: 8px; border-radius: 4px; background: var(--line); display: block; }
+  .vbar span { display: block; height: 8px; border-radius: 4px; }
+  .vbar span.now { background: var(--blue); }
+  .vbar span.other { background: color-mix(in srgb, var(--blue) 35%, var(--line)); }
+  .vreturns { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 5px 10px; align-items: baseline; font-size: 11.5px; color: var(--txt-dim); }
+  .vreturns .mono { font-family: var(--mono); color: var(--txt); }
+  .vreturn-lines { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+  .vnotes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  .vnotes li { display: flex; gap: 7px; font-size: 11.5px; line-height: 1.45; color: var(--txt-dim); }
+  .vnote-mark { flex-shrink: 0; width: 10px; color: var(--txt-faint); }
+  .vnotes li.ok .vnote-mark { color: var(--accent); font-weight: 700; }
+  .vnotes li.ok { color: var(--txt); }
+  .vnotes li.warn .vnote-mark, .vnotes li.warn { color: #e7c489; }
+  .vnotes code, .vdesc code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
   .vdump { margin: 4px 8px 4px calc(8px + var(--depth, 0) * 14px); font-size: 11px; color: var(--txt-dim); }
   .vdump-head { color: var(--txt-faint); margin-bottom: 2px; }
   .vdump-line { padding: 1px 0 1px 10px; text-indent: -10px; overflow-wrap: anywhere; }

@@ -15,14 +15,20 @@ const place = (o) => placeSignatureHint({
   name: 'sendCC', params: ['channel', 'cc', 'value'], active: 1, lineHeight: 20, charWidth: CW, box: BOX, ...o,
 });
 
-test('the hint goes after the end of the caret\'s line, two characters on, when it fits there', () => {
+test('the hint goes on the caret\'s line against the right edge, when it ends two characters past the code', () => {
   // `  ce.midi.sendCC(1, 74, 64)`: 27 characters, the caret in the 74.
   const p = place({ lineEndX: at(27), caretX: at(21), lineTop: 160 });
   assert.equal(p.mode, 'inline');
-  assert.equal(p.x, at(27) + HINT.gapChars * CW);
-  assert.equal(p.y, 160, 'on the line itself, not the one above');
-  assert.deepEqual(p.parts.map((q) => [q.text, q.active]), [['channel', false], ['cc', true], ['value', false]]);
   assert.equal(p.width, Math.ceil(hintLength('sendCC', p.parts) * CW + 2 * HINT.padX));
+  assert.ok(Math.abs(p.x + hintLength('sendCC', p.parts) * CW + 2 * HINT.padX - (BOX.right - HINT.margin)) < 1e-9,
+    'its right end at the text area\'s right edge, less the margin');
+  assert.equal(p.y, 160, 'on the line itself, not the one above');
+  assert.deepEqual(p.parts.map((q) => [q.text, q.active, q.index]), [['channel', false, 0], ['cc', true, 1], ['value', false, 2]]);
+  // A line that ends just short of where the hint would start: two characters' gap is the least.
+  const width = hintLength('sendCC', p.parts) * CW + 2 * HINT.padX;
+  const room = BOX.right - HINT.margin - width - HINT.gapChars * CW;
+  assert.equal(place({ lineEndX: room, caretX: at(10), lineTop: 160 }).mode, 'inline');
+  assert.equal(place({ lineEndX: room + 1, caretX: at(10), lineTop: 160 }).mode, 'above');
 });
 
 test('a line too long for it puts it in a box exactly over the line before, at the caret, kept inside the editor', () => {
