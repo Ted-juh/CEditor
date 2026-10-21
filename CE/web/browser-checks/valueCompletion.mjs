@@ -23,6 +23,10 @@
  *   symbols    Go to symbol's list follows the arrow keys the same way
  *   path       a property path is built a segment at a time: typing in the quotes lists the
  *              controls, a dot opens the next segment's list by itself, Enter writes that segment
+ *   hint       the signature hint sits after the end of the caret's line when it fits there, else in
+ *              a box a line tall exactly over the line before (after, on the top visible line); it
+ *              and the completion list are drawn on their own background, though they are moved to
+ *              <body>; the caret's line has a bar in the accent colour
  *   js         the same in JavaScript, a choice picked with the mouse
  *
  * Text goes in with keyboard.insertText, as valuesSidebar.mjs does; keys that complete go in as keys.
@@ -364,6 +368,81 @@ try {
       section: afterSection,
       text: await editorText(),
     });
+
+  // ===============================================================================================
+  // HINT — the signature hint after the end of the caret's line, or a box above or below it; and the
+  // popups drawn as boxes, in the editor's colours, though they are moved to <body>.
+  // ===============================================================================================
+  const LONG = `-- ${'a long comment that runs past the edge of the editor '.repeat(3)}`;
+  // Line 3 has tabs, which the editor draws two columns wide: the hint is placed by columns as drawn.
+  const HINTS = `ce.midi.sendCC(1, 74, 64) ${LONG}
+function onValueChanged(value)
+\t\t\tce.midi.sendCC(1,\t74, 64)
+  ce.midi.sendCC(1, 74, 64) ${LONG}
+end
+`;
+  await typeScript(HINTS);
+  const lineOf = (n) => HINTS.split('\n').slice(0, n - 1).join('\n').length + (n > 1 ? 1 : 0);
+  /** The hint shown, its box and paint, and the caret line's on-screen top and its text's end. */
+  const hintAt = async (line) => {
+    const start = lineOf(line);
+    await clickAt(HINTS.indexOf('74', start) + 1);
+    await until(() => document.querySelector('.ce-sig'));
+    await kit.settle(200);
+    const row = await charRect(start);
+    const text = HINTS.split('\n')[line - 1];
+    const end = await charRect(start + text.length - 1);
+    return page.evaluate(({ row, end }) => {
+      const n = document.querySelector('.ce-sig');
+      const r = n.getBoundingClientRect();
+      const s = getComputedStyle(n);
+      const ta = document.querySelector('.bd-app .detail textarea.ce-ta').getBoundingClientRect();
+      // The caret's line: its band, and the bar at its left edge in the accent colour.
+      const active = document.querySelector('.bd-app .detail .ce-activeline');
+      const a = active.getBoundingClientRect();
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--accent)';
+      active.parentElement.appendChild(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      // A character's box is its glyph's; the line's box is the textarea's line height around it.
+      const lh = parseFloat(getComputedStyle(document.querySelector('.bd-app .detail textarea.ce-ta')).lineHeight);
+      const top = row.top - (lh - row.height) / 2;
+      return { mode: n.dataset.mode, parent: n.parentElement.tagName, text: n.textContent.replace(/\s+/g, ' ').trim(),
+        opaque: s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent', border: s.borderTopStyle,
+        onLine: Math.abs(r.top - top) <= 1, after: end ? r.left >= end.left + end.width : null,
+        oneLine: Math.abs(r.height - lh) <= 1,
+        overPrev: Math.abs(r.top - (top - lh)) <= 1 && r.bottom <= top + 0.5,
+        overNext: Math.abs(r.top - (top + lh)) <= 1,
+        inside: r.left >= ta.left && r.right <= ta.right,
+        bar: Math.abs(a.top - top) <= 1 && getComputedStyle(active).boxShadow.includes(accent) && getComputedStyle(active).boxShadow.includes('inset') };
+    }, { row, end });
+  };
+  const inline = await hintAt(3);
+  const above = await hintAt(4);
+  const below = await hintAt(1);
+  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC written with tabs, the hint is on that line after its last character as drawn, a line tall, over no code, and drawn on a background of its own though it is moved to <body>; the line carries the accent bar the caret\'s line has',
+    { mode: 'inline', parent: 'BODY', text: 'sendCC(channel, cc, value)', opaque: true, onLine: true, after: true, oneLine: true, inside: true, bar: true },
+    { mode: inline.mode, parent: inline.parent, text: inline.text, opaque: inline.opaque, onLine: inline.onLine, after: inline.after, oneLine: inline.oneLine,
+      inside: inline.inside, bar: inline.bar });
+  led.check(S, 'no room after the line', 'on a line too long for it, the hint is a box a line tall exactly over the line before, so it covers that line and no other, with a border and a background, inside the editor; on the top visible line, exactly over the line after',
+    { above: { mode: 'above', opaque: true, border: 'solid', oneLine: true, overPrev: true, inside: true, bar: true }, below: { mode: 'below', oneLine: true, overNext: true, inside: true } },
+    { above: { mode: above.mode, opaque: above.opaque, border: above.border, oneLine: above.oneLine, overPrev: above.overPrev, inside: above.inside, bar: above.bar },
+      below: { mode: below.mode, oneLine: below.oneLine, overNext: below.overNext, inside: below.inside } });
+  // The completion list is moved to <body> the same way, and is drawn as a box too.
+  await clickAt(lineOf(5));
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Control+Space');
+  await until(() => document.querySelector('.ce-ac'));
+  const acPaint = await page.evaluate(() => {
+    const s = getComputedStyle(document.querySelector('.ce-ac'));
+    return { opaque: s.backgroundColor !== 'rgba(0, 0, 0, 0)', border: s.borderTopStyle };
+  });
+  await page.keyboard.press('Escape');
+  led.check(S, 'the completion list is a box', 'the completion list, moved to <body> as the hint is, is drawn on its own background with its border, not over the code bare',
+    { opaque: true, border: 'solid' }, acPaint);
 
   // ===============================================================================================
   // JAVASCRIPT — the same, a choice picked with the mouse.
