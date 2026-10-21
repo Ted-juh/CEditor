@@ -281,13 +281,129 @@ test('a description with its detail moved out keeps every fact somewhere a reade
   assert.match(words('bytesFromHex'), /0x/);
   assert.match(words('bytesToBase64'), /= padding/);
   assert.match(words('bytesFromBase64'), /line breaks are ignored/);
+  // ce.math: the facts its old descriptions held. How a colour is read and that random numbers are
+  // seeded are said once, in the chapter's introduction (generate-scripting-manual.mjs).
+  assert.match(words('lighten'), /Default: 0\.4/);
+  assert.match(words('darken'), /Default: 0\.55/);
+  assert.match(words('darken'), /opposite way/);
+  assert.match(words('mixColour'), /straight line/);
+  assert.match(words('mixColour'), /Left out: 0/);
+  assert.match(words('colourAlpha'), /AARRGGBB/);
+  assert.match(words('colourAlpha'), /ce\.draw\.opacity/);
+  assert.match(words('colourAlpha'), /already has is replaced/);
+  assert.match(words('hexToRgb'), /0 ↔ 255/);
+  assert.match(words('hexToRgb'), /alpha is ignored/);
+  assert.match(words('rgbToHex'), /held at 0 or 255/);
+  assert.match(words('rgbToHex'), /fraction is rounded/);
+  assert.match(words('colourFromArgb'), /RRGGBBAA to a drawing/);
+  assert.match(words('colourFromArgb'), /returned solid/);
+  assert.match(words('colourFromRgba'), /alpha last/);
+  assert.match(words('colourFromRgba'), /returned solid/);
+  assert.match(words('hexToHsl'), /not rounded/);
+  assert.match(words('hexToHsl'), /grey has hue 0/);
+  assert.match(words('hslToHex'), /wraps round/);
+  assert.match(words('hslToHex'), /ce\.math\.hsl/);
+  assert.match(words('clamp'), /Must be below hi/);
+  assert.match(words('round'), /-2\.5 gives -2/);
+  assert.match(words('snap'), /0 leaves the value unchanged/);
+  assert.match(words('snap'), /Must be given/);
+  assert.match(words('curve'), /"linear"/);
+  assert.match(words('curve'), /ce\.math\.map/);
+  assert.match(words('curve'), /not held at 0 or 1/);
+  assert.match(words('lerp'), /not held at 0 or 1/);
+  assert.match(words('lerp'), /Must be given/);
+  assert.match(words('wrap'), /11 in Lua and -1 in JavaScript/);
+  assert.match(words('wrap'), /never equals hi/);
+  assert.match(words('mapCurve'), /later one wins/);
+  assert.match(words('mapCurve'), /held at that point's y/);
+  assert.match(words('mapCurve'), /sorted by x/);
+  assert.match(words('quantizeTo'), /lower one wins/);
+  assert.match(words('quantizeTo'), /value is returned unchanged/);
+  assert.match(words('randomChoice'), /negative weight counts as 0/);
+  assert.match(words('randomChoice'), /one random number/);
+  assert.match(words('dbToGain'), /0 dB gives 1/);
+  assert.match(words('gainToDb'), /-144/);
+  assert.match(words('norm'), /held at 0 or 1/);
+  assert.match(words('norm'), /ce\.math\.denorm/);
+  assert.match(words('denorm'), /held at 0 or 1/);
+  assert.match(words('bipolar'), /0\.5 gives 0/);
+  assert.match(words('unipolar'), /0 gives 0\.5/);
+  assert.match(words('fold'), /ce\.math\.wrap/);
+  assert.match(words('fold'), /modulation depths/);
+  assert.match(words('indexOfRange'), /last slot/);
+  assert.match(words('crossfade'), /dips audibly/);
+  assert.match(words('crossfade'), /Default: "linear"/);
+  assert.match(words('approach'), /straight to the target/);
+  assert.match(words('approach'), /without a timer/);
+  assert.match(words('roundTo'), /not text/);
+  assert.match(words('almost'), /0\.000000001/);
+  assert.match(words('minOf'), /Empty or left out: no result/);
+  assert.match(words('maxOf'), /Empty or left out: no result/);
+  assert.match(words('sumOf'), /Empty or left out: 0/);
+  assert.match(words('meanOf'), /Empty or left out: no result/);
+  assert.match(words('blend'), /shorter one/);
+  assert.match(words('blend'), /ce\.math\.lerp/);
+  assert.match(words('randomFloat'), /never reaches/);
+  assert.match(words('randomFloat'), /whole numbers/);
+  assert.match(words('randomGaussian'), /two thirds/);
+  assert.match(words('randomGaussian'), /two random numbers/);
+  assert.match(words('randomWalk'), /bounces back/);
+  assert.match(words('randomWalk'), /no limits/);
+  assert.match(words('randomBool'), /Default: 0\.5/);
+  assert.match(words('randomBool'), /probability gate/);
+  assert.match(words('shuffle'), /not changed/);
+  assert.match(words('shuffle'), /same seed always shuffles/);
+  assert.match(words('toDegrees'), /ce\.draw/);
+  assert.match(words('toRadians'), /sin and cos/);
+  assert.match(words('distance'), /XY pads/);
+  assert.match(words('angleOf'), /twelve o'clock/);
+  assert.match(words('angleOf'), /straight above gives 0/);
+  assert.match(words('polar'), /tip of a knob's pointer/);
+  assert.match(words('polar'), /y counts downwards/);
+  assert.match(words('shapeCurve'), /Default: 1\.6/);
+  assert.match(words('shapeCurve'), /different family/);
+  assert.match(words('shapeCurve'), /Macro/);
+  assert.match(words('deadzone'), /Expression Router/);
+  assert.match(words('deadzone'), /stretched/);
+  assert.match(words('weightsFor'), /adding up to 1/);
+  assert.match(words('weightsFor'), /ce\.math\.blendBy/);
+  assert.match(words('blendBy'), /0 or less: 0/);
+  assert.match(words('blendBy'), /need not add up to 1/);
+  assert.match(words('tickStops'), /Default: 11/);
+  assert.match(words('tickStops'), /line up/);
+  assert.match(words('dbPosition'), /-60/);
+  assert.match(words('dbPosition'), /\+6/);
+  assert.match(words('smooth'), /Default: 0\.0001/);
+  assert.match(words('smooth'), /ce\.math\.approach/);
+  assert.match(words('hysteresis'), /Schmitt trigger/);
+  assert.match(words('hysteresis'), /Must be below high/);
+  assert.match(words('median'), /even count/);
+  assert.match(words('median'), /stray spike/);
+  assert.match(words('euclid'), /64/);
+  assert.match(words('euclid'), /Arpeggiator/);
+  assert.match(words('unshape'), /no exact reverse/);
+  assert.match(words('unshape'), /taper/);
+  assert.match(words('random'), /whole number/);
+  assert.match(words('random'), /never 1/);
+  assert.match(words('randomSeed'), /0 uses the default/);
+  assert.match(words('randomSeed'), /never affects another script/);
+  assert.match(words('randomStream'), /ends in an error/);
+  assert.match(words('randomStream'), /drum pattern/);
   // And the descriptions themselves are the one plain sentence: no example, no parameter names.
   const midiRest = ['sendCC', 'sendRPN', 'sendSongPosition', 'sendMidi', 'sendNote', 'feedMidi', 'routeMidi', 'sendNoteOff',
     'sendProgramChange', 'sendPitchBend', 'sendAftertouch', 'sendClock', 'sendTransport', 'sendSysex', 'panic', 'from7bit',
     'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize', 'denibblize', 'toAscii', 'fromAscii', 'toOffset',
     'fromOffset', 'toSigned', 'fromSigned', 'bytesWrite', 'bytesSlice', 'bytesPut', 'bytesFind', 'bytesToHex', 'bytesFromHex',
     'bytesToBase64', 'bytesFromBase64'];
-  for (const id of ['getBits', 'setBits', 'bytesRead', 'to7bit', 'sendNRPN', 'scale', 'panelBatch', 'interceptMidiIn', 'animateStop', 'nowMs', ...midiRest]) {
+  const mathRest = ['lighten', 'darken', 'mixColour', 'colourAlpha', 'hexToRgb', 'rgbToHex',
+    'colourFromArgb', 'colourFromRgba', 'hexToHsl', 'hslToHex', 'clamp', 'round', 'snap', 'curve', 'lerp',
+    'wrap', 'mapCurve', 'quantizeTo', 'randomChoice', 'dbToGain', 'gainToDb', 'norm', 'denorm', 'bipolar',
+    'unipolar', 'fold', 'indexOfRange', 'crossfade', 'approach', 'roundTo', 'almost', 'minOf', 'maxOf',
+    'sumOf', 'meanOf', 'blend', 'randomFloat', 'randomGaussian', 'randomWalk', 'randomBool', 'shuffle',
+    'toDegrees', 'toRadians', 'distance', 'angleOf', 'polar', 'shapeCurve', 'deadzone', 'weightsFor',
+    'blendBy', 'tickStops', 'dbPosition', 'smooth', 'hysteresis', 'median', 'euclid', 'unshape', 'random',
+    'randomSeed', 'randomStream'];
+  for (const id of ['getBits', 'setBits', 'bytesRead', 'to7bit', 'sendNRPN', 'scale', 'panelBatch', 'interceptMidiIn', 'animateStop', 'nowMs', ...midiRest, ...mathRest]) {
     const s = MEMBER_BY_ID[id].summary;
     assert.ok(!s.includes('`'), `${id}: no code in the description`);
     assert.ok(s.split(/(?<=\.)\s/).length <= 2, `${id}: two sentences at most`);

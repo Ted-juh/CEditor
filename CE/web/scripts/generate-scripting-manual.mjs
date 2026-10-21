@@ -60,7 +60,34 @@ const MODULE_INTROS = {
   'ce.device': 'Working with the synth through its device profile — the description of the synth\'s parameters, messages and dumps that you build in the Device Profile Designer. With a profile you work in parameter names and real values, and the profile turns them into MIDI. These commands ask the synth for its settings, recall presets, read and change parameters by name, and describe a synth from a script when it has no profile. `role` picks which device to talk to when a panel uses more than one; it defaults to "mainSynth".',
   'ce.music': 'Helper functions for notes and harmony: note names and numbers, scales, chords, keeping a note in key, and building arpeggios. They only calculate — nothing is sent anywhere.',
   'ce.time': 'Timers, and the musical clock. A timer runs your code later or repeatedly; the musical commands read the tempo and the song position, convert between beats and milliseconds, and help you step a sequence in time. Musical timing here is accurate to about a thirtieth of a second: right for lights, displays and stepping patterns, not for timing audio.',
-  'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.',
+  'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.\n\n'
+    + '**Colours that every colour command reads**\n'
+    + '\n'
+    + '| Written as | Example | Read as |\n'
+    + '|---|---|---|\n'
+    + '| Six hex digits | "#FF8800" or "FF8800" | #FF8800 |\n'
+    + '| Eight hex digits, alpha first | "80FF8800" | #FF8800 (alpha ignored) |\n'
+    + '| Three hex digits, with # | "#F80" | #FF8800 |\n'
+    + '| A colour name | "red", "steelblue" | #FF0000, #4682B4 |\n'
+    + '| rgb() or rgba() | "rgb(255, 136, 0)" | #FF8800 |\n'
+    + '| hsl() or hsla() | "hsl(32, 100%, 50%)" | #FF8800 |\n'
+    + '\n'
+    + '**Not accepted.** The command writes an error to the console and returns no value.\n'
+    + '\n'
+    + '| Written as | Example |\n'
+    + '|---|---|\n'
+    + '| A number | 255 |\n'
+    + '| Three hex digits without # | "F80" |\n'
+    + '| # with four digits | "#F808" |\n'
+    + '| Spaces around it | " #FF8800" |\n'
+    + '\n'
+    + 'Colour commands return "#RRGGBB" unless their description says otherwise.\n'
+    + '\n'
+    + '**Random numbers**\n'
+    + '\n'
+    + '- Every random command takes its numbers from the script\'s own random sequence.\n'
+    + '- `ce.math.seed(n)` sets where that sequence starts. The same seed gives the same numbers every time: in every scripting language, in the editor and in the exported plugin.\n'
+    + '- `ce.math.stream(name, fn)` gives a block of code its own separate sequence, so two parts of a script don\'t affect each other\'s numbers.',
   'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.',
   'ce.panel': 'Changing the panel itself from a script: creating, copying and removing controls, finding them, lining them up, and editing the lists inside a control such as its states and animations. Most of these need the panel window; each entry says so. While you preview, everything a script changes is put back when the preview stops — `ce.panel.keep` is how you keep it.',
   'ce.storage': 'Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.',

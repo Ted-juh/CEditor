@@ -277,7 +277,36 @@ without a message where the byte-list helpers refuse. `to7bit(20000, 2)`, `to14b
 gives the text "41943296C", and `toAscii` does not cut text longer than its length. Their
 parameters say the ranges, not that a value outside them goes unnoticed.
 
-Next: `ce.math`, the same way: a table for the owner first.
+**Done on 2026-10-21, `ce.math`:** its 60 commands (`scale` was in the first batch). The owner
+reviewed the first twenty one at a time and asked for the rest to follow them. What was decided on
+the way, for the modules after it:
+
+- **Show the owner one item at a time.** A table of sixty was too much to answer at once.
+- **Parameters are written schematically**, not as sentences of options:
+  `Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.`
+  The parts, in this order, where they apply: what it is, `Range: a ↔ b (what a means ↔ what b
+  means)`, `Default: x` or `Left out: x`, `Must be given.`, `Must be below hi.`, `Outside the
+  range: …` (held at 0 or 1, not held, or an error in the console and no result). Use ↔, not
+  `<->`, which a page could read as the start of a tag.
+- **Plain technical wording.** Not "nothing comes back" or "gives nothing": "returns no value", "an
+  error in the console and no result", "Empty: no result".
+- **Rules a module shares can be a table.** How a colour is read is two tables in the manual's
+  `ce.math` introduction (what is read, with an example and what it is read as; what is not
+  accepted), and the random rules are a short list there.
+- **Say what the runtime does at the edges**, checked, not assumed: a value left out, outside the
+  range, or a range given the wrong way round. Where the result is meaningless (NaN), the parameter
+  says it must be given.
+
+Found on the way and left for the owner, since it is behaviour:
+
+- `hslToHex` with a negative hue gives the wrong colour (-120 gives "#FF00FF", not "#0000FF"), and a
+  negative saturation is not held at 0 (-10 gives "#738C8C").
+- `random(1.5, 3.5)` can return 1, below lo. `randomFloat` with one number is between it and 1.
+- `angleOf` of the same point twice gives 180.
+- `mixColour`, `rgbToHex` and `hslToHex` read a value that is not a number as 0, without an error.
+- `snap` without a step and `lerp` without t return NaN, without an error.
+
+Next: `ce.anim`, the same way: one command at a time.
 
 How many descriptions each module has, and how many need the most work (first sentence built on
 parameter names, with a bracketed aside, or over 25 words):
@@ -285,7 +314,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | Module | Descriptions | Need most work |
 | --- | --- | --- |
 | ce.midi | 44 | 29, all done |
-| ce.math | 61 | 35 |
+| ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12 |
 | ce.draw | 27 | 18 |
 | ce.time | 22 | 15 |
@@ -343,8 +372,8 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it. The first batch and ce.midi are done;
-rewrite the ce.math descriptions by its rules and fields (summary, example, params[].summary,
-returns, notes). Before changing any file, show me a before/after table for the ce.math commands,
-with what moves to a parameter, a note or the example marked, and wait for my answer.
+Read docs/design/api-descriptions-handoff.md and follow it. The first batch, ce.midi and ce.math are
+done; rewrite the ce.anim descriptions by its rules and fields (summary, example, params[].summary,
+returns, notes). Before changing any file, show me one command at a time, its text now and every
+field as proposed, and wait for my answer before the next.
 ```

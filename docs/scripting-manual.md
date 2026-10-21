@@ -2299,63 +2299,177 @@ Value and range arithmetic, and moving a value over time.
 
 Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.
 
+**Colours that every colour command reads**
+
+| Written as | Example | Read as |
+|---|---|---|
+| Six hex digits | "#FF8800" or "FF8800" | #FF8800 |
+| Eight hex digits, alpha first | "80FF8800" | #FF8800 (alpha ignored) |
+| Three hex digits, with # | "#F80" | #FF8800 |
+| A colour name | "red", "steelblue" | #FF0000, #4682B4 |
+| rgb() or rgba() | "rgb(255, 136, 0)" | #FF8800 |
+| hsl() or hsla() | "hsl(32, 100%, 50%)" | #FF8800 |
+
+**Not accepted.** The command writes an error to the console and returns no value.
+
+| Written as | Example |
+|---|---|
+| A number | 255 |
+| Three hex digits without # | "F80" |
+| # with four digits | "#F808" |
+| Spaces around it | " #FF8800" |
+
+Colour commands return "#RRGGBB" unless their description says otherwise.
+
+**Random numbers**
+
+- Every random command takes its numbers from the script's own random sequence.
+- `ce.math.seed(n)` sets where that sequence starts. The same seed gives the same numbers every time: in every scripting language, in the editor and in the exported plugin.
+- `ce.math.stream(name, fn)` gives a block of code its own separate sequence, so two parts of a script don't affect each other's numbers.
+
 #### `ce.math.lighten(colour [, amount]) -> string`
 
-Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is read as a colour property reads it: 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#", or a short form, "#RGB", a name such as "red", rgb(), rgba(), hsl() or hsla(), read as the colour a property would store for it ("red" is "#FF0000", and rgba(255, 0, 0, 0.5) is "80FF0000", its alpha set aside). A number, "#" with four digits, text with space around it and anything else that cannot be read are refused with a message, and nothing is returned.
+Make a colour lighter.
+
+Example: `lighten("#336699", 0.5)` gives "#99B3CC".
+
+- `colour`: The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).
+- `amount`: Range: 0 ↔ 1 (unchanged ↔ white). Default: 0.4. Outside the range: an error in the console and no result.
 
 *Short name: `lighten`.*
 
 #### `ce.math.darken(colour [, amount]) -> string`
 
-Make a colour darker. `amount` is how much of the colour's brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55; a number outside 0 to 1 is refused with a message. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. The colour is read as `ce.math.lighten()` reads it, and one that cannot be read is refused with a message, so nothing is returned.
+Make a colour darker.
+
+Example: `darken("#336699", 0.5)` gives "#1A334D".
+
+- `colour`: The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).
+- `amount`: Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.
+
+Good to know:
+
+- The amount works the opposite way to lighten's: a smaller amount makes the colour darker.
 
 *Short name: `darken`.*
 
 #### `ce.math.mix(a, b, t) -> string`
 
-Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Each colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and if either cannot be read, it is refused with a message and nothing is returned.
+Blend two colours.
+
+Example: `mixColour("#00FF00", "#FF0000", 0.5)` gives "#808000".
+
+- `a`: The first colour, in any form a colour property takes.
+- `b`: The second colour, in any form a colour property takes.
+- `t`: Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway. Left out: 0. Outside the range: held at 0 or 1.
+
+Good to know:
+
+- Red, green and blue are each blended in a straight line. This suits a meter that fades from green to red.
 
 *Short name: `mixColour`.*
 
 #### `ce.math.alpha(colour, a) -> string`
 
-Give a colour a transparency, ready to store in a control's colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel's own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web's `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. The colour is read as `ce.math.lighten()` reads it, and any alpha it has is replaced; one it cannot read is refused with a message, and nothing is returned.
+Give a colour a transparency, ready to store in a control's colour property.
+
+Example: `colourAlpha("#FF0000", 0.5)` gives "80FF0000".
+
+- `colour`: The colour, in any form a colour property takes. Any alpha it already has is replaced.
+- `a`: Range: 0 ↔ 1 (fully transparent ↔ fully solid). Outside the range or left out: an error in the console and no result.
+
+Good to know:
+
+- It returns AARRGGBB without "#", the form a colour property stores. The other colour commands return "#RRGGBB".
+- The web's #RRGGBBAA form has the same four bytes in a different order, so the two forms can't be swapped.
+- To make something you draw see-through, use `ce.draw.opacity`.
 
 *Short name: `colourAlpha`.*
 
 #### `ce.math.rgb(colour) -> table`
 
-Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. The colour is read as `ce.math.lighten()` reads it: eight hex digits are AARRGGBB, short forms such as "#abc", "red" and rgb() are read too, and any alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.
+Split a colour into its red, green and blue parts.
+
+Example: `hexToRgb("#FF8000")` gives r 255, g 128 and b 0.
+
+- `colour`: The colour, in any form a colour property takes. Any alpha is ignored.
+
+Good to know:
+
+- It returns r, g and b, each in the range 0 ↔ 255.
 
 *Short name: `hexToRgb`.*
 
 #### `ce.math.hex(r, g, b) -> string`
 
-Build a colour from red, green and blue parts, each from 0 to 255, and return it as "#RRGGBB". A part outside that range is held at 0 or 255 rather than wrapping round, and fractions are rounded.
+Build a colour from red, green and blue parts.
+
+Example: `rgbToHex(255, 128, 0)` gives "#FF8000".
+
+- `r`: Red. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.
+- `g`: Green. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.
+- `b`: Blue. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.
 
 *Short name: `rgbToHex`.*
 
 #### `ce.math.fromARGB(colour) -> string`
 
-Read a colour written with its alpha first, `AARRGGBB`, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are AARRGGBB to a colour property and to the other colour commands, but the other way round to a drawing, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromRGBA()` reads the alpha last.
+Read a colour written with its alpha first, as AARRGGBB.
+
+Example: `colourFromArgb("#80FF0000")` gives "80FF0000".
+
+- `colour`: 8 or 4 hex digits, alpha first, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.
+
+Good to know:
+
+- It returns "#RRGGBB" when the colour is fully solid, otherwise AARRGGBB without "#".
+- "#" with 8 hex digits means AARRGGBB to a colour property and the colour commands, but RRGGBBAA to a drawing. This command says you mean alpha first; `ce.math.fromRGBA` says alpha last.
 
 *Short name: `colourFromArgb`.*
 
 #### `ce.math.fromRGBA(colour) -> string`
 
-Read a colour written with its alpha last, `RRGGBBAA`, the web's order, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are read this way by a drawing, but as AARRGGBB by a colour property and the other colour commands, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromARGB()` reads the alpha first.
+Read a colour written with its alpha last, as RRGGBBAA, the web's order.
+
+Example: `colourFromRgba("#FF000080")` gives "80FF0000".
+
+- `colour`: 8 or 4 hex digits, alpha last, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.
+
+Good to know:
+
+- It returns "#RRGGBB" when the colour is fully solid, otherwise AARRGGBB without "#".
+- "#" with 8 hex digits means RRGGBBAA to a drawing, but AARRGGBB to a colour property and the colour commands. This command says you mean alpha last; `ce.math.fromARGB` says alpha first.
 
 *Short name: `colourFromRgba`.*
 
 #### `ce.math.hsl(colour) -> table`
 
-Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. The colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and one that cannot be read is refused with a message, so nothing is returned.
+Describe a colour by its hue, saturation and lightness.
+
+Example: `hexToHsl("#FF0000")` gives h 0, s 100 and l 50.
+
+- `colour`: The colour, in any form a colour property takes. Any alpha is ignored.
+
+Good to know:
+
+- It returns h in the range 0 ↔ 360, and s and l in the range 0 ↔ 100, as in the colour editor. The numbers are not rounded.
+- A grey has hue 0 and saturation 0.
 
 *Short name: `hexToHsl`.*
 
 #### `ce.math.fromHsl(h, s, l) -> string`
 
-Build a colour from hue (0 to 360), saturation and lightness (0 to 100) and return it as "#RRGGBB". The reverse of `ce.math.hsl()`.
+Build a colour from hue, saturation and lightness.
+
+Example: `hslToHex(120, 100, 50)` gives "#00FF00".
+
+- `h`: Hue. Range: 0 ↔ 360. Left out: 0. Above 360: wraps round, so 480 is 120.
+- `s`: Saturation. Range: 0 ↔ 100. Left out: 0. Above 100: held at 100.
+- `l`: Lightness. Range: 0 ↔ 100. Left out: 0. Above 100: held at 100.
+
+Good to know:
+
+- The reverse of `ce.math.hsl`.
 
 *Short name: `hslToHex`.*
 
@@ -2364,56 +2478,56 @@ Build a colour from hue (0 to 360), saturation and lightness (0 to 100) and retu
 | Function | What it does |
 |---|---|
 | `ce.math.scale(v, inLo, inHi, outLo, outHi)` | Move a value from one range to another. Example: `scale(64, 0, 127, 0, 100)` gives about 50. `v`: The value to move. `inLo`: The low end of the range the value is in. `inHi`: The high end of the range the value is in. If it equals the low end, the result is the new range's low end. `outLo`: The low end of the range to move it to. `outHi`: The high end of the range to move it to. The result is not kept inside the new range: a value outside the first range lands outside the second. Use `ce.math.norm()` and `ce.math.denorm()` when it must stay inside. Short name: `scale`. |
-| `ce.math.clamp(v, lo, hi)` | Keep a value inside a range: anything below `lo` becomes `lo`, anything above `hi` becomes `hi`, and anything in between comes back unchanged. Short name: `clamp`. |
-| `ce.math.round(v)` | Round to the nearest whole number. A half rounds up, so 2.5 gives 3 and -2.5 gives -2. To keep some decimal places, use `ce.math.roundTo()`. Short name: `round`. |
-| `ce.math.snap(v, step)` | Round a value to the nearest multiple of `step`: `ce.math.snap(37, 10)` gives 40. A `step` of 0 leaves the value unchanged. For steps that are not evenly spaced, use `ce.math.quantize()`. Short name: `snap`. |
-| `ce.math.curve(v, shape)` | Bend a 0 to 1 value with a named response curve: "linear", "exp", "log" or "s". An unknown name prints a note to the console and is treated as "linear". For a curve of your own, use `ce.math.map()`; for the curves the panel's Envelopes use, use `ce.math.shape()`. Short name: `curve`. |
-| `ce.math.lerp(a, b, t)` | Blend between two numbers: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the point halfway between. `t` is not held inside 0 to 1, so values beyond either end carry on past `a` or `b`. For whole lists of numbers, use `ce.math.blend()`. Short name: `lerp`. |
-| `ce.math.wrap(v, lo, hi)` | Wrap a value round into a range, so that going past the top starts again from the bottom: `ce.math.wrap(12, 0, 12)` gives 0 and `ce.math.wrap(-1, 0, 12)` gives 11. The result can equal `lo` but never `hi`. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator, which treats negative numbers differently from language to language: the same expression gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
-| `ce.math.map(v, points)` | Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point's y rather than continuing the line. Two points with the same x make a step, and the later one wins. A point can also bend the line that ends at it, the way an Envelope's point does: a third entry or `curve` names the shape, as `ce.math.shape()` does ("exp", "log", "s" or "hold"), and a fourth entry or `tension` says how far it bends, so {1, 1, "exp"} rises slowly and then fast. Short name: `mapCurve`. |
-| `ce.math.quantize(v, values)` | Snap a value to the nearest entry in a list: `ce.math.quantize(9, {0, 8, 16})` gives 8. When the value sits exactly halfway between two entries, the lower one wins. An empty list returns the value unchanged. For evenly spaced steps, use `ce.math.snap()`. Short name: `quantizeTo`. |
-| `ce.math.choice(values [, weights])` | Pick one entry from a list at random, using the script's seeded random numbers. With `weights`, each entry's chance is its weight divided by the total, so weights of {3, 1} make the first entry three times as likely as the second. A missing or negative weight counts as zero, and if every weight is zero each entry is equally likely. It uses exactly one random number either way, so adding weights does not change what later random calls return. Returns nothing for an empty list. Short name: `randomChoice`. |
-| `ce.math.dbToGain(db)` | Convert decibels to a linear gain: 0 dB gives 1, and -6 dB gives about 0.5. Short name: `dbToGain`. |
-| `ce.math.gainToDb(gain)` | Convert a linear gain to decibels: 1 gives 0 dB, and 0.5 gives about -6 dB. A gain of zero or less gives -144 dB (the floor of 24-bit audio) instead of minus infinity, and nothing comes back lower than that. Short name: `gainToDb`. |
-| `ce.math.norm(v, lo, hi)` | Turn a value into its position within a range: 0 at `lo`, 1 at `hi`. Values outside the range are held at 0 or 1. The reverse is `ce.math.denorm()`. Short name: `norm`. |
-| `ce.math.denorm(t, lo, hi)` | Turn a 0 to 1 position back into a value in a range: 0 gives `lo` and 1 gives `hi`. Positions outside 0 to 1 are held at the ends. The reverse of `ce.math.norm()`. Short name: `denorm`. |
-| `ce.math.bipolar(t)` | Convert a 0 to 1 value to the -1 to +1 range: 0 becomes -1, 0.5 becomes 0 and 1 becomes +1. The reverse is `ce.math.unipolar()`. Short name: `bipolar`. |
-| `ce.math.unipolar(v)` | Convert a -1 to +1 value to the 0 to 1 range: -1 becomes 0, 0 becomes 0.5 and +1 becomes 1. The reverse of `ce.math.bipolar()`. Short name: `unipolar`. |
-| `ce.math.fold(v, lo, hi)` | Bounce a value back off the ends of a range instead of wrapping it: past `hi` it heads back down, and below `lo` it heads back up. Where `ce.math.wrap()` jumps from the top to the bottom, fold keeps the movement smooth, which suits modulation depths; wrap suits pitch classes. Short name: `fold`. |
-| `ce.math.index(t, count)` | Turn a 0 to 1 position into a slot number, counting from 0, for `count` slots, for example to pick one of eight waveforms with a knob. At exactly 1 it returns the last slot, `count - 1`, rather than one past the end. Short name: `indexOfRange`. |
-| `ce.math.crossfade(a, b, t [, law])` | Fade from `a` to `b` as `t` goes from 0 to 1, using one of the Crossfader component's three fade laws: "linear", "equalPower" or "sharp". `law` defaults to "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. Short name: `crossfade`. |
-| `ce.math.approach(current, target, maxStep)` | Move `current` toward `target`, but by no more than `maxStep` in one call; once it is within `maxStep`, it lands exactly on the target. It keeps nothing between calls, so you can use it in any handler (say, each time an expression pedal sends a value) without running a timer. A `maxStep` of 0 jumps straight to the target. Short name: `approach`. |
-| `ce.math.roundTo(v, decimals)` | Round to a number of decimal places: `ce.math.roundTo(3.14159, 2)` gives 3.14. Returns a number, not text, so you can keep calculating with it. Short name: `roundTo`. |
-| `ce.math.almost(a, b [, epsilon])` | Check whether two numbers are equal to within `epsilon`, which defaults to a tiny 0.000000001. Use it instead of == on values that have been through `ce.math.scale()`, `ce.math.curve()` or similar arithmetic, where rounding can leave numbers that should match a hair apart. Short name: `almost`. |
-| `ce.math.min(values)` | The smallest number in a list, or nothing if the list is empty. Short name: `minOf`. |
-| `ce.math.max(values)` | The largest number in a list, or nothing if the list is empty. Short name: `maxOf`. |
-| `ce.math.sum(values)` | The total of a list of numbers, or 0 if the list is empty. Short name: `sumOf`. |
-| `ce.math.mean(values)` | The average of a list of numbers, or nothing if the list is empty. Short name: `meanOf`. |
-| `ce.math.blend(fromList, toList, t) -> list` | Blend one list of numbers into another, entry by entry: `t` of 0 gives `fromList` and 1 gives `toList`, like a morph between two snapshots. Both arguments are lists; for two single numbers use `ce.math.lerp()`. If the lists differ in length, the result is as long as the shorter one: the extra entries are dropped, not blended toward zero. Short name: `blend`. |
-| `ce.math.randomFloat(lo, hi)` | A random number with a fractional part, from `lo` up to but not including `hi`, taken from the script's seeded random numbers. With no arguments it runs from 0 to 1. `ce.math.random(lo, hi)` gives whole numbers; use this when you want fractions. Short name: `randomFloat`. |
-| `ce.math.gaussian([mean, sd])` | A random number on a bell curve: most results land near `mean` (default 0), and `sd`, the standard deviation (default 1), sets how widely they spread, with about two thirds falling within one `sd` of `mean`. Good for humanising velocity or timing, where an even spread sounds mechanical. It always uses exactly two numbers from the seeded sequence, so replaying a seed stays in step. Short name: `randomGaussian`. |
-| `ce.math.walk(current, step, lo, hi)` | Take one step of a random walk: returns `current` moved by a random amount of up to `step` in either direction. Feed the result back in each time for a line that drifts instead of jumping. At `lo` and `hi` the walk bounces back rather than sticking to the edge; leave them out for no limits. Uses the script's seeded random numbers. Short name: `randomWalk`. |
-| `ce.math.chance([chance])` | Return true or false at random, from the script's seeded random numbers. `chance` is the probability of true, from 0 to 1, and defaults to 0.5: 0.25 gives true about one time in four. Handy as a probability gate on sequencer steps. Short name: `randomBool`. |
-| `ce.math.shuffle(values)` | Return a new list with the same entries in random order; the original list is left alone. It uses the script's seeded random numbers, one for each entry after the first, so the same seed always shuffles the same way. Short name: `shuffle`. |
-| `ce.math.degrees(radians)` | Convert an angle from radians to degrees, the unit `ce.draw` uses for arcs. Short name: `toDegrees`. |
-| `ce.math.radians(degrees)` | Convert an angle from degrees to radians, the unit your language's own sin and cos expect. Short name: `toRadians`. |
-| `ce.math.distance(x1, y1, x2, y2)` | The straight-line distance between two points. Handy for XY pads, joysticks and the Orbit, and for checking whether a click landed on something you drew with `ce.draw`. Short name: `distance`. |
-| `ce.math.angle(x1, y1, x2, y2)` | The angle from the first point to the second, in the convention `ce.draw` uses: degrees from 0 to 360, with 0 at twelve o'clock and increasing clockwise. As on screen, y counts downwards, so a point straight above gives 0. Short name: `angleOf`. |
-| `ce.math.polar(angle, radius)` | Turn an angle and a distance into { x, y } offsets from a centre point, using the same convention as `ce.math.angle()`: degrees, 0 at twelve o'clock, clockwise. Add the offsets to your centre to find, for example, the tip of a knob's pointer. Short name: `polar`. |
-| `ce.math.shape(v, curve [, tension])` | Bend a 0 to 1 value with the curves the panel's Envelope segments and Router breakpoints use: "linear", "exp", "log", "scurve" ("s" also works) and "hold". This is a different family from `ce.math.curve()`. `tension` sets how strongly "exp" and "log" bend and defaults to 1.6, as in the app, so leaving it out (or passing 0) does not give a straight line. With `tension` at 1 it matches the curve a Macro slot uses, so `shape(v, curve, 1)` reproduces it. Short name: `shapeCurve`. |
-| `ce.math.deadzone(v, amount [, invert])` | Add a dead zone to the bottom of a 0 to 1 value, the way the Expression Router shapes its input. Anything at or below `amount` becomes 0, and the rest is stretched to fill 0 to 1, so the response starts right at the edge of the dead zone instead of jumping up from it. Pass `invert` as true to flip the value first. Short name: `deadzone`. |
-| `ce.math.weights(points, x, y [, power])` | Work out how much each anchor point counts at a position, the way a Timbre Space or Preset Constellation does: the closer an anchor is to `x`, `y`, the bigger its share. `points` is a list of { x, y } anchors, and `x` and `y` run from 0 to 1. Returns one weight per point, adding up to 1. `power` (default 2) sets how sharp the blend is: higher lets the nearest anchor take over sooner. Pass the result to `ce.math.blendBy()` to morph values. Short name: `weightsFor`. |
-| `ce.math.blendBy(values, weights)` | A weighted average: each entry in `values` counts as much as its matching entry in `weights`, which is how a morph pad turns its weights into one value. The weights do not need to add up to 1, and if they add up to zero or less the result is 0. `ce.math.blend()` blends two lists; this combines many values into one. Short name: `blendBy`. |
-| `ce.math.ticks(major [, minor])` | The positions of a slider's scale marks, from 0 to 1, as { major, minor } lists, the same ones the app draws. `major` is how many major marks there are, counting both ends (default 11); `minor` is how many smaller marks sit between each pair (default 0). Use it when you draw your own scale, so its marks line up with the app's. Short name: `tickStops`. |
-| `ce.math.dbPosition(fraction [, floorDb, ceilDb])` | How far up a dB meter a level reaches, from 0 (bottom) to 1 (top). `fraction` is a linear level from 0 to 1; it is converted to decibels and placed between `floorDb` and `ceilDb`, which default to -60 and +6 like the Meter component. Short name: `dbPosition`. |
-| `ce.math.smooth(current, target, coefficient [, epsilon])` | Move `current` part of the way toward `target`: `coefficient`, from 0 to 1, is the share of the remaining distance covered on each call, so the value moves quickly at first and eases in as it gets close. Once within `epsilon` (default 0.0001) it snaps to the target, so it actually arrives instead of creeping closer forever. Good for taming a jittery pedal or a noisy CC. For a fixed step size, use `ce.math.approach()`. Short name: `smooth`. |
-| `ce.math.hysteresis(value, on, low, high)` | Turn a changing value into an on/off state that does not flicker. It switches on when `value` reaches `high`, switches off when it falls to `low`, and keeps its current state in between. Pass the current state as `on` and it returns the new one. With two thresholds, a value hovering around one line cannot flip the state back and forth. Electronics calls this a Schmitt trigger. Short name: `hysteresis`. |
-| `ce.math.median(values)` | The middle value of a list, or the average of the two middle values when the count is even. Returns nothing for an empty list. Unlike an average, a single stray spike does not pull it off course. Short name: `median`. |
-| `ce.math.euclid(steps, pulses [, rotation])` | A Euclidean rhythm: `pulses` hits spread as evenly as possible across `steps` steps (up to 64), returned as a list of true and false values. It is the same pattern the Arpeggiator uses for its rests. `rotation` shifts the pattern round without changing the spacing between hits. Short name: `euclid`. |
-| `ce.math.unshape(y, curve [, tension])` | The reverse of `ce.math.shape()`: give it a value that has been through a curve, with the same `curve` and `tension`, and it returns the value from before the curve. Use it when a value comes back from the synth through a taper, so the control lands where it started. "hold" is a step with no true reverse, so it returns the earliest input that gives that output. Short name: `unshape`. |
-| `ce.math.random([lo, hi])` | A random number from the script's seeded sequence. With no arguments, a fraction from 0 up to but not including 1. With `lo` and `hi`, a whole number from `lo` to `hi`, both included. The same seed replays the same sequence in every scripting language, in the editor and in the exported plugin. Short name: `random`. |
-| `ce.math.seed(n)` | Set the seed for this script's random numbers, so the same seed replays the same sequence. A seed of 0 uses the default. Until you set one, every script starts from that same default, so its numbers repeat each time it loads. Every script has its own sequence, and so does every named stream, so this never affects another script. Short name: `randomSeed`. |
-| `ce.math.stream(name, fn)` | Run `fn` with its random numbers taken from a separate, named sequence, so two generative parts of one script (a melody and a drum pattern, say) do not disturb each other's numbers or seeds. The script's normal sequence comes back when the block ends, even if it ends in an error. Streams belong to one script: two scripts using the same name get separate streams. Short name: `randomStream`. |
+| `ce.math.clamp(v, lo, hi)` | Keep a value inside a range. Example: `clamp(140, 0, 127)` gives 127. `v`: The value to keep in range. `lo`: The bottom of the range. Must be below hi. A value below it gives lo. `hi`: The top of the range. A value above it gives hi. Short name: `clamp`. |
+| `ce.math.round(v)` | Round to the nearest whole number. Example: `round(2.5)` gives 3. `v`: The number to round. A half always rounds up, so -2.5 gives -2. To keep decimal places, use `ce.math.roundTo`. Short name: `round`. |
+| `ce.math.snap(v, step)` | Round a value to the nearest step. Example: `snap(37, 10)` gives 40. `v`: The value to round. `step`: The size of the steps, such as 10 or 0.25. Must be given. 0 leaves the value unchanged. Halfway rounds up, as with `ce.math.round`: 35 gives 40. For steps that are not evenly spaced, use `ce.math.quantize`. Short name: `snap`. |
+| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v`: The value. Range: 0 ↔ 1. Outside the range: not held at 0 or 1. `shape`: "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
+| `ce.math.lerp(a, b, t)` | Blend between two numbers. Example: `lerp(10, 20, 0.25)` gives 12.5. `a`: The first number. `b`: The second number. `t`: Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway. Must be given. Outside the range: not held at 0 or 1, so the result goes past a or b. For whole lists of numbers, use `ce.math.blend`. Short name: `lerp`. |
+| `ce.math.wrap(v, lo, hi)` | Wrap a value into a range, so going past the top starts again from the bottom. Example: `wrap(-1, 0, 12)` gives 11. `v`: The value to wrap. `lo`: The bottom of the range. Must be below hi. The result can equal lo. `hi`: The top of the range. The result never equals hi: wrap(12, 0, 12) gives 0. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator. With a negative number, % differs between languages: -1 % 12 gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
+| `ce.math.map(v, points)` | Map a value through a curve you draw as points. Example: `mapCurve(0.25, {{0, 0}, {0.5, 0.9}, {1, 1}})` gives 0.45. `v`: The value to map. `points`: A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends. Left out or empty: the value is returned unchanged. Below the first point or above the last: held at that point's y. Two points with the same x make a step, and the later one wins. {1, 1, "exp"} rises slowly, then fast. Short name: `mapCurve`. |
+| `ce.math.quantize(v, values)` | Snap a value to the nearest entry in a list. Example: `quantizeTo(9, {0, 8, 16})` gives 8. `v`: The value to snap. `values`: The entries to choose from, in any order. Left out or empty: the value is returned unchanged. Exactly halfway between two entries, the lower one wins: 12 gives 8. For evenly spaced steps, use `ce.math.snap`. Short name: `quantizeTo`. |
+| `ce.math.choice(values [, weights])` | Pick an entry from a list at random. Example: `randomChoice({"C", "E", "G"}, {3, 1, 1})` picks "C" three times as often as "E" or "G". `values`: The entries. Empty: no result. `weights`: How likely each entry is: its weight divided by the total. Default: all equal. A missing or negative weight counts as 0; if every weight is 0, all are equal. It uses one random number, with or without weights, so adding weights does not change later random numbers. Short name: `randomChoice`. |
+| `ce.math.dbToGain(db)` | Convert decibels to a linear gain. Example: `dbToGain(-6)` gives about 0.5. `db`: The level in dB. 0 dB gives 1. Short name: `dbToGain`. |
+| `ce.math.gainToDb(gain)` | Convert a linear gain to decibels. Example: `gainToDb(0.5)` gives about -6. `gain`: The linear gain. 1 gives 0 dB. 0 or below gives -144 dB, the floor of 24-bit audio; no result is lower than that. Short name: `gainToDb`. |
+| `ce.math.norm(v, lo, hi)` | Turn a value into its position within a range, from 0 to 1. Example: `norm(64, 0, 127)` gives about 0.5. `v`: The value. Outside the range: held at 0 or 1. `lo`: The value that gives 0. `hi`: The value that gives 1. It may be below lo, for a range that runs the other way. The reverse is `ce.math.denorm`. Short name: `norm`. |
+| `ce.math.denorm(t, lo, hi)` | Turn a position from 0 to 1 back into a value in a range. Example: `denorm(0.5, 0, 127)` gives 63.5. `t`: Range: 0 ↔ 1 (lo ↔ hi). Outside the range: held at 0 or 1. `lo`: The value at 0. `hi`: The value at 1. It may be below lo, for a range that runs the other way. The reverse of `ce.math.norm`. Short name: `denorm`. |
+| `ce.math.bipolar(t)` | Turn a value from 0 to 1 into one from -1 to +1. Example: `bipolar(0.75)` gives 0.5. `t`: Range: 0 ↔ 1 (-1 ↔ +1). 0.5 gives 0. Outside the range: not held. The reverse is `ce.math.unipolar`. Short name: `bipolar`. |
+| `ce.math.unipolar(v)` | Turn a value from -1 to +1 into one from 0 to 1. Example: `unipolar(0.5)` gives 0.75. `v`: Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5. Outside the range: not held. The reverse of `ce.math.bipolar`. Short name: `unipolar`. |
+| `ce.math.fold(v, lo, hi)` | Bounce a value back off the ends of a range. Example: `fold(12, 0, 10)` gives 8. `v`: The value. Past the top it heads back down; below the bottom it heads back up. `lo`: The bottom of the range. Must be below hi. `hi`: The top of the range. Where `ce.math.wrap` jumps from the top to the bottom, fold keeps the movement smooth. Fold suits modulation depths; wrap suits pitch classes. Short name: `fold`. |
+| `ce.math.index(t, count)` | Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks. Example: `indexOfRange(0.5, 8)` gives 4. `t`: Range: 0 ↔ 1 (first slot ↔ last slot). Outside the range: held at the first or last slot. `count`: How many slots. They count from 0, so the last is count - 1. Short name: `indexOfRange`. |
+| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a`: The value at 0. `b`: The value at 1. `t`: Range: 0 ↔ 1 (a ↔ b). Left out: 0. Outside the range: held at 0 or 1. `law`: "linear", "equalPower" or "sharp". Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
+| `ce.math.approach(current, target, maxStep)` | Move a value toward a target by no more than a set step. Example: `approach(10, 50, 15)` gives 25. `current`: The value now. `target`: Where it is going. Within one step of it: the target exactly. `maxStep`: The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive. It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value. Short name: `approach`. |
+| `ce.math.roundTo(v, decimals)` | Round to a number of decimal places. Example: `roundTo(3.14159, 2)` gives 3.14. `v`: The number to round. `decimals`: How many decimal places to keep. Default: 0. Below 0: 0. It returns a number, not text, so you can keep calculating with it. Short name: `roundTo`. |
+| `ce.math.almost(a, b [, epsilon])` | Check whether two numbers are equal to within a small margin. Example: `almost(0.1 + 0.2, 0.3)` gives true. `a`: The first number. `b`: The second number. `epsilon`: How far apart they may be. Default: 0.000000001. Use it instead of == on numbers that have been through arithmetic such as `ce.math.scale`, where rounding can leave two numbers that should match very slightly apart. Short name: `almost`. |
+| `ce.math.min(values)` | Find the smallest number in a list. Example: `minOf({3, 1, 2})` gives 1. `values`: The numbers. Empty or left out: no result. Short name: `minOf`. |
+| `ce.math.max(values)` | Find the largest number in a list. Example: `maxOf({3, 1, 2})` gives 3. `values`: The numbers. Empty or left out: no result. Short name: `maxOf`. |
+| `ce.math.sum(values)` | Add up a list of numbers. Example: `sumOf({1, 2, 3})` gives 6. `values`: The numbers. Empty or left out: 0. Short name: `sumOf`. |
+| `ce.math.mean(values)` | Find the average of a list of numbers. Example: `meanOf({1, 2, 6})` gives 3. `values`: The numbers. Empty or left out: no result. Short name: `meanOf`. |
+| `ce.math.blend(fromList, toList, t) -> list` | Blend one list of numbers into another, entry by entry. Example: `blend({0, 100}, {10, 0}, 0.5)` gives {5, 50}. `fromList`: The list at 0. `toList`: The list at 1. If the lists differ in length, the result is as long as the shorter one. `t`: Range: 0 ↔ 1 (fromList ↔ toList). Left out: 0. Outside the range: not held at 0 or 1. Use it to morph between two snapshots. For two single numbers, use `ce.math.lerp`. Short name: `blend`. |
+| `ce.math.randomFloat(lo, hi)` | Get a random number with a fractional part. Example: `randomFloat(0.5, 2)` gives a number from 0.5 up to, but not including, 2. `lo`: The bottom of the range. Both left out: 0 ↔ 1. Given alone: between lo and 1, so randomFloat(5) is between 1 and 5. `hi`: The top of the range, which it never reaches. It may be below lo. `ce.math.random` with two numbers gives whole numbers; use this one for fractions. Short name: `randomFloat`. |
+| `ce.math.gaussian([mean, sd])` | Get a random number on a bell curve, so most results land near the middle. Example: `randomGaussian(100, 5)` gives a number near 100: within 5 of it about two times in three. `mean`: Where most results land. Default: 0. `sd`: How widely they spread, the standard deviation: about two thirds land within one sd of the mean. Default: 1. Use it to humanise velocity or timing, where an even spread sounds mechanical. It always uses two random numbers, so a replayed seed stays in step. Short name: `randomGaussian`. |
+| `ce.math.walk(current, step, lo, hi)` | Take one step of a random walk, for a value that drifts instead of jumping. Example: `randomWalk(64, 3, 0, 127)` gives a number from 61 to 67. `current`: The value now. Pass back what the last call returned. `step`: The most it moves, either way. `lo`: The bottom. At it, the walk bounces back. Left out, with hi: no limits. `hi`: The top. At it, the walk bounces back. Short name: `randomWalk`. |
+| `ce.math.chance([chance])` | Get true or false at random. Example: `randomBool(0.25)` gives true about one time in four. `chance`: The probability of true. Range: 0 ↔ 1 (never ↔ always). Default: 0.5. Outside the range: held at 0 or 1. Use it as a probability gate on sequencer steps. Short name: `randomBool`. |
+| `ce.math.shuffle(values)` | Put a list in random order. Example: `shuffle({1, 2, 3})` gives the same three numbers in a random order. `values`: The list. It is not changed: a new list is returned. Empty or left out: an empty list. It uses one random number for each entry after the first, so the same seed always shuffles the same way. Short name: `shuffle`. |
+| `ce.math.degrees(radians)` | Convert an angle from radians to degrees. Example: `toDegrees(3.14159)` gives about 180. `radians`: The angle in radians. ce.draw measures arcs in degrees. Short name: `toDegrees`. |
+| `ce.math.radians(degrees)` | Convert an angle from degrees to radians. Example: `toRadians(180)` gives about 3.14159. `degrees`: The angle in degrees. Your language's own sin and cos take radians. Short name: `toRadians`. |
+| `ce.math.distance(x1, y1, x2, y2)` | Measure the straight-line distance between two points. Example: `distance(0, 0, 3, 4)` gives 5. `x1`: The first point's x. `y1`: The first point's y. `x2`: The second point's x. `y2`: The second point's y. Use it for XY pads, joysticks and the Orbit, or to check whether a click landed on something you drew. Short name: `distance`. |
+| `ce.math.angle(x1, y1, x2, y2)` | Find the angle from one point to another. Example: `angleOf(0, 0, 10, 0)` gives 90. `x1`: The first point's x. `y1`: The first point's y. `x2`: The second point's x. `y2`: The second point's y. It returns degrees in the range 0 ↔ 360: 0 at twelve o'clock, increasing clockwise, as ce.draw measures them. y counts downwards, as on screen, so a point straight above gives 0. The same point twice gives 180. Short name: `angleOf`. |
+| `ce.math.polar(angle, radius)` | Turn an angle and a distance into x and y offsets from a centre. Example: `polar(0, 10)` gives x 0 and y -10: straight up, as y counts downwards. `angle`: The angle in degrees: 0 at twelve o'clock, increasing clockwise, as ce.math.angle returns it. `radius`: The distance from the centre. Left out: 0. Add the offsets to your centre to find, for example, the tip of a knob's pointer. Short name: `polar`. |
+| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v`: The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1. `curve`: "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Left out or unknown: "linear". `tension`: How strongly "exp" and "log" bend. Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
+| `ce.math.deadzone(v, amount [, invert])` | Add a dead zone to the bottom of a value from 0 to 1, as the Expression Router does. Example: `deadzone(0.55, 0.1)` gives 0.5. `v`: The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1. `amount`: The size of the dead zone. At or below it: 0. The rest is stretched to fill 0 ↔ 1. `invert`: true flips the value first. Default: false. The response starts at the edge of the dead zone instead of jumping up from it. Short name: `deadzone`. |
+| `ce.math.weights(points, x, y [, power])` | Work out how much each anchor point counts at a position, as a Timbre Space or Preset Constellation does. `points`: The anchors, as a list of {x, y}. Empty: an empty list. `x`: The position's x. Range: 0 ↔ 1. `y`: The position's y. Range: 0 ↔ 1. `power`: How sharp the blend is: higher lets the nearest anchor take over sooner. Default: 2. It returns one weight per anchor, adding up to 1: the closer the anchor, the bigger its share. Pass the result to `ce.math.blendBy` to morph values. Short name: `weightsFor`. |
+| `ce.math.blendBy(values, weights)` | Combine many values into one weighted average. Example: `blendBy({0, 100}, {3, 1})` gives 25. `values`: The values to combine. `weights`: How much each value counts. They need not add up to 1. Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides. This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead. Short name: `blendBy`. |
+| `ce.math.ticks(major [, minor])` | Get the positions of a slider's scale marks, the same ones the app draws. Example: `tickStops(3, 1)` gives major {0, 0.5, 1} and minor {0.25, 0.75}. `major`: How many major marks, counting both ends. Default: 11. `minor`: How many smaller marks between each pair of major ones. Default: 0. It returns two lists, major and minor, of positions in the range 0 ↔ 1. Use it when you draw your own scale, so its marks line up with the app's. Short name: `tickStops`. |
+| `ce.math.dbPosition(fraction [, floorDb, ceilDb])` | Find how far up a dB meter a level reaches. Example: `dbPosition(1)` gives about 0.91: 0 dB on a meter from -60 to +6. `fraction`: The level, as a linear value. Range: 0 ↔ 1. Outside the range: held at 0 or 1. `floorDb`: The bottom of the meter, in dB. Default: -60, as on the Meter component. `ceilDb`: The top of the meter, in dB. Default: +6. It returns a position in the range 0 ↔ 1 (bottom ↔ top). Short name: `dbPosition`. |
+| `ce.math.smooth(current, target, coefficient [, epsilon])` | Move a value part of the way toward a target, so it eases in as it gets close. Example: `smooth(0, 100, 0.2)` gives 20. `current`: The value now. `target`: Where it is going. `coefficient`: The share of the remaining distance covered in each call. Range: 0 ↔ 1 (stays put ↔ jumps to the target). Outside the range: held at 0 or 1. `epsilon`: How close counts as arrived: within it, the value lands on the target. Default: 0.0001. Use it to steady a jittery pedal or a noisy CC. For a fixed step size, use `ce.math.approach`. Short name: `smooth`. |
+| `ce.math.hysteresis(value, on, low, high)` | Turn a changing value into an on/off state that does not flicker. Example: `hysteresis(0.5, true, 0.3, 0.7)` gives true: between the two thresholds the state stays as it was. `value`: The changing value. `on`: The state now. Pass back what the last call returned. `low`: At or below this, the state switches off. Must be below high. `high`: At or above this, the state switches on. With two thresholds, a value hovering around one line cannot flip the state back and forth. Electronics calls this a Schmitt trigger. Short name: `hysteresis`. |
+| `ce.math.median(values)` | Find the middle value of a list. Example: `median({1, 2, 100})` gives 2. `values`: The numbers, in any order. With an even count: the average of the two middle ones. Empty or left out: no result. Unlike the average, one stray spike does not move it. Short name: `median`. |
+| `ce.math.euclid(steps, pulses [, rotation])` | Make a Euclidean rhythm: hits spread as evenly as possible across a number of steps. Example: `euclid(8, 3)` gives {false, false, true, false, false, true, false, true}. `steps`: How many steps. Range: 1 ↔ 64. Outside the range: held at 1 or 64. `pulses`: How many of the steps are hits. More than steps: every step is a hit. `rotation`: How many steps to shift the pattern by, without changing the spacing. Default: 0. Negative shifts the other way. It returns a list of true and false, the same pattern the Arpeggiator uses for its rests. Short name: `euclid`. |
+| `ce.math.unshape(y, curve [, tension])` | Undo a curve: give a value after the curve and get the value from before it. Example: `unshape(shapeCurve(0.3, "exp"), "exp")` gives 0.3. `y`: The value after the curve. `curve`: The same curve that was used. `tension`: The same tension that was used. Default: 1.6. The reverse of `ce.math.shape`. Use it when a value returns from the synth through a taper, so the control lands where it started. "hold" has no exact reverse: it returns the earliest value that gives the same result. Short name: `unshape`. |
+| `ce.math.random([lo, hi])` | Get a random number. Example: `random(1, 6)` gives a whole number from 1 to 6, as a die does. `lo`: The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1. `hi`: The highest whole number it can return. It may be below lo. Short name: `random`. |
+| `ce.math.seed(n)` | Set where this script's random numbers start, so the same seed gives the same sequence. `n`: The seed. 0 uses the default. Until you set one, every script starts from the same default, so its numbers repeat each time it loads. Every script and every named stream has its own sequence, so this never affects another script. Short name: `randomSeed`. |
+| `ce.math.stream(name, fn)` | Run a block of code with random numbers from a separate, named sequence. `name`: The sequence's name. Two scripts using the same name get separate sequences. `fn`: The code to run. The script's own sequence returns when it ends, even if it ends in an error. Use it so two parts of one script, such as a melody and a drum pattern, do not affect each other's random numbers or seeds. Short name: `randomStream`. |
 
 ### ce.anim: smooth movement
 

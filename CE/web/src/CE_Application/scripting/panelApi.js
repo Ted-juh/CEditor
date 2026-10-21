@@ -949,82 +949,113 @@ export const COMMANDS = [
      answer. Case is normalised to upper; hex is case-insensitive everywhere it is read. */
   {
     id: 'lighten', category: 'Value / range', signature: 'lighten(colour [, amount]) -> string',
-    summary: 'Make a colour lighter. `amount` runs from 0 (unchanged) to 1 (white) and defaults to 0.4; a number outside that, such as 40 written for 0.4, is refused with a message. The colour is read as a colour property reads it: 6 hex digits (RRGGBB) or 8 (AARRGGBB, its alpha set aside), with or without "#", or a short form, "#RGB", a name such as "red", rgb(), rgba(), hsl() or hsla(), read as the colour a property would store for it ("red" is "#FF0000", and rgba(255, 0, 0, 0.5) is "80FF0000", its alpha set aside). A number, "#" with four digits, text with space around it and anything else that cannot be read are refused with a message, and nothing is returned.',
+    summary: 'Make a colour lighter.',
+    example: '`lighten("#336699", 0.5)` gives "#99B3CC".',
     params: [
-      { name: 'colour', type: 'string', required: true, kind: 'colour' },
-      { name: 'amount', type: 'number', required: false, unit: '0 to 1' },
+      { name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).' },
+      { name: 'amount', type: 'number', required: false, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (unchanged ↔ white). Default: 0.4. Outside the range: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
   {
     id: 'darken', category: 'Value / range', signature: 'darken(colour [, amount]) -> string',
-    summary: 'Make a colour darker. `amount` is how much of the colour\'s brightness to keep: 1 leaves it unchanged, 0 makes it black, and the default is 0.55; a number outside 0 to 1 is refused with a message. This runs the opposite way to `ce.math.lighten()`, where a bigger `amount` means a bigger change. The colour is read as `ce.math.lighten()` reads it, and one that cannot be read is refused with a message, so nothing is returned.',
+    summary: 'Make a colour darker.',
+    example: '`darken("#336699", 0.5)` gives "#1A334D".',
+    notes: ['The amount works the opposite way to lighten\'s: a smaller amount makes the colour darker.'],
     params: [
-      { name: 'colour', type: 'string', required: true, kind: 'colour' },
-      { name: 'amount', type: 'number', required: false, unit: '0 to 1' },
+      { name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).' },
+      { name: 'amount', type: 'number', required: false, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
   {
     id: 'mixColour', category: 'Value / range', signature: 'mixColour(a, b, t) -> string',
-    summary: 'Blend two colours: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the colour halfway between. Red, green and blue are each blended in a straight line, which suits something like a meter fading from green to red. `t` is held inside 0 to 1. Each colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and if either cannot be read, it is refused with a message and nothing is returned.',
+    summary: 'Blend two colours.',
+    example: '`mixColour("#00FF00", "#FF0000", 0.5)` gives "#808000".',
+    notes: ['Red, green and blue are each blended in a straight line. This suits a meter that fades from green to red.'],
     params: [
-      { name: 'a', type: 'string', required: true, kind: 'colour' },
-      { name: 'b', type: 'string', required: true, kind: 'colour' },
-      { name: 't', type: 'number', required: true, unit: '0 to 1' },
+      { name: 'a', type: 'string', required: true, kind: 'colour', summary: 'The first colour, in any form a colour property takes.' },
+      { name: 'b', type: 'string', required: true, kind: 'colour', summary: 'The second colour, in any form a colour property takes.' },
+      { name: 't', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway. Left out: 0. Outside the range: held at 0 or 1.' },
     ],
     scopes: 'any',
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'Give a colour a transparency, ready to store in a control\'s colour property. `a` runs from 0 (fully transparent) to 1 (fully solid); a number outside that, or none, is refused with a message. The result is in the panel\'s own stored form, AARRGGBB with no leading #, which makes this the one colour command that does not return "#RRGGBB". Take care: the web\'s `#RRGGBBAA` form holds the same four bytes in the opposite order, so the two cannot be swapped for each other. To make something you draw see-through, use `ce.draw.opacity()` instead. The colour is read as `ce.math.lighten()` reads it, and any alpha it has is replaced; one it cannot read is refused with a message, and nothing is returned.',
+    summary: 'Give a colour a transparency, ready to store in a control\'s colour property.',
+    example: '`colourAlpha("#FF0000", 0.5)` gives "80FF0000".',
+    notes: [
+      'It returns AARRGGBB without "#", the form a colour property stores. The other colour commands return "#RRGGBB".',
+      'The web\'s #RRGGBBAA form has the same four bytes in a different order, so the two forms can\'t be swapped.',
+      'To make something you draw see-through, use `ce.draw.opacity`.',
+    ],
     params: [
-      { name: 'colour', type: 'string', required: true, kind: 'colour' },
-      { name: 'a', type: 'number', required: true, unit: '0 to 1' },
+      { name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes. Any alpha it already has is replaced.' },
+      { name: 'a', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (fully transparent ↔ fully solid). Outside the range or left out: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
   {
     id: 'hexToRgb', category: 'Value / range', signature: 'hexToRgb(colour) -> table',
-    summary: 'Split a colour into its red, green and blue parts, returned as { r, g, b } with each from 0 to 255. The colour is read as `ce.math.lighten()` reads it: eight hex digits are AARRGGBB, short forms such as "#abc", "red" and rgb() are read too, and any alpha is left out. A colour that cannot be read is refused with a message, and nothing is returned.',
-    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour' }],
+    summary: 'Split a colour into its red, green and blue parts.',
+    example: '`hexToRgb("#FF8000")` gives r 255, g 128 and b 0.',
+    notes: ['It returns r, g and b, each in the range 0 ↔ 255.'],
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes. Any alpha is ignored.' }],
     scopes: 'any',
   },
   {
     id: 'rgbToHex', category: 'Value / range', signature: 'rgbToHex(r, g, b) -> string',
-    summary: 'Build a colour from red, green and blue parts, each from 0 to 255, and return it as "#RRGGBB". A part outside that range is held at 0 or 255 rather than wrapping round, and fractions are rounded.',
+    summary: 'Build a colour from red, green and blue parts.',
+    example: '`rgbToHex(255, 128, 0)` gives "#FF8000".',
     params: [
-      { name: 'r', type: 'number', required: true },
-      { name: 'g', type: 'number', required: true },
-      { name: 'b', type: 'number', required: true },
+      { name: 'r', type: 'number', required: true, summary: 'Red. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.' },
+      { name: 'g', type: 'number', required: true, summary: 'Green. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.' },
+      { name: 'b', type: 'number', required: true, summary: 'Blue. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded.' },
     ],
     scopes: 'any',
   },
   {
     id: 'colourFromArgb', category: 'Value / range', signature: 'colourFromArgb(colour) -> string',
-    summary: 'Read a colour written with its alpha first, `AARRGGBB`, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are AARRGGBB to a colour property and to the other colour commands, but the other way round to a drawing, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromRGBA()` reads the alpha last.',
-    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'argb' }],
+    summary: 'Read a colour written with its alpha first, as AARRGGBB.',
+    example: '`colourFromArgb("#80FF0000")` gives "80FF0000".',
+    notes: [
+      'It returns "#RRGGBB" when the colour is fully solid, otherwise AARRGGBB without "#".',
+      '"#" with 8 hex digits means AARRGGBB to a colour property and the colour commands, but RRGGBBAA to a drawing. This command says you mean alpha first; `ce.math.fromRGBA` says alpha last.',
+    ],
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'argb', summary: '8 or 4 hex digits, alpha first, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.' }],
     scopes: 'any',
   },
   {
     id: 'colourFromRgba', category: 'Value / range', signature: 'colourFromRgba(colour) -> string',
-    summary: 'Read a colour written with its alpha last, `RRGGBBAA`, the web\'s order, and return it in the form every reader reads the same way: "#RRGGBB" when it is solid, AARRGGBB with no "#" when it is not. Eight hex digits after a "#" are read this way by a drawing, but as AARRGGBB by a colour property and the other colour commands, so this says which you meant. It takes 8 hex digits or 4, with or without a "#"; 6 or 3 have no alpha. Anything else is refused with a message, and nothing is returned. `ce.math.fromARGB()` reads the alpha first.',
-    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'rgba' }],
+    summary: 'Read a colour written with its alpha last, as RRGGBBAA, the web\'s order.',
+    example: '`colourFromRgba("#FF000080")` gives "80FF0000".',
+    notes: [
+      'It returns "#RRGGBB" when the colour is fully solid, otherwise AARRGGBB without "#".',
+      '"#" with 8 hex digits means RRGGBBAA to a drawing, but AARRGGBB to a colour property and the colour commands. This command says you mean alpha last; `ce.math.fromARGB` says alpha first.',
+    ],
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'rgba', summary: '8 or 4 hex digits, alpha last, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.' }],
     scopes: 'any',
   },
   {
     id: 'hexToHsl', category: 'Value / range', signature: 'hexToHsl(colour) -> table',
-    summary: 'Describe a colour as { h, s, l }: hue from 0 to 360, and saturation and lightness from 0 to 100, the same ranges the colour editor uses. The numbers are not rounded. A grey has hue 0 and saturation 0. The colour is read as `ce.math.lighten()` reads it, short forms such as "red" included, and one that cannot be read is refused with a message, so nothing is returned.',
-    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour' }],
+    summary: 'Describe a colour by its hue, saturation and lightness.',
+    example: '`hexToHsl("#FF0000")` gives h 0, s 100 and l 50.',
+    notes: [
+      'It returns h in the range 0 ↔ 360, and s and l in the range 0 ↔ 100, as in the colour editor. The numbers are not rounded.',
+      'A grey has hue 0 and saturation 0.',
+    ],
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes. Any alpha is ignored.' }],
     scopes: 'any',
   },
   {
     id: 'hslToHex', category: 'Value / range', signature: 'hslToHex(h, s, l) -> string',
-    summary: 'Build a colour from hue (0 to 360), saturation and lightness (0 to 100) and return it as "#RRGGBB". The reverse of `ce.math.hsl()`.',
+    summary: 'Build a colour from hue, saturation and lightness.',
+    example: '`hslToHex(120, 100, 50)` gives "#00FF00".',
+    notes: ['The reverse of `ce.math.hsl`.'],
     params: [
-      { name: 'h', type: 'number', required: true },
-      { name: 's', type: 'number', required: true },
-      { name: 'l', type: 'number', required: true },
+      { name: 'h', type: 'number', required: true, summary: 'Hue. Range: 0 ↔ 360. Left out: 0. Above 360: wraps round, so 480 is 120.' },
+      { name: 's', type: 'number', required: true, summary: 'Saturation. Range: 0 ↔ 100. Left out: 0. Above 100: held at 100.' },
+      { name: 'l', type: 'number', required: true, summary: 'Lightness. Range: 0 ↔ 100. Left out: 0. Above 100: held at 100.' },
     ],
     scopes: 'any',
   },
@@ -3601,85 +3632,403 @@ export const HELPERS = [
       { name: 'outHi', type: 'value', required: true, summary: 'The high end of the range to move it to.' },
     ],
   },
-  { id: 'clamp', category: 'Value / range', signature: 'clamp(v, lo, hi)', summary: 'Keep a value inside a range: anything below `lo` becomes `lo`, anything above `hi` becomes `hi`, and anything in between comes back unchanged.' },
-  { id: 'round', category: 'Value / range', signature: 'round(v)', summary: 'Round to the nearest whole number. A half rounds up, so 2.5 gives 3 and -2.5 gives -2. To keep some decimal places, use `ce.math.roundTo()`.' },
-  { id: 'snap', category: 'Value / range', signature: 'snap(v, step)', summary: 'Round a value to the nearest multiple of `step`: `ce.math.snap(37, 10)` gives 40. A `step` of 0 leaves the value unchanged. For steps that are not evenly spaced, use `ce.math.quantize()`.' },
-  { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)',
-    summary: 'Bend a 0 to 1 value with a named response curve: "linear", "exp", "log" or "s". An unknown name prints a note to the console and is treated as "linear". For a curve of your own, use `ce.math.map()`; for the curves the panel\'s Envelopes use, use `ce.math.shape()`.' },
-  { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between two numbers: `t` of 0 gives `a`, 1 gives `b`, and 0.5 the point halfway between. `t` is not held inside 0 to 1, so values beyond either end carry on past `a` or `b`. For whole lists of numbers, use `ce.math.blend()`.' },
+  {
+    id: 'clamp', category: 'Value / range', signature: 'clamp(v, lo, hi)',
+    summary: 'Keep a value inside a range.',
+    example: '`clamp(140, 0, 127)` gives 127.',
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value to keep in range.' },
+      { name: 'lo', type: 'value', required: true, summary: 'The bottom of the range. Must be below hi. A value below it gives lo.' },
+      { name: 'hi', type: 'value', required: true, summary: 'The top of the range. A value above it gives hi.' },
+    ],
+  },
+  {
+    id: 'round', category: 'Value / range', signature: 'round(v)',
+    summary: 'Round to the nearest whole number.',
+    example: '`round(2.5)` gives 3.',
+    notes: [
+      'A half always rounds up, so -2.5 gives -2.',
+      'To keep decimal places, use `ce.math.roundTo`.',
+    ],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The number to round.' },
+    ],
+  },
+  {
+    id: 'snap', category: 'Value / range', signature: 'snap(v, step)',
+    summary: 'Round a value to the nearest step.',
+    example: '`snap(37, 10)` gives 40.',
+    notes: [
+      'Halfway rounds up, as with `ce.math.round`: 35 gives 40.',
+      'For steps that are not evenly spaced, use `ce.math.quantize`.',
+    ],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value to round.' },
+      { name: 'step', type: 'value', required: true, summary: 'The size of the steps, such as 10 or 0.25. Must be given. 0 leaves the value unchanged.' },
+    ],
+  },
+  {
+    id: 'curve', category: 'Value / range', signature: 'curve(v, shape)',
+    summary: 'Bend a value from 0 to 1 with a response curve.',
+    example: '`curve(0.5, "exp")` gives 0.25.',
+    notes: ['For a curve of your own, use `ce.math.map`. For the curves the panel\'s Envelopes use, use `ce.math.shape`.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value. Range: 0 ↔ 1. Outside the range: not held at 0 or 1.' },
+      { name: 'shape', type: 'value', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used.' },
+    ],
+  },
+  {
+    id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)',
+    summary: 'Blend between two numbers.',
+    example: '`lerp(10, 20, 0.25)` gives 12.5.',
+    notes: ['For whole lists of numbers, use `ce.math.blend`.'],
+    params: [
+      { name: 'a', type: 'value', required: true, summary: 'The first number.' },
+      { name: 'b', type: 'value', required: true, summary: 'The second number.' },
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway. Must be given. Outside the range: not held at 0 or 1, so the result goes past a or b.' },
+    ],
+  },
   // wrap, and why it is not `%`. The five runtimes DISAGREE about the sign of a modulo: (-1) % 12
   // is 11 in Lua and Python and -1 in JavaScript, C++, C# and Java. So the ordinary way to write a
   // pitch class — (note + transpose) % 12 — already gives two different answers depending on which
   // engine the panel is running in, and nothing said so. This is the one arithmetic a synth panel
   // does constantly, which is why it belongs to the module rather than to each panel.
-  { id: 'wrap', category: 'Value / range', signature: 'wrap(v, lo, hi)',
-    summary: 'Wrap a value round into a range, so that going past the top starts again from the bottom: `ce.math.wrap(12, 0, 12)` gives 0 and `ce.math.wrap(-1, 0, 12)` gives 11. The result can equal `lo` but never `hi`. Use it for pitch classes, LFO phase and step numbers instead of your language\'s % operator, which treats negative numbers differently from language to language: the same expression gives 11 in Lua and -1 in JavaScript.' },
+  {
+    id: 'wrap', category: 'Value / range', signature: 'wrap(v, lo, hi)',
+    summary: 'Wrap a value into a range, so going past the top starts again from the bottom.',
+    example: '`wrap(-1, 0, 12)` gives 11.',
+    notes: ['Use it for pitch classes, LFO phase and step numbers instead of your language\'s % operator. With a negative number, % differs between languages: -1 % 12 gives 11 in Lua and -1 in JavaScript.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value to wrap.' },
+      { name: 'lo', type: 'value', required: true, summary: 'The bottom of the range. Must be below hi. The result can equal lo.' },
+      { name: 'hi', type: 'value', required: true, summary: 'The top of the range. The result never equals hi: wrap(12, 0, 12) gives 0.' },
+    ],
+  },
   // map, and why `curve` was not enough. curve() is a CLOSED set of four names, so a taper it does
   // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
   // either, since a property stores a constant. Breakpoints are the smallest thing that can.
-  { id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
-    summary: 'Map a value through a curve you draw as points joined by straight lines, given as {{x, y}, …}: `ce.math.map(v, {{0,0},{0.5,0.9},{1,1}})`. The points are sorted by x first. Below the first point or above the last, the value is held at that point\'s y rather than continuing the line. Two points with the same x make a step, and the later one wins. A point can also bend the line that ends at it, the way an Envelope\'s point does: a third entry or `curve` names the shape, as `ce.math.shape()` does ("exp", "log", "s" or "hold"), and a fourth entry or `tension` says how far it bends, so {1, 1, "exp"} rises slowly and then fast.' },
-  { id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
-    summary: 'Snap a value to the nearest entry in a list: `ce.math.quantize(9, {0, 8, 16})` gives 8. When the value sits exactly halfway between two entries, the lower one wins. An empty list returns the value unchanged. For evenly spaced steps, use `ce.math.snap()`.' },
-  { id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',
-    summary: 'Pick one entry from a list at random, using the script\'s seeded random numbers. With `weights`, each entry\'s chance is its weight divided by the total, so weights of {3, 1} make the first entry three times as likely as the second. A missing or negative weight counts as zero, and if every weight is zero each entry is equally likely. It uses exactly one random number either way, so adding weights does not change what later random calls return. Returns nothing for an empty list.' },
-  { id: 'dbToGain', category: 'Value / range', signature: 'dbToGain(db)',
-    summary: 'Convert decibels to a linear gain: 0 dB gives 1, and -6 dB gives about 0.5.' },
-  { id: 'gainToDb', category: 'Value / range', signature: 'gainToDb(gain)',
-    summary: 'Convert a linear gain to decibels: 1 gives 0 dB, and 0.5 gives about -6 dB. A gain of zero or less gives -144 dB (the floor of 24-bit audio) instead of minus infinity, and nothing comes back lower than that.' },
+  {
+    id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
+    summary: 'Map a value through a curve you draw as points.',
+    example: '`mapCurve(0.25, {{0, 0}, {0.5, 0.9}, {1, 1}})` gives 0.45.',
+    notes: [
+      'Below the first point or above the last: held at that point\'s y.',
+      'Two points with the same x make a step, and the later one wins.',
+      '{1, 1, "exp"} rises slowly, then fast.',
+    ],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value to map.' },
+      { name: 'points', type: 'value', required: false, summary: 'A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends. Left out or empty: the value is returned unchanged.' },
+    ],
+  },
+  {
+    id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
+    summary: 'Snap a value to the nearest entry in a list.',
+    example: '`quantizeTo(9, {0, 8, 16})` gives 8.',
+    notes: [
+      'Exactly halfway between two entries, the lower one wins: 12 gives 8.',
+      'For evenly spaced steps, use `ce.math.snap`.',
+    ],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value to snap.' },
+      { name: 'values', type: 'value', required: false, summary: 'The entries to choose from, in any order. Left out or empty: the value is returned unchanged.' },
+    ],
+  },
+  {
+    id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',
+    summary: 'Pick an entry from a list at random.',
+    example: '`randomChoice({"C", "E", "G"}, {3, 1, 1})` picks "C" three times as often as "E" or "G".',
+    notes: ['It uses one random number, with or without weights, so adding weights does not change later random numbers.'],
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The entries. Empty: no result.' },
+      { name: 'weights', type: 'value', required: false, summary: 'How likely each entry is: its weight divided by the total. Default: all equal. A missing or negative weight counts as 0; if every weight is 0, all are equal.' },
+    ],
+  },
+  {
+    id: 'dbToGain', category: 'Value / range', signature: 'dbToGain(db)',
+    summary: 'Convert decibels to a linear gain.',
+    example: '`dbToGain(-6)` gives about 0.5.',
+    params: [
+      { name: 'db', type: 'value', required: true, summary: 'The level in dB. 0 dB gives 1.' },
+    ],
+  },
+  {
+    id: 'gainToDb', category: 'Value / range', signature: 'gainToDb(gain)',
+    summary: 'Convert a linear gain to decibels.',
+    example: '`gainToDb(0.5)` gives about -6.',
+    params: [
+      { name: 'gain', type: 'value', required: true, summary: 'The linear gain. 1 gives 0 dB. 0 or below gives -144 dB, the floor of 24-bit audio; no result is lower than that.' },
+    ],
+  },
 
   // --- the rest of the arithmetic a synth panel actually does (design doc §32) ---
   // Nothing here duplicates the language's own scalar maths — min/max/abs/floor/ceil/sin all exist
   // in every runtime already, and that rule is what keeps the list finite. What IS here is either
   // domain-specific, list-shaped (Lua's varargs make the language version unusable over a table),
   // or has to be identical in five runtimes to be worth anything.
-  { id: 'norm', category: 'Value / range', signature: 'norm(v, lo, hi)',
-    summary: 'Turn a value into its position within a range: 0 at `lo`, 1 at `hi`. Values outside the range are held at 0 or 1. The reverse is `ce.math.denorm()`.' },
-  { id: 'denorm', category: 'Value / range', signature: 'denorm(t, lo, hi)',
-    summary: 'Turn a 0 to 1 position back into a value in a range: 0 gives `lo` and 1 gives `hi`. Positions outside 0 to 1 are held at the ends. The reverse of `ce.math.norm()`.' },
-  { id: 'bipolar', category: 'Value / range', signature: 'bipolar(t)',
-    summary: 'Convert a 0 to 1 value to the -1 to +1 range: 0 becomes -1, 0.5 becomes 0 and 1 becomes +1. The reverse is `ce.math.unipolar()`.' },
-  { id: 'unipolar', category: 'Value / range', signature: 'unipolar(v)',
-    summary: 'Convert a -1 to +1 value to the 0 to 1 range: -1 becomes 0, 0 becomes 0.5 and +1 becomes 1. The reverse of `ce.math.bipolar()`.' },
-  { id: 'fold', category: 'Value / range', signature: 'fold(v, lo, hi)',
-    summary: 'Bounce a value back off the ends of a range instead of wrapping it: past `hi` it heads back down, and below `lo` it heads back up. Where `ce.math.wrap()` jumps from the top to the bottom, fold keeps the movement smooth, which suits modulation depths; wrap suits pitch classes.' },
-  { id: 'indexOfRange', category: 'Value / range', signature: 'indexOfRange(t, count)',
-    summary: 'Turn a 0 to 1 position into a slot number, counting from 0, for `count` slots, for example to pick one of eight waveforms with a knob. At exactly 1 it returns the last slot, `count - 1`, rather than one past the end.' },
-  { id: 'crossfade', category: 'Value / range', signature: 'crossfade(a, b, t [, law])',
-    summary: 'Fade from `a` to `b` as `t` goes from 0 to 1, using one of the Crossfader component\'s three fade laws: "linear", "equalPower" or "sharp". `law` defaults to "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not.' },
-  { id: 'approach', category: 'Value / range', signature: 'approach(current, target, maxStep)',
-    summary: 'Move `current` toward `target`, but by no more than `maxStep` in one call; once it is within `maxStep`, it lands exactly on the target. It keeps nothing between calls, so you can use it in any handler (say, each time an expression pedal sends a value) without running a timer. A `maxStep` of 0 jumps straight to the target.' },
-  { id: 'roundTo', category: 'Value / range', signature: 'roundTo(v, decimals)',
-    summary: 'Round to a number of decimal places: `ce.math.roundTo(3.14159, 2)` gives 3.14. Returns a number, not text, so you can keep calculating with it.' },
-  { id: 'almost', category: 'Value / range', signature: 'almost(a, b [, epsilon])',
-    summary: 'Check whether two numbers are equal to within `epsilon`, which defaults to a tiny 0.000000001. Use it instead of == on values that have been through `ce.math.scale()`, `ce.math.curve()` or similar arithmetic, where rounding can leave numbers that should match a hair apart.' },
-  { id: 'minOf', category: 'Value / range', signature: 'minOf(values)',
-    summary: 'The smallest number in a list, or nothing if the list is empty.' },
-  { id: 'maxOf', category: 'Value / range', signature: 'maxOf(values)', summary: 'The largest number in a list, or nothing if the list is empty.' },
-  { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list of numbers, or 0 if the list is empty.' },
-  { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list of numbers, or nothing if the list is empty.' },
+  {
+    id: 'norm', category: 'Value / range', signature: 'norm(v, lo, hi)',
+    summary: 'Turn a value into its position within a range, from 0 to 1.',
+    example: '`norm(64, 0, 127)` gives about 0.5.',
+    notes: ['The reverse is `ce.math.denorm`.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value. Outside the range: held at 0 or 1.' },
+      { name: 'lo', type: 'value', required: true, summary: 'The value that gives 0.' },
+      { name: 'hi', type: 'value', required: true, summary: 'The value that gives 1. It may be below lo, for a range that runs the other way.' },
+    ],
+  },
+  {
+    id: 'denorm', category: 'Value / range', signature: 'denorm(t, lo, hi)',
+    summary: 'Turn a position from 0 to 1 back into a value in a range.',
+    example: '`denorm(0.5, 0, 127)` gives 63.5.',
+    notes: ['The reverse of `ce.math.norm`.'],
+    params: [
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (lo ↔ hi). Outside the range: held at 0 or 1.' },
+      { name: 'lo', type: 'value', required: true, summary: 'The value at 0.' },
+      { name: 'hi', type: 'value', required: true, summary: 'The value at 1. It may be below lo, for a range that runs the other way.' },
+    ],
+  },
+  {
+    id: 'bipolar', category: 'Value / range', signature: 'bipolar(t)',
+    summary: 'Turn a value from 0 to 1 into one from -1 to +1.',
+    example: '`bipolar(0.75)` gives 0.5.',
+    notes: ['The reverse is `ce.math.unipolar`.'],
+    params: [
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (-1 ↔ +1). 0.5 gives 0. Outside the range: not held.' },
+    ],
+  },
+  {
+    id: 'unipolar', category: 'Value / range', signature: 'unipolar(v)',
+    summary: 'Turn a value from -1 to +1 into one from 0 to 1.',
+    example: '`unipolar(0.5)` gives 0.75.',
+    notes: ['The reverse of `ce.math.bipolar`.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5. Outside the range: not held.' },
+    ],
+  },
+  {
+    id: 'fold', category: 'Value / range', signature: 'fold(v, lo, hi)',
+    summary: 'Bounce a value back off the ends of a range.',
+    example: '`fold(12, 0, 10)` gives 8.',
+    notes: ['Where `ce.math.wrap` jumps from the top to the bottom, fold keeps the movement smooth. Fold suits modulation depths; wrap suits pitch classes.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value. Past the top it heads back down; below the bottom it heads back up.' },
+      { name: 'lo', type: 'value', required: true, summary: 'The bottom of the range. Must be below hi.' },
+      { name: 'hi', type: 'value', required: true, summary: 'The top of the range.' },
+    ],
+  },
+  {
+    id: 'indexOfRange', category: 'Value / range', signature: 'indexOfRange(t, count)',
+    summary: 'Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks.',
+    example: '`indexOfRange(0.5, 8)` gives 4.',
+    params: [
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (first slot ↔ last slot). Outside the range: held at the first or last slot.' },
+      { name: 'count', type: 'value', required: true, summary: 'How many slots. They count from 0, so the last is count - 1.' },
+    ],
+  },
+  {
+    id: 'crossfade', category: 'Value / range', signature: 'crossfade(a, b, t [, law])',
+    summary: 'Fade from one value to another with one of the Crossfader\'s fade laws.',
+    example: '`crossfade(0, 1, 0.5, "equalPower")` gives about 0.71.',
+    notes: [
+      'A linear fade between two sounds dips audibly in the middle; "equalPower" does not.',
+      '"equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes.',
+    ],
+    params: [
+      { name: 'a', type: 'value', required: true, summary: 'The value at 0.' },
+      { name: 'b', type: 'value', required: true, summary: 'The value at 1.' },
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). Left out: 0. Outside the range: held at 0 or 1.' },
+      { name: 'law', type: 'value', required: false, summary: '"linear", "equalPower" or "sharp". Default: "linear". An unknown name is used as "linear".' },
+    ],
+  },
+  {
+    id: 'approach', category: 'Value / range', signature: 'approach(current, target, maxStep)',
+    summary: 'Move a value toward a target by no more than a set step.',
+    example: '`approach(10, 50, 15)` gives 25.',
+    notes: ['It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value.'],
+    params: [
+      { name: 'current', type: 'value', required: true, summary: 'The value now.' },
+      { name: 'target', type: 'value', required: true, summary: 'Where it is going. Within one step of it: the target exactly.' },
+      { name: 'maxStep', type: 'value', required: true, summary: 'The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive.' },
+    ],
+  },
+  {
+    id: 'roundTo', category: 'Value / range', signature: 'roundTo(v, decimals)',
+    summary: 'Round to a number of decimal places.',
+    example: '`roundTo(3.14159, 2)` gives 3.14.',
+    notes: ['It returns a number, not text, so you can keep calculating with it.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The number to round.' },
+      { name: 'decimals', type: 'value', required: false, summary: 'How many decimal places to keep. Default: 0. Below 0: 0.' },
+    ],
+  },
+  {
+    id: 'almost', category: 'Value / range', signature: 'almost(a, b [, epsilon])',
+    summary: 'Check whether two numbers are equal to within a small margin.',
+    example: '`almost(0.1 + 0.2, 0.3)` gives true.',
+    notes: ['Use it instead of == on numbers that have been through arithmetic such as `ce.math.scale`, where rounding can leave two numbers that should match very slightly apart.'],
+    params: [
+      { name: 'a', type: 'value', required: true, summary: 'The first number.' },
+      { name: 'b', type: 'value', required: true, summary: 'The second number.' },
+      { name: 'epsilon', type: 'value', required: false, summary: 'How far apart they may be. Default: 0.000000001.' },
+    ],
+  },
+  {
+    id: 'minOf', category: 'Value / range', signature: 'minOf(values)',
+    summary: 'Find the smallest number in a list.',
+    example: '`minOf({3, 1, 2})` gives 1.',
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The numbers. Empty or left out: no result.' },
+    ],
+  },
+  {
+    id: 'maxOf', category: 'Value / range', signature: 'maxOf(values)',
+    summary: 'Find the largest number in a list.',
+    example: '`maxOf({3, 1, 2})` gives 3.',
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The numbers. Empty or left out: no result.' },
+    ],
+  },
+  {
+    id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)',
+    summary: 'Add up a list of numbers.',
+    example: '`sumOf({1, 2, 3})` gives 6.',
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The numbers. Empty or left out: 0.' },
+    ],
+  },
+  {
+    id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)',
+    summary: 'Find the average of a list of numbers.',
+    example: '`meanOf({1, 2, 6})` gives 3.',
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The numbers. Empty or left out: no result.' },
+    ],
+  },
   // `a, b` said nothing about these being LISTS, and with no return annotation the signature read
   // like lerp's. Passing two numbers returns an empty list, which is correct and baffling.
-  { id: 'blend', category: 'Value / range', signature: 'blend(fromList, toList, t) -> list',
-    summary: 'Blend one list of numbers into another, entry by entry: `t` of 0 gives `fromList` and 1 gives `toList`, like a morph between two snapshots. Both arguments are lists; for two single numbers use `ce.math.lerp()`. If the lists differ in length, the result is as long as the shorter one: the extra entries are dropped, not blended toward zero.' },
-  { id: 'randomFloat', category: 'Value / range', signature: 'randomFloat(lo, hi)',
-    summary: 'A random number with a fractional part, from `lo` up to but not including `hi`, taken from the script\'s seeded random numbers. With no arguments it runs from 0 to 1. `ce.math.random(lo, hi)` gives whole numbers; use this when you want fractions.' },
-  { id: 'randomGaussian', category: 'Value / range', signature: 'randomGaussian([mean, sd])',
-    summary: 'A random number on a bell curve: most results land near `mean` (default 0), and `sd`, the standard deviation (default 1), sets how widely they spread, with about two thirds falling within one `sd` of `mean`. Good for humanising velocity or timing, where an even spread sounds mechanical. It always uses exactly two numbers from the seeded sequence, so replaying a seed stays in step.' },
-  { id: 'randomWalk', category: 'Value / range', signature: 'randomWalk(current, step, lo, hi)',
-    summary: 'Take one step of a random walk: returns `current` moved by a random amount of up to `step` in either direction. Feed the result back in each time for a line that drifts instead of jumping. At `lo` and `hi` the walk bounces back rather than sticking to the edge; leave them out for no limits. Uses the script\'s seeded random numbers.' },
-  { id: 'randomBool', category: 'Value / range', signature: 'randomBool([chance])',
-    summary: 'Return true or false at random, from the script\'s seeded random numbers. `chance` is the probability of true, from 0 to 1, and defaults to 0.5: 0.25 gives true about one time in four. Handy as a probability gate on sequencer steps.' },
-  { id: 'shuffle', category: 'Value / range', signature: 'shuffle(values)',
-    summary: 'Return a new list with the same entries in random order; the original list is left alone. It uses the script\'s seeded random numbers, one for each entry after the first, so the same seed always shuffles the same way.' },
-  { id: 'toDegrees', category: 'Value / range', signature: 'toDegrees(radians)', summary: 'Convert an angle from radians to degrees, the unit `ce.draw` uses for arcs.' },
-  { id: 'toRadians', category: 'Value / range', signature: 'toRadians(degrees)', summary: 'Convert an angle from degrees to radians, the unit your language\'s own sin and cos expect.' },
-  { id: 'distance', category: 'Value / range', signature: 'distance(x1, y1, x2, y2)',
-    summary: 'The straight-line distance between two points. Handy for XY pads, joysticks and the Orbit, and for checking whether a click landed on something you drew with `ce.draw`.' },
-  { id: 'angleOf', category: 'Value / range', signature: 'angleOf(x1, y1, x2, y2)',
-    summary: 'The angle from the first point to the second, in the convention `ce.draw` uses: degrees from 0 to 360, with 0 at twelve o\'clock and increasing clockwise. As on screen, y counts downwards, so a point straight above gives 0.' },
-  { id: 'polar', category: 'Value / range', signature: 'polar(angle, radius)',
-    summary: 'Turn an angle and a distance into { x, y } offsets from a centre point, using the same convention as `ce.math.angle()`: degrees, 0 at twelve o\'clock, clockwise. Add the offsets to your centre to find, for example, the tip of a knob\'s pointer.' },
+  {
+    id: 'blend', category: 'Value / range', signature: 'blend(fromList, toList, t) -> list',
+    summary: 'Blend one list of numbers into another, entry by entry.',
+    example: '`blend({0, 100}, {10, 0}, 0.5)` gives {5, 50}.',
+    notes: [
+      'Use it to morph between two snapshots.',
+      'For two single numbers, use `ce.math.lerp`.',
+    ],
+    params: [
+      { name: 'fromList', type: 'value', required: true, summary: 'The list at 0.' },
+      { name: 'toList', type: 'value', required: true, summary: 'The list at 1. If the lists differ in length, the result is as long as the shorter one.' },
+      { name: 't', type: 'value', required: true, summary: 'Range: 0 ↔ 1 (fromList ↔ toList). Left out: 0. Outside the range: not held at 0 or 1.' },
+    ],
+  },
+  {
+    id: 'randomFloat', category: 'Value / range', signature: 'randomFloat(lo, hi)',
+    summary: 'Get a random number with a fractional part.',
+    example: '`randomFloat(0.5, 2)` gives a number from 0.5 up to, but not including, 2.',
+    notes: ['`ce.math.random` with two numbers gives whole numbers; use this one for fractions.'],
+    params: [
+      { name: 'lo', type: 'value', required: false, summary: 'The bottom of the range. Both left out: 0 ↔ 1. Given alone: between lo and 1, so randomFloat(5) is between 1 and 5.' },
+      { name: 'hi', type: 'value', required: false, summary: 'The top of the range, which it never reaches. It may be below lo.' },
+    ],
+  },
+  {
+    id: 'randomGaussian', category: 'Value / range', signature: 'randomGaussian([mean, sd])',
+    summary: 'Get a random number on a bell curve, so most results land near the middle.',
+    example: '`randomGaussian(100, 5)` gives a number near 100: within 5 of it about two times in three.',
+    notes: [
+      'Use it to humanise velocity or timing, where an even spread sounds mechanical.',
+      'It always uses two random numbers, so a replayed seed stays in step.',
+    ],
+    params: [
+      { name: 'mean', type: 'value', required: false, summary: 'Where most results land. Default: 0.' },
+      { name: 'sd', type: 'value', required: false, summary: 'How widely they spread, the standard deviation: about two thirds land within one sd of the mean. Default: 1.' },
+    ],
+  },
+  {
+    id: 'randomWalk', category: 'Value / range', signature: 'randomWalk(current, step, lo, hi)',
+    summary: 'Take one step of a random walk, for a value that drifts instead of jumping.',
+    example: '`randomWalk(64, 3, 0, 127)` gives a number from 61 to 67.',
+    params: [
+      { name: 'current', type: 'value', required: true, summary: 'The value now. Pass back what the last call returned.' },
+      { name: 'step', type: 'value', required: true, summary: 'The most it moves, either way.' },
+      { name: 'lo', type: 'value', required: false, summary: 'The bottom. At it, the walk bounces back. Left out, with hi: no limits.' },
+      { name: 'hi', type: 'value', required: false, summary: 'The top. At it, the walk bounces back.' },
+    ],
+  },
+  {
+    id: 'randomBool', category: 'Value / range', signature: 'randomBool([chance])',
+    summary: 'Get true or false at random.',
+    example: '`randomBool(0.25)` gives true about one time in four.',
+    notes: ['Use it as a probability gate on sequencer steps.'],
+    params: [
+      { name: 'chance', type: 'value', required: false, summary: 'The probability of true. Range: 0 ↔ 1 (never ↔ always). Default: 0.5. Outside the range: held at 0 or 1.' },
+    ],
+  },
+  {
+    id: 'shuffle', category: 'Value / range', signature: 'shuffle(values)',
+    summary: 'Put a list in random order.',
+    example: '`shuffle({1, 2, 3})` gives the same three numbers in a random order.',
+    notes: ['It uses one random number for each entry after the first, so the same seed always shuffles the same way.'],
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The list. It is not changed: a new list is returned. Empty or left out: an empty list.' },
+    ],
+  },
+  {
+    id: 'toDegrees', category: 'Value / range', signature: 'toDegrees(radians)',
+    summary: 'Convert an angle from radians to degrees.',
+    example: '`toDegrees(3.14159)` gives about 180.',
+    notes: ['ce.draw measures arcs in degrees.'],
+    params: [
+      { name: 'radians', type: 'value', required: true, summary: 'The angle in radians.' },
+    ],
+  },
+  {
+    id: 'toRadians', category: 'Value / range', signature: 'toRadians(degrees)',
+    summary: 'Convert an angle from degrees to radians.',
+    example: '`toRadians(180)` gives about 3.14159.',
+    notes: ['Your language\'s own sin and cos take radians.'],
+    params: [
+      { name: 'degrees', type: 'value', required: true, summary: 'The angle in degrees.' },
+    ],
+  },
+  {
+    id: 'distance', category: 'Value / range', signature: 'distance(x1, y1, x2, y2)',
+    summary: 'Measure the straight-line distance between two points.',
+    example: '`distance(0, 0, 3, 4)` gives 5.',
+    notes: ['Use it for XY pads, joysticks and the Orbit, or to check whether a click landed on something you drew.'],
+    params: [
+      { name: 'x1', type: 'value', required: true, summary: 'The first point\'s x.' },
+      { name: 'y1', type: 'value', required: true, summary: 'The first point\'s y.' },
+      { name: 'x2', type: 'value', required: true, summary: 'The second point\'s x.' },
+      { name: 'y2', type: 'value', required: true, summary: 'The second point\'s y.' },
+    ],
+  },
+  {
+    id: 'angleOf', category: 'Value / range', signature: 'angleOf(x1, y1, x2, y2)',
+    summary: 'Find the angle from one point to another.',
+    example: '`angleOf(0, 0, 10, 0)` gives 90.',
+    notes: [
+      'It returns degrees in the range 0 ↔ 360: 0 at twelve o\'clock, increasing clockwise, as ce.draw measures them.',
+      'y counts downwards, as on screen, so a point straight above gives 0.',
+      'The same point twice gives 180.',
+    ],
+    params: [
+      { name: 'x1', type: 'value', required: true, summary: 'The first point\'s x.' },
+      { name: 'y1', type: 'value', required: true, summary: 'The first point\'s y.' },
+      { name: 'x2', type: 'value', required: true, summary: 'The second point\'s x.' },
+      { name: 'y2', type: 'value', required: true, summary: 'The second point\'s y.' },
+    ],
+  },
+  {
+    id: 'polar', category: 'Value / range', signature: 'polar(angle, radius)',
+    summary: 'Turn an angle and a distance into x and y offsets from a centre.',
+    example: '`polar(0, 10)` gives x 0 and y -10: straight up, as y counts downwards.',
+    notes: ['Add the offsets to your centre to find, for example, the tip of a knob\'s pointer.'],
+    params: [
+      { name: 'angle', type: 'value', required: true, summary: 'The angle in degrees: 0 at twelve o\'clock, increasing clockwise, as ce.math.angle returns it.' },
+      { name: 'radius', type: 'value', required: true, summary: 'The distance from the centre. Left out: 0.' },
+    ],
+  },
 
   // --- the transforms the Properties panel itself applies (design doc §33) ---
   // The panel does not only store constants; it CONFIGURES value transforms — a Macro slot's
@@ -3688,42 +4037,177 @@ export const HELPERS = [
   // reproduce any of them, so it could not compute what its own panel was about to display, and
   // anything it worked out alongside a bound control came out subtly different. These are the
   // app's own functions, matched exactly.
-  { id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
-    summary: 'Bend a 0 to 1 value with the curves the panel\'s Envelope segments and Router breakpoints use: "linear", "exp", "log", "scurve" ("s" also works) and "hold". This is a different family from `ce.math.curve()`. `tension` sets how strongly "exp" and "log" bend and defaults to 1.6, as in the app, so leaving it out (or passing 0) does not give a straight line. With `tension` at 1 it matches the curve a Macro slot uses, so `shape(v, curve, 1)` reproduces it.' },
-  { id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
-    summary: 'Add a dead zone to the bottom of a 0 to 1 value, the way the Expression Router shapes its input. Anything at or below `amount` becomes 0, and the rest is stretched to fill 0 to 1, so the response starts right at the edge of the dead zone instead of jumping up from it. Pass `invert` as true to flip the value first.' },
-  { id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',
-    summary: 'Work out how much each anchor point counts at a position, the way a Timbre Space or Preset Constellation does: the closer an anchor is to `x`, `y`, the bigger its share. `points` is a list of { x, y } anchors, and `x` and `y` run from 0 to 1. Returns one weight per point, adding up to 1. `power` (default 2) sets how sharp the blend is: higher lets the nearest anchor take over sooner. Pass the result to `ce.math.blendBy()` to morph values.' },
-  { id: 'blendBy', category: 'Value / range', signature: 'blendBy(values, weights)',
-    summary: 'A weighted average: each entry in `values` counts as much as its matching entry in `weights`, which is how a morph pad turns its weights into one value. The weights do not need to add up to 1, and if they add up to zero or less the result is 0. `ce.math.blend()` blends two lists; this combines many values into one.' },
-  { id: 'tickStops', category: 'Value / range', signature: 'tickStops(major [, minor])',
-    summary: 'The positions of a slider\'s scale marks, from 0 to 1, as { major, minor } lists, the same ones the app draws. `major` is how many major marks there are, counting both ends (default 11); `minor` is how many smaller marks sit between each pair (default 0). Use it when you draw your own scale, so its marks line up with the app\'s.' },
-  { id: 'dbPosition', category: 'Value / range', signature: 'dbPosition(fraction [, floorDb, ceilDb])',
-    summary: 'How far up a dB meter a level reaches, from 0 (bottom) to 1 (top). `fraction` is a linear level from 0 to 1; it is converted to decibels and placed between `floorDb` and `ceilDb`, which default to -60 and +6 like the Meter component.' },
+  {
+    id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
+    summary: 'Bend a value from 0 to 1 with the curves the panel\'s Envelope segments and Router breakpoints use.',
+    example: '`shapeCurve(0.5, "exp")` gives about 0.16.',
+    notes: [
+      'This is a different family from `ce.math.curve`.',
+      '`ce.math.unshape` reverses it.',
+    ],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1.' },
+      { name: 'curve', type: 'value', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Left out or unknown: "linear".' },
+      { name: 'tension', type: 'value', required: false, summary: 'How strongly "exp" and "log" bend. Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses.' },
+    ],
+  },
+  {
+    id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
+    summary: 'Add a dead zone to the bottom of a value from 0 to 1, as the Expression Router does.',
+    example: '`deadzone(0.55, 0.1)` gives 0.5.',
+    notes: ['The response starts at the edge of the dead zone instead of jumping up from it.'],
+    params: [
+      { name: 'v', type: 'value', required: true, summary: 'The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1.' },
+      { name: 'amount', type: 'value', required: true, summary: 'The size of the dead zone. At or below it: 0. The rest is stretched to fill 0 ↔ 1.' },
+      { name: 'invert', type: 'value', required: false, summary: 'true flips the value first. Default: false.' },
+    ],
+  },
+  {
+    id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',
+    summary: 'Work out how much each anchor point counts at a position, as a Timbre Space or Preset Constellation does.',
+    notes: [
+      'It returns one weight per anchor, adding up to 1: the closer the anchor, the bigger its share.',
+      'Pass the result to `ce.math.blendBy` to morph values.',
+    ],
+    params: [
+      { name: 'points', type: 'value', required: true, summary: 'The anchors, as a list of {x, y}. Empty: an empty list.' },
+      { name: 'x', type: 'value', required: true, summary: 'The position\'s x. Range: 0 ↔ 1.' },
+      { name: 'y', type: 'value', required: true, summary: 'The position\'s y. Range: 0 ↔ 1.' },
+      { name: 'power', type: 'value', required: false, summary: 'How sharp the blend is: higher lets the nearest anchor take over sooner. Default: 2.' },
+    ],
+  },
+  {
+    id: 'blendBy', category: 'Value / range', signature: 'blendBy(values, weights)',
+    summary: 'Combine many values into one weighted average.',
+    example: '`blendBy({0, 100}, {3, 1})` gives 25.',
+    notes: ['This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead.'],
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The values to combine.' },
+      { name: 'weights', type: 'value', required: true, summary: 'How much each value counts. They need not add up to 1. Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides.' },
+    ],
+  },
+  {
+    id: 'tickStops', category: 'Value / range', signature: 'tickStops(major [, minor])',
+    summary: 'Get the positions of a slider\'s scale marks, the same ones the app draws.',
+    example: '`tickStops(3, 1)` gives major {0, 0.5, 1} and minor {0.25, 0.75}.',
+    notes: [
+      'It returns two lists, major and minor, of positions in the range 0 ↔ 1.',
+      'Use it when you draw your own scale, so its marks line up with the app\'s.',
+    ],
+    params: [
+      { name: 'major', type: 'value', required: false, summary: 'How many major marks, counting both ends. Default: 11.' },
+      { name: 'minor', type: 'value', required: false, summary: 'How many smaller marks between each pair of major ones. Default: 0.' },
+    ],
+  },
+  {
+    id: 'dbPosition', category: 'Value / range', signature: 'dbPosition(fraction [, floorDb, ceilDb])',
+    summary: 'Find how far up a dB meter a level reaches.',
+    example: '`dbPosition(1)` gives about 0.91: 0 dB on a meter from -60 to +6.',
+    notes: ['It returns a position in the range 0 ↔ 1 (bottom ↔ top).'],
+    params: [
+      { name: 'fraction', type: 'value', required: true, summary: 'The level, as a linear value. Range: 0 ↔ 1. Outside the range: held at 0 or 1.' },
+      { name: 'floorDb', type: 'value', required: false, summary: 'The bottom of the meter, in dB. Default: -60, as on the Meter component.' },
+      { name: 'ceilDb', type: 'value', required: false, summary: 'The top of the meter, in dB. Default: +6.' },
+    ],
+  },
 
   // --- taming what arrives on the wire (design doc §34) ---
   // A controller does not send tidy numbers. It sends a value that jitters, crosses a threshold
   // repeatedly, spikes once, and has already been through a taper. These four are what a script
   // needs to make that usable, and none of them composes out of what was already here.
-  { id: 'smooth', category: 'Value / range', signature: 'smooth(current, target, coefficient [, epsilon])',
-    summary: 'Move `current` part of the way toward `target`: `coefficient`, from 0 to 1, is the share of the remaining distance covered on each call, so the value moves quickly at first and eases in as it gets close. Once within `epsilon` (default 0.0001) it snaps to the target, so it actually arrives instead of creeping closer forever. Good for taming a jittery pedal or a noisy CC. For a fixed step size, use `ce.math.approach()`.' },
-  { id: 'hysteresis', category: 'Value / range', signature: 'hysteresis(value, on, low, high)',
-    summary: 'Turn a changing value into an on/off state that does not flicker. It switches on when `value` reaches `high`, switches off when it falls to `low`, and keeps its current state in between. Pass the current state as `on` and it returns the new one. With two thresholds, a value hovering around one line cannot flip the state back and forth. Electronics calls this a Schmitt trigger.' },
-  { id: 'median', category: 'Value / range', signature: 'median(values)',
-    summary: 'The middle value of a list, or the average of the two middle values when the count is even. Returns nothing for an empty list. Unlike an average, a single stray spike does not pull it off course.' },
-  { id: 'euclid', category: 'Value / range', signature: 'euclid(steps, pulses [, rotation])',
-    summary: 'A Euclidean rhythm: `pulses` hits spread as evenly as possible across `steps` steps (up to 64), returned as a list of true and false values. It is the same pattern the Arpeggiator uses for its rests. `rotation` shifts the pattern round without changing the spacing between hits.' },
-  { id: 'unshape', category: 'Value / range', signature: 'unshape(y, curve [, tension])',
-    summary: 'The reverse of `ce.math.shape()`: give it a value that has been through a curve, with the same `curve` and `tension`, and it returns the value from before the curve. Use it when a value comes back from the synth through a taper, so the control lands where it started. "hold" is a step with no true reverse, so it returns the earliest input that gives that output.' },
+  {
+    id: 'smooth', category: 'Value / range', signature: 'smooth(current, target, coefficient [, epsilon])',
+    summary: 'Move a value part of the way toward a target, so it eases in as it gets close.',
+    example: '`smooth(0, 100, 0.2)` gives 20.',
+    notes: [
+      'Use it to steady a jittery pedal or a noisy CC.',
+      'For a fixed step size, use `ce.math.approach`.',
+    ],
+    params: [
+      { name: 'current', type: 'value', required: true, summary: 'The value now.' },
+      { name: 'target', type: 'value', required: true, summary: 'Where it is going.' },
+      { name: 'coefficient', type: 'value', required: true, summary: 'The share of the remaining distance covered in each call. Range: 0 ↔ 1 (stays put ↔ jumps to the target). Outside the range: held at 0 or 1.' },
+      { name: 'epsilon', type: 'value', required: false, summary: 'How close counts as arrived: within it, the value lands on the target. Default: 0.0001.' },
+    ],
+  },
+  {
+    id: 'hysteresis', category: 'Value / range', signature: 'hysteresis(value, on, low, high)',
+    summary: 'Turn a changing value into an on/off state that does not flicker.',
+    example: '`hysteresis(0.5, true, 0.3, 0.7)` gives true: between the two thresholds the state stays as it was.',
+    notes: ['With two thresholds, a value hovering around one line cannot flip the state back and forth. Electronics calls this a Schmitt trigger.'],
+    params: [
+      { name: 'value', type: 'value', required: true, summary: 'The changing value.' },
+      { name: 'on', type: 'value', required: true, summary: 'The state now. Pass back what the last call returned.' },
+      { name: 'low', type: 'value', required: true, summary: 'At or below this, the state switches off. Must be below high.' },
+      { name: 'high', type: 'value', required: true, summary: 'At or above this, the state switches on.' },
+    ],
+  },
+  {
+    id: 'median', category: 'Value / range', signature: 'median(values)',
+    summary: 'Find the middle value of a list.',
+    example: '`median({1, 2, 100})` gives 2.',
+    notes: ['Unlike the average, one stray spike does not move it.'],
+    params: [
+      { name: 'values', type: 'value', required: true, summary: 'The numbers, in any order. With an even count: the average of the two middle ones. Empty or left out: no result.' },
+    ],
+  },
+  {
+    id: 'euclid', category: 'Value / range', signature: 'euclid(steps, pulses [, rotation])',
+    summary: 'Make a Euclidean rhythm: hits spread as evenly as possible across a number of steps.',
+    example: '`euclid(8, 3)` gives {false, false, true, false, false, true, false, true}.',
+    notes: ['It returns a list of true and false, the same pattern the Arpeggiator uses for its rests.'],
+    params: [
+      { name: 'steps', type: 'value', required: true, summary: 'How many steps. Range: 1 ↔ 64. Outside the range: held at 1 or 64.' },
+      { name: 'pulses', type: 'value', required: true, summary: 'How many of the steps are hits. More than steps: every step is a hit.' },
+      { name: 'rotation', type: 'value', required: false, summary: 'How many steps to shift the pattern by, without changing the spacing. Default: 0. Negative shifts the other way.' },
+    ],
+  },
+  {
+    id: 'unshape', category: 'Value / range', signature: 'unshape(y, curve [, tension])',
+    summary: 'Undo a curve: give a value after the curve and get the value from before it.',
+    example: '`unshape(shapeCurve(0.3, "exp"), "exp")` gives 0.3.',
+    notes: [
+      'The reverse of `ce.math.shape`. Use it when a value returns from the synth through a taper, so the control lands where it started.',
+      '"hold" has no exact reverse: it returns the earliest value that gives the same result.',
+    ],
+    params: [
+      { name: 'y', type: 'value', required: true, summary: 'The value after the curve.' },
+      { name: 'curve', type: 'value', required: true, summary: 'The same curve that was used.' },
+      { name: 'tension', type: 'value', required: false, summary: 'The same tension that was used. Default: 1.6.' },
+    ],
+  },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
-  { id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
-    summary: 'A random number from the script\'s seeded sequence. With no arguments, a fraction from 0 up to but not including 1. With `lo` and `hi`, a whole number from `lo` to `hi`, both included. The same seed replays the same sequence in every scripting language, in the editor and in the exported plugin.' },
-  { id: 'randomSeed', category: 'Value / range', signature: 'randomSeed(n)',
-    summary: 'Set the seed for this script\'s random numbers, so the same seed replays the same sequence. A seed of 0 uses the default. Until you set one, every script starts from that same default, so its numbers repeat each time it loads. Every script has its own sequence, and so does every named stream, so this never affects another script.' },
-  { id: 'randomStream', category: 'Value / range', signature: 'randomStream(name, fn)',
-    summary: 'Run `fn` with its random numbers taken from a separate, named sequence, so two generative parts of one script (a melody and a drum pattern, say) do not disturb each other\'s numbers or seeds. The script\'s normal sequence comes back when the block ends, even if it ends in an error. Streams belong to one script: two scripts using the same name get separate streams.' },
+  {
+    id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
+    summary: 'Get a random number.',
+    example: '`random(1, 6)` gives a whole number from 1 to 6, as a die does.',
+    params: [
+      { name: 'lo', type: 'value', required: false, summary: 'The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1.' },
+      { name: 'hi', type: 'value', required: false, summary: 'The highest whole number it can return. It may be below lo.' },
+    ],
+  },
+  {
+    id: 'randomSeed', category: 'Value / range', signature: 'randomSeed(n)',
+    summary: 'Set where this script\'s random numbers start, so the same seed gives the same sequence.',
+    notes: [
+      'Until you set one, every script starts from the same default, so its numbers repeat each time it loads.',
+      'Every script and every named stream has its own sequence, so this never affects another script.',
+    ],
+    params: [
+      { name: 'n', type: 'value', required: true, summary: 'The seed. 0 uses the default.' },
+    ],
+  },
+  {
+    id: 'randomStream', category: 'Value / range', signature: 'randomStream(name, fn)',
+    summary: 'Run a block of code with random numbers from a separate, named sequence.',
+    notes: ['Use it so two parts of one script, such as a melody and a drum pattern, do not affect each other\'s random numbers or seeds.'],
+    params: [
+      { name: 'name', type: 'value', required: true, summary: 'The sequence\'s name. Two scripts using the same name get separate sequences.' },
+      { name: 'fn', type: 'function', required: true, summary: 'The code to run. The script\'s own sequence returns when it ends, even if it ends in an error.' },
+    ],
+  },
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
