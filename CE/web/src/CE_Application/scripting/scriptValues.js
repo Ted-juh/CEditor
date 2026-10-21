@@ -45,6 +45,8 @@ import { DRAW_SHAPES, drawNumber, curveTension } from './drawShapes.js';
 import { readPresetSlot, programWords, bankWords } from './presetWords.js';
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { componentClampWarning } from './componentVerbs.js';
+import { ARRANGE_VERBS } from '../utils/arrangement.js';
+import { readArrangement } from './arrangePreview.js';
 
 const COMPONENT_VERB_BY_ID = new Map(COMPONENT_VERBS.map((verb) => [verb.id, verb]));
 import { FIELD_SETS } from '../models/inspectorFieldSets.js';
@@ -426,6 +428,23 @@ function buildCall(raw, env) {
       const at = name === 'tension' ? args.find((a) => a.param?.name === 'opts')?.options?.find((o) => o.name === 'tension')
         : args.find((a) => a.param?.name === name);
       if (at && !at.problem) at.problem = { severity: 'warning', message };
+    }
+  }
+  // An arrangement's controls where they are and where it puts them, by the verb's own plan
+  // (arrangePreview.js), and what the runtime says of a name that is not a control and of a `to`
+  // that is not one of the names.
+  if (member && ARRANGE_VERBS[member.id]) {
+    const arrange = readArrangement(member.id, args, env.ctx);
+    if (arrange) {
+      call.arrange = arrange;
+      const to = args.find((a) => a.param?.name === 'opts')?.options?.find((o) => o.name === 'to');
+      if (arrange.refused) {
+        if (to && !to.problem) to.problem = { severity: 'error', message: arrange.refused };
+        else if (!call.problem) call.problem = { severity: 'error', message: arrange.refused };
+      }
+      if (arrange.missing.length && !call.problem) {
+        call.problem = { severity: 'warning', message: arrange.missing.map((m) => m.message).join(' ') };
+      }
     }
   }
   // A colour built from numbers written out has a row of its own, the colour it makes, which the

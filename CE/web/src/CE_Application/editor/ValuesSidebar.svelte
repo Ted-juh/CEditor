@@ -58,6 +58,7 @@
   import BezierEditor from '../components/animation/BezierEditor.svelte';
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
   import LcdLinePreview from './LcdLinePreview.svelte';
+  import { arrangementView, labelFits } from '../scripting/arrangePreview.js';
   import { learnFor, learnTakes, learnedEdit, learnWords, sendableHex } from './valueLearn.js';
   import { learnNext } from '../stores/midiLearnTap.js';
   import { rawMidiDraft } from '../stores/rawMidiDraft.js';
@@ -830,7 +831,7 @@
         {#if firstCall.summary}<div class="vsum" title={plainSummary(firstCall.summary)}>{plainSummary(firstCall.summary)}</div>{/if}
       {/if}
     </div>
-    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem)}
+    {#if !rows.some((r) => r.type === 'arg') && !(statement.calls ?? []).some((c) => c.problem || c.arrange)}
       <p class="vempty">Nothing in this {isJson ? 'object' : 'statement'} that the editor can read.</p>
     {/if}
     <div class="vlist" bind:this={listEl}>
@@ -867,6 +868,41 @@
                 <path class="vshape-in" d={shape.d} vector-effect="non-scaling-stroke" />
               {/if}
             </svg>
+          {/if}
+          {#if row.call.arrange}
+            {@const arrange = row.call.arrange}
+            {@const view = arrangementView(arrange)}
+            {#if view}
+              <!-- The named controls where they are, dashed, and where the verb puts them, solid, among
+                   the panel's other controls: the canvas is not on screen while the script is. -->
+              <svg class="varrange" style:--depth={row.depth} width={view.width} height={view.height} viewBox={view.viewBox}
+                role="img" aria-label={`${arrange.verb}: the controls where they are, dashed, and where it puts them, solid`}>
+                {#each view.others as other, i (i)}
+                  <rect class="varr-other" x={other.x} y={other.y} width={other.w} height={other.h} vector-effect="non-scaling-stroke" />
+                {/each}
+                {#if view.line}
+                  <line class="varr-line" x1={view.line.x1} y1={view.line.y1} x2={view.line.x2} y2={view.line.y2} vector-effect="non-scaling-stroke" />
+                {/if}
+                {#each arrange.items as item, i (i)}
+                  {#if item.moved}
+                    <rect class="varr-before" x={item.before.x} y={item.before.y} width={item.before.w} height={item.before.h} vector-effect="non-scaling-stroke" />
+                    <line class="varr-move" x1={item.before.x + item.before.w / 2} y1={item.before.y + item.before.h / 2}
+                      x2={item.after.x + item.after.w / 2} y2={item.after.y + item.after.h / 2} vector-effect="non-scaling-stroke" />
+                  {/if}
+                {/each}
+                {#each arrange.items as item, i (i)}
+                  <rect class={['varr-after', item.moved ? 'moved' : 'still', item.key && 'key']} data-name={item.name}
+                    x={item.after.x} y={item.after.y} width={item.after.w} height={item.after.h} vector-effect="non-scaling-stroke" />
+                  {#if labelFits(item.name, item.after, view.scale)}
+                    <text class="varr-label" x={item.after.x + item.after.w / 2} y={item.after.y + item.after.h / 2} font-size={view.labelSize}>{item.name}</text>
+                  {/if}
+                {/each}
+              </svg>
+            {/if}
+            <div class="varr-said" style:--depth={row.depth}>
+              <span class="varr-text">{arrange.said}</span>
+              {#if arrange.moved}<span class="varr-key"><i class="now"></i>now <i class="then"></i>after</span>{/if}
+            </div>
           {/if}
         {:else if row.type === 'loose'}
           <div class="vcall" style:--depth={0}><div class="vsum">Values outside any call</div></div>
@@ -1014,6 +1050,22 @@
   .vshape-in { fill: none; stroke: currentColor; stroke-width: 1.5; }
   .vshape-toward { stroke: #e7c489; stroke-width: 1.25; stroke-dasharray: 2 2; }
   .vshape-toward-end { fill: #e7c489; }
+  .varrange { display: block; margin: 2px 8px 2px calc(8px + var(--depth, 0) * 14px); }
+  .varr-other { fill: none; stroke: var(--line-2); stroke-width: 1; }
+  .varr-line { stroke: #e7c489; stroke-width: 1; stroke-dasharray: 3 2; }
+  .varr-before { fill: none; stroke: var(--txt-faint); stroke-width: 1; stroke-dasharray: 3 2; }
+  .varr-move { stroke: var(--txt-faint); stroke-width: 1; }
+  .varr-after { stroke-width: 1.25; }
+  .varr-after.moved { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: var(--accent); }
+  .varr-after.still { fill: color-mix(in srgb, var(--txt) 8%, transparent); stroke: var(--txt-dim); }
+  .varr-after.key { stroke: #e7c489; stroke-width: 2; }
+  .varr-label { fill: var(--txt); font-family: var(--mono); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .varr-said { margin: 0 8px 4px calc(8px + var(--depth, 0) * 14px); color: var(--txt-dim); font-size: 11px;
+    display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+  .varr-key { color: var(--txt-faint); display: inline-flex; align-items: center; gap: 4px; }
+  .varr-key i { display: inline-block; width: 12px; height: 8px; box-sizing: border-box; }
+  .varr-key i.now { border: 1px dashed var(--txt-faint); }
+  .varr-key i.then { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); margin-left: 4px; }
   .vfont { font-size: 15px; line-height: 1; color: var(--txt); padding: 1px 6px; border: 1px solid var(--line-2); border-radius: 4px; }
   .vthumb { width: 22px; height: 22px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 3px; background: #0c0f12; }
   .vfield {

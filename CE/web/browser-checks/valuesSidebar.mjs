@@ -41,6 +41,8 @@
  *              row puts its bytes in the Ports tab's box and sends nothing; a colour built from
  *              numbers (ce.math.hex) has a swatch, and the Colors tab writes the numbers back;
  *              ce.panel.create's type is a dropdown
+ *   arrange    ce.panel.grid and align draw the named controls where they are and where they go,
+ *              align its edge, and a `to` not in the list is said in the runtime's words
  *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
  *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
@@ -897,6 +899,65 @@ try {
   led.check(S, 'create\'s type is a dropdown', 'ce.panel.create\'s type row lists the component types there are, and the one picked is written in its quotes, as one edit',
     { offers: true, text: builtText.replace('create("Knob"', 'create("Slider"'), writes: 1 },
     { offers: ['Knob', 'Slider', 'Label', 'LcdDisplay'].every((t) => typeChoices.includes(t)), text: await editorText(), writes: await inputs() });
+
+  // ---- an arrangement ----------------------------------------------------------------------------
+  // The canvas is not on screen while a script is written: the row draws the named controls where
+  // they are and where the verb puts them, by the verb's own plan.
+  const ARRANGE = `function onValueChanged(value) {
+  ce.panel.grid(["Cutoff", "Title"], { columns: 2, gapX: 12 });
+  ce.panel.align(["Cutoff", "Title"], "top");
+  ce.panel.align(["Cutoff", "Title"], "left", { to: "Fader" });
+}
+`;
+  await typeScript(ARRANGE);
+  const transformsNow = () => page.evaluate(async () => {
+    const { panels, scriptRuntimePanelId } = await import('/src/CE_Application/stores/panels.js');
+    const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+    const panel = get(panels).find((p) => p.id === get(scriptRuntimePanelId));
+    const of = (name) => { const t = panel.controls.find((c) => c._children.Core.name === name)._children.Transform; return { x: t.x, y: t.y, w: t.width, h: t.height }; };
+    return { cutoff: of('Cutoff'), title: of('Title') };
+  });
+  const arrangeOf = () => page.evaluate(() => {
+    const side = document.querySelector('[data-testid="values-sidebar"]');
+    const svg = side.querySelector('svg.varrange');
+    const r = svg?.getBoundingClientRect();
+    const rect = (el) => (el ? ['x', 'y', 'width', 'height'].map((k) => Number(el.getAttribute(k))) : null);
+    const after = (name) => svg?.querySelector(`rect.varr-after[data-name="${name}"]`);
+    const line = svg?.querySelector('line.varr-line');
+    return {
+      drawn: !!svg && (r?.width ?? 0) > 60 && (r?.height ?? 0) > 20,
+      title: { after: rect(after('Title')), moved: after('Title')?.classList.contains('moved') ?? null,
+        before: rect(svg?.querySelector('rect.varr-before')) },
+      cutoff: { after: rect(after('Cutoff')), still: after('Cutoff')?.classList.contains('still') ?? null },
+      line: line ? [line.getAttribute('y1'), line.getAttribute('y2')].map(Number) : null,
+      said: side.querySelector('.varr-said .varr-text')?.textContent.trim() ?? '',
+      to: side.querySelector('.vrow[data-name="to"] .vproblem')?.textContent ?? '',
+    };
+  });
+  const now = await transformsNow();
+  await clickAt(ARRANGE.indexOf('grid(') + 2);
+  await waitHead('Line 2');
+  const gridded = await arrangeOf();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-arrange-grid.png` });
+  const cell = Math.max(now.cutoff.w, now.title.w);
+  const t = now.title;
+  const c = now.cutoff;
+  // Reading order puts Cutoff first, above Title: Title goes into the second cell of the row.
+  led.check(S, 'a grid is drawn before and after', 'ce.panel.grid(["Cutoff", "Title"], { columns: 2, gapX: 12 }) draws a map under its call: Title dashed where it is and solid in the second cell, one cell width and 12 px on from Cutoff, and Cutoff where it stays; the row says so',
+    { drawn: true, title: { after: [c.x + cell + 12, c.y, t.w, t.h], moved: true, before: [t.x, t.y, t.w, t.h] },
+      cutoff: { after: [c.x, c.y, c.w, c.h], still: true }, line: null, said: 'Moves 1 of 2; "Cutoff" stays where it is.', to: '' },
+    gridded);
+  await clickAt(ARRANGE.indexOf('"top"') + 2);
+  await waitHead('Line 3');
+  const aligned = await arrangeOf();
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-arrange-align.png` });
+  await clickAt(ARRANGE.indexOf('"Fader"') + 2);
+  await waitHead('Line 4');
+  const refusedTo = await arrangeOf();
+  led.check(S, 'align draws the edge it lines up on, and says a `to` it refuses', 'ce.panel.align(…, "top") draws the line along the group\'s top and Title moved up to it; with { to: "Fader" }, a name not in the list, the `to` row says the runtime\'s refusal and the map says nothing moves',
+    { line: [c.y, c.y], titleAfterY: c.y, said: 'Moves 1 of 2; "Cutoff" stays where it is.',
+      to: 'ce.panel.align: "Fader" is not one of the names given, so nothing was moved.', refusedSaid: 'Nothing moves.' },
+    { line: aligned.line, titleAfterY: aligned.title.after?.[1], said: aligned.said, to: refusedTo.to, refusedSaid: refusedTo.said });
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();
