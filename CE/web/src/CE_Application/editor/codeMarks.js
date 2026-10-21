@@ -16,6 +16,8 @@
 // A long text is drawn a window of lines at a time (the editor's windowStart); a box is placed only
 // for a line inside that window. A folded view draws none, since its lines are not the text's.
 
+import { visualColumn } from './textColumns.js';
+
 /** The kinds of mark, in the order they are drawn (later ones on top). */
 export const MARK_KINDS = Object.freeze(['statement', 'param', 'hover', 'edit']);
 
@@ -41,8 +43,8 @@ function lineOf(starts, index) {
  * @param {{ first?: number, last?: number, folded?: boolean }} [view]  The lines drawn (`last`
  *   exclusive), and whether the view is folded.
  * @returns {{ kind: string, line: number, col: number, width: number, band: boolean, key: string, colour?: string }[]}
- *   `line` from 0; `col` and `width` in characters; `band` for a statement line, drawn the whole
- *   width of the text area.
+ *   `line` from 0; `col` and `width` in columns as the editor draws them, a tab to its next stop
+ *   (textColumns.js); `band` for a statement line, drawn the whole width of the text area.
  */
 export function markBoxes(marks, text, starts, { first = 0, last = Infinity, folded = false } = {}) {
   if (folded || !Array.isArray(marks) || !marks.length) return [];
@@ -64,11 +66,13 @@ export function markBoxes(marks, text, starts, { first = 0, last = Infinity, fol
         out.push({ kind: mark.kind, line, col: 0, width: 0, band: true, key });
         continue;
       }
-      const indent = /^[ \t]*/.exec(src.slice(lineStart, lineEnd))[0].length;
+      const text = src.slice(lineStart, lineEnd);
+      const indent = /^[ \t]*/.exec(text)[0].length;
       const from = line === l0 ? start : lineStart + indent;
       const to = line === l1 ? end : lineEnd;
       if (to <= from) continue;
-      const box = { kind: mark.kind, line, col: from - lineStart, width: to - from, band: false, key };
+      const col = visualColumn(text, from - lineStart);
+      const box = { kind: mark.kind, line, col, width: visualColumn(text, to - lineStart) - col, band: false, key };
       if (mark.kind === 'param') box.colour = mark.colour ?? null;
       out.push(box);
     }

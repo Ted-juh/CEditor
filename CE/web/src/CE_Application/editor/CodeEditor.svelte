@@ -34,7 +34,8 @@
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
   import { carryPopupTheme } from './popupTheme.js';
-  import { placeSignatureHint, visualColumn } from './signatureHint.js';
+  import { placeSignatureHint } from './signatureHint.js';
+  import { visualColumn, indexAtColumn } from './textColumns.js';
   import { paramColours } from '../scripting/paramColours.js';
   import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
   import { markBoxes } from './codeMarks.js';
@@ -154,10 +155,14 @@
   // Each diagnostic, resolved to the on-screen token it underlines.
   // Squiggle overlay positions are in full-source space; suppress while folded
   // (the gutter error tint still shows via errorLines, keyed by full line number).
+  // Columns as drawn (textColumns.js): the diagnostic's own column and its word's length count
+  // characters, and a tab before it put the underline under the wrong text.
   let diagSpans = $derived(isFolded ? [] : diagnostics.map((d) => {
     const w = wordAt(analyzedSource, d.index) || wordAt(analyzedSource, d.index - 1);
     const len = w ? w.word.length : 1;
-    return { line: d.line, col: d.col, len, message: d.message };
+    const text = analyzedSource.split('\n')[d.line - 1] ?? '';
+    const col = visualColumn(text, d.col);
+    return { line: d.line, col, len: visualColumn(text, d.col + len) - col, message: d.message };
   }));
   $effect(() => { ondiagnostics?.(diagnostics); });
 
@@ -352,10 +357,18 @@
     return () => observer.disconnect();
   });
 
-  // line/column (0-based) of a character offset.
+  // The text of line `line` (from 0).
+  function lineTextOf(line) {
+    const start = valueStarts[line] ?? 0;
+    return value.slice(start, line + 1 < valueStarts.length ? valueStarts[line + 1] - 1 : value.length);
+  }
+  // line/column (0-based) of a character offset, the column as the editor draws it, a tab to its next
+  // stop (textColumns.js). Counted in characters, every box placed by it (the completion list, the
+  // rename box, the occurrence marks) sat left of its text on a line with tabs.
   function posOf(index) {
-    const line = lineAt(valueStarts, Math.min(index, value.length));
-    return { line, col: index - valueStarts[line] };
+    const at = Math.min(index, value.length);
+    const line = lineAt(valueStarts, at);
+    return { line, col: visualColumn(lineTextOf(line), at - valueStarts[line]) };
   }
   // Content-space pixel (pre-scroll) for a line/col.
   function xyOf(line, col) {
@@ -370,9 +383,7 @@
     const line = Math.max(0, Math.floor(ly / lineHeight));
     const col = Math.max(0, Math.round(lx / charWidth));
     if (line >= valueStarts.length) return value.length;
-    const base = valueStarts[line];
-    const end = line + 1 < valueStarts.length ? valueStarts[line + 1] - 1 : value.length;
-    return base + Math.min(col, end - base);
+    return valueStarts[line] + indexAtColumn(lineTextOf(line), col);
   }
 
   // ----- autocomplete -----
@@ -1104,11 +1115,11 @@
     {#each occurrences as o (o.start)}
       {@const p = posOf(o.start)}
       <div class="ce-occ"
-        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(o.end - o.start) * charWidth}px; height:{lineHeight}px"></div>
+        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(posOf(o.end).col - p.col) * charWidth}px; height:{lineHeight}px"></div>
     {/each}
     {#each columnCaretLines as ln (ln)}
       <div class="ce-mcaret"
-        style="left:{PAD_L + column.col * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+        style="left:{PAD_L + visualColumn(lineTextOf(ln), column.col) * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {/each}
     <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {firstRow * lineHeight - scrollTop}px)">{@html highlightedSafe}</pre>
     <textarea

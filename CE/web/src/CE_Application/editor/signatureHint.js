@@ -28,14 +28,9 @@ export const HINT = Object.freeze({
   margin: 4,            // kept clear of the text area's edges
 });
 
-/** The column `index` (a character offset into `line`) is drawn at, a tab taking the code to its
- *  next stop: the editor draws tabs `tabSize` wide (CodeEditor.svelte's tab-size). */
-export function visualColumn(line, index, tabSize = 2) {
-  let col = 0;
-  const text = String(line ?? '');
-  for (let i = 0; i < Math.min(index, text.length); i += 1) col = text[i] === '\t' ? col + tabSize - (col % tabSize) : col + 1;
-  return col + Math.max(0, index - text.length);
-}
+// Columns as the editor draws them, a tab to its next stop (textColumns.js, which the editor's other
+// overlays count with too).
+export { visualColumn } from './textColumns.js';
 
 /** The parameters as the hint shows them: each { text, active, index }, or, folded, the active one
  *  alone with "…" for each run of the others. `index` is the parameter's place in `params`, which

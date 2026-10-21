@@ -42,6 +42,16 @@ test('a statement is a band over every line it covers, and nothing changes a cha
   assert.deepEqual([band.band, band.col, band.width], [true, 0, 0], 'a band is the whole width, not a box of characters');
 });
 
+test('a box on a line with tabs is placed by the columns the editor draws', () => {
+  // Two tabs are four columns, so "250" starts at column 15, not 13; the tab inside is two wide.
+  const text = 'ce.anim.to("x", 1, {\n\t\tduration = 250,\n\t\tcurve =\t"outBack" })';
+  const at = text.indexOf('250');
+  assert.deepEqual(boxes([{ start: at, end: at + 3, kind: 'hover' }], text), ['hover@1:15+3']);
+  const value = text.indexOf('"outBack"');
+  assert.deepEqual(boxes([{ start: value, end: value + 9, kind: 'edit' }], text), ['edit@2:12+9'],
+    'after "\t\tcurve =" (11 columns) the tab runs to 12');
+});
+
 test('a value over several lines gets one box per line: from its start, from each indent, to its end', () => {
   const text = 'x({\n    a = 1,\n\n    b = 2 })\n';
   const start = text.indexOf('{');
