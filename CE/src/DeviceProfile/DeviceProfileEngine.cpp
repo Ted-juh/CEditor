@@ -2321,6 +2321,19 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             return juce::Result::ok();
         }
 
+        if (encodingType == "s7")
+        {
+            // signed 7-bit: the value plus its bias (default 64), the reverse of the dump decoder's
+            // s7 branch and of codecs.mjs encodeValue('s7'). Without it a profile could read a
+            // bipolar parameter (pan, tune, env depth) but every write of one was refused here.
+            auto signedOffset = encoding != nullptr ? propInt (*encoding, "signedOffset", 64) : 64;
+            auto byte = (int) std::round (numeric) + signedOffset;
+            if (! isMidiDataByte (byte))
+                return juce::Result::fail ("Encoded s7 value outside MIDI data byte range for " + propString (parameter, "id"));
+            encodedBytes.add (byte);
+            return juce::Result::ok();
+        }
+
         return juce::Result::fail ("Unsupported numeric encoder: " + encodingType);
     }
 

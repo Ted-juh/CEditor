@@ -1341,6 +1341,37 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
+    // ...and written: the value plus the bias, the reverse of the decode above. The encoder had no s7
+    // branch, so every write of lfo.pan, as a message or in a dump, was refused as
+    // "Unsupported numeric encoder: s7".
+    struct SignedCase { int value; const char* hex; };
+    for (const auto& c : { SignedCase { -64, "00" }, SignedCase { -10, "36" }, SignedCase { 0, "40" }, SignedCase { 63, "7F" } })
+    {
+        const auto set = engine.compileSetParameter ("mainSynth", "lfo.pan", c.value, true);
+        if (! set.ok || set.transaction.encodedValueHex != c.hex)
+        {
+            std::cerr << "[FAIL] dump shape s7 write: lfo.pan " << c.value << " should encode as " << c.hex
+                      << ", got " << (set.ok ? set.transaction.encodedValueHex : "!" + set.error) << "\n";
+            return 1;
+        }
+    }
+    auto* signedWanted = new juce::DynamicObject();
+    signedWanted->setProperty ("lfo.pan", -10);
+    const auto signedBuilt = engine.buildDumpMessage ("s7PatchDump", juce::var (signedWanted));
+    if (! signedBuilt.ok || signedBuilt.hex != "F0 7D 10 0A 36 F7")
+    {
+        std::cerr << "[FAIL] dump shape s7 dump should build as F0 7D 10 0A 36 F7, got "
+                  << (signedBuilt.ok ? signedBuilt.hex : "!" + signedBuilt.error) << "\n";
+        return 1;
+    }
+    const auto signedBack = engine.parseDumpMessage (signedBuilt.hex);
+    auto* signedBackValues = signedBack.values.getDynamicObject();
+    if (! signedBack.ok || signedBackValues == nullptr || (int) signedBackValues->getProperty ("lfo.pan") != -10)
+    {
+        std::cerr << "[FAIL] dump shape s7 dump did not read its own -10 back\n";
+        return 1;
+    }
+
     // 14-bit LSB-first (byteOrder lsb-first): wire 39 60 -> 12345 (LSB 0x39 first, MSB 0x60 second).
     auto lsbDump = engine.parseDumpMessage ("F0 7D 10 0B 39 60 F7");
     auto* lsbValues = lsbDump.values.getDynamicObject();

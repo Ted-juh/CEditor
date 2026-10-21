@@ -27,8 +27,7 @@ test('every field of every dump is where the engine puts it, as wide as it write
     if (p.type === 'text') return ['A'.repeat(32), 'B'.repeat(32)].map((t) => t.slice(0, Number(p.encoding?.length ?? 1)));
     const choices = Array.isArray(p.choices) ? p.choices : Array.isArray(p.options) ? p.options : [];
     if (choices.length > 1) return [choices[0].value, choices[1].value];
-    // From 0 up: the local encoder writes a signed (s7) value as it is, clamped to 0–127.
-    const lo = Math.max(0, Number(p.range?.min ?? 0));
+    const lo = Number(p.range?.min ?? 0);
     return [lo, lo + 1];
   };
   let fieldsChecked = 0;

@@ -1412,11 +1412,14 @@ Then the last two from the same list, which the owner had held back for a step o
   changes lies in that field's place: over 800 fields in the four test profiles. A dump a script
   declares with `defineDump` is not read yet, only the profiles'.
 
-Found on the way and not changed here: the local profile engine (`deviceProfileLocalEngine.js`)
-encodes an `s7` parameter as a plain 0–127 number, without its signed offset, while its decoder
-takes the offset off. A pan of 0 goes out as byte 0 and reads back as −64; 10 reads back as −54;
-anything below 0 goes out as 0. It matters only where the web engine builds a dump or a message,
-in the editor with no C++ host.
+Found on the way, and fixed after in a change of its own: a signed (`s7`) parameter was not
+written right by either engine. The web engine (`deviceProfileLocalEngine.js`) encoded it as a plain
+0–127 number, without its bias, while its decoder took the bias off: a pan of 0 went out as byte 0
+and read back as −64, and anything below 0 went out as 0. Its dump decoder had no `s7` branch, so a
+dump's pan of −10 read as 54. The C++ engine decoded `s7` but had no encoder for it, so every write
+of one, as a message or in a dump, was refused as "Unsupported numeric encoder: s7". Both engines
+now write the value plus its bias and read the byte less it, as the DPD's `codecs.mjs` does
+(`test/s7Encoding.test.js`, and `DeviceProfileEngineTests.cpp`'s dump shape test).
 
 ## Open questions for the owner
 

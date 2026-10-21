@@ -267,6 +267,21 @@ export function encodeParameterValue(parameter, value) {
     for (let shift = (nibbles - 1) * 4; shift >= 0; shift -= 4) bytes.push((number >> shift) & 0x0f);
     return { bytes, number, normalized: max > 1 ? number / (max - 1) : 0, displayed: String(number) };
   }
+  if (encoding === 's7') {
+    // Signed 7-bit: the value plus its bias (64 unless the profile says otherwise), the reverse of
+    // decodeParameterValue's s7 branch, and what DeviceProfileEngine.cpp and the DPD's codecs.mjs
+    // write. It fell through to the u7 line below, which clamped the signed value to 0-127: every
+    // negative value went out as 0, the bottom of the range, and every other one 64 too low, so a
+    // pan of 0 read back as -64. A value the byte cannot hold is refused, as a nibbled one is.
+    const offset = Number(parameter?.encoding?.signedOffset ?? 64);
+    const bias = Number.isFinite(offset) ? offset : 64;
+    const signed = Math.round(Number(value) || 0);
+    const byte = signed + bias;
+    if (byte < 0 || byte > 127) {
+      return { error: `Signed value outside ${-bias} to ${127 - bias} for ${parameter?.id ?? ''}` };
+    }
+    return { bytes: [byte], number: byte, normalized: byte / 127, displayed: String(signed) };
+  }
   const number = clampInt(value, 0, 127);
   return { bytes: [number], number, normalized: number / 127, displayed: String(number) };
 }
@@ -597,6 +612,11 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     for (let index = 0; index < nibbles; index += 1) {
       numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
+  } else if (encodingType === 's7') {
+    // Signed 7-bit, the byte less its bias, as decodeParameterValue and DeviceProfileEngine.cpp read
+    // it. A dump's s7 field came back as the raw byte here, so a pan of -10 read as 54.
+    const signedOffset = Number(encoding?.signedOffset ?? 64);
+    numeric = (bytes[offset] & 0x7f) - (Number.isFinite(signedOffset) ? signedOffset : 64);
   }
 
   if (type === 'choice' || type === 'enum') {
