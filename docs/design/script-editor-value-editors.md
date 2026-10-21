@@ -1410,7 +1410,13 @@ Then the last two from the same list, which the owner had held back for a step o
   mappings count unpacked bytes, so no byte of it is one value. `dumpOffsets.test.js` holds each
   layout to the engine's own dumps. One value is changed and the dump rebuilt, and every byte that
   changes lies in that field's place: over 800 fields in the four test profiles. A dump a script
-  declares with `defineDump` is not read yet, only the profiles'.
+  declares with `defineDump` is read the same way, and said first, since a script reading bytes
+  beside its own `defineDump` is most likely reading that dump. It is laid out by the runtime's own
+  `defineParameter` and `defineDump`, run on a role of their own (`declaredProfile` in
+  `deviceDefinitions.js`), so what the runtime refuses, such as a field naming a parameter nobody
+  defined, is not laid out either. What decides a place or a width has to be written out: an offset
+  built as the script runs would read as 0 and put the field at the wrong byte. How a parameter
+  reaches the synth is no part of a dump, so a SysEx template built from parts does not stop it.
 
 Found on the way, and fixed after in a change of its own: a signed (`s7`) parameter was not
 written right by either engine. The web engine (`deviceProfileLocalEngine.js`) encoded it as a plain

@@ -13,6 +13,7 @@ import { fontCatalogue } from '../scripting/textStyle.js';
 import { assetCatalogue } from '../utils/imageLayers.js';
 import { familyOf, literalOf, matchBrackets, scanCalls, tokenize } from '../scripting/scriptValueScan.js';
 import { parameterValueWidth } from '../stores/deviceProfileLocalEngine.js';
+import { declaredProfile } from '../scripting/deviceDefinitions.js';
 
 /**
  * The fonts and images a script can name, as readStatement takes them: every family by its stored
@@ -47,8 +48,9 @@ export const valueCatalogueStore = derived([availableFonts, storedIcons, documen
  * library keeps for its slots (`library`, slot → name); `declared`, the parameters the scripts
  * declare with ce.device.defineParameter (declaredDeviceParameters), which no profile needs to
  * have, each as { id, role } (a bare id is declared for any role); and `declaredDumps`, the dumps
- * they declare with ce.device.defineDump, the same way. `mappings`, `profiles`, `tables`, `sources`
- * and `library` are the device stores' values.
+ * they declare with ce.device.defineDump, the same way, with the name and layout of each one written
+ * out (declaredDeviceDumps). `mappings`, `profiles`, `tables`, `sources` and `library` are the
+ * device stores' values.
  */
 export function deviceValueContext({ mappings = {}, profiles = [], tables = {}, sources = {}, declared = [], declaredDumps = [], library = {} } = {}) {
   const roles = {};
@@ -169,14 +171,89 @@ const DEFAULT_ROLE = 'mainSynth';
  * built from parts is not known until it runs and is left out.
  */
 export function declaredDeviceParameters(scripts) {
-  return declaredBy(scripts, DECLARES_PARAMETER, 'id');
+  return declaredBy(scripts, DECLARES_PARAMETER, 'id').map(({ id, role }) => ({ id, role }));
 }
 
-/** …and the dumps they declare with defineDump, the same way: [{ id: kind, role }]. */
+/**
+ * …and the dumps they declare with defineDump, the same way: [{ id: kind, role }], with `name` and
+ * `layout` (dumpLayout) for a dump whose spec is written out as defineDump would take it, read with
+ * the parameters declared for its role (deviceDefinitions.declaredProfile), so a byte-list call's row
+ * names what the script's own dump holds at its offset (scripting/dumpOffsets.js), as it does a
+ * profile's.
+ */
 export function declaredDeviceDumps(scripts) {
-  return declaredBy(scripts, DECLARES_DUMP, 'kind');
+  const dumps = declaredBy(scripts, DECLARES_DUMP, 'kind');
+  if (!dumps.length) return [];
+  const parameters = declaredBy(scripts, DECLARES_PARAMETER, 'id');
+  return dumps.map(({ id, role, spec }) => ({ id, role, ...declaredDumpLayout(id, role, spec, parameters) }));
 }
 
+// What decides where a dump's values are, and how wide a parameter's value is: written out, or the
+// dump is not laid out and the parameter not read. A part built when the script runs would read here
+// as left out, which puts a field at offset 0, or a value one byte wide, and says so with confidence.
+const DUMP_PLACES = ['fields', 'offset', 'size', 'match', 'prefix', 'suffix', 'checksum'];
+const PARAMETER_WIDTH = ['type', 'encoding', 'nibbles', 'length'];
+const WIRES = ['cc', 'nrpn', 'sysex'];
+
+function declaredDumpLayout(kind, role, spec, parameters) {
+  if (!isPlain(spec) || DUMP_PLACES.some((k) => hasComputed(spec[k]))) return {};
+  const definitions = [];
+  for (const p of parameters) {
+    if (!(p.role === role || p.role === null || role === null) || !isPlain(p.spec)) continue;
+    if (PARAMETER_WIDTH.some((k) => hasComputed(p.spec[k]))) continue;
+    // How a parameter reaches the synth is no part of a dump; one built from parts is a template
+    // that carries its value as its encoding says, so defineParameter reads the rest of it.
+    const computedWire = WIRES.some((k) => hasComputed(p.spec[k]));
+    const wire = computedWire ? Object.fromEntries(WIRES.map((k) => [k, undefined])) : {};
+    const spec = { ...withoutComputed(p.spec), ...wire, ...(computedWire ? { sysex: 'F0 $value F7' } : {}) };
+    definitions.push({ verb: 'parameter', id: p.id, spec });
+  }
+  definitions.push({ verb: 'dump', id: kind, spec: withoutComputed(spec) });
+  const profile = declaredProfile(definitions);
+  const dump = profile.dumpDefinitions.find((d) => d.id === kind);
+  if (!dump) return {};
+  const layout = dumpLayout(dump, new Map(profile.parameters.map((p) => [p.id, p])));
+  return layout ? { name: dump.name, layout } : {};
+}
+
+// A spec's text as values, with what is built when the script runs as COMPUTED: a list with such an
+// item is COMPUTED as a whole, its places being unknown.
+const COMPUTED = Symbol('computed');
+const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+function writtenValue(node) {
+  switch (node?.type) {
+    case 'string': case 'number': case 'boolean': return node.value;
+    case 'null': return null;
+    case 'list': case 'table': {
+      if (node.entries.every((e) => e.key === null)) {
+        const items = node.entries.map((e) => writtenValue(e.node));
+        return items.includes(COMPUTED) ? COMPUTED : items;
+      }
+      const out = {};
+      let index = 0;
+      for (const e of node.entries) {
+        if (e.key === null) { index += 1; out[String(index)] = writtenValue(e.node); } else out[e.key] = writtenValue(e.node);
+      }
+      return out;
+    }
+    default: return COMPUTED;
+  }
+}
+
+function hasComputed(value) {
+  if (value === COMPUTED) return true;
+  return !!value && typeof value === 'object' && Object.values(value).some(hasComputed);
+}
+
+/** A spec with what is built when it runs left out, as if it were not given. */
+function withoutComputed(value) {
+  if (Array.isArray(value)) return value.map(withoutComputed);
+  if (!isPlain(value)) return value;
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== COMPUTED).map(([k, v]) => [k, withoutComputed(v)]));
+}
+
+/** The declarations of one verb, written out: [{ id, role, spec }], spec COMPUTED or undefined when it is not. */
 function declaredBy(scripts, verbs, idName) {
   const out = new Map();
   for (const script of Array.isArray(scripts) ? scripts : []) {
@@ -185,9 +262,10 @@ function declaredBy(scripts, verbs, idName) {
     const fam = familyOf(script?.language);
     const tokens = tokenize(source, script?.language);
     const match = matchBrackets(tokens);
+    const nodeOf = (arg) => (arg ? literalOf(tokens, arg.a, arg.b, fam, match) : null);
     const textOf = (arg) => {
       if (!arg) return undefined;
-      const node = literalOf(tokens, arg.a, arg.b, fam, match);
+      const node = nodeOf(arg);
       return node.type === 'string' ? node.value : node.type === 'null' ? null : NaN;
     };
     const visit = (calls) => {
@@ -200,7 +278,8 @@ function declaredBy(scripts, verbs, idName) {
         const written = textOf(call.args.find((a) => a.keyword === 'role') ?? positional[2]);
         const role = written === undefined || written === null || written === '' ? DEFAULT_ROLE
           : typeof written === 'string' ? written : null;
-        out.set(`${role ?? '*'}\u0000${id}`, { id, role });
+        const specArg = call.args.find((a) => a.keyword === 'spec') ?? positional[1];
+        out.set(`${role ?? '*'}\u0000${id}`, { id, role, spec: specArg ? writtenValue(nodeOf(specArg)) : undefined });
       }
     };
     visit(scanCalls(tokens, 0, tokens.length, fam, match));

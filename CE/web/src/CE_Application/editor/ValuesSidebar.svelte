@@ -59,7 +59,7 @@
   import EnvelopePointsEditor from './EnvelopePointsEditor.svelte';
   import LcdLinePreview from './LcdLinePreview.svelte';
   import { arrangementView, labelFits } from '../scripting/arrangePreview.js';
-  import { dumpRangeSaid } from '../scripting/dumpOffsets.js';
+  import { dumpHeadSaid, dumpLineWho } from '../scripting/dumpOffsets.js';
   import { bitRows, cellCentre, hex2, rangeLines, listText, codeParts } from './explainViews.js';
   import { learnFor, learnTakes, learnedEdit, learnWords, sendableHex } from './valueLearn.js';
   import { learnNext } from '../stores/midiLearnTap.js';
@@ -1133,12 +1133,11 @@
           {/if}
           {#if row.call.dumpAt}
             {@const at = row.call.dumpAt}
-            {@const profiles = [...new Set(at.lines.map((l) => l.profile))]}
-            <!-- What the profile's dumps hold at the bytes the call reads or writes. -->
+            <!-- What the profiles' dumps, and the scripts' own, hold at the bytes the call reads or writes. -->
             <div class="vdump" style:--depth={row.depth}>
-              <div class="vdump-head">{dumpRangeSaid(at)}{profiles.length === 1 && profiles[0] ? `, in a ${profiles[0]} dump` : ''}:</div>
+              <div class="vdump-head">{dumpHeadSaid(at)}</div>
               {#each at.lines as line, i (i)}
-                <div class="vdump-line"><span class="vdump-who">{profiles.length > 1 && line.profile ? `${line.profile} · ` : ''}{line.who}</span>: <span class="vdump-what">{line.text}</span></div>
+                <div class="vdump-line"><span class="vdump-who">{dumpLineWho(at, line)}</span>: <span class="vdump-what">{line.text}</span></div>
               {/each}
               {#if at.more}<div class="vdump-more">…and {at.more} other dump{at.more === 1 ? '' : 's'}</div>{/if}
             </div>

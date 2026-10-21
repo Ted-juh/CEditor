@@ -44,7 +44,7 @@
  *   arrange    ce.panel.grid and align draw the named controls where they are and where they go,
  *              align its edge, and a `to` not in the list is said in the runtime's words
  *   bytes      getBits and setBits draw the byte with the field marked; ce.midi.read names what the
- *              mapped profile's dumps hold at its byte
+ *              mapped profile's dumps hold at its byte, and what a dump the script declares holds
  *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
  *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
@@ -1027,6 +1027,25 @@ try {
     st.deviceProfiles.set(kept.profiles);
     st.profileSources.set(kept.sources);
   });
+  // A dump the script declares itself, with no profile on the main synth: the row reads it the same way.
+  const DECLARED = `ce.device.defineParameter("cutoff", { cc: 74 });
+ce.device.defineDump("tone", { name: "My Tone", match: { prefix: "F0 43 10" }, offset: 4, fields: [{ parameter: "cutoff", offset: 3 }] });
+function onMidiIn(midi) {
+  const cutoff = ce.midi.read(midi.bytes, 7, 1);
+}
+`;
+  await typeScript(DECLARED);
+  await clickAt(DECLARED.indexOf('7, 1') + 1);
+  await waitHead('Line 4');
+  await until(() => document.querySelector('[data-testid="values-sidebar"] .vdump') !== null);
+  const declaredDump = await page.evaluate(() => {
+    const box = document.querySelector('[data-testid="values-sidebar"] .vdump');
+    return { head: box.querySelector('.vdump-head').textContent.trim(),
+      lines: [...box.querySelectorAll('.vdump-line')].map((l) => [l.querySelector('.vdump-who').textContent.trim(), l.querySelector('.vdump-what').textContent.trim()]) };
+  });
+  led.check(S, 'a read names what the script\'s own dump holds at its byte', 'with no profile chosen, a script that declares a dump with ce.device.defineDump, its cutoff at offset 3 of a payload starting at byte 4, has ce.midi.read(midi.bytes, 7, 1) named as that dump\'s cutoff',
+    { head: 'Byte 7, counting from F0, in a dump the scripts declare:', lines: [['My Tone', 'cutoff']] },
+    declaredDump);
 
   // ---- back on the panel -------------------------------------------------------------------------
   await page.locator('.tab-bar .tab', { hasText: 'Values select check' }).click();

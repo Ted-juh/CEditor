@@ -12,7 +12,9 @@
 // Which dump the bytes are is not known from the call, so every dump of every mapped profile that has
 // something at those bytes is said, the dumps that hold the same thing there on one line (a GAIA's
 // three tones have their filter cutoff at the same byte), four lines at most; when the bytes are
-// written out, only the dumps they match. Read when the offset and the count are written out.
+// written out, only the dumps they match. Read when the offset and the count are written out. The
+// dumps the scripts declare with ce.device.defineDump are said the same way, laid out by the rules
+// defineDump reads them by (valuesContext.declaredDeviceDumps).
 
 import { readBytes } from './scriptValueKinds.js';
 
@@ -28,13 +30,14 @@ const variableWords = (token) => `the ${String(token).slice(1).replace(/([a-z])(
  * What a read, write, slice or put call's bytes are in the profiles' dumps, or null when it is none
  * of those, a part it reads is not written out, or no dump has anything there:
  *
- *   { verb, from, to, dumps: [{ role, profile, dump, id, parts: [{ what, text, from, to }] }],
- *     lines: [{ profile, dumps: [names], who, text }], more }
+ *   { verb, from, to, dumps: [{ role, profile, declared, dump, id, parts: [{ what, text, from, to }] }],
+ *     lines: [{ profile, declared, dumps: [names], who, text }], more }
  *
  * `to` is null for a slice to the end. `what` is 'header', 'field', 'packed', 'checksum' or 'end'; a field's
  * part also has `parameter` and `whole`, false when the call reads or writes only some of its bytes.
  * `lines` is what the row says, a line for each different thing those bytes are, with the dumps they
- * are that in; `more` counts the dumps on lines past the fourth.
+ * are that in; `more` counts the dumps on lines past the fourth. `declared` is true for a dump the
+ * scripts declare, whose `profile` is empty.
  */
 export function readDumpOffset(memberId, args, devices) {
   const verb = VERBS[memberId];
@@ -65,21 +68,25 @@ export function readDumpOffset(memberId, args, devices) {
   const given = bytesArg?.literal ? readBytes(bytesArg.value, { verb }).meaning.bytes : null;
 
   const found = [];
+  const look = (dump, role, profile, declared) => {
+    const layout = dump?.layout;
+    if (!layout) return;
+    if (Array.isArray(given) && !matches(layout.prefix, given)) return;
+    const parts = partsOf(layout, from, to);
+    if (parts.length) found.push({ role, profile, declared, dump: dump.name || dump.id, id: dump.id, parts });
+  };
+  // The scripts' own dumps first: a script reading bytes beside its defineDump is most likely
+  // reading that dump, and a profile's may fill the four lines.
+  for (const dump of Array.isArray(devices?.declaredDumps) ? devices.declaredDumps : []) look(dump, dump.role, '', true);
   for (const [role, info] of Object.entries(devices?.roles ?? {})) {
-    for (const dump of Array.isArray(info?.dumps) ? info.dumps : []) {
-      const layout = dump?.layout;
-      if (!layout) continue;
-      if (Array.isArray(given) && !matches(layout.prefix, given)) continue;
-      const parts = partsOf(layout, from, to);
-      if (parts.length) found.push({ role, profile: info.profileName ?? '', dump: dump.name || dump.id, id: dump.id, parts });
-    }
+    for (const dump of Array.isArray(info?.dumps) ? info.dumps : []) look(dump, role, info.profileName ?? '', false);
   }
   if (!found.length) return null;
   const byText = new Map();
   for (const d of found) {
     const text = dumpPartsSaid(d.parts);
-    const key = `${d.profile}\u0000${text}`;
-    if (!byText.has(key)) byText.set(key, { profile: d.profile, dumps: [], text });
+    const key = `${d.declared ? '\u0001' : d.profile}\u0000${text}`;
+    if (!byText.has(key)) byText.set(key, { profile: d.profile, declared: d.declared, dumps: [], text });
     byText.get(key).dumps.push(d.dump);
   }
   const lines = [...byText.values()].map((line) => ({ ...line, who: dumpNamesSaid(line.dumps) }));
@@ -146,6 +153,22 @@ export function dumpPartsSaid(parts) {
   const shown = parts.slice(0, 4).map((p) => p.text);
   const more = parts.length - shown.length;
   return `${shown.join('; ')}${more > 0 ? `; and ${more} more` : ''}`;
+}
+
+/** The row's first line: the bytes, and whose dumps they are when the lines are all one profile's,
+ *  or all the scripts' own. */
+export function dumpHeadSaid(at) {
+  const sources = new Set(at.lines.map((l) => (l.declared ? '\u0001' : l.profile)));
+  const one = sources.size === 1 ? at.lines[0] : null;
+  const whose = !one ? '' : one.declared ? ', in a dump the scripts declare' : one.profile ? `, in a ${one.profile} dump` : '';
+  return `${dumpRangeSaid(at)}${whose}:`;
+}
+
+/** The dumps a line is about, with whose they are when the row's lines are not all one source's. */
+export function dumpLineWho(at, line) {
+  const sources = new Set(at.lines.map((l) => (l.declared ? '\u0001' : l.profile)));
+  if (sources.size < 2) return line.who;
+  return line.declared ? `Declared · ${line.who}` : line.profile ? `${line.profile} · ${line.who}` : line.who;
 }
 
 /** "Byte 23", "Bytes 23 to 24" or "From byte 11 to the end", counting from F0. */
