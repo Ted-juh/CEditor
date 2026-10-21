@@ -1419,7 +1419,11 @@ and read back as −64, and anything below 0 went out as 0. Its dump decoder had
 dump's pan of −10 read as 54. The C++ engine decoded `s7` but had no encoder for it, so every write
 of one, as a message or in a dump, was refused as "Unsupported numeric encoder: s7". Both engines
 now write the value plus its bias and read the byte less it, as the DPD's `codecs.mjs` does
-(`test/s7Encoding.test.js`, and `DeviceProfileEngineTests.cpp`'s dump shape test).
+(`test/s7Encoding.test.js`, and `DeviceProfileEngineTests.cpp`'s dump shape test). A 14-bit value
+kept least significant byte first (`u14-lsb-msb`) had the same gap: neither engine wrote it, and the
+web dump decoder read only its first byte. Both write it now, an NRPN still sending the MSB on CC 6,
+and both engines' dump builders use the codec a dump's mapping gives, as their parsers do, rather
+than the parameter's own encoding (`test/lsbFirstEncoding.test.js`).
 
 ## Open questions for the owner
 

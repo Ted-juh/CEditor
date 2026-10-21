@@ -1234,11 +1234,24 @@ DumpBuildResult DeviceProfileEngine::buildDumpMessage (const juce::String& dumpI
         }
         consumed.insert (parameterId);
 
+        // A mapping's codec, when it gives one, is how this dump keeps the value, as the parser reads
+        // it (decodeDumpParameterValue's codecOverride). Built with the parameter's own encoding
+        // instead, a field the dump keeps LSB-first went out MSB-first, or was refused.
+        auto codecOverride = mapping->getProperty ("codec");
+        if (codecOverride.isVoid())
+            codecOverride = mapping->getProperty ("nameCodec");
+        std::unique_ptr<juce::DynamicObject> withCodec;
+        if (asObject (codecOverride) != nullptr)
+        {
+            withCodec = parameter->clone();
+            withCodec->setProperty ("encoding", codecOverride);
+        }
+
         juce::var semanticValue;
         juce::Array<int> encodedBytes;
         double normalizedValue = 0.0;
         juce::String displayedValue;
-        auto encoded = validateAndEncodeValue (*parameter, given->getProperty (parameterId),
+        auto encoded = validateAndEncodeValue (withCodec != nullptr ? *withCodec : *parameter, given->getProperty (parameterId),
                                                semanticValue, encodedBytes, normalizedValue, displayedValue);
         if (encoded.failed())
             return fail ("Cannot encode " + parameterId + ": " + encoded.getErrorMessage());
@@ -2290,13 +2303,17 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             return juce::Result::ok();
         }
 
-        if (encodingType == "u14-msb-lsb")
+        if (encodingType == "u14-msb-lsb" || encodingType == "u14" || encodingType == "u14-lsb-msb")
         {
+            // "u14" is the decoder's other name for MSB first; u14-lsb-msb keeps the same 14 bits
+            // least significant byte first. Both were read here and only one of the three written.
             auto value = (int) std::round (numeric);
             if (value < 0 || value > 16383)
                 return juce::Result::fail ("Encoded u14 value outside 0-16383 for " + propString (parameter, "id"));
-            encodedBytes.add ((value >> 7) & 0x7f);
-            encodedBytes.add (value & 0x7f);
+            const auto msb = (value >> 7) & 0x7f;
+            const auto lsb = value & 0x7f;
+            encodedBytes.add (encodingType == "u14-lsb-msb" ? lsb : msb);
+            encodedBytes.add (encodingType == "u14-lsb-msb" ? msb : lsb);
             return juce::Result::ok();
         }
 
@@ -2561,8 +2578,12 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
         if (encodedBytes.size() < 2)
             return { false, label + " 14-bit recipe requires two encoded bytes", {} };
 
-        addCc (transaction.messages, 6, encodedBytes[0]);
-        addCc (transaction.messages, 38, encodedBytes[1]);
+        // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
+        // two bytes in elsewhere.
+        auto* encoding = asObject (parameter.getProperty ("encoding"));
+        const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+        addCc (transaction.messages, 6, encodedBytes[lsbFirst ? 1 : 0]);
+        addCc (transaction.messages, 38, encodedBytes[lsbFirst ? 0 : 1]);
     }
     else
     {
