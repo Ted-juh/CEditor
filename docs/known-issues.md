@@ -328,7 +328,9 @@ What was built is iPlug2's half of the scoping, step 2 below, and the first step
   Enter are the exception the other way: the panel presses the focused control on them, and every
   focusable control takes the focus when clicked, so after a click (not after Tab) those two are
   taken for the host before any control sees them. Without that, turning a knob and pressing Space
-  pressed the knob.
+  pressed the knob. Unless the click put a field on the panel's screen in edit (an LCD or pixel
+  display marks itself `data-editing` then): there Space types and Enter finishes the edit, and the
+  keys the edit leaves unused go to the host after it, as any other key does.
 - **C++** (`HostKeyForwarding.h`, `PlayerHost::forwardKeyToHost`) makes the key message Windows would
   have sent (`WM_KEYDOWN`, `WM_SYSKEYDOWN` with Alt or for F10, the scan code, the extended-key bit)
   and posts it to the plug-in window's parent, as JUCE does with its own.

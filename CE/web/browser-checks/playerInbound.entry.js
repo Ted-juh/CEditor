@@ -116,6 +116,23 @@ const panelDocument = {
   ],
 };
 
+// The same panel with a screen whose field is edited on the screen itself (playerHostKeys.mjs):
+// a click puts the caret in it, and the keys type into it without any text box on the page.
+const panelWithScreen = {
+  ...panelDocument,
+  controls: [
+    ...panelDocument.controls,
+    createControl('LcdDisplay', {
+      Core: { id: 'screen', name: 'screen' },
+      Transform: { x: 120, y: 250, width: 256, height: 40 },
+      Display: {
+        cols: 16, rows: 1, editText: 'AB', editCharset: 'upper', editMaxLength: 12, cursorMode: 'off',
+        layouts: [{ id: 'home', zones: [{ id: 'edit', show: 'edit', sourceId: '@edit', prefix: '[', suffix: ']', row: 1, colStart: 1, colEnd: 16 }] }],
+      },
+    }),
+  ],
+};
+
 // What the Player would fetch over the bridge, under the profile id it defaults to.
 profileSources.set({
   'roland-gaia': { profileId: 'roland-gaia', source: JSON.stringify(gaiaProfile), native: true },
@@ -124,7 +141,7 @@ profileSources.set({
 mount(Player, { target: document.getElementById('host') });
 
 window.__player = {
-  load: () => fire('loadPanel', { panel: panelDocument }),
+  load: (variant) => fire('loadPanel', { panel: variant === 'screen' ? panelWithScreen : panelDocument }),
   cc: (hex) => fire('midiInputMessage', { messageType: 'cc', hex }),
   // As the bridge labels anything that is not 0xB0: "midi", not "cc".
   channelMidi: (hex) => fire('midiInputMessage', { messageType: 'midi', hex }),

@@ -21,8 +21,11 @@
  * control on either, which is right for someone moving through it with Tab and wrong for someone who
  * has just turned a knob with the mouse and presses Space to hear it: every focusable control takes
  * the focus when clicked. So once the focus came from a click, those two are the host's before any
- * control sees them, unless the page keeps them anyway (`pageKeeps`: a panic key bound to one).
- * Tab hands them back to the controls. The arrows on a clicked knob still turn it.
+ * control sees them, unless the page keeps them anyway (`pageKeeps`: a panic key bound to one), or
+ * the click put a field on the panel's own screen in edit (an LCD or pixel display marks itself
+ * `data-editing` then): there Space types a space and Enter finishes the edit, and what the edit
+ * leaves unused still goes to the host as any other key does. Tab hands them back to the controls.
+ * The arrows on a clicked knob still turn it.
  *
  * Only where it does something: PlayerHost tells the page in window.__CE_PLAYER_SESSION__.hostKeys,
  * which it sets for a plug-in on Windows. Elsewhere (the CEditor Player app, Linux, where a host
@@ -47,6 +50,11 @@ function inKeyboardWidget(target) {
     if (role && KEYBOARD_ROLES.has(role)) return true;
   }
   return false;
+}
+
+/** A field on the panel's screen that is being edited takes the keys, Space and Enter among them. */
+function beingEdited(target) {
+  return typeof target?.closest === 'function' && target.closest('[data-editing]') !== null;
 }
 
 /**
@@ -98,7 +106,7 @@ export function installHostKeyForwarding({ target = window, enabled, send, pageK
       handedOver.delete(event.code);
     } else {
       if (!focusByClick || !ACTIVATION_KEYS.has(event.key) || !enabled()) return false;
-      if (pageKeeps(event) || !keyIsForTheHost(event)) return false;
+      if (pageKeeps(event) || beingEdited(event.target) || !keyIsForTheHost(event)) return false;
       takenEarly.add(event.code);
       handedOver.add(event.code);
     }

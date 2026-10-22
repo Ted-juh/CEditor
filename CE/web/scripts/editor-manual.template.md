@@ -897,9 +897,11 @@ Preview, without the editor around it.
 
 - **Keys.** Keys the panel does not use go to the DAW, so the space bar starts and stops playback and
   the DAW's shortcuts work while the plugin window has focus. The panel keeps what it uses: what you
-  type into a text field, Tab to move between controls, the arrow keys on a knob you clicked or in a
-  list it has open, and its panic key (Escape unless the panel sets another). Space and Enter go to
-  the DAW even after you click a control; they press a control only when you reached it with Tab.
+  type into a text field or a field on its screen, Tab to move between controls, the arrow keys on a
+  knob you clicked or in a list it has open, and its panic key (Escape unless the panel sets
+  another). Space and Enter go to the DAW even after you click a control; they press a control only
+  when you reached it with Tab. In a field you are editing on the panel's screen they type a space
+  and finish the edit.
   This is on Windows, where the plugin's window would otherwise take every key.
 
 ## 13. HoSTage, the instrument host

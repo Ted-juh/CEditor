@@ -21,6 +21,9 @@
  *   clicked   a click gives a control the focus, and the panel presses the focused control on Space:
  *             after a click Space is the host's all the same, and the control is not pressed; the
  *             arrows still turn the clicked knob; after Tab, Space presses the control again
+ *   screen    a field the panel edits on its own screen, put in edit by a click: what is typed,
+ *             spaces included, goes into the field and Enter finishes the edit; a shortcut the
+ *             edit does not use, Ctrl+S, still goes to the host
  *
  * Run by `npm run test:browser` (after the scenery build, as playerInbound is).
  */
@@ -67,7 +70,7 @@ let failed = false;
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/playerInbound.html`);
   await page.waitForFunction(() => !!window.__player, null, { timeout: 20000 });
-  await page.evaluate(() => window.__player.load());
+  await page.evaluate(() => window.__player.load('screen'));
   await page.waitForFunction(() => document.querySelectorAll('[data-control-id]').length >= 3, null, { timeout: 30000 });
   await page.evaluate(() => {
     // Every key-down, kept to read its outcome once the page is done with it.
@@ -169,8 +172,28 @@ try {
   assert.deepEqual(await sentKeys(), [], 'after Tab, Space went to the host instead of pressing the control');
   assert.equal(pressedAfterTab, true, 'after Tab, Space did not press the focused control');
 
+  // ---- a field edited on the panel's screen ------------------------------------------------------
+  // Where the keys go is what is checked: into the edit, not to the host. (What the edit writes is
+  // not drawn by the Player yet, so the screen's text is not the measure here.)
+  const screenEditing = () => page.evaluate(() => document.querySelector('[data-control-id="screen"]')?.hasAttribute('data-editing') === true);
+  const field = await page.locator('[data-control-id="screen"]').first().boundingBox();
+  await page.mouse.click(field.x + field.width - 20, field.y + field.height / 2);
+  assert.equal(await screenEditing(), true, 'the click did not put the screen field in edit, so this proves nothing');
+  await page.evaluate(() => window.__player.forget());
+  await page.keyboard.type('C');
+  await page.keyboard.press('Space');
+  const spaceTaken = await lastDownPrevented();
+  await page.keyboard.type('D');
+  assert.deepEqual(await sentKeys(), [], 'keys typed into a field edited on the screen went to the host');
+  assert.equal(spaceTaken, true, 'Space in a field edited on the screen did not reach the edit');
+  await page.keyboard.press('Control+KeyS');
+  assert.deepEqual(await sentKeys(), ['down KeyS+ctrl', 'up KeyS+ctrl'], 'Ctrl+S, which the edit does not use, did not go to the host');
+  await page.keyboard.press('Enter');
+  assert.deepEqual(await sentKeys(), [], 'Enter in a field edited on the screen went to the host instead of finishing the edit');
+  assert.equal(await screenEditing(), false, 'Enter did not finish the edit on the screen');
+
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('player host keys: ok (kept without the word; Space and Ctrl+S handed over and not acted on; panic key, typing, Tab, Shift, used and stopped keys, an open list and an orphan key-up kept; Space the host\'s after a click and the control\'s after Tab)');
+  console.log('player host keys: ok (kept without the word; Space and Ctrl+S handed over and not acted on; panic key, typing, Tab, Shift, used and stopped keys, an open list and an orphan key-up kept; Space the host\'s after a click and the control\'s after Tab; typing and Enter kept by a field edited on the screen)');
 } catch (error) {
   failed = true;
   console.error('player host keys: FAILED\n', error.message);
