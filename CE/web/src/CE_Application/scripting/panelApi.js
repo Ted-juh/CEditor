@@ -1559,13 +1559,18 @@ export const COMMANDS = [
   },
   {
     id: 'drawArc', category: 'Drawing', signature: 'drawArc(x, y, radius, from, to)',
-    summary: 'Draw part of a circle centred on (`x`, `y`), from angle `from` to angle `to`. Angles are in degrees, with 0 at twelve o\'clock and increasing clockwise, the same as the Meter\'s `arcStart` and `arcSweep`. The arc is drawn in the stroke colour; if a fill is set, it is filled as a pie slice.',
+    summary: 'Draw part of a circle.',
+    example: '`drawArc(50, 50, 40, 0, 90)` draws a quarter circle of radius 40 centred on (50, 50), from twelve o\'clock clockwise to three o\'clock.',
+    notes: [
+      'Drawn with the stroke in force; with a fill, filled as a pie slice through the centre.',
+      'Returns true; no control to draw on: rejected with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x', type: 'number', required: true, kind: 'number' }, { name: 'y', type: 'number', required: true, kind: 'number' },
-      { name: 'radius', type: 'number', required: true, kind: 'number' },
-      { name: 'from', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise' },
-      { name: 'to', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise' },
+      { name: 'x', type: 'number', required: true, kind: 'number', summary: 'Centre, in pixels from the control\'s left.' }, { name: 'y', type: 'number', required: true, kind: 'number', summary: 'Centre, in pixels from the control\'s top.' },
+      { name: 'radius', type: 'number', required: true, kind: 'number', summary: 'Radius in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
+      { name: 'from', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise', summary: 'Start angle in degrees.\n0: twelve o\'clock, increasing clockwise, as the Meter\'s arcStart.' },
+      { name: 'to', type: 'number', required: true, unit: 'degrees', hint: '0 is twelve o\'clock, increasing clockwise', summary: 'End angle in degrees.\nAbove from: drawn clockwise; below from: anticlockwise.\n360 or more apart: a full circle.' },
     ],
     scopes: 'any',
     snippet: {

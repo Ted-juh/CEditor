@@ -541,6 +541,11 @@ Done, approved by the owner:
   radius with `Range: ≥ 0.` / `< 0, or invalid: 0.`, and the two notes; `line`'s first note says
   the fill does not apply.
 
+- `arc`: "Draw part of a circle.", the example, the centre and radius as `circle`'s, `from` (0 at
+  twelve o'clock, clockwise, as the Meter's arcStart) and `to` (above from: clockwise; below:
+  anticlockwise; 360 or more apart: a full circle, as `ScriptDrawOverlay`'s arcPath draws it), and
+  the notes (a fill makes a pie slice through the centre).
+
 Left, in the order of the dump: `circle`, `line`, `path`, `arc`,
 `gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
 `points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
@@ -574,7 +579,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18; `clear`, `fill`, `stroke`, `rect`, `circle`, `line` and `ellipse` done |
+| ce.draw | 27 | 18; `clear`, `fill`, `stroke`, `rect`, `circle`, `line`, `ellipse` and `arc` done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -632,7 +637,7 @@ not open a pull request unless asked.
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
 on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill,
-stroke, rect, circle, line, ellipse); continue with ce.draw.arc, in technical English, schematic, one rule per line, with ranges, as its table
+stroke, rect, circle, line, ellipse, arc); continue with ce.draw.gradient, in technical English, schematic, one rule per line, with ranges, as its table
 says, showing every parameter and option of the command in its item. Check each command at its
 edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.

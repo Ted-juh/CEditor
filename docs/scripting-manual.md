@@ -3612,7 +3612,20 @@ ce.draw.path(pts);
 
 #### `ce.draw.arc(x, y, radius, from, to)`
 
-Draw part of a circle centred on (`x`, `y`), from angle `from` to angle `to`. Angles are in degrees, with 0 at twelve o'clock and increasing clockwise, the same as the Meter's `arcStart` and `arcSweep`. The arc is drawn in the stroke colour; if a fill is set, it is filled as a pie slice.
+Draw part of a circle.
+
+Example: `drawArc(50, 50, 40, 0, 90)` draws a quarter circle of radius 40 centred on (50, 50), from twelve o'clock clockwise to three o'clock.
+
+- `x` (number, required): Centre, in pixels from the control's left.
+- `y` (number, required): Centre, in pixels from the control's top.
+- `radius` (number, required): Radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `from` (number, required): Start angle in degrees.<br>0: twelve o'clock, increasing clockwise, as the Meter's arcStart.
+- `to` (number, required): End angle in degrees.<br>Above from: drawn clockwise; below from: anticlockwise.<br>360 or more apart: a full circle.
+
+Good to know:
+
+- Drawn with the stroke in force; with a fill, filled as a pie slice through the centre.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawArc`.*
 
