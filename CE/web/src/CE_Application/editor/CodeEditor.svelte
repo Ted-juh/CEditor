@@ -1681,7 +1681,8 @@
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
   .ce-hover-doc code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
-  .ce-hover-params { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--txt-dim); line-height: 1.4; }
+  /* pre-line: a parameter's rules are one per line (Range, Default, Invalid…). */
+  .ce-hover-params { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--txt-dim); line-height: 1.4; white-space: pre-line; }
   .ce-hover-params li + li { margin-top: 3px; }
   .ce-hover-params code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
   .ce-hover-type { color: var(--txt-faint, var(--txt-dim)); font-style: italic; }

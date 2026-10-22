@@ -354,12 +354,20 @@ The owner rejected each of these, some more than once. Use the right-hand column
 | "The shape of the move" | "Easing curve" |
 | "How quickly the wobble dies away", "how fast it wobbles" | "Spring damping", "Spring oscillation frequency" |
 | "Higher: settles sooner", "the wobble grows" | "0: undamped.", "Below 0: oscillation grows." |
-| a sentence listing cases ("one below 0 is a jump of 1 ms, and anything else moves in the default time") | schematic parts, each "Label: value.": `Range: 0 or more.` `0: immediate jump.` `Below 0: immediate jump.` `Invalid: default.` |
+| a sentence listing cases ("one below 0 is a jump of 1 ms, and anything else moves in the default time") | schematic parts, each "Label: value.", **one per line** (a `\n` in the text): `Range: ≥ 0.` / `0 or below: immediate jump.` / `Invalid: default.` |
+| "Range: 0 or more", "Range: above 0" | `Range: ≥ 0.`, `Range: > 0.`, `Range: 0 ↔ 1.` (symbols, not words) |
+| several rules in one paragraph | one rule per line. The owner: "Short. Viewable in a glance. Users don't want to read whole texts. Every new rule must be on a new line." |
 
 Two more rules from the same review:
 
-- **Show the range whenever there is one:** `Range: 0 ↔ 1`, `Range: 0 or more`, `Range: above 0`,
+- **Show the range whenever there is one:** `Range: 0 ↔ 1`, `Range: ≥ 0`, `Range: > 0`,
   `Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3`.
+- **A line break in a text is a rule of its own**, and every place renders it: the manual writes
+  it as `<br>` in a cell or a list item (`cell()` and `lines()` in `generate-scripting-manual.mjs`),
+  which GitHub renders and the app's Help lets through as the one tag (`utils/markdown.js`); the
+  hover card uses `white-space: pre-line`; the API explorer turns it into `<br>`; the sidebar hint's
+  tooltip shows it as it is. The schematic parameters of `ce.math` and `ce.midi` were split the
+  same way, mechanically, before each "Label: value" sentence (63 texts).
 - **Use the term the field uses** (easing, Bézier control points, damping, frequency, transport,
   tempo), not a description of it.
 
@@ -429,16 +437,35 @@ and `ScriptRuntime::startAnimation`), with the release notes saying so:
 
 `ce.anim.spring`'s own `damping` and `frequency` rows still have their old text (step 2 below).
 
+### Item 4, proposed to the owner: `from`, `stagger`, `repeat`, `pingpong`, `done`
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `from` | number | current value | Start value.<br>Default: the current value.<br>Invalid: default. |
+| `stagger` | number (ms) | 0 | Delay added per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>A fraction is rounded.<br>0 or below: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (repeat is a keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
+
+Four edges where both runtimes are silent, unlike every other option (checked in the editor's
+runtime; `ScriptRuntime.cpp` reads them the same way). Each would get the module's one-time
+warning and the fallback in its row:
+
+1. `from` = "abc" or `true`: starts from 0 or 1 (`Number()`), no message. Warn and use the current value?
+2. `stagger` below 0: the per-entry delays go negative, are held at 0, and the warning names
+   `delay`, not `stagger`. Reject: warn, use 0?
+3. `repeat` = "x" or `true`: 1 run, no message. Warn?
+4. `done` = "x" or 5: ignored, no message. Warn?
+
 ### Left to do in `ce.anim`
 
-1. The other shared options, in `SHARED_OPTION_FIELDS`: `from` (`animFrom`), `stagger`, `repeat`,
-   `pingpong`, `done`. Check `from` first: it is read with `Number()`, so "abc" and "" start from 0
-   and `true` from 1, without a message, where every other number option uses `realNumber` and
-   warns.
+1. Item 4 above, once the owner answers.
 2. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows,
    which take item 3's text).
 3. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
 4. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+
+Write every one in the line form above.
 
 For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
 range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
@@ -519,7 +546,8 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to, its timing options and its curve options are done; continue with the
-other shared options (from first) in technical English, schematic, with ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.anim.to, its timing options and its curve options are done; item 4 (from,
+stagger, repeat, pingpong, done) is proposed with four open decisions: put those to me first.
+Continue in technical English, schematic, one rule per line, with ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```

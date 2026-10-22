@@ -157,7 +157,10 @@ const anchor = (text) => String(text).toLowerCase().replace(/[^\w\s-]/g, '').tri
 const moduleHeading = (id) => `${id}: ${MODULE_TITLES[id]}`;
 const moduleLink = (id) => `[${id}](#${anchor(moduleHeading(id))})`;
 
-const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+// A line break in a text is a rule of its own (a parameter's Range, Default, Invalid…): <br> in a
+// cell and in a list item, which GitHub and the app's Help (utils/markdown.js) both render.
+const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+const lines = (text) => String(text ?? '').replace(/\n/g, '<br>');
 
 /** The value list a field accepts, as a sentence fragment. */
 function valuesText(values) {
@@ -178,7 +181,7 @@ function fieldTable(param, lifecycle) {
     const type = f.unit ? `${f.type} (${f.unit})` : f.type;
     // The list, unless the description already names every value in it.
     const named = f.values?.every((v) => f.summary.includes(`"${v}"`));
-    const values = f.values?.length && !named ? ` One of ${valuesText(f.values)}.` : '';
+    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.` : '';
     const what = `${f.summary}${values}`;
     if (!withDefault) return `| \`${f.name}\` | ${cell(type)} | ${cell(what)} |`;
     const def = f.required ? 'required' : (f.default ?? '—');
@@ -228,7 +231,7 @@ function memberDetails(member) {
   let out = '';
   if (member.example) out += `\nExample: ${member.example}\n`;
   const params = described(member);
-  if (params.length) out += `\n${params.map((p) => `- ${paramHead(member, p)}: ${p.summary}`).join('\n')}\n`;
+  if (params.length) out += `\n${params.map((p) => `- ${paramHead(member, p)}: ${lines(p.summary)}`).join('\n')}\n`;
   if (member.returns?.length) {
     out += `\n| What \`${fnName(member)}\` returns | What happens |\n|---|---|\n`
       + `${member.returns.map((r) => `| ${cell(r.when)} | ${cell(r.then)} |`).join('\n')}\n`;
@@ -242,7 +245,7 @@ function memberDetails(member) {
 function memberDetailsInline(member) {
   const parts = [];
   if (member.example) parts.push(`Example: ${member.example}`);
-  for (const p of described(member)) parts.push(`${paramHead(member, p)}: ${p.summary}`);
+  for (const p of described(member)) parts.push(`${paramHead(member, p)}: ${cell(p.summary)}`);
   if (member.returns?.length) {
     parts.push(`What \`${fnName(member)}\` returns: ${member.returns.map((r) => `${r.when}, ${r.then.charAt(0).toLowerCase()}${r.then.slice(1).replace(/\.$/, '')}`).join('; ')}.`);
   }

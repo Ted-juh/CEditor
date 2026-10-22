@@ -289,19 +289,19 @@ const SHARED_OPTION_FIELDS = {
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
   duration: {
     name: 'duration', type: 'number', default: '300', unit: 'milliseconds',
-    summary: 'Length of the animation. Range: 0 or more (0: immediate jump). Below 0: immediate jump. Not a number: default.',
+    summary: 'Length of the animation.\nRange: ≥ 0.\n0 or below: immediate jump.\nInvalid: default.',
   },
   beats: {
     name: 'beats', type: 'number', sample: '2', unit: 'beats',
-    summary: 'Length in beats. Overrides duration. Range: above 0. Tempo: read at the start; with sync, followed. Outside the range, or not a number: duration is used.',
+    summary: 'Length in beats, overriding duration.\nRange: > 0.\nTempo: read at the start; with sync, followed.\nOutside the range, or invalid: duration.',
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
-    summary: '`true`: moves only while the transport plays, and follows tempo changes. Other values: false.',
+    summary: '`true`: moves only while the transport plays, and follows tempo changes.\nOther values: false.',
   },
   delay: {
     name: 'delay', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'Wait before the start. Range: 0 or more. Below 0, or not a number: no wait.',
+    summary: 'Wait before the start.\nRange: ≥ 0.\nBelow 0, or invalid: no wait.',
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
@@ -952,7 +952,7 @@ export const COMMANDS = [
     example: '`lighten("#336699", 0.5)` gives "#99B3CC".',
     params: [
       { name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).' },
-      { name: 'amount', type: 'number', required: false, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (unchanged ↔ white). Default: 0.4. Outside the range: an error in the console and no result.' },
+      { name: 'amount', type: 'number', required: false, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (unchanged ↔ white).\nDefault: 0.4.\nOutside the range: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -963,7 +963,7 @@ export const COMMANDS = [
     notes: ['The amount works the opposite way to lighten\'s: a smaller amount makes the colour darker.'],
     params: [
       { name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).' },
-      { name: 'amount', type: 'number', required: false, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.' },
+      { name: 'amount', type: 'number', required: false, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (black ↔ unchanged).\nDefault: 0.55.\nOutside the range: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -975,7 +975,7 @@ export const COMMANDS = [
     params: [
       { name: 'a', type: 'string', required: true, kind: 'colour', summary: 'The first colour, in any form a colour property takes.' },
       { name: 'b', type: 'string', required: true, kind: 'colour', summary: 'The second colour, in any form a colour property takes.' },
-      { name: 't', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway. Left out: 0. Outside the range: held at 0 or 1. Not a number: an error in the console and no result.' },
+      { name: 't', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway.\nLeft out: 0.\nOutside the range: held at 0 or 1.\nNot a number: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -990,7 +990,7 @@ export const COMMANDS = [
     ],
     params: [
       { name: 'colour', type: 'string', required: true, kind: 'colour', summary: 'The colour, in any form a colour property takes. Any alpha it already has is replaced.' },
-      { name: 'a', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (fully transparent ↔ fully solid). Outside the range or left out: an error in the console and no result.' },
+      { name: 'a', type: 'number', required: true, unit: '0 to 1', summary: 'Range: 0 ↔ 1 (fully transparent ↔ fully solid).\nOutside the range or left out: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -1007,9 +1007,9 @@ export const COMMANDS = [
     summary: 'Build a colour from red, green and blue parts.',
     example: '`rgbToHex(255, 128, 0)` gives "#FF8000".',
     params: [
-      { name: 'r', type: 'number', required: true, summary: 'Red. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.' },
-      { name: 'g', type: 'number', required: true, summary: 'Green. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.' },
-      { name: 'b', type: 'number', required: true, summary: 'Blue. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.' },
+      { name: 'r', type: 'number', required: true, summary: 'Red.\nRange: 0 ↔ 255.\nLeft out: 0.\nOutside the range: held at 0 or 255. A fraction is rounded.\nNot a number: an error in the console and no result.' },
+      { name: 'g', type: 'number', required: true, summary: 'Green.\nRange: 0 ↔ 255.\nLeft out: 0.\nOutside the range: held at 0 or 255. A fraction is rounded.\nNot a number: an error in the console and no result.' },
+      { name: 'b', type: 'number', required: true, summary: 'Blue.\nRange: 0 ↔ 255.\nLeft out: 0.\nOutside the range: held at 0 or 255. A fraction is rounded.\nNot a number: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -1021,7 +1021,7 @@ export const COMMANDS = [
       'It returns "#RRGGBB" when the colour is fully solid, otherwise AARRGGBB without "#".',
       '"#" with 8 hex digits means AARRGGBB to a colour property and the colour commands, but RRGGBBAA to a drawing. This command says you mean alpha first; `ce.math.fromRGBA` says alpha last.',
     ],
-    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'argb', summary: '8 or 4 hex digits, alpha first, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.' }],
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'argb', summary: '8 or 4 hex digits, alpha first, with or without "#". 6 or 3 hex digits: no alpha, returned solid.\nAnything else, such as "red": an error in the console and no result.' }],
     scopes: 'any',
   },
   {
@@ -1032,7 +1032,7 @@ export const COMMANDS = [
       'It returns "#RRGGBB" when the colour is fully solid, otherwise AARRGGBB without "#".',
       '"#" with 8 hex digits means RRGGBBAA to a drawing, but AARRGGBB to a colour property and the colour commands. This command says you mean alpha last; `ce.math.fromARGB` says alpha first.',
     ],
-    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'rgba', summary: '8 or 4 hex digits, alpha last, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.' }],
+    params: [{ name: 'colour', type: 'string', required: true, kind: 'colour', order: 'rgba', summary: '8 or 4 hex digits, alpha last, with or without "#". 6 or 3 hex digits: no alpha, returned solid.\nAnything else, such as "red": an error in the console and no result.' }],
     scopes: 'any',
   },
   {
@@ -1052,9 +1052,9 @@ export const COMMANDS = [
     example: '`hslToHex(120, 100, 50)` gives "#00FF00".',
     notes: ['The reverse of `ce.math.hsl`.'],
     params: [
-      { name: 'h', type: 'number', required: true, summary: 'Hue. Range: 0 ↔ 360. Left out: 0. Outside the range: wraps round, so -120 is 240 and 480 is 120. Not a number: an error in the console and no result.' },
-      { name: 's', type: 'number', required: true, summary: 'Saturation. Range: 0 ↔ 100. Left out: 0. Outside the range: held at 0 or 100. Not a number: an error in the console and no result.' },
-      { name: 'l', type: 'number', required: true, summary: 'Lightness. Range: 0 ↔ 100. Left out: 0. Outside the range: held at 0 or 100. Not a number: an error in the console and no result.' },
+      { name: 'h', type: 'number', required: true, summary: 'Hue.\nRange: 0 ↔ 360.\nLeft out: 0.\nOutside the range: wraps round, so -120 is 240 and 480 is 120.\nNot a number: an error in the console and no result.' },
+      { name: 's', type: 'number', required: true, summary: 'Saturation.\nRange: 0 ↔ 100.\nLeft out: 0.\nOutside the range: held at 0 or 100.\nNot a number: an error in the console and no result.' },
+      { name: 'l', type: 'number', required: true, summary: 'Lightness.\nRange: 0 ↔ 100.\nLeft out: 0.\nOutside the range: held at 0 or 100.\nNot a number: an error in the console and no result.' },
     ],
     scopes: 'any',
   },
@@ -1078,18 +1078,18 @@ export const COMMANDS = [
       'Returns false if the call is rejected.',
     ],
     params: [
-      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values. Colour property, or a control not on the panel: rejected with a console error. List containing either: the entire list is rejected.' },
+      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values.\nColour property, or a control not on the panel: rejected with a console error.\nList containing either: the entire list is rejected.' },
       { name: 'target', type: 'number', required: true, summary: 'The end value.' },
-      { name: 'opts', type: 'object', required: false, summary: 'The options below. Left out: linear curve, 300 ms.',
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: linear curve, 300 ms.',
         fields: optionFields([
           'duration', 'beats', 'sync',
           { name: 'curve', type: 'text or list', default: '"linear"', kind: 'curve',
             values: [...ANIM_CURVE_NAMES],
-            summary: 'Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}. Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3. Invalid: linear.' },
+            summary: 'Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.\nRange: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.\nInvalid: linear.' },
           { name: 'damping', type: 'number', default: '6', kind: 'number',
-            summary: 'Spring damping (curve = "spring"). Range: 0 or more. 0: undamped. Invalid: default.' },
+            summary: 'Spring damping (curve = "spring").\nRange: ≥ 0.\n0: undamped.\nInvalid: default.' },
           { name: 'frequency', type: 'number', default: '12', kind: 'number',
-            summary: 'Spring oscillation frequency (curve = "spring"). 0: no oscillation. Invalid: default.' },
+            summary: 'Spring oscillation frequency (curve = "spring").\n0: no oscillation.\nInvalid: default.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],
@@ -3662,7 +3662,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value to round.' },
-      { name: 'step', type: 'number', required: true, summary: 'The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged. Left out: an error in the console and no result.' },
+      { name: 'step', type: 'number', required: true, summary: 'The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged.\nLeft out: an error in the console and no result.' },
     ],
   },
   {
@@ -3671,8 +3671,8 @@ export const HELPERS = [
     example: '`curve(0.5, "exp")` gives 0.25.',
     notes: ['For a curve of your own, use `ce.math.map`. For the curves the panel\'s Envelopes use, use `ce.math.shape`.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The value. Range: 0 ↔ 1. Outside the range: not held at 0 or 1.' },
-      { name: 'shape', type: 'text', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used.' },
+      { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: not held at 0 or 1.' },
+      { name: 'shape', type: 'text', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends).\nLeft out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used.' },
     ],
   },
   {
@@ -3683,7 +3683,7 @@ export const HELPERS = [
     params: [
       { name: 'a', type: 'number', required: true, summary: 'The first number.' },
       { name: 'b', type: 'number', required: true, summary: 'The second number.' },
-      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway. Left out: an error in the console and no result. Outside the range: not held at 0 or 1, so the result goes past a or b.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway.\nLeft out: an error in the console and no result.\nOutside the range: not held at 0 or 1, so the result goes past a or b.' },
     ],
   },
   // wrap, and why it is not `%`. The five runtimes DISAGREE about the sign of a modulo: (-1) % 12
@@ -3699,7 +3699,7 @@ export const HELPERS = [
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value to wrap.' },
       { name: 'lo', type: 'number', required: true, summary: 'The bottom of the range. Must be below hi. The result can equal lo.' },
-      { name: 'hi', type: 'number', required: true, summary: 'The top of the range. The result never equals hi: wrap(12, 0, 12) gives 0.' },
+      { name: 'hi', type: 'number', required: true, summary: 'The top of the range.\nThe result never equals hi: wrap(12, 0, 12) gives 0.' },
     ],
   },
   // map, and why `curve` was not enough. curve() is a CLOSED set of four names, so a taper it does
@@ -3716,7 +3716,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value to map.' },
-      { name: 'points', type: 'list', required: false, summary: 'A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends. Left out or empty: the value is returned unchanged.' },
+      { name: 'points', type: 'list', required: false, summary: 'A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends.\nLeft out or empty: the value is returned unchanged.' },
     ],
   },
   {
@@ -3729,7 +3729,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value to snap.' },
-      { name: 'values', type: 'list of numbers', required: false, summary: 'The entries to choose from, in any order. Left out or empty: the value is returned unchanged.' },
+      { name: 'values', type: 'list of numbers', required: false, summary: 'The entries to choose from, in any order.\nLeft out or empty: the value is returned unchanged.' },
     ],
   },
   {
@@ -3738,8 +3738,8 @@ export const HELPERS = [
     example: '`randomChoice({"C", "E", "G"}, {3, 1, 1})` picks "C" three times as often as "E" or "G".',
     notes: ['It uses one random number, with or without weights, so adding weights does not change later random numbers.'],
     params: [
-      { name: 'values', type: 'list', required: true, summary: 'The entries. Empty: no result.' },
-      { name: 'weights', type: 'list of numbers', required: false, summary: 'How likely each entry is: its weight divided by the total. Default: all equal. A missing or negative weight counts as 0; if every weight is 0, all are equal.' },
+      { name: 'values', type: 'list', required: true, summary: 'The entries.\nEmpty: no result.' },
+      { name: 'weights', type: 'list of numbers', required: false, summary: 'How likely each entry is: its weight divided by the total.\nDefault: all equal. A missing or negative weight counts as 0; if every weight is 0, all are equal.' },
     ],
   },
   {
@@ -3770,7 +3770,7 @@ export const HELPERS = [
     example: '`norm(64, 0, 127)` gives about 0.5.',
     notes: ['The reverse is `ce.math.denorm`.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The value. Outside the range: held at 0 or 1.' },
+      { name: 'v', type: 'number', required: true, summary: 'The value.\nOutside the range: held at 0 or 1.' },
       { name: 'lo', type: 'number', required: true, summary: 'The value that gives 0.' },
       { name: 'hi', type: 'number', required: true, summary: 'The value that gives 1. It may be below lo, for a range that runs the other way.' },
     ],
@@ -3781,7 +3781,7 @@ export const HELPERS = [
     example: '`denorm(0.5, 0, 127)` gives 63.5.',
     notes: ['The reverse of `ce.math.norm`.'],
     params: [
-      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (lo ↔ hi). Outside the range: held at 0 or 1.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (lo ↔ hi).\nOutside the range: held at 0 or 1.' },
       { name: 'lo', type: 'number', required: true, summary: 'The value at 0.' },
       { name: 'hi', type: 'number', required: true, summary: 'The value at 1. It may be below lo, for a range that runs the other way.' },
     ],
@@ -3792,7 +3792,7 @@ export const HELPERS = [
     example: '`bipolar(0.75)` gives 0.5.',
     notes: ['The reverse is `ce.math.unipolar`.'],
     params: [
-      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (-1 ↔ +1). 0.5 gives 0. Outside the range: not held.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (-1 ↔ +1). 0.5 gives 0.\nOutside the range: not held.' },
     ],
   },
   {
@@ -3801,7 +3801,7 @@ export const HELPERS = [
     example: '`unipolar(0.5)` gives 0.75.',
     notes: ['The reverse of `ce.math.bipolar`.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5. Outside the range: not held.' },
+      { name: 'v', type: 'number', required: true, summary: 'Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5.\nOutside the range: not held.' },
     ],
   },
   {
@@ -3820,7 +3820,7 @@ export const HELPERS = [
     summary: 'Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks.',
     example: '`indexOfRange(0.5, 8)` gives 4.',
     params: [
-      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (first slot ↔ last slot). Outside the range: held at the first or last slot.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (first slot ↔ last slot).\nOutside the range: held at the first or last slot.' },
       { name: 'count', type: 'number', required: true, summary: 'How many slots. They count from 0, so the last is count - 1.' },
     ],
   },
@@ -3835,8 +3835,8 @@ export const HELPERS = [
     params: [
       { name: 'a', type: 'number', required: true, summary: 'The value at 0.' },
       { name: 'b', type: 'number', required: true, summary: 'The value at 1.' },
-      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b). Left out: 0. Outside the range: held at 0 or 1.' },
-      { name: 'law', type: 'text', required: false, summary: '"linear", "equalPower" or "sharp". Default: "linear". An unknown name is used as "linear".' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b).\nLeft out: 0.\nOutside the range: held at 0 or 1.' },
+      { name: 'law', type: 'text', required: false, summary: '"linear", "equalPower" or "sharp".\nDefault: "linear". An unknown name is used as "linear".' },
     ],
   },
   {
@@ -3846,7 +3846,7 @@ export const HELPERS = [
     notes: ['It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value.'],
     params: [
       { name: 'current', type: 'number', required: true, summary: 'The value now.' },
-      { name: 'target', type: 'number', required: true, summary: 'Where it is going. Within one step of it: the target exactly.' },
+      { name: 'target', type: 'number', required: true, summary: 'Where it is going.\nWithin one step of it: the target exactly.' },
       { name: 'maxStep', type: 'number', required: true, summary: 'The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive.' },
     ],
   },
@@ -3857,7 +3857,7 @@ export const HELPERS = [
     notes: ['It returns a number, not text, so you can keep calculating with it.'],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The number to round.' },
-      { name: 'decimals', type: 'number', required: false, summary: 'How many decimal places to keep. Default: 0. Below 0: 0.' },
+      { name: 'decimals', type: 'number', required: false, summary: 'How many decimal places to keep.\nDefault: 0.\nBelow 0: 0.' },
     ],
   },
   {
@@ -3868,7 +3868,7 @@ export const HELPERS = [
     params: [
       { name: 'a', type: 'number', required: true, summary: 'The first number.' },
       { name: 'b', type: 'number', required: true, summary: 'The second number.' },
-      { name: 'epsilon', type: 'number', required: false, summary: 'How far apart they may be. Default: 0.000000001.' },
+      { name: 'epsilon', type: 'number', required: false, summary: 'How far apart they may be.\nDefault: 0.000000001.' },
     ],
   },
   {
@@ -3876,7 +3876,7 @@ export const HELPERS = [
     summary: 'Find the smallest number in a list.',
     example: '`minOf({3, 1, 2})` gives 1.',
     params: [
-      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers. Empty or left out: no result.' },
+      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers.\nEmpty or left out: no result.' },
     ],
   },
   {
@@ -3884,7 +3884,7 @@ export const HELPERS = [
     summary: 'Find the largest number in a list.',
     example: '`maxOf({3, 1, 2})` gives 3.',
     params: [
-      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers. Empty or left out: no result.' },
+      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers.\nEmpty or left out: no result.' },
     ],
   },
   {
@@ -3892,7 +3892,7 @@ export const HELPERS = [
     summary: 'Add up a list of numbers.',
     example: '`sumOf({1, 2, 3})` gives 6.',
     params: [
-      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers. Empty or left out: 0.' },
+      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers.\nEmpty or left out: 0.' },
     ],
   },
   {
@@ -3900,7 +3900,7 @@ export const HELPERS = [
     summary: 'Find the average of a list of numbers.',
     example: '`meanOf({1, 2, 6})` gives 3.',
     params: [
-      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers. Empty or left out: no result.' },
+      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers.\nEmpty or left out: no result.' },
     ],
   },
   // `a, b` said nothing about these being LISTS, and with no return annotation the signature read
@@ -3916,7 +3916,7 @@ export const HELPERS = [
     params: [
       { name: 'fromList', type: 'list of numbers', required: true, summary: 'The list at 0.' },
       { name: 'toList', type: 'list of numbers', required: true, summary: 'The list at 1. If the lists differ in length, the result is as long as the shorter one.' },
-      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (fromList ↔ toList). Left out: 0. Outside the range: not held at 0 or 1.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (fromList ↔ toList).\nLeft out: 0.\nOutside the range: not held at 0 or 1.' },
     ],
   },
   {
@@ -3925,7 +3925,7 @@ export const HELPERS = [
     example: '`randomFloat(0.5, 2)` gives a number from 0.5 up to, but not including, 2.',
     notes: ['`ce.math.random` with two numbers gives whole numbers; use this one for fractions.'],
     params: [
-      { name: 'lo', type: 'number', required: false, summary: 'The bottom of the range. Both left out: 0 ↔ 1. Given alone: the top of a range from 0, so randomFloat(5) is from 0 up to 5.' },
+      { name: 'lo', type: 'number', required: false, summary: 'The bottom of the range.\nBoth left out: 0 ↔ 1.\nGiven alone: the top of a range from 0, so randomFloat(5) is from 0 up to 5.' },
       { name: 'hi', type: 'number', required: false, summary: 'The top of the range, which it never reaches. It may be below lo.' },
     ],
   },
@@ -3938,8 +3938,8 @@ export const HELPERS = [
       'It always uses two random numbers, so a replayed seed stays in step.',
     ],
     params: [
-      { name: 'mean', type: 'number', required: false, summary: 'Where most results land. Default: 0.' },
-      { name: 'sd', type: 'number', required: false, summary: 'How widely they spread, the standard deviation: about two thirds land within one sd of the mean. Default: 1.' },
+      { name: 'mean', type: 'number', required: false, summary: 'Where most results land.\nDefault: 0.' },
+      { name: 'sd', type: 'number', required: false, summary: 'How widely they spread, the standard deviation: about two thirds land within one sd of the mean.\nDefault: 1.' },
     ],
   },
   {
@@ -3949,7 +3949,7 @@ export const HELPERS = [
     params: [
       { name: 'current', type: 'number', required: true, summary: 'The value now. Pass back what the last call returned.' },
       { name: 'step', type: 'number', required: true, summary: 'The most it moves, either way.' },
-      { name: 'lo', type: 'number', required: false, summary: 'The bottom. At it, the walk bounces back. Left out, with hi: no limits.' },
+      { name: 'lo', type: 'number', required: false, summary: 'The bottom. At it, the walk bounces back.\nLeft out, with hi: no limits.' },
       { name: 'hi', type: 'number', required: false, summary: 'The top. At it, the walk bounces back.' },
     ],
   },
@@ -3959,7 +3959,7 @@ export const HELPERS = [
     example: '`randomBool(0.25)` gives true about one time in four.',
     notes: ['Use it as a probability gate on sequencer steps.'],
     params: [
-      { name: 'chance', type: 'number', required: false, summary: 'The probability of true. Range: 0 ↔ 1 (never ↔ always). Default: 0.5. Outside the range: held at 0 or 1.' },
+      { name: 'chance', type: 'number', required: false, summary: 'The probability of true.\nRange: 0 ↔ 1 (never ↔ always).\nDefault: 0.5.\nOutside the range: held at 0 or 1.' },
     ],
   },
   {
@@ -3968,7 +3968,7 @@ export const HELPERS = [
     example: '`shuffle({1, 2, 3})` gives the same three numbers in a random order.',
     notes: ['It uses one random number for each entry after the first, so the same seed always shuffles the same way.'],
     params: [
-      { name: 'values', type: 'list', required: true, summary: 'The list. It is not changed: a new list is returned. Empty or left out: an empty list.' },
+      { name: 'values', type: 'list', required: true, summary: 'The list.\nIt is not changed: a new list is returned.\nEmpty or left out: an empty list.' },
     ],
   },
   {
@@ -4024,7 +4024,7 @@ export const HELPERS = [
     notes: ['Add the offsets to your centre to find, for example, the tip of a knob\'s pointer.'],
     params: [
       { name: 'angle', type: 'number', required: true, summary: 'The angle in degrees: 0 at twelve o\'clock, increasing clockwise, as ce.math.angle returns it.' },
-      { name: 'radius', type: 'number', required: true, summary: 'The distance from the centre. Left out: 0.' },
+      { name: 'radius', type: 'number', required: true, summary: 'The distance from the centre.\nLeft out: 0.' },
     ],
   },
 
@@ -4044,9 +4044,9 @@ export const HELPERS = [
       '`ce.math.unshape` reverses it.',
     ],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1.' },
-      { name: 'curve', type: 'text', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Left out or unknown: "linear".' },
-      { name: 'tension', type: 'number', required: false, summary: 'How strongly "exp" and "log" bend. Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses.' },
+      { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: held at 0 or 1.' },
+      { name: 'curve', type: 'text', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1).\nLeft out or unknown: "linear".' },
+      { name: 'tension', type: 'number', required: false, summary: 'How strongly "exp" and "log" bend.\nDefault: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses.' },
     ],
   },
   {
@@ -4055,9 +4055,9 @@ export const HELPERS = [
     example: '`deadzone(0.55, 0.1)` gives 0.5.',
     notes: ['The response starts at the edge of the dead zone instead of jumping up from it.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1.' },
-      { name: 'amount', type: 'number', required: true, summary: 'The size of the dead zone. At or below it: 0. The rest is stretched to fill 0 ↔ 1.' },
-      { name: 'invert', type: 'true or false', required: false, summary: 'true flips the value first. Default: false.' },
+      { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: held at 0 or 1.' },
+      { name: 'amount', type: 'number', required: true, summary: 'The size of the dead zone.\nAt or below it: 0. The rest is stretched to fill 0 ↔ 1.' },
+      { name: 'invert', type: 'true or false', required: false, summary: 'true flips the value first.\nDefault: false.' },
     ],
   },
   {
@@ -4068,10 +4068,10 @@ export const HELPERS = [
       'Pass the result to `ce.math.blendBy` to morph values.',
     ],
     params: [
-      { name: 'points', type: 'list', required: true, summary: 'The anchors, as a list of {x, y}. Empty: an empty list.' },
-      { name: 'x', type: 'number', required: true, summary: 'The position\'s x. Range: 0 ↔ 1.' },
-      { name: 'y', type: 'number', required: true, summary: 'The position\'s y. Range: 0 ↔ 1.' },
-      { name: 'power', type: 'number', required: false, summary: 'How sharp the blend is: higher lets the nearest anchor take over sooner. Default: 2.' },
+      { name: 'points', type: 'list', required: true, summary: 'The anchors, as a list of {x, y}.\nEmpty: an empty list.' },
+      { name: 'x', type: 'number', required: true, summary: 'The position\'s x.\nRange: 0 ↔ 1.' },
+      { name: 'y', type: 'number', required: true, summary: 'The position\'s y.\nRange: 0 ↔ 1.' },
+      { name: 'power', type: 'number', required: false, summary: 'How sharp the blend is: higher lets the nearest anchor take over sooner.\nDefault: 2.' },
     ],
   },
   {
@@ -4081,7 +4081,7 @@ export const HELPERS = [
     notes: ['This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead.'],
     params: [
       { name: 'values', type: 'list of numbers', required: true, summary: 'The values to combine.' },
-      { name: 'weights', type: 'list of numbers', required: true, summary: 'How much each value counts. They need not add up to 1. Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides.' },
+      { name: 'weights', type: 'list of numbers', required: true, summary: 'How much each value counts. They need not add up to 1.\nAdding up to 0 or less: 0. If the lists differ in length, the shorter one decides.' },
     ],
   },
   {
@@ -4093,8 +4093,8 @@ export const HELPERS = [
       'Use it when you draw your own scale, so its marks line up with the app\'s.',
     ],
     params: [
-      { name: 'major', type: 'number', required: false, summary: 'How many major marks, counting both ends. Default: 11.' },
-      { name: 'minor', type: 'number', required: false, summary: 'How many smaller marks between each pair of major ones. Default: 0.' },
+      { name: 'major', type: 'number', required: false, summary: 'How many major marks, counting both ends.\nDefault: 11.' },
+      { name: 'minor', type: 'number', required: false, summary: 'How many smaller marks between each pair of major ones.\nDefault: 0.' },
     ],
   },
   {
@@ -4103,9 +4103,9 @@ export const HELPERS = [
     example: '`dbPosition(1)` gives about 0.91: 0 dB on a meter from -60 to +6.',
     notes: ['It returns a position in the range 0 ↔ 1 (bottom ↔ top).'],
     params: [
-      { name: 'fraction', type: 'number', required: true, summary: 'The level, as a linear value. Range: 0 ↔ 1. Outside the range: held at 0 or 1.' },
-      { name: 'floorDb', type: 'number', required: false, summary: 'The bottom of the meter, in dB. Default: -60, as on the Meter component.' },
-      { name: 'ceilDb', type: 'number', required: false, summary: 'The top of the meter, in dB. Default: +6.' },
+      { name: 'fraction', type: 'number', required: true, summary: 'The level, as a linear value.\nRange: 0 ↔ 1.\nOutside the range: held at 0 or 1.' },
+      { name: 'floorDb', type: 'number', required: false, summary: 'The bottom of the meter, in dB.\nDefault: -60, as on the Meter component.' },
+      { name: 'ceilDb', type: 'number', required: false, summary: 'The top of the meter, in dB.\nDefault: +6.' },
     ],
   },
 
@@ -4124,8 +4124,8 @@ export const HELPERS = [
     params: [
       { name: 'current', type: 'number', required: true, summary: 'The value now.' },
       { name: 'target', type: 'number', required: true, summary: 'Where it is going.' },
-      { name: 'coefficient', type: 'number', required: true, summary: 'The share of the remaining distance covered in each call. Range: 0 ↔ 1 (stays put ↔ jumps to the target). Outside the range: held at 0 or 1.' },
-      { name: 'epsilon', type: 'number', required: false, summary: 'How close counts as arrived: within it, the value lands on the target. Default: 0.0001.' },
+      { name: 'coefficient', type: 'number', required: true, summary: 'The share of the remaining distance covered in each call.\nRange: 0 ↔ 1 (stays put ↔ jumps to the target).\nOutside the range: held at 0 or 1.' },
+      { name: 'epsilon', type: 'number', required: false, summary: 'How close counts as arrived: within it, the value lands on the target.\nDefault: 0.0001.' },
     ],
   },
   {
@@ -4146,7 +4146,7 @@ export const HELPERS = [
     example: '`median({1, 2, 100})` gives 2.',
     notes: ['Unlike the average, one stray spike does not move it.'],
     params: [
-      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers, in any order. With an even count: the average of the two middle ones. Empty or left out: no result.' },
+      { name: 'values', type: 'list of numbers', required: true, summary: 'The numbers, in any order.\nWith an even count: the average of the two middle ones.\nEmpty or left out: no result.' },
     ],
   },
   {
@@ -4155,9 +4155,9 @@ export const HELPERS = [
     example: '`euclid(8, 3)` gives {false, false, true, false, false, true, false, true}.',
     notes: ['It returns a list of true and false, the same pattern the Arpeggiator uses for its rests.'],
     params: [
-      { name: 'steps', type: 'number', required: true, summary: 'How many steps. Range: 1 ↔ 64. Outside the range: held at 1 or 64.' },
-      { name: 'pulses', type: 'number', required: true, summary: 'How many of the steps are hits. More than steps: every step is a hit.' },
-      { name: 'rotation', type: 'number', required: false, summary: 'How many steps to shift the pattern by, without changing the spacing. Default: 0. Negative shifts the other way.' },
+      { name: 'steps', type: 'number', required: true, summary: 'How many steps.\nRange: 1 ↔ 64.\nOutside the range: held at 1 or 64.' },
+      { name: 'pulses', type: 'number', required: true, summary: 'How many of the steps are hits.\nMore than steps: every step is a hit.' },
+      { name: 'rotation', type: 'number', required: false, summary: 'How many steps to shift the pattern by, without changing the spacing.\nDefault: 0. Negative shifts the other way.' },
     ],
   },
   {
@@ -4171,7 +4171,7 @@ export const HELPERS = [
     params: [
       { name: 'y', type: 'number', required: true, summary: 'The value after the curve.' },
       { name: 'curve', type: 'text', required: true, summary: 'The same curve that was used.' },
-      { name: 'tension', type: 'number', required: false, summary: 'The same tension that was used. Default: 1.6.' },
+      { name: 'tension', type: 'number', required: false, summary: 'The same tension that was used.\nDefault: 1.6.' },
     ],
   },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
@@ -4510,7 +4510,7 @@ export const HELPERS = [
       'An option other than bits and order is refused with a message, and nothing comes back.',
     ],
     params: [
-      { name: 'bytes', type: 'bytes', required: true, summary: 'The message, as a list of bytes or as hex text. It is not changed: a new list comes back.' },
+      { name: 'bytes', type: 'bytes', required: true, summary: 'The message, as a list of bytes or as hex text.\nIt is not changed: a new list comes back.' },
       { name: 'offset', type: 'number', required: true, summary: 'Where the number starts, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end.' },
       { name: 'count', type: 'number', required: true, summary: 'How many bytes the number takes, from 1 to 4.' },
       { name: 'value', type: 'number', required: true, summary: 'The number to write. A number that does not fit in the bytes is refused with a message.' },
@@ -4538,7 +4538,7 @@ export const HELPERS = [
       { text: 'Offsets count from 0 in every language, Lua included, as dump layouts count them.', check: 'luaOffset' },
     ],
     params: [
-      { name: 'bytes', type: 'bytes', required: true, summary: 'The list, or hex text. It is not changed: a new list comes back.' },
+      { name: 'bytes', type: 'bytes', required: true, summary: 'The list, or hex text.\nIt is not changed: a new list comes back.' },
       { name: 'offset', type: 'number', required: true, summary: 'Where to start writing, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end.' },
       { name: 'values', type: 'bytes', required: true, summary: 'The bytes to write, as a list or as hex text.' },
     ],
