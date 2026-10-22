@@ -404,9 +404,11 @@ manual and Help, and take screenshots with Playwright through `browser-checks/be
   pass a missing path as empty. Tests: `scriptAnim.test.js`, `PythonScriptEngineTests.cpp`,
   `PanelValueModelTests.cpp`. The release notes say it.
 
-### Waiting for the owner: item 3
+### Item 3: wording accepted, three decisions open
 
-Proposed, in the owner's latest wording rule:
+The owner answered this wording "Better." when handing the work over. It is not yet in
+`panelApi.js`: put it into `animateTo`'s `curve`, `damping` and `frequency` fields once the
+decisions below are made, since two of them change what the rows say.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -417,7 +419,7 @@ Proposed, in the owner's latest wording rule:
 The old `curve` text said x1 and x2 "are kept between 0 and 1". They are not: numbers outside the
 range are rejected and the move is linear (`bezierOf` in `easingTables.js`).
 
-Three decisions, each a change in both runtimes if made (the editor's `startAnimationImpl`, and
+Three decisions, still to put to the owner, each a change in both runtimes if made (the editor's `startAnimationImpl`, and
 `ScriptRuntime::startAnimation`, which applies the same rules):
 
 1. An unknown `curve` name or invalid control points are logged as an ordinary console line on
@@ -516,8 +518,8 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to and its timing options are done; item 3 (curve, damping, frequency) is
-proposed with three open decisions. Continue from there in technical English, schematic, with
+on 2026-10-22". ce.anim.to and its timing options are done; item 3's wording (curve, damping,
+frequency) is accepted and its three decisions are open: put those to me first. Continue from there in technical English, schematic, with
 ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```
