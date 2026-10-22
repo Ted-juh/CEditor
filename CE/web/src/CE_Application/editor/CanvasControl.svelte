@@ -196,6 +196,8 @@
     previewValueField = null,
     previewEditableFields = null,
     previewKeyboardFocus = false,
+    // A field on this control's screen is being edited, and the keys type into it (hostKeys.js).
+    previewEditing = false,
     previewHighlighted = false,
     onpreviewpointerenter = null,
     onpreviewpointerleave = null,
@@ -3238,6 +3240,7 @@
   role={previewInteractive && previewRole ? previewRole
     : (inPreview && previewImageRole ? 'img' : undefined)}
   data-preview-role={previewInteractive ? (previewRole || '') : undefined}
+  data-editing={previewInteractive && previewEditing ? '' : undefined}
   tabindex={previewInteractive && !isListboxControl ? effectiveTabIndex : undefined}
   aria-label={previewInteractive || (inPreview && previewImageRole) ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}

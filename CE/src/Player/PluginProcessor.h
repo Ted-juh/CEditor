@@ -2638,6 +2638,10 @@ public:
         setResizable (true, true);
         setSize (800, 480);
 
+        // In a DAW, the keys the panel does not use are the DAW's: Space starts its transport while
+        // the plug-in has focus. The plug-in's own Standalone window has no host to hand them to.
+        host.forwardKeysToHost = p.wrapperType != juce::AudioProcessor::wrapperType_Standalone;
+
         // A blank window and a drawn one look the same from outside the page, so the log says which
         // it was: the profile folder the webview was given (WebViewProfileFolders.h, the switch for
         // one engine per process included), then when the page answered and when the panel was in

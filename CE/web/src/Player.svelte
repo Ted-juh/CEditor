@@ -10,6 +10,8 @@
   import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { hostWindowShown } from './CE_Application/stores/hostWindow.js';
+  import { installHostKeyForwarding } from './CE_Application/utils/hostKeys.js';
+  import { DEFAULT_PANIC_SHORTCUT, isPanicShortcut } from './CE_Application/utils/panicLayout.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
   import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
@@ -612,6 +614,7 @@
     let restoreToken = null;
     let sessionToken = null;
     let hostWindowToken = null;
+    let stopHostKeys = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
       listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
@@ -650,6 +653,14 @@
         sessionRestored = true;
         if (synthSyncTimer) { clearTimeout(synthSyncTimer); synthSyncTimer = 0; startupReadPort = null; }
       });
+      // In a DAW, the keys the panel does not use go to the host: Space starts its transport while
+      // the plug-in has focus (utils/hostKeys.js). PlayerHost says whether this window is one.
+      stopHostKeys = installHostKeyForwarding({
+        enabled: () => window.__CE_PLAYER_SESSION__?.hostKeys === true,
+        send: (payload) => backend.emitEvent('hostKey', payload),
+        // The panel's panic key stays the panel's, whatever key it is.
+        pageKeeps: (event) => isPanicShortcut(event, { shortcut: panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT }),
+      });
       backend.emitEvent('playerReady', {});
     } else if (window.__CE_PANEL__ != null) {
       // Browser/dev fallback: boot from a pre-injected document.
@@ -672,6 +683,7 @@
       if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
       if (backend && hostWindowToken != null) backend.removeEventListener(hostWindowToken);
       hostWindowShown.set(true);
+      if (stopHostKeys) stopHostKeys();
       if (portsUnsub) portsUnsub();
       if (inputsUnsub) inputsUnsub();
       if (inMsgUnsub) inMsgUnsub();

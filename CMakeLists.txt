@@ -1003,6 +1003,19 @@ target_link_libraries(CEditorUpdateCheckTests PRIVATE
 add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
 ce_configure_test(CEditorUpdateCheckTests)
 
+# --- An exported plug-in's unused keys, handed to the DAW ---
+# The key message is a pure function of the key and runs anywhere; posting it is the Windows half,
+# driven there with real windows in the shape a DAW gives a plug-in (HostKeyForwarding.h). It is
+# reached otherwise only through PlayerHost.cpp, which needs a webview.
+add_executable(CEditorHostKeyForwardingTests "${CE_ROOT}/tests/HostKeyForwardingTests.cpp")
+target_include_directories(CEditorHostKeyForwardingTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorHostKeyForwardingTests PRIVATE juce::juce_core)
+if(WIN32)
+    target_link_libraries(CEditorHostKeyForwardingTests PRIVATE user32)
+endif()
+add_test(NAME HostKeyForwarding COMMAND CEditorHostKeyForwardingTests)
+ce_configure_test(CEditorHostKeyForwardingTests)
+
 # The WebView2 profile folders a player or host webview gets, and the sweep of the ones processes
 # that have gone left in temp (WebViewProfileFolders.h). Plain juce_core: the folders are files and
 # the sweep never makes a webview, so it runs anywhere.

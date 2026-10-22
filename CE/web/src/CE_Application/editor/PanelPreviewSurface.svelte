@@ -8920,6 +8920,7 @@
       } : null,
       previewEditableFields: { ...spinnerEditableFields(control), ...numericEditableFields(control) },
       previewKeyboardFocus: keyboardFocusControlId === getControlId(control),
+      previewEditing: lcdEdit.active && lcdEdit.id === getControlId(control),
       previewHighlighted: $showPreviewSelectionRing && $previewInspectedControlId === getControlId(control),
       onpreviewpointerenter: () => handlePointerEnter(control),
       onpreviewpointerleave: () => handlePointerLeave(control),
