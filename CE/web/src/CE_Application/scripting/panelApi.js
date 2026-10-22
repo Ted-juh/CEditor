@@ -42,7 +42,7 @@ import {
 import { FEATURE_KEYS, CASE_MODES, SCRIPT_MODES, JUSTIFICATIONS } from './textStyle.js';
 // And ce.anim's curve names from the table ce.anim evaluates. This list was typed out, and when the
 // animation overhaul added five easings every runtime accepted them and the documentation did not.
-import { ANIM_CURVE_NAMES, CURVE_NAMES } from './easingTables.js';
+import { ANIM_CURVE_NAMES } from './easingTables.js';
 // The two vocabularies a component verb's enum may be, so its argument can say which (verbValueTyping).
 import { DIVISION_NAMES } from './timeTables.js';
 import { SCALE_NAMES } from './musicTheory.js';
@@ -1085,17 +1085,11 @@ export const COMMANDS = [
           'duration', 'beats', 'sync',
           { name: 'curve', type: 'text or list', default: '"linear"', kind: 'curve',
             values: [...ANIM_CURVE_NAMES],
-            summary: `The shape of the move. The first ${CURVE_NAMES.length} names are the curves of `
-              + '`ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an '
-              + 'animation that name the same curve move the same way. "spring" overshoots and settles like '
-              + '`ce.anim.spring()`, shaped by `damping` and `frequency`. Instead of a name you can give the '
-              + 'four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an '
-              + 'animation\'s `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name '
-              + 'it does not know is reported, and the move runs in a straight line.' },
+            summary: 'Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}. Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3. Invalid: linear.' },
           { name: 'damping', type: 'number', default: '6', kind: 'number',
-            summary: 'With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it.' },
+            summary: 'Spring damping (curve = "spring"). Range: 0 or more. 0: undamped. Invalid: default.' },
           { name: 'frequency', type: 'number', default: '12', kind: 'number',
-            summary: 'With curve = "spring": how fast it wobbles, as ce.anim.spring reads it.' },
+            summary: 'Spring oscillation frequency (curve = "spring"). 0: no oscillation. Invalid: default.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],

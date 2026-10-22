@@ -404,40 +404,41 @@ manual and Help, and take screenshots with Playwright through `browser-checks/be
   pass a missing path as empty. Tests: `scriptAnim.test.js`, `PythonScriptEngineTests.cpp`,
   `PanelValueModelTests.cpp`. The release notes say it.
 
-### Item 3: wording accepted, three decisions open
+### Item 3: done
 
-The owner answered this wording "Better." when handing the work over. It is not yet in
-`panelApi.js`: put it into `animateTo`'s `curve`, `damping` and `frequency` fields once the
-decisions below are made, since two of them change what the rows say.
+`animateTo`'s `curve`, `damping` and `frequency` rows, approved by the owner:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}. Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3. Invalid: linear. |
-| `damping` | number | 6 | Spring damping (curve = "spring"). 0: undamped. Below 0: oscillation grows. Invalid: default. |
+| `damping` | number | 6 | Spring damping (curve = "spring"). Range: 0 or more. 0: undamped. Invalid: default. |
 | `frequency` | number | 12 | Spring oscillation frequency (curve = "spring"). 0: no oscillation. Invalid: default. |
 
 The old `curve` text said x1 and x2 "are kept between 0 and 1". They are not: numbers outside the
 range are rejected and the move is linear (`bezierOf` in `easingTables.js`).
 
-Three decisions, still to put to the owner, each a change in both runtimes if made (the editor's `startAnimationImpl`, and
-`ScriptRuntime::startAnimation`, which applies the same rules):
+Three decisions the owner made, each applied in both runtimes (the editor's `startAnimationImpl`
+and `ScriptRuntime::startAnimation`), with the release notes saying so:
 
-1. An unknown `curve` name or invalid control points are logged as an ordinary console line on
-   every call. Every other option gives a warning, once (`warnAnimTiming`). Make `curve` the same?
-2. `damping` below 0 makes the oscillation grow without limit: a move from 0 to 100 with damping -2
-   is at -161 halfway. Reject it as invalid (warning, default 6)?
-3. A `curve` that is neither text nor a list (`curve = 5`) is linear without a message. Warn?
+1. An invalid `curve` is a console warning, once per command, as every other option is
+   (`warnAnimTiming` / `warnTiming`). It was an ordinary console line on every call.
+2. `damping` below 0 is invalid: a warning, and the default 6. It made the oscillation grow without
+   limit.
+3. A `curve` that is neither text nor a list (`curve = 5`) warns the same way. It was linear in
+   silence.
+
+`ce.anim.spring`'s own `damping` and `frequency` rows still have their old text (step 2 below).
 
 ### Left to do in `ce.anim`
 
-1. Item 3 above.
-2. The other shared options, in `SHARED_OPTION_FIELDS`: `from` (`animFrom`), `stagger`, `repeat`,
+1. The other shared options, in `SHARED_OPTION_FIELDS`: `from` (`animFrom`), `stagger`, `repeat`,
    `pingpong`, `done`. Check `from` first: it is read with `Number()`, so "abc" and "" start from 0
    and `true` from 1, without a message, where every other number option uses `realNumber` and
    warns.
-3. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows).
-4. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
-5. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+2. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows,
+   which take item 3's text).
+3. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
+4. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
 
 For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
 range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
@@ -518,8 +519,7 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to and its timing options are done; item 3's wording (curve, damping,
-frequency) is accepted and its three decisions are open: put those to me first. Continue from there in technical English, schematic, with
-ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.anim.to, its timing options and its curve options are done; continue with the
+other shared options (from first) in technical English, schematic, with ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```

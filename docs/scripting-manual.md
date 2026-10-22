@@ -2561,9 +2561,9 @@ Good to know:
 | `duration` | number (milliseconds) | 300 | Length of the animation. Range: 0 or more (0: immediate jump). Below 0: immediate jump. Not a number: default. |
 | `beats` | number (beats) | — | Length in beats. Overrides duration. Range: above 0. Tempo: read at the start; with sync, followed. Outside the range, or not a number: duration is used. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes. Other values: false. |
-| `curve` | text or list | "linear" | The shape of the move. The first 4 names are the curves of `ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an animation that name the same curve move the same way. "spring" overshoots and settles like `ce.anim.spring()`, shaped by `damping` and `frequency`. Instead of a name you can give the four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an animation's `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name it does not know is reported, and the move runs in a straight line. One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
-| `damping` | number | 6 | With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it. |
-| `frequency` | number | 12 | With curve = "spring": how fast it wobbles, as ce.anim.spring reads it. |
+| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}. Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3. Invalid: linear. One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
+| `damping` | number | 6 | Spring damping (curve = "spring"). Range: 0 or more. 0: undamped. Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency (curve = "spring"). 0: no oscillation. Invalid: default. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
 | `delay` | number (milliseconds) | 0 | Wait before the start. Range: 0 or more. Below 0, or not a number: no wait. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |

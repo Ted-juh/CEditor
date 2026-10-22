@@ -4509,8 +4509,9 @@ function animTiming(verb, opts, name, fallback) {
   return n;
 }
 /** `stagger`, `damping` and `frequency`: a number, or text that is one, or after saying why not, the
- *  default. A number below 0 is used as it is: a stagger below 0 runs the list back to front behind
- *  a delay, and a damping or frequency is the curve's own business. */
+ *  default. A stagger below 0 runs the list back to front behind a delay, and a frequency's sign
+ *  makes no difference, so both are used as given. A damping below 0 makes the spring grow instead
+ *  of settling (a move from 0 to 100 at -2 is at -161 halfway), so it is the default, and said. */
 const ANIM_OPTION_FALLBACK_WORDS = {
   stagger: () => 'not a number of milliseconds, so the moves start together, as they do when no stagger is given.',
   damping: (d) => `not a number, so the spring's damping is ${d}, as it is when none is given.`,
@@ -4520,7 +4521,13 @@ function animOption(verb, opts, name, fallback) {
   const v = opts?.[name];
   if (v === undefined || v === null) return fallback;
   const n = realNumber(v);
-  if (n !== undefined) return n;
+  if (n !== undefined) {
+    if (name === 'damping' && n < 0) {
+      warnAnimTiming(verb, name, `a damping of ${shownValue(n)} is less than 0, so the spring would grow instead of settling: its damping is ${fallback}, as it is when none is given.`);
+      return fallback;
+    }
+    return n;
+  }
   warnAnimTiming(verb, name, `${shownValue(v)} is ${ANIM_OPTION_FALLBACK_WORDS[name](fallback)}`);
   return fallback;
 }
@@ -4589,21 +4596,27 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
   // Properties panel offers three feet away, and it was linear here in every runtime. A curve can
   // also be drawn — four numbers, see drawnCurve — which is how a script moves along the same
-  // custom curve an animation in the Animation tab uses.
+  // custom curve an animation in the Animation tab uses. Said once per command, as every other
+  // option is (warnAnimTiming): it was a line on every call, and a curve that was neither a name
+  // nor numbers (curve = 5) was linear without a word. ScriptRuntime::startAnimation says the same.
+  const curveVerb = `ce.anim.${kind}`;
   let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
   let bezier = null;
   if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
     bezier = drawnCurve(opts.curve);
     curve = bezier ? 'custom' : 'linear';
     if (!bezier) {
-      addScriptTrace('log', scriptId,
-        'ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
+      warnAnimTiming(curveVerb, 'curve',
+        'a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
     }
-  } else if (!spring && !envelope && animationEase(0.5, curve) === undefined) {
-    addScriptTrace('log', scriptId,
-      `ce.anim: "${curve}" is not a curve this build knows — animating linear. `
+  } else if (!spring && !envelope && typeof opts?.curve === 'string' && animationEase(0.5, curve) === undefined) {
+    warnAnimTiming(curveVerb, 'curve',
+      `"${curve}" is not a curve this build knows — animating linear. `
       + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.`);
     curve = 'linear';
+  } else if (!spring && !envelope && opts?.curve !== undefined && opts?.curve !== null && typeof opts.curve !== 'string') {
+    warnAnimTiming(curveVerb, 'curve',
+      `${shownValue(opts.curve)} is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.`);
   }
 
   // `from` defaults to where the value IS, so an animation starts from the truth rather than from

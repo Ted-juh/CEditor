@@ -21,7 +21,7 @@ import { EASING_BEZIERS, ANIM_CURVE_NAMES } from '../src/CE_Application/scriptin
 import { EASING_BEZIERS as PANEL_BEZIERS } from '../src/CE_Application/utils/interactionRuntime.js';
 import { OVERSHOOTING_EASINGS } from '../src/CE_Application/utils/easing.js';
 import { get as getStore } from 'svelte/store';
-import { setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { setRuntimeHost, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { animationPlays } from '../src/CE_Application/stores/animationActivity.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -188,6 +188,44 @@ test('a drawn curve that is not one says so, and animates linear', () => {
     tickAnimations(250);
     assert.equal(api.animateValue('a').value, 25);
     assert.match(getStore(scriptTrace).map((t) => t.message).join('\n'), /a drawn curve is four numbers/);
+  });
+});
+
+test('a curve that cannot be used is said once per command, as the other options are; damping below 0 is the default', () => {
+  // The owner's three decisions on item 3 (docs/design/api-descriptions-handoff.md): an invalid
+  // curve was a line on every call, a curve that was neither a name nor numbers was linear in
+  // silence, and a damping below 0 made the spring grow instead of settling. ScriptRuntimeTests
+  // checks the plug-in's runtime says the same.
+  const said = () => {
+    const lines = getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`).filter((l) => !l.startsWith('error:set:'));
+    clearScriptTrace();
+    return lines;
+  };
+  const once = ' This is said only the first time.';
+  resetScriptStateForTesting();
+  withClock(() => {
+    said();
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: 'outBak' });
+    assert.deepEqual(said(), [`warn:ce.anim.to: "outBak" is not a curve this build knows — animating linear. `
+      + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.${once}`]);
+    api.animateTo('b', 100, { duration: 1000, from: 0, curve: [1.5, 0, 0, 1] });
+    api.animateTo('c', 100, { duration: 1000, from: 0, curve: 5 });
+    assert.deepEqual(said(), [], 'not again by the same command, whatever the curve was');
+    tickAnimations(250);
+    assert.deepEqual(['a', 'b', 'c'].map((p) => api.animateValue(p).value), [25, 25, 25], 'each move is linear');
+  });
+  resetScriptStateForTesting();
+  withClock(() => {
+    said();
+    api.animateTo('d', 100, { duration: 1000, from: 0, curve: true });
+    assert.deepEqual(said(), [`warn:ce.anim.to: true is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.${once}`],
+      'neither a name nor numbers is said, where it was linear in silence');
+    api.animateSpring('e', 100, { duration: 1000, from: 0, damping: -2 });
+    api.animateSpring('f', 100, { duration: 1000, from: 0 });
+    assert.deepEqual(said(), [`warn:ce.anim.spring: a damping of -2 is less than 0, so the spring would grow instead of settling: its damping is 6, as it is when none is given.${once}`]);
+    tickAnimations(500);
+    assert.equal(api.animateValue('e').value, api.animateValue('f').value, 'the default damping, not a spring that grows');
+    assert.ok(api.animateValue('e').value > 0 && api.animateValue('e').value < 110, 'and it settles');
   });
 });
 

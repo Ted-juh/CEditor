@@ -907,9 +907,13 @@ test('a curve the runtime does not know is said in its words, and the move runs 
     ['ce.anim.to("X", 1, { curve = { 2, 0, 1, 1 } })', (api) => api.ce.anim.to('X', 1, { curve: [2, 0, 1, 1] })],
   ]) {
     const row = optOf(argOf(callOf(read(src, 'lua', 'ce.')), 'opts'), 'curve');
+    // The runtime says a curve once per command (warnAnimTiming), so each case starts afresh, and
+    // its "said only the first time" is the runtime's alone.
+    resetScriptStateForTesting();
     const lines = withPanel([knob], (api) => runtimeLines(() => run(api), ['log', 'warn', 'error']));
+    const line = String(lines[0] ?? '').replace(/ This is said only the first time\.$/, '');
     assert.equal(row.problem.severity, 'warning');
-    assert.ok(row.problem.message.startsWith(lines[0]), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${lines[0]}`);
+    assert.ok(line && row.problem.message.startsWith(line), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${lines[0]}`);
   }
 });
 
@@ -1106,7 +1110,7 @@ test('record example 6: an easing curve, and a duration in milliseconds', () => 
   const drawn = 'ce.anim.to("cutoff", 127, { curve = { 0.2, 0.9, 0.3, 1.4 } })';
   assert.equal(writeValue(drawn, 'lua', optOf(argOf(callOf(read(drawn, 'lua', 'ce.')), 'opts'), 'curve'), 'outBack').text, '"outBack"');
   const typo = optOf(argOf(callOf(read('ce.anim.to("cutoff", 127, { curve = "outBak" })', 'lua', 'ce.')), 'opts'), 'curve');
-  assert.match(typo.problem.message, /^ce\.anim: "outBak" is not a curve this build knows — animating linear\..* Did you mean "outBack"\?$/);
+  assert.match(typo.problem.message, /^ce\.anim\.to: "outBak" is not a curve this build knows — animating linear\..* Did you mean "outBack"\?$/);
 });
 
 test('record example 7: note names, what was the silent C-1', () => {

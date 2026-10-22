@@ -574,6 +574,9 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     if (o != nullptr) a.doneToken = o->getProperty ("__done").toString();
     a.scriptSet = animationScriptSet;
 
+    // A curve that cannot be used is said once per command, as every other option is (warnTiming),
+    // and the move is linear. It was a line on every call, and a curve that was neither a name nor
+    // numbers (curve = 5) was linear without a word. The WebView's startAnimationImpl says the same.
     const auto curveVar = o != nullptr ? o->getProperty ("curve") : juce::var();
     if (curveVar.isArray() || curveVar.isObject())
     {
@@ -581,22 +584,22 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         // the same custom curve an animation in the Animation tab uses.
         a.hasBezier = drawnCurve (curveVar, a.bezier);
         if (a.hasBezier) a.curve = "custom";
-        else host.log ("[panel] ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), "
-                       "with x1 and x2 between 0 and 1 — animating linear.", juce::var());
+        else warnTiming ("curve", juce::String (juce::CharPointer_UTF8 ("a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), "
+                                                                        "with x1 and x2 between 0 and 1 — animating linear.")));
     }
-    else if (o != nullptr && o->hasProperty ("curve"))
+    else if (curveVar.isString())
     {
-        const auto name = o->getProperty ("curve").toString();
+        const auto name = curveVar.toString();
         bool known = true;
         animationEase (0.5, name, &known);
-        if (! known)
-        {
-            // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name
-            // the Properties panel offers three feet away, and it was linear here in every runtime.
-            host.log ("[panel] ce.anim: \"" + name + "\" is not a curve this build knows — animating linear.",
-                      juce::var());
-        }
+        // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
+        // Properties panel offers three feet away, and it was linear here in every runtime.
+        if (! known) warnTiming ("curve", "\"" + name + juce::String (juce::CharPointer_UTF8 ("\" is not a curve this build knows — animating linear.")));
         else a.curve = name;
+    }
+    else if (! curveVar.isVoid() && ! curveVar.isUndefined())
+    {
+        warnTiming ("curve", animationShown (curveVar) + juce::String (juce::CharPointer_UTF8 (" is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.")));
     }
 
     if (a.kind == "envelope")
@@ -606,6 +609,14 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     const double defaultMs = a.kind == "spring" ? 600.0 : 300.0;
     a.duration = juce::jmax (1.0, timing ("duration", defaultMs));
     a.damping = option ("damping", 6.0, "not a number, so the spring's damping is 6, as it is when none is given.");
+    if (a.damping < 0.0)
+    {
+        // Below 0 the spring grows instead of settling (a move from 0 to 100 at -2 is at -161
+        // halfway), so it is the default, and said, as the WebView's animOption says it.
+        warnTiming ("damping", "a damping of " + animationShown (juce::var (a.damping))
+                               + " is less than 0, so the spring would grow instead of settling: its damping is 6, as it is when none is given.");
+        a.damping = 6.0;
+    }
     a.frequency = option ("frequency", 12.0, "not a number, so the spring's frequency is 12, as it is when none is given.");
     a.delay = juce::jmax (0.0, timing ("delay", 0.0));
     a.pingpong = flag ("pingpong");

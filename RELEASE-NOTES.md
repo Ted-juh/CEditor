@@ -62,6 +62,11 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   used to start: it returned true, wrote an error on every step, and called `done` with true at
   the end. A list with such a name in it is rejected whole, as a list with a colour property is.
 - An empty path, or none, writes an error to the console. It returned false without a word.
+- A `damping` below 0 is replaced by the default, 6, with a console warning. It made the spring
+  grow without limit instead of settling.
+- A `curve` that cannot be used (an unknown name, control points out of range, or a value that is
+  neither a name nor four numbers) is warned about once per command, as every other option is, and
+  the move is linear. It was logged on every call, and the last case was linear in silence.
 
 ## What you get
 
