@@ -630,6 +630,8 @@ test('the Python engine prelude computes what the WebView runtime computes', asy
 // refusals for it print no value, because each language would print a different word. FN stands for
 // a function, which each engine is handed in its own language.
 const FN = { __function: true };
+// A transport at 120 BPM, for the sandboxes whose musical timers must arm as the editor's do.
+const TEMPO_120 = { playing: false, bpm: 120, beats: 0, beatsPerBar: 4, source: 'internal', valid: true };
 // Points ce.anim.envelope refuses, in every engine and in the same words, and points it takes. A nil
 // cannot sit in a Lua list, so no case holds one; Lua's table of two would be a list of one.
 const ENVELOPE_REFUSED = [
@@ -651,6 +653,17 @@ const REFUSAL_CASES = [
   // Divisions: any case is read, and a name that is not a division says so.
   ['beatsPerDivision', ['1/6']], ['stepAt', [2, 'nope']], ['stepsBetween', [0, 1, '1/3']],
   ['swingOffset', [1, 0.5, 'quarter']],
+  // A number a helper cannot do without, left out, is rejected (it was the default in silence);
+  // one it can do without is the default, and says nothing. The first one left out is said, alone.
+  ['barBeatAt', [null]], ['barBeatAt', [4]], ['stepAt', [null, '1/16']], ['stepsBetween', [null, 4, '1/4']],
+  ['stepsBetween', [0, null, '1/4']], ['stepsBetween', [null, null, '1/4']], ['swingOffset', [null, 0.5, '1/16']],
+  ['swingOffset', [1, null, '1/16']], ['cycleAt', [6, null]], ['cycleAt', [null, 1]], ['cycleAt', [6, 1]],
+  ['loopedBeats', [4, 4, null]], ['loopedBeats', [null, 4, 8]], ['beatsToMs', [null, 120]], ['msToBeats', [null]],
+  // A timer with no id, a one-shot with no function, and a list of taps or gaps that is not one.
+  ['startTimer', [null, 250]], ['startTimer', ['', 250]], ['stopTimer', [null]], ['syncTimer', [null, 1]],
+  ['after', [10, 'x']], ['after', [10, null]], ['afterBeats', [1, 'x']], ['afterBeats', [1, null]],
+  ['tapTempo', [null]], ['tapTempo', ['x']], ['tapTempo', [5]], ['tapTempo', [[1000, 1500]]],
+  ['clockTempo', [null]], ['clockTempo', ['x']], ['clockTempo', [[20.8, 20.8]]],
   ['beatsPerDivision', ['1/8t']], ['stepAt', [2.5, '1/16D']], ['swingOffset', [1, 0.5, '1/4d']],
   // Music helpers: an unreadable note name, an unknown scale or chord, the scale checked first.
   ['scaleNotes', ['c4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
@@ -809,7 +822,9 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
   resetScriptStateForTesting();
   assert.ok(want.some((lines) => lines.length), 'the cases must include some refusals');
 
-  // JavaScript, under node:vm.
+  // JavaScript, under node:vm. The transport reports a tempo, as the editor's clock always does, so
+  // a musical timer that is accepted arms rather than stopping at "no tempo", which is an error
+  // now, as every rejection is.
   {
     const errors = [];
     const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {},
@@ -818,7 +833,8 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
     vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
     // The prelude declares its own logError, forwarding to __api.logAt, so capture it there.
     sandbox.__api = new Proxy({}, {
-      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error') errors.push(String(m)); } : () => undefined),
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error') errors.push(String(m)); }
+        : prop === 'transportState' ? () => TEMPO_120 : () => undefined),
     });
     REFUSAL_CASES.forEach(([fn, args], i) => {
       errors.length = 0;
@@ -832,13 +848,14 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
     const { LuaFactory } = await import('wasmoon');
     const lua = await new LuaFactory().createEngine();
     try {
-      // __transportState answers nothing, as a host with no transport does, so a musical timer
-      // that is accepted stops at "no tempo" (a log line, not an error).
+      // __transportState reports a tempo, as the editor's clock always does, so a musical timer
+      // that is accepted arms rather than stopping at "no tempo", which is an error now.
       // `set` is a host binding in this engine, and has to exist before the prelude loads for the
       // option check to wrap it, as the real engine binds it first.
-      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer', '__transportState']) {
+      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
         lua.global.set(name, () => {});
       }
+      lua.global.set('__transportState', () => TEMPO_120);
       await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
       const calls = REFUSAL_CASES.map(([fn, args]) =>
         `__errs = {}; ${fn}(${args.map(luaLiteral).join(', ')}); out[#out + 1] = table.concat(__errs, "\\1")`);
@@ -863,7 +880,9 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
   const driver = `
 import sys, json
 class _Bridge:
-    def __getattr__(self, name): return lambda *a, **k: None
+    def __getattr__(self, name):
+        if name == "transportState": return lambda *a, **k: {"playing": False, "bpm": 120, "beats": 0, "beatsPerBar": 4, "source": "internal", "valid": True}
+        return lambda *a, **k: None
 sys.modules["ceditor"] = _Bridge()
 payload = json.loads(sys.stdin.read())
 g = {"__name__": "prelude"}
@@ -1411,6 +1430,8 @@ const TIME_CALLS = [
   ['stepsBetween', [-2, 'soon', '1/4']], ['swingOffset', [true, 2, '1/16']], ['cycleAt', ['x', 100, 0]],
   ['cycleAt', [4, 0.1]], ['loopedBeats', [-3, -1, 0]], ['beatsToMs', ['x', 120]], ['beatsToMs', [1, -5]],
   ['msToBeats', [true, 'fast']], ['barBeatAt', ['8', null]], ['stepAt', ['2.5', '1/8']],
+  // A tap or a gap that is not a number above 0 is left out, and a pause that is not one is 2000.
+  ['tapTempo', [[1000, 'x', 1500, 0, 2000], 'x']], ['tapTempo', [[1000, 1500], -1]], ['clockTempo', [[20, 0, 21]]],
 ];
 
 test('ce.time\'s helpers say a number they cannot use as written, once, in the same words everywhere', async (t) => {
@@ -1438,7 +1459,10 @@ test('ce.time\'s helpers say a number they cannot use as written, once, in the s
     said('ce.time.beatsToMs: bpm is -5, which is not above 0, so the transport\'s tempo was used.'),
     said('ce.time.msToBeats: ms is true, which is not a number, so 0 was used.'),
     said('ce.time.msToBeats: bpm is "fast", which is not a number, so the transport\'s tempo was used.'),
-  ]);
+    said('ce.time.tap: "x" at position 2 of times is not a tap time in milliseconds above 0, so it was left out.'),
+    said('ce.time.tap: resetMs is "x", which is not a number, so 2000 was used.'),
+    said('ce.time.clockTempo: 0 at position 2 of intervalsMs is not a gap in milliseconds above 0, so it was left out.'),
+  ], 'the second tap\'s 0 and -1 are not said again');
   assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
   resetScriptStateForTesting();
 

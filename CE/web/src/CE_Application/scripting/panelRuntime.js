@@ -2285,13 +2285,16 @@ const helpers = {
   // argument's default.
   barBeatAt: (beats, beatsPerBar) => {
     const b = timeArg('barBeatAt', 'beats', beats);
+    if (b === undefined) return undefined;
     const signature = { beats: timeArg('barBeatAt', 'beatsPerBar', beatsPerBar), unit: 4 };
     return { ...panelBarBeat(b, signature), text: panelFormatBarBeat(b, signature) };
   },
   // Which step of the grid a position is on, counting from 0 at the transport origin.
   stepAt: (beats, division) => {
     const id = divisionId('ce.time.step', division);
-    return id === undefined ? undefined : panelStepAtBeat(timeArg('stepAt', 'beats', beats), id);
+    if (id === undefined) return undefined;
+    const b = timeArg('stepAt', 'beats', beats);
+    return b === undefined ? undefined : panelStepAtBeat(b, id);
   },
   // The step boundaries crossed between two readings — the never-lose-an-event rule every synced
   // follower in the panel runs on. A stalled frame must FIRE the steps it slept through rather than
@@ -2303,7 +2306,9 @@ const helpers = {
     const id = divisionId('ce.time.steps', division);
     if (id === undefined) return undefined;
     const from = timeArg('stepsBetween', 'from', fromBeats);
+    if (from === undefined) return undefined;
     const to = timeArg('stepsBetween', 'to', toBeats);
+    if (to === undefined) return undefined;
     return panelCrossedSteps(from, to, id, timeArg('stepsBetween', 'max', max));
   },
   // The panel's shuffle: every odd step pushed later by up to half a step. In BEATS, to add to a
@@ -2313,14 +2318,19 @@ const helpers = {
     const id = divisionId('ce.time.swing', division);
     if (id === undefined) return undefined;
     const s = timeArg('swingOffset', 'step', step);
-    return panelSwungBeatOffset(s, timeArg('swingOffset', 'amount', amount), id);
+    if (s === undefined) return undefined;
+    const a = timeArg('swingOffset', 'amount', amount);
+    if (a === undefined) return undefined;
+    return panelSwungBeatOffset(s, a, id);
   },
   // For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep.
   // Derived from the position, never accumulated, so a cycle running for an hour is still exactly
   // on the bar line. `length` is the cycle in beats; `count` is how many have completed.
   cycleAt: (beats, bars, beatsPerBar) => {
     const b = timeArg('cycleAt', 'beats', beats);
+    if (b === undefined) return undefined;
     const n = timeArg('cycleAt', 'bars', bars);
+    if (n === undefined) return undefined;
     const perBar = timeArg('cycleAt', 'beatsPerBar', beatsPerBar);
     return {
       phase: panelCyclePhaseAt(b, n, perBar),
@@ -2334,19 +2344,35 @@ const helpers = {
   // watching it for CHANGES knows a wrap happened without a wrap handler that can miss one.
   loopedBeats: (beats, startBeats, lengthBeats) => {
     const b = timeArg('loopedBeats', 'beats', beats);
+    if (b === undefined) return undefined;
     const start = timeArg('loopedBeats', 'startBeats', startBeats);
+    if (start === undefined) return undefined;
     const length = timeArg('loopedBeats', 'lengthBeats', lengthBeats);
+    if (length === undefined) return undefined;
     return { beats: panelLoopedBeats(b, start, length), pass: panelLoopCycleIndex(b, start, length) };
   },
   // Tempo from tap times, in the milliseconds nowMs() reports. Taps more than `resetMs` apart start
   // a NEW measurement rather than averaging across the pause — otherwise the first tap after a
   // break poisons it, which is what every hand-rolled tap tempo gets wrong. Nothing comes back from
   // fewer than two usable taps.
-  tapTempo: (times, resetMs) => panelTapTempo(times, resetMs == null ? 2000 : resetMs) ?? undefined,
+  tapTempo: (times, resetMs) => {
+    const list = timeList('ce.time.tap', 'times', 'a tap time in milliseconds', times);
+    if (list === undefined) return undefined;
+    // A pause that is not a number above 0 gave nothing (every gap was "after a pause") or 2000, in
+    // silence; it is 2000, said once.
+    const reset = realNumber(resetMs);
+    if (resetMs !== undefined && resetMs !== null && !(reset > 0)) {
+      timeSaid('tapTempo resetMs', `ce.time.tap: resetMs is ${shownValue(resetMs)}, which is ${reset === undefined ? 'not a number' : 'not above 0'}, so 2000 was used.`);
+    }
+    return panelTapTempo(list, reset > 0 ? reset : 2000) ?? undefined;
+  },
   // Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not
   // the mean: one late pulse from a USB hiccup drags an average around, and a wobbling BPM readout
   // is worse than a slightly stale one.
-  clockTempo: (intervalsMs) => panelClockTempo(intervalsMs) ?? undefined,
+  clockTempo: (intervalsMs) => {
+    const list = timeList('ce.time.clockTempo', 'intervalsMs', 'a gap in milliseconds', intervalsMs);
+    return list === undefined ? undefined : (panelClockTempo(list) ?? undefined);
+  },
 
 // @module ce.midi
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
@@ -5077,16 +5103,51 @@ function drawPaint(call, what, colour) {
 
 // ce.time's number arguments as the transport reads them (timeWords.js), with one not used as
 // written said once per call and argument: these run on every frame, and a line per frame would
-// bury the console. resetScriptState clears what has been said.
+// bury the console. resetScriptState clears what has been said. A required one left out is
+// rejected, and said every time: it was the default without a word.
 const timeNumberWarned = new Set();
 function timeArg(memberId, name, value) {
-  const { n, said } = timeNumber(memberId, name, value);
+  const { n, said, rejected } = timeNumber(memberId, name, value);
+  if (rejected) {
+    addScriptTrace('error', '', said);
+    return undefined;
+  }
   const key = `${memberId} ${name}`;
   if (said && !timeNumberWarned.has(key)) {
     timeNumberWarned.add(key);
     addScriptTrace('warn', '', `${said} This is said only the first time.`);
   }
   return n;
+}
+
+/** A line said once per key, as timeArg says its numbers. */
+function timeSaid(key, said) {
+  if (timeNumberWarned.has(key)) return;
+  timeNumberWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+
+/** ce.time.tap's times and ce.time.clockTempo's intervals: the numbers above 0 in `value`, or
+ *  undefined after saying that it is no list, or was left out. An item that is not a number above
+ *  0 is left out, and said once: every one of these was done in silence, and a list that was not
+ *  one gave no result as if the taps were too few. */
+function timeList(verb, name, what, value) {
+  if (value === undefined || value === null) {
+    addScriptTrace('error', '', `${verb}: ${name} was not given, so there is no answer.`);
+    return undefined;
+  }
+  if (typeof value !== 'object') {
+    addScriptTrace('error', '', `${verb}: ${name} is ${shownValue(value)}, not a list, so there is no answer.`);
+    return undefined;
+  }
+  const items = Array.isArray(value) ? value : Object.values(value);
+  const out = [];
+  items.forEach((item, i) => {
+    const n = realNumber(item);
+    if (n > 0) { out.push(n); return; }
+    timeSaid(`${verb} ${name}`, `${verb}: ${shownValue(item)} at position ${i + 1} of ${name} is not ${what} above 0, so it was left out.`);
+  });
+  return out;
 }
 
 // What ce.draw.stroke made of a dash, a cap or a join it could not draw as written (drawDash.js),
@@ -7240,7 +7301,11 @@ function beatsOf(call, value, { positive, outcome }) {
 /** startTimer as a script calls it: the interval checked, then armed. */
 function startTimer(id, ms) {
   const key = String(id ?? '');
-  if (!key) return;
+  if (!key) {
+    // Started nothing, in silence.
+    addScriptTrace('error', '', 'ce.time.startTimer: no id was given, so no timer was started.');
+    return;
+  }
   if (timeRefused(`ce.time.startTimer("${key}")`, ms,
     { unit: 'milliseconds', what: 'interval', positive: true, outcome: 'no timer was started' })) return;
   armTimer(key, ms);
@@ -7263,6 +7328,11 @@ function armTimer(key, ms) {
 
 function stopTimer(id) {
   const key = String(id ?? '');
+  if (!key) {
+    // Stopped nothing, in silence; an id that is not running is not a mistake, no id is.
+    addScriptTrace('error', '', 'ce.time.stopTimer: no id was given, so nothing was stopped.');
+    return;
+  }
   syncFollowers.delete(key);
   clearTimerHandle(key);
 }
@@ -7281,9 +7351,9 @@ function stopTimer(id) {
 let afterSeq = 0;
 const afterCallbacks = new Map();   // timer id -> the function to run once
 
-function afterFor(scriptId, ms, fn) {
+function afterFor(scriptId, ms, fn, verb = 'ce.time.after') {
   if (typeof fn !== 'function') {
-    addScriptTrace('error', scriptId ?? '', 'after(ms, fn) needs a function to run — nothing was scheduled');
+    addScriptTrace('error', scriptId ?? '', `${verb}: fn is ${shownValue(fn)}, not a function, so nothing was scheduled.`);
     return undefined;
   }
   afterSeq += 1;
@@ -7371,6 +7441,7 @@ const isPlayingRead = () => transportSnapshot().playing;
 // A bpm that is not above 0, or not a number, is the transport's tempo, and says so (timeArg).
 function beatsToMsRead(beats, bpm) {
   const b = timeArg('beatsToMs', 'beats', beats);
+  if (b === undefined) return undefined;
   const rate = timeArg('beatsToMs', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
   return b * 60000 / rate;
@@ -7378,6 +7449,7 @@ function beatsToMsRead(beats, bpm) {
 
 function msToBeatsRead(ms, bpm) {
   const m = timeArg('msToBeats', 'ms', ms);
+  if (m === undefined) return undefined;
   const rate = timeArg('msToBeats', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
   return m * rate / 60000;
@@ -7397,12 +7469,18 @@ function msToBeatsRead(ms, bpm) {
  */
 function syncTimerRead(id, beats, opts) {
   const key = String(id ?? '');
+  if (!key) {
+    // Started a timer called "", in silence.
+    addScriptTrace('error', '', 'ce.time.syncTimer: no id was given, so no timer was started.');
+    return;
+  }
   const length = beatsOf(`ce.time.syncTimer("${key}")`, beats, { positive: true, outcome: 'no timer was started' });
   if (length === undefined) return;
   const ms = beatsToMsRead(length);
   if (ms == null) {
-    addScriptTrace('log', '',
-      `syncTimer("${id}"): no tempo is being reported, so there is no interval to compute. `
+    // An error, as every rejection is: it was a plain line, and the call did nothing.
+    addScriptTrace('error', '',
+      `ce.time.syncTimer("${key}"): no tempo is being reported, so no timer was started. `
       + 'Use startTimer with a millisecond interval, or wait for onTransport.');
     return;
   }
@@ -7454,12 +7532,14 @@ function watchTempoForSyncTimers() {
  * says so rather than firing immediately.
  */
 function afterBeatsFor(scriptId, beats, fn) {
+  // fn first, in this call's name: it was said as after's, after the delay was read.
+  if (typeof fn !== 'function') return afterFor(scriptId, 0, fn, 'ce.time.afterBeats');
   const length = beatsOf('ce.time.afterBeats', beats, { positive: false, outcome: 'nothing was scheduled' });
   if (length === undefined) return undefined;
   const ms = beatsToMsRead(length);
   if (ms == null) {
-    addScriptTrace('log', scriptId ?? '',
-      'afterBeats(): no tempo is being reported, so there is no delay to compute. '
+    addScriptTrace('error', scriptId ?? '',
+      'ce.time.afterBeats: no tempo is being reported, so nothing was scheduled. '
       + 'Use after() with milliseconds, or wait for onTransport.');
     return undefined;
   }

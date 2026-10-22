@@ -45,7 +45,7 @@ export const MODULE_COST = {
   "ce.components.turing": { "javascript": 250, "lua": 250, "python": 250, "webview": 0 },
   "ce.core": { "javascript": 5044, "lua": 0, "python": 5024, "webview": 0 },
   "ce.device": { "javascript": 7573, "lua": 6814, "python": 7226, "webview": 34355 },
-  "ce.draw": { "javascript": 351, "lua": 351, "python": 351, "webview": 49003 },
+  "ce.draw": { "javascript": 351, "lua": 351, "python": 351, "webview": 50517 },
   "ce.image": { "javascript": 106, "lua": 106, "python": 106, "webview": 0 },
   "ce.math": { "javascript": 41032, "lua": 48398, "python": 41250, "webview": 44114 },
   "ce.midi": { "javascript": 31981, "lua": 30055, "python": 31066, "webview": 46145 },
@@ -53,7 +53,7 @@ export const MODULE_COST = {
   "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 56117 },
   "ce.storage": { "javascript": 9304, "lua": 17028, "python": 12794, "webview": 20981 },
   "ce.text": { "javascript": 84, "lua": 84, "python": 84, "webview": 0 },
-  "ce.time": { "javascript": 20296, "lua": 20961, "python": 20211, "webview": 20699 },
+  "ce.time": { "javascript": 23315, "lua": 23774, "python": 23248, "webview": 22848 },
   "ce.ui": { "javascript": 946, "lua": 731, "python": 716, "webview": 4026 },
 };
 

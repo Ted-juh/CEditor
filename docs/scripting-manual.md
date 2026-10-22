@@ -2013,9 +2013,26 @@ Helper functions for notes and harmony: note names and numbers, scales, chords, 
 
 Timers, and the musical clock. A timer runs your code later or repeatedly; the musical commands read the tempo and the song position, convert between beats and milliseconds, and help you step a sequence in time. Musical timing here is accurate to about a thirtieth of a second: right for lights, displays and stepping patterns, not for timing audio.
 
+- Beats are quarter notes; bars and beats count from 1, as musicians do.
+- A required value that is left out: rejected with a console error.
+- A number outside its range: the nearest end, with a console warning, the first time only.
+- A number that is not one: the fallback in its row, with a console warning, the first time only.
+- Number arguments also accept text that is a number, such as "500"; a timer's interval or delay does not.
+
 #### `ce.time.startTimer(id, ms)`
 
-Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.
+Start a repeating timer.
+
+Example: `startTimer("blink", 250)` runs onTimer with info.id "blink" every 250 ms.
+
+- `id` (text, required): The timer's name, as onTimer's info.id reports it.<br>Left out, or "": rejected with a console error.
+- `ms` (number, required): Interval in milliseconds.<br>Range: > 0.<br>Text, even "250", ≤ 0, or invalid: rejected with a console error.
+
+Good to know:
+
+- Runs onTimer each time, until `ce.time.stopTimer()` with the same id.
+- An id already running: restarted with the new interval; a `ce.time.syncTimer()` of that name becomes a millisecond one.
+- Returns no value; rejected with a console error: no timer is started.
 
 *Short name: `startTimer`.*
 
@@ -2025,7 +2042,17 @@ ce.time.startTimer("id", 250)
 
 #### `ce.time.after(ms, fn) -> id`
 
-Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs. 0 runs it as soon as the handler that asked has returned. A missing delay, text (even "1000") or a negative number schedules nothing and writes a message.
+Run a function once, after a delay.
+
+Example: `after(500, function() set("gate", 0) end)` sets gate to 0 half a second from now.
+
+- `ms` (number, required): Delay in milliseconds.<br>Range: ≥ 0.<br>0: as soon as the handler has returned.<br>Text, even "1000", < 0, or invalid: rejected with a console error.
+- `fn` (function, required): The function to run.<br>Not a function: rejected with a console error.
+
+Good to know:
+
+- Returns an id for `ce.time.stopTimer()`, which cancels it before it runs.
+- Rejected with a console error: nothing is scheduled, no result.
 
 *Short name: `after`.*
 
@@ -2044,7 +2071,17 @@ ce.time.after(250, function () {
 
 #### `ce.time.stopTimer(id)`
 
-Stop a timer started with `ce.time.startTimer()` or `ce.time.syncTimer()`, or cancel a `ce.time.after()` before it runs. Stopping an id that is not running does nothing and is not an error.
+Stop a timer, or cancel a one-off before it runs.
+
+Example: `stopTimer("blink")` stops the timer called blink.
+
+- `id` (text, required): The timer's name, or the id `after()` returned.<br>Left out, or "": rejected with a console error.
+
+Good to know:
+
+- Stops a `ce.time.startTimer()` or `ce.time.syncTimer()` timer, or cancels an `after()` or `afterBeats()` by the id it returned.
+- An id that is not running: nothing happens, and nothing is said.
+- Returns no value.
 
 *Short name: `stopTimer`.*
 
@@ -2054,7 +2091,13 @@ ce.time.stopTimer("id")
 
 #### `ce.time.tempo()`
 
-Return the current tempo in beats per minute, or nothing if nothing is supplying a tempo. Read it rather than assuming 120.
+Read the tempo in beats per minute.
+
+Example: `tempo()` gives 120 at 120 BPM.
+
+Good to know:
+
+- Returns the tempo; nothing supplying one: no result. Read it rather than assuming 120.
 
 *Short name: `tempo`.*
 
@@ -2069,7 +2112,13 @@ const bpm = ce.time.tempo() ?? 120;
 
 #### `ce.time.playing()`
 
-Return true while the transport is running. Returns false when it is stopped, and also when nothing is supplying a transport at all.
+Read whether the transport is running.
+
+Example: `ce.time.playing()` gives true while the transport runs.
+
+Good to know:
+
+- Returns true while running; stopped, or nothing supplying a transport: false.
 
 *Short name: `isPlaying`.*
 
@@ -2084,7 +2133,15 @@ if (ce.time.playing()) {  }
 
 #### `ce.time.transport()`
 
-Return everything about the transport in one table: `playing`, `bpm`, `beats`, `bar`, `beat`, `beatsPerBar`, `source` and `valid`. `beats` counts quarter notes from the very start (bar 1, beat 1), and `bar` and `beat` count from 1, as musicians do. `source` says what is driving the clock. If `valid` is false, nothing is supplying a position and the other values are only defaults, not real readings.
+Read the whole transport state in one table.
+
+Example: `ce.time.transport().bar` gives the current bar, counted from 1.
+
+Good to know:
+
+- Returns { playing, bpm, beats, bar, beat, beatsPerBar, source, valid }.
+- `beats` counts quarter notes from the start (bar 1, beat 1); `bar` and `beat` count from 1.
+- `source` names what drives the clock. `valid` false: nothing supplies a position, and the rest are defaults.
 
 *Short name: `transportInfo`.*
 
@@ -2101,7 +2158,17 @@ if (t.valid) log("bar " + t.bar);
 
 #### `ce.time.beatsToMs(beats [, bpm])`
 
-Convert a number of beats to milliseconds at the current tempo, or at `bpm` if you give one. Returns nothing if there is no tempo to work from.
+Convert beats to milliseconds.
+
+Example: `beatsToMs(0.75)` gives 375 at 120 BPM.
+
+- `beats` (number, required): Length in beats (quarter notes).<br>Invalid: 0.
+- `bpm` (number, optional): Tempo to convert at.<br>Range: > 0.<br>Left out, ≤ 0, or invalid: the transport's tempo.
+
+Good to know:
+
+- Returns milliseconds; no tempo to work from: no result.
+- Rejected with a console error: no result.
 
 *Short name: `beatsToMs`.*
 
@@ -2116,7 +2183,17 @@ set("delayTime", ce.time.beatsToMs(0.75));
 
 #### `ce.time.msToBeats(ms [, bpm])`
 
-Convert a length of time in milliseconds to beats (quarter notes) at the current tempo, or at `bpm` if you give one — the reverse of `ce.time.beatsToMs()`. Returns nothing if there is no tempo to work from.
+Convert milliseconds to beats.
+
+Example: `msToBeats(500)` gives 1 at 120 BPM.
+
+- `ms` (number, required): Length in milliseconds.<br>Invalid: 0.
+- `bpm` (number, optional): Tempo to convert at.<br>Range: > 0.<br>Left out, ≤ 0, or invalid: the transport's tempo.
+
+Good to know:
+
+- Returns beats (quarter notes); no tempo to work from: no result.
+- Rejected with a console error: no result.
 
 *Short name: `msToBeats`.*
 
@@ -2131,7 +2208,19 @@ const beats = ce.time.msToBeats(500);
 
 #### `ce.time.syncTimer(id, beats [, opts])`
 
-Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division's name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.
+Start a repeating timer with an interval in beats.
+
+Example: `syncTimer("step", 0.25)` runs onTimer with info.id "step" every sixteenth note.
+
+- `id` (text, required): The timer's name, as onTimer's info.id reports it.<br>Left out, or "": rejected with a console error.
+- `beats` (number or text, required): Interval in beats, or a division name such as "1/16" or "1/8T" (any case).<br>Range: > 0.<br>Text that is not a division, ≤ 0, or invalid: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: the interval follows the tempo.
+
+Good to know:
+
+- Works as `ce.time.startTimer()`: onTimer each time, `ce.time.stopTimer()` stops it.
+- A tempo change changes the interval, and restarts the timer from that moment.
+- Returns no value; rejected with a console error, or no tempo to work from: no timer is started.
 
 *Short name: `syncTimer`.*
 
@@ -2139,7 +2228,7 @@ Start a repeating timer whose interval is measured in beats rather than millisec
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `follow` | true or false | true | Change the interval when the tempo changes. false keeps the interval the tempo gave it when it started. |
+| `follow` | true or false | true | Follow the tempo: the interval changes with it.<br>false: the interval stays as the tempo at the start gave it.<br>Invalid: true. |
 
 ```lua
 -- Lua
@@ -2152,7 +2241,17 @@ ce.time.syncTimer("step", 0.25);
 
 #### `ce.time.afterBeats(beats, fn) -> id`
 
-Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. `beats` may also be a division's name, such as "1/4", read as `ce.time.division()` reads it; 0 runs `fn` as soon as the handler has returned. A negative number, a name that is not a division, or no delay at all schedules nothing and writes a message. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.
+Run a function once, after a number of beats.
+
+Example: `afterBeats(2, fn)` runs fn two beats from now.
+
+- `beats` (number or text, required): Delay in beats, or a division name such as "1/4" (any case).<br>Range: ≥ 0.<br>0: as soon as the handler has returned.<br>Text that is not a division, < 0, or invalid: rejected with a console error.
+- `fn` (function, required): The function to run.<br>Not a function: rejected with a console error.
+
+Good to know:
+
+- The delay is worked out from the tempo at the call; a later tempo change does not move it.
+- Returns an id for `ce.time.stopTimer()`; rejected with a console error, or no tempo to work from: nothing is scheduled, no result.
 
 *Short name: `afterBeats`.*
 
@@ -2171,7 +2270,14 @@ ce.time.afterBeats(2, () => {
 
 #### `ce.time.timers() -> list`
 
-List the ids of the repeating timers that are running — the ones started with `ce.time.startTimer()` or `ce.time.syncTimer()` — in sorted order. One-off timers from `ce.time.after()` and `ce.time.afterBeats()` are not listed; you already have their ids from when you started them.
+List the repeating timers that are running.
+
+Example: `ce.time.timers()` gives {"blink", "step"} with those two running.
+
+Good to know:
+
+- Returns the ids of `ce.time.startTimer()` and `ce.time.syncTimer()` timers, sorted.
+- One-off timers from `after()` and `afterBeats()` are not listed: their ids were returned when they were started.
 
 *Short name: `runningTimers`.*
 
@@ -2186,11 +2292,13 @@ for (const id of ce.time.timers()) log(id);
 
 #### `ce.time.now() -> number`
 
-A clock in milliseconds, for measuring how long something takes.
+Read a clock in milliseconds, for measuring how long something takes.
+
+Example: `ce.time.now() - t0` gives the milliseconds since t0 was read.
 
 Good to know:
 
-- One reading alone means nothing: subtract an earlier reading to find how much time has passed.
+- Returns milliseconds. One reading alone means nothing: subtract an earlier reading to find how much time has passed.
 - It is not the time of day or a date, and it does not jump when the computer's clock is changed.
 
 *Short name: `nowMs`.*
@@ -2206,7 +2314,16 @@ const t0 = ce.time.now();
 
 #### `ce.time.division(name) -> number`
 
-Return how many beats a note division lasts: "1/16" is 0.25, "1/8T" is 0.333… and "1/4D" is 1.5. These are the same names the sequencer components use for their division settings, and capitals do not matter ("1/8t" is "1/8T"). A name it does not recognise returns nothing and writes a message listing the divisions.
+Convert a note division to beats.
+
+Example: `ce.time.division("1/16")` gives 0.25.
+
+- `name` (text, required): A division name: "1/16", "1/8T", "1/4D".<br>Any case.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The names the sequencer components use: "1/1" to "1/32", "D" dotted, "T" triplet; any case.
+- Returns beats; not a division: rejected with a console error, no result.
 
 *Short name: `beatsPerDivision`.*
 
@@ -2221,7 +2338,13 @@ const beats = ce.time.division("1/16");
 
 #### `ce.time.divisions() -> list`
 
-List every note division available, in the order a division menu shows them. Each entry has an `id` such as "1/16", a display `label` such as "16th", and its length in `beats`. Build your menus from this list instead of typing the names in by hand.
+List every note division.
+
+Example: `ce.time.divisions()` gives 14 entries, "1/1" first.
+
+Good to know:
+
+- Returns { id, label, beats } per division, in menu order: "1/16", "16th", 0.25.
 
 *Short name: `divisionNames`.*
 
@@ -2236,7 +2359,17 @@ for (const d of ce.time.divisions()) log(d.label);
 
 #### `ce.time.position(beats [, beatsPerBar]) -> table`
 
-Turn a position in beats into bars, beats and ticks — for any position, not only where the transport is now. Returns `bar`, `beat`, `tick` and `text`. Bars and beats count from 1, and `tick` splits each beat into 24 parts (0 to 23), the same resolution as MIDI clock. `text` is written the way the Transport component displays it, such as "3.2.00". `beatsPerBar` defaults to 4.
+Convert a position in beats to bar, beat and tick.
+
+Example: `ce.time.position(4.5)` gives bar 2, beat 1, tick 12, text "2.1.12".
+
+- `beats` (number, required): Position in beats from the start.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `beatsPerBar` (number, optional): Beats in a bar.<br>Range: ≥ 1.<br>Default: 4.<br>< 1: 1.<br>Invalid: default.
+
+Good to know:
+
+- Returns { bar, beat, tick, text }: bars and beats from 1, ticks 0 ↔ 23 (24 per beat, as MIDI clock), text as the Transport shows it.
+- Rejected with a console error: no result.
 
 *Short name: `barBeatAt`.*
 
@@ -2251,43 +2384,124 @@ log(ce.time.position(transportInfo().beats).text);
 
 #### `ce.time.step(beats, division) -> number`
 
-Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Capitals in `division` do not matter; a name it does not recognise returns nothing and writes a message.
+Find which step of a note grid a position is on.
+
+Example: `ce.time.step(2.5, "1/16")` gives 10.
+
+- `beats` (number, required): Position in beats from the start.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `division` (text, required): A division name, as `ce.time.division()` reads it.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Steps count from 0 at the start.
+- Returns the step; rejected with a console error: no result.
 
 *Short name: `stepAt`.*
 
 #### `ce.time.steps(from, to, division [, max]) -> table`
 
-Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. An unknown division returns nothing and writes a message.
+Find the grid steps that start between two positions.
+
+Example: `ce.time.steps(0, 1, "1/16")` gives steps {1, 2, 3, 4}, dropped 0.
+
+- `from` (number, required): Position in beats from the start.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `to` (number, required): Position in beats from the start.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `division` (text, required): A division name, as `ce.time.division()` reads it.<br>Invalid: rejected with a console error.
+- `max` (number, optional): Most steps returned.<br>Range: ≥ 1, whole.<br>Default: 16.<br>A fraction: rounded.<br>< 1: 1.<br>Invalid: default.
+
+Good to know:
+
+- Returns { steps, dropped }: the steps after from, up to and including to, and how many were left out.
+- More than max crossed: the most recent are kept, the rest counted in dropped. Use it to catch up after a late update.
+- Rejected with a console error: no result.
 
 *Short name: `stepsBetween`.*
 
 #### `ce.time.swing(step, amount, division) -> number`
 
-Return how far to delay a step to give it swing, in beats — add it to the step's position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport's swing setting holds. It uses the Transport's own swing calculation, so your timing matches the panel's sequencers. An unknown division returns nothing and writes a message.
+Find how far to delay a step for swing, in beats.
+
+Example: `ce.time.swing(1, 0.5, "1/16")` gives 0.0625: step 1 is delayed a quarter of a step.
+
+- `step` (number, required): Step number.<br>A fraction: rounded.<br>Invalid: 0.
+- `amount` (number, required): Swing amount.<br>Range: 0 ↔ 1 (0: straight; 1: half a step).<br>Outside the range: the nearest end.<br>Invalid: 0.
+- `division` (text, required): A division name, as `ce.time.division()` reads it.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Even steps (0, 2, 4…) stay; odd steps are delayed by up to half a step. Add it to the step's position.
+- The Transport's own calculation, so a script's timing matches the panel's sequencers.
+- Rejected with a console error: no result.
 
 *Short name: `swingOffset`.*
 
 #### `ce.time.cycle(beats, bars [, beatsPerBar]) -> table`
 
-Find where a position falls within a cycle that repeats every `bars` bars (0.25 to 64). Returns `phase`, how far through the current cycle you are, from 0 to 1; `count`, how many whole cycles have finished; and `length`, the cycle's length in beats. It is worked out fresh from the position each time rather than added up as it goes, so it does not drift, even after hours.
+Find where a position falls in a cycle of bars.
+
+Example: `ce.time.cycle(6, 1)` gives phase 0.5, count 1, length 4.
+
+- `beats` (number, required): Position in beats from the start.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `bars` (number, required): Cycle length in bars.<br>Range: 0.25 ↔ 64.<br>Outside the range: the nearest end.<br>Invalid: 0.25.
+- `beatsPerBar` (number, optional): Beats in a bar.<br>Range: ≥ 1.<br>Default: 4.<br>< 1: 1.<br>Invalid: default.
+
+Good to know:
+
+- Returns { phase, count, length }: 0 ↔ 1 through the current cycle, whole cycles finished, and the cycle in beats.
+- Worked out from the position each time, so it does not drift.
+- Rejected with a console error: no result.
 
 *Short name: `cycleAt`.*
 
 #### `ce.time.looped(beats, startBeats, lengthBeats) -> table`
 
-Map a position on the timeline into a loop that starts at `startBeats` and lasts `lengthBeats`. Returns `beats`, the position inside the loop, and `pass`, which time round the loop you are on, counting from 0. Positions before the loop start come back unchanged with `pass` set to -1, so a count-in or lead-in works. When `pass` changes, the loop has just wrapped round. Like `ce.time.cycle()`, it is worked out fresh from the position each time, so it does not drift over long runs.
+Fold a position into a loop.
+
+Example: `ce.time.looped(13, 4, 8)` gives beats 5, pass 1.
+
+- `beats` (number, required): Position in beats from the start.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `startBeats` (number, required): Loop start in beats.<br>Range: ≥ 0.<br>< 0: 0.<br>Invalid: 0.
+- `lengthBeats` (number, required): Loop length in beats.<br>Range: ≥ 0.01.<br>< 0.01: 0.01.<br>Invalid: 0.01.
+
+Good to know:
+
+- Returns { beats, pass }: the position inside the loop, and which time round, from 0.
+- Before the loop start: the position unchanged, pass -1, so a count-in works.
+- Worked out from the position each time, so it does not drift; a change of pass is a wrap.
+- Rejected with a console error: no result.
 
 *Short name: `loopedBeats`.*
 
 #### `ce.time.tap(times [, resetMs]) -> number`
 
-Work out a tempo from a list of tap times, in milliseconds as `ce.time.now()` gives them. Only the taps since the last pause count: a gap longer than `resetMs` (2000 by default) starts a new measurement, so taps after a break are not averaged with the ones before it. Returns nothing if there are fewer than two usable taps. The result is kept between 20 and 300 bpm.
+Work out a tempo from tap times.
+
+Example: `ce.time.tap({1000, 1500, 2000, 2500})` gives 120.
+
+- `times` (list, required): A list of tap times in milliseconds, as `ce.time.now()` gives them.<br>An item that is not a number above 0: left out.<br>Not a list: rejected with a console error.
+- `resetMs` (number, optional): Gap that starts a new measurement, in milliseconds.<br>Range: > 0.<br>Default: 2000.<br>≤ 0, or invalid: default.
+
+Good to know:
+
+- Only the taps since the last pause count: a gap longer than resetMs starts a new measurement.
+- Returns BPM, 20 ↔ 300; fewer than two usable taps: no result.
+- Rejected with a console error: no result.
 
 *Short name: `tapTempo`.*
 
 #### `ce.time.clockTempo(intervalsMs) -> number`
 
-Work out the tempo from the gaps between incoming MIDI clock pulses, which arrive 24 times per beat — for example the times between `0xF8` messages you collected with `ce.midi.interceptIn()`. It uses the middle value of the gaps (the median), so one late pulse does not throw the result off. Returns nothing from an empty list. The result is kept between 20 and 300 bpm.
+Work out a tempo from the gaps between MIDI clock pulses.
+
+Example: `ce.time.clockTempo({20.8, 20.8, 20.9})` gives 120.
+
+- `intervalsMs` (list, required): A list of gaps in milliseconds.<br>An item that is not a number above 0: left out.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- 24 pulses per beat, as between the 0xF8 messages `ce.midi.interceptIn()` sees; the median gap, so one late pulse does not move the result.
+- Returns BPM, 20 ↔ 300; an empty list: no result.
+- Rejected with a console error: no result.
 
 *Short name: `clockTempo`.*
 

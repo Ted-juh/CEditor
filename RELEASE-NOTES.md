@@ -119,6 +119,23 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   `ce.draw.redraw` with a control name the panel does not have names it; it said "no control to
   redraw", which reads as the script's attachment being wrong when its spelling is.
 
+**Scripts written for an earlier build: `ce.time` says more, in every language.**
+
+- A musical helper with a number it cannot do without left out (`ce.time.position()`,
+  `ce.time.beatsToMs()`, `ce.time.swing(1)`) writes an error to the console and returns nothing.
+  It used the default without a word: bar 1, 0 ms, no swing. `beatsPerBar`, `max` and `bpm` keep
+  their defaults, and say nothing.
+- `ce.time.startTimer` and `ce.time.syncTimer` with no id, or "", write an error and start nothing;
+  `syncTimer` started a timer called "". `ce.time.stopTimer` with no id writes an error; an id that
+  is not running is still not a mistake.
+- `ce.time.after` and `ce.time.afterBeats` with something that is not a function write an error
+  that names the call; it was a plain line in `after`'s words for both. With no tempo to work from,
+  `syncTimer` and `afterBeats` write an error, where it was a plain line: the call did nothing.
+- `ce.time.tap` and `ce.time.clockTempo` with a list that is not one write an error; they returned
+  nothing as if the taps were too few. An item that is not a number above 0 is left out with a
+  warning, and a `resetMs` that is not a number above 0 is 2000 with a warning; both were silent,
+  and a `resetMs` of 0 or below made every gap "after a pause".
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

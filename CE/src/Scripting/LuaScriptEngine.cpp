@@ -2493,11 +2493,11 @@ function isPlaying() return __transport().playing == true end
 -- argument: what is used for one that is not a number, the least and the most it is read as, and
 -- whether it is rounded first; a bpm falls back to the transport's tempo.
 local __TIME_NUMBERS = {
-  barBeatAt = { "ce.time.position", { beats = { fallback = 0, min = 0 }, beatsPerBar = { fallback = 4, min = 1 } } },
+  barBeatAt = { "ce.time.position", { beats = { fallback = 0, min = 0 }, beatsPerBar = { fallback = 4, min = 1, optional = true } } },
   stepAt = { "ce.time.step", { beats = { fallback = 0, min = 0 } } },
-  stepsBetween = { "ce.time.steps", { from = { fallback = 0, min = 0 }, to = { fallback = 0, min = 0 }, max = { fallback = 16, min = 1, round = true } } },
+  stepsBetween = { "ce.time.steps", { from = { fallback = 0, min = 0 }, to = { fallback = 0, min = 0 }, max = { fallback = 16, min = 1, round = true, optional = true } } },
   swingOffset = { "ce.time.swing", { step = { fallback = 0 }, amount = { fallback = 0, min = 0, max = 1 } } },
-  cycleAt = { "ce.time.cycle", { beats = { fallback = 0, min = 0 }, bars = { fallback = 0.25, min = 0.25, max = 64 }, beatsPerBar = { fallback = 4, min = 1 } } },
+  cycleAt = { "ce.time.cycle", { beats = { fallback = 0, min = 0 }, bars = { fallback = 0.25, min = 0.25, max = 64 }, beatsPerBar = { fallback = 4, min = 1, optional = true } } },
   loopedBeats = { "ce.time.looped", { beats = { fallback = 0, min = 0 }, startBeats = { fallback = 0, min = 0 }, lengthBeats = { fallback = 0.01, min = 0.01 } } },
   beatsToMs = { "ce.time.beatsToMs", { beats = { fallback = 0 }, bpm = { tempo = true } } },
   msToBeats = { "ce.time.msToBeats", { ms = { fallback = 0 }, bpm = { tempo = true } } },
@@ -2507,8 +2507,12 @@ local function __tread(fn, name, v)
   local helper = __TIME_NUMBERS[fn]
   local s = helper[2][name]
   if v == nil then
+    -- An argument the helper cannot do without, left out, is rejected: it was the default without
+    -- a word (position() was bar 1).
     if s.tempo then return nil end
-    return s.fallback
+    if s.optional then return s.fallback end
+    logError(helper[1] .. ": " .. name .. " was not given, so there is no answer.")
+    return nil
   end
   local read = __realNumber(v)
   local n, why, used
@@ -2537,12 +2541,14 @@ end
 -- gave nothing here, where the WebView used the tempo, and "fast" raised an error.
 function beatsToMs(beats, bpm)
   local b = __tread("beatsToMs", "beats", beats)
+  if b == nil then return nil end
   local rate = __tread("beatsToMs", "bpm", bpm) or tempo()
   if rate == nil or rate <= 0 then return nil end
   return b * 60000 / rate
 end
 function msToBeats(ms, bpm)
   local m = __tread("msToBeats", "ms", ms)
+  if m == nil then return nil end
   local rate = __tread("msToBeats", "bpm", bpm) or tempo()
   if rate == nil or rate <= 0 then return nil end
   return m * rate / 60000
@@ -2597,7 +2603,10 @@ local function __armTimer(key, ms)
 end
 function startTimer(id, ms)
   local key = tostring(id == nil and "" or id)
-  if key == "" then return end
+  if key == "" then
+    logError("ce.time.startTimer: no id was given, so no timer was started.")
+    return
+  end
   if __timeRefused('ce.time.startTimer("' .. key .. '")', ms, "milliseconds", "interval", true, "no timer was started") then
     return
   end
@@ -2605,6 +2614,10 @@ function startTimer(id, ms)
 end
 function stopTimer(id)
   local key = tostring(id == nil and "" or id)
+  if key == "" then
+    logError("ce.time.stopTimer: no id was given, so nothing was stopped.")
+    return
+  end
   __syncFollow[key] = nil
   __timerIds[key] = nil
   __hostStopTimer(key)
@@ -2627,11 +2640,15 @@ end
 -- that is permanently at the wrong rate.
 function syncTimer(id, beats, opts)
   local key = tostring(id == nil and "" or id)
+  if key == "" then
+    logError("ce.time.syncTimer: no id was given, so no timer was started.")
+    return
+  end
   local length = __beatsOf('ce.time.syncTimer("' .. key .. '")', beats, true, "no timer was started")
   if length == nil then return end
   local ms = beatsToMs(length)
   if ms == nil then
-    log("syncTimer(\"" .. tostring(id) .. "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
+    logError('ce.time.syncTimer("' .. key .. '"): no tempo is being reported, so no timer was started. Use startTimer with a millisecond interval, or wait for onTransport.')
     return
   end
   __armTimer(key, ms)                                     -- clears any previous follow…
@@ -2677,7 +2694,7 @@ function __oneShot(ms, fn)
 end
 function after(ms, fn)
   if type(fn) ~= "function" then
-    log("after(ms, fn) needs a function to run — nothing was scheduled")
+    logError("ce.time.after: fn is " .. __shownValue(fn) .. ", not a function, so nothing was scheduled.")
     return nil
   end
   if __timeRefused("ce.time.after", ms, "milliseconds", "delay", false, "nothing was scheduled") then return nil end
@@ -2700,11 +2717,15 @@ end)
 -- had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 -- fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 function afterBeats(beats, fn)
+  if type(fn) ~= "function" then
+    logError("ce.time.afterBeats: fn is " .. __shownValue(fn) .. ", not a function, so nothing was scheduled.")
+    return nil
+  end
   local length = __beatsOf("ce.time.afterBeats", beats, false, "nothing was scheduled")
   if length == nil then return nil end
   local ms = beatsToMs(length)
   if ms == nil then
-    log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
+    logError("ce.time.afterBeats: no tempo is being reported, so nothing was scheduled. Use after() with milliseconds, or wait for onTransport.")
     return nil
   end
   return after(ms, fn)
@@ -2758,6 +2779,7 @@ end
 -- beats count from 1 as musicians do; `text` is the Transport component's own readout.
 function barBeatAt(beats, beatsPerBar)
   local b = __tread("barBeatAt", "beats", beats)
+  if b == nil then return nil end
   local perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar)
   local bar = math.floor(b / perBar) + 1
   local beat = math.floor(b % perBar) + 1
@@ -2769,7 +2791,9 @@ end
 function stepAt(beats, division)
   local per = __division("ce.time.step", division)
   if per == nil then return nil end
-  return math.floor(__tread("stepAt", "beats", beats) / per)
+  local b = __tread("stepAt", "beats", beats)
+  if b == nil then return nil end
+  return math.floor(b / per)
 end
 
 -- The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
@@ -2780,7 +2804,9 @@ function stepsBetween(fromBeats, toBeats, division, maxSteps)
   local per = __division("ce.time.steps", division)
   if per == nil then return nil end
   local from = __tread("stepsBetween", "from", fromBeats)
+  if from == nil then return nil end
   local to = __tread("stepsBetween", "to", toBeats)
+  if to == nil then return nil end
   local cap = __tread("stepsBetween", "max", maxSteps)
   if to <= from then return { steps = {}, dropped = 0 } end
   local first = math.floor(from / per) + 1
@@ -2799,7 +2825,9 @@ function swingOffset(step, amount, division)
   local per = __division("ce.time.swing", division)
   if per == nil then return nil end
   local n = __tread("swingOffset", "step", step)
+  if n == nil then return nil end
   local s = __tread("swingOffset", "amount", amount)
+  if s == nil then return nil end
   if math.abs(math.floor(n + 0.5)) % 2 == 1 then return s * 0.5 * per end
   return 0
 end
@@ -2808,7 +2836,9 @@ end
 -- never accumulated, so a cycle running for an hour is still exactly on the bar line.
 function cycleAt(beats, bars, beatsPerBar)
   local b = __tread("cycleAt", "beats", beats)
+  if b == nil then return nil end
   local n = __tread("cycleAt", "bars", bars)
+  if n == nil then return nil end
   local len = n * __tread("cycleAt", "beatsPerBar", beatsPerBar)
   if len < 0.01 then len = 0.01 end
   return { phase = ((b / len) % 1 + 1) % 1, count = math.floor(b / len), length = len }
@@ -2819,8 +2849,11 @@ end
 -- reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 function loopedBeats(beats, startBeats, lengthBeats)
   local b = __tread("loopedBeats", "beats", beats)
+  if b == nil then return nil end
   local st = __tread("loopedBeats", "startBeats", startBeats)
+  if st == nil then return nil end
   local len = __tread("loopedBeats", "lengthBeats", lengthBeats)
+  if len == nil then return nil end
   if b < st then return { beats = b, pass = -1 } end
   return { beats = st + ((b - st) % len), pass = math.floor((b - st) / len) }
 end
@@ -2828,12 +2861,47 @@ end
 -- Tempo from tap times, in the milliseconds nowMs() reports. Taps more than resetMs apart start a
 -- NEW measurement rather than averaging across the pause — the thing every hand-rolled tap gets
 -- wrong, because the first tap after a break poisons the average.
+-- The times, and clockTempo's gaps, are the numbers above 0 in a list, with one that is not said
+-- once; a list that is not one, or left out, is refused. Each was done in silence, and a list that
+-- was not one gave no result as if the taps were too few.
+local function __timeList(verb, name, what, value)
+  if value == nil then
+    logError(verb .. ": " .. name .. " was not given, so there is no answer.")
+    return nil
+  end
+  if type(value) ~= "table" then
+    logError(verb .. ": " .. name .. " is " .. __shownValue(value) .. ", not a list, so there is no answer.")
+    return nil
+  end
+  local out = {}
+  for i = 1, #value do
+    local n = __realNumber(value[i])
+    if n ~= nil and n > 0 then
+      out[#out + 1] = n
+    else
+      local key = verb .. " " .. name
+      if not __timeWarned[key] then
+        __timeWarned[key] = true
+        logWarn(verb .. ": " .. __shownValue(value[i]) .. " at position " .. tostring(i) .. " of " .. name .. " is not " .. what
+          .. " above 0, so it was left out. This is said only the first time.")
+      end
+    end
+  end
+  return out
+end
 function tapTempo(timestamps, resetMs)
-  if type(timestamps) ~= "table" then return nil end
-  local list = {}
-  for i = 1, #timestamps do local v = __tnum(timestamps[i], 0) if v > 0 then list[#list + 1] = v end end
+  local list = __timeList("ce.time.tap", "times", "a tap time in milliseconds", timestamps)
+  if list == nil then return nil end
+  -- A pause that is not a number above 0 gave nothing (every gap was "after a pause") or 2000, in
+  -- silence; it is 2000, said once.
+  local reset = __realNumber(resetMs)
+  if resetMs ~= nil and not (reset ~= nil and reset > 0) and not __timeWarned["tapTempo resetMs"] then
+    __timeWarned["tapTempo resetMs"] = true
+    logWarn("ce.time.tap: resetMs is " .. __shownValue(resetMs) .. ", which is " .. (reset == nil and "not a number" or "not above 0")
+      .. ", so 2000 was used. This is said only the first time.")
+  end
   if #list < 2 then return nil end
-  local limit = __tnum(resetMs, 2000)
+  local limit = (reset ~= nil and reset > 0) and reset or 2000
   local sum, count = 0, 0
   for i = #list, 2, -1 do
     local gap = list[i] - list[i - 1]
@@ -2848,10 +2916,8 @@ end
 -- mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse
 -- than a slightly stale one.
 function clockTempo(intervalsMs)
-  if type(intervalsMs) ~= "table" then return nil end
-  local list = {}
-  for i = 1, #intervalsMs do local v = __tnum(intervalsMs[i], 0) if v > 0 then list[#list + 1] = v end end
-  if #list == 0 then return nil end
+  local list = __timeList("ce.time.clockTempo", "intervalsMs", "a gap in milliseconds", intervalsMs)
+  if list == nil or #list == 0 then return nil end
   table.sort(list)
   local mid = math.floor(#list / 2)
   local median
