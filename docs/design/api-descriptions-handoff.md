@@ -618,10 +618,12 @@ Next in the table: `ce.components.lcd` (37 descriptions, 22 that need the most w
 
 ### The branch
 
-On `ccr-d7809877-w74329`, pushed, not merged, no pull request: `ae59f63` (type labels), `ed09bc6`
-(`ce.anim.to` and the timing options), `b759a41` (hover card and hint by path), `adf0367` (the two
-ce.anim rejections), and this handoff. The owner merges through a pull request when asked, after
-screenshots.
+Everything above is on `main`, merged through three pull requests the owner asked for and merged
+when CI was green: #63 (`ce.anim`, the type labels, the hover card and hint by path), #65
+(`ce.draw`) and #66 (`ce.time`). After each merge the session's branch, `ccr-d7809877-w74329`,
+was rebuilt from `main`, so it carries nothing that `main` does not. The owner merges through a
+pull request when asked; "Merge and then next module" was the standing instruction for these
+three.
 
 Still deferred from `ce.midi`, by the owner's choice: the older helpers' silent wrong answers
 (`to7bit(20000, 2)`, `to14bit(20000)`, `fromNibbles(16, 0)`, `nibblize({300})`, `denibblize` with
