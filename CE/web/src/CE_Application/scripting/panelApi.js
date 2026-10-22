@@ -1496,12 +1496,17 @@ export const COMMANDS = [
   },
   {
     id: 'drawRect', category: 'Drawing', signature: 'drawRect(x, y, w, h [, radius])',
-    summary: 'Draw a rectangle at (`x`, `y`), `w` wide and `h` tall, measured from the control\'s top-left corner. `radius` rounds the corners.',
+    summary: 'Draw a rectangle.',
+    example: '`drawRect(10, 10, 40, 20, 4)` draws a 40 × 20 rectangle at (10, 10) with rounded corners.',
+    notes: [
+      'Drawn with the fill and stroke in force.',
+      'Returns true; no control to draw on: rejected with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x', type: 'number', required: true, kind: 'number' }, { name: 'y', type: 'number', required: true, kind: 'number' },
-      { name: 'w', type: 'number', required: true, kind: 'number' }, { name: 'h', type: 'number', required: true, kind: 'number' },
-      { name: 'radius', type: 'number', required: false, kind: 'number' },
+      { name: 'x', type: 'number', required: true, kind: 'number', summary: 'Left edge, in pixels from the control\'s left.' }, { name: 'y', type: 'number', required: true, kind: 'number', summary: 'Top edge, in pixels from the control\'s top.' },
+      { name: 'w', type: 'number', required: true, kind: 'number', summary: 'Width in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' }, { name: 'h', type: 'number', required: true, kind: 'number', summary: 'Height in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
+      { name: 'radius', type: 'number', required: false, kind: 'number', summary: 'Corner radius in pixels.\nRange: ≥ 0.\nDefault: 0.\n< 0, or invalid: 0.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.rect(${1:0}, ${2:0}, ${3:40}, ${4:20})$0', javascript: 'ce.draw.rect(${1:0}, ${2:0}, ${3:40}, ${4:20});$0' },

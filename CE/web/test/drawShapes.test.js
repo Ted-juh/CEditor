@@ -37,6 +37,38 @@ function run(fn) {
 const PANEL = { controls: [createControl('Knob', { name: 'K' })] };
 const callOf = (src, ctx = { panel: PANEL, selfControl: 'K' }) => readStatement(src, 'lua', src.indexOf('(') + 1, ctx).calls[0];
 
+test('a size below 0 is 0 and said once; a required argument left out is rejected', () => {
+  // Both were silent: a rect -10 wide drew nothing, and drawRect(0, 0) drew a 0 × 0 rect at the
+  // corner. The owner's two decisions on ce.draw.rect, for every shape command.
+  const { lines } = run((api) => {
+    assert.equal(api.drawRect(0, 0, -10, 5), true);
+    api.drawRect(0, 0, -10, 5);
+    api.drawCircle(5, 5, -3);
+    assert.equal(api.drawRect(0, 0), false);
+    assert.equal(api.drawCircle(5, 5), false);
+    assert.equal(api.drawLine(0, 0, 10), false);
+    assert.equal(api.drawArc(5, 5, 4, 0), false);
+    assert.equal(api.drawEllipse(5, 5, 4), false);
+    assert.equal(api.drawPolygon(5, 5, 4), false);
+    assert.equal(api.drawText(0, 10), false);
+    assert.equal(api.drawPixelText('A', 0), false);
+    assert.equal(api.drawImage('data:image/png;base64,AAAA', 0, 0, 10), false);
+  });
+  assert.deepEqual(lines, [
+    `ce.draw.rect: w is -10, which is less than 0, so 0 was used.${ONCE}`,
+    `ce.draw.circle: r is -3, which is less than 0, so 0 was used.${ONCE}`,
+    'ce.draw.rect: w was not given, so nothing was drawn.',
+    'ce.draw.circle: r was not given, so nothing was drawn.',
+    'ce.draw.line: y2 was not given, so nothing was drawn.',
+    'ce.draw.arc: to was not given, so nothing was drawn.',
+    'ce.draw.ellipse: ry was not given, so nothing was drawn.',
+    'ce.draw.polygon: sides was not given, so nothing was drawn.',
+    'ce.draw.text: text was not given, so nothing was drawn.',
+    'ce.draw.pixelText: y was not given, so nothing was drawn.',
+    'ce.draw.image: h was not given, so nothing was drawn.',
+  ]);
+});
+
 test.after(() => resetScriptStateForTesting());
 
 test('a shape wholly outside its control is said, once, and is still drawn', () => {

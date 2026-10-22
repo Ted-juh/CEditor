@@ -3404,10 +3404,10 @@ Drawing, images, typography, and dialogs with the user.
 Drawing your own graphics on top of a control, from its script's onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control's top-left corner.
 
 - Drawing commands add to what is there: clear first.
-- A coordinate or size that is not a number: 0, with a console warning, the first time only.
+- A coordinate or size that is not a number, or a size below 0: 0, with a console warning, the first time only.
 - A shape wholly outside the control: a console warning, the first time only.
 - An option with a wrong value: a console warning, the first time only, and the fallback in its row.
-- A required value that is missing or of the wrong type: rejected with a console error.
+- A required value that is left out: rejected with a console error.
 
 **Colours that fill, stroke and gradient read**
 
@@ -3509,7 +3509,20 @@ ce.draw.stroke("#5B9BD5", 2);
 
 #### `ce.draw.rect(x, y, w, h [, radius])`
 
-Draw a rectangle at (`x`, `y`), `w` wide and `h` tall, measured from the control's top-left corner. `radius` rounds the corners.
+Draw a rectangle.
+
+Example: `drawRect(10, 10, 40, 20, 4)` draws a 40 × 20 rectangle at (10, 10) with rounded corners.
+
+- `x` (number, required): Left edge, in pixels from the control's left.
+- `y` (number, required): Top edge, in pixels from the control's top.
+- `w` (number, required): Width in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `h` (number, required): Height in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `radius` (number, optional): Corner radius in pixels.<br>Range: ≥ 0.<br>Default: 0.<br>< 0, or invalid: 0.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawRect`.*
 

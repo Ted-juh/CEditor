@@ -37,12 +37,38 @@ export const DRAW_SHAPES = {
   drawCurve: { verb: 'ce.draw.curve', nums: [] },
 };
 
-/** A coordinate as a shape reads it: `n`, and `said` for one that is not a number (left out is 0). */
+/** The numbers that are sizes, which cannot be below 0: one that was drew nothing, in silence.
+ *  Not a clip's: it is no shape, and says itself when its area is empty. */
+const DRAW_SIZES = {
+  drawRect: ['w', 'h', 'radius'], drawCircle: ['r'], drawEllipse: ['rx', 'ry'], drawArc: ['radius'],
+  drawPolygon: ['radius'], drawImage: ['w', 'h'],
+};
+
+/** The arguments a shape cannot be drawn without. Left out, the call is rejected (drawMissing): it
+ *  drew at 0, or wrote no text, in silence. */
+export const DRAW_REQUIRED = {
+  drawRect: ['x', 'y', 'w', 'h'], drawCircle: ['cx', 'cy', 'r'], drawEllipse: ['cx', 'cy', 'rx', 'ry'],
+  drawArc: ['x', 'y', 'radius', 'from', 'to'], drawLine: ['x1', 'y1', 'x2', 'y2'],
+  drawPolygon: ['cx', 'cy', 'radius', 'sides'], drawImage: ['x', 'y', 'w', 'h'],
+  drawText: ['x', 'y', 'text'], drawPixelText: ['text', 'x', 'y'],
+};
+
+/** A coordinate as a shape reads it: `n`, and `said` for one that is not a number, or a size below
+ *  0, each 0 (left out is 0 here; the call says so itself, through drawMissing). */
 export function drawNumber(memberId, name, value) {
   if (value === undefined || value === null) return { n: 0, said: null };
+  const verb = DRAW_SHAPES[memberId]?.verb ?? 'ce.draw';
   const n = realNumber(value);
-  if (n !== undefined) return { n, said: null };
-  return { n: 0, said: `${DRAW_SHAPES[memberId]?.verb ?? 'ce.draw'}: ${name} is ${shown(value)}, which is not a number, so 0 was used.` };
+  if (n === undefined) return { n: 0, said: `${verb}: ${name} is ${shown(value)}, which is not a number, so 0 was used.` };
+  if (n < 0 && DRAW_SIZES[memberId]?.includes(name)) return { n: 0, said: `${verb}: ${name} is ${shown(n)}, which is less than 0, so 0 was used.` };
+  return { n, said: null };
+}
+
+/** Why a shape is not drawn for a required argument left out, or null. `given` holds each
+ *  required argument by its name, as the call received it. */
+export function drawMissing(memberId, given) {
+  const name = (DRAW_REQUIRED[memberId] ?? []).find((k) => given[k] === undefined || given[k] === null);
+  return name ? `${DRAW_SHAPES[memberId]?.verb ?? 'ce.draw'}: ${name} was not given, so nothing was drawn.` : null;
 }
 
 /**

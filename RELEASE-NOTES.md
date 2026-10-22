@@ -88,6 +88,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   always means the call did nothing.
 - `ce.draw.stroke` with a `width` that is not a number above 0, or a `dashOffset` that is not a
   number, draws the default (1, and no offset) with a warning. Both were silent.
+- A shape command with a required coordinate, size or text left out (`drawRect(0, 0)`,
+  `drawText(0, 10)`) writes an error to the console and draws nothing. It drew at 0, or wrote no
+  text, in silence. A size or radius below 0 is 0, with a warning; it drew nothing in silence.
 
 ## What you get
 

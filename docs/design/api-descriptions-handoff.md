@@ -530,7 +530,13 @@ Done, approved by the owner:
   the same way. Two edges, warned about once now where they were silent: a `width` that is not a
   number above 0 (drawn as 1), and a `dashOffset` that is not a number (none).
 
-Left, in the order of the dump: `rect`, `circle`, `line`, `path`, `arc`,
+- `rect`: "Draw a rectangle.", the example, `x`, `y`, `w`, `h`, `radius` with their ranges, two
+  notes. Two decisions, for every shape command (`drawShapes.js`: `DRAW_REQUIRED`, `DRAW_SIZES`,
+  `drawMissing`; `drawRejected` in the runtime): a required coordinate, size or text left out is
+  rejected with an error (it drew at 0, or wrote no text, in silence), and a size or radius below
+  0 is 0 with the one-time warning (it drew nothing in silence). The introduction says both.
+
+Left, in the order of the dump: `circle`, `line`, `path`, `arc`,
 `gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
 `points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
 if it is declared. What the probe found, for the items to come: `rect`, `circle`, `ellipse`,
@@ -563,7 +569,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18, `clear`, `fill` and `stroke` done |
+| ce.draw | 27 | 18, `clear`, `fill`, `stroke` and `rect` done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -621,7 +627,7 @@ not open a pull request unless asked.
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
 on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill,
-stroke); continue with ce.draw.rect, in technical English, schematic, one rule per line, with ranges, as its table
+stroke, rect); continue with ce.draw.circle, in technical English, schematic, one rule per line, with ranges, as its table
 says, showing every parameter and option of the command in its item. Check each command at its
 edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.

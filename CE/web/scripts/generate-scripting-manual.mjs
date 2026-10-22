@@ -96,10 +96,10 @@ const MODULE_INTROS = {
   'ce.storage': 'Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.',
   'ce.draw': 'Drawing your own graphics on top of a control, from its script\'s onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control\'s top-left corner.\n\n'
     + '- Drawing commands add to what is there: clear first.\n'
-    + '- A coordinate or size that is not a number: 0, with a console warning, the first time only.\n'
+    + '- A coordinate or size that is not a number, or a size below 0: 0, with a console warning, the first time only.\n'
     + '- A shape wholly outside the control: a console warning, the first time only.\n'
     + '- An option with a wrong value: a console warning, the first time only, and the fallback in its row.\n'
-    + '- A required value that is missing or of the wrong type: rejected with a console error.\n'
+    + '- A required value that is left out: rejected with a console error.\n'
     + '\n'
     + '**Colours that fill, stroke and gradient read**\n'
     + '\n'

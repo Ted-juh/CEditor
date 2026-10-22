@@ -43,7 +43,7 @@ import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sec
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import {
-  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
+  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords, drawMissing,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
 import { recallNoProfileWords } from './presetWords.js';
@@ -5213,6 +5213,15 @@ function drawNum(memberId, name, value) {
   return n;
 }
 
+/** True, after saying so, when a shape's required argument is left out (drawShapes' drawMissing):
+ *  it was drawn at 0, or with no text, in silence. */
+function drawRejected(memberId, given) {
+  const said = drawMissing(memberId, given);
+  if (!said) return false;
+  addScriptTrace('error', '', said);
+  return true;
+}
+
 /** Append a command for `target`, with the style in force at this moment baked into it. `memberId`
  *  names the call, for saying when its shape lies wholly outside the control. */
 function pushCommand(explicit, ownerName, command, memberId = null) {
@@ -5380,6 +5389,7 @@ function drawCurveImpl(explicit, ownerName, value, opts) {
 }
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
+  if (drawRejected('drawPolygon', { cx, cy, radius: r, sides })) return false;
   const n = Math.max(3, Math.round(Number(sides) || 3));
   const radius = drawNum('drawPolygon', 'radius', r);
   const x = drawNum('drawPolygon', 'cx', cx);
@@ -8743,7 +8753,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       if (Number.isFinite(scale) && scale !== 1) parts.push(`scale(${scale})`);
       drawState.transform = parts.length ? parts.join(' ') : null;
     },
-    drawEllipse: (cx, cy, rx, ry) => pushCommand(null, ownerName,
+    drawEllipse: (cx, cy, rx, ry) => drawRejected('drawEllipse', { cx, cy, rx, ry }) ? false : pushCommand(null, ownerName,
       { op: 'ellipse', cx: drawNum('drawEllipse', 'cx', cx), cy: drawNum('drawEllipse', 'cy', cy),
         rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
@@ -8751,6 +8761,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // Its numbers are read as every shape's are, and a character it has no glyph for is said
     // (drawShapes.js): each left a gap, without a word.
     drawPixelText: (text, x, y, scale) => {
+      if (drawRejected('drawPixelText', { text, x, y })) return false;
       const written = String(text ?? '');
       const { scale: s, said } = pixelScale(scale);
       drawSaid('drawPixelText\u0000scale', said);
@@ -8778,6 +8789,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
           'ce.draw.image: no source. Pass a data URL, or ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
+      if (drawRejected('drawImage', { x, y, w, h })) return false;
       if (!/^data:/i.test(source)) {
         const shown = source.length > 60 ? `${source.slice(0, 57)}…` : source;
         addScriptTrace('error', '', findAsset(imageCatalogue(), source)
@@ -8869,22 +8881,23 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
-    drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
+    drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
         h: drawNum('drawRect', 'h', h), radius: Math.max(0, drawNum('drawRect', 'radius', radius)) }, 'drawRect'),
-    drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
+    drawCircle: (cx, cy, r) => drawRejected('drawCircle', { cx, cy, r }) ? false : pushCommand(null, ownerName,
       { op: 'circle', cx: drawNum('drawCircle', 'cx', cx), cy: drawNum('drawCircle', 'cy', cy), r: drawNum('drawCircle', 'r', r) }, 'drawCircle'),
     // Angles in DEGREES, 0 at twelve o'clock, clockwise — the way a knob's arc is described, and
     // the convention the Meter's arcStart/arcSweep already use. The renderer converts.
-    drawArc: (cx, cy, r, from, to) => pushCommand(null, ownerName,
+    drawArc: (cx, cy, r, from, to) => drawRejected('drawArc', { x: cx, y: cy, radius: r, from, to }) ? false : pushCommand(null, ownerName,
       { op: 'arc', cx: drawNum('drawArc', 'x', cx), cy: drawNum('drawArc', 'y', cy), r: drawNum('drawArc', 'radius', r),
         from: drawNum('drawArc', 'from', from), to: drawNum('drawArc', 'to', to) }, 'drawArc'),
-    drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
+    drawLine: (x1, y1, x2, y2) => drawRejected('drawLine', { x1, y1, x2, y2 }) ? false : pushCommand(null, ownerName,
       { op: 'line', x1: drawNum('drawLine', 'x1', x1), y1: drawNum('drawLine', 'y1', y1),
         x2: drawNum('drawLine', 'x2', x2), y2: drawNum('drawLine', 'y2', y2) }, 'drawLine'),
     drawPath: (points, closed) => pushCommand(null, ownerName,
       { op: 'path', points: toPointList(points), closed: closed === true }, 'drawPath'),
     drawText: (x, y, text, opts) => {
+      if (drawRejected('drawText', { x, y, text })) return false;
       const align = drawTextAlign(opts?.align);
       if (align === undefined) return false;
       return pushCommand(null, ownerName,
