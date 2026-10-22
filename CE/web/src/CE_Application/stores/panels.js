@@ -30,6 +30,7 @@ import {
   restoreUnsavedWork,
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { findControlById } from '../utils/containment.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
 import { confirmDiscardUnsaved, confirmDestructive } from '../utils/confirmDiscard.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
@@ -456,14 +457,6 @@ export const deviceProfileTabs = writable([]);
 /** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile'|'component'|'script', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
-/** Editor split layout. Primary and secondary pin the two tabs shown in the split workspace. */
-export const editorSplitLayout = writable({
-  mode: 'single',
-  orientation: 'vertical',
-  primary: null,
-  secondary: null,
-});
-
 /** Per-panel Device Profile Designer companions keyed by panel id. */
 export const panelDesignerSplits = writable({});
 
@@ -631,7 +624,6 @@ export function openSettingsTab(section = 'general') {
   settingsSection.set(String(section || 'general'));
   settingsTabOpen.set(true);
   activeEditorTab.set({ type: 'settings', id: 'settings' });
-  editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
   clearSelection();
 }
 
@@ -639,7 +631,6 @@ export function openSettingsTab(section = 'general') {
 export function openInstrumentHostTab() {
   instrumentHostTabOpen.set(true);
   activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
-  editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'instrumentHost', id: 'instrumentHost' } } : layout);
   clearSelection();
 }
 
@@ -760,11 +751,6 @@ export function closeDeviceProfileTab(id) {
     }
     return next;
   });
-  editorSplitLayout.update((layout) => {
-    if (layout.primary?.type === 'deviceProfile' && layout.primary?.id === id) return { mode: 'single', orientation: 'vertical', primary: null, secondary: null };
-    if (layout.secondary?.type === 'deviceProfile' && layout.secondary?.id === id) return { ...layout, mode: 'single', secondary: null };
-    return layout;
-  });
 
   if (closingActive) {
     const panelId = get(activePanelId);
@@ -780,81 +766,36 @@ export function closeDeviceProfileTab(id) {
   }
 }
 
-export function openEditorSplit(primaryTab, secondaryTab) {
-  if (!primaryTab || !secondaryTab) return;
-  editorSplitLayout.set({
-    mode: 'split',
-    orientation: 'vertical',
-    primary: normalizeEditorTabDescriptor(primaryTab),
-    secondary: normalizeEditorTabDescriptor(secondaryTab),
-  });
-}
-
-export function closeEditorSplit() {
-  editorSplitLayout.set({
-    mode: 'single',
-    orientation: 'vertical',
-    primary: null,
-    secondary: null,
-  });
-}
-
 export function swapEditorSplit() {
   const activeTab = get(activeEditorTab);
   const panelId = activeTab?.type === 'panel' ? activeTab.id : get(activePanelId);
-  if (panelId != null) {
-    let didSwap = false;
-    panelDesignerSplits.update((splits) => {
-      const split = splits?.[panelId];
-      if (!split) return splits;
-      didSwap = true;
-      return {
-        ...splits,
-        [panelId]: {
-          ...split,
-          deviceOnLeft: !split.deviceOnLeft,
-        },
-      };
-    });
-    if (didSwap) return;
-  }
-
-  const layout = get(editorSplitLayout);
-  if (layout.mode !== 'split' || !layout.primary || !layout.secondary) return;
-
-  editorSplitLayout.set({
-    ...layout,
-    primary: layout.secondary,
-    secondary: layout.primary,
+  if (panelId == null) return;
+  panelDesignerSplits.update((splits) => {
+    const split = splits?.[panelId];
+    if (!split) return splits;
+    return {
+      ...splits,
+      [panelId]: {
+        ...split,
+        deviceOnLeft: !split.deviceOnLeft,
+      },
+    };
   });
-  setActiveEditorTab(layout.secondary);
 }
 
 export function toggleEditorSplitOrientation() {
   const activeTab = get(activeEditorTab);
   const panelId = activeTab?.type === 'panel' ? activeTab.id : get(activePanelId);
-  if (panelId != null) {
-    let didToggle = false;
-    panelDesignerSplits.update((splits) => {
-      const split = splits?.[panelId];
-      if (!split) return splits;
-      didToggle = true;
-      return {
-        ...splits,
-        [panelId]: {
-          ...split,
-          orientation: split.orientation === 'horizontal' ? 'vertical' : 'horizontal',
-        },
-      };
-    });
-    if (didToggle) return;
-  }
-
-  editorSplitLayout.update((layout) => {
-    if (layout.mode !== 'split') return layout;
+  if (panelId == null) return;
+  panelDesignerSplits.update((splits) => {
+    const split = splits?.[panelId];
+    if (!split) return splits;
     return {
-      ...layout,
-      orientation: layout.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+      ...splits,
+      [panelId]: {
+        ...split,
+        orientation: split.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+      },
     };
   });
 }
@@ -894,17 +835,10 @@ export function openTabToSide(tab) {
     }));
     activeEditorTab.set({ type: 'panel', id: panelId });
     clearSelection();
-    return;
   }
-  openEditorSplit(current, tab);
-}
-
-function normalizeEditorTabDescriptor(tab) {
-  if (!tab) return null;
-  return {
-    type: tab.type || tab.tabType || 'panel',
-    id: tab.id ?? null,
-  };
+  // Nothing else opens to the side: a device profile beside its panel is the one split there is.
+  // A general split of any two tabs was kept here as a layout nothing drew, so a script tab and
+  // its panel were never on screen together, whatever the script editor's comments said.
 }
 
 /** Close a CTRL49 Screen Builder tab. It asks first when the screen has changes: the Screen
@@ -984,6 +918,32 @@ export function closePanel(id) {
  */
 export const selectionBeforeScriptTab = writable(null);
 
+/**
+ * A control picked in a script tab to be its panel's selection: `{ panelId, id }`, or null. The
+ * script editor's Values tab picks one from a row that names a control (Select, beside it).
+ *
+ * A script tab shows no canvas, and every tab switch clears the selection, so the way back to the
+ * panel would clear a selection made there. Nor is the selection set while the script tab is in
+ * front: a change of selection lets go of the display panel's colour and gradient targets
+ * (colorTarget.js, gradientTarget.js), which would end an edit the Values tab has open in them. So
+ * the pick is held here, and the control is selected once its panel's tab is in front, whichever
+ * way it gets there (the tab bar, closing the script tab). A pick for another panel waits for that
+ * panel; a newer pick replaces it. The Panel file screen opens on it, as it opens on the control
+ * selected when the script tab took over.
+ */
+export const panelSelectionPick = writable(null);
+
+/** Select control `id` on panel `panelId` when that panel's tab is next in front. An `id` of null
+ *  takes back the pick made for that panel. */
+export function pickPanelSelection(panelId, id) {
+  if (panelId == null) return;
+  if (id == null || id === '') {
+    if (String(get(panelSelectionPick)?.panelId) === String(panelId)) panelSelectionPick.set(null);
+    return;
+  }
+  panelSelectionPick.set({ panelId, id });
+}
+
 /** Switch to a panel by id */
 export function setActivePanel(id) {
   const nextTab = { type: 'panel', id };
@@ -998,7 +958,6 @@ export function setActiveEditorTab(tab) {
 
   if (tab.tabType === 'settings' || tab.type === 'settings' || tab.id === 'settings') {
     openSettingsTab();
-    editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
     return;
   }
 
@@ -1334,6 +1293,17 @@ activePanelId.subscribe(() => {
 activeEditorTab.subscribe((tab) => {
   if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
   syncPanelSelection();
+});
+
+// A control picked in a script tab (panelSelectionPick) is selected when its panel's tab is in
+// front. By then setActivePanel has cleared the selection the tab switch clears, so this one stays.
+// A control the panel no longer has is not selected.
+activeEditorTab.subscribe((tab) => {
+  const pick = get(panelSelectionPick);
+  if (!pick || tab?.type !== 'panel' || tab.id == null || String(tab.id) !== String(pick.panelId)) return;
+  panelSelectionPick.set(null);
+  const panel = get(panels).find((p) => String(p.id) === String(pick.panelId));
+  if (panel && findControlById(panel.controls, pick.id)) selectComponent(pick.id);
 });
 
 // --- Bridge event listeners ---

@@ -139,7 +139,7 @@ The node suite takes about three and a half minutes here. `validate-script-expor
 failure, but do not read a run full of skips as coverage.
 
 `npm run test:browser` additionally drives Playwright over the built bundle and the editor's dev
-server: 35 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
+server: 38 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
 first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows, in a job of
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
 docks, the player inbound path or the learn chips.

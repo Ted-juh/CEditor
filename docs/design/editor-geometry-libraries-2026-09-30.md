@@ -45,6 +45,15 @@ wrong often enough — a narrow window, a scrolled inspector — and, being `pos
 was also clipped by any scrolling ancestor. The insert flyout stays as it is: it is not a popup but a
 panel docked to the icon rail, the full height of the workspace.
 
+Signature help has since left `use:floating` (2026-10-20). It sits after the end of the caret's
+line, on that line, where it covers no code. That is a place in the text, not a side of an anchor,
+so `editor/signatureHint.js` works it out. It falls back to a box above the line, or below it on
+the top visible line, only when the line's end and the hint do not fit in the editor's width. The
+code editor's popups are moved to `<body>` for the reason this section gives, and their colours are
+carried with them (`editor/popupTheme.js`). Until then they did not reach `<body>`, and the hint and
+the completion list were drawn with no background. `browser-checks/valueCompletion.mjs` checks
+both.
+
 Checked by `browser-checks/floatingUi.mjs`: a menu at the window corner flips up and left and
 follows a resize, a submenu at the right edge flips left, the menu bar survives a 520 px window, the
 tree menu opens upward from its lowest row, a bottom-row combobox opens above itself, the tab tray

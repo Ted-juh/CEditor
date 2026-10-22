@@ -298,5 +298,25 @@ export function planAxis(descriptor, tag, value) {
     writes.push({ section: 'Font', field: 'weightValue', value: pair.weightValue });
     writes.push({ section: 'Font', field: 'weight', value: pair.weight });
   }
-  return { writes, refused: [] };
+  // `used` is what was written, the value kept within the axis's range; `given` the number it was given.
+  return { writes, refused: [], axis, given: asNumber, used: clamped };
+}
+
+// The registered axes, by what they are; a font's own axis is its tag.
+const AXIS_NAMES = { wght: 'weight', wdth: 'width', slnt: 'slant', ital: 'italic', opsz: 'optical size' };
+
+/** An axis as the Values tab names it: "weight, 100 to 900, 400 by default". */
+export function axisWords(axis) {
+  return `${AXIS_NAMES[axis.tag] ?? axis.tag}, ${axis.min} to ${axis.max}, ${axis.default} by default`;
+}
+
+/** What ce.text.axis says of a number the font's axis does not reach, which is kept within it:
+ *  it did that without a word. */
+export function axisClampWords(name, family, axis, given, used) {
+  return `ce.text.axis("${name}", "${axis.tag}"): ${given} is outside the ${axis.min} to ${axis.max} "${family}" has, so ${used} was used.`;
+}
+
+/** What ce.text.axis says when it refuses, as the runtime words it (panelRuntime's textAxisImpl). */
+export function axisRefusalWords(name, family, option, reason) {
+  return `ce.text.axis("${name}", "${option}"): refused — ${reason}. ce.text.font("${family}") reports the axes it has.`;
 }

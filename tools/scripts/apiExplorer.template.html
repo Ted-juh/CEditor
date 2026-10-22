@@ -2494,7 +2494,8 @@ function onDumpReceived(dump) {
   // Summaries in panelApi.js are written with `backtick code spans`, because they are read in the
   // editor's own hint panel as well as here. Escape first, then promote — so a summary cannot
   // inject markup, and the one thing it can do is what its author meant.
-  const doc = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+  // A line break in a summary is a rule of its own (a parameter's Range, Default, Invalid…).
+  const doc = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\n/g, "<br>");
   const num = (n) => n.toLocaleString("en-US");
 
   /* ------------------------------------------------- arguments and examples */

@@ -255,6 +255,12 @@ export function encodeParameterValue(parameter, value) {
     const number = clampInt(value, 0, 16383);
     return { bytes: [(number >> 7) & 0x7f, number & 0x7f], number, normalized: number / 16383, displayed: String(number) };
   }
+  if (encoding === 'u14-lsb-msb') {
+    // The same 14 bits, least significant byte first, as decodeParameterValue reads them. It fell
+    // through to the u7 line and went out as one byte, clamped to 127.
+    const number = clampInt(value, 0, 16383);
+    return { bytes: [number & 0x7f, (number >> 7) & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return { error };
@@ -266,6 +272,21 @@ export function encodeParameterValue(parameter, value) {
     const bytes = [];
     for (let shift = (nibbles - 1) * 4; shift >= 0; shift -= 4) bytes.push((number >> shift) & 0x0f);
     return { bytes, number, normalized: max > 1 ? number / (max - 1) : 0, displayed: String(number) };
+  }
+  if (encoding === 's7') {
+    // Signed 7-bit: the value plus its bias (64 unless the profile says otherwise), the reverse of
+    // decodeParameterValue's s7 branch, and what DeviceProfileEngine.cpp and the DPD's codecs.mjs
+    // write. It fell through to the u7 line below, which clamped the signed value to 0-127: every
+    // negative value went out as 0, the bottom of the range, and every other one 64 too low, so a
+    // pan of 0 read back as -64. A value the byte cannot hold is refused, as a nibbled one is.
+    const offset = Number(parameter?.encoding?.signedOffset ?? 64);
+    const bias = Number.isFinite(offset) ? offset : 64;
+    const signed = Math.round(Number(value) || 0);
+    const byte = signed + bias;
+    if (byte < 0 || byte > 127) {
+      return { error: `Signed value outside ${-bias} to ${127 - bias} for ${parameter?.id ?? ''}` };
+    }
+    return { bytes: [byte], number: byte, normalized: byte / 127, displayed: String(signed) };
   }
   const number = clampInt(value, 0, 127);
   return { bytes: [number], number, normalized: number / 127, displayed: String(number) };
@@ -309,7 +330,10 @@ export function localCompileParameter(profile, request = {}) {
     ];
 
     if (resolution === 14) {
-      const value14 = encoded.bytes.length > 1
+      // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
+      // two bytes in elsewhere.
+      const lsbFirst = String(parameter?.encoding?.type ?? '') === 'u14-lsb-msb';
+      const value14 = encoded.bytes.length > 1 && !lsbFirst
         ? encoded
         : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
       bytes.push(status, 6, value14.bytes[0] ?? 0);
@@ -597,6 +621,18 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     for (let index = 0; index < nibbles; index += 1) {
       numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
+  } else if (encodingType === 'u14-lsb-msb') {
+    // Least significant byte first, as DeviceProfileEngine.cpp reads it. It came back as its first
+    // byte alone: 12345 (39 60) as 57.
+    if (offset + 1 >= bytes.length) return { ok: false, error: `14-bit dump value requires two bytes for ${parameter?.id ?? ''}` };
+    numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+  } else if (encodingType === 'u8') {
+    numeric = bytes[offset] & 0xff;                // a full byte, as an unpacked payload holds one
+  } else if (encodingType === 's7') {
+    // Signed 7-bit, the byte less its bias, as decodeParameterValue and DeviceProfileEngine.cpp read
+    // it. A dump's s7 field came back as the raw byte here, so a pan of -10 read as 54.
+    const signedOffset = Number(encoding?.signedOffset ?? 64);
+    numeric = (bytes[offset] & 0x7f) - (Number.isFinite(signedOffset) ? signedOffset : 64);
   }
 
   if (type === 'choice' || type === 'enum') {
@@ -827,7 +863,12 @@ export function localBuildDumpMessage(profile, dumpId = '', values = {}) {
     }
     consumed.add(parameterId);
 
-    const encoded = encodeParameterValue(parameter, values[parameterId]);
+    // A mapping's codec, when it gives one, is how this dump keeps the value, as the parser reads it
+    // (localDecodeDumpParameterValue's override). Built with the parameter's own encoding instead, a
+    // field the dump keeps LSB-first went out MSB-first, or as one byte.
+    const codec = mapping?.codec ?? mapping?.nameCodec ?? null;
+    const encodeAs = codec && typeof codec === 'object' ? { ...parameter, encoding: codec } : parameter;
+    const encoded = encodeParameterValue(encodeAs, values[parameterId]);
     if (encoded?.error) return fail(`Cannot encode ${parameterId}: ${encoded.error}`);
 
     const offset = Number(mapping?.offset ?? 0);

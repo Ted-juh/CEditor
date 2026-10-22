@@ -15,6 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_Application/scripting/panelApi.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from '../src/CE_Application/scripting/timeTables.js';
 import {
@@ -106,6 +107,36 @@ test('an unknown division returns nothing — the ONE place this differs from th
   assert.equal(beatsPerStep('1/3'), DIVISIONS['1/16'], 'the component falls back…');
   assert.equal(api.beatsPerDivision('1/3'), undefined, '…and the verb deliberately does not');
   assert.equal(api.beatsPerDivision(''), undefined);
+});
+
+test('a division is read in any case, and one that is not a division says so', () => {
+  // "A script that mistyped should find out" — it found out only by getting nothing back. Now the
+  // console says it too, in every runtime's words (scriptPreludeAgreement.test.js compares them).
+  // The names differ only by D and T, so reading them in any case is not a guess.
+  assert.equal(api.beatsPerDivision('1/8t'), DIVISIONS['1/8T']);
+  assert.equal(api.beatsPerDivision('1/4d'), DIVISIONS['1/4D']);
+  assert.equal(api.stepAt(2.5, '1/16t'), api.stepAt(2.5, '1/16T'));
+  assert.deepEqual(api.stepsBetween(0, 1, '1/8d'), api.stepsBetween(0, 1, '1/8D'));
+  assert.equal(api.swingOffset(1, 0.5, '1/8t'), api.swingOffset(1, 0.5, '1/8T'));
+
+  const errorsFrom = (call) => {
+    clearScriptTrace();
+    call();
+    return get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+  };
+  assert.deepEqual(errorsFrom(() => api.stepAt(2, '1/8T')), [], 'a right name says nothing');
+  assert.deepEqual(errorsFrom(() => api.stepAt(2, '1/6')), [
+    `ce.time.step: "1/6" is not a division, so there is no answer. The divisions are ${DIVISION_NAMES.join(', ')}.`,
+  ]);
+  for (const [verb, call] of [
+    ['ce.time.division', () => api.beatsPerDivision('x')],
+    ['ce.time.steps', () => api.stepsBetween(0, 1, 'x')],
+    ['ce.time.swing', () => api.swingOffset(1, 0.5, 'x')],
+  ]) {
+    const lines = errorsFrom(call);
+    assert.equal(lines.length, 1, verb);
+    assert.ok(lines[0].startsWith(`${verb}: "x" is not a division`), lines[0]);
+  }
 });
 
 test('divisions lists every one, in picker order, with its label and length', () => {

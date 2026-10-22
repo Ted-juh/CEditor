@@ -1,7 +1,7 @@
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { writeEmbeddedBundle } from './scripts/embed-web.mjs';
@@ -118,6 +118,11 @@ export function embedPlayerBundle({ web = fileURLToPath(new URL('.', import.meta
     },
     closeBundle() {
       if (outDir !== dist || failed) return;
+      // A build stopped by another plugin's error in generateBundle (oneByteChunks above) still
+      // reaches here, with renderError never called, and dist/ holds no pages. Writing the embed
+      // then threw "player.html is not in dist; run vite build first", which hid the error that
+      // stopped the build behind one that pointed at the wrong step.
+      if (!existsSync(path.join(dist, 'player.html'))) return;
       const { files, compressed } = writeEmbeddedBundle(dist, embed, { publicDir: path.join(web, 'public') });
       this.info?.(`dist-embed: ${files.length} files for the player and host pages, ${(compressed / 1048576).toFixed(1)} MB compressed`);
     },
@@ -195,6 +200,12 @@ export default defineConfig(({ command }) => ({
     // into a component it renders (see `treeshake: false` below, which explains why a barrel import
     // is not free here). test/bundleHygiene.test.js now fails on both halves of that: any
     // `from 'lucide-svelte'` in src/, and any built chunk over this limit.
+    //
+    // And again, by `main` itself, at 4.05 MB: a fifth of it was the Yamaha AN1x's device runtime,
+    // 1.4 MB of JSON imported statically by deviceAddress.js for one line of the Device insight
+    // strip, and parsed at every start. The runtimes load when an address is first asked of one
+    // now, and `main` is 3.2 MB. That test only sees a build, and CI's web-tests job does not
+    // build, so it is a local gate: `npm run build` before `npm test`.
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
       // Tree-shaking off: profiling showed Rollup's `include` pass (includeCallArguments alone

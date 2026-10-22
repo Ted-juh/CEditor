@@ -286,7 +286,8 @@ final class CeContext {
     }
 
     /** sendSysex(bytes) or sendSysex("F0 41 10 …"). The list or the string goes to the host as it is —
-     *  the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS. No byte[] overload:
+     *  the host reads it as it does for Lua and JS (each byte 0 to 255, each hex token one byte,
+     *  anything else refused with a message) and adds F0/F7. No byte[] overload:
      *  a Java byte is signed, so (byte) 0xF0 is -16, where the preview reads it as 240. */
     public void sendSysex(int[] bytes) { CeRuntime.HOST.sysexList(h, bytes == null ? new int[0] : bytes); }
     public void sendSysex(java.util.List<Integer> bytes) {

@@ -140,3 +140,37 @@ test('with no panel there is nothing to check against, and nothing is claimed', 
   const script = { source: 'function onX(){ arpRate("cutoffslider", 4) }', scope: 'panel', event: 'onX' };
   assert.equal(wrongTarget(validateScript(script)), undefined);
 });
+
+// --- a ce.<module>.<name> the module does not have (unknownCalls.js) -----------------------------
+// It fails the moment it runs, in every language, and nothing said so: ce.panel.on read to this
+// check as on(), and Python's ce.midi.send_note as nothing at all.
+
+const problemsOf = (language, source) => validateScript({ id: 'u', event: 'onValueChanged', scope: 'component', language, source })
+  .map((p) => `${p.severity}: ${p.message}`);
+
+test('a call the module does not have is an error, with the one meant', () => {
+  assert.ok(problemsOf('lua', 'function onValueChanged(value)\n  ce.panel.on("Cutoff", "valueChanged", function() end)\nend').includes(
+    'error: ce.panel.on is not a call ce.panel has, so the script stops with an error here when it runs. Did you mean ce.core.on?'));
+  assert.ok(problemsOf('python', 'def onValueChanged(value):\n    ce.midi.send_note(1, 60, 100)\n').includes(
+    'error: ce.midi.send_note is not a call ce.midi has, so the script stops with an error here when it runs. Did you mean ce.midi.sendNote?'));
+  assert.ok(problemsOf('javascript', 'function onValueChanged(v) { ce.anim.too("X", 1); }').includes(
+    'error: ce.anim.too is not a call ce.anim has, so the script stops with an error here when it runs. Did you mean ce.anim.to?'));
+  // A Lua method call is the same name.
+  assert.ok(problemsOf('lua', 'function onValueChanged(v)\n  ce.panel:on("A", "valueChanged", f)\nend').some((p) => p.startsWith('error: ce.panel.on is not')));
+});
+
+test('a call the module has, one in a comment, and anything not ce.<module>.<name> are left alone', () => {
+  const quiet = (language, source) => problemsOf(language, source).filter((p) => / is not a call /.test(p));
+  assert.deepEqual(quiet('lua', 'function onValueChanged(v)\n  ce.core.set("A", 1)\n  ce.math.fromARGB("#80123456")\n  -- ce.panel.gone(1)\n  --[[ ce.panel.gone(2) ]]\n  ce.components.drumpads.colour("Kit", 1, "red")\n  ce.has("ce.midi")\nend'), []);
+  assert.deepEqual(quiet('python', 'def onValueChanged(v):\n    ce.core.log("x")  # ce.midi.nope()\n'), []);
+  assert.deepEqual(quiet('javascript', 'function onValueChanged(v) { /* ce.ui.gone() */ ce.ui.notify("x"); // ce.ui.alsoGone()\n mine.ce.panel.on(1); }'), []);
+  assert.equal(quiet('lua', 'function onValueChanged(v)\n  ce.panel.on(1)\n  ce.panel.on(2)\nend').length, 1, 'once per call, however often it is written');
+});
+
+test('on() is only the on() there is: ce.panel.on\'s argument is not read as an event', () => {
+  const events = (language, source) => problemsOf(language, source).filter((p) => /isn't a known control\/panel\/device event/.test(p));
+  assert.deepEqual(events('lua', 'function onValueChanged(v)\n  ce.panel.on("Cutoff", "onValueChangd", f)\nend'), []);
+  assert.equal(events('lua', 'function onValueChanged(v)\n  ce.core.on("Cutoff", "valueChangd", f)\nend').length, 1);
+  assert.equal(events('lua', 'function onValueChanged(v)\n  on("Cutoff", "valueChangd", f)\nend').length, 1);
+  assert.equal(events('cpp', '[](CeContext& ctx, const CeEvent& e) {\n  ctx.on("Cutoff", "valueChangd", f);\n}').length, 1);
+});

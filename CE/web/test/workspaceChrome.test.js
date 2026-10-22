@@ -128,3 +128,53 @@ test('the component workspace keeps the rail but disarms insertion', () => {
   assert.equal(state.railTogglesEnabled, false);
   assert.equal(state.railInsertEnabled, false);
 });
+
+// --- the display panel in the script workspace (docs/design/script-editor-value-editors.md) -------
+// A script's colours and gradients are edited in the shared display panel, opened from the script
+// editor's Values tab, so the script workspace lets that panel show, and only that one.
+
+test('the script workspace shows the display panel, and only it, when it is asked for', () => {
+  const shown = resolveWorkspaceChrome({
+    activeTab: { type: 'script' }, viewportWidth: 1440,
+    showTreePanel: true, showDisplayPanel: false, showDisplayPanelInScript: true, showPropertiesPanel: true,
+  });
+  assert.equal(shown.workspaceKind, 'script');
+  assert.equal(shown.ownsChrome, true, 'it still owns its layout');
+  assert.deepEqual([shown.showDisplayPanel, shown.showTreePanel, shown.showPropertiesPanel], [true, false, false]);
+  assert.equal(shown.railDisplayToggleEnabled, true, 'the rail can show and hide it there');
+  assert.equal(shown.railTogglesEnabled, false, 'the tree and properties toggles stay off');
+  assert.equal(shown.railInsertEnabled, false);
+
+  const hidden = resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 1440, showDisplayPanelInScript: false });
+  assert.equal(hidden.showDisplayPanel, false, 'hidden when the viewer has it hidden');
+  // A narrow window changes nothing there: compact is the panel editor's.
+  const narrow = resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 600, showDisplayPanelInScript: true });
+  assert.deepEqual([narrow.compactPanel, narrow.showDisplayPanel], [false, true]);
+});
+
+test('the script workspace has a display switch of its own: the panel editor\'s does not reach it', () => {
+  const panelOpen = { showDisplayPanel: true, showDisplayPanelInScript: false };
+  assert.equal(resolveWorkspaceChrome({ activeTab: { type: 'script' }, viewportWidth: 1440, ...panelOpen }).showDisplayPanel, false,
+    'a dock left open in the panel editor stays out of the script editor');
+  assert.equal(resolveWorkspaceChrome({ activeTab: { type: 'panel' }, viewportWidth: 1440, ...panelOpen }).showDisplayPanel, true);
+  const scriptOpen = { showDisplayPanel: false, showDisplayPanelInScript: true };
+  assert.equal(resolveWorkspaceChrome({ activeTab: { type: 'panel' }, viewportWidth: 1440, ...scriptOpen }).showDisplayPanel, false,
+    'and one opened for a script colour does not follow the viewer back');
+});
+
+test('every other workspace keeps the display panel exactly as before', () => {
+  for (const [activeTab, componentWorkspaceMode] of [
+    [{ type: 'deviceProfile' }, 'panel'], [{ type: 'screen' }, 'panel'], [{ type: 'component' }, 'surface'],
+    [{ type: 'panel' }, 'surface'], [{ type: 'instrumentHost' }, 'panel'],
+  ]) {
+    const state = resolveWorkspaceChrome({ activeTab, componentWorkspaceMode, viewportWidth: 1440, showDisplayPanel: true });
+    assert.equal(state.showDisplayPanel, false, `${activeTab.type} (${componentWorkspaceMode})`);
+    assert.equal(state.railDisplayToggleEnabled, false, `${activeTab.type} (${componentWorkspaceMode})`);
+  }
+  const editor = resolveWorkspaceChrome({ activeTab: { type: 'panel' }, viewportWidth: 1440, showDisplayPanel: true });
+  assert.deepEqual([editor.showDisplayPanel, editor.railDisplayToggleEnabled, editor.railTogglesEnabled], [true, true, true]);
+  const compact = resolveWorkspaceChrome({ activeTab: { type: 'panel' }, viewportWidth: COMPACT_CHROME_BREAKPOINT - 1, showDisplayPanel: true });
+  assert.deepEqual([compact.showDisplayPanel, compact.railDisplayToggleEnabled], [false, false]);
+  const settings = resolveWorkspaceChrome({ activeTab: { type: 'settings' }, viewportWidth: 1440, showDisplayPanel: true });
+  assert.equal(settings.showDisplayPanel, true, 'the settings tab, which owns no chrome, as before');
+});

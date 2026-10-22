@@ -25,6 +25,9 @@
     // The rail is part of the persistent shell — it renders in every
     // workspace. These gates say what it may DO there (workspaceChrome.js).
     togglesEnabled = true,
+    // The display dock's toggle may work where the other two do not: the script workspace shows
+    // the display panel alone (workspaceChrome.js). Unset, it follows togglesEnabled.
+    displayToggleEnabled = null,
     insertEnabled = true,
     // Preview is a mode, not a panel, so it has its own gate: it needs a panel
     // canvas, but NOT the panel toggles — that is the whole point of it being
@@ -38,6 +41,7 @@
   } = $props();
 
   let canPreview = $derived(previewEnabled && !!$activePanel);
+  let displayToggleOn = $derived(displayToggleEnabled ?? togglesEnabled);
 
   // Insertion needs an open panel AND a workspace whose canvas is that
   // panel — the component/script/device workspaces sit over a hidden panel
@@ -336,10 +340,10 @@
   <div class="panel-toggles">
     <button
       class="icon-btn rail-toggle"
-      class:active={togglesEnabled && showDisplayPanel}
-      title={togglesEnabled ? 'Display dock — colours, gradients, align, device, console' : 'Panels are unavailable in this workspace'}
-      aria-pressed={togglesEnabled && showDisplayPanel}
-      disabled={!togglesEnabled}
+      class:active={displayToggleOn && showDisplayPanel}
+      title={displayToggleOn ? 'Display dock — colours, gradients, align, device, console' : 'Panels are unavailable in this workspace'}
+      aria-pressed={displayToggleOn && showDisplayPanel}
+      disabled={!displayToggleOn}
       onclick={onToggleDisplay}
     >
       <PanelBottom size={18} strokeWidth={1.5} />

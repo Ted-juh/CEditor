@@ -619,7 +619,8 @@ have states. Edit them on the **States** tab of the properties panel (one contro
    changing the normal look.
 3. **When** says when the state is active: seven switches — **Hover**, **Pressed**, **Focused**,
    **Dragging**, **Disabled**, **Checked**, **Mixed** — and an optional **Rule** for anything more
-   specific.
+   specific. A rule can compare the control's value: `value > 64` is active above 64, and
+   `valueNormalized >= 0.5` in the top half of the range, whatever the range is.
 4. **Overrides** lists what the state changes, with buttons to clear them.
 
 Add your own state by typing a name in **New** and pressing **Add**. When several states are active
@@ -662,6 +663,32 @@ name of the patch, a light blinking on a timer — you can attach a script. Scri
 
 The [scripting manual](scripting-manual.md) explains scripting from the beginning; start with
 [Scripting: getting started](scripting-getting-started.md).
+
+The dock on the right of the code has four tabs, and opens on the one you used last: **Insert**
+(the commands and your controls, to insert), **Library** (scripts you saved to reuse), **History**
+(earlier versions of the script) and **Values**. **Values** lists the values in the statement the
+caret is in, with what each means and any problem with it, and the code shows which: a faint band
+over the statement, a light box around the value under the pointer, an outlined box around the one
+you are editing. A colour's swatch opens the display panel's **Colors** tab, which shows in the
+script workspace for this (and from the **Dock** button on the left, which has a setting of its own
+here: a dock left open in the panel editor stays there, and one the swatch opened closes again when
+you finish); the colour is written into the code when you let go, as one step of the editor's undo,
+and **Cancel** puts back exactly what was there before. A gradient opens the **Gradient** tab the
+same way, with the angle and the stops alone, since a drawing's gradient is always linear. A list of
+choices is a dropdown in the row, a font family's of the fonts the panel can use, an image's of
+the library's and the panel's images, and a device parameter's (`ce.device.write("cutoff", …)`) of
+the parameters of the synth's device profile, each with its name; a number with a unit is a field; a
+curve written as four numbers has the **Animation** tab's curve editor under its row, written when
+you let go of a handle; and the points of an envelope (`ce.anim.envelope`) have its shape under
+their row, with each point to drag, a double-click to add one and **Remove** to take one out,
+written when you let go. A row that names one of the panel's controls, by its name or in a path,
+has **Select**: the control is selected on the panel when you go back to its tab, and the code is
+left as it is. A stroke's dash is drawn in its row as the line it makes.
+The lists are in the code as well: with the caret inside a
+value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
+selected, and the one you choose replaces the whole value. A property path is completed one part
+at a time: inside `"Cutoff."` the list is what Cutoff has, its value and its sections, and the part
+you choose replaces only the part the caret is in.
 
 Two things to know from the editor's side:
 
@@ -773,6 +800,12 @@ on every save), and an embedded image, which shows as a short placeholder and is
 An applied edit is one step in the panel's undo history, named after what you edited, such as
 "Edit cutoff as text". Go back to the panel and press **Undo** to take it back. **Show on the
 panel** goes there with the control selected.
+
+**Values**, above the text, shows the script editor's dock with its **Values** tab alone: the colours,
+gradients and choices in the object the caret is in, a `Fill` say, read the way the panel reads them.
+A colour's swatch, or a gradient's strip, opens the display panel; what you choose there is written
+into the text as typing it would be, so it is an edit like any other, applied with **Apply**. In
+**Every field** and in the whole file the values are listed, to read, and nothing is edited.
 
 **Whole file**, at the top of the outline, shows the whole file instead, as **Save** would write it
 now, laid out to read. A large panel's file is long (the Roland GAIA's is about 71,000 lines), so the

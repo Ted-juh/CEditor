@@ -18,7 +18,7 @@
    * gradient stays on screen while one of its stops is edited.
    */
   import { onDestroy, onMount, untrack } from 'svelte';
-  import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, interpolateColor, squareRampToDataURL } from '../utils/gradientCSS.js';
+  import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, gradientStopCSS, interpolateColor, squareRampToDataURL } from '../utils/gradientCSS.js';
   import {
     computeAxisGeometry, stopThumbPoint,
     projectOntoAxis as projectPointOntoAxis,
@@ -205,7 +205,7 @@
   // CSS string for a stop thumb at its fraction of the axis.
   function getThumbStyle(stop) {
     const { x, y } = stopThumbPoint(axisStart, axisEnd, stop.position);
-    return `left: ${x}%; top: ${y}%; background: #${stop.color}`;
+    return `left: ${x}%; top: ${y}%; background: ${gradientStopCSS(stop.color)}`;
   }
 
   // SVG line: main axis

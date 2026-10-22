@@ -31,11 +31,11 @@ const apiPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'p
 
 const { MODULES, moduleMemberMap, MODULE_BY_ID, MODULE_CORE, MODULE_GATE_MESSAGE, CE_API_VERSION,
         ALL_MEMBERS, isValueMember, RUNTIME_ANY, RUNTIME_PLAYER, RUNTIME_WEBVIEW, memberRuntime,
-        WEBVIEW_ONLY_MEMBERS, memberModule }
+        WEBVIEW_ONLY_MEMBERS, memberModule, MEMBER_BY_ID, optionChecks }
   = await import(`file://${apiPath}`);
 
 const musicPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'musicTheory.js');
-const { SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
+const { SCALES, CHORDS, SCALE_NAMES, CHORD_NAMES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
         QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES } = await import(`file://${musicPath}`);
 
 const timePath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'timeTables.js');
@@ -44,6 +44,9 @@ const { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN, MIN_BPM, MAX_BPM }
 
 const easingPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'easingTables.js');
 const { EASING_BEZIERS } = await import(`file://${easingPath}`);
+
+const coloursPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'scriptColours.js');
+const { CSS_NAMED_COLOURS } = await import(`file://${coloursPath}`);
 
 // The envelope sample count is the WebView runtime's own constant rather than a second copy: the
 // two sides sampling a different number of points is exactly the divergence sampling exists to
@@ -79,6 +82,22 @@ export const MUSIC_END = 'END GENERATED music tables';
 // hundredth trace a curve that looks right and is not the Properties panel's.
 export const ANIM_BEGIN = 'BEGIN GENERATED animation tables';
 export const ANIM_END = 'END GENERATED animation tables';
+
+// The options each member takes, and the check that refuses a call holding a key it does not. The
+// WebView runtime checks every call against panelApi.js's lists (applyOptionChecks); a prelude
+// cannot read them, and a hand-copied list is a key that refuses in one runtime and works in the
+// other, which is the one thing the check must not do. So the lists AND the check are generated,
+// and the check's words come from one template per language, held to the WebView's word for word
+// by scriptPreludeAgreement.test.js.
+export const OPTIONS_BEGIN = 'BEGIN GENERATED option keys';
+export const OPTIONS_END = 'END GENERATED option keys';
+
+// CSS's 148 named colours, which a colour property writes out ("red" as "#FF0000") and the ce.math
+// colour helpers read the same way in every runtime. A mistyped digit here is a colour a shade off
+// in the export and right in the editor, with nothing failing, so the table is scriptColours.js's
+// own and not a copy.
+export const COLOURS_BEGIN = 'BEGIN GENERATED colour names';
+export const COLOURS_END = 'END GENERATED colour names';
 
 // A short name has to be a legal member name in EVERY language a prelude is generated for. Lua is
 // the strict one: `goto` is a keyword there, so both `{ goto = ... }` and `t.goto(...)` fail to
@@ -679,6 +698,10 @@ const MUSIC_TABLES = [
   { name: '__CE_QUALITY_SUFFIX', kind: 'map', data: QUALITY_SUFFIX },
   { name: '__CE_ROMAN', kind: 'list', data: ROMAN },
   { name: '__CE_MINOR_QUALITIES', kind: 'set', data: MINOR_QUALITY_NAMES },
+  // The names in the table's own order, which a Lua table does not keep: a helper refusing an
+  // unknown scale or chord lists these, and the list has to read the same in every runtime.
+  { name: '__CE_SCALE_NAMES', kind: 'list', data: SCALE_NAMES },
+  { name: '__CE_CHORD_NAMES', kind: 'list', data: CHORD_NAMES },
 ];
 
 // ce.time's division table, emitted the same way and for the same reason: a mistyped fraction is a
@@ -772,6 +795,65 @@ ${tableRows(EASING_TABLES, 'python').join('\n')}
 # ${MUSIC_END}`;
 }
 
+/* --------------------------------------------------------------------- CSS's colour names */
+// One table literal per prelude, several names to a line: one assignment per name, as the music
+// tables are written, would be three times the bytes for a table every panel with ce.math carries.
+// The names are plain lower-case words, so each is a bare key in Lua and JavaScript; a name that
+// were not would be refused here rather than written as a prelude that does not parse.
+
+/** The table's entries as lines of `key = "RRGGBB"` pairs, wrapped near 100 columns. */
+function colourLines(key, indent) {
+  const pairs = Object.entries(CSS_NAMED_COLOURS).map(([name, hex]) => {
+    if (!/^[a-z]+$/.test(name) || RESERVED.lua.has(name) || RESERVED.javascript.has(name)) {
+      throw new Error(`CSS_NAMED_COLOURS has "${name}", which is not a plain word every prelude can key by`);
+    }
+    if (!/^[0-9A-F]{6}$/.test(hex)) throw new Error(`CSS_NAMED_COLOURS.${name} is "${hex}", not RRGGBB`);
+    return key(name, hex);
+  });
+  const lines = [];
+  let line = '';
+  for (const pair of pairs) {
+    if (line && indent.length + line.length + pair.length + 2 > 100) { lines.push(`${indent}${line}`); line = ''; }
+    line += line ? ` ${pair},` : `${pair},`;
+  }
+  if (line) lines.push(`${indent}${line}`);
+  return lines.join('\n');
+}
+
+const COLOURS_INTRO = 'CSS\'s named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour\n'
+  + 'property writes "red" out as, and what the ce.math colour helpers read it as.';
+const colourIntro = (prefix) => COLOURS_INTRO.split('\n').map((l) => `${prefix} ${l}`).join('\n');
+
+export function luaColourBlock() {
+  return `-- ${COLOURS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- @module ce.math
+${colourIntro('--')}
+__CE_CSS_COLOURS = {
+${colourLines((name, hex) => `${name} = "${hex}"`, '  ')}
+}
+-- ${COLOURS_END}`;
+}
+
+export function jsColourBlock() {
+  return `// ${COLOURS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// @module ce.math
+${colourIntro('//')}
+var __CE_CSS_COLOURS = {
+${colourLines((name, hex) => `${name}: "${hex}"`, '  ')}
+};
+// ${COLOURS_END}`;
+}
+
+export function pythonColourBlock() {
+  return `# ${COLOURS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# @module ce.math
+${colourIntro('#')}
+__CE_CSS_COLOURS = {
+${colourLines((name, hex) => `"${name}": "${hex}"`, '    ')}
+}
+# ${COLOURS_END}`;
+}
+
 /* --------------------------------------------------------- ce.anim tables, for C++ CODE */
 
 export function cppAnimBlock() {
@@ -792,6 +874,284 @@ ${rows}
 // number in every runtime is what makes the sampled shape identical rather than merely similar.
 static constexpr int kAnimSamples = ${ANIM_SAMPLES};
 // ${ANIM_END}`;
+}
+
+/* --------------------------------------------------------------------- option keys, checked */
+// One entry per member a prelude implements (not a panel-window one: those are stubs there) whose
+// options list fields. Each is wrapped once, where the block sits, which is before the namespace
+// block captures the real functions, so the flat name and every ce.* spelling carry the check, as
+// they do in the WebView. Nothing in a member's own code changes.
+//
+// What a refused call answers comes from panelApi.js (refusalOf). 'unanswered' and a `<section>`
+// field are things only panel-window members have; a member the preludes implement that gained one
+// would need the template taught it first, so generation stops rather than writing half a check.
+
+/** The checks the preludes carry, in the contract's order: [{ id, path, refusal, index, name, shape }]. */
+function preludeOptionChecks() {
+  const out = [];
+  for (const check of optionChecks()) {
+    if (memberRuntime(MEMBER_BY_ID[check.id]) === RUNTIME_WEBVIEW) continue;
+    if (check.params.length !== 1) throw new Error(`${check.id}: the prelude check reads one options argument, not ${check.params.length}`);
+    if (!['nothing', 'false', 'zero', 'empty list', 'result'].includes(check.refusal)) {
+      throw new Error(`${check.id}: the preludes cannot answer a refusal of "${check.refusal}"`);
+    }
+    const [{ index, name, shape }] = check.params;
+    const noSections = (s) => {
+      if (s.sections) throw new Error(`${check.id}: the preludes cannot check a <section> field`);
+      Object.values(s.nested).forEach(noSections);
+    };
+    noSections(shape);
+    out.push({ id: check.id, path: check.path, refusal: check.refusal, index, name, shape });
+  }
+  return out;
+}
+
+/** A shape as a literal: names in the contract's order, and the shapes of options with their own. */
+function shapeLiteral(shape, language) {
+  const q = JSON.stringify;
+  const nested = Object.entries(shape.nested);
+  if (language === 'lua') {
+    const inner = nested.map(([k, s]) => `[${q(k)}] = ${shapeLiteral(s, language)}`).join(', ');
+    return `{ names = { ${shape.names.map(q).join(', ')} }${nested.length ? `, nested = { ${inner} }` : ''} }`;
+  }
+  const key = (k) => (language === 'python' ? q(k) : k);
+  const inner = nested.map(([k, s]) => `${q(k)}: ${shapeLiteral(s, language)}`).join(', ');
+  return `{ ${key('names')}: [${shape.names.map(q).join(', ')}]${nested.length ? `, ${key('nested')}: { ${inner} }` : ''} }`;
+}
+
+/** One line per checked member: where its options sit, what a refusal answers, and the shape. */
+function optionRows(language) {
+  const q = JSON.stringify;
+  return preludeOptionChecks().map(({ id, path, refusal, index, name, shape }) => {
+    const body = shapeLiteral(shape, language).replace(/^\{ /, '');
+    if (language === 'lua') {
+      return `  [${q(id)}] = { path = ${q(path)}, at = ${index + 1}, refusal = ${q(refusal)}, ${body},`;
+    }
+    if (language === 'python') {
+      return `    ${q(id)}: { "path": ${q(path)}, "at": ${index}, "param": ${q(name)}, "refusal": ${q(refusal)}, ${body},`;
+    }
+    return `  ${q(id)}: { path: ${q(path)}, at: ${index}, refusal: ${q(refusal)}, ${body},`;
+  });
+}
+
+const OPTIONS_INTRO = `An options table holding a key its member does not take REFUSES the call: nothing is done, the
+console names the keys and the options the member has, and the call answers what the member
+answers for any other refusal. The WebView runtime does the same from the same lists in
+panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+order a message could follow.`;
+const commented = (prefix) => OPTIONS_INTRO.split('\n').map((l) => `${prefix} ${l}`).join('\n');
+
+export function luaOptionBlock() {
+  return `-- ${OPTIONS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+${commented('--')}
+local __CE_OPTIONS = {
+${optionRows('lua').join('\n')}
+}
+-- Byte order, which is what JavaScript's sort and Python's sorted() give these names. table.sort's
+-- own < compares with the C library's collation, which a locale can change.
+local function __ce_optionLess(a, b)
+  for i = 1, math.min(#a, #b) do
+    local x, y = string.byte(a, i), string.byte(b, i)
+    if x ~= y then return x < y end
+  end
+  return #a < #b
+end
+local function __ce_optionShape(shape)
+  shape.known = {}
+  for _, name in ipairs(shape.names) do shape.known[name] = true end
+  for _, inner in pairs(shape.nested or {}) do __ce_optionShape(inner) end
+end
+-- The keys \`opts\` holds that \`shape\` does not list, in groups: its own, then those inside each
+-- option that lists fields of its own, in the contract's order.
+local function __ce_unknownOptions(opts, shape, parent, out)
+  local unknown = {}
+  for k in pairs(opts) do
+    if type(k) == "string" and not shape.known[k] and not string.match(k, "^%d+$") then unknown[#unknown + 1] = k end
+  end
+  if #unknown > 0 then
+    table.sort(unknown, __ce_optionLess)
+    out[#out + 1] = { parent = parent, keys = unknown, shape = shape }
+  end
+  for _, name in ipairs(shape.names) do
+    local inner = shape.nested and shape.nested[name]
+    if inner ~= nil and type(opts[name]) == "table" then
+      __ce_unknownOptions(opts[name], inner, parent == "" and name or (parent .. "." .. name), out)
+    end
+  end
+  return out
+end
+local function __ce_optionsLine(path, group)
+  local p = group.parent
+  local quoted = {}
+  for i, k in ipairs(group.keys) do quoted[i] = '"' .. (p == "" and "" or (p .. ".")) .. k .. '"' end
+  local what
+  if #quoted == 1 then what = quoted[1] .. " is not one of its options, so nothing was done."
+  else what = table.concat(quoted, ", ", 1, #quoted - 1) .. " and " .. quoted[#quoted] .. " are not among its options, so nothing was done." end
+  local names, listed = group.shape.names, nil
+  if #names == 1 then listed = (p == "" and "Its only option" or ("The only option of " .. p)) .. " is " .. names[1] .. "."
+  else listed = (p == "" and "Its options" or ("The options of " .. p)) .. " are: " .. table.concat(names, ", ") .. "." end
+  return path .. ": " .. what .. " " .. listed
+end
+local function __ce_refused(refusal, lines)
+  if refusal == "false" then return false end
+  if refusal == "zero" then return 0 end
+  if refusal == "empty list" then return {} end
+  if refusal == "result" then return { ok = false, error = table.concat(lines, " ") } end
+  return nil
+end
+for __id, __spec in pairs(__CE_OPTIONS) do
+  local __fn = _G[__id]
+  if type(__fn) == "function" then
+    __ce_optionShape(__spec)
+    _G[__id] = function(...)
+      local __opts = (select(__spec.at, ...))
+      if type(__opts) == "table" then
+        local __groups = __ce_unknownOptions(__opts, __spec, "", {})
+        if #__groups > 0 then
+          local __lines = {}
+          for __i, __group in ipairs(__groups) do
+            __lines[__i] = __ce_optionsLine(__spec.path, __group)
+            logError(__lines[__i])
+          end
+          return __ce_refused(__spec.refusal, __lines)
+        end
+      end
+      return __fn(...)
+    end
+  end
+end
+-- ${OPTIONS_END}`;
+}
+
+export function jsOptionBlock() {
+  return `// ${OPTIONS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+${commented('//')}
+var __CE_OPTIONS = {
+${optionRows('javascript').join('\n')}
+};
+function __ce_isOptions(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v)
+    && !(typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(v));
+}
+// The keys \`opts\` holds that \`shape\` does not list, in groups: its own, then those inside each
+// option that lists fields of its own, in the contract's order.
+function __ce_unknownOptions(opts, shape, parent, out) {
+  var unknown = [];
+  for (var key in opts) {
+    if (Object.prototype.hasOwnProperty.call(opts, key) && shape.names.indexOf(key) < 0 && !/^\\d+$/.test(key)) unknown.push(key);
+  }
+  if (unknown.length) { unknown.sort(); out.push({ parent: parent, keys: unknown, shape: shape }); }
+  for (var i = 0; i < shape.names.length; i++) {
+    var name = shape.names[i], inner = shape.nested ? shape.nested[name] : undefined;
+    if (inner && Object.prototype.hasOwnProperty.call(opts, name) && __ce_isOptions(opts[name]))
+      __ce_unknownOptions(opts[name], inner, parent ? parent + "." + name : name, out);
+  }
+  return out;
+}
+function __ce_optionsLine(path, group) {
+  var p = group.parent, quoted = [];
+  for (var i = 0; i < group.keys.length; i++) quoted.push('"' + (p ? p + "." : "") + group.keys[i] + '"');
+  var what = quoted.length === 1 ? quoted[0] + " is not one of its options, so nothing was done."
+    : quoted.slice(0, -1).join(", ") + " and " + quoted[quoted.length - 1] + " are not among its options, so nothing was done.";
+  var names = group.shape.names;
+  var listed = names.length === 1 ? (p ? "The only option of " + p : "Its only option") + " is " + names[0] + "."
+    : (p ? "The options of " + p : "Its options") + " are: " + names.join(", ") + ".";
+  return path + ": " + what + " " + listed;
+}
+function __ce_refused(refusal, lines) {
+  if (refusal === "false") return false;
+  if (refusal === "zero") return 0;
+  if (refusal === "empty list") return [];
+  if (refusal === "result") return { ok: false, error: lines.join(" ") };
+  return undefined;
+}
+(function () {
+  var __g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  for (var id in __CE_OPTIONS) {
+    if (!Object.prototype.hasOwnProperty.call(__CE_OPTIONS, id) || typeof __g[id] !== "function") continue;
+    __g[id] = (function (fn, spec) {
+      return function () {
+        var opts = arguments[spec.at];
+        if (__ce_isOptions(opts)) {
+          var groups = __ce_unknownOptions(opts, spec, "", []);
+          if (groups.length) {
+            var lines = [];
+            for (var i = 0; i < groups.length; i++) { lines.push(__ce_optionsLine(spec.path, groups[i])); logError(lines[i]); }
+            return __ce_refused(spec.refusal, lines);
+          }
+        }
+        return fn.apply(this, arguments);
+      };
+    })(__g[id], __CE_OPTIONS[id]);
+  }
+})();
+// ${OPTIONS_END}`;
+}
+
+export function pythonOptionBlock() {
+  return `# ${OPTIONS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+${commented('#')}
+# In Python an options argument can also be passed by its parameter's name, so it is looked for there.
+__CE_OPTIONS = {
+${optionRows('python').join('\n')}
+}
+# The keys \`opts\` holds that \`shape\` does not list, in groups: its own, then those inside each
+# option that lists fields of its own, in the contract's order.
+def __ce_unknownOptions(opts, shape, parent, out):
+    names = shape["names"]
+    unknown = sorted(k for k in opts
+                     if isinstance(k, str) and k not in names and not (k.isascii() and k.isdigit()))
+    if unknown:
+        out.append({ "parent": parent, "keys": unknown, "shape": shape })
+    nested = shape.get("nested") or {}
+    for name in names:
+        if name in nested and isinstance(opts.get(name), dict):
+            __ce_unknownOptions(opts[name], nested[name], (parent + "." + name) if parent else name, out)
+    return out
+
+def __ce_optionsLine(path, group):
+    p = group["parent"]
+    quoted = ['"' + (p + "." if p else "") + k + '"' for k in group["keys"]]
+    if len(quoted) == 1:
+        what = quoted[0] + " is not one of its options, so nothing was done."
+    else:
+        what = ", ".join(quoted[:-1]) + " and " + quoted[-1] + " are not among its options, so nothing was done."
+    names = group["shape"]["names"]
+    if len(names) == 1:
+        listed = ("The only option of " + p if p else "Its only option") + " is " + names[0] + "."
+    else:
+        listed = ("The options of " + p if p else "Its options") + " are: " + ", ".join(names) + "."
+    return path + ": " + what + " " + listed
+
+def __ce_refused(refusal, lines):
+    if refusal == "false": return False
+    if refusal == "zero": return 0
+    if refusal == "empty list": return []
+    if refusal == "result": return { "ok": False, "error": " ".join(lines) }
+    return None
+
+def __ce_optionChecked(fn, spec):
+    def checked(*args, **kwargs):
+        at = spec["at"]
+        opts = args[at] if len(args) > at else kwargs.get(spec["param"])
+        if isinstance(opts, dict):
+            groups = __ce_unknownOptions(opts, spec, "", [])
+            if groups:
+                lines = [__ce_optionsLine(spec["path"], g) for g in groups]
+                for line in lines:
+                    logError(line)
+                return __ce_refused(spec["refusal"], lines)
+        return fn(*args, **kwargs)
+    return checked
+
+__ceOptionId = None
+for __ceOptionId in __CE_OPTIONS:
+    if callable(globals().get(__ceOptionId)):
+        globals()[__ceOptionId] = __ce_optionChecked(globals()[__ceOptionId], __CE_OPTIONS[__ceOptionId])
+# del, for the reason the stub list gives: a module-level loop variable outlives its loop.
+del __ceOptionId
+# ${OPTIONS_END}`;
 }
 
 /* ------------------------------------------------------------------------------- splicing */
@@ -816,6 +1176,21 @@ const MUSIC_TARGETS = [
   { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaMusicBlock },
   { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsMusicBlock },
   { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonMusicBlock },
+];
+
+// Marked by hand, like the stub list, because where it sits matters: after every member it wraps is
+// defined, and before the namespace block captures them.
+const OPTION_TARGETS = [
+  { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaOptionBlock },
+  { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsOptionBlock },
+  { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonOptionBlock },
+];
+
+// Marked by hand too: inside each prelude's ce.math region, before the colour readers use it.
+const COLOUR_TARGETS = [
+  { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaColourBlock },
+  { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsColourBlock },
+  { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonColourBlock },
 ];
 
 /** Replace an existing generated block, or append one just before the prelude's closing delimiter. */
@@ -863,10 +1238,16 @@ function run() {
     const source = readText(path);
     const stubs = STUB_TARGETS.find((t) => t.file === target.file);
     const music = MUSIC_TARGETS.find((t) => t.file === target.file);
+    const options = OPTION_TARGETS.find((t) => t.file === target.file);
+    const colours = COLOUR_TARGETS.find((t) => t.file === target.file);
     const next = splice(
       splice(
-        splice(source, music.block(), null, MUSIC_BEGIN, MUSIC_END),
-        stubs.block(), null, STUBS_BEGIN, STUBS_END),
+        splice(
+          splice(
+            splice(source, colours.block(), null, COLOURS_BEGIN, COLOURS_END),
+            music.block(), null, MUSIC_BEGIN, MUSIC_END),
+          stubs.block(), null, STUBS_BEGIN, STUBS_END),
+        options.block(), null, OPTIONS_BEGIN, OPTIONS_END),
       target.block(), target.end);
 
     if (mode === '--write') {

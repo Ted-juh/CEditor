@@ -23,7 +23,8 @@ panel API (mirrors `CE/web/src/CE_Application/scripting/panelApi.js`).
 | `LuaScriptEngine.cpp` | Lua 5.4 via Sol3. Per-script `sol::environment` isolation, native API bindings, pure-Lua helper prelude. |
 | `JsScriptEngine.cpp` | JS via `juce::JavascriptEngine`. One engine per panel, each script a function scope with its own per-script context (listeners, timers, `state`, `self`, and any new name it assigns without declaring or puts on `globalThis`, kept behind the global by a proxy that relies on patch 7 in `JUCE/VENDORED.md`); native `__api` object + JS prelude. |
 | `PythonScriptEngine.cpp` | Embedded CPython 3.12+ (behind `CEDITOR_PYTHON`). An interpreter per instance, so two instances share no module, builtin or host; its own `ceditor` bridge module, whose state names the instance; each script its own namespace dict; no threads. |
-| `BridgeScriptHost.h` | `ScriptHostApi` impl forwarding to app-supplied callbacks; computes transmit-by-default. |
+| `BridgeScriptHost.h` | `ScriptHostApi` impl forwarding to app-supplied callbacks; computes transmit-by-default. Reads every set()'s colours by the editor's rule (`colourWrites`) before writing. |
+| `ScriptColours.h` | The editor's colour-property rule (`scriptColours.js`) in C++, in its words: what is stored, written out or refused, and which fields are colours. Its tables are `ScriptColours.generated.h`, written by `tools/scripts/gen-colour-fields.mjs`; `CE/web/test/fixtures/colourPropertyCases.json` holds both sides to the same answers. |
 
 ## Build
 ```

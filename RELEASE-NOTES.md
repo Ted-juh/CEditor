@@ -36,6 +36,49 @@ or follow the control's value like a scrubbed film. A track can be a part's tran
 colour, one of the control's value channels, or a filmstrip part's frame, so a filmstrip knob
 turns on the sequence too.
 
+**Scripts written for an earlier build: zones and phrase cells now count from 1.** The Zone
+Splitter's verbs (`ce.components.split.mute`, `channel`, `transpose` and `point`) and
+`ce.components.phrase.cell` count from 1, as the panel labels them and as every other component verb
+counts, so zone 1 is the one labelled "Zone 1". They counted from 0, so a script that names a zone, a
+step or a row by number now reaches the one before the one it meant: add 1 to each. Zone 0 and step
+0 are refused, and the console says the range. A zone named by its label works as it did.
+
+**Scripts written for an earlier build: some `ce.math` answers have changed.**
+
+- `randomFloat(5)` gives a number from 0 up to 5. It was between 1 and 5.
+- `random` gives only whole numbers inside its range: `random(1.5, 3.5)` gives 2 or 3, where it
+  could give 1. A range with no whole number in it, such as 1.2 to 1.8, is refused.
+- `hslToHex` with a negative hue gave the wrong colour in the editor and in JavaScript scripts; -120
+  is blue now, as it was in Lua and Python. A saturation or lightness below 0 is held at 0.
+- `angleOf` of the same point twice is 0. It was 180 in the editor and in JavaScript scripts.
+- A number written as text, such as "128", is read as one in every language (Python read it as 0).
+  A value that is not a number is refused in `rgbToHex`, `hslToHex`, `mixColour`, `snap` and `lerp`,
+  where it was read as 0 or gave NaN, and the console says which one.
+
+**Scripts written for an earlier build: `ce.anim` rejects a control the panel does not have.**
+
+- `ce.anim.to`, `ce.anim.spring` and `ce.anim.envelope` given a control name the panel does not
+  have, such as a misspelt `"cutof"`, return false and write one error to the console. The move
+  used to start: it returned true, wrote an error on every step, and called `done` with true at
+  the end. A list with such a name in it is rejected whole, as a list with a colour property is.
+- An empty path, or none, writes an error to the console. It returned false without a word.
+- A `damping` below 0 is replaced by the default, 6, with a console warning. It made the spring
+  grow without limit instead of settling.
+- A `curve` that cannot be used (an unknown name, control points out of range, or a value that is
+  neither a name nor four numbers) is warned about once per command, as every other option is, and
+  the move is linear. It was logged on every call, and the last case was linear in silence.
+- A `from` that is not a number ("abc", true) starts from the current value, with a console
+  warning. It started from 0 or 1 in silence.
+- A `stagger` below 0 is replaced by 0, with a warning. It gave each path a delay below 0, and the
+  warning named `delay`.
+- A `repeat` that is not a number runs the move once, with a warning. It was silent.
+- A `done` that is not a function is reported with a warning. It was dropped in silence.
+- `ce.anim.envelope` with a `from` or `to` that is not a number uses the default (0 and 1), with a
+  warning. "abc" was read as 0 and true as 1 in silence, so `to = "abc"` held the whole move at 0;
+  in Python, "abc" raised an error.
+- `ce.anim.envelope` with fewer than two points writes an error to the console, as every other
+  rejection does. It wrote a plain line.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

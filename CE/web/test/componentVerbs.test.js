@@ -596,3 +596,53 @@ test('an addressed verb types its index or name separately from its value', () =
   assert.equal(params('pixelX').name, 'string');
   assert.equal(params('pixelX').x, 'number');
 });
+
+/* ------------------------------------------------------------------------- colours they write */
+// Which verbs write a colour is said by the colour fields (scriptColours.colourFieldAt), not by any
+// verb's name, and every verb built from the spec writes through one place that reads them by the
+// rule set() follows. So a verb added later that reaches a colour field is read the same way.
+
+test('the one verb whose value is a colour is found by the colour fields, not by its name', async () => {
+  const { colourFieldAt } = await import('../src/CE_Application/scripting/scriptColours.js');
+  const bare = { _children: {} };
+  const valueIsColour = (verb) => {
+    if (verb.k === 'item' || verb.k === 'elem') return colourFieldAt(bare, `${verb.section}.${verb.f}.0.${verb.item}`);
+    return verb.f && ['num', 'int', 'bool', 'str', 'enum'].includes(verb.k) && colourFieldAt(bare, `${verb.section}.${verb.f}`);
+  };
+  assert.deepEqual(COMPONENT_VERBS.filter(valueIsColour).map((verb) => verb.id), ['drumPadsColour']);
+});
+
+test('a verb that rewrites a list of colours reads every colour in it, and names the one it cannot', async () => {
+  // meter.zoneAt moves where one zone starts, and writes the zones list whole. A colour stored in it
+  // before the rule is written out on the way through; one the panel cannot read refuses the call.
+  const { scriptApiForTesting, setRuntimeHost } = await import('../src/CE_Application/scripting/panelRuntime.js');
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { scriptTrace, clearScriptTrace } = await import('../src/CE_Application/stores/scriptConsole.js');
+  const { get } = await import('svelte/store');
+
+  const meter = createControl('Meter', { name: 'M' });
+  meter._children.Meter.zones = [{ from: 0, colour: 'lime' }, { from: 0.8, colour: 'FFFF0000' }];
+  const panel = {
+    id: 'p', name: 'Verbs', width: 800, height: 400, controls: [meter],
+    scripting: { modules: ['ce.components.meter'] },
+  };
+  setRuntimeHost({ panel, scripts: [], ...(await valueIo()) });
+  const lines = () => get(scriptTrace).map((t) => `${t.kind}: ${t.message}`);
+  try {
+    const api = scriptApiForTesting('', 'verb-script');
+    clearScriptTrace();
+    assert.equal(api.meterZoneAt('M', 2, 0.7), true);
+    assert.deepEqual(meter._children.Meter.zones, [{ from: 0, colour: '#00FF00' }, { from: 0.7, colour: 'FFFF0000' }]);
+    assert.deepEqual(lines(), ['log: meter M: zoneAt → zones']);
+
+    meter._children.Meter.zones[1].colour = 'redd';
+    clearScriptTrace();
+    assert.equal(api.meterZoneAt('M', 1, 0.1), false);
+    assert.deepEqual(lines(), ['error: ce.components.meter.zoneAt("M"): in zone 2, "redd" is not a colour the panel '
+      + 'can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
+      + 'or "#RGB", a CSS colour name, rgb() or hsl().']);
+    assert.equal(meter._children.Meter.zones[0].from, 0, 'nothing was written');
+  } finally {
+    setRuntimeHost(null);
+  }
+});

@@ -20,6 +20,7 @@
     language as languageOf,
   } from '../scripting/panelApi.js';
   import { moduleAppliesToType, describeType, isKnownType } from '../scripting/componentSchema.js';
+  import { codeParts } from './explainViews.js';
   import { untrack } from 'svelte';
 
   let {
@@ -98,9 +99,13 @@
   let narrowing = $derived(narrowable && narrowPref);
   const fitsTarget = (module) => !narrowing || !module || moduleAppliesToType(module.id, targetType);
 
+  // A command's words beyond its description are searched too: a word moved from the description into
+  // a note ("Non-Registered Parameter Number") still finds it. docs/design/api-descriptions-handoff.md.
+  const wordsOf = (m) => [m.summary, m.example, ...(m.notes ?? []).map((n) => (typeof n === 'string' ? n : n?.text))]
+    .filter(Boolean).join(' ').toLowerCase();
   const matches = (m) => !q || m.id.toLowerCase().includes(q)
     || memberPath(m.id).toLowerCase().includes(q)
-    || (m.summary ?? '').toLowerCase().includes(q);
+    || wordsOf(m).includes(q);
 
   let allGroups = $derived(
     membersByModule()
@@ -193,6 +198,10 @@
   }
 </script>
 
+<!-- A description and its example mark code with backticks; they are drawn as code, as the Values
+     tab draws them, not shown as backticks. -->
+{#snippet described(text)}{#each codeParts(text) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}{/snippet}
+
 <div class="picker">
   <div class="ptabs">
     <button class={['ptab', tab === 'paths' && 'active']} onclick={() => tab = 'paths'}>Paths</button>
@@ -243,7 +252,7 @@
         <div class="pitem" role="button" tabindex="0" onclick={() => insertEvent(ev)}
           onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && insertEvent(ev)}>
           <div class="pn">{ev.fn} <span class="pd">({ev.payload ?? ''})</span></div>
-          <div class="pd">{ev.summary}</div>
+          <div class="pd">{@render described(ev.summary)}</div>
         </div>
       {/each}
     {/each}
@@ -270,7 +279,7 @@
           onclick={() => insertCommand(m)}
           onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && insertCommand(m)}>
           <div class="pn">{spelling === 'module' ? memberPath(m.id) : m.id}<span class="pd">{(m.signature ?? '').slice((m.id ?? '').length)}</span></div>
-          <div class="pd">{m.summary}{invalid ? `  ·  ${(m.scopes || []).join('/')} only` : ''}</div>
+          <div class="pd">{@render described(m.example ? `${m.summary} ${m.example}` : m.summary)}{invalid ? `  ·  ${(m.scopes || []).join('/')} only` : ''}</div>
         </div>
       {/each}
     {/each}
@@ -293,7 +302,7 @@
           {#each g.items as m (m.id)}
             <div class="pitem pitem-off" title="This module is not enabled — the call would log a notice instead of acting.">
               <div class="pn">{memberPath(m.id)}<span class="pd">{(m.signature ?? '').slice((m.id ?? '').length)}</span></div>
-              <div class="pd">{m.summary}</div>
+              <div class="pd">{@render described(m.summary)}</div>
             </div>
           {/each}
         {/each}

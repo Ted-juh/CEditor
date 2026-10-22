@@ -1356,6 +1356,7 @@ private:
     std::map<juce::String, float> lastCapturedValue;
     bool dumpCaptureBuilt = false;                 // refreshCapturedDumps has reached a profile
     std::set<juce::String> loggedSkippedDumps;     // dumps already reported as not captured
+    std::set<juce::String> deviceOverrideWarned;   // setVariable / setTiming names that have said a value was not used as given
 
     // S4. The bank is baked at export and never changes — the host caches getNumPrograms() the
     // moment it loads us. `programChangePending` is atomic because setCurrentProgram can arrive on
@@ -1680,15 +1681,6 @@ private:
     }
    #endif
 
-    /** The `{ ok: false, error }` shape a script-facing callback returns when it cannot answer. */
-    static juce::var errorVar (const juce::String& message)
-    {
-        auto* out = new juce::DynamicObject();
-        out->setProperty ("ok", false);
-        out->setProperty ("error", message);
-        return juce::var (out);
-    }
-
     void setupScripting (const std::shared_ptr<const ceditor::SharedPanelDocument>& panel)
     {
         // The document construction already parsed, shared with every other instance of the panel:
@@ -1702,6 +1694,14 @@ private:
         // control's own Behavior.min/max, so get("cutoff.normalizedValue") answers window-closed
         // exactly as it does in the panel view.
         cb.getValue = [this] (const juce::String& path, const juce::String& form) { return scriptValues.getValue (path, form); };
+        cb.whyNoValue = [this] (const juce::String& path) { return scriptValues.whyNoAnswer (path); };
+        // A colour is read by the editor's rule before it is written, and ce.anim refuses a colour
+        // property as its path (Scripting/ScriptColours.h), in the editor's words, so "red" written
+        // here is stored as "#FF0000" and "redd" is refused, window shut as in the panel view.
+        cb.colourWrites = [this] (const juce::String& call, const juce::String& path, const juce::var& value,
+                                  const juce::String& form) { return scriptValues.colourWrites (call, path, value, form); };
+        cb.isColourProperty = [this] (const juce::String& path) { return scriptValues.isColourProperty (path); };
+        cb.namesMissingControl = [this] (const juce::String& path) { return scriptValues.namesMissingControl (path); };
         cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER
@@ -1850,11 +1850,19 @@ private:
         // is the value that parameter should carry. Parameters no control is bound to are simply not
         // supplied, and the engine leaves the definition's default bytes in place and says which
         // they were — the ordinary case for a panel that covers part of a dump.
+        //
+        // A dump it cannot build gives nothing back and says why, as the editor's runtime does: it
+        // gave back { ok = false, error }, which a script testing the result for truth took for a
+        // dump, and said nothing. A kind the profile has no dump by is refused before this, in
+        // BridgeScriptHost::buildDump.
         cb.buildDump = [this] (const juce::String& kind) -> juce::var
         {
             auto* engine = deviceService.engineForRole ({});
             if (engine == nullptr)
-                return errorVar ("No device profile is loaded");
+            {
+                scriptLogLine ("[script] buildDump(\"" + kind + "\"): no device profile is chosen for mainSynth, so nothing was built.");
+                return {};
+            }
 
             auto* values = new juce::DynamicObject();
             for (const auto& desc : panelParams)
@@ -1868,7 +1876,10 @@ private:
 
             const auto built = engine->buildDumpMessage (kind, juce::var (values));
             if (! built.ok)
-                return errorVar (built.error);
+            {
+                scriptLogLine ("[script] buildDump(\"" + kind + "\"): " + built.error);
+                return {};
+            }
 
             // The shape a script gets back: the bytes to send, plus what was and was not covered.
             // `unmapped` is the interesting field — it is how a script can tell it is about to send
@@ -1902,27 +1913,54 @@ private:
                                  const juce::String& roleIn) -> bool
         {
             if (parameterId.isEmpty()) return false;
+            const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
             auto* req = new juce::DynamicObject();
-            req->setProperty ("deviceRole", roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn);
+            req->setProperty ("deviceRole", role);
             req->setProperty ("parameterId", parameterId);
             req->setProperty ("value", value);
             req->setProperty ("dryRun", false);      // actually send it
             const auto result = deviceService.compileParameterMessage (juce::var (req), true);
             auto* obj = result.getDynamicObject();
-            return obj != nullptr && (bool) obj->getProperty ("ok");
+            if (obj != nullptr && (bool) obj->getProperty ("ok")) return true;
+            // A parameter the profile does not have, and a device no profile is chosen for, both
+            // answered false without a word. Each is said, in the words the editor's runtime says it
+            // in (CE/web/src/CE_Application/scripting/deviceWords.js;
+            // test/deviceParameterTable.test.js holds the two to one text). A parameter the script
+            // declared never comes here: BridgeScriptHost sends it without a profile.
+            const auto error = obj != nullptr ? obj->getProperty ("error").toString() : juce::String();
+            if (error.startsWith ("Unknown parameter: "))
+                scriptLogLine ("[script] ce.device.write: \"" + parameterId + "\" is not a parameter of the "
+                               + role
+                               + " profile, so nothing was sent.");
+            else if (error.startsWith ("No device profile mapped for role: "))
+                scriptLogLine ("[script] ce.device.write: no device profile is chosen for " + role + ", so \""
+                               + parameterId
+                               + "\" was not sent. A parameter declared with ce.device.defineParameter is sent without one.");
+            return false;
         };
 
         // setVariable / setTiming. The override goes onto this project's ROLE MAPPING, merged over
         // the profile's defaults on the way to every recipe — a profile is a shared document and
         // two panels driving two units of the same synth must not have to edit it to disagree
         // about a device id.
-        cb.deviceSet = [this] (const juce::String& kind, const juce::String& name,
+        //
+        // A name left out, a role no profile is chosen for, a value that is no number, and a number
+        // used as the nearest whole one in range each answered false or was stored without a word,
+        // text and all. Each is said now, in the editor's runtime's words and order (deviceWords.js;
+        // test/deviceOverrides.test.js holds the two to them), the last once per name.
+        cb.deviceSet = [this] (const juce::String& kind, const juce::String& nameIn,
                                const juce::var& value, const juce::String& roleIn) -> bool
         {
-            if (name.isEmpty()) return false;
             const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
             const bool wantVars = kind == "variable";
             if (! wantVars && kind != "timing") return false;
+            const juce::String label = wantVars ? "setVariable" : "setTiming";
+            const auto name = nameIn.trim();
+            if (name.isEmpty())
+            {
+                scriptLogLine ("[script] ce.device." + label + ": a name is required, so nothing was changed.");
+                return false;
+            }
 
             const auto session = deviceService.getSessionState();
             auto* sessionObj = session.getDynamicObject();
@@ -1930,7 +1968,20 @@ private:
             auto* recordObj = record.getDynamicObject();
             const auto profileId = recordObj != nullptr ? recordObj->getProperty ("profileId").toString()
                                                         : juce::String();
-            if (profileId.isEmpty()) return false;   // nothing mapped — say so rather than pretend
+            if (profileId.isEmpty())
+            {
+                scriptLogLine ("[script] ce.device." + label + ": no device profile is chosen for " + role
+                               + ", so nothing was changed.");
+                return false;
+            }
+            const auto read = deviceOverrideValue (label, name, value, 0, wantVars ? 127 : 60000);
+            if (! read.ok)
+            {
+                scriptLogLine ("[script] " + read.refused);
+                return false;
+            }
+            if (read.said.isNotEmpty() && deviceOverrideWarned.insert (label + "/" + role + "/" + name).second)
+                scriptLogLine ("[script] " + read.said + " This is said only the first time.");
 
             // Carried forward whole: setDeviceRoleMapping replaces the mapping, so dropping the
             // ports here would silently unplug the device this call is about.
@@ -1947,7 +1998,7 @@ private:
                 if (auto* existing = recordObj->getProperty (slot).getDynamicObject())
                     for (const auto& e : existing->getProperties())
                         merged->setProperty (e.name, e.value);
-            merged->setProperty (juce::Identifier (name), value);
+            merged->setProperty (juce::Identifier (name), read.value);
             req->setProperty (slot, juce::var (merged));
             if (recordObj != nullptr)
                 req->setProperty (wantVars ? "timingOverrides" : "variables",
@@ -2050,18 +2101,35 @@ private:
             // coming in) rather than by asking the instrument, which almost none can be asked.
             if (kind == "recallPreset")
             {
+                const auto slot = p != nullptr ? p->getProperty ("slot") : juce::var (0);
                 auto* request = new juce::DynamicObject();
                 request->setProperty ("deviceRole", role);
-                request->setProperty ("slot", p != nullptr ? p->getProperty ("slot") : juce::var (0));
+                request->setProperty ("slot", slot);
                 request->setProperty ("dryRun", false);
                 auto result = deviceService.compilePresetRecallAction (juce::var (request), true);
 
-                if (auto* answered = result.getDynamicObject())
-                    if (answered->getProperty ("ok").equals (juce::var (true)))
-                    {
-                        currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
-                        currentPresetSource[role] = "panel";
-                    }
+                auto* answered = result.getDynamicObject();
+                if (answered != nullptr && answered->getProperty ("ok").equals (juce::var (true)))
+                {
+                    currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
+                    currentPresetSource[role] = "panel";
+                    return result;
+                }
+
+                // A recall that recalled nothing answered { ok: false } without a word. Said as the
+                // editor says it (CE/web/.../presetWords.js and panelRuntime's recallPresetImpl):
+                // the slot as it reads it, a role with no profile, and else the engine's own reason,
+                // which is the editor's local engine's too.
+                const double asNumber = slot.isString() ? slot.toString().getDoubleValue() : static_cast<double> (slot);
+                const bool isNumber = slot.isInt() || slot.isInt64() || slot.isDouble() || (slot.isString() && slot.toString().trim().containsOnly ("0123456789.-+eE"));
+                if (! isNumber || ! std::isfinite (asNumber) || juce::roundToInt (asNumber) < 0)
+                    scriptLogLine ("[script] recallPreset(slot): slot must be an integer >= 0.");
+                else if (deviceService.engineForRole (role) == nullptr)
+                    scriptLogLine ("[script] recallPreset(" + juce::String (juce::roundToInt (asNumber)) + "): no device profile is chosen for "
+                                   + role + ", so nothing was recalled.");
+                else
+                    scriptLogLine ("[script] recallPreset(" + juce::String (juce::roundToInt (asNumber)) + "): "
+                                   + (answered != nullptr ? answered->getProperty ("error").toString() : juce::String ("nothing was recalled.")));
                 return result;
             }
 
@@ -2182,6 +2250,42 @@ private:
             }
 
             // The ids of what a profile can build or ask for.
+            // The dumps the profile defines, by id: what requestDump, sendDump and buildDump take
+            // (BridgeScriptHost::unknownDumpKind). Void, not empty, when there is no document to
+            // say, so a kind is not refused for want of one.
+            if (kind == "dumps")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr) return {};
+                juce::Array<juce::var> out;
+                if (auto* arr = docObj->getProperty ("dumpDefinitions").getArray())
+                    for (const auto& item : *arr)
+                        if (auto* o = item.getDynamicObject())
+                            if (const auto id = o->getProperty ("id").toString(); id.isNotEmpty())
+                                out.add (juce::var (id));
+                return juce::var (out);
+            }
+
+            // The dump a request answers with: requestDump(kind, fn) waits for it under that id,
+            // which is the one its answer arrives under. Void for a kind that is no request.
+            if (kind == "answers")
+            {
+                const auto wanted = p != nullptr ? p->getProperty ("request").toString() : juce::String();
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    if (auto* arr = docObj->getProperty ("requests").getArray())
+                        for (const auto& item : *arr)
+                            if (auto* o = item.getDynamicObject(); o != nullptr && o->getProperty ("id").toString() == wanted)
+                            {
+                                auto* response = o->getProperty ("response").getDynamicObject();
+                                const auto dump = response != nullptr ? response->getProperty ("dump").toString()
+                                                                      : o->getProperty ("expectedDump").toString();
+                                return dump.isNotEmpty() ? juce::var (dump) : juce::var();
+                            }
+                return {};
+            }
+
             if (kind == "recipes" || kind == "requests")
             {
                 const auto doc = profileDocument();

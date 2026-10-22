@@ -27,7 +27,7 @@ import {
   SCRIPT_LANGUAGES, SELF, VALUE_ACCESSORS,
   LIFECYCLE_HOOKS, CONTROL_EVENTS, PANEL_EVENTS, TIME_EVENTS, DEVICE_EVENTS, COMPONENT_EVENTS,
   MODULE_GROUPS, COMPONENT_GROUPS, moduleById, membersByModule, memberPath, memberRuntime,
-  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
+  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER, paramTypeLine,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 // The canonical handler in every language — REAL, toolchain-validated source (the fixture
@@ -55,12 +55,43 @@ const LANGUAGE_NOTES = {
 /** One paragraph per module, introducing the chapter in Part 2. */
 const MODULE_INTROS = {
   'ce.core': 'The commands nearly every script uses: reading and changing values, deciding whether a change is sent to the synth, listening for events, and printing to the script console. These are always available and are written without a `ce.` prefix: `set(…)`, `get(…)`, `on(…)`, `log(…)`. Three are the exception, because their short names would clash with words the languages already use: `ce.core.action`, `ce.core.warn` and `ce.core.error`, also known as `defineAction`, `logWarn` and `logError`.',
-  'ce.midi': 'Sending MIDI yourself, and catching MIDI on its way in or out. Most panels do not need these, because a control bound to a synth parameter sends its own MIDI. Reach for them for messages the device profile does not cover: notes, program changes, clock, hand-built SysEx. Channels are always counted 1 to 16. The last part of this chapter is a set of helper functions for packing values into SysEx bytes.',
+  'ce.midi': 'Sending MIDI yourself, and catching MIDI on its way in or out. Most panels do not need these, because a control bound to a synth parameter sends its own MIDI. Reach for them for messages the device profile does not cover: notes, program changes, clock, hand-built SysEx. Channels are always counted 1 to 16. The last part of this chapter is a set of helper functions for packing values into SysEx bytes.\n\n'
+    + 'Every send command reads its numbers the same way. A channel, controller or note outside its range, or anything that is not a number, is refused with a message and nothing is sent. A value past the end of its range is sent as the nearest end, and the first time a warning says so. Text that is a number is read as one, and a fraction is rounded.',
   'ce.device': 'Working with the synth through its device profile — the description of the synth\'s parameters, messages and dumps that you build in the Device Profile Designer. With a profile you work in parameter names and real values, and the profile turns them into MIDI. These commands ask the synth for its settings, recall presets, read and change parameters by name, and describe a synth from a script when it has no profile. `role` picks which device to talk to when a panel uses more than one; it defaults to "mainSynth".',
   'ce.music': 'Helper functions for notes and harmony: note names and numbers, scales, chords, keeping a note in key, and building arpeggios. They only calculate — nothing is sent anywhere.',
   'ce.time': 'Timers, and the musical clock. A timer runs your code later or repeatedly; the musical commands read the tempo and the song position, convert between beats and milliseconds, and help you step a sequence in time. Musical timing here is accurate to about a thirtieth of a second: right for lights, displays and stepping patterns, not for timing audio.',
-  'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.',
-  'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.',
+  'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.\n\n'
+    + '**Colours that every colour command reads**\n'
+    + '\n'
+    + '| Written as | Example | Read as |\n'
+    + '|---|---|---|\n'
+    + '| Six hex digits | "#FF8800" or "FF8800" | #FF8800 |\n'
+    + '| Eight hex digits, alpha first | "80FF8800" | #FF8800 (alpha ignored) |\n'
+    + '| Three hex digits, with # | "#F80" | #FF8800 |\n'
+    + '| A colour name | "red", "steelblue" | #FF0000, #4682B4 |\n'
+    + '| rgb() or rgba() | "rgb(255, 136, 0)" | #FF8800 |\n'
+    + '| hsl() or hsla() | "hsl(32, 100%, 50%)" | #FF8800 |\n'
+    + '\n'
+    + '**Not accepted.** The command writes an error to the console and returns no value.\n'
+    + '\n'
+    + '| Written as | Example |\n'
+    + '|---|---|\n'
+    + '| A number | 255 |\n'
+    + '| Three hex digits without # | "F80" |\n'
+    + '| # with four digits | "#F808" |\n'
+    + '| Spaces around it | " #FF8800" |\n'
+    + '\n'
+    + 'Colour commands return "#RRGGBB" unless their description says otherwise.\n'
+    + '\n'
+    + '**Random numbers**\n'
+    + '\n'
+    + '- Every random command takes its numbers from the script\'s own random sequence.\n'
+    + '- `ce.math.seed(n)` sets where that sequence starts. The same seed gives the same numbers every time: in every scripting language, in the editor and in the exported plugin.\n'
+    + '- `ce.math.stream(name, fn)` gives a block of code its own separate sequence, so two parts of a script don\'t affect each other\'s numbers.',
+  'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.\n\n'
+    + '- A required value that is missing or of the wrong type: the call is rejected with a console error.\n'
+    + '- An option with a wrong value: a console warning, the first time only, and the fallback in its row is used.\n'
+    + '- Number options also accept text that is a number, such as "500".',
   'ce.panel': 'Changing the panel itself from a script: creating, copying and removing controls, finding them, lining them up, and editing the lists inside a control such as its states and animations. Most of these need the panel window; each entry says so. While you preview, everything a script changes is put back when the preview stops — `ce.panel.keep` is how you keep it.',
   'ce.storage': 'Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.',
   'ce.draw': 'Drawing your own graphics on top of a control, from its script\'s onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control\'s top-left corner.',
@@ -126,7 +157,10 @@ const anchor = (text) => String(text).toLowerCase().replace(/[^\w\s-]/g, '').tri
 const moduleHeading = (id) => `${id}: ${MODULE_TITLES[id]}`;
 const moduleLink = (id) => `[${id}](#${anchor(moduleHeading(id))})`;
 
-const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+// A line break in a text is a rule of its own (a parameter's Range, Default, Invalid…): <br> in a
+// cell and in a list item, which GitHub and the app's Help (utils/markdown.js) both render.
+const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+const lines = (text) => String(text ?? '').replace(/\n/g, '<br>');
 
 /** The value list a field accepts, as a sentence fragment. */
 function valuesText(values) {
@@ -147,7 +181,7 @@ function fieldTable(param, lifecycle) {
     const type = f.unit ? `${f.type} (${f.unit})` : f.type;
     // The list, unless the description already names every value in it.
     const named = f.values?.every((v) => f.summary.includes(`"${v}"`));
-    const values = f.values?.length && !named ? ` One of ${valuesText(f.values)}.` : '';
+    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.` : '';
     const what = `${f.summary}${values}`;
     if (!withDefault) return `| \`${f.name}\` | ${cell(type)} | ${cell(what)} |`;
     const def = f.required ? 'required' : (f.default ?? '—');
@@ -183,14 +217,50 @@ function headingSignature(member) {
   return sig.startsWith(member.id) ? path + sig.slice(member.id.length) : sig;
 }
 
+// A command's text beyond its description (docs/design/api-descriptions-handoff.md, "The fields"):
+// its example, what each parameter is, the choice a function's answer makes, and "Good to know".
+// Each parameter is named with its type and whether it is required, from the contract, so its own
+// text does not have to say "Number required."; an options parameter's fields follow as a table.
+const noteText = (note) => (typeof note === 'string' ? note : note?.text ?? '');
+const described = (member) => (member.params ?? []).filter((p) => p.summary);
+const paramHead = (member, p) => `\`${p.name}\` (${paramTypeLine(p, member)})`;
+const fnName = (member) => (member.params ?? []).find((p) => p.type === 'function')?.name ?? 'fn';
+
+/** Under a heading: the example, the parameters as a list, the answers as a table, the notes as a list. */
+function memberDetails(member) {
+  let out = '';
+  if (member.example) out += `\nExample: ${member.example}\n`;
+  const params = described(member);
+  if (params.length) out += `\n${params.map((p) => `- ${paramHead(member, p)}: ${lines(p.summary)}`).join('\n')}\n`;
+  if (member.returns?.length) {
+    out += `\n| What \`${fnName(member)}\` returns | What happens |\n|---|---|\n`
+      + `${member.returns.map((r) => `| ${cell(r.when)} | ${cell(r.then)} |`).join('\n')}\n`;
+  }
+  const notes = (member.notes ?? []).map(noteText).filter(Boolean);
+  if (notes.length) out += `\nGood to know:\n\n${notes.map((n) => `- ${n}`).join('\n')}\n`;
+  return out;
+}
+
+/** The same, run together for one cell of a table. */
+function memberDetailsInline(member) {
+  const parts = [];
+  if (member.example) parts.push(`Example: ${member.example}`);
+  for (const p of described(member)) parts.push(`${paramHead(member, p)}: ${cell(p.summary)}`);
+  if (member.returns?.length) {
+    parts.push(`What \`${fnName(member)}\` returns: ${member.returns.map((r) => `${r.when}, ${r.then.charAt(0).toLowerCase()}${r.then.slice(1).replace(/\.$/, '')}`).join('; ')}.`);
+  }
+  for (const n of (member.notes ?? []).map(noteText).filter(Boolean)) parts.push(n);
+  return parts.length ? ` ${parts.join(' ')}` : '';
+}
+
 function memberEntry(member, level, opts) {
-  return `${'#'.repeat(level)} \`${headingSignature(member)}\`\n\n${member.summary}\n${notesLine(member, opts)}${fieldTables(member)}${codeBlocks(member)}`;
+  return `${'#'.repeat(level)} \`${headingSignature(member)}\`\n\n${member.summary}\n${memberDetails(member)}${notesLine(member, opts)}${fieldTables(member)}${codeBlocks(member)}`;
 }
 
 function helperTable(helpers) {
   const rows = helpers.map((h) => {
     const short = memberPath(h.id) !== h.id ? ` Short name: \`${h.id}\`.` : '';
-    return `| \`${cell(headingSignature(h))}\` | ${cell(h.summary)}${short} |`;
+    return `| \`${cell(headingSignature(h))}\` | ${cell(h.summary)}${cell(memberDetailsInline(h))}${short} |`;
   });
   return ['| Function | What it does |', '|---|---|', ...rows].join('\n');
 }
@@ -580,6 +650,11 @@ positions:
 set("resonance.normalizedValue", get("cutoff.normalizedValue"))
 \`\`\`
 
+The form's name can also go after the path as an argument of its own: \`get("cutoff",
+"normalizedValue")\`, and \`set("cutoff", 0.5, "normalizedValue")\`. A name that is not one of the
+three is refused with a message, and nothing is read or written. When it is a form written another
+way, other capitals or the British "normalised", the message names the one to write.
+
 ### The script's own control: self
 
 ${SELF.summary}
@@ -591,7 +666,16 @@ sets it. Write it with a dot, not a colon, in Lua as well.
 
 Paths that start with \`panel\` reach the panel rather than a control: \`get("panel.width")\`,
 \`set("panel.bgColour", "FF202020")\`. Its name, size and background can be read and changed this
-way; the things that identify the panel, such as its file path, can only be read.
+way; the things that identify the panel, such as its file path, can only be read. Its colours
+(\`bgColour\`, \`gridColour\`, \`gridSubColour\` and the image and texture tints) take what a
+control's colour properties take, and refuse the same.
+
+The colour of each of \`bgGradient\`'s stops is read the same way and stored as six digits,
+RRGGBB, with no "#": \`set("panel.bgGradient.stops.0.color", "red")\` stores "FF0000". A stop has
+no alpha of its own, because the gradient's opacity belongs to its layer (\`bgGradientOpacity\`),
+so a colour with one, such as "80FF0000" or rgba() below 1, is refused. A control's gradients take
+their stops the same way, \`Background.Fill.gradient\` and the rest, whether a stop is written by
+its path or the gradient is written whole.
 
 ## 5. Talking to your synth
 
@@ -848,7 +932,13 @@ Each command is shown the way you type it, with its arguments:
   means \`nil\` in Lua, \`undefined\` in JavaScript and \`None\` in Python.
 - **\`opts\`** is a table (Lua) or object (JavaScript) of optional settings, such as
   \`{ duration = 500 }\` or \`{ duration: 500 }\`. When a command takes one, a table lists what it can
-  contain and what each setting is when you leave it out.
+  contain and what each setting is when you leave it out. A setting that is not in that table
+  refuses the whole command: nothing is done, the script console names the setting and lists the
+  ones the command has, and the command gives back what it gives whenever it refuses: false from a
+  command that says whether it worked, 0 from one that counts what it changed, an empty list from
+  one that gives a list, a result whose \`ok\` is false from \`ce.device.recallPreset\`, and
+  otherwise nothing. So a misspelling such as \`{ duraton = 500 }\` cannot pass for a setting that
+  worked, with the panel window open or closed.
 - ***Short name*** gives the other name a command answers to (see
   [chapter 10](#10-command-names-and-modules)).
 - ***${PANEL_WINDOW_ONLY.replace(/\.$/, '')}*** means the command needs the panel window

@@ -33,6 +33,16 @@ export function splitColourAlpha(hex, fallback = '333333') {
   return { color: h.slice(0, 6).toUpperCase().padEnd(6, '0'), alpha: 1 };
 }
 
+/**
+ * A stored colour read as the panel reads one, strictly: 6 hex digits are RRGGBB and 8 AARRGGBB,
+ * with one leading # or none, as { color: 'RRGGBB', alpha: 0-1 }; anything else is null. What a
+ * script's set() stores in a colour property is always one of these (scripting/scriptColours.js).
+ */
+export function readStoredColour(value) {
+  const h = typeof value === 'string' ? value.replace(/^#/, '') : '';
+  return /^(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(h) ? splitColourAlpha(h) : null;
+}
+
 /** Uppercase RRGGBB, with clamp + round so fractional/out-of-range inputs are safe. */
 export function rgbToHex(r, g, b) {
   const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0').toUpperCase();

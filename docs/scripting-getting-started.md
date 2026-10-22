@@ -59,11 +59,38 @@ same script, named after another event, is never called. To react to another eve
 add another script, or listen for it with `on` — the manual's chapter "When a script
 runs" shows how.
 
-Two tools help you while you type:
+Three tools help you while you type:
 
 - **The picker** is the tree on the right. It lists every control, with its
   properties and events. It also lists every command. Click an entry and the
   call is inserted in your language. You never need to type a path from memory.
+- **The Values tab**, beside the picker, lists the values in the statement the
+  caret is in, a call over several lines included: each argument and option, what
+  it means (a colour's swatch, a duration in beats, the control a path names), and
+  any problem, in the words the script would report when it runs, such as an option
+  the command does not have. Click a row to go to its value. A colour's swatch opens
+  the **Colors** tab of the display panel, and a gradient's strip its **Gradient**
+  tab: the new colour is written into your code when you let go, and **Cancel**
+  puts back exactly what you had written. A value chosen from a list has a dropdown
+  (a curve, a division, a font, an image, a parameter of your synth's device profile…),
+  a number with a unit has a field, written
+  when you press Enter or leave it, a curve drawn as four numbers has the curve
+  editor under its row, and an envelope's points have its shape there, each point
+  to drag, written when you let go. A row naming one of your controls has
+  **Select**, which selects that control on the panel for when you go back there,
+  and a stroke's dash is drawn as the line it makes. An arrangement
+  (`ce.panel.align`, `distribute`, `match`, `grid`, `circle`, `flip`) has a small
+  map: the controls it names dashed where they are and solid where it puts them.
+  `getBits` and `setBits` draw the byte a bit to a cell with the field marked, and
+  `ce.midi.read`, `write`, `slice` and `put` say what your synth's dumps hold at
+  that byte, counting from F0.
+  The dock opens on the tab you used last. The same lists are in the code too: with
+  the caret inside a value such as `"outBack"`, **Ctrl+Space** lists the curves
+  (or divisions, scales, events, your controls' names, your synth's parameters,
+  fonts…) with yours selected,
+  and the one you pick replaces the whole value. In a property path such as
+  `"Cutoff.Background.Fill.colour"` the list is one part of it at a time: your
+  controls, then after a dot what that control or section has.
 - **The problems list** checks as you type. It warns about a handler that will
   never be called because it does not match **Runs on** — if the script runs on
   `onClick` but defines no `onClick(mouse)`, you are told it will not fire — and

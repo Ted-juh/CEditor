@@ -50,7 +50,7 @@ var __ceCur = {
   __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
   __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
   __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
-  __after: {}, __afterN: 0, __animDone: {}, __animGroup: {}, __animGroupN: 0, __dumpWaiters: [],
+  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [],
   __globals: {}
 };
 var __CE_OWN = Object.keys(__ceCur);
@@ -196,7 +196,7 @@ function __putRule(list, rule) {
   for (var i = 0; i < list.length; i++) if (list[i].path === rule.path) { list[i] = rule; return; }
   list.push(rule);
 }
-function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(get(path)), prev: undefined }); }
+function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(__read(path)), prev: undefined }); }
 function compute(path, fn) { __putRule(__computeds, { path: path, fn: fn, failed: false }); }
 function intercept(path, fn) { __putRule(__filters, { path: path, fn: fn }); }
 function defineAction(name, fn) {
@@ -243,7 +243,7 @@ function __runReactive() {
         var next;
         try { next = c.fn(); } catch (err) { logError("compute " + c.path + ": " + err); c.failed = true; continue; }
         if (next === undefined) continue;
-        if (__sig(next) === __sig(get(c.path))) continue;
+        if (__sig(next) === __sig(__read(c.path))) continue;
         set(c.path, next); wrote = true;
       }
       if (!wrote) break;
@@ -255,14 +255,14 @@ function __runReactive() {
     // landing — still obey their filter. Needs an idempotent filter to settle, which snapping,
     // clamping and quantising all are.
     for (var f = 0; f < __filters.length; f++) {
-      var cur = get(__filters[f].path);
+      var cur = __read(__filters[f].path);
       if (cur === undefined) continue;
       var d = __applyIntercepts(__filters[f].path, cur);
       if (d.reject) continue;                       // a veto has nothing to revert to
       if (__sig(d.value) !== __sig(cur)) set(__filters[f].path, d.value);
     }
     for (var w = 0; w < __watchers.length; w++) {
-      var rule = __watchers[w], v = get(rule.path), s = __sig(v);
+      var rule = __watchers[w], v = __read(rule.path), s = __sig(v);
       if (s === rule.last) continue;
       var previous = rule.prev;
       rule.last = s; rule.prev = v;
@@ -278,7 +278,20 @@ function set(path, value, opts) {
   if (d.reject) return undefined;
   return __api.set(path, d.value, opts || null);
 }
-function get(path, form) { return __api.get(path, form || "value"); }
+// A script's own get() says why it has no answer when the control or the path is not there, in the
+// editor's words (ScriptHostApi::whyNoValue asks the app). __read is the quiet read the prelude's
+// own watch, compute and snapshot use, as the editor's do: a watch on a path that is not there yet
+// would otherwise say so on every pass.
+function __read(path) { return __api.get(path, "value"); }
+function __scriptGet(path, form) {
+  var v = __api.get(path, form || "value");
+  if (v === undefined || v === null) {
+    var why = __api.whyNoValue(path, form || "value");
+    if (why) logError(why);
+  }
+  return v;
+}
+function get(path, form) { return __scriptGet(path, form); }
 
 // `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is the running
 // script's (__CE_OWN), and each script gets its own `self` from __ceMakeSelf. Plain object literal
@@ -291,12 +304,25 @@ function __ownerPrefix(p) {
 function __ceMakeSelf() {
   return {
     set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
-    get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
+    get: function (p, form) { return __scriptGet(__ownerPrefix(p), form); }
   };
 }
 // @module ce.midi
-function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
-function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
+// sendCC and sendNRPN are host bindings; what a script passes is checked here first (__midiArg, in
+// the ce.midi section), as the editor checks it, and only numbers that are a message reach the host.
+function sendCC(ch, cc, v) {
+  var c = __midiArg("sendCC", "channel", ch); if (c === undefined) return;
+  var n = __midiArg("sendCC", "controller", cc); if (n === undefined) return;
+  var value = __midiArg("sendCC", "value", v); if (value === undefined) return;
+  __api.sendCC(c, n, value);
+}
+function sendNRPN(ch, msb, lsb, v) {
+  var c = __midiArg("sendNRPN", "channel", ch); if (c === undefined) return;
+  var m = __midiArg("sendNRPN", "msb", msb); if (m === undefined) return;
+  var l = __midiArg("sendNRPN", "lsb", lsb); if (l === undefined) return;
+  var value = __midiArg("sendNRPN", "value14", v); if (value === undefined) return;
+  __api.sendNRPN(c, m, l, value);
+}
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
 // @module ce.device
 // requestDump is assembled further down, over __api.requestDump: it takes an optional callback,
@@ -308,14 +334,51 @@ function buildDump(kind) { return __api.buildDump(kind); }
 // The prelude tracks which timers exist (runningTimers) and which follow the tempo (syncTimer), so
 // these are more than a pass-through to the host. Both tables, __timerIds and __syncFollow, are the
 // running script's own (__CE_OWN).
-function startTimer(id, ms) {
-  var key = String(id === undefined || id === null ? "" : id);
-  if (!key) return undefined;
+// An interval or a delay a script got wrong is refused, in the WebView runtime's words (timeRefused
+// there). `Number(ms) || 0` made startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) a
+// timer at the host's 5 ms floor, and after("1s", fn) ran at once. A repeating interval is a number
+// above 0; a one-shot's delay a number from 0, where 0 is "as soon as the handler has returned".
+// Text is refused, "250" included. Returns true when it refused.
+function __timeRefused(call, value, unit, what, positive, outcome) {
+  var why = null;
+  if (value === undefined || value === null) why = "no " + what + " was given";
+  else if (typeof value === "string") why = '"' + value + '" is not a number of ' + unit;
+  else if (typeof value !== "number") why = "the " + what + " is not a number of " + unit;
+  else if (!isFinite(value)) why = "the " + what + " is not a finite number of " + unit;
+  else if (positive && value <= 0) why = String(value) + " is not more than 0 " + unit;
+  else if (!positive && value < 0) why = String(value) + " is less than 0 " + unit;
+  if (why === null) return false;
+  logError(call + ": " + why + ", so " + outcome + ".");
+  return true;
+}
+// A number of beats, or a division's name ("1/16" is a quarter of a beat), any case. Nothing when
+// refused. The WebView runtime's beatsOf.
+function __beatsOf(call, value, positive, outcome) {
+  if (typeof value === "string") {
+    var wanted = value.toLowerCase();
+    for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
+      if (__CE_DIVISION_NAMES[i].toLowerCase() === wanted) return __CE_DIVISIONS[__CE_DIVISION_NAMES[i]];
+    }
+    logError(call + ': "' + value + '" is neither a number of beats nor a division, so ' + outcome
+      + ". The divisions are " + __CE_DIVISION_NAMES.join(", ") + ".");
+    return undefined;
+  }
+  return __timeRefused(call, value, "beats", "number of beats", positive, outcome) ? undefined : value;
+}
+// Start or re-time a timer whose interval the caller checked or worked out itself.
+function __armTimer(key, ms) {
   // An explicit millisecond interval REPLACES a musical one: this is a script asking for
   // milliseconds, not beats.
   delete __syncFollow[key];
   __timerIds[key] = true;
   return __api.startTimer(key, Math.round(Number(ms) || 0));
+}
+function startTimer(id, ms) {
+  var key = String(id === undefined || id === null ? "" : id);
+  if (!key) return undefined;
+  if (__timeRefused('ce.time.startTimer("' + key + '")', ms, "milliseconds", "interval", true, "no timer was started"))
+    return undefined;
+  return __armTimer(key, ms);
 }
 function stopTimer(id) {
   var key = String(id === undefined || id === null ? "" : id);
@@ -343,8 +406,22 @@ function transmit(fn) { __api.beginTransmit(true); try { fn(); } finally { __api
 function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function round(v) { return Math.round(v); }
 function scale(v, inLo, inHi, outLo, outHi) { return inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo); }
-function snap(v, step) { return step === 0 ? v : Math.round(v / step) * step; }
-function lerp(a, b, t) { return a + (b - a) * t; }
+function snap(v, step) {
+  var n = __mnum("ce.math.snap", "the value", v);
+  if (n === undefined) return undefined;
+  var s = __mnum("ce.math.snap", "the step", step);
+  if (s === undefined) return undefined;
+  return s === 0 ? n : Math.round(n / s) * s;
+}
+function lerp(a, b, t) {
+  var x = __mnum("ce.math.lerp", "a", a);
+  if (x === undefined) return undefined;
+  var y = __mnum("ce.math.lerp", "b", b);
+  if (y === undefined) return undefined;
+  var f = __mnum("ce.math.lerp", "t", t);
+  if (f === undefined) return undefined;
+  return x + (y - x) * f;
+}
 function curve(v, shape) {
   shape = shape || "linear";
   if (shape === "exp") return v * v;
@@ -370,16 +447,27 @@ function wrap(v, lo, hi) {
   if (!(span > 0)) return a;
   return a + (((n - a) % span) + span) % span;
 }
-// [[x, y], …] sorted by x. Accepts pairs and { x: , y: } objects, so a panel can write either.
+// A point's [x, y, curve, tension] as written, or null when it is no point: a pair is a list of
+// them in that order; an object is read by its names, and failing those by its numbered entries,
+// counted from 0 when it has an entry 0 and from 1 when it does not. The WebView runtime reads a
+// point the same way (animEnvelope.js envelopePointParts), so it is one point in both.
+function __pointParts(p) {
+  if (p === null || typeof p !== "object") return null;
+  if (p.length !== undefined) return [p[0], p[1], p[2], p[3]];
+  var from = Object.prototype.hasOwnProperty.call(p, "0") ? 0 : 1;
+  var named = function (key, at) { return p[key] !== undefined && p[key] !== null ? p[key] : p[from + at]; };
+  return [named("x", 0), named("y", 1), named("curve", 2), named("tension", 3)];
+}
+// [[x, y, curve, tension], …] sorted by x. Accepts pairs and { x: , y: } objects, so a panel can
+// write either; a point's curve shapes the segment that ends at it (mapCurve).
 function __points(points) {
   var out = [];
   if (points && points.length !== undefined) {
     for (var i = 0; i < points.length; i++) {
-      var p = points[i], x, y;
-      if (p && p.length !== undefined) { x = p[0]; y = p[1]; }
-      else if (p) { x = p.x; y = p.y; }
-      x = Number(x); y = Number(y);
-      if (isFinite(x) && isFinite(y)) out.push([x, y]);
+      var parts = __pointParts(points[i]);
+      if (!parts) continue;
+      var x = Number(parts[0]), y = Number(parts[1]);
+      if (isFinite(x) && isFinite(y)) out.push([x, y, parts[2], parts[3]]);
     }
   }
   out.sort(function(p, q) { return p[0] - q[0]; });
@@ -403,7 +491,15 @@ function mapCurve(v, points) {
   if (n > last[0]) return last[1];
   for (var i = 1; i < list.length; i++) {
     var x0 = list[i - 1][0], y0 = list[i - 1][1], x1 = list[i][0], y1 = list[i][1];
-    if (n < x1 && x1 !== x0) return y0 + (n - x0) * (y1 - y0) / (x1 - x0);
+    if (n < x1 && x1 !== x0) {
+      // The segment's own shape, from the point it ends at, as the WebView runtime's mapCurve and
+      // the Envelope component take it. Read for straight lines alone, a point's curve played as a
+      // line here and as a curve in the editor.
+      if (list[i][2] !== undefined && list[i][2] !== null) {
+        return y0 + shapeCurve((n - x0) / (x1 - x0), list[i][2], list[i][3]) * (y1 - y0);
+      }
+      return y0 + (n - x0) * (y1 - y0) / (x1 - x0);
+    }
   }
   return last[1];
 }
@@ -553,7 +649,9 @@ function blend(a, b, t) {
 // Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
 // them a panel used.
 function randomFloat(lo, hi) {
-  var a = __num(lo), b = __num(hi, 1);
+  // One number alone is the top of a range from 0, not the bottom of one up to 1.
+  var alone = hi === undefined || hi === null;
+  var a = alone ? 0 : __num(lo), b = alone ? __num(lo, 1) : __num(hi);
   return a + random() * (b - a);
 }
 // A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
@@ -592,6 +690,8 @@ function distance(x1, y1, x2, y2) {
 }
 function angleOf(x1, y1, x2, y2) {
   var dx = __num(x2) - __num(x1), dy = __num(y2) - __num(y1);
+  // The same point twice has no direction: 0, in every runtime. atan2 answered 180 for it here.
+  if (dx === 0 && dy === 0) return 0;
   var a = toDegrees(Math.atan2(dx, -dy));
   return a < 0 ? a + 360 : a;
 }
@@ -759,9 +859,17 @@ function random(lo, hi) {
   __rndStates[__streamOverride] = x;
   var r = x / 4294967296;
   if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
-  var a = Math.floor(Number(lo) || 0), b = Math.floor(Number(hi) || 0);
-  var low = Math.min(a, b), high = Math.max(a, b);
-  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+  var a = __mnum("ce.math.random", "lo", lo);
+  if (a === undefined) return undefined;
+  var b = __mnum("ce.math.random", "hi", hi);
+  if (b === undefined) return undefined;
+  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+  // only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+  var low = Math.ceil(Math.min(a, b)), high = Math.floor(Math.max(a, b));
+  if (high < low) {
+    logError("ce.math.random: there is no whole number from " + __shownValue(a) + " to " + __shownValue(b) + ", so there is no answer.");
+    return undefined;
+  }
   return low + Math.floor(r * (high - low + 1));
 }
 // randomChoice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
@@ -793,57 +901,274 @@ function randomChoice(values, weights) {
 // reason every table here is: a script lightening a colour and the border renderer lightening the
 // same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 //
-// In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" — the last six characters are the colour. Out is
-// "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
-// returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round.
-function __cchan(hex) {
-  var h = String(hex === undefined || hex === null ? "" : hex).split("#").join("");
-  h = h.slice(-6);
-  if (h.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(h)) return null;
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+// In takes what a colour property takes, read as if what the property would store had been given:
+// "RRGGBB", "AARRGGBB" or "#RRGGBB" as written (6 hex digits are RRGGBB, 8 are AARRGGBB with the
+// alpha set aside, one leading "#" either way), and CSS's short forms written out first, as the
+// WebView writes them out (scriptColours.js's storedColour): "#RGB", a name from the generated
+// table below, rgb(), rgba(), hsl() and hsla(), so "red" is "#FF0000" and rgba(255, 0, 0, 0.5) is
+// "80FF0000". Out is "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception
+// is alpha(), which returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way
+// round.
+//
+// Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
+// the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
+// (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
+// colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
+// checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
+// BEGIN GENERATED colour names — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// @module ce.math
+// CSS's named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour
+// property writes "red" out as, and what the ce.math colour helpers read it as.
+var __CE_CSS_COLOURS = {
+  aliceblue: "F0F8FF", antiquewhite: "FAEBD7", aqua: "00FFFF", aquamarine: "7FFFD4",
+  azure: "F0FFFF", beige: "F5F5DC", bisque: "FFE4C4", black: "000000", blanchedalmond: "FFEBCD",
+  blue: "0000FF", blueviolet: "8A2BE2", brown: "A52A2A", burlywood: "DEB887", cadetblue: "5F9EA0",
+  chartreuse: "7FFF00", chocolate: "D2691E", coral: "FF7F50", cornflowerblue: "6495ED",
+  cornsilk: "FFF8DC", crimson: "DC143C", cyan: "00FFFF", darkblue: "00008B", darkcyan: "008B8B",
+  darkgoldenrod: "B8860B", darkgray: "A9A9A9", darkgreen: "006400", darkgrey: "A9A9A9",
+  darkkhaki: "BDB76B", darkmagenta: "8B008B", darkolivegreen: "556B2F", darkorange: "FF8C00",
+  darkorchid: "9932CC", darkred: "8B0000", darksalmon: "E9967A", darkseagreen: "8FBC8F",
+  darkslateblue: "483D8B", darkslategray: "2F4F4F", darkslategrey: "2F4F4F",
+  darkturquoise: "00CED1", darkviolet: "9400D3", deeppink: "FF1493", deepskyblue: "00BFFF",
+  dimgray: "696969", dimgrey: "696969", dodgerblue: "1E90FF", firebrick: "B22222",
+  floralwhite: "FFFAF0", forestgreen: "228B22", fuchsia: "FF00FF", gainsboro: "DCDCDC",
+  ghostwhite: "F8F8FF", gold: "FFD700", goldenrod: "DAA520", gray: "808080", green: "008000",
+  greenyellow: "ADFF2F", grey: "808080", honeydew: "F0FFF0", hotpink: "FF69B4", indianred: "CD5C5C",
+  indigo: "4B0082", ivory: "FFFFF0", khaki: "F0E68C", lavender: "E6E6FA", lavenderblush: "FFF0F5",
+  lawngreen: "7CFC00", lemonchiffon: "FFFACD", lightblue: "ADD8E6", lightcoral: "F08080",
+  lightcyan: "E0FFFF", lightgoldenrodyellow: "FAFAD2", lightgray: "D3D3D3", lightgreen: "90EE90",
+  lightgrey: "D3D3D3", lightpink: "FFB6C1", lightsalmon: "FFA07A", lightseagreen: "20B2AA",
+  lightskyblue: "87CEFA", lightslategray: "778899", lightslategrey: "778899",
+  lightsteelblue: "B0C4DE", lightyellow: "FFFFE0", lime: "00FF00", limegreen: "32CD32",
+  linen: "FAF0E6", magenta: "FF00FF", maroon: "800000", mediumaquamarine: "66CDAA",
+  mediumblue: "0000CD", mediumorchid: "BA55D3", mediumpurple: "9370DB", mediumseagreen: "3CB371",
+  mediumslateblue: "7B68EE", mediumspringgreen: "00FA9A", mediumturquoise: "48D1CC",
+  mediumvioletred: "C71585", midnightblue: "191970", mintcream: "F5FFFA", mistyrose: "FFE4E1",
+  moccasin: "FFE4B5", navajowhite: "FFDEAD", navy: "000080", oldlace: "FDF5E6", olive: "808000",
+  olivedrab: "6B8E23", orange: "FFA500", orangered: "FF4500", orchid: "DA70D6",
+  palegoldenrod: "EEE8AA", palegreen: "98FB98", paleturquoise: "AFEEEE", palevioletred: "DB7093",
+  papayawhip: "FFEFD5", peachpuff: "FFDAB9", peru: "CD853F", pink: "FFC0CB", plum: "DDA0DD",
+  powderblue: "B0E0E6", purple: "800080", rebeccapurple: "663399", red: "FF0000",
+  rosybrown: "BC8F8F", royalblue: "4169E1", saddlebrown: "8B4513", salmon: "FA8072",
+  sandybrown: "F4A460", seagreen: "2E8B57", seashell: "FFF5EE", sienna: "A0522D", silver: "C0C0C0",
+  skyblue: "87CEEB", slateblue: "6A5ACD", slategray: "708090", slategrey: "708090", snow: "FFFAFA",
+  springgreen: "00FF7F", steelblue: "4682B4", tan: "D2B48C", teal: "008080", thistle: "D8BFD8",
+  tomato: "FF6347", turquoise: "40E0D0", violet: "EE82EE", wheat: "F5DEB3", white: "FFFFFF",
+  whitesmoke: "F5F5F5", yellow: "FFFF00", yellowgreen: "9ACD32",
+};
+// END GENERATED colour names
+var __CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS colour name, rgb() or hsl()';
+function __chex(n, width) { var s = n.toString(16).toUpperCase(); while (s.length < width) s = "0" + s; return s; }
+function __chint(v) {
+  if (typeof v === "number") {
+    if (!isFinite(v) || Math.floor(v) !== v || v < 0 || v > 0xFFFFFFFF) return "";
+    return " As text, " + String(v) + ' is "' + (v <= 0xFFFFFF ? "#" + __chex(v, 6) : __chex(v, 8)) + '".';
+  }
+  if (typeof v !== "string") return "";
+  var m = /^(#?)([0-9a-fA-F]{3,4})$/.exec(v);
+  if (!m) return "";
+  var d = m[2].toUpperCase();
+  var two = function (i) { return d.charAt(i) + d.charAt(i); };
+  return d.length === 3 ? ' Write "' + m[1] + two(0) + two(1) + two(2) + '".'
+                        : ' Write "' + two(3) + two(0) + two(1) + two(2) + '".';
+}
+function __realNumber(v) {
+  if (typeof v === "number") return isFinite(v) ? v : undefined;
+  if (typeof v !== "string" || !/^\s*[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\s*$/.test(v)) return undefined;
+  var n = Number(v);
+  return isFinite(n) ? n : undefined;
+}
+// A number a ce.math command was given, or undefined after an error in the console. Left out, it
+// is the fallback when there is one. The WebView runtime's mathNumber, word for word.
+function __mnum(verb, what, v, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  var n = __realNumber(v);
+  if (n !== undefined) return n;
+  logError(v === undefined || v === null
+    ? verb + ": " + what + " is a number, and none was given, so there is no answer."
+    : verb + ": " + what + " is a number, and " + __shownValue(v) + " is not, so there is no answer.");
+  return undefined;
+}
+function __cunit(verb, what, v, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  var n = __realNumber(v);
+  if (n !== undefined && n >= 0 && n <= 1) return n;
+  var shown = v === undefined || v === null ? "none was given"
+    : (typeof v === "string" ? '"' + v + '" is not'
+      : (typeof v === "number" && isFinite(v) ? String(v) + " is not" : "the value given is not"));
+  var hint = n !== undefined && n / 100 >= 0 && n / 100 <= 1
+    ? " If you meant " + String(n) + " out of 100, write " + String(Number((n / 100).toFixed(4))) + "." : "";
+  logError(verb + ": " + what + " is a number from 0 to 1, and " + shown + ", so there is no answer." + hint);
+  return undefined;
+}
+// CSS's short forms, read as scriptColours.js reads them: its cssChannels, panelFormOf, longForm and
+// cssHint, with its four expressions, written out again because a prelude cannot import them.
+var __CSS_NUM = "[+-]?(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?";
+var __CSS_ALPHA_LEGACY = "(?:,\\s*(" + __CSS_NUM + ")(%?)\\s*)?";
+var __CSS_ALPHA_MODERN = "(?:\\/\\s*(" + __CSS_NUM + ")(%?)\\s*)?";
+var __CSS_RGB_LEGACY = new RegExp("^rgba?\\(\\s*(" + __CSS_NUM + ")(%?)\\s*,\\s*(" + __CSS_NUM + ")(%?)\\s*,\\s*("
+  + __CSS_NUM + ")(%?)\\s*" + __CSS_ALPHA_LEGACY + "\\)$", "i");
+var __CSS_RGB_MODERN = new RegExp("^rgba?\\(\\s*(" + __CSS_NUM + ")(%?)\\s+(" + __CSS_NUM + ")(%?)\\s+("
+  + __CSS_NUM + ")(%?)\\s*" + __CSS_ALPHA_MODERN + "\\)$", "i");
+var __CSS_HSL_LEGACY = new RegExp("^hsla?\\(\\s*(" + __CSS_NUM + ")(deg|grad|rad|turn)?\\s*,\\s*(" + __CSS_NUM
+  + ")()%\\s*,\\s*(" + __CSS_NUM + ")()%\\s*" + __CSS_ALPHA_LEGACY + "\\)$", "i");
+var __CSS_HSL_MODERN = new RegExp("^hsla?\\(\\s*(" + __CSS_NUM + ")(deg|grad|rad|turn)?\\s+(" + __CSS_NUM
+  + ")(%?)\\s+(" + __CSS_NUM + ")(%?)\\s*" + __CSS_ALPHA_MODERN + "\\)$", "i");
+var __CSS_TURN = { deg: 1, grad: 0.9, rad: 180 / Math.PI, turn: 360 };
+function __cclamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+function __calpha(value, percent) { return value === undefined ? 1 : __cclamp(Number(value) / (percent ? 100 : 1), 0, 1); }
+// A CSS colour as { r, g, b, a } (0-255, 0-1), or null. An own name only, so "constructor" is none.
+function __ccss(text) {
+  var s = String(text).trim();
+  var lower = s.toLowerCase();
+  if (lower === "transparent") return { r: 0, g: 0, b: 0, a: 0 };
+  if (Object.prototype.hasOwnProperty.call(__CE_CSS_COLOURS, lower)) {
+    var named = __CE_CSS_COLOURS[lower];
+    return { r: parseInt(named.slice(0, 2), 16), g: parseInt(named.slice(2, 4), 16), b: parseInt(named.slice(4, 6), 16), a: 1 };
+  }
+  var m = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(s);
+  if (m) {
+    var d = m[1].length <= 4 ? m[1].replace(/./g, function (c) { return c + c; }) : m[1];
+    var byte = function (i) { return parseInt(d.slice(i, i + 2), 16); };
+    return { r: byte(0), g: byte(2), b: byte(4), a: d.length === 8 ? byte(6) / 255 : 1 };
+  }
+  m = __CSS_RGB_LEGACY.exec(s) || __CSS_RGB_MODERN.exec(s);
+  if (m) {
+    var channel = function (i) { return __cclamp(Math.round(Number(m[i]) * (m[i + 1] ? 2.55 : 1)), 0, 255); };
+    return { r: channel(1), g: channel(3), b: channel(5), a: __calpha(m[7], m[8]) };
+  }
+  m = __CSS_HSL_LEGACY.exec(s) || __CSS_HSL_MODERN.exec(s);
+  if (m) {
+    // A hue too large to be a number has no angle, and is not a colour.
+    var turned = Number(m[1]) * __CSS_TURN[(m[2] || "deg").toLowerCase()];
+    if (!isFinite(turned)) return null;
+    var h = (turned % 360 + 360) % 360;
+    var sat = __cclamp(Number(m[3]), 0, 100) / 100;
+    var light = __cclamp(Number(m[5]), 0, 100) / 100;
+    var k = function (n) { return (n + h / 30) % 12; };
+    var amp = sat * Math.min(light, 1 - light);
+    var f = function (n) { return Math.round(255 * (light - amp * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))); };
+    return { r: f(0), g: f(8), b: f(4), a: __calpha(m[7], m[8]) };
+  }
+  return null;
+}
+// The same colour in the panel's form: #RRGGBB when solid, AARRGGBB when it is not.
+function __cpanelForm(c) {
+  var rgb = __chex(c.r, 2) + __chex(c.g, 2) + __chex(c.b, 2);
+  return c.a >= 1 ? "#" + rgb : __chex(Math.round(c.a * 255), 2) + rgb;
+}
+// Does the panel read this as a colour? 6 or 8 hex digits, with or without one "#".
+function __cpanelHex(v) { return typeof v === "string" && /^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v); }
+// CSS's short forms written out, as a property stores them, or "": not text with space around it,
+// "#" only with three digits ("#" with four is RGBA to CSS and ARGB here), and nothing CSS cannot read.
+function __clong(value) {
+  if (typeof value !== "string" || value !== value.trim()) return "";
+  if (value.charAt(0) === "#" && !/^#[0-9a-f]{3}$/i.test(value)) return "";
+  var c = __ccss(value);
+  return c ? __cpanelForm(c) : "";
+}
+// For a refusal: what CSS text with space around it is in the panel's form, or "". Text that is the
+// panel's own form once the space is gone is that text, read as the panel reads it.
+function __ccssHint(value) {
+  if (typeof value !== "string" || __cpanelHex(value)) return "";
+  var trimmed = value.trim();
+  if (trimmed !== value && __cpanelHex(trimmed)) return ' Write "' + trimmed + '".';
+  var c = __ccss(value);
+  return c ? ' Write "' + __cpanelForm(c) + '".' : "";
+}
+function __cchan(verb, hex) {
+  var stored = typeof hex === "string" ? (__cpanelHex(hex) ? hex : __clong(hex)) : "";
+  if (stored) {
+    var h = stored.slice(-6);
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  var why = hex === undefined || hex === null ? "no colour was given"
+    : (typeof hex === "string" ? '"' + hex + '" is not a colour'
+      : (typeof hex === "number" && isFinite(hex) ? String(hex) + " is not a colour" : "the colour given is not text"));
+  logError(verb + ": " + why + ", so there is no answer. " + __CFORMS + "." + (__chint(hex) || __ccssHint(hex)));
+  return null;
 }
 function __cbyte(v) {
   var n = Math.round(Number(v) || 0);
   return n < 0 ? 0 : (n > 255 ? 255 : n);
 }
 function rgbToHex(r, g, b) {
+  var rr = __mnum("ce.math.hex", "the red part", r, 0);
+  if (rr === undefined) return undefined;
+  var gg = __mnum("ce.math.hex", "the green part", g, 0);
+  if (gg === undefined) return undefined;
+  var bb = __mnum("ce.math.hex", "the blue part", b, 0);
+  if (bb === undefined) return undefined;
   var c = function (v) { var s = __cbyte(v).toString(16); return s.length < 2 ? "0" + s : s; };
-  return ("#" + c(r) + c(g) + c(b)).toUpperCase();
+  return ("#" + c(rr) + c(gg) + c(bb)).toUpperCase();
 }
 function hexToRgb(hex) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.rgb", hex);
   return c === null ? undefined : { r: c[0], g: c[1], b: c[2] };
 }
 function lighten(hex, amount) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.lighten", hex);
   if (c === null) return undefined;
-  var f = isFinite(Number(amount)) ? Number(amount) : 0.4;
+  var f = __cunit("ce.math.lighten", "the amount", amount, 0.4);
+  if (f === undefined) return undefined;
   return rgbToHex(c[0] + (255 - c[0]) * f, c[1] + (255 - c[1]) * f, c[2] + (255 - c[2]) * f);
 }
 function darken(hex, amount) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.darken", hex);
   if (c === null) return undefined;
-  var f = isFinite(Number(amount)) ? Number(amount) : 0.55;
+  var f = __cunit("ce.math.darken", "the amount", amount, 0.55);
+  if (f === undefined) return undefined;
   return rgbToHex(c[0] * f, c[1] * f, c[2] * f);
 }
 // NOT an app algorithm, and said so: lerp() per channel in plain RGB.
 function mixColour(a, b, t) {
-  var x = __cchan(a), y = __cchan(b);
-  if (x === null || y === null) return undefined;
-  var f = Math.min(1, Math.max(0, Number(t) || 0));
+  var x = __cchan("ce.math.mix", a);
+  if (x === null) return undefined;
+  var y = __cchan("ce.math.mix", b);
+  if (y === null) return undefined;
+  var n = __mnum("ce.math.mix", "t", t, 0);
+  if (n === undefined) return undefined;
+  var f = Math.min(1, Math.max(0, n));
   return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
 // The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
+// A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+// reads one way: "#RRGGBB" when solid, AARRGGBB when not. scriptColours.orderedColour's reading,
+// in the WebView runtime's colourFromOrder words.
+var __CORDER = {
+  argb: 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+  rgba: 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.'
+};
+function __corder(verb, order, value) {
+  if (typeof value === "string") {
+    var m = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(value);
+    if (m) {
+      var d = (m[1].length <= 4 ? m[1].replace(/[0-9a-fA-F]/g, function (c) { return c + c; }) : m[1]).toUpperCase();
+      var first = order === "argb";
+      var aa = d.length === 8 ? (first ? d.slice(0, 2) : d.slice(6)) : "FF";
+      var rgb = d.length === 8 ? (first ? d.slice(2) : d.slice(0, 6)) : d;
+      return aa === "FF" ? "#" + rgb : aa + rgb;
+    }
+  }
+  var why = value === undefined || value === null ? "no colour was given"
+    : (typeof value === "string" ? '"' + value + '" is not a colour written ' + (order === "argb" ? "AARRGGBB" : "RRGGBBAA")
+      : (typeof value === "number" && isFinite(value) ? String(value) + " is a number, not text" : "the colour given is not text"));
+  logError(verb + ": " + why + ", so there is no answer. " + __CORDER[order]);
+  return undefined;
+}
+function colourFromArgb(colour) { return __corder("ce.math.fromARGB", "argb", colour); }
+function colourFromRgba(colour) { return __corder("ce.math.fromRGBA", "rgba", colour); }
 function colourAlpha(hex, a) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.alpha", hex);
   if (c === null) return undefined;
-  var f = Math.min(1, Math.max(0, isFinite(Number(a)) ? Number(a) : 1));
+  var f = __cunit("ce.math.alpha", "the alpha", a);
+  if (f === undefined) return undefined;
   var aa = Math.round(f * 255).toString(16);
   if (aa.length < 2) aa = "0" + aa;
   return (aa + rgbToHex(c[0], c[1], c[2]).slice(1)).toUpperCase();
 }
 function hexToHsl(hex) {
-  var c = __cchan(hex);
+  var c = __cchan("ce.math.hsl", hex);
   if (c === null) return undefined;
   var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
   var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -858,7 +1183,18 @@ function hexToHsl(hex) {
   return { h: h, s: s * 100, l: l * 100 };
 }
 function hslToHex(hue, sat, light) {
-  var h = Number(hue) || 0, s = (Number(sat) || 0) / 100, l = (Number(light) || 0) / 100;
+  var h = __mnum("ce.math.fromHsl", "the hue", hue, 0);
+  if (h === undefined) return undefined;
+  var s = __mnum("ce.math.fromHsl", "the saturation", sat, 0);
+  if (s === undefined) return undefined;
+  var l = __mnum("ce.math.fromHsl", "the lightness", light, 0);
+  if (l === undefined) return undefined;
+  // A hue goes round: -120 is 240. JavaScript's % keeps the sign, so a negative hue gave the wrong
+  // colour here and the right one in Lua and Python. The saturation and the lightness are held at 0
+  // and 100.
+  h = h - 360 * Math.floor(h / 360);
+  s = Math.max(0, Math.min(100, s)) / 100;
+  l = Math.max(0, Math.min(100, l)) / 100;
   var a = s * Math.min(l, 1 - l);
   var f = function (n) {
     var k = (n + h / 30) % 12;
@@ -893,7 +1229,7 @@ function noteNumber(name) {
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME, __CE_EASINGS;
+var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_SCALE_NAMES, __CE_CHORD_NAMES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME, __CE_EASINGS;
 __CE_SCALES = {};
 __CE_SCALES["major"] = [0,2,4,5,7,9,11];
 __CE_SCALES["minor"] = [0,2,3,5,7,8,10];
@@ -966,6 +1302,8 @@ __CE_MINOR_QUALITIES["m7b5"] = true;
 __CE_MINOR_QUALITIES["min"] = true;
 __CE_MINOR_QUALITIES["min7"] = true;
 __CE_MINOR_QUALITIES["minMaj7"] = true;
+__CE_SCALE_NAMES = ["major","minor","harmonicMinor","melodicMinor","dorian","phrygian","lydian","mixolydian","locrian","pentatonicMaj","pentatonicMin","blues"];
+__CE_CHORD_NAMES = ["major","minor","dim","aug","sus2","sus4","power","maj6","min6","dom7","maj7","min7","minMaj7","dim7","m7b5","aug7","add9","dom9","maj9","min9"];
 // @module ce.time
 __CE_DIVISIONS = {};
 __CE_DIVISIONS["1/1"] = 4;
@@ -1019,21 +1357,56 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55];
 // Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 // or a name ("C4"), the way sendNote does. An unknown scale or chord name returns undefined rather
 // than guessing "major" — a script that asked for something this build does not know should find out.
-// noteNumber is undefined for a name it cannot read; __pitch feeds scaleNotes and friends, where an
-// undefined root would turn one bad string into an unexplained undefined list.
-function __pitch(v) { if (typeof v !== "string") return Math.floor(Number(v) || 0); var n = noteNumber(v); return n === undefined ? 0 : n; }
+// It found out only by getting undefined, and an unreadable note NAME was worse: __pitch made it 0,
+// so scaleNotes("c4") answered with the scale on C-1. Both now answer undefined and say why, through
+// __setOf and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each
+// helper checks its scale or chord first, then its notes in argument order, and stops at the first.
+// A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
+// unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
+function __pitch(v) {
+  if (typeof v === "string") return noteNumber(v);
+  return typeof v === "number" && isFinite(v) ? Math.floor(v) : undefined;
+}
 function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
+function __pitchOf(verb, v) {
+  // A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
+  if (v === undefined || v === null) {
+    logError(verb + ': no note was given, so there is no answer. A note is a MIDI number or a name, such as 60 or "C4".');
+    return undefined;
+  }
+  var n = __pitch(v);
+  if (n === undefined) {
+    logError(typeof v === "string"
+      ? verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
+        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+      : verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
+        + 'number or a name, such as 60 or "C4".');
+  }
+  return n;
+}
+function __setOf(verb, kind, name) {
+  var s = __steps(kind === "chord" ? __CE_CHORDS : __CE_SCALES, name, "major");
+  if (!s) {
+    logError(verb + ': "' + String(name) + '" is not a ' + kind + ', so there is no answer. The ' + kind
+      + 's are ' + (kind === "chord" ? __CE_CHORD_NAMES : __CE_SCALE_NAMES).join(", ") + '.');
+  }
+  return s;
+}
 function scaleNotes(root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var base = __pitch(root); var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
+  var s = __setOf("ce.music.scale", "scale", scale); if (!s) return undefined;
+  var base = __pitchOf("ce.music.scale", root); if (base === undefined) return undefined;
+  var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
 }
 function chordNotes(root, chordType) {
-  var s = __steps(__CE_CHORDS, chordType, "major"); if (!s) return undefined;
-  var base = __pitch(root); var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
+  var s = __setOf("ce.music.chord", "chord", chordType); if (!s) return undefined;
+  var base = __pitchOf("ce.music.chord", root); if (base === undefined) return undefined;
+  var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
 }
 function quantizeNote(note, root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var n = __pitch(note), base = __pitch(root), inKey = {};
+  var s = __setOf("ce.music.quantize", "scale", scale); if (!s) return undefined;
+  var n = __pitchOf("ce.music.quantize", note); if (n === undefined) return undefined;
+  var base = __pitchOf("ce.music.quantize", root); if (base === undefined) return undefined;
+  var inKey = {};
   for (var i = 0; i < s.length; i++) inKey[(((base + s[i]) % 12) + 12) % 12] = true;
   // Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested before
   // the -d one, so a note exactly between two scale tones lands on the same one in every runtime.
@@ -1050,15 +1423,18 @@ function quantizeNote(note, root, scale) {
 // chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 function noteSpelling(root, scale) {
   var nm = (scale === undefined || scale === null) ? "major" : String(scale);
-  if (!__CE_SCALES[nm]) return undefined;
-  var pc = __m12(__pitch(root));
+  if (!__setOf("ce.music.spelling", "scale", scale)) return undefined;
+  var pitch = __pitchOf("ce.music.spelling", root); if (pitch === undefined) return undefined;
+  var pc = __m12(pitch);
   // Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
   if (__CE_MINOR_SCALES[nm] === true) pc = __m12(pc + 3);
   return __CE_FLAT_KEYS[pc] === true;
 }
 function inScale(note, root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var base = __m12(__pitch(root)), pc = __m12(__pitch(note));
+  var s = __setOf("ce.music.inScale", "scale", scale); if (!s) return undefined;
+  var n = __pitchOf("ce.music.inScale", note); if (n === undefined) return undefined;
+  var r = __pitchOf("ce.music.inScale", root); if (r === undefined) return undefined;
+  var base = __m12(r), pc = __m12(n);
   for (var i = 0; i < s.length; i++) if (__m12(base + s[i]) === pc) return true;
   return false;
 }
@@ -1066,16 +1442,19 @@ function inScale(note, root, scale) {
 // rather than the nearest one — rounding here turns a wrong note into a plausible chord, and
 // quantizeNote is the verb that rounds on purpose.
 function scaleDegree(note, root, scale) {
-  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
-  var base = __m12(__pitch(root)), pc = __m12(__pitch(note));
+  var s = __setOf("ce.music.degree", "scale", scale); if (!s) return undefined;
+  var n = __pitchOf("ce.music.degree", note); if (n === undefined) return undefined;
+  var r = __pitchOf("ce.music.degree", root); if (r === undefined) return undefined;
+  var base = __m12(r), pc = __m12(n);
   for (var i = 0; i < s.length; i++) if (__m12(base + s[i]) === pc) return i + 1;
   return undefined;
 }
 // Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 // chordNotes, in the vocabulary the Chord Pad labels with.
 function chordQuality(notes) {
-  var list = __sortedNotes(notes);
-  if (!list.length) return undefined;
+  var read = __noteList("chordQuality", "notes", notes);
+  if (!read || !read.length) return undefined;
+  var list = __sortedNotes(read);
   var iv = {};
   for (var i = 0; i < list.length; i++) iv[__m12(list[i] - list[0])] = true;
   var has = function (a) { return iv[a] === true; };
@@ -1110,8 +1489,9 @@ function __roman(rootSemitone, quality) {
 // scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size) {
   var nm = (scale === undefined || scale === null) ? "major" : String(scale);
-  var s = __CE_SCALES[nm];
+  var s = __setOf("ce.music.degreeChord", "scale", scale);
   if (!s || !s.length) return undefined;
+  if (__pitchOf("ce.music.degreeChord", root) === undefined) return undefined;
   var n = s.length;
   var d = __count(degree, 1) - 1;
   var sz = Math.max(2, __count(size, 3));
@@ -1135,13 +1515,48 @@ function degreeChord(root, scale, degree, size) {
 // A count argument that is not a finite number falls back to its default. Written out rather than
 // leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
 function __count(v, fallback) { var n = Number(v); return isFinite(n) ? Math.floor(n) : fallback; }
-function __sortedNotes(list) {
-  var out = [];
-  if (list && list.length !== undefined) {
-    for (var i = 0; i < list.length; i++) { var v = Number(list[i]); if (isFinite(v)) out.push(v); }
-  }
-  return out.sort(function (a, b) { return a - b; });
+// ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
+// or text that is a number, and one that is neither refuses the call, saying where it is. They were
+// read with Number(), so a chord written by name was an empty one, and true was a note. null for a
+// list refused, and the same sentences in all four runtimes.
+var __NOTE_LISTS = {
+  chordQuality: ["ce.music.quality", "there is no answer"], voiceLead: ["ce.music.lead", "the answer is an empty list"],
+  expandOctaves: ["ce.music.octaves", "the answer is an empty list"], arpOrder: ["ce.music.arp", "the answer is an empty list"]
+};
+function __noteListItem(v) {
+  if (typeof v === "number") return isFinite(v) ? v : undefined;
+  if (typeof v !== "string") return undefined;
+  var n = noteNumber(v);
+  if (n !== undefined && n !== null) return n;
+  return __realNumber(v);
 }
+function __noteList(fn, name, list, mayBeAbsent) {
+  var spec = __NOTE_LISTS[fn];
+  function say(why, more) { logError(spec[0] + ": " + why + ", so " + spec[1] + "." + (more || "")); return null; }
+  if (list === undefined || list === null) return mayBeAbsent ? [] : say("no " + name + " were given");
+  if (!Array.isArray(list)) return say(__shownValue(list) + " is not a list of notes");
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var n = __noteListItem(list[i]);
+    if (n === undefined) {
+      var where = __shownValue(list[i]) + " at position " + (i + 1) + " of " + name;
+      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        : say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".');
+    }
+    out.push(n);
+  }
+  return out;
+}
+function __sortedNotes(list) { return list.slice().sort(function (a, b) { return a - b; }); }
+// A word or a count used as its default, said once (noteLists.js).
+var __musicWarned = {};
+function __musicSaid(text) {
+  if (!text || __musicWarned[text]) return;
+  __musicWarned[text] = true;
+  logWarn(text + " This is said only the first time.");
+}
+var __VOICE_LEAD_MODES = ["closest", "smooth", "off"];
+var __ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"];
 // Each voice to its NEAREST note in the other chord — voice counts differ (a triad following a
 // seventh), so pairing by index would compare nonsense.
 function __motion(a, b) {
@@ -1157,8 +1572,15 @@ function __motion(a, b) {
 // voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
 // melody still), "off" returns root position. No previous chord means nothing to lead from.
 function voiceLead(notes, previous, mode) {
-  var chord = __sortedNotes(notes), prev = __sortedNotes(previous);
+  var read = __noteList("voiceLead", "notes", notes);
+  var before = read && __noteList("voiceLead", "previous", previous, true);
+  if (!read || !before) return [];
+  var chord = __sortedNotes(read), prev = __sortedNotes(before);
   var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  if (__VOICE_LEAD_MODES.indexOf(how) < 0) {
+    __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.');
+    how = "closest";
+  }
   if (!chord.length || !prev.length || how === "off") return chord;
   var cands = [chord], span = Math.max(1, chord.length - 1) * 2, cur = chord, i, nx;
   for (i = 0; i < span; i++) {
@@ -1186,8 +1608,19 @@ function voiceLead(notes, previous, mode) {
 // The Arpeggiator's octave expansion. Anything landing above 127 is DROPPED rather than clamped:
 // clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
 function expandOctaves(notes, octaves) {
-  var base = __sortedNotes(notes);
-  var oc = Math.max(1, Math.min(4, __count(octaves, 1)));
+  var read = __noteList("expandOctaves", "notes", notes);
+  if (!read) return [];
+  var base = __sortedNotes(read);
+  var oc = 1;
+  if (octaves !== undefined && octaves !== null) {
+    var say = function (why, used) { __musicSaid("ce.music.octaves: octaves is " + __shownValue(octaves) + ", which is " + why + ", so " + used + " was used."); return used; };
+    var r = __realNumber(octaves);
+    if (r === undefined) oc = say("not a number", 1);
+    else if (Math.floor(r) < 1) oc = say("less than 1", 1);
+    else if (Math.floor(r) > 4) oc = say("more than 4", 4);
+    else if (Math.floor(r) !== r) oc = say("not a whole number", Math.floor(r));
+    else oc = Math.floor(r);
+  }
   var out = [];
   for (var o = 0; o < oc; o++) {
     for (var i = 0; i < base.length; i++) {
@@ -1204,9 +1637,17 @@ function expandOctaves(notes, octaves) {
 // which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 // panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
 function arpOrder(notes, pattern) {
-  var asc = (notes && notes.length !== undefined) ? Array.prototype.slice.call(notes) : [];
+  var asc = __noteList("arpOrder", "notes", notes);
+  if (!asc) return [];
+  var p, seq, i;
+  if (pattern === undefined || pattern === null) {
+    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
+    p = "up";
+  } else if (__ARP_ORDER_PATTERNS.indexOf(String(pattern)) < 0) {
+    __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
+    p = "up";
+  } else p = String(pattern);
   if (!asc.length) return [];
-  var p = String(pattern), seq, i;
   if (p === "chord") return [asc];
   if (p === "down") { seq = asc.slice().reverse(); }
   else if (p === "updown") { seq = asc.concat(asc.slice(1, -1).reverse()); }   // no repeated endpoints
@@ -1280,11 +1721,81 @@ function __ce_crc_ref(bytes, poly, init, xorOut, bits) {
   }
   return ((crc ^ xorOut) & mask) >>> 0;
 }
+// How a refusal shows a value the script passed, in the same words in every runtime (the WebView
+// runtime's shownValue): "nothing" for undefined or null, text in quotes, "a list" for any list.
+function __shownValue(v) {
+  if (v === undefined || v === null) return "nothing";
+  if (typeof v === "boolean") return String(v);
+  if (typeof v === "number") return v !== v ? "NaN" : isFinite(v) ? String(v) : (v > 0 ? "Infinity" : "-Infinity");
+  if (typeof v === "string") return '"' + v + '"';
+  return typeof v === "function" ? "a function" : "a list";
+}
+function __hexByte(token) { return /^(0x)?[0-9a-f]{1,2}$/i.test(token) ? parseInt(token, 16) : undefined; }
+// A script's bytes, read the way every runtime reads them (the WebView runtime's scriptBytes,
+// BridgeScriptHost's bytesFromScript). Hex text is split on spaces, tabs, line breaks, form and
+// vertical tab and commas (not \s, which would also take a no-break space), and each token is one
+// byte. A list's items are bytes: a whole number from 0 to 255, or text that is one hex byte. A typed
+// array is a list. Anything else is refused, naming what and where, and undefined comes back;
+// nothing given is an empty list, for the caller to judge.
+function __scriptBytes(verb, input, outcome) {
+  if (input === undefined || input === null) return [];
+  if (typeof input === "string") {
+    var tokens = input.split(/[ \t\r\n\f\v,]+/).filter(function (t) { return t !== ""; });
+    var out = [];
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      var b = __hexByte(token);
+      if (b === undefined) {
+        var spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(" ") : "";
+        logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. '
+          + (spaced ? 'Put a space between the bytes: "' + spaced + '".'
+            : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+        return undefined;
+      }
+      out.push(b);
+    }
+    return out;
+  }
+  if (typeof input !== "object") {
+    logError(verb + ": " + __shownValue(input) + " is not a list of bytes, so " + outcome + ".");
+    return undefined;
+  }
+  var items = typeof input.length === "number" ? Array.prototype.slice.call(input)
+    : Object.keys(input).map(function (k) { return input[k]; });
+  var bytes = [];
+  for (var j = 0; j < items.length; j++) {
+    var v = items[j];
+    var byte = typeof v === "number" ? (__whole(v) && v >= 0 && v <= 255 ? v : undefined)
+      : typeof v === "string" ? __hexByte(v) : undefined;
+    if (byte === undefined) {
+      logError(verb + ": " + __shownValue(v) + " at position " + j + " is not a byte, so " + outcome
+        + '. A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".');
+      return undefined;
+    }
+    bytes.push(byte);
+  }
+  return bytes;
+}
 function checksum(kind, bytes, opts) {
-  if (bytes === undefined || bytes === null) { bytes = kind; kind = "roland"; }
-  var id = __CE_CKSUM_ALIAS[String(kind === undefined || kind === null ? "" : kind).toLowerCase()];
+  var verb = "ce.midi.checksum";
+  if (bytes === undefined || bytes === null) {
+    // checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
+    if (kind === undefined || kind === null
+        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase()))) {
+      logError(verb + ": no bytes given, so there is no checksum.");
+      return undefined;
+    }
+    bytes = kind; kind = "roland";
+  }
+  bytes = __scriptBytes(verb, bytes, "there is no checksum");
+  if (bytes === undefined) return undefined;
+  // An own key only: "constructor" or "toString" would otherwise be found on Object's prototype.
+  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase())
+    ? __CE_CKSUM_ALIAS[kind.toLowerCase()] : undefined;
   if (id === undefined) {
-    logError('ce.midi.checksum("' + String(kind) + '"): no such algorithm.');
+    // The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
+    var which = kind === undefined || kind === null ? ": no algorithm given" : "(" + __shownValue(kind) + "): no such algorithm";
+    logError("ce.midi.checksum" + which + ". One of: " + Object.keys(__CE_CKSUM_ALIAS).sort().join(", ") + ".");
     return undefined;
   }
   var sum7 = 0, sum8 = 0, x = 0;
@@ -1310,6 +1821,211 @@ function checksum(kind, bytes, opts) {
   return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32);
 }
 
+// Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+// (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
+// and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
+// count from 0. A list may be hex text or a typed array such as Uint8Array, and its items must be
+// bytes (0 to 255, or one hex byte), both read by __scriptBytes; a mistake answers undefined and says
+// why; every list returned is new.
+var __BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32";
+var __WRITE_START = "Writing can run past the end, but not start beyond it.";
+var __B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function __whole(n) { return typeof n === "number" && isFinite(n) && Math.floor(n) === n; }
+function __plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+function __span(word, a, b) { return a === b ? word + " " + a + " is past" : word + "s " + a + " to " + b + " run past"; }
+function __refuse(verb, why, tail) {
+  logError(verb + ": " + why + ", so there is no answer." + (tail ? " " + tail : ""));
+  return undefined;
+}
+function __bytesIn(verb, input) {
+  if (input === undefined || input === null) return __refuse(verb, "no bytes given");
+  return __scriptBytes(verb, input, "there is no answer");
+}
+// Why a value to write cannot be written in `bits` bits, or "" when it can.
+function __doesNotFit(v, bits) {
+  if (v === undefined || v === null) return "the value to write is missing";
+  if (!__whole(v)) return __shownValue(v) + " is not a whole number";
+  return v < 0 || v >= Math.pow(2, bits) ? v + " does not fit in " + __plural(bits, "bit") : "";
+}
+function __shape(verb, opts) {
+  var bits = 7, order = "msb";
+  if (opts && typeof opts === "object") {
+    if (opts.bits !== undefined && opts.bits !== null) bits = opts.bits;
+    if (opts.order !== undefined && opts.order !== null) order = opts.order;
+  }
+  if (bits !== 7 && bits !== 8) return __refuse(verb, "bits must be 7 or 8");
+  if (order !== "msb" && order !== "lsb") return __refuse(verb, 'order must be "msb" or "lsb"');
+  return { bits: bits, order: order };
+}
+function getBits(value, start, count) {
+  var verb = "ce.midi.getBits";
+  if (!__whole(start) || start < 0 || !__whole(count) || count < 1 || count > 32) return __refuse(verb, __BIT_RANGE);
+  if (typeof value === "number") {
+    if (!isFinite(value)) return __refuse(verb, __shownValue(value) + " is not a finite number");
+    if (start + count > 32) return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here");
+    var m = Math.pow(2, count);
+    return ((Math.floor(Math.floor(value) / Math.pow(2, start)) % m) + m) % m;
+  }
+  var bytes = __bytesIn(verb, value);
+  if (bytes === undefined) return undefined;
+  if (start + count > bytes.length * 8) {
+    return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(bytes.length, "byte"));
+  }
+  var out = 0;
+  for (var k = 0; k < count; k++) {
+    var at = start + k;
+    out += (Math.floor(bytes[Math.floor(at / 8)] / Math.pow(2, at % 8)) % 2) * Math.pow(2, k);
+  }
+  return out;
+}
+function setBits(value, start, count, bits) {
+  var verb = "ce.midi.setBits";
+  if (!__whole(start) || start < 0 || !__whole(count) || count < 1 || count > 32) return __refuse(verb, __BIT_RANGE);
+  var unfit = __doesNotFit(bits, count);
+  if (unfit) return __refuse(verb, unfit);
+  if (typeof value === "number") {
+    if (!isFinite(value)) return __refuse(verb, __shownValue(value) + " is not a finite number");
+    if (start + count > 32) return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here");
+    var v = Math.floor(value), m = Math.pow(2, count);
+    var old = ((Math.floor(v / Math.pow(2, start)) % m) + m) % m;
+    return v - old * Math.pow(2, start) + bits * Math.pow(2, start);
+  }
+  var bytes = __bytesIn(verb, value);
+  if (bytes === undefined) return undefined;
+  if (start + count > bytes.length * 8) {
+    return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(bytes.length, "byte"));
+  }
+  for (var k = 0; k < count; k++) {
+    var at = start + k, i = Math.floor(at / 8), mask = Math.pow(2, at % 8);
+    var now = Math.floor(bytes[i] / mask) % 2, want = Math.floor(bits / Math.pow(2, k)) % 2;
+    bytes[i] += (want - now) * mask;
+  }
+  return bytes;
+}
+function bytesRead(bytes, offset, count, opts) {
+  var verb = "ce.midi.read";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  if (!__whole(count) || count < 1 || count > 4) return __refuse(verb, "count must be a whole number from 1 to 4");
+  var shape = __shape(verb, opts);
+  if (shape === undefined) return undefined;
+  if (offset + count > list.length) {
+    return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(list.length, "byte"));
+  }
+  var base = Math.pow(2, shape.bits), v = 0;
+  for (var k = 0; k < count; k++) {
+    var i = shape.order === "msb" ? offset + k : offset + count - 1 - k;
+    v = v * base + (list[i] % base);
+  }
+  return v;
+}
+function bytesWrite(bytes, offset, count, value, opts) {
+  var verb = "ce.midi.write";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  if (!__whole(count) || count < 1 || count > 4) return __refuse(verb, "count must be a whole number from 1 to 4");
+  var shape = __shape(verb, opts);
+  if (shape === undefined) return undefined;
+  var unfit = __doesNotFit(value, shape.bits * count);
+  if (unfit) return __refuse(verb, unfit);
+  if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"), __WRITE_START);
+  var base = Math.pow(2, shape.bits), v = value, digits = [];
+  for (var k = 0; k < count; k++) { digits.push(v % base); v = Math.floor(v / base); }
+  if (shape.order === "msb") digits.reverse();
+  for (var j = 0; j < count; j++) list[offset + j] = digits[j];
+  return list;
+}
+function bytesSlice(bytes, offset, count) {
+  var verb = "ce.midi.slice";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  if (count === undefined || count === null) {
+    if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"));
+    return list.slice(offset);
+  }
+  if (!__whole(count) || count < 0) return __refuse(verb, "count must be a whole number from 0");
+  if (offset + count > list.length) {
+    return __refuse(verb, count === 0 ? "offset " + offset + " is past the end of " + __plural(list.length, "byte")
+      : __span("byte", offset, offset + count - 1) + " the end of " + __plural(list.length, "byte"));
+  }
+  return list.slice(offset, offset + count);
+}
+function bytesPut(bytes, offset, values) {
+  var verb = "ce.midi.put";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  if (!__whole(offset) || offset < 0) return __refuse(verb, "offset must be a whole number from 0");
+  var part = __bytesIn(verb, values);
+  if (part === undefined) return undefined;
+  if (offset > list.length) return __refuse(verb, "offset " + offset + " is past the end of " + __plural(list.length, "byte"), __WRITE_START);
+  for (var k = 0; k < part.length; k++) list[offset + k] = part[k];
+  return list;
+}
+function bytesFind(bytes, pattern, from) {
+  var verb = "ce.midi.find";
+  var list = __bytesIn(verb, bytes);
+  if (list === undefined) return undefined;
+  var wanted = __bytesIn(verb, pattern);
+  if (wanted === undefined) return undefined;
+  if (!wanted.length) return __refuse(verb, "the pattern is empty");
+  var first = (from === undefined || from === null) ? 0 : from;
+  if (!__whole(first) || first < 0) return __refuse(verb, "from must be a whole number from 0");
+  // Not found is an answer, not a mistake: undefined comes back and nothing is said.
+  for (var i = first; i + wanted.length <= list.length; i++) {
+    var j = 0;
+    while (j < wanted.length && list[i + j] === wanted[j]) j++;
+    if (j === wanted.length) return i;
+  }
+  return undefined;
+}
+function bytesToHex(bytes) {
+  var list = __bytesIn("ce.midi.toHex", bytes);
+  if (list === undefined) return undefined;
+  return list.map(function (b) { var h = b.toString(16).toUpperCase(); return h.length < 2 ? "0" + h : h; }).join(" ");
+}
+function bytesFromHex(text) {
+  var verb = "ce.midi.fromHex";
+  if (text === undefined || text === null) return __refuse(verb, "no hex text given");
+  if (typeof text !== "string") return __refuse(verb, __shownValue(text) + " is not hex text");
+  return __bytesIn(verb, text);
+}
+function bytesToBase64(bytes) {
+  var list = __bytesIn("ce.midi.toBase64", bytes);
+  if (list === undefined) return undefined;
+  var out = "";
+  for (var i = 0; i < list.length; i += 3) {
+    var a = list[i], b = list[i + 1], c = list[i + 2];
+    var n = a * 65536 + (b === undefined ? 0 : b) * 256 + (c === undefined ? 0 : c);
+    out += __B64.charAt(Math.floor(n / 262144) % 64) + __B64.charAt(Math.floor(n / 4096) % 64)
+      + (b === undefined ? "=" : __B64.charAt(Math.floor(n / 64) % 64))
+      + (c === undefined ? "=" : __B64.charAt(n % 64));
+  }
+  return out;
+}
+function bytesFromBase64(text) {
+  var verb = "ce.midi.fromBase64";
+  if (text === undefined || text === null) return __refuse(verb, "no base64 text given");
+  var clean = typeof text === "string" ? text.replace(/[ \t\r\n]/g, "") : null;
+  if (clean === null || clean.length % 4 !== 0 || !/^[A-Za-z0-9+\/]*={0,2}$/.test(clean)) {
+    return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.");
+  }
+  var out = [];
+  for (var i = 0; i < clean.length; i += 4) {
+    var n = 0, pad = 0;
+    for (var j = 0; j < 4; j++) {
+      var c = clean.charAt(i + j);
+      if (c === "=") { pad++; n = n * 64; } else n = n * 64 + __B64.indexOf(c);
+    }
+    out.push(Math.floor(n / 65536) % 256);
+    if (pad < 2) out.push(Math.floor(n / 256) % 256);
+    if (pad < 1) out.push(n % 256);
+  }
+  return out;
+}
+
 // panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 // order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
 // out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
@@ -1317,7 +2033,12 @@ function panic(opts) {
   opts = opts || {};
   var reset = opts.resetControllers !== false;
   var first = 1, last = 16;
-  if (opts.channel !== undefined && opts.channel !== null) { first = Math.floor(opts.channel); last = first; }
+  // A channel that is not one ("all", 17) is refused; leaving it out is how every channel is named.
+  if (opts.channel !== undefined && opts.channel !== null) {
+    first = __midiArg("panic", "channel", opts.channel);
+    if (first === undefined) return;
+    last = first;
+  }
   for (var ch = first; ch <= last; ch++) {
     sendCC(ch, 120, 0);
     sendCC(ch, 123, 0);
@@ -1529,19 +2250,91 @@ function logError(message, value) { return __api.logAt("error", String(message),
 
 // @module ce.midi
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
-function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ? 16 : c)) - 1; }
-function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
-// noteNumber is undefined for an unreadable name; a MIDI message still needs a BYTE, so it becomes
-// 0 here rather than an undefined slipping into a message.
-function __note(n) { return typeof n === "string" ? (noteNumber(n) === undefined ? 0 : noteNumber(n)) : __7(n); }
+// The numbers a channel message carries, checked before anything is sent: the WebView runtime's
+// MIDI_ARGS and midiArg, word for word. An address (channel, controller, program, bank, parameter
+// number) outside its range is refused, since clamping it picks a different message; a value past
+// the end of its range is clamped, as before; anything that is not a number, or is missing where
+// there is no default, is refused. A fraction rounds half up (this floored it, the editor rounded).
+var __MIDI_ARGS = {
+  channel: ["channel", "a channel", 1, 16, true, "A channel is a whole number from 1 to 16."],
+  controller: ["controller number", "a controller number", 0, 127, true, "A controller number is a whole number from 0 to 127."],
+  program: ["program", "a program", 0, 127, true, "A program is a whole number from 0 to 127."],
+  bank: ["bank number", "a bank number", 0, 127, true, "A bank number is a whole number from 0 to 127."],
+  msb: ["MSB", "an MSB", 0, 127, true, "An MSB is a whole number from 0 to 127."],
+  lsb: ["LSB", "an LSB", 0, 127, true, "An LSB is a whole number from 0 to 127."],
+  value: ["value", "a value", 0, 127, false, "A value is a number from 0 to 127."],
+  velocity: ["velocity", "a velocity", 0, 127, false, "A velocity is a number from 0 to 127."],
+  pressure: ["pressure", "a pressure", 0, 127, false, "A pressure is a number from 0 to 127."],
+  value14: ["value", "a value", 0, 16383, false, "A value is a number from 0 to 16383."],
+  bend: ["bend", "a bend", 0, 16383, false, "A bend is a number from 0 to 16383, and 8192 is the centre."],
+  position: ["song position", "a song position", 0, 16383, false, "A song position is a number of MIDI beats from 0 to 16383."]
+};
+var __edgeWarned = {};
+function __midiArg(verb, kind, v) {
+  var a = __MIDI_ARGS[kind];
+  if (v === undefined || v === null) { logError(verb + ": no " + a[0] + " given, so nothing was sent."); return undefined; }
+  var r = __realNumber(v);   // text that is a number ("64") is read as one, as it always was
+  var n = r === undefined ? undefined : Math.floor(r + 0.5);
+  if (n === undefined || (a[4] && (n < a[2] || n > a[3]))) {
+    logError(verb + ": " + __shownValue(v) + " is not " + a[1] + ", so nothing was sent. " + a[5]);
+    return undefined;
+  }
+  if (n >= a[2] && n <= a[3]) return n;
+  // A value past the end of its range is sent as the nearest end, and said once per command.
+  var sent = n < a[2] ? a[2] : a[3];
+  if (!__edgeWarned[verb]) {
+    __edgeWarned[verb] = true;
+    logWarn(verb + ": the " + a[0] + " " + __shownValue(v) + " is outside " + a[2] + " to " + a[3]
+      + ", so " + sent + " was sent. This is said only the first time.");
+  }
+  return sent;
+}
+// A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
+// range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a
+// name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
+// table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
+function __note(n) {
+  var v = typeof n === "string" ? noteNumber(n) : (typeof n === "number" && isFinite(n) ? Math.floor(n + 0.5) : undefined);
+  return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
+}
+function __badNote(verb, note) {
+  var range = "MIDI notes run from 0 to 127, which is C-1 to G9.";
+  var why;
+  if (note === undefined || note === null) {
+    why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
+  } else if (typeof note === "string") {
+    why = noteNumber(note) === undefined
+      ? '"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+        + 'has one, then the octave: "C4", "Eb3", "F#-1".'
+      : '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + range;
+  } else if (typeof note === "number" && isFinite(note)) {
+    why = note + " is outside the MIDI notes, so nothing was sent. " + range;
+  } else {
+    why = __shownValue(note) + ' is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
+  }
+  logError(verb + ": " + why);
+}
+// sendNote's `ms`: left out (null here), the script sends the note off itself; given, it must be a
+// length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+function __noteLength(verb, ms) {
+  if (ms === undefined || ms === null) return null;
+  var length = __realNumber(ms);   // "500" is what sendNote has always read
+  if (length !== undefined && length > 0) return length;
+  logError(verb + ": " + __shownValue(ms) + " is not a length in milliseconds, so nothing was sent. "
+    + "Give a number above 0, or leave it out to send the note off yourself.");
+  return undefined;
+}
 
 // A duration schedules the note off — otherwise every script that plays a note hand-rolls a timer,
 // and getting that wrong means a hung voice, the one MIDI mistake you hear rather than read.
 function sendNote(channel, note, velocity, ms) {
+  var c = __midiArg("sendNote", "channel", channel); if (c === undefined) return;
   var n = __note(note);
-  sendMidi([0x90 | __ch(channel), n, __7(velocity)]);
-  if (ms !== undefined && ms !== null && ms > 0)
-    after(ms, function () { sendMidi([0x80 | __ch(channel), n, 0]); });
+  if (n === undefined) return __badNote("sendNote", note);
+  var v = __midiArg("sendNote", "velocity", velocity); if (v === undefined) return;
+  var length = __noteLength("sendNote", ms); if (length === undefined) return;
+  sendMidi([0x90 | (c - 1), n, v]);
+  if (length !== null) __oneShot(length, function () { sendMidi([0x80 | (c - 1), n, 0]); });
 }
 // routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
 // ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
@@ -1567,37 +2360,70 @@ function __applyMidiFilter(inbound, bytes) {
 function sendRPN(channel, msb, lsb, value) {
   // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
   // fine tuning (0,1) and coarse tuning (0,2).
-  var s = 0xB0 | __ch(channel);
-  var v = Math.floor(Number(value) || 0); v = v < 0 ? 0 : (v > 16383 ? 16383 : v);
-  sendMidi([s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F]);
+  var c = __midiArg("sendRPN", "channel", channel); if (c === undefined) return;
+  var m = __midiArg("sendRPN", "msb", msb); if (m === undefined) return;
+  var l = __midiArg("sendRPN", "lsb", lsb); if (l === undefined) return;
+  var v = __midiArg("sendRPN", "value14", value); if (v === undefined) return;
+  var s = 0xB0 | (c - 1);
+  sendMidi([s, 0x65, m, s, 0x64, l, s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F]);
 }
 // Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
 function sendSongPosition(beats) {
-  var b = Math.floor(Number(beats) || 0); b = b < 0 ? 0 : (b > 16383 ? 16383 : b);
+  var b = __midiArg("sendSongPosition", "position", beats); if (b === undefined) return;
   sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F]);
 }
-function sendNoteOff(channel, note, velocity) { sendMidi([0x80 | __ch(channel), __note(note), __7(velocity || 0)]); }
+function sendNoteOff(channel, note, velocity) {
+  var c = __midiArg("sendNoteOff", "channel", channel); if (c === undefined) return;
+  var n = __note(note);
+  if (n === undefined) return __badNote("sendNoteOff", note);
+  var v = __midiArg("sendNoteOff", "velocity", velocity === undefined || velocity === null ? 0 : velocity);
+  if (v === undefined) return;
+  sendMidi([0x80 | (c - 1), n, v]);
+}
 function sendProgramChange(channel, program, bankMsb, bankLsb) {
+  var verb = "sendProgramChange";
+  var c = __midiArg(verb, "channel", channel); if (c === undefined) return;
+  var p = __midiArg(verb, "program", program); if (p === undefined) return;
+  var msb = null, lsb = null;
+  if (bankMsb !== undefined && bankMsb !== null) { msb = __midiArg(verb, "bank", bankMsb); if (msb === undefined) return; }
+  if (bankLsb !== undefined && bankLsb !== null) { lsb = __midiArg(verb, "bank", bankLsb); if (lsb === undefined) return; }
   // Bank select first: a device applies the bank that was in force when the program change lands.
-  if (bankMsb !== undefined && bankMsb !== null) sendCC(channel, 0, __7(bankMsb));
-  if (bankLsb !== undefined && bankLsb !== null) sendCC(channel, 32, __7(bankLsb));
-  sendMidi([0xC0 | __ch(channel), __7(program)]);
+  if (msb !== null) sendCC(c, 0, msb);
+  if (lsb !== null) sendCC(c, 32, lsb);
+  sendMidi([0xC0 | (c - 1), p]);
 }
 function sendPitchBend(channel, value) {
-  var v = Math.floor(Number(value)); if (!isFinite(v)) v = 8192;
-  if (v < 0) v = 0; else if (v > 16383) v = 16383;
-  sendMidi([0xE0 | __ch(channel), v % 128, Math.floor(v / 128) % 128]);
+  var c = __midiArg("sendPitchBend", "channel", channel); if (c === undefined) return;
+  var v = __midiArg("sendPitchBend", "bend", value === undefined || value === null ? 8192 : value);
+  if (v === undefined) return;
+  sendMidi([0xE0 | (c - 1), v % 128, Math.floor(v / 128) % 128]);
 }
 function sendAftertouch(channel, pressure, note) {
-  if (note !== undefined && note !== null) sendMidi([0xA0 | __ch(channel), __note(note), __7(pressure)]);
-  else sendMidi([0xD0 | __ch(channel), __7(pressure)]);
+  var c = __midiArg("sendAftertouch", "channel", channel); if (c === undefined) return;
+  var p;
+  if (note === undefined || note === null) {
+    p = __midiArg("sendAftertouch", "pressure", pressure); if (p === undefined) return;
+    return sendMidi([0xD0 | (c - 1), p]);
+  }
+  var n = __note(note);
+  if (n === undefined) return __badNote("sendAftertouch", note);
+  p = __midiArg("sendAftertouch", "pressure", pressure); if (p === undefined) return;
+  sendMidi([0xA0 | (c - 1), n, p]);
 }
 function sendClock() { sendMidi([0xF8]); }
+// Any action but stop and continue used to send Start, so "pause" started the sequencer.
 function sendTransport(action) {
-  action = String(action === undefined || action === null ? "start" : action).toLowerCase();
-  if (action === "stop") sendMidi([0xFC]);
-  else if (action === "continue") sendMidi([0xFB]);
-  else sendMidi([0xFA]);
+  var actions = 'The actions are "start", "continue" and "stop".';
+  if (action === undefined || action === null) {
+    logError("sendTransport: no action given, so nothing was sent. " + actions);
+    return;
+  }
+  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.toLowerCase()] : undefined;
+  if (status === undefined) {
+    logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions);
+    return;
+  }
+  sendMidi([status]);
 }
 
 // @module ce.time
@@ -1625,15 +2451,21 @@ function transportInfo() {
 }
 function tempo() { var t = __transport(); return (t.bpm && t.bpm > 0) ? t.bpm : null; }
 function isPlaying() { return __transport().playing === true; }
+// A bpm that is not above 0, or not a number, is the transport's tempo, and says so (__tread). It
+// gave nothing here, where the WebView used the tempo, and "fast" gave NaN.
 function beatsToMs(beats, bpm) {
-  bpm = bpm || tempo();
-  if (!bpm || bpm <= 0) return null;
-  return (Number(beats) || 0) * 60000 / bpm;
+  var b = __tread("beatsToMs", "beats", beats);
+  var rate = __tread("beatsToMs", "bpm", bpm);
+  if (rate === undefined) rate = tempo();
+  if (!rate || rate <= 0) return null;
+  return b * 60000 / rate;
 }
 function msToBeats(ms, bpm) {
-  bpm = bpm || tempo();
-  if (!bpm || bpm <= 0) return null;
-  return (Number(ms) || 0) * bpm / 60000;
+  var m = __tread("msToBeats", "ms", ms);
+  var rate = __tread("msToBeats", "bpm", bpm);
+  if (rate === undefined) rate = tempo();
+  if (!rate || rate <= 0) return null;
+  return m * rate / 60000;
 }
 // syncTimer(id, beats [, opts]) — a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
 // The first version computed the interval once and then kept firing at the old rate forever; a verb
@@ -1642,13 +2474,15 @@ function msToBeats(ms, bpm) {
 // that is permanently at the wrong rate.
 function syncTimer(id, beats, opts) {
   var key = String(id === undefined || id === null ? "" : id);
-  var ms = beatsToMs(beats);
+  var length = __beatsOf('ce.time.syncTimer("' + key + '")', beats, true, "no timer was started");
+  if (length === undefined) return;
+  var ms = beatsToMs(length);
   if (ms === null) {
     log("syncTimer(\"" + id + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.");
     return;
   }
-  startTimer(key, ms);                                    // clears any previous follow…
-  if (!(opts && opts.follow === false)) __syncFollow[key] = Number(beats) || 0;   // …put back on purpose
+  __armTimer(key, ms);                                    // clears any previous follow…
+  if (!(opts && opts.follow === false)) __syncFollow[key] = length;   // …put back on purpose
 }
 // Re-time every following sync timer. Armed from the prelude's own onTransport listener, so it
 // belongs to no script and survives every reload of them.
@@ -1660,7 +2494,7 @@ function __reArmSyncTimers() {
     var ms = beatsToMs(pending[k]);
     // No tempo any more: leave it running at the last one rather than stopping the music.
     if (ms === null) continue;
-    startTimer(k, ms);
+    __armTimer(k, ms);
     __syncFollow[k] = pending[k];
   }
 }
@@ -1685,10 +2519,15 @@ function after(ms, fn) {
     log("after(ms, fn) needs a function to run — nothing was scheduled");
     return undefined;
   }
+  if (__timeRefused("ce.time.after", ms, "milliseconds", "delay", false, "nothing was scheduled")) return undefined;
+  return __oneShot(ms, fn);
+}
+// The one-shot itself, unchecked: sendNote's duration works out its own delay.
+function __oneShot(ms, fn) {
   __afterN += 1;
   var id = "__after:" + __afterN;
   __after[id] = fn;
-  startTimer(id, ms);
+  __armTimer(id, ms);
   return id;
 }
 // Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
@@ -1708,7 +2547,9 @@ on("*", "onTimer", function (info) {
 // had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 // fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 function afterBeats(beats, fn) {
-  var ms = beatsToMs(beats);
+  var length = __beatsOf("ce.time.afterBeats", beats, false, "nothing was scheduled");
+  if (length === undefined) return undefined;
+  var ms = beatsToMs(length);
   if (ms === null) {
     log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.");
     return undefined;
@@ -1723,6 +2564,47 @@ function afterBeats(beats, fn) {
 // fallback that differs by one is a sequencer a step out.
 function __tnum(v, fallback) { var n = Number(v); return isFinite(n) ? n : fallback; }
 function __tclamp(v, lo, hi) { var n = __tnum(v, lo); return n < lo ? lo : (n > hi ? hi : n); }
+// A helper's number argument as the transport reads it, with one not used as written said once
+// per helper and argument, in the words of the WebView runtime's timeWords.js. A position before
+// the start is the start, a bar of no beats is a bar of one, and text that is not a number is the
+// argument's default; each gave an answer for a number nobody wrote, without a word. For each
+// argument: what is used for one that is not a number, the least and the most it is read as, and
+// whether it is rounded first; a bpm falls back to the transport's tempo.
+var __TIME_NUMBERS = {
+  barBeatAt: ["ce.time.position", { beats: [0, 0], beatsPerBar: [4, 1] }],
+  stepAt: ["ce.time.step", { beats: [0, 0] }],
+  stepsBetween: ["ce.time.steps", { from: [0, 0], to: [0, 0], max: [16, 1, undefined, true] }],
+  swingOffset: ["ce.time.swing", { step: [0], amount: [0, 0, 1] }],
+  cycleAt: ["ce.time.cycle", { beats: [0, 0], bars: [0.25, 0.25, 64], beatsPerBar: [4, 1] }],
+  loopedBeats: ["ce.time.looped", { beats: [0, 0], startBeats: [0, 0], lengthBeats: [0.01, 0.01] }],
+  beatsToMs: ["ce.time.beatsToMs", { beats: [0], bpm: ["tempo"] }],
+  msToBeats: ["ce.time.msToBeats", { ms: [0], bpm: ["tempo"] }]
+};
+var __timeWarned = {};
+function __tread(fn, name, v) {
+  var helper = __TIME_NUMBERS[fn], s = helper[1][name], tempo = s[0] === "tempo";
+  if (v === undefined || v === null) return tempo ? undefined : s[0];
+  var read = __realNumber(v), n, why, used;
+  if (tempo) {
+    if (read !== undefined && read > 0) return read;
+    why = read === undefined ? "not a number" : "not above 0";
+    used = "the transport's tempo";
+  } else if (read === undefined) {
+    why = "not a number"; n = used = s[0];
+  } else {
+    n = s[3] ? Math.round(read) : read;
+    if (s[1] !== undefined && n < s[1]) { why = "less than " + s[1]; n = used = s[1]; }
+    else if (s[2] !== undefined && n > s[2]) { why = "more than " + s[2]; n = used = s[2]; }
+    else return n;
+  }
+  var key = fn + " " + name;
+  if (!__timeWarned[key]) {
+    __timeWarned[key] = true;
+    logWarn(helper[0] + ": " + name + " is " + __shownValue(v) + ", which is " + why + ", so " + used
+      + " was used. This is said only the first time.");
+  }
+  return n;
+}
 
 // A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and
 // only DIFFERENCES mean anything, so a machine syncing its clock cannot corrupt an interval.
@@ -1730,8 +2612,22 @@ function nowMs() { return __api.nowMs(); }
 
 // The panel's division vocabulary, in both directions. An unknown name returns undefined rather
 // than the component's 1/16 fallback: a component has to keep running, a script that mistyped a
-// division should find out.
-function beatsPerDivision(name) { return __CE_DIVISIONS[String(name)]; }
+// division should find out. It found out only by getting undefined, so __division says so as well,
+// in the words of the WebView runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the
+// names differ only by D and T and nothing is ambiguous.
+function __division(verb, name) {
+  if (typeof name === "string") {
+    var wanted = name.toLowerCase();
+    for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
+      var id = __CE_DIVISION_NAMES[i];
+      if (id.toLowerCase() === wanted) return __CE_DIVISIONS[id];
+    }
+  }
+  logError(verb + ": " + (name === undefined || name === null ? "no division given" : __shownValue(name) + " is not a division")
+    + ", so there is no answer. The divisions are " + __CE_DIVISION_NAMES.join(", ") + ".");
+  return undefined;
+}
+function beatsPerDivision(name) { return __division("ce.time.division", name); }
 function divisionNames() {
   var out = [];
   for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
@@ -1744,8 +2640,8 @@ function divisionNames() {
 // Where a beat position falls musically — for ANY position, not only the transport's. Bars and
 // beats count from 1 as musicians do; `text` is the Transport component's own readout.
 function barBeatAt(beats, beatsPerBar) {
-  var perBar = __tnum(beatsPerBar, 4); if (perBar < 1) perBar = 1;
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  var b = __tread("barBeatAt", "beats", beats);
+  var perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar);
   var bar = Math.floor(b / perBar) + 1;
   var beat = Math.floor(b % perBar) + 1;
   var tick = Math.floor((b % 1) * __CE_TIME.ppqn);
@@ -1755,10 +2651,9 @@ function barBeatAt(beats, beatsPerBar) {
 }
 
 function stepAt(beats, division) {
-  var per = __CE_DIVISIONS[String(division)];
+  var per = __division("ce.time.step", division);
   if (per === undefined) return undefined;
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
-  return Math.floor(b / per);
+  return Math.floor(__tread("stepAt", "beats", beats) / per);
 }
 
 // The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
@@ -1766,16 +2661,16 @@ function stepAt(beats, division) {
 // returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
 // an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
 function stepsBetween(fromBeats, toBeats, division, maxSteps) {
-  var per = __CE_DIVISIONS[String(division)];
+  var per = __division("ce.time.steps", division);
   if (per === undefined) return undefined;
-  var from = __tnum(fromBeats, 0); if (from < 0) from = 0;
-  var to = __tnum(toBeats, 0); if (to < 0) to = 0;
+  var from = __tread("stepsBetween", "from", fromBeats);
+  var to = __tread("stepsBetween", "to", toBeats);
+  var cap = __tread("stepsBetween", "max", maxSteps);
   if (to <= from) return { steps: [], dropped: 0 };
   var first = Math.floor(from / per) + 1;
   var last = Math.floor(to / per);
   if (last < first) return { steps: [], dropped: 0 };
   var total = last - first + 1;
-  var cap = Math.round(__tnum(maxSteps, 16)); if (cap < 1) cap = 1;
   var kept = total < cap ? total : cap;
   var steps = [];
   for (var i = last - kept + 1; i <= last; i++) steps.push(i);
@@ -1785,22 +2680,20 @@ function stepsBetween(fromBeats, toBeats, division, maxSteps) {
 // The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
 // same" swing are only the same swing if they compute it the same way.
 function swingOffset(step, amount, division) {
-  var per = __CE_DIVISIONS[String(division)];
+  var per = __division("ce.time.swing", division);
   if (per === undefined) return undefined;
-  var s = __tclamp(amount, 0, 1);
-  return (Math.abs(Math.round(__tnum(step, 0))) % 2 === 1) ? s * 0.5 * per : 0;
+  var n = __tread("swingOffset", "step", step);
+  var s = __tread("swingOffset", "amount", amount);
+  return (Math.abs(Math.round(n)) % 2 === 1) ? s * 0.5 * per : 0;
 }
 
 // For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
 // never accumulated, so a cycle running for an hour is still exactly on the bar line.
-function __cycleBeats(bars, beatsPerBar) {
-  var perBar = __tnum(beatsPerBar, 4); if (perBar < 1) perBar = 1;
-  var len = __tclamp(bars, 0.25, 64) * perBar;
-  return len < 0.01 ? 0.01 : len;
-}
 function cycleAt(beats, bars, beatsPerBar) {
-  var len = __cycleBeats(bars, beatsPerBar);
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  var b = __tread("cycleAt", "beats", beats);
+  var n = __tread("cycleAt", "bars", bars);
+  var len = n * __tread("cycleAt", "beatsPerBar", beatsPerBar);
+  if (len < 0.01) len = 0.01;
   return { phase: (((b / len) % 1) + 1) % 1, count: Math.floor(b / len), length: len };
 }
 
@@ -1808,9 +2701,9 @@ function cycleAt(beats, bars, beatsPerBar) {
 // run IN to a loop from earlier in the song. `pass` is which time round, -1 before the loop is
 // reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 function loopedBeats(beats, startBeats, lengthBeats) {
-  var b = __tnum(beats, 0); if (b < 0) b = 0;
-  var st = __tnum(startBeats, 0); if (st < 0) st = 0;
-  var len = __tnum(lengthBeats, 0.01); if (len < 0.01) len = 0.01;
+  var b = __tread("loopedBeats", "beats", beats);
+  var st = __tread("loopedBeats", "startBeats", startBeats);
+  var len = __tread("loopedBeats", "lengthBeats", lengthBeats);
   if (b < st) return { beats: b, pass: -1 };
   return { beats: st + ((b - st) % len), pass: Math.floor((b - st) / len) };
 }
@@ -1854,17 +2747,27 @@ function clockTempo(intervalsMs) {
 //
 // `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 // this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
-// a completion callback can be a plain argument in every language. __animDone, __animGroup and
-// __animGroupN are the running script's own (__CE_OWN).
+// a completion callback can be a plain argument in every language. __animDone is the running
+// script's own (__CE_OWN).
+//
+// Each move with a done gets a token of its own ("js:3"), handed to the host as `__done` and emitted
+// back with the result, and its function is stored under that. It was stored under the path, or for
+// a list under a number the host counted separately, so replacing a move called the new move's done
+// for the old one, and two lists from two scripts or engines crossed their dones
+// (ScriptRuntime::fireAnimationDone says how). __animSeq is the engine's, not a script's, so no two
+// scripts hand out the same token.
+var __animSeq = 0;
 
-// An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
-// own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
-// envelope at all: map()'s per-point curves live in this prelude, not in C++.
+// An envelope's shape is SAMPLED here, with mapCurve() — ce.math.map, the Envelope component's
+// own envValueAt — and the host interpolates the samples. That is what lets the host engine run
+// an envelope at all: mapCurve()'s per-point curves live in this prelude, not in C++. This called
+// map(), which no prelude defines, so Lua and JavaScript stopped with an error and Python's own
+// map() made every sample 0.
 var __ANIM_SAMPLES = 1024;
 function __animSample(points) {
   var out = [];
   for (var i = 0; i <= __ANIM_SAMPLES; i++) {
-    var y = Number(map(i / __ANIM_SAMPLES, points));
+    var y = Number(mapCurve(i / __ANIM_SAMPLES, points));
     out.push(isFinite(y) ? y : 0);
   }
   return out;
@@ -1883,35 +2786,92 @@ function __animStart(kind, path, target, opts) {
   for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
   o.done = undefined;
   if (typeof opts.done === "function") {
-    if (list) {
-      __animGroupN += 1;
-      __animGroup[__animGroupN] = opts.done;
-      o.group = __animGroupN;
-    } else {
-      __animDone[String(path)] = opts.done;
-    }
+    __animSeq += 1;
+    var token = "js:" + __animSeq;
+    __animDone[token] = opts.done;
+    o.__done = token;
+  } else if (opts.done != null) {
+    o.__badDone = opts.done;   // not a function: the host says so, once, and the move goes ahead
   }
-  __api.animate(kind, list ? list : String(path), Number(target) || 0, o);
+  // The host answers whether the move started: not when a colour property is the path or one of a
+  // list's paths, and then nothing in the list starts and its done is never called, so it is let go.
+  // A missing path is passed as empty, which the host says is no path, not as the text "undefined".
+  var started = __api.animate(kind, list ? list : (path == null ? "" : String(path)), Number(target) || 0, o) === true;
+  if (!started && o.__done !== undefined) delete __animDone[o.__done];
+  return started;
 }
 
-function animateTo(path, target, opts) { __animStart("to", path, target, opts); }
-function animateSpring(path, target, opts) { __animStart("spring", path, target, opts); }
+// to and spring move to a number, and only a number. A target that is not one ("full", "100px",
+// "#FF0000") used to move the value to 0; text that is a number ("100") is read as one, as it always
+// was. In the words of the WebView runtime's animationTarget.
+function __animTarget(verb, target) {
+  var n = __realNumber(target);
+  if (n !== undefined) return n;
+  var why = target === undefined || target === null ? "no number to move to was given"
+    : (typeof target === "string" ? '"' + target + '" is not a number' : "the target given is not a number");
+  logError(verb + ": " + why + ", so nothing was started.");
+  return undefined;
+}
+function animateTo(path, target, opts) {
+  var n = __animTarget("ce.anim.to", target);
+  return n === undefined ? false : __animStart("to", path, n, opts);
+}
+function animateSpring(path, target, opts) {
+  var n = __animTarget("ce.anim.spring", target);
+  return n === undefined ? false : __animStart("spring", path, n, opts);
+}
 // envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
 // `to` has one destination; an envelope goes up before it comes down, which is the single most
 // obvious thing a synth panel animates and the one thing `to` cannot express.
+//
+// A point is { x, y } or the two as a pair, each a number or text that is one. One that is not, or
+// whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView runtime's
+// envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler dropped a point
+// it could not read, and never reached one whose x is past 0 to 1, both without a word. A y past 0
+// to 1 is a level past `from` or `to`, and is read as it is. The points are a list, as there: text
+// has a length too, and was read as a list of its characters.
 function animateEnvelope(path, points, opts) {
-  if (!points || points.length === undefined || points.length < 2) {
-    log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
+  if (!Array.isArray(points) || points.length < 2) {
+    logError("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
     return false;
+  }
+  var written = function (v) {
+    if (v === undefined || v === null) return "none was given";
+    if (typeof v === "string") return '"' + v + '" is not';
+    if (typeof v === "number" && isFinite(v)) return String(v) + " is not";
+    return "the value given is not";
+  };
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i], which = "point " + (i + 1) + " of " + points.length;
+    if (p === null || typeof p !== "object") {
+      logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.");
+      return false;
+    }
+    var parts = __pointParts(p), x = parts[0], y = parts[1];
+    var nx = __realNumber(x);
+    if (nx === undefined || nx < 0 || nx > 1) {
+      var hint = nx !== undefined && nx / 100 >= 0 && nx / 100 <= 1
+        ? " If you meant " + String(nx) + " out of 100, write " + String(Number((nx / 100).toFixed(4))) + "." : "";
+      logError("ce.anim.envelope: the x of " + which + " is a number from 0 to 1, and " + written(x) + ", so nothing was started." + hint);
+      return false;
+    }
+    if (__realNumber(y) === undefined) {
+      logError("ce.anim.envelope: the y of " + which + " is a number, and " + written(y) + ", so nothing was started.");
+      return false;
+    }
   }
   var o = {}, k;
   if (opts) for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
   o.samples = __animSample(points);
-  o.from = Number(o.from) || 0;
-  var to = o.to === undefined || o.to === null ? 1 : Number(o.to);
+  // from and to: a number, or text that is one, or the default, which the host says (__badFrom,
+  // __badTo). Number() read "abc" as 0 and true as 1, in silence.
+  var from = __realNumber(o.from);
+  if (o.from != null && from === undefined) o.__badFrom = o.from;
+  o.from = from === undefined ? 0 : from;
+  var to = __realNumber(o.to);
+  if (o.to != null && to === undefined) o.__badTo = o.to;
   o.to = undefined;
-  __animStart("envelope", path, to, o);
-  return true;
+  return __animStart("envelope", path, to === undefined ? 1 : to, o);
 }
 function animateStop(path) { __api.animateStop(path === undefined || path === null ? "" : String(path)); }
 function animateRunning(path) { return __api.animateRunning(path === undefined || path === null ? "" : String(path)); }
@@ -1923,18 +2883,14 @@ function animateReverse(path) { return __api.animateReverse(path === undefined |
 function animateFinish(path) { return __api.animateFinish(path === undefined || path === null ? "" : String(path)); }
 
 // Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+// done(completed): one argument, true or false, for one path and for a list alike. It was handed an
+// object, { path, completed } or { paths, completed }, and an object is always truthy, so
+// `if (completed)` read a cancelled move as a finished one.
 on("*", "__animDone", function (info) {
-  if (!info) return;
-  if (info.group !== undefined && info.group !== null) {
-    var g = __animGroup[info.group];
-    delete __animGroup[info.group];
-    if (g) g({ paths: info.paths, completed: info.completed === true });
-    return;
-  }
-  var key = String(info.path === undefined ? "" : info.path);
-  var fn = __animDone[key];
-  delete __animDone[key];
-  if (fn) fn({ path: key, completed: info.completed === true });
+  if (!info || info.token === undefined || info.token === null) return;
+  var fn = __animDone[info.token];
+  delete __animDone[info.token];
+  if (fn) fn(info.completed === true);
 });
 
 // @module ce.device
@@ -1967,7 +2923,7 @@ function panelSnapshot() {
   var out = {}, names = __panelQuery("controls", null);
   if (!names) return out;
   for (var i = 0; i < names.length; i++) {
-    var v = get(names[i] + ".value");
+    var v = __read(names[i] + ".value");
     if (v !== undefined && v !== null) out[names[i]] = v;
   }
   return out;
@@ -1979,7 +2935,7 @@ function panelRestore(snap) {
     if (!Object.prototype.hasOwnProperty.call(snap, name)) continue;
     // A name the panel no longer has is skipped rather than failing the whole restore: a snapshot
     // taken before an edit is still worth most of what it holds.
-    var cur = get(name + ".value");
+    var cur = __read(name + ".value");
     if (cur !== undefined && cur !== null) { set(name + ".value", snap[name]); n += 1; }
   }
   return n;
@@ -2077,13 +3033,18 @@ function requestDump(kind, fn, opts) {
   kind = String(kind === undefined || kind === null ? "" : kind);
   if (typeof fn === "function") {
     var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout) : 3000;
-    var waiter = { kind: kind, fn: fn, done: false };
+    // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    // so that is what the callback waits for; waiting for the request's own id, it heard only the
+    // timeout.
+    var answer = __deviceQuery("answers", { role: "mainSynth", request: kind });
+    var waitFor = typeof answer === "string" && answer ? answer : kind;
+    var waiter = { kind: waitFor, fn: fn, done: false };
     __dumpWaiters.push(waiter);
     // Resolved rather than left hanging: a synth that is off, or that does not answer this
     // request, is the common case and not the exotic one.
     after(ms, function() {
       if (waiter.done) return;
-      __resolveDumps(kind, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
+      __resolveDumps(waitFor, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
     });
   }
   return __api.requestDump(kind);
@@ -2112,13 +3073,32 @@ var __CE_SCOPES = ["panel", "script", "local"];
 
 /* The scope asked for, or nothing when it is not one this build knows. Refusing rather than falling
  * back to "panel": storing a value in a scope the caller did not ask for is how a private setting
- * quietly becomes a shared one, and a typo in a scope name would be the way it happened. */
-function __storageScope(opts) {
+ * quietly becomes a shared one, and a typo in a scope name would be the way it happened. A typo in
+ * the KEY ({ scop: "script" }) is the same leak, so any key but `scope` is refused as well, sorted so
+ * every runtime names them in one order. A key that is a number is a list entry and is left alone.
+ * `verb` is the call's namespaced path. The WebView runtime's storageScopeOf says the same words. */
+function __storageScope(opts, verb) {
+  if (opts !== null && typeof opts === "object" && !Array.isArray(opts)) {
+    var unknown = [];
+    for (var key in opts) {
+      if (Object.prototype.hasOwnProperty.call(opts, key) && key !== "scope" && !/^\d+$/.test(key)) unknown.push(key);
+    }
+    if (unknown.length) {
+      unknown.sort();
+      var quoted = [];
+      for (var i = 0; i < unknown.length; i++) quoted.push('"' + unknown[i] + '"');
+      var listed = quoted.length < 2 ? quoted.join("")
+        : quoted.slice(0, -1).join(", ") + " and " + quoted[quoted.length - 1];
+      logError(verb + ": " + listed + (unknown.length === 1 ? " is not one of its options" : " are not among its options")
+               + ", so nothing was done. Its only option is scope.");
+      return undefined;
+    }
+  }
   var raw = (typeof opts === "string") ? opts : (opts ? opts.scope : undefined);
   if (raw === undefined || raw === null || raw === "") return "panel";
   var scope = String(raw);
   if (__CE_SCOPES.indexOf(scope) >= 0) return scope;
-  logError('ce.storage: "' + scope + '" is not a scope. One of: ' + __CE_SCOPES.join(", ") + ".");
+  logError(verb + ': "' + scope + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
   return undefined;
 }
 // Which of the host's two real stores a scope lives in.
@@ -2140,7 +3120,7 @@ function __storageKeyFrom(scope, stored) {
 }
 
 function saveSetting(key, value, opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.saveSetting");
   if (!scope) return false;
   var store = __storageStore(scope);
   if (__api.settingsAvailable(store) !== true) {
@@ -2152,14 +3132,14 @@ function saveSetting(key, value, opts) {
   return true;
 }
 function loadSetting(key, fallback, opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.loadSetting");
   if (!scope) return fallback;
   var v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope));
   return (v === undefined || v === null) ? fallback : v;
 }
 // settings() lists every saved key; forget() deletes one and says whether there was one.
 function listSettings(opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.settings");
   if (!scope) return [];
   var raw = __api.listSettings(__storageStore(scope)) || [];
   var out = [];
@@ -2170,14 +3150,14 @@ function listSettings(opts) {
   return out;
 }
 function forgetSetting(key, opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.forget");
   if (!scope) return false;
   return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) === true;
 }
 // Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 // one was the only way before.
 function allSettings(opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.all");
   if (!scope) return {};
   var keys = listSettings(opts), out = {};
   for (var i = 0; i < keys.length; i++) out[keys[i]] = loadSetting(keys[i], undefined, opts);
@@ -2186,6 +3166,8 @@ function allSettings(opts) {
 // Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
 // keys alone: "clear my settings" must not mean "clear everybody's".
 function clearSettings(opts) {
+  // Checked here first, so a refusal names clear rather than the settings() it calls.
+  if (!__storageScope(opts, "ce.storage.clear")) return 0;
   var keys = listSettings(opts), gone = 0;
   for (var i = 0; i < keys.length; i++) if (forgetSetting(keys[i], opts)) gone++;
   return gone;
@@ -2193,7 +3175,7 @@ function clearSettings(opts) {
 // Which store a scope is talking to, and what is in it. `available` is the honest field: false means
 // writes in this scope will not stick, which is worth saying once rather than per key.
 function storageInfo(opts) {
-  var scope = __storageScope(opts);
+  var scope = __storageScope(opts, "ce.storage.info");
   if (!scope) return undefined;
   var store = __storageStore(scope);
   var contents = allSettings(opts);
@@ -2267,15 +3249,97 @@ function decodeJson(text) {
 }
 
 // @module -
+// BEGIN GENERATED option keys — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// An options table holding a key its member does not take REFUSES the call: nothing is done, the
+// console names the keys and the options the member has, and the call answers what the member
+// answers for any other refusal. The WebView runtime does the same from the same lists in
+// panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+// list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+// order a message could follow.
+var __CE_OPTIONS = {
+  "set": { path: "set", at: 2, refusal: "nothing", names: ["transmit"] },
+  "requestDump": { path: "ce.device.requestDump", at: 2, refusal: "false", names: ["timeout"] },
+  "recallPreset": { path: "ce.device.recallPreset", at: 1, refusal: "result", names: ["role"] },
+  "animateTo": { path: "ce.anim.to", at: 2, refusal: "false", names: ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "animateSpring": { path: "ce.anim.spring", at: 2, refusal: "false", names: ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "animateEnvelope": { path: "ce.anim.envelope", at: 2, refusal: "false", names: ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "syncTimer": { path: "ce.time.syncTimer", at: 2, refusal: "nothing", names: ["follow"] },
+  "deviceParameters": { path: "ce.device.parameters", at: 0, refusal: "empty list", names: ["role", "query", "group", "type", "access", "limit"] },
+  "deviceDefineParameter": { path: "ce.device.defineParameter", at: 1, refusal: "false", names: ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], nested: { "nrpn": { names: ["msb", "lsb"] } } },
+  "deviceDefineDump": { path: "ce.device.defineDump", at: 1, refusal: "false", names: ["name", "request", "match", "prefix", "suffix", "offset", "size", "checksum", "fields"], nested: { "match": { names: ["prefix", "suffix"] } } },
+  "devicePorts": { path: "ce.device.ports", at: 0, refusal: "empty list", names: ["direction"] },
+  "checksum": { path: "ce.midi.checksum", at: 2, refusal: "nothing", names: ["offset"] },
+  "panic": { path: "ce.midi.panic", at: 0, refusal: "nothing", names: ["channel", "resetControllers"] },
+  "encodeJson": { path: "ce.storage.encode", at: 1, refusal: "nothing", names: ["indent"] },
+  "bytesRead": { path: "ce.midi.read", at: 3, refusal: "nothing", names: ["bits", "order"] },
+  "bytesWrite": { path: "ce.midi.write", at: 4, refusal: "nothing", names: ["bits", "order"] },
+};
+function __ce_isOptions(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v)
+    && !(typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(v));
+}
+// The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
+// option that lists fields of its own, in the contract's order.
+function __ce_unknownOptions(opts, shape, parent, out) {
+  var unknown = [];
+  for (var key in opts) {
+    if (Object.prototype.hasOwnProperty.call(opts, key) && shape.names.indexOf(key) < 0 && !/^\d+$/.test(key)) unknown.push(key);
+  }
+  if (unknown.length) { unknown.sort(); out.push({ parent: parent, keys: unknown, shape: shape }); }
+  for (var i = 0; i < shape.names.length; i++) {
+    var name = shape.names[i], inner = shape.nested ? shape.nested[name] : undefined;
+    if (inner && Object.prototype.hasOwnProperty.call(opts, name) && __ce_isOptions(opts[name]))
+      __ce_unknownOptions(opts[name], inner, parent ? parent + "." + name : name, out);
+  }
+  return out;
+}
+function __ce_optionsLine(path, group) {
+  var p = group.parent, quoted = [];
+  for (var i = 0; i < group.keys.length; i++) quoted.push('"' + (p ? p + "." : "") + group.keys[i] + '"');
+  var what = quoted.length === 1 ? quoted[0] + " is not one of its options, so nothing was done."
+    : quoted.slice(0, -1).join(", ") + " and " + quoted[quoted.length - 1] + " are not among its options, so nothing was done.";
+  var names = group.shape.names;
+  var listed = names.length === 1 ? (p ? "The only option of " + p : "Its only option") + " is " + names[0] + "."
+    : (p ? "The options of " + p : "Its options") + " are: " + names.join(", ") + ".";
+  return path + ": " + what + " " + listed;
+}
+function __ce_refused(refusal, lines) {
+  if (refusal === "false") return false;
+  if (refusal === "zero") return 0;
+  if (refusal === "empty list") return [];
+  if (refusal === "result") return { ok: false, error: lines.join(" ") };
+  return undefined;
+}
+(function () {
+  var __g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  for (var id in __CE_OPTIONS) {
+    if (!Object.prototype.hasOwnProperty.call(__CE_OPTIONS, id) || typeof __g[id] !== "function") continue;
+    __g[id] = (function (fn, spec) {
+      return function () {
+        var opts = arguments[spec.at];
+        if (__ce_isOptions(opts)) {
+          var groups = __ce_unknownOptions(opts, spec, "", []);
+          if (groups.length) {
+            var lines = [];
+            for (var i = 0; i < groups.length; i++) { lines.push(__ce_optionsLine(spec.path, groups[i])); logError(lines[i]); }
+            return __ce_refused(spec.refusal, lines);
+          }
+        }
+        return fn.apply(this, arguments);
+      };
+    })(__g[id], __CE_OPTIONS[id]);
+  }
+})();
+// END GENERATED option keys
 // BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
-  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
-  "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+  "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
   "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -2451,8 +3515,19 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
 
     api->setMethod ("set", [host, arg] (const Args& a) -> juce::var
         { host->setValue (arg (a, 0).toString(), arg (a, 1), arg (a, 2)); return {}; });
-    api->setMethod ("get", [host, arg] (const Args& a) -> juce::var
-        { return host->getValue (arg (a, 0).toString(), arg (a, 1).toString()); });
+    // get's form is text or it is no form, as in the WebView runtime: a table or a number where the
+    // form goes means the value, rather than the text a var makes of it, which the host would now
+    // refuse as a form that is not one (BridgeScriptHost::formRefusal).
+    auto formOf = [arg] (const Args& a, int i) -> juce::String
+    {
+        const auto form = arg (a, i);
+        return form.isString() ? form.toString() : juce::String ("value");
+    };
+    api->setMethod ("get", [host, arg, formOf] (const Args& a) -> juce::var
+        { return host->getValue (arg (a, 0).toString(), formOf (a, 1)); });
+    api->setMethod ("whyNoValue", [host, arg, formOf] (const Args& a) -> juce::var
+        { const auto why = host->whyNoValue (arg (a, 0).toString(), formOf (a, 1));
+          return why.isEmpty() ? juce::var() : juce::var (why); });
     api->setMethod ("sendCC", [host, arg] (const Args& a) -> juce::var
         { host->sendCC ((int) arg (a, 0), (int) arg (a, 1), arg (a, 2)); return {}; });
     api->setMethod ("sendNRPN", [host, arg] (const Args& a) -> juce::var
@@ -2464,7 +3539,7 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
     api->setMethod ("animate", [host, arg] (const Args& a) -> juce::var
-        { host->startAnimation (arg (a, 0).toString(), arg (a, 1), (double) arg (a, 2), arg (a, 3)); return {}; });
+        { return juce::var (host->startAnimation (arg (a, 0).toString(), arg (a, 1), (double) arg (a, 2), arg (a, 3))); });
     api->setMethod ("animateStop", [host, arg] (const Args& a) -> juce::var
         { host->stopAnimation (arg (a, 0).toString()); return {}; });
     api->setMethod ("animateRunning", [host, arg] (const Args& a) -> juce::var

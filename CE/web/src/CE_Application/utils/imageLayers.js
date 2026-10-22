@@ -200,10 +200,14 @@ const BOOLEANS = {
  *
  * `Src` and `Enabled` are always written together: they are two fields that must agree, and a layer
  * left enabled with a blank source is the commonest way to get a bug you cannot see.
+ *
+ * `tintColour(tint)` reads a tint: `{ colour }`, what to store, or `{ reason }`, why it cannot be
+ * read, as a refusal's reason. Without one, a tint is stored as it was written.
  */
-export function planImage(layer, src, opts) {
+export function planImage(layer, src, opts, { tintColour = null } = {}) {
   const writes = [];
   const refused = [];
+  const warnings = [];
   const source = opts && typeof opts === 'object' ? opts : {};
   const has = (name) => layer.fields.includes(name);
   const put = (name, value) => {
@@ -260,7 +264,15 @@ export function planImage(layer, src, opts) {
     } else put('ClipMode', String(source.clipMode));
   }
 
-  if (source.tint !== undefined) put('Tint', String(source.tint).replace(/^#/, ''));
+  // A tint the panel cannot read ("#000", "red") used to be stored and painted white. The runtime
+  // hands in its colour reader (scriptColours.panelColour, in the words set() uses), which writes a
+  // short form out and refuses what it cannot read, and keeps this module free of the panel model
+  // it would otherwise have to import.
+  if (source.tint !== undefined) {
+    const read = tintColour ? tintColour(source.tint) : { colour: source.tint };
+    if (read.reason) refused.push({ option: 'tint', reason: read.reason });
+    else put('Tint', String(read.colour).replace(/^#/, ''));
+  }
 
   for (const [key, value] of Object.entries(source)) {
     const lower = key.toLowerCase();
@@ -278,13 +290,20 @@ export function planImage(layer, src, opts) {
         ? Math.max(0, Math.min(100, asNumber))
         : (lower === 'tilescale' ? Math.max(0.1, asNumber) : asNumber);
       put(NUMBERS[lower], clamped);
+      // ce.image.icon's opacity, one call away, runs from 0 to 1, so 0.5 is an easy thing to write
+      // here and it means almost invisible. Applied as written (the scale is the panel's), with a
+      // warning that says how it was read. Up to and including 1, since 1% is as unlikely a wish.
+      if (lower === 'opacity' && asNumber > 0 && asNumber <= 1) {
+        warnings.push(`opacity runs from 0 to 100 here, so ${asNumber} is almost invisible. `
+          + `If you meant ${asNumber} out of 1, write ${Number((asNumber * 100).toFixed(4))}.`);
+      }
       continue;
     }
     if (BOOLEANS[lower]) { put(BOOLEANS[lower], value === true); continue; }
     refused.push({ option: key, reason: 'not an image option' });
   }
 
-  return { writes, refused };
+  return { writes, refused, warnings };
 }
 
 /** The writes that turn a layer OFF, which is two or three fields rather than one. */

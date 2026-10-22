@@ -15,7 +15,7 @@ import { get } from 'svelte/store';
 import { render } from 'svelte/server';
 
 import {
-  scriptApiForTesting, setRuntimeHost, drawCommandsFor, clearAllDrawings,
+  scriptApiForTesting, setRuntimeHost, drawCommandsFor, clearAllDrawings, resetScriptStateForTesting,
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptDrawings } from '../src/CE_Application/stores/scriptDraw.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
@@ -386,6 +386,44 @@ test('a dash is a list of on/off lengths, the way every drawing API spells it', 
   });
 });
 
+test('a dash length that cannot be drawn is drawn as 0 and said once; a dash that is not a list is none, and said', () => {
+  resetScriptStateForTesting();   // what has been said is forgotten with the script set
+  withPanel(scopePanel(), 'screen', (api) => {
+    const drawn = (dash) => {
+      clearScriptTrace();
+      clearAllDrawings();
+      api.drawStroke('#FFF', 1, { dash });
+      api.drawLine(0, 0, 10, 10);
+      return [drawCommandsFor('screen')[0].dash, get(scriptTrace).filter((t) => t.kind !== 'log').map((t) => `${t.kind}: ${t.message}`)];
+    };
+    const once = ' This is said only the first time.';
+    // A negative length was clamped without a word, so { 3, -3 } drew a solid line and nothing said why.
+    assert.deepEqual(drawn([3, -3]), ['3 0', [`warn: ce.draw.stroke: length 2 of the dash is -3, which is less than 0, so 0 was used.${once}`]]);
+    assert.deepEqual(drawn([3, -3]), ['3 0', []], 'once: onDraw sets its stroke on every redraw');
+    assert.deepEqual(drawn(['x', 3]), ['0 3', [`warn: ce.draw.stroke: length 1 of the dash is "x", which is not a length in pixels, so 0 was used.${once}`]]);
+    assert.deepEqual(drawn([true, 3])[0], '0 3', 'true was read as 1');
+    assert.deepEqual(drawn([Infinity, 2])[0], '0 2', 'Infinity made the whole pattern one SVG drops');
+    // Not a list: a number was dropped without a word, and text taken apart a character at a time
+    // ("3 3" drew "3 0 3", and "10 5" drew "1 0 0 5").
+    const solid = (shown) => `error: ce.draw.stroke: the dash is ${shown}, not a list of lengths, so the line is solid. `
+      + `A dash is a list of lengths in pixels, drawn and skipped in turn.${once}`;
+    assert.deepEqual(drawn(3), [null, [solid('3')]]);
+    assert.deepEqual(drawn('3 3'), [null, [solid('"3 3"')]]);
+    assert.deepEqual(drawn('10 5'), [null, [solid('"10 5"')]]);
+    // What is no mistake says nothing: a list, text that is a number in one, a Lua table over the
+    // bridge, an odd list (repeated as SVG repeats it), no dash, an empty list, and all zeros.
+    assert.deepEqual(drawn([3, 3]), ['3 3', []]);
+    assert.deepEqual(drawn(['4', '2.5']), ['4 2.5', []]);
+    assert.deepEqual(drawn({ 1: 4, 2: 2 }), ['4 2', []]);
+    assert.deepEqual(drawn([3, 2, 1]), ['3 2 1', []]);
+    assert.deepEqual(drawn(undefined), [null, []]);
+    assert.deepEqual(drawn(false), [null, []], 'a Lua `recording and { 4, 2 }` when not recording');
+    assert.deepEqual(drawn([]), [null, []]);
+    assert.deepEqual(drawn([0, 0]), ['0 0', []]);
+  });
+  resetScriptStateForTesting();
+});
+
 test('an unknown cap or join is not one, and no dash is no dash', () => {
   withPanel(scopePanel(), 'screen', (api) => {
     api.drawStroke('#FFF', 1, { cap: 'sausage', join: 'wibble' });
@@ -444,14 +482,20 @@ test('a rotation with no centre turns about the origin, and says so by omission'
   });
 });
 
-test('opacity clamps, and a non-number clears it', () => {
+test('opacity outside 0..1, or not a number, is refused and leaves what is in force; nothing clears it', () => {
+  // It used to clamp (5 was fully solid) and clear on a non-number ("50%" switched it off), both in
+  // silence. scriptVisualValues.test.js has the words.
   withPanel(scopePanel(), 'screen', (api) => {
+    api.drawOpacity(0.5);
     api.drawOpacity(5);
     api.drawRect(0, 0, 1, 1);
-    assert.equal(drawCommandsFor('screen')[0].opacity, 1);
+    assert.equal(drawCommandsFor('screen')[0].opacity, 0.5);
     api.drawOpacity('nonsense');
     api.drawRect(0, 0, 1, 1);
-    assert.equal(drawCommandsFor('screen')[1].opacity, null);
+    assert.equal(drawCommandsFor('screen')[1].opacity, 0.5);
+    api.drawOpacity();
+    api.drawRect(0, 0, 1, 1);
+    assert.equal(drawCommandsFor('screen')[2].opacity, null, 'no number switches it off, as documented');
   });
 });
 

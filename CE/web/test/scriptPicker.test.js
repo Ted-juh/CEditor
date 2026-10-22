@@ -192,3 +192,18 @@ test('narrowing the Paths tab: only the target control, and already open', () =>
   assert.ok(!body.includes('myarp'), 'the other controls are out of the way');
   assert.ok(body.includes('cutoffslider.min'), 'and the target is expanded, not one dead collapsed row');
 });
+
+test('code in a description or its example is drawn as code, never as backticks', () => {
+  // The examples moved out of the descriptions are written with code marks, and so are many older
+  // descriptions. The picker showed them as backticks, which is how "`sendCC(1, 74, 100)` sets
+  // controller 74" read under every ce.midi command.
+  const descriptions = (body) => [...body.matchAll(/<div class="pd[^"]*">([\s\S]*?)<\/div>/g)].map((m) => m[1]);
+  const commands = html({ panel: { id: 'p', scripts: [midiScript] } });
+  assert.match(commands, /<code[^>]*>sendCC\(1, 74, 100\)<\/code>/, 'the example is code');
+  const shown = descriptions(commands);
+  assert.ok(shown.length > 100, 'the commands are listed');
+  assert.deepEqual(shown.filter((d) => d.includes('`')), [], 'no description shows a backtick');
+  const events = descriptions(html({ panel: { id: 'p', scripts: [] }, initialTab: 'events' }));
+  assert.ok(events.length > 10, 'the events are listed');
+  assert.deepEqual(events.filter((d) => d.includes('`')), [], 'nor does an event');
+});

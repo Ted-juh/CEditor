@@ -270,6 +270,15 @@ PyObject* api_get (PyObject* self, PyObject* args)
     if (! PyArg_ParseTuple (args, "s|s", &path, &form)) return nullptr;
     return varToPy (hostOf (self).getValue (juce::String::fromUTF8 (path), juce::String::fromUTF8 (form)));
 }
+// Why a script's get() found nothing, or None (ScriptHostApi::whyNoValue).
+PyObject* api_whyNoValue (PyObject* self, PyObject* args)
+{
+    const char* path = nullptr; const char* form = "value";
+    if (! PyArg_ParseTuple (args, "s|s", &path, &form)) return nullptr;
+    const auto why = hostOf (self).whyNoValue (juce::String::fromUTF8 (path), juce::String::fromUTF8 (form));
+    if (why.isEmpty()) Py_RETURN_NONE;
+    return PyUnicode_FromString (why.toRawUTF8());
+}
 PyObject* api_sendCC (PyObject* self, PyObject* args)
 {
     int ch = 0, cc = 0; PyObject* v = nullptr;
@@ -322,9 +331,9 @@ PyObject* api_animate (PyObject* self, PyObject* args)
     // as an object and pyToVar decides which it was.
     const char* kind = nullptr; PyObject* path = nullptr; double target = 0.0; PyObject* opts = nullptr;
     if (! PyArg_ParseTuple (args, "sOd|O", &kind, &path, &target, &opts)) return nullptr;
-    hostOf (self).startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
-                                  opts != nullptr ? pyToVar (opts) : juce::var());
-    Py_RETURN_NONE;
+    const bool started = hostOf (self).startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
+                                                       opts != nullptr ? pyToVar (opts) : juce::var());
+    return PyBool_FromLong (started ? 1 : 0);
 }
 PyObject* api_animateStop (PyObject* self, PyObject* args)
 {
@@ -519,6 +528,7 @@ PyObject* api_off (PyObject* self, PyObject* args);
 PyMethodDef apiMethods[] = {
     { "set",           api_set,           METH_VARARGS, nullptr },
     { "get",           api_get,           METH_VARARGS, nullptr },
+    { "whyNoValue",    api_whyNoValue,    METH_VARARGS, nullptr },
     { "sendCC",        api_sendCC,        METH_VARARGS, nullptr },
     { "sendNRPN",      api_sendNRPN,      METH_VARARGS, nullptr },
     { "sendSysex",     api_sendSysex,     METH_VARARGS, nullptr },
@@ -608,7 +618,7 @@ def __putRule(lst, rule):
             return
     lst.append(rule)
 
-def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(get(path)), "prev": None})
+def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(__read(path)), "prev": None})
 def compute(path, fn):   __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
 def intercept(path, fn): __putRule(__filters, {"path": path, "fn": fn})
 
@@ -661,7 +671,7 @@ def __runReactive():
                     c["failed"] = True
                     continue
                 if nxt is None: continue
-                if __sig(nxt) == __sig(get(c["path"])): continue
+                if __sig(nxt) == __sig(__read(c["path"])): continue
                 set(c["path"], nxt)
                 wrote = True
             if not wrote: break
@@ -672,13 +682,13 @@ def __runReactive():
         # landing — still obey their filter. Needs an idempotent filter to settle, which snapping,
         # clamping and quantising all are.
         for f in __filters:
-            cur = get(f["path"])
+            cur = __read(f["path"])
             if cur is None: continue
             d = __applyIntercepts(f["path"], cur)
             if d.get("reject"): continue      # a veto has nothing to revert to
             if __sig(d["value"]) != __sig(cur): set(f["path"], d["value"])
         for w in __watchers:
-            v = get(w["path"])
+            v = __read(w["path"])
             s = __sig(v)
             if s == w["last"]: continue
             previous = w["prev"]
@@ -696,10 +706,39 @@ def set(path, value, opts=None):
     d = __applyIntercepts(path, value)
     if d.get("reject"): return None
     return __api.set(path, d["value"], opts)
-def get(path, form="value"):      return __api.get(path, form)
+# A script's own get() says why it has no answer when the control or the path is not there, in the
+# editor's words (ScriptHostApi::whyNoValue asks the app). __read is the quiet read the prelude's own
+# watch, compute and snapshot use, as the editor's do: a watch on a path that is not there yet would
+# otherwise say so on every pass.
+def __read(path):                 return __api.get(path, "value")
+def __scriptGet(path, form="value"):
+    v = __api.get(path, form)
+    if v is None:
+        why = __api.whyNoValue(path, form)
+        if why: logError(why)
+    return v
+def get(path, form="value"):      return __scriptGet(path, form)
 # @module ce.midi
-def sendCC(ch, cc, v):            return __api.sendCC(ch, cc, v)
-def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
+# sendCC and sendNRPN are host bindings; what a script passes is checked here first (__midiArg, in
+# the ce.midi section), as the editor checks it, and only numbers that are a message reach the host.
+def sendCC(ch=None, cc=None, v=None):
+    c = __midiArg("sendCC", "channel", ch)
+    if c is None: return
+    n = __midiArg("sendCC", "controller", cc)
+    if n is None: return
+    value = __midiArg("sendCC", "value", v)
+    if value is None: return
+    __api.sendCC(c, n, value)
+def sendNRPN(ch=None, msb=None, lsb=None, v=None):
+    c = __midiArg("sendNRPN", "channel", ch)
+    if c is None: return
+    m = __midiArg("sendNRPN", "msb", msb)
+    if m is None: return
+    l = __midiArg("sendNRPN", "lsb", lsb)
+    if l is None: return
+    value = __midiArg("sendNRPN", "value14", v)
+    if value is None: return
+    __api.sendNRPN(c, m, l, value)
 def sendSysex(b):                 return __api.sendSysex(b)
 # @module ce.time
 # Musical time. One host primitive behind tempo() / isPlaying() / transportInfo(), so the three can
@@ -732,17 +771,23 @@ def tempo():
 def isPlaying():
     return __transport().get("playing") is True
 
+# A bpm that is not above 0, or not a number, is the transport's tempo, and says so (__tread). It
+# gave nothing here, where the WebView used the tempo, and "fast" raised a TypeError.
 def beatsToMs(beats, bpm=None):
-    bpm = bpm or tempo()
-    if not bpm or bpm <= 0:
+    b = __tread("beatsToMs", "beats", beats)
+    rate = __tread("beatsToMs", "bpm", bpm)
+    if rate is None: rate = tempo()
+    if not rate or rate <= 0:
         return None
-    return (float(beats) if beats is not None else 0.0) * 60000.0 / bpm
+    return b * 60000.0 / rate
 
 def msToBeats(ms, bpm=None):
-    bpm = bpm or tempo()
-    if not bpm or bpm <= 0:
+    m = __tread("msToBeats", "ms", ms)
+    rate = __tread("msToBeats", "bpm", bpm)
+    if rate is None: rate = tempo()
+    if not rate or rate <= 0:
         return None
-    return (float(ms) if ms is not None else 0.0) * bpm / 60000.0
+    return m * rate / 60000.0
 
 # syncTimer(id, beats [, opts]) - a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
 # The first version computed the interval once and then kept firing at the old rate forever; a verb
@@ -751,16 +796,18 @@ def msToBeats(ms, bpm=None):
 # that is permanently at the wrong rate.
 def syncTimer(id, beats, opts=None):
     key = "" if id is None else str(id)
-    ms = beatsToMs(beats)
+    length = __beatsOf('ce.time.syncTimer("' + key + '")', beats, True, "no timer was started")
+    if length is None: return
+    ms = beatsToMs(length)
     if ms is None:
         log("syncTimer(\"" + str(id) + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
         return
-    startTimer(key, ms)                                   # clears any previous follow...
+    __armTimer(key, ms)                                   # clears any previous follow...
     follow = True
     if isinstance(opts, dict) and opts.get("follow") is False:
         follow = False
     if follow:
-        __syncFollow[key] = float(beats or 0)             # ...and this puts it back on purpose
+        __syncFollow[key] = length                        # ...and this puts it back on purpose
 # Re-time every following sync timer. Armed from the prelude's own onTransport listener, so it
 # belongs to no script and survives every reload of them.
 def __reArmSyncTimers():
@@ -768,7 +815,7 @@ def __reArmSyncTimers():
         ms = beatsToMs(beats)
         # No tempo any more: leave it running at the last one rather than stopping the music.
         if ms is None: continue
-        startTimer(key, ms)
+        __armTimer(key, ms)
         __syncFollow[key] = beats
 __lastSyncBpm = [None]
 def __syncOnTransport(t):
@@ -790,10 +837,14 @@ def after(ms, fn):
     if not callable(fn):
         log("after(ms, fn) needs a function to run — nothing was scheduled")
         return None
+    if __timeRefused("ce.time.after", ms, "milliseconds", "delay", False, "nothing was scheduled"): return None
+    return __oneShot(ms, fn)
+# The one-shot itself, unchecked: sendNote's duration works out its own delay.
+def __oneShot(ms, fn):
     __afterN[0] += 1
     _id = "__after:" + str(__afterN[0])
     __after[_id] = fn
-    startTimer(_id, ms)
+    __armTimer(_id, ms)
     return _id
 # Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
 # A one-shot is NOT a timer the panel declared, so it is swallowed here rather than surfacing as
@@ -811,7 +862,9 @@ on("*", "onTimer", __afterTick)
 # had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 # fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 def afterBeats(beats, fn):
-    ms = beatsToMs(beats)
+    length = __beatsOf("ce.time.afterBeats", beats, False, "nothing was scheduled")
+    if length is None: return None
+    ms = beatsToMs(length)
     if ms is None:
         log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
         return None
@@ -833,6 +886,53 @@ def __tclamp(v, lo, hi):
     n = __tnum(v, lo)
     return lo if n < lo else (hi if n > hi else n)
 
+# A helper's number argument as the transport reads it, with one not used as written said once per
+# helper and argument, in the words of the WebView runtime's timeWords.js. A position before the
+# start is the start, a bar of no beats is a bar of one, and text that is not a number is the
+# argument's default; each gave an answer for a number nobody wrote, without a word. For each
+# argument: what is used for one that is not a number, the least and the most it is read as, and
+# whether it is rounded first; a bpm falls back to the transport's tempo.
+__TIME_NUMBERS = {
+    "barBeatAt": ("ce.time.position", { "beats": { "fallback": 0, "min": 0 }, "beatsPerBar": { "fallback": 4, "min": 1 } }),
+    "stepAt": ("ce.time.step", { "beats": { "fallback": 0, "min": 0 } }),
+    "stepsBetween": ("ce.time.steps", { "from": { "fallback": 0, "min": 0 }, "to": { "fallback": 0, "min": 0 }, "max": { "fallback": 16, "min": 1, "round": True } }),
+    "swingOffset": ("ce.time.swing", { "step": { "fallback": 0 }, "amount": { "fallback": 0, "min": 0, "max": 1 } }),
+    "cycleAt": ("ce.time.cycle", { "beats": { "fallback": 0, "min": 0 }, "bars": { "fallback": 0.25, "min": 0.25, "max": 64 }, "beatsPerBar": { "fallback": 4, "min": 1 } }),
+    "loopedBeats": ("ce.time.looped", { "beats": { "fallback": 0, "min": 0 }, "startBeats": { "fallback": 0, "min": 0 }, "lengthBeats": { "fallback": 0.01, "min": 0.01 } }),
+    "beatsToMs": ("ce.time.beatsToMs", { "beats": { "fallback": 0 }, "bpm": { "tempo": True } }),
+    "msToBeats": ("ce.time.msToBeats", { "ms": { "fallback": 0 }, "bpm": { "tempo": True } }),
+}
+# A dict, not a set: the prelude's own set(path, value) is the name `set` here.
+__timeWarned = {}
+def __tread(fn, name, v):
+    import math
+    verb, args = __TIME_NUMBERS[fn]
+    s = args[name]
+    if v is None:
+        return None if s.get("tempo") else s["fallback"]
+    read = __realNumber(v)
+    n = None
+    if s.get("tempo"):
+        if read is not None and read > 0: return read
+        why = "not a number" if read is None else "not above 0"
+        used = "the transport's tempo"
+    elif read is None:
+        why = "not a number"; n = s["fallback"]; used = __shown(n)
+    else:
+        n = math.floor(read + 0.5) if s.get("round") else read
+        if "min" in s and n < s["min"]:
+            why = "less than " + __shown(s["min"]); n = s["min"]; used = __shown(n)
+        elif "max" in s and n > s["max"]:
+            why = "more than " + __shown(s["max"]); n = s["max"]; used = __shown(n)
+        else:
+            return n
+    key = fn + " " + name
+    if key not in __timeWarned:
+        __timeWarned[key] = True
+        logWarn(verb + ": " + name + " is " + __shownValue(v) + ", which is " + why + ", so " + used
+                + " was used. This is said only the first time.")
+    return n
+
 # A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and only
 # DIFFERENCES mean anything, so a machine syncing its clock cannot corrupt an interval.
 def nowMs():
@@ -840,8 +940,19 @@ def nowMs():
 
 # The panel's division vocabulary, in both directions. An unknown name returns None rather than the
 # component's 1/16 fallback: a component has to keep running, a script that mistyped should find out.
-def beatsPerDivision(name):
-    return __CE_DIVISIONS.get(str(name))
+# It found out only by getting None, so __division says so as well, in the words of the WebView
+# runtime's divisionId. Any case is read: "1/8t" is "1/8T", because the names differ only by D and T
+# and nothing is ambiguous.
+def __division(verb, name):
+    if isinstance(name, str):
+        wanted = name.lower()
+        for i in __CE_DIVISION_NAMES:
+            if i.lower() == wanted: return __CE_DIVISIONS[i]
+    logError(verb + ": " + ("no division given" if name is None else __shownValue(name) + " is not a division")
+             + ", so there is no answer. The divisions are " + ", ".join(__CE_DIVISION_NAMES) + ".")
+    return None
+def beatsPerDivision(name=None):
+    return __division("ce.time.division", name)
 def divisionNames():
     return [{ "id": i, "label": __CE_DIVISION_LABELS.get(i), "beats": __CE_DIVISIONS.get(i) }
             for i in __CE_DIVISION_NAMES]
@@ -850,68 +961,57 @@ def divisionNames():
 # count from 1 as musicians do; `text` is the Transport component's own readout.
 def barBeatAt(beats, beatsPerBar=None):
     import math
-    perBar = __tnum(beatsPerBar, 4)
-    if perBar < 1: perBar = 1
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
+    b = __tread("barBeatAt", "beats", beats)
+    perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar)
     bar = math.floor(b / perBar) + 1
     beat = math.floor(b % perBar) + 1
     tick = math.floor((b % 1) * __CE_TIME["ppqn"])
     return { "bar": bar, "beat": beat, "tick": tick,
              "text": str(bar) + "." + str(beat) + "." + str(tick).rjust(2, "0") }
 
-def stepAt(beats, division):
+def stepAt(beats=None, division=None):
     import math
-    per = __CE_DIVISIONS.get(str(division))
+    per = __division("ce.time.step", division)
     if per is None: return None
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
-    return math.floor(b / per)
+    return math.floor(__tread("stepAt", "beats", beats) / per)
 
 # The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
 # through rather than drop them - the difference between a stutter and a hole in the bar. Capped so
 # returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
 # an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
-def stepsBetween(fromBeats, toBeats, division, maxSteps=None):
+def stepsBetween(fromBeats=None, toBeats=None, division=None, maxSteps=None):
     import math
-    per = __CE_DIVISIONS.get(str(division))
+    per = __division("ce.time.steps", division)
     if per is None: return None
-    frm = __tnum(fromBeats, 0)
-    if frm < 0: frm = 0
-    to = __tnum(toBeats, 0)
-    if to < 0: to = 0
+    frm = __tread("stepsBetween", "from", fromBeats)
+    to = __tread("stepsBetween", "to", toBeats)
+    cap = __tread("stepsBetween", "max", maxSteps)
     if to <= frm: return { "steps": [], "dropped": 0 }
     first = math.floor(frm / per) + 1
     last = math.floor(to / per)
     if last < first: return { "steps": [], "dropped": 0 }
     total = last - first + 1
-    cap = int(__tnum(maxSteps, 16) + 0.5)
-    if cap < 1: cap = 1
     kept = total if total < cap else cap
     return { "steps": list(range(last - kept + 1, last + 1)), "dropped": total - kept }
 
 # The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
 # same" swing are only the same swing if they compute it the same way.
-def swingOffset(step, amount, division):
+def swingOffset(step=None, amount=None, division=None):
     import math
-    per = __CE_DIVISIONS.get(str(division))
+    per = __division("ce.time.swing", division)
     if per is None: return None
-    s = __tclamp(amount, 0, 1)
-    idx = math.floor(__tnum(step, 0) + 0.5)
+    idx = math.floor(__tread("swingOffset", "step", step) + 0.5)
+    s = __tread("swingOffset", "amount", amount)
     return s * 0.5 * per if abs(idx) % 2 == 1 else 0
 
 # For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
 # never accumulated, so a cycle running for an hour is still exactly on the bar line.
-def __cycleBeats(bars, beatsPerBar):
-    perBar = __tnum(beatsPerBar, 4)
-    if perBar < 1: perBar = 1
-    length = __tclamp(bars, 0.25, 64) * perBar
-    return 0.01 if length < 0.01 else length
 def cycleAt(beats, bars, beatsPerBar=None):
     import math
-    length = __cycleBeats(bars, beatsPerBar)
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
+    b = __tread("cycleAt", "beats", beats)
+    n = __tread("cycleAt", "bars", bars)
+    length = n * __tread("cycleAt", "beatsPerBar", beatsPerBar)
+    if length < 0.01: length = 0.01
     return { "phase": ((b / length) % 1 + 1) % 1, "count": math.floor(b / length), "length": length }
 
 # Fold a timeline position into a loop. Before the loop start the position is untouched - you can
@@ -919,12 +1019,9 @@ def cycleAt(beats, bars, beatsPerBar=None):
 # reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 def loopedBeats(beats, startBeats, lengthBeats):
     import math
-    b = __tnum(beats, 0)
-    if b < 0: b = 0
-    st = __tnum(startBeats, 0)
-    if st < 0: st = 0
-    length = __tnum(lengthBeats, 0.01)
-    if length < 0.01: length = 0.01
+    b = __tread("loopedBeats", "beats", beats)
+    st = __tread("loopedBeats", "startBeats", startBeats)
+    length = __tread("loopedBeats", "lengthBeats", lengthBeats)
     if b < st: return { "beats": b, "pass": -1 }
     return { "beats": st + ((b - st) % length), "pass": math.floor((b - st) / length) }
 
@@ -965,18 +1062,26 @@ def clockTempo(intervalsMs):
 # `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 # this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
 # a completion callback can be a plain argument in every language.
+#
+# Each move with a done gets a token of its own ("py:<script id>:3"), handed to the host as `__done`
+# and emitted back with the result, and its function is stored under that. It was stored under the
+# path, or for a list under a number the host counted separately, so replacing a move called the new
+# move's done for the old one, and two lists from two scripts or engines crossed their dones
+# (ScriptRuntime::fireAnimationDone says how). This prelude runs in each script's own namespace, so
+# the count is the script's and the token carries the script's id.
 __animDone = {}
-__animGroup = {}
-__animGroupN = [0]
+__animSeq = [0]
 
-# An envelope's shape is SAMPLED here, with map() - ce.math's, which is the Envelope component's own
-# envValueAt - and the host interpolates the samples. That is what lets the host engine run an
-# envelope at all: map()'s per-point curves live in this prelude, not in C++.
+# An envelope's shape is SAMPLED here, with mapCurve() - ce.math.map, the Envelope component's
+# own envValueAt - and the host interpolates the samples. That is what lets the host engine run
+# an envelope at all: mapCurve()'s per-point curves live in this prelude, not in C++. This called
+# map(), which no prelude defines, so Lua and JavaScript stopped with an error and Python's own
+# map() made every sample 0.
 __ANIM_SAMPLES = 1024
 def __animSample(points):
     out = []
     for i in range(__ANIM_SAMPLES + 1):
-        try: y = float(map(i / __ANIM_SAMPLES, points))
+        try: y = float(mapCurve(i / __ANIM_SAMPLES, points))
         except (TypeError, ValueError): y = 0.0
         out.append(y)
     return out
@@ -993,33 +1098,90 @@ def __animStart(kind, path, target, opts):
     o.pop("done", None)
     fn = opts.get("done") if isinstance(opts, dict) else None
     if callable(fn):
-        if lst is not None:
-            __animGroupN[0] += 1
-            __animGroup[__animGroupN[0]] = fn
-            o["group"] = __animGroupN[0]
-        else:
-            __animDone[str(path)] = fn
-    __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o)
+        __animSeq[0] += 1
+        token = "py:" + str(globals().get("__scriptId", "")) + ":" + str(__animSeq[0])
+        __animDone[token] = fn
+        o["__done"] = token
+    elif fn is not None:
+        # Not a function: the host says so, once, and the move goes ahead.
+        o["__badDone"] = fn if isinstance(fn, (bool, int, float, str)) else str(fn)
+    # The host answers whether the move started: not when a colour property is the path or one of a
+    # list's paths, and then nothing in the list starts and its done is never called, so it is let go.
+    # A missing path is passed as empty, which the host says is no path, not as the text "None".
+    started = __api.animate(kind, lst if lst is not None else ("" if path is None else str(path)), float(target or 0), o) is True
+    if not started and "__done" in o: __animDone.pop(o["__done"], None)
+    return started
+
+# to and spring move to a number, and only a number. A target that is not one ("full", "100px",
+# "#FF0000") used to raise ValueError here, and moved the value to 0 everywhere else; text that is
+# a number ("100") is read as one, as it always was. In the words of the WebView runtime's
+# animationTarget.
+def __animTarget(verb, target):
+    n = __realNumber(target)
+    if n is not None: return n
+    if target is None: why = "no number to move to was given"
+    elif isinstance(target, str): why = '"' + target + '" is not a number'
+    else: why = "the target given is not a number"
+    logError(verb + ": " + why + ", so nothing was started.")
+    return None
 
 def animateTo(path, target, opts=None):
-    __animStart("to", path, target, opts)
+    n = __animTarget("ce.anim.to", target)
+    return False if n is None else __animStart("to", path, n, opts)
 
 def animateSpring(path, target, opts=None):
-    __animStart("spring", path, target, opts)
+    n = __animTarget("ce.anim.spring", target)
+    return False if n is None else __animStart("spring", path, n, opts)
 
 # envelope(path, points, opts) - drive a value THROUGH a shape rather than between two numbers.
 # `to` has one destination; an envelope goes up before it comes down, which is the single most
 # obvious thing a synth panel animates and the one thing `to` cannot express.
+#
+# A point is { "x": , "y": } or the two as a pair, each a number or text that is one. One that is
+# not, or whose x is not from 0 to 1, starts nothing and says why, in the words of the WebView
+# runtime's envelopeRefusal (CE/web/src/CE_Application/scripting/animEnvelope.js): the sampler
+# dropped a point it could not read, and never reached one whose x is past 0 to 1, both without a
+# word. A y past 0 to 1 is a level past `from` or `to`, and is read as it is.
 def animateEnvelope(path, points, opts=None):
     if not isinstance(points, (list, tuple)) or len(points) < 2:
-        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 - nothing was started.")
+        logError("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
         return False
+    def written(v):
+        if v is None: return "none was given"
+        if isinstance(v, str): return '"' + v + '" is not'
+        if isinstance(v, (int, float)) and __realNumber(v) is not None: return __cshown(v) + " is not"
+        return "the value given is not"
+    count = len(points)
+    for i, p in enumerate(points):
+        which = "point " + str(i + 1) + " of " + str(count)
+        parts = __pointParts(p)
+        if parts is not None:
+            x, y = parts[0], parts[1]
+        else:
+            logError("ce.anim.envelope: " + which + " is { x, y } or the two as a pair, and " + written(p) + ", so nothing was started.")
+            return False
+        nx = __realNumber(x)
+        if nx is None or nx < 0 or nx > 1:
+            hint = ""
+            if nx is not None and 0 <= nx / 100 <= 1:
+                hint = " If you meant " + __cshown(nx) + " out of 100, write " + __cfour(nx / 100) + "."
+            logError("ce.anim.envelope: the x of " + which + " is a number from 0 to 1, and " + written(x) + ", so nothing was started." + hint)
+            return False
+        if __realNumber(y) is None:
+            logError("ce.anim.envelope: the y of " + which + " is a number, and " + written(y) + ", so nothing was started.")
+            return False
     o = dict(opts or {})
     o["samples"] = __animSample(points)
-    o["from"] = float(o.get("from") or 0)
-    to = o.pop("to", None)
-    __animStart("envelope", path, 1 if to is None else to, o)
-    return True
+    # from and to: a number, or text that is one, or the default, which the host says (__badFrom,
+    # __badTo). float() raised on "abc" and read True as 1.
+    raw = o.get("from")
+    frm = __realNumber(raw)
+    if raw is not None and frm is None: o["__badFrom"] = raw if isinstance(raw, (bool, int, float, str)) else str(raw)
+    o["from"] = 0.0 if frm is None else float(frm)
+    raw = o.pop("to", None)
+    to = __realNumber(raw)
+    if raw is not None and to is None: o["__badTo"] = raw if isinstance(raw, (bool, int, float, str)) else str(raw)
+    return __animStart("envelope", path, 1.0 if to is None else float(to), o)
 
 def animateStop(path=None):
     __api.animateStop("" if path is None else str(path))
@@ -1046,16 +1208,13 @@ def animateFinish(path=None):
     return __api.animateFinish("" if path is None else str(path))
 
 # Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+# done(completed): one argument, True or False, for one path and for a list alike. It was handed a
+# dict, { "path", "completed" } or { "paths", "completed" }, and a dict that is not empty is always
+# true, so `if completed:` read a cancelled move as a finished one.
 def __animDoneTick(info):
     if not hasattr(info, "get"): return
-    gid = info.get("group")
-    if gid is not None:
-        fn = __animGroup.pop(gid, None)
-        if fn is not None: fn({ "paths": info.get("paths"), "completed": info.get("completed") is True })
-        return
-    key = str(info.get("path") or "")
-    fn = __animDone.pop(key, None)
-    if fn is not None: fn({ "path": key, "completed": info.get("completed") is True })
+    fn = __animDone.pop(info.get("token"), None)
+    if fn is not None: fn(info.get("completed") is True)
 on("*", "__animDone", __animDoneTick)
 
 # @module ce.device
@@ -1070,14 +1229,47 @@ def buildDump(kind):              return __api.buildDump(kind)
 # global round (ce.math) which shadows the builtin for this whole namespace.
 __timerIds = {}
 __syncFollow = {}
-def startTimer(id, ms=0):
-    key = "" if id is None else str(id)
-    if not key: return None
+# An interval or a delay a script got wrong is refused, in the WebView runtime's words (timeRefused
+# there). A repeating interval is a number above 0; a one-shot's delay a number from 0, where 0 is
+# "as soon as the handler has returned". Text is refused, "250" included, and so are True and
+# False, which Python would otherwise count as 1 and 0. Returns True when it refused.
+def __timeRefused(call, value, unit, what, positive, outcome):
+    import math as __m
+    why = None
+    if value is None: why = "no " + what + " was given"
+    elif isinstance(value, str): why = '"' + value + '" is not a number of ' + unit
+    elif isinstance(value, bool) or not isinstance(value, (int, float)): why = "the " + what + " is not a number of " + unit
+    elif isinstance(value, float) and (__m.isnan(value) or __m.isinf(value)):
+        why = "the " + what + " is not a finite number of " + unit
+    elif positive and value <= 0: why = __shown(value) + " is not more than 0 " + unit
+    elif not positive and value < 0: why = __shown(value) + " is less than 0 " + unit
+    if why is None: return False
+    logError(call + ": " + why + ", so " + outcome + ".")
+    return True
+# A number of beats, or a division's name ("1/16" is a quarter of a beat), any case. None when
+# refused. The WebView runtime's beatsOf.
+def __beatsOf(call, value, positive, outcome):
+    if isinstance(value, str):
+        wanted = value.lower()
+        for name in __CE_DIVISION_NAMES:
+            if name.lower() == wanted: return __CE_DIVISIONS[name]
+        logError(call + ': "' + value + '" is neither a number of beats nor a division, so ' + outcome
+                 + ". The divisions are " + ", ".join(__CE_DIVISION_NAMES) + ".")
+        return None
+    return None if __timeRefused(call, value, "beats", "number of beats", positive, outcome) else value
+# Start or re-time a timer whose interval the caller checked or worked out itself.
+def __armTimer(key, ms):
     # An explicit millisecond interval REPLACES a musical one: this is a script asking for
     # milliseconds, not beats.
     __syncFollow.pop(key, None)
     __timerIds[key] = True
     return __api.startTimer(key, int((ms or 0) + 0.5))
+def startTimer(id, ms=None):
+    key = "" if id is None else str(id)
+    if not key: return None
+    if __timeRefused('ce.time.startTimer("' + key + '")', ms, "milliseconds", "interval", True, "no timer was started"):
+        return None
+    return __armTimer(key, ms)
 def stopTimer(id):
     key = "" if id is None else str(id)
     __syncFollow.pop(key, None)
@@ -1103,12 +1295,17 @@ def transmit(fn):
     finally: __api.endTransmit()
 
 # `self` — owner-relative set/get (Q7). __owner is injected per-script before this prelude runs.
+# The methods call out through _ce-named functions because a name that starts with two underscores
+# is MANGLED inside a class body: `__api` written in a method is looked up as `_Self__api`, so
+# self.set and self.get raised NameError on every call until this.
+def _ceSelfSet(p, value, opts): return __api.set(p, value, opts)
+def _ceSelfGet(p, form):         return __scriptGet(p, form)
 class _Self:
     def _p(self, p):
         o = globals().get("__owner", "")
         return p if not o else (o + "." + p)
-    def set(self, p, value, opts=None): return __api.set(self._p(p), value, opts)
-    def get(self, p, form="value"):     return __api.get(self._p(p), form)
+    def set(self, p, value, opts=None): return _ceSelfSet(self._p(p), value, opts)
+    def get(self, p, form="value"):     return _ceSelfGet(self._p(p), form)
 self = _Self()
 
 # @module ce.math
@@ -1124,9 +1321,20 @@ def round(v, ndigits=None):
     return math.floor(v + 0.5)
 def scale(v, inLo, inHi, outLo, outHi):
     return outLo if inHi == inLo else outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)
-def snap(v, step):
-    return v if step == 0 else round(v / step) * step
-def lerp(a, b, t): return a + (b - a) * t
+def snap(v=None, step=None):
+    n = __mnum("ce.math.snap", "the value", v)
+    if n is None: return None
+    s = __mnum("ce.math.snap", "the step", step)
+    if s is None: return None
+    return n if s == 0 else round(n / s) * s
+def lerp(a=None, b=None, t=None):
+    x = __mnum("ce.math.lerp", "a", a)
+    if x is None: return None
+    y = __mnum("ce.math.lerp", "b", b)
+    if y is None: return None
+    f = __mnum("ce.math.lerp", "t", t)
+    if f is None: return None
+    return x + (y - x) * f
 def curve(v, shape="linear"):
     import math
     if shape == "exp": return v * v
@@ -1153,20 +1361,37 @@ def wrap(v, lo, hi):
         return a
     return a + (((n - a) % span) + span) % span
 
-# [[x, y], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel can write either.
+# A point's (x, y, curve, tension) as written, or None when it is no point: a pair is a list or a
+# tuple of them in that order; a mapping is read by its names, and failing those by its numbered
+# entries, counted from 0 when it has an entry 0 and from 1 when it does not. The WebView runtime
+# reads a point the same way (animEnvelope.js envelopePointParts), so it is one point in both.
+def __pointParts(p):
+    if isinstance(p, (list, tuple)):
+        return tuple(p[i] if len(p) > i else None for i in range(4))
+    if hasattr(p, "get"):
+        try:
+            start = 0 if 0 in p else 1
+        except TypeError:
+            start = 1
+        def named(key, at):
+            v = p.get(key)
+            return p.get(start + at) if v is None else v
+        return (named("x", 0), named("y", 1), named("curve", 2), named("tension", 3))
+    return None
+
+# [[x, y, curve, tension], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel
+# can write either; a point's curve shapes the segment that ends at it (mapCurve).
 def __points(points):
     out = []
     for p in (points or []):
-        x = y = None
-        if isinstance(p, (list, tuple)) and len(p) >= 2:
-            x, y = p[0], p[1]
-        elif hasattr(p, "get"):
-            x, y = p.get("x"), p.get("y")
+        parts = __pointParts(p)
+        if parts is None:
+            continue
         try:
-            x, y = float(x), float(y)
+            x, y = float(parts[0]), float(parts[1])
         except (TypeError, ValueError):
             continue
-        out.append((x, y))
+        out.append((x, y, parts[2], parts[3]))
     out.sort(key=lambda p: p[0])
     return out
 
@@ -1193,9 +1418,14 @@ def mapCurve(v, points):
     if n > lst[-1][0]:
         return lst[-1][1]
     for i in range(1, len(lst)):
-        x0, y0 = lst[i - 1]
-        x1, y1 = lst[i]
+        x0, y0 = lst[i - 1][0], lst[i - 1][1]
+        x1, y1 = lst[i][0], lst[i][1]
         if n < x1 and x1 != x0:
+            # The segment's own shape, from the point it ends at, as the WebView runtime's mapCurve
+            # and the Envelope component take it. Read for straight lines alone, a point's curve
+            # played as a line here and as a curve in the editor.
+            if lst[i][2] is not None:
+                return y0 + shapeCurve((n - x0) / (x1 - x0), lst[i][2], lst[i][3]) * (y1 - y0)
             return y0 + (n - x0) * (y1 - y0) / (x1 - x0)
     return lst[-1][1]
 
@@ -1354,8 +1584,10 @@ def blend(a, b, t):
 
 # Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
 # them a panel used.
-def randomFloat(lo, hi):
-    a, b = __num(lo), __num(hi, 1)
+def randomFloat(lo=None, hi=None):
+    # One number alone is the top of a range from 0, not the bottom of one up to 1.
+    if hi is None: a, b = 0.0, __num(lo, 1)
+    else: a, b = __num(lo), __num(hi)
     return a + random() * (b - a)
 
 # A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
@@ -1406,6 +1638,8 @@ def distance(x1, y1, x2, y2):
 def angleOf(x1, y1, x2, y2):
     import math
     dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+    # The same point twice has no direction: 0, in every runtime.
+    if dx == 0 and dy == 0: return 0
     a = toDegrees(math.atan2(dx, -dy))
     return a + 360 if a < 0 else a
 
@@ -1574,9 +1808,16 @@ def random(lo=None, hi=None):
     __rndStates[__streamOverride[0]] = x
     r = x / 4294967296.0
     if lo is None or hi is None: return r
-    a, b = math.floor(lo or 0), math.floor(hi or 0)
-    low, high = min(a, b), max(a, b)
-    # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+    a = __mnum("ce.math.random", "lo", lo)
+    if a is None: return None
+    b = __mnum("ce.math.random", "hi", hi)
+    if b is None: return None
+    # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+    # only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+    low, high = math.ceil(min(a, b)), math.floor(max(a, b))
+    if high < low:
+        logError("ce.math.random: there is no whole number from " + __shownValue(a) + " to " + __shownValue(b) + ", so there is no answer.")
+        return None
     return low + math.floor(r * (high - low + 1))
 
 # Draws inside the block come from a generator of their own. A block rather than a name argument on
@@ -1627,50 +1868,290 @@ def randomChoice(values, weights=None):
 # reason every table here is: a script lightening a colour and the border renderer lightening the
 # same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
 #
-# In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" - the last six characters are the colour. Out is
-# "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
-# returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round.
-def __cchan(hex_):
-    import re as __re
-    h = str("" if hex_ is None else hex_).replace("#", "")[-6:]
-    if len(h) != 6 or not __re.match(r"^[0-9a-fA-F]{6}$", h): return None
-    return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+# In takes what a colour property takes, read as if what the property would store had been given:
+# "RRGGBB", "AARRGGBB" or "#RRGGBB" as written (6 hex digits are RRGGBB, 8 are AARRGGBB with the
+# alpha set aside, one leading "#" either way), and CSS's short forms written out first, as the
+# WebView writes them out (scriptColours.js's storedColour): "#RGB", a name from the generated
+# table below, rgb(), rgba(), hsl() and hsla(), so "red" is "#FF0000" and rgba(255, 0, 0, 0.5) is
+# "80FF0000". Out is "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception
+# is alpha(), which returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way
+# round.
+#
+# Anything else is refused, where it used to be read from its last six characters ("x5B9BD5" and
+# the number 0xFF0000 were colours). So is an amount outside 0..1, which used to be used as it was
+# (lighten by 40 was white) or clamped (alpha 128 was solid). In the words of the WebView runtime's
+# colourChannels and colourUnit (scripting/scriptColours.js), which scriptPreludeAgreement.test.js
+# checks; __realNumber is its realNumber, and ce.anim's targets are read by it too.
+# BEGIN GENERATED colour names — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# @module ce.math
+# CSS's named colours (scriptColours.CSS_NAMED_COLOURS), as RRGGBB: what a colour
+# property writes "red" out as, and what the ce.math colour helpers read it as.
+__CE_CSS_COLOURS = {
+    "aliceblue": "F0F8FF", "antiquewhite": "FAEBD7", "aqua": "00FFFF", "aquamarine": "7FFFD4",
+    "azure": "F0FFFF", "beige": "F5F5DC", "bisque": "FFE4C4", "black": "000000",
+    "blanchedalmond": "FFEBCD", "blue": "0000FF", "blueviolet": "8A2BE2", "brown": "A52A2A",
+    "burlywood": "DEB887", "cadetblue": "5F9EA0", "chartreuse": "7FFF00", "chocolate": "D2691E",
+    "coral": "FF7F50", "cornflowerblue": "6495ED", "cornsilk": "FFF8DC", "crimson": "DC143C",
+    "cyan": "00FFFF", "darkblue": "00008B", "darkcyan": "008B8B", "darkgoldenrod": "B8860B",
+    "darkgray": "A9A9A9", "darkgreen": "006400", "darkgrey": "A9A9A9", "darkkhaki": "BDB76B",
+    "darkmagenta": "8B008B", "darkolivegreen": "556B2F", "darkorange": "FF8C00",
+    "darkorchid": "9932CC", "darkred": "8B0000", "darksalmon": "E9967A", "darkseagreen": "8FBC8F",
+    "darkslateblue": "483D8B", "darkslategray": "2F4F4F", "darkslategrey": "2F4F4F",
+    "darkturquoise": "00CED1", "darkviolet": "9400D3", "deeppink": "FF1493",
+    "deepskyblue": "00BFFF", "dimgray": "696969", "dimgrey": "696969", "dodgerblue": "1E90FF",
+    "firebrick": "B22222", "floralwhite": "FFFAF0", "forestgreen": "228B22", "fuchsia": "FF00FF",
+    "gainsboro": "DCDCDC", "ghostwhite": "F8F8FF", "gold": "FFD700", "goldenrod": "DAA520",
+    "gray": "808080", "green": "008000", "greenyellow": "ADFF2F", "grey": "808080",
+    "honeydew": "F0FFF0", "hotpink": "FF69B4", "indianred": "CD5C5C", "indigo": "4B0082",
+    "ivory": "FFFFF0", "khaki": "F0E68C", "lavender": "E6E6FA", "lavenderblush": "FFF0F5",
+    "lawngreen": "7CFC00", "lemonchiffon": "FFFACD", "lightblue": "ADD8E6", "lightcoral": "F08080",
+    "lightcyan": "E0FFFF", "lightgoldenrodyellow": "FAFAD2", "lightgray": "D3D3D3",
+    "lightgreen": "90EE90", "lightgrey": "D3D3D3", "lightpink": "FFB6C1", "lightsalmon": "FFA07A",
+    "lightseagreen": "20B2AA", "lightskyblue": "87CEFA", "lightslategray": "778899",
+    "lightslategrey": "778899", "lightsteelblue": "B0C4DE", "lightyellow": "FFFFE0",
+    "lime": "00FF00", "limegreen": "32CD32", "linen": "FAF0E6", "magenta": "FF00FF",
+    "maroon": "800000", "mediumaquamarine": "66CDAA", "mediumblue": "0000CD",
+    "mediumorchid": "BA55D3", "mediumpurple": "9370DB", "mediumseagreen": "3CB371",
+    "mediumslateblue": "7B68EE", "mediumspringgreen": "00FA9A", "mediumturquoise": "48D1CC",
+    "mediumvioletred": "C71585", "midnightblue": "191970", "mintcream": "F5FFFA",
+    "mistyrose": "FFE4E1", "moccasin": "FFE4B5", "navajowhite": "FFDEAD", "navy": "000080",
+    "oldlace": "FDF5E6", "olive": "808000", "olivedrab": "6B8E23", "orange": "FFA500",
+    "orangered": "FF4500", "orchid": "DA70D6", "palegoldenrod": "EEE8AA", "palegreen": "98FB98",
+    "paleturquoise": "AFEEEE", "palevioletred": "DB7093", "papayawhip": "FFEFD5",
+    "peachpuff": "FFDAB9", "peru": "CD853F", "pink": "FFC0CB", "plum": "DDA0DD",
+    "powderblue": "B0E0E6", "purple": "800080", "rebeccapurple": "663399", "red": "FF0000",
+    "rosybrown": "BC8F8F", "royalblue": "4169E1", "saddlebrown": "8B4513", "salmon": "FA8072",
+    "sandybrown": "F4A460", "seagreen": "2E8B57", "seashell": "FFF5EE", "sienna": "A0522D",
+    "silver": "C0C0C0", "skyblue": "87CEEB", "slateblue": "6A5ACD", "slategray": "708090",
+    "slategrey": "708090", "snow": "FFFAFA", "springgreen": "00FF7F", "steelblue": "4682B4",
+    "tan": "D2B48C", "teal": "008080", "thistle": "D8BFD8", "tomato": "FF6347",
+    "turquoise": "40E0D0", "violet": "EE82EE", "wheat": "F5DEB3", "white": "FFFFFF",
+    "whitesmoke": "F5F5F5", "yellow": "FFFF00", "yellowgreen": "9ACD32",
+}
+# END GENERATED colour names
+__CFORMS = 'A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", or "#RGB", a CSS colour name, rgb() or hsl()'
+def __cshown(n):
+    # A number as JavaScript prints it, for the numbers a script writes: whole ones without ".0".
+    if isinstance(n, float) and n.is_integer() and abs(n) < 2 ** 53: return str(int(n))
+    return str(n)
+def __cfour(x):
+    # x to four places with the trailing zeros dropped, as Number(x.toFixed(4)) prints it.
+    return ("%.4f" % x).rstrip("0").rstrip(".")
+def __chint(v):
+    import math, re as __re
+    if isinstance(v, bool): return ""
+    if isinstance(v, (int, float)):
+        if isinstance(v, float) and (not math.isfinite(v) or not v.is_integer()): return ""
+        n = int(v)
+        if n < 0 or n > 0xFFFFFFFF: return ""
+        text = ("#%06X" % n) if n <= 0xFFFFFF else ("%08X" % n)
+        return " As text, " + __cshown(v) + ' is "' + text + '".'
+    if not isinstance(v, str): return ""
+    m = __re.fullmatch(r"(#?)([0-9a-fA-F]{3,4})", v)
+    if not m: return ""
+    d = m.group(2).upper()
+    if len(d) == 3: return ' Write "' + m.group(1) + d[0] * 2 + d[1] * 2 + d[2] * 2 + '".'
+    return ' Write "' + d[3] * 2 + d[0] * 2 + d[1] * 2 + d[2] * 2 + '".'
+def __realNumber(v):
+    import math, re as __re
+    if isinstance(v, bool): return None
+    if isinstance(v, (int, float)):
+        try: return v if math.isfinite(v) else None
+        except OverflowError: return None
+    if not isinstance(v, str): return None
+    if not __re.fullmatch(r"\s*[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\s*", v): return None
+    n = float(v)
+    return n if math.isfinite(n) else None
+# A number a ce.math command was given, or None after an error in the console. Left out, it is the
+# fallback when there is one. The WebView runtime's mathNumber, word for word.
+def __mnum(verb, what, v, fallback=None):
+    if v is None and fallback is not None: return fallback
+    n = __realNumber(v)
+    if n is not None: return n
+    if v is None: logError(verb + ": " + what + " is a number, and none was given, so there is no answer.")
+    else: logError(verb + ": " + what + " is a number, and " + __shownValue(v) + " is not, so there is no answer.")
+    return None
+def __cunit(verb, what, v, fallback=None):
+    if v is None and fallback is not None: return fallback
+    n = __realNumber(v)
+    if n is not None and 0 <= n <= 1: return n
+    if v is None: shown = "none was given"
+    elif isinstance(v, str): shown = '"' + v + '" is not'
+    elif isinstance(v, (int, float)) and __realNumber(v) is not None: shown = __cshown(v) + " is not"
+    else: shown = "the value given is not"
+    hint = ""
+    if n is not None and 0 <= n / 100 <= 1:
+        hint = " If you meant " + __cshown(n) + " out of 100, write " + __cfour(n / 100) + "."
+    logError(verb + ": " + what + " is a number from 0 to 1, and " + shown + ", so there is no answer." + hint)
+    return None
+# CSS's short forms, read as scriptColours.js reads them: its cssChannels, panelFormOf, longForm and
+# cssHint, with its four expressions. Two things in them read differently in Python and are written
+# out: JavaScript's white space (\s and strip() here take \x1c to \x1f and \x85 as well, and not
+# ﻿), and its case-blind matching, which is ASCII's only (here the long s would match "s"
+# without re.ASCII). Every number goes through what JavaScript does to it: Number(), Math.round,
+# whose half goes up where round() goes to even, and `%`, which keeps the sign of what it divides,
+# as math.fmod does and Python's % does not.
+import re as __css_re
+import math as __css_math
+__CSS_WS = " \t\n\v\f\r                 　﻿"
+def __css_pattern(p):
+    # One of scriptColours.js's expressions, its NUM written in and its \s made JavaScript's.
+    p = p.replace("NUM", r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+    return __css_re.compile(p.replace(r"\s", "[" + __CSS_WS + "]"), __css_re.IGNORECASE | __css_re.ASCII)
+__CSS_RGB_LEGACY = __css_pattern(r"rgba?\(\s*(NUM)(%?)\s*,\s*(NUM)(%?)\s*,\s*(NUM)(%?)\s*(?:,\s*(NUM)(%?)\s*)?\)")
+__CSS_RGB_MODERN = __css_pattern(r"rgba?\(\s*(NUM)(%?)\s+(NUM)(%?)\s+(NUM)(%?)\s*(?:/\s*(NUM)(%?)\s*)?\)")
+__CSS_HSL_LEGACY = __css_pattern(r"hsla?\(\s*(NUM)(deg|grad|rad|turn)?\s*,\s*(NUM)()%\s*,\s*(NUM)()%\s*(?:,\s*(NUM)(%?)\s*)?\)")
+__CSS_HSL_MODERN = __css_pattern(r"hsla?\(\s*(NUM)(deg|grad|rad|turn)?\s+(NUM)(%?)\s+(NUM)(%?)\s*(?:/\s*(NUM)(%?)\s*)?\)")
+__CSS_TURN = { "deg": 1, "grad": 0.9, "rad": 180 / __css_math.pi, "turn": 360 }
+def __cround(x):
+    # JavaScript's Math.round: a half goes up, so 2.5 is 3 and -2.5 is -2.
+    if not __css_math.isfinite(x): return x
+    r = __css_math.floor(x)
+    return r + 1 if x - r >= 0.5 else r
+def __cclamp(v, lo, hi):
+    return min(hi, max(lo, v))
+def __calpha(value, percent):
+    return 1 if value is None else __cclamp(float(value) / (100 if percent else 1), 0, 1)
+def __ccss(text):
+    # A CSS colour as (r, g, b, a), 0-255 and 0-1, or None.
+    s = text.strip(__CSS_WS)
+    lower = s.lower()
+    if lower == "transparent": return (0, 0, 0, 0)
+    named = __CE_CSS_COLOURS.get(lower)
+    if named is not None: return (int(named[0:2], 16), int(named[2:4], 16), int(named[4:6], 16), 1)
+    m = __css_re.fullmatch(r"#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", s)
+    if m:
+        d = m.group(1)
+        if len(d) <= 4: d = "".join(c + c for c in d)
+        return (int(d[0:2], 16), int(d[2:4], 16), int(d[4:6], 16), int(d[6:8], 16) / 255 if len(d) == 8 else 1)
+    m = __CSS_RGB_LEGACY.fullmatch(s) or __CSS_RGB_MODERN.fullmatch(s)
+    if m:
+        def channel(i): return __cclamp(__cround(float(m.group(i)) * (2.55 if m.group(i + 1) else 1)), 0, 255)
+        return (channel(1), channel(3), channel(5), __calpha(m.group(7), m.group(8)))
+    m = __CSS_HSL_LEGACY.fullmatch(s) or __CSS_HSL_MODERN.fullmatch(s)
+    if m:
+        # A hue too large to be a number has no angle, and is not a colour.
+        turned = float(m.group(1)) * __CSS_TURN[(m.group(2) or "deg").lower()]
+        if not __css_math.isfinite(turned): return None
+        h = __css_math.fmod(__css_math.fmod(turned, 360) + 360, 360)
+        sat = __cclamp(float(m.group(3)), 0, 100) / 100
+        light = __cclamp(float(m.group(5)), 0, 100) / 100
+        amp = sat * min(light, 1 - light)
+        def f(n):
+            k = __css_math.fmod(n + h / 30, 12)
+            return __cround(255 * (light - amp * max(-1, min(k - 3, 9 - k, 1))))
+        return (f(0), f(8), f(4), __calpha(m.group(7), m.group(8)))
+    return None
+def __cpanelForm(c):
+    # The same colour in the panel's form: #RRGGBB when solid, AARRGGBB when it is not.
+    rgb = "%02X%02X%02X" % (c[0], c[1], c[2])
+    return "#" + rgb if c[3] >= 1 else ("%02X" % __cround(c[3] * 255)) + rgb
+def __cpanelHex(v):
+    # Does the panel read this as a colour? 6 or 8 hex digits, with or without one "#".
+    return isinstance(v, str) and __css_re.fullmatch(r"#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", v) is not None
+def __clong(value):
+    # CSS's short forms written out, as a property stores them, or None: not text with space around
+    # it, "#" only with three digits ("#" with four is RGBA to CSS and ARGB here), and nothing CSS
+    # cannot read.
+    if not isinstance(value, str) or value.strip(__CSS_WS) != value: return None
+    if value.startswith("#") and not __css_re.fullmatch(r"#[0-9a-fA-F]{3}", value): return None
+    c = __ccss(value)
+    return None if c is None else __cpanelForm(c)
+def __ccssHint(value):
+    # For a refusal: what CSS text with space around it is in the panel's form, or "". Text that is
+    # the panel's own form once the space is gone is that text, read as the panel reads it.
+    if not isinstance(value, str) or __cpanelHex(value): return ""
+    trimmed = value.strip(__CSS_WS)
+    if trimmed != value and __cpanelHex(trimmed): return ' Write "' + trimmed + '".'
+    c = __ccss(value)
+    return "" if c is None else ' Write "' + __cpanelForm(c) + '".'
+def __cchan(verb, hex_):
+    stored = None
+    if isinstance(hex_, str): stored = hex_ if __cpanelHex(hex_) else __clong(hex_)
+    if stored:
+        h = stored[-6:]
+        return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+    if hex_ is None: why = "no colour was given"
+    elif isinstance(hex_, str): why = '"' + hex_ + '" is not a colour'
+    elif isinstance(hex_, (int, float)) and __realNumber(hex_) is not None: why = __cshown(hex_) + " is not a colour"
+    else: why = "the colour given is not text"
+    logError(verb + ": " + why + ", so there is no answer. " + __CFORMS + "." + (__chint(hex_) or __ccssHint(hex_)))
+    return None
 def __cbyte(v):
     import math
     n = math.floor((float(v) if isinstance(v, (int, float)) else 0) + 0.5)
     return 0 if n < 0 else (255 if n > 255 else n)
-def rgbToHex(r, g, b):
-    return ("#%02x%02x%02x" % (__cbyte(r), __cbyte(g), __cbyte(b))).upper()
+def rgbToHex(r=None, g=None, b=None):
+    rr = __mnum("ce.math.hex", "the red part", r, 0)
+    if rr is None: return None
+    gg = __mnum("ce.math.hex", "the green part", g, 0)
+    if gg is None: return None
+    bb = __mnum("ce.math.hex", "the blue part", b, 0)
+    if bb is None: return None
+    return ("#%02x%02x%02x" % (__cbyte(rr), __cbyte(gg), __cbyte(bb))).upper()
 def hexToRgb(hex_):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.rgb", hex_)
     return None if c is None else { "r": c[0], "g": c[1], "b": c[2] }
 def lighten(hex_, amount=None):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.lighten", hex_)
     if c is None: return None
-    f = 0.4 if not isinstance(amount, (int, float)) else float(amount)
+    f = __cunit("ce.math.lighten", "the amount", amount, 0.4)
+    if f is None: return None
     return rgbToHex(c[0] + (255 - c[0]) * f, c[1] + (255 - c[1]) * f, c[2] + (255 - c[2]) * f)
 def darken(hex_, amount=None):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.darken", hex_)
     if c is None: return None
-    f = 0.55 if not isinstance(amount, (int, float)) else float(amount)
+    f = __cunit("ce.math.darken", "the amount", amount, 0.55)
+    if f is None: return None
     return rgbToHex(c[0] * f, c[1] * f, c[2] * f)
 # NOT an app algorithm, and said so: lerp() per channel in plain RGB.
-def mixColour(a, b, t):
-    x = __cchan(a); y = __cchan(b)
-    if x is None or y is None: return None
-    f = float(t) if isinstance(t, (int, float)) else 0.0
+def mixColour(a=None, b=None, t=None):
+    x = __cchan("ce.math.mix", a)
+    if x is None: return None
+    y = __cchan("ce.math.mix", b)
+    if y is None: return None
+    f = __mnum("ce.math.mix", "t", t, 0)
+    if f is None: return None
     f = 0.0 if f < 0 else (1.0 if f > 1 else f)
     return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f)
 # The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
-def colourAlpha(hex_, a):
+# A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+# reads one way: "#RRGGBB" when solid, AARRGGBB when not. scriptColours.orderedColour's reading,
+# in the WebView runtime's colourFromOrder words.
+__CORDER = {
+    "argb": 'Write 8 hex digits with the alpha first, such as "80123456" or "#80123456", or 4, such as "#8123". With 6 or 3 there is no alpha.',
+    "rgba": 'Write 8 hex digits with the alpha last, such as "12345680" or "#12345680", or 4, such as "#1238". With 6 or 3 there is no alpha.',
+}
+def __corder(verb, order, value):
+    import re
+    if isinstance(value, str):
+        m = re.fullmatch(r"#?([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})", value)
+        if m:
+            d = m.group(1)
+            if len(d) <= 4: d = "".join(c + c for c in d)
+            d = d.upper()
+            aa, rgb = "FF", d
+            if len(d) == 8:
+                aa, rgb = (d[0:2], d[2:]) if order == "argb" else (d[6:8], d[0:6])
+            return "#" + rgb if aa == "FF" else aa + rgb
+    if value is None: why = "no colour was given"
+    elif isinstance(value, str): why = '"' + value + '" is not a colour written ' + ("AARRGGBB" if order == "argb" else "RRGGBBAA")
+    elif isinstance(value, (int, float)) and not isinstance(value, bool) and __realNumber(value) is not None:
+        why = __cshown(value) + " is a number, not text"
+    else: why = "the colour given is not text"
+    logError(verb + ": " + why + ", so there is no answer. " + __CORDER[order])
+    return None
+def colourFromArgb(colour=None): return __corder("ce.math.fromARGB", "argb", colour)
+def colourFromRgba(colour=None): return __corder("ce.math.fromRGBA", "rgba", colour)
+def colourAlpha(hex_, a=None):
     import math
-    c = __cchan(hex_)
+    c = __cchan("ce.math.alpha", hex_)
     if c is None: return None
-    f = float(a) if isinstance(a, (int, float)) else 1.0
-    f = 0.0 if f < 0 else (1.0 if f > 1 else f)
+    f = __cunit("ce.math.alpha", "the alpha", a)
+    if f is None: return None
     return ("%02x" % math.floor(f * 255 + 0.5) + rgbToHex(c[0], c[1], c[2])[1:]).upper()
 def hexToHsl(hex_):
-    c = __cchan(hex_)
+    c = __cchan("ce.math.hsl", hex_)
     if c is None: return None
     r = c[0] / 255.0; g = c[1] / 255.0; b = c[2] / 255.0
     mx = max(r, g, b); mn = min(r, g, b)
@@ -1683,10 +2164,18 @@ def hexToHsl(hex_):
         elif mx == g: h = ((b - r) / d + 2) * 60
         else: h = ((r - g) / d + 4) * 60
     return { "h": h, "s": s * 100, "l": l * 100 }
-def hslToHex(hue, sat, light):
-    h = float(hue) if isinstance(hue, (int, float)) else 0.0
-    s = (float(sat) if isinstance(sat, (int, float)) else 0.0) / 100
-    l = (float(light) if isinstance(light, (int, float)) else 0.0) / 100
+def hslToHex(hue=None, sat=None, light=None):
+    import math
+    h = __mnum("ce.math.fromHsl", "the hue", hue, 0)
+    if h is None: return None
+    s = __mnum("ce.math.fromHsl", "the saturation", sat, 0)
+    if s is None: return None
+    l = __mnum("ce.math.fromHsl", "the lightness", light, 0)
+    if l is None: return None
+    # A hue goes round (-120 is 240); the saturation and the lightness are held at 0 and 100.
+    h = h - 360 * math.floor(h / 360)
+    s = max(0, min(100, s)) / 100
+    l = max(0, min(100, l)) / 100
     a = s * min(l, 1 - l)
     def f(n):
         k = (n + h / 30) % 12
@@ -1796,6 +2285,8 @@ __CE_MINOR_QUALITIES["m7b5"] = True
 __CE_MINOR_QUALITIES["min"] = True
 __CE_MINOR_QUALITIES["min7"] = True
 __CE_MINOR_QUALITIES["minMaj7"] = True
+__CE_SCALE_NAMES = ["major","minor","harmonicMinor","melodicMinor","dorian","phrygian","lydian","mixolydian","locrian","pentatonicMaj","pentatonicMin","blues"]
+__CE_CHORD_NAMES = ["major","minor","dim","aug","sus2","sus4","power","maj6","min6","dom7","maj7","min7","minMaj7","dim7","m7b5","aug7","add9","dom9","maj9","min9"]
 # @module ce.time
 __CE_DIVISIONS = {}
 __CE_DIVISIONS["1/1"] = 4
@@ -1849,29 +2340,60 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 # Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 # or a name ("C4"), the way sendNote does. An unknown scale or chord name returns None rather than
 # guessing "major" — a script that asked for something this build does not know should find out.
-# noteNumber is None for a name it cannot read; __pitch feeds scaleNotes and friends, where a None
-# root would turn one bad string into an unexplained None list.
+# It found out only by getting None, and an unreadable note NAME was worse: __pitch made it 0, so
+# scaleNotes("c4") answered with the scale on C-1. Both now answer None and say why, through __setOf
+# and __pitchOf, in the words of the WebView runtime's musicSetOf and musicPitchOf. Each helper
+# checks its scale or chord first, then its notes in argument order, and stops at the first.
+# A number has to be a finite one: NaN, True or a table rooted the answer at C-1 (or raised) where an
+# unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 def __pitch(v):
     import math
     if isinstance(v, str):
-        return noteNumber(v) or 0
-    return math.floor(v or 0)
+        return noteNumber(v)
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
+        return math.floor(v)
+    return None
 def __steps(tbl, name, fallback):
     return tbl.get(fallback if name is None else str(name))
+def __pitchOf(verb, v):
+    # A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
+    if v is None:
+        logError(verb + ': no note was given, so there is no answer. A note is a MIDI number or a name, such as 60 or "C4".')
+        return None
+    n = __pitch(v)
+    if n is None:
+        if isinstance(v, str):
+            logError(verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
+                     + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        else:
+            logError(verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
+                     + 'number or a name, such as 60 or "C4".')
+    return n
+def __setOf(verb, kind, name):
+    s = __steps(__CE_CHORDS if kind == "chord" else __CE_SCALES, name, "major")
+    if s is None:
+        logError(verb + ': "' + str(name) + '" is not a ' + kind + ', so there is no answer. The ' + kind
+                 + 's are ' + ", ".join(__CE_CHORD_NAMES if kind == "chord" else __CE_SCALE_NAMES) + '.')
+    return s
 def scaleNotes(root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.scale", "scale", scale)
     if s is None: return None
-    base = __pitch(root)
+    base = __pitchOf("ce.music.scale", root)
+    if base is None: return None
     return [base + x for x in s]
 def chordNotes(root, chordType=None):
-    s = __steps(__CE_CHORDS, chordType, "major")
+    s = __setOf("ce.music.chord", "chord", chordType)
     if s is None: return None
-    base = __pitch(root)
+    base = __pitchOf("ce.music.chord", root)
+    if base is None: return None
     return [base + x for x in s]
 def quantizeNote(note, root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.quantize", "scale", scale)
     if s is None: return None
-    n = __pitch(note); base = __pitch(root)
+    n = __pitchOf("ce.music.quantize", note)
+    if n is None: return None
+    base = __pitchOf("ce.music.quantize", root)
+    if base is None: return None
     # NOT set(): this prelude defines set(path, value) as ce.core's write verb, which shadows the
     # builtin for the whole namespace, so set(<generator>) raises TypeError - which is what
     # quantizeNote did on every call in the Python engine until the prelude was actually executed.
@@ -1891,37 +2413,81 @@ def quantizeNote(note, root, scale=None):
 # chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 def noteSpelling(root, scale=None):
     nm = "major" if scale is None else str(scale)
-    if __CE_SCALES.get(nm) is None: return None
-    pc = __m12(__pitch(root))
+    if __setOf("ce.music.spelling", "scale", scale) is None: return None
+    pitch = __pitchOf("ce.music.spelling", root)
+    if pitch is None: return None
+    pc = __m12(pitch)
     # Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
     if __CE_MINOR_SCALES.get(nm) is True: pc = __m12(pc + 3)
     return __CE_FLAT_KEYS.get(pc) is True
 def inScale(note, root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.inScale", "scale", scale)
     if s is None: return None
-    base = __m12(__pitch(root)); pc = __m12(__pitch(note))
+    n = __pitchOf("ce.music.inScale", note)
+    if n is None: return None
+    r = __pitchOf("ce.music.inScale", root)
+    if r is None: return None
+    base = __m12(r); pc = __m12(n)
     return any(__m12(base + x) == pc for x in s)
 # 1 for the tonic, 5 for the dominant. A note OUTSIDE the key has NO degree and gets None rather
 # than the nearest one - rounding here turns a wrong note into a plausible chord, and quantizeNote
 # is the verb that rounds on purpose.
 def scaleDegree(note, root, scale=None):
-    s = __steps(__CE_SCALES, scale, "major")
+    s = __setOf("ce.music.degree", "scale", scale)
     if s is None: return None
-    base = __m12(__pitch(root)); pc = __m12(__pitch(note))
+    n = __pitchOf("ce.music.degree", note)
+    if n is None: return None
+    r = __pitchOf("ce.music.degree", root)
+    if r is None: return None
+    base = __m12(r); pc = __m12(n)
     for i in range(len(s)):
         if __m12(base + s[i]) == pc: return i + 1
     return None
-def __sortedNotes(list_):
+# ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
+# or text that is a number, and one that is neither refuses the call, saying where it is. They were
+# read with float(), so a chord written by name was an empty one, and "inf" was a note. None for a
+# list refused, and the same sentences in all four runtimes.
+__NOTE_LISTS = {
+    "chordQuality": ("ce.music.quality", "there is no answer"), "voiceLead": ("ce.music.lead", "the answer is an empty list"),
+    "expandOctaves": ("ce.music.octaves", "the answer is an empty list"), "arpOrder": ("ce.music.arp", "the answer is an empty list"),
+}
+def __noteListItem(v):
+    import math
+    if isinstance(v, bool): return None
+    if isinstance(v, (int, float)):
+        return v if math.isfinite(v) else None     # ints stay ints, so a note reads 60 and not 60.0
+    if not isinstance(v, str): return None
+    n = noteNumber(v)
+    if n is not None: return n
+    r = __realNumber(v)
+    return int(r) if r is not None and r == int(r) else r
+def __noteList(fn, name, lst, mayBeAbsent=False):
+    verb, outcome = __NOTE_LISTS[fn]
+    def say(why, more=""):
+        logError(verb + ": " + why + ", so " + outcome + "." + more)
+        return None
+    if lst is None:
+        return [] if mayBeAbsent else say("no " + name + " were given")
+    if not isinstance(lst, (list, tuple)): return say(__shownValue(lst) + " is not a list of notes")
     out = []
-    if isinstance(list_, (list, tuple)):
-        for v in list_:
-            if isinstance(v, bool): continue
-            if isinstance(v, (int, float)):
-                out.append(v)                      # ints stay ints, so a note reads 60 and not 60.0
-            else:
-                try: out.append(float(v))
-                except (TypeError, ValueError): pass
-    return sorted(out)
+    for i, v in enumerate(lst):
+        n = __noteListItem(v)
+        if n is None:
+            where = __shownValue(v) + " at position " + str(i + 1) + " of " + name
+            if isinstance(v, str): return say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+            return say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
+        out.append(n)
+    return out
+def __sortedNotes(lst):
+    return sorted(lst)
+# A word or a count used as its default, said once (noteLists.js).
+__musicWarned = {}
+def __musicSaid(text):
+    if not text or text in __musicWarned: return
+    __musicWarned[text] = True
+    logWarn(text + " This is said only the first time.")
+__VOICE_LEAD_MODES = ["closest", "smooth", "off"]
+__ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"]
 # A count argument that is not a finite number falls back to its default. Written out rather than
 # leaning on falsiness, because `0 or 3` is 3 in Python and JavaScript and 0 in Lua.
 def __count(v, fallback):
@@ -1934,8 +2500,9 @@ def __count(v, fallback):
 # Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 # chordNotes, in the vocabulary the Chord Pad labels with.
 def chordQuality(notes):
-    lst = __sortedNotes(notes)
-    if not lst: return None
+    read = __noteList("chordQuality", "notes", notes)
+    if not read: return None
+    lst = __sortedNotes(read)
     iv = {}
     for x in lst:
         iv[__m12(x - lst[0])] = True
@@ -1974,8 +2541,9 @@ def __roman(rootSemitone, quality):
 def degreeChord(root, scale, degree, size=None):
     import math
     nm = "major" if scale is None else str(scale)
-    s = __CE_SCALES.get(nm)
+    s = __setOf("ce.music.degreeChord", "scale", scale)
     if not s: return None
+    if __pitchOf("ce.music.degreeChord", root) is None: return None
     n = len(s)
     d = __count(degree, 1) - 1
     sz = max(2, __count(size, 3))
@@ -2001,9 +2569,15 @@ def __motion(a, b):
 # Re-voice a chord so it moves as little as possible from the one before it - the Harmoniser's
 # voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
 # melody still), "off" returns root position. No previous chord means nothing to lead from.
-def voiceLead(notes, previous, mode=None):
-    chord = __sortedNotes(notes); prev = __sortedNotes(previous)
+def voiceLead(notes, previous=None, mode=None):
+    read = __noteList("voiceLead", "notes", notes)
+    before = __noteList("voiceLead", "previous", previous, True) if read is not None else None
+    if read is None or before is None: return []
+    chord = __sortedNotes(read); prev = __sortedNotes(before)
     how = "closest" if mode is None else str(mode)
+    if how not in __VOICE_LEAD_MODES:
+        __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
+        how = "closest"
     if not chord or not prev or how == "off": return chord
     cands = [chord]; span = max(1, len(chord) - 1) * 2
     cur = chord
@@ -2024,8 +2598,20 @@ def voiceLead(notes, previous, mode=None):
 # clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
 def expandOctaves(notes, octaves=None):
     import math
-    base = __sortedNotes(notes)
-    oc = max(1, min(4, __count(octaves, 1)))
+    read = __noteList("expandOctaves", "notes", notes)
+    if read is None: return []
+    base = __sortedNotes(read)
+    oc = 1
+    if octaves is not None:
+        def say(why, used):
+            __musicSaid("ce.music.octaves: octaves is " + __shownValue(octaves) + ", which is " + why + ", so " + str(used) + " was used.")
+            return used
+        r = __realNumber(octaves)
+        if r is None: oc = say("not a number", 1)
+        elif math.floor(r) < 1: oc = say("less than 1", 1)
+        elif math.floor(r) > 4: oc = say("more than 4", 4)
+        elif math.floor(r) != r: oc = say("not a whole number", math.floor(r))
+        else: oc = math.floor(r)
     out = []
     for o in range(oc):
         for x in base:
@@ -2038,10 +2624,18 @@ def expandOctaves(notes, octaves=None):
 # step, everything at once) has the same shape as the rest. Notes are taken in the order given,
 # which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 # panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
-def arpOrder(notes, pattern):
-    asc = list(notes) if isinstance(notes, (list, tuple)) else []
+def arpOrder(notes, pattern=None):
+    asc = __noteList("arpOrder", "notes", notes)
+    if asc is None: return []
+    if pattern is None:
+        __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
+        p = "up"
+    elif str(pattern) not in __ARP_ORDER_PATTERNS:
+        __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
+        p = "up"
+    else:
+        p = str(pattern)
     if not asc: return []
-    p = str(pattern)
     if p == "chord": return [list(asc)]
     if p == "down":
         seq = list(reversed(asc))
@@ -2133,13 +2727,79 @@ def __ce_crc_ref(data, poly, init, xor_out, bits):
             crc = ((crc >> 1) ^ poly) & mask if (crc & 1) else (crc >> 1) & mask
     return (crc ^ xor_out) & mask
 
-def checksum(kind, bytes=None, opts=None):
+# How a refusal shows a value the script passed, in the same words in every runtime (the WebView
+# runtime's shownValue): "nothing" for None, true and false, NaN and Infinity as JavaScript writes
+# them, a whole number without ".0", text in quotes, "a list" for any list, tuple or dict.
+def __shownValue(v):
+    if v is None: return "nothing"
+    if isinstance(v, bool): return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        if v != v: return "NaN"
+        if v in (float("inf"), float("-inf")): return "Infinity" if v > 0 else "-Infinity"
+        return __shown(v)
+    if isinstance(v, str): return '"' + v + '"'
+    if callable(v): return "a function"
+    return "a list"
+def __hexByte(token):
+    import re
+    return int(token, 16) if re.fullmatch(r"(0[xX])?[0-9a-fA-F]{1,2}", token) else None
+# A script's bytes, read the way every runtime reads them (the WebView runtime's scriptBytes,
+# BridgeScriptHost's bytesFromScript). Hex text is split on spaces, tabs, line breaks, form and
+# vertical tab and commas (not \s, which would also take a no-break space), and each token is one
+# byte. A list's items are bytes: a whole number from 0 to 255, or text that is one hex byte; bytes
+# and a bytearray are lists, and a dict is read as its values, as a Lua table is in the editor.
+# Anything else is refused, naming what and where, and None comes back; nothing given is an empty
+# list, for the caller to judge.
+def __scriptBytes(verb, data, outcome):
+    import re
+    if data is None: return []
+    if isinstance(data, str):
+        out = []
+        for token in [t for t in re.split(r"[ \t\r\n\f\v,]+", data) if t]:
+            b = __hexByte(token)
+            if b is None:
+                if re.fullmatch(r"[0-9a-fA-F]+", token) and len(token) % 2 == 0:
+                    tail = 'Put a space between the bytes: "' + " ".join(token[i:i + 2] for i in range(0, len(token), 2)) + '".'
+                else:
+                    tail = 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'
+                logError(verb + ': "' + token + '" is not one byte, so ' + outcome + '. ' + tail)
+                return None
+            out.append(b)
+        return out
+    if isinstance(data, (bytes, bytearray)): return list(data)
+    if isinstance(data, dict): data = list(data.values())
+    if not isinstance(data, (list, tuple)):
+        logError(verb + ": " + __shownValue(data) + " is not a list of bytes, so " + outcome + ".")
+        return None
+    out = []
+    for i, v in enumerate(data):
+        b = None
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            if v == v and 0 <= v <= 255 and v == int(v): b = int(v)
+        elif isinstance(v, str):
+            b = __hexByte(v)
+        if b is None:
+            logError(verb + ": " + __shownValue(v) + " at position " + str(i) + " is not a byte, so " + outcome
+                     + '. A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".')
+            return None
+        out.append(b)
+    return out
+def checksum(kind=None, bytes=None, opts=None):
     import math
-    if bytes is None: bytes = kind; kind = "roland"
-    key = str(kind if kind is not None else "").lower()
-    cid = __CE_CKSUM_ALIAS.get(key)
+    verb = "ce.midi.checksum"
+    if bytes is None:
+        # checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
+        if kind is None or (isinstance(kind, str) and kind.lower() in __CE_CKSUM_ALIAS):
+            logError(verb + ": no bytes given, so there is no checksum.")
+            return None
+        bytes = kind; kind = "roland"
+    bytes = __scriptBytes(verb, bytes, "there is no checksum")
+    if bytes is None: return None
+    cid = __CE_CKSUM_ALIAS.get(kind.lower()) if isinstance(kind, str) else None
     if cid is None:
-        logError('ce.midi.checksum("' + str(kind) + '"): no such algorithm.')
+        # The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
+        which = ": no algorithm given" if kind is None else "(" + __shownValue(kind) + "): no such algorithm"
+        logError("ce.midi.checksum" + which + ". One of: " + ", ".join(sorted(__CE_CKSUM_ALIAS.keys())) + ".")
         return None
     total = 0; total8 = 0; x = 0
     for v in bytes:
@@ -2164,6 +2824,206 @@ def checksum(kind, bytes=None, opts=None):
     if cid == "crc16-modbus": return __ce_crc_ref(bytes, 0xa001, 0xffff, 0x0000, 16)
     return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32)
 
+# Byte lists: what JUCE's MemoryBlock does, over the lists scripts already pass bytes in
+# (docs/design/script-bytes.md). Ported from the WebView runtime's "byte lists" block rule for rule
+# and message for message, which scriptPreludeAgreement.test.js checks. Offsets and bit positions
+# count from 0. A list may be hex text, bytes or a bytearray, and its items must be bytes (0 to 255,
+# or one hex byte), both read by __scriptBytes; a mistake answers None and says why; every list
+# returned is new.
+__BIT_RANGE = "start must be a whole number from 0, and count one from 1 to 32"
+__WRITE_START = "Writing can run past the end, but not start beyond it."
+__B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+def __whole(n):
+    import math
+    return isinstance(n, (int, float)) and not isinstance(n, bool) and math.isfinite(n) and n == math.floor(n)
+# A whole number prints as one ("9", not Python's "9.0" for a float), as it does in the other runtimes.
+def __shown(n):
+    if isinstance(n, float) and n.is_integer(): return str(int(n))
+    return str(n)
+def __plural(n, word): return str(n) + " " + word + ("" if n == 1 else "s")
+def __span(word, a, b):
+    if a == b: return word + " " + str(a) + " is past"
+    return word + "s " + str(a) + " to " + str(b) + " run past"
+def __refuse(verb, why, tail=None):
+    logError(verb + ": " + why + ", so there is no answer." + ((" " + tail) if tail else ""))
+    return None
+def __bytesIn(verb, data):
+    if data is None: return __refuse(verb, "no bytes given")
+    return __scriptBytes(verb, data, "there is no answer")
+# Why a value to write cannot be written in `bits` bits, or None when it can.
+def __doesNotFit(v, bits):
+    if v is None: return "the value to write is missing"
+    if not __whole(v): return __shownValue(v) + " is not a whole number"
+    if v < 0 or v >= 2 ** bits: return __shown(v) + " does not fit in " + __plural(bits, "bit")
+    return None
+def __shape(verb, opts):
+    bits, order = 7, "msb"
+    if isinstance(opts, dict):
+        if opts.get("bits") is not None: bits = opts.get("bits")
+        if opts.get("order") is not None: order = opts.get("order")
+    if isinstance(bits, bool) or bits not in (7, 8): return __refuse(verb, "bits must be 7 or 8")
+    if order not in ("msb", "lsb"): return __refuse(verb, 'order must be "msb" or "lsb"')
+    return { "bits": int(bits), "order": order }
+def getBits(value=None, start=None, count=None):
+    verb = "ce.midi.getBits"
+    if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
+    start = int(start); count = int(count)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value != value or value in (float("inf"), float("-inf")): return __refuse(verb, __shownValue(value) + " is not a finite number")
+        import math
+        if start + count > 32:
+            return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here")
+        return (int(math.floor(value)) >> start) & ((1 << count) - 1)
+    data = __bytesIn(verb, value)
+    if data is None: return None
+    if start + count > len(data) * 8:
+        return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(len(data), "byte"))
+    out = 0
+    for k in range(count):
+        at = start + k
+        out |= ((data[at // 8] >> (at % 8)) & 1) << k
+    return out
+def setBits(value=None, start=None, count=None, bits=None):
+    verb = "ce.midi.setBits"
+    if not __whole(start) or start < 0 or not __whole(count) or count < 1 or count > 32: return __refuse(verb, __BIT_RANGE)
+    start = int(start); count = int(count)
+    unfit = __doesNotFit(bits, count)
+    if unfit: return __refuse(verb, unfit)
+    bits = int(bits)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value != value or value in (float("inf"), float("-inf")): return __refuse(verb, __shownValue(value) + " is not a finite number")
+        import math
+        if start + count > 32:
+            return __refuse(verb, __span("bit", start, start + count - 1) + " the 32 bits a number holds here")
+        return (int(math.floor(value)) & ~(((1 << count) - 1) << start)) | (bits << start)
+    data = __bytesIn(verb, value)
+    if data is None: return None
+    if start + count > len(data) * 8:
+        return __refuse(verb, __span("bit", start, start + count - 1) + " the end of " + __plural(len(data), "byte"))
+    for k in range(count):
+        at = start + k
+        i, bit = at // 8, 1 << (at % 8)
+        if (bits >> k) & 1: data[i] |= bit
+        else: data[i] &= ~bit
+    return data
+def bytesRead(data=None, offset=None, count=None, opts=None):
+    verb = "ce.midi.read"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    if not __whole(count) or count < 1 or count > 4: return __refuse(verb, "count must be a whole number from 1 to 4")
+    offset = int(offset); count = int(count)
+    shape = __shape(verb, opts)
+    if shape is None: return None
+    if offset + count > len(data):
+        return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(len(data), "byte"))
+    part = data[offset:offset + count]
+    if shape["order"] == "lsb": part.reverse()
+    base, v = 1 << shape["bits"], 0
+    for b in part: v = v * base + (b % base)
+    return v
+def bytesWrite(data=None, offset=None, count=None, value=None, opts=None):
+    verb = "ce.midi.write"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    if not __whole(count) or count < 1 or count > 4: return __refuse(verb, "count must be a whole number from 1 to 4")
+    offset = int(offset); count = int(count)
+    shape = __shape(verb, opts)
+    if shape is None: return None
+    unfit = __doesNotFit(value, shape["bits"] * count)
+    if unfit: return __refuse(verb, unfit)
+    if offset > len(data):
+        return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"), __WRITE_START)
+    base, v, digits = 1 << shape["bits"], int(value), []
+    for _ in range(count):
+        digits.append(v % base); v //= base
+    if shape["order"] == "msb": digits.reverse()
+    for j, d in enumerate(digits):
+        if offset + j < len(data): data[offset + j] = d
+        else: data.append(d)
+    return data
+def bytesSlice(data=None, offset=None, count=None):
+    verb = "ce.midi.slice"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    offset = int(offset)
+    if count is None:
+        if offset > len(data): return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"))
+        return data[offset:]
+    if not __whole(count) or count < 0: return __refuse(verb, "count must be a whole number from 0")
+    count = int(count)
+    if offset + count > len(data):
+        if count == 0: return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"))
+        return __refuse(verb, __span("byte", offset, offset + count - 1) + " the end of " + __plural(len(data), "byte"))
+    return data[offset:offset + count]
+def bytesPut(data=None, offset=None, values=None):
+    verb = "ce.midi.put"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    if not __whole(offset) or offset < 0: return __refuse(verb, "offset must be a whole number from 0")
+    offset = int(offset)
+    part = __bytesIn(verb, values)
+    if part is None: return None
+    if offset > len(data):
+        return __refuse(verb, "offset " + str(offset) + " is past the end of " + __plural(len(data), "byte"), __WRITE_START)
+    for j, b in enumerate(part):
+        if offset + j < len(data): data[offset + j] = b
+        else: data.append(b)
+    return data
+def bytesFind(data=None, pattern=None, start=None):
+    verb = "ce.midi.find"
+    data = __bytesIn(verb, data)
+    if data is None: return None
+    wanted = __bytesIn(verb, pattern)
+    if wanted is None: return None
+    if not wanted: return __refuse(verb, "the pattern is empty")
+    first = 0 if start is None else start
+    if not __whole(first) or first < 0: return __refuse(verb, "from must be a whole number from 0")
+    # Not found is an answer, not a mistake: None comes back and nothing is said.
+    for i in range(int(first), len(data) - len(wanted) + 1):
+        if data[i:i + len(wanted)] == wanted: return i
+    return None
+def bytesToHex(data=None):
+    data = __bytesIn("ce.midi.toHex", data)
+    if data is None: return None
+    return " ".join("%02X" % b for b in data)
+def bytesFromHex(text=None):
+    verb = "ce.midi.fromHex"
+    if text is None: return __refuse(verb, "no hex text given")
+    if not isinstance(text, str): return __refuse(verb, __shownValue(text) + " is not hex text")
+    return __bytesIn(verb, text)
+def bytesToBase64(data=None):
+    data = __bytesIn("ce.midi.toBase64", data)
+    if data is None: return None
+    out = ""
+    for i in range(0, len(data), 3):
+        chunk = data[i:i + 3]
+        n = chunk[0] * 65536 + (chunk[1] if len(chunk) > 1 else 0) * 256 + (chunk[2] if len(chunk) > 2 else 0)
+        out += __B64[(n >> 18) & 63] + __B64[(n >> 12) & 63]
+        out += (__B64[(n >> 6) & 63] if len(chunk) > 1 else "=") + (__B64[n & 63] if len(chunk) > 2 else "=")
+    return out
+def bytesFromBase64(text=None):
+    import re
+    verb = "ce.midi.fromBase64"
+    if text is None: return __refuse(verb, "no base64 text given")
+    clean = re.sub(r"[ \t\r\n]", "", text) if isinstance(text, str) else None
+    if clean is None or len(clean) % 4 != 0 or not re.fullmatch(r"[A-Za-z0-9+/]*={0,2}", clean):
+        return __refuse(verb, "that is not base64", "Base64 is groups of four characters from A-Z, a-z, 0-9, + and /, with = only as padding at the end.")
+    out = []
+    for i in range(0, len(clean), 4):
+        group, n, pad = clean[i:i + 4], 0, 0
+        for c in group:
+            if c == "=":
+                pad += 1; n = n * 64
+            else:
+                n = n * 64 + __B64.index(c)
+        out.append((n >> 16) & 255)
+        if pad < 2: out.append((n >> 8) & 255)
+        if pad < 1: out.append(n & 255)
+    return out
+
 # panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 # order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
 # out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
@@ -2172,7 +3032,12 @@ def panic(opts=None):
     opts = opts or {}
     reset = opts.get("resetControllers", True) is not False
     ch = opts.get("channel")
-    channels = [math.floor(ch)] if ch is not None else range(1, 17)
+    channels = range(1, 17)
+    # A channel that is not one ("all", 17) is refused; leaving it out is how every channel is named.
+    if ch is not None:
+        c = __midiArg("panic", "channel", ch)
+        if c is None: return
+        channels = [c]
     for c in channels:
         sendCC(c, 120, 0)
         sendCC(c, 123, 0)
@@ -2379,29 +3244,96 @@ def logError(message, value=None): return __api.logAt("error", str(message), val
 
 # @module ce.midi
 def sendMidi(b):                  return __api.sendMidi(b)
-def __ch(c):
+# The numbers a channel message carries, checked before anything is sent: the WebView runtime's
+# MIDI_ARGS and midiArg, word for word. An address (channel, controller, program, bank, parameter
+# number) outside its range is refused, since clamping it picks a different message; a value past
+# the end of its range is clamped, as before; anything that is not a number, or is missing where
+# there is no default, is refused. A fraction rounds half up (this floored it, the editor rounded).
+__MIDI_ARGS = {
+    "channel": ("channel", "a channel", 1, 16, True, "A channel is a whole number from 1 to 16."),
+    "controller": ("controller number", "a controller number", 0, 127, True, "A controller number is a whole number from 0 to 127."),
+    "program": ("program", "a program", 0, 127, True, "A program is a whole number from 0 to 127."),
+    "bank": ("bank number", "a bank number", 0, 127, True, "A bank number is a whole number from 0 to 127."),
+    "msb": ("MSB", "an MSB", 0, 127, True, "An MSB is a whole number from 0 to 127."),
+    "lsb": ("LSB", "an LSB", 0, 127, True, "An LSB is a whole number from 0 to 127."),
+    "value": ("value", "a value", 0, 127, False, "A value is a number from 0 to 127."),
+    "velocity": ("velocity", "a velocity", 0, 127, False, "A velocity is a number from 0 to 127."),
+    "pressure": ("pressure", "a pressure", 0, 127, False, "A pressure is a number from 0 to 127."),
+    "value14": ("value", "a value", 0, 16383, False, "A value is a number from 0 to 16383."),
+    "bend": ("bend", "a bend", 0, 16383, False, "A bend is a number from 0 to 16383, and 8192 is the centre."),
+    "position": ("song position", "a song position", 0, 16383, False, "A song position is a number of MIDI beats from 0 to 16383."),
+}
+def __finite(v):
     import math
-    c = math.floor(c or 1)
-    return (1 if c < 1 else (16 if c > 16 else c)) - 1
-def __7(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+__edgeWarned = {}   # a dict: the panel API's own set() shadows the builtin here
+def __midiArg(verb, kind, v):
     import math
-    v = math.floor(v or 0)
-    return 0 if v < 0 else (127 if v > 127 else v)
-# noteNumber is None for an unreadable name; a MIDI message still needs a BYTE, so it becomes 0
-# here rather than a None slipping into a message.
+    noun, a_noun, lo, hi, address, hint = __MIDI_ARGS[kind]
+    if v is None:
+        logError(verb + ": no " + noun + " given, so nothing was sent.")
+        return None
+    r = __realNumber(v)   # text that is a number ("64") is read as one, as it always was
+    n = int(math.floor(r + 0.5)) if r is not None else None
+    if n is None or (address and (n < lo or n > hi)):
+        logError(verb + ": " + __shownValue(v) + " is not " + a_noun + ", so nothing was sent. " + hint)
+        return None
+    if lo <= n <= hi: return n
+    # A value past the end of its range is sent as the nearest end, and said once per command.
+    sent = lo if n < lo else hi
+    if verb not in __edgeWarned:
+        __edgeWarned[verb] = True
+        logWarn(verb + ": the " + noun + " " + __shownValue(v) + " is outside " + str(lo) + " to " + str(hi)
+                + ", so " + str(sent) + " was sent. This is said only the first time.")
+    return sent
+# A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that
+# range. An unreadable name used to become note 0, so "c4" played C-1 with nothing to say why; a
+# name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
+# table raised or played C-1. __badNote refuses each in the WebView runtime's words.
 def __note(n):
-    if isinstance(n, str):
-        return noteNumber(n) or 0
-    return __7(n)
+    import math
+    v = noteNumber(n) if isinstance(n, str) else (int(math.floor(n + 0.5)) if __finite(n) else None)
+    return v if v is not None and 0 <= v <= 127 else None
+def __badNote(verb, note):
+    rng = "MIDI notes run from 0 to 127, which is C-1 to G9."
+    if note is None:
+        why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
+    elif isinstance(note, str):
+        if noteNumber(note) is None:
+            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+                   + 'has one, then the octave: "C4", "Eb3", "F#-1".')
+        else:
+            why = '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + rng
+    elif __finite(note):
+        why = __shown(note) + " is outside the MIDI notes, so nothing was sent. " + rng
+    else:
+        why = __shownValue(note) + ' is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
+    logError(verb + ": " + why)
+# sendNote's `ms`: left out (False here), the script sends the note off itself; given, it must be
+# a length. "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+def __noteLength(verb, ms):
+    if ms is None: return False
+    length = __realNumber(ms)   # "500" is what sendNote has always read
+    if length is not None and length > 0: return length
+    logError(verb + ": " + __shownValue(ms) + " is not a length in milliseconds, so nothing was sent. "
+             + "Give a number above 0, or leave it out to send the note off yourself.")
+    return None
 
-def sendNote(channel, note, velocity, ms=None):
+def sendNote(channel=None, note=None, velocity=None, ms=None):
     # A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
     # timer for it, and getting that wrong means a hung voice - the one MIDI mistake you hear rather
     # than read. A panel cannot play a note at all.
+    c = __midiArg("sendNote", "channel", channel)
+    if c is None: return
     n = __note(note)
-    sendMidi([0x90 | __ch(channel), n, __7(velocity)])
-    if ms is not None and ms > 0:
-        after(ms, lambda: sendMidi([0x80 | __ch(channel), n, 0]))
+    if n is None: return __badNote("sendNote", note)
+    v = __midiArg("sendNote", "velocity", velocity)
+    if v is None: return
+    length = __noteLength("sendNote", ms)
+    if length is None: return
+    sendMidi([0x90 | (c - 1), n, v])
+    if length is not False:
+        __oneShot(length, lambda: sendMidi([0x80 | (c - 1), n, 0]))
 
 # routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
 # ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
@@ -2435,41 +3367,78 @@ def __applyMidiFilter(inbound, b):
         if out is None: continue
         if len(out): b = out
     return {"bytes": b}
-def sendRPN(channel, msb, lsb, value):
+def sendRPN(channel=None, msb=None, lsb=None, value=None):
     # RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
     # fine tuning (0,1) and coarse tuning (0,2).
-    import math
-    s = 0xB0 | __ch(channel)
-    v = math.floor(value or 0)
-    v = 0 if v < 0 else (16383 if v > 16383 else v)
-    sendMidi([s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F])
-# Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
-def sendSongPosition(beats):
-    import math
-    b = math.floor(beats or 0)
-    b = 0 if b < 0 else (16383 if b > 16383 else b)
+    c = __midiArg("sendRPN", "channel", channel)
+    if c is None: return
+    m = __midiArg("sendRPN", "msb", msb)
+    if m is None: return
+    l = __midiArg("sendRPN", "lsb", lsb)
+    if l is None: return
+    v = __midiArg("sendRPN", "value14", value)
+    if v is None: return
+    s = 0xB0 | (c - 1)
+    sendMidi([s, 0x65, m, s, 0x64, l, s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F])
+def sendSongPosition(beats=None):
+    b = __midiArg("sendSongPosition", "position", beats)
+    if b is None: return
     sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F])
-def sendNoteOff(channel, note, velocity=0):
-    sendMidi([0x80 | __ch(channel), __note(note), __7(velocity)])
-def sendProgramChange(channel, program, bankMsb=None, bankLsb=None):
+def sendNoteOff(channel=None, note=None, velocity=None):
+    c = __midiArg("sendNoteOff", "channel", channel)
+    if c is None: return
+    n = __note(note)
+    if n is None: return __badNote("sendNoteOff", note)
+    v = __midiArg("sendNoteOff", "velocity", 0 if velocity is None else velocity)
+    if v is None: return
+    sendMidi([0x80 | (c - 1), n, v])
+def sendProgramChange(channel=None, program=None, bankMsb=None, bankLsb=None):
+    verb = "sendProgramChange"
+    c = __midiArg(verb, "channel", channel)
+    if c is None: return
+    p = __midiArg(verb, "program", program)
+    if p is None: return
+    msb = lsb = False
+    if bankMsb is not None:
+        msb = __midiArg(verb, "bank", bankMsb)
+        if msb is None: return
+    if bankLsb is not None:
+        lsb = __midiArg(verb, "bank", bankLsb)
+        if lsb is None: return
     # Bank select first: a device applies the bank that was in force when the program change lands.
-    if bankMsb is not None: sendCC(channel, 0, __7(bankMsb))
-    if bankLsb is not None: sendCC(channel, 32, __7(bankLsb))
-    sendMidi([0xC0 | __ch(channel), __7(program)])
-def sendPitchBend(channel, value):
-    import math
-    v = math.floor(value if value is not None else 8192)
-    v = 0 if v < 0 else (16383 if v > 16383 else v)
-    sendMidi([0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128])
-def sendAftertouch(channel, pressure, note=None):
-    if note is not None: sendMidi([0xA0 | __ch(channel), __note(note), __7(pressure)])
-    else: sendMidi([0xD0 | __ch(channel), __7(pressure)])
+    if msb is not False: sendCC(c, 0, msb)
+    if lsb is not False: sendCC(c, 32, lsb)
+    sendMidi([0xC0 | (c - 1), p])
+def sendPitchBend(channel=None, value=None):
+    c = __midiArg("sendPitchBend", "channel", channel)
+    if c is None: return
+    v = __midiArg("sendPitchBend", "bend", 8192 if value is None else value)
+    if v is None: return
+    sendMidi([0xE0 | (c - 1), v % 128, (v // 128) % 128])
+def sendAftertouch(channel=None, pressure=None, note=None):
+    c = __midiArg("sendAftertouch", "channel", channel)
+    if c is None: return
+    if note is None:
+        p = __midiArg("sendAftertouch", "pressure", pressure)
+        if p is None: return
+        return sendMidi([0xD0 | (c - 1), p])
+    n = __note(note)
+    if n is None: return __badNote("sendAftertouch", note)
+    p = __midiArg("sendAftertouch", "pressure", pressure)
+    if p is None: return
+    sendMidi([0xA0 | (c - 1), n, p])
 def sendClock(): sendMidi([0xF8])
-def sendTransport(action="start"):
-    action = str(action).lower()
-    if action == "stop": sendMidi([0xFC])
-    elif action == "continue": sendMidi([0xFB])
-    else: sendMidi([0xFA])
+# Any action but stop and continue used to send Start, so "pause" started the sequencer.
+def sendTransport(action=None):
+    actions = 'The actions are "start", "continue" and "stop".'
+    if action is None:
+        logError("sendTransport: no action given, so nothing was sent. " + actions)
+        return
+    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.lower()) if isinstance(action, str) else None
+    if status is None:
+        logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions)
+        return
+    sendMidi([status])
 
 # @module ce.device
 # Device READS — four wrappers over one host primitive, so the shape a script sees is assembled
@@ -2501,7 +3470,7 @@ def panelSnapshot():
     names = __panelQuery("controls", None)
     if not names: return out
     for name in names:
-        v = get(name + ".value")
+        v = __read(name + ".value")
         if v is not None: out[name] = v
     return out
 def panelRestore(snap):
@@ -2510,7 +3479,7 @@ def panelRestore(snap):
     for name, v in snap.items():
         # A name the panel no longer has is skipped rather than failing the whole restore: a
         # snapshot taken before an edit is still worth most of what it holds.
-        if get(name + ".value") is not None:
+        if __read(name + ".value") is not None:
             set(name + ".value", v)
             n += 1
     return n
@@ -2621,13 +3590,18 @@ def requestDump(kind, fn=None, opts=None):
         ms = 3000
         if opts is not None and opts.get("timeout") is not None and float(opts.get("timeout")) > 0:
             ms = float(opts.get("timeout"))
-        waiter = { "kind": kind, "fn": fn, "done": False }
+        # A request's answer arrives under the dump it answers with ("requestSystem" brings
+        # "system"), so that is what the callback waits for; waiting for the request's own id, it
+        # heard only the timeout.
+        answer = __deviceQuery("answers", { "role": "mainSynth", "request": kind })
+        waitFor = answer if isinstance(answer, str) and answer else kind
+        waiter = { "kind": waitFor, "fn": fn, "done": False }
         __dumpWaiters.append(waiter)
         # Resolved rather than left hanging: a synth that is off, or that does not answer this
         # request, is the common case and not the exotic one.
         def __timeout():
             if waiter["done"]: return
-            __resolveDumps(kind, "", None, "no dump arrived within " + str(int(ms)) + "ms")
+            __resolveDumps(waitFor, "", None, "no dump arrived within " + str(int(ms)) + "ms")
         after(ms, __timeout)
     return __api.requestDump(kind)
 
@@ -2661,19 +3635,32 @@ __CE_SCOPES = ("panel", "script", "local")
 # even called. All four runtimes spell the prefix this way.
 __CE_SCRIPT_PREFIX = "\u0001script:"
 
-def __storageScope(opts):
+def __storageScope(opts, verb):
     """The scope asked for, or None when it is not one this build knows.
 
     Refusing rather than falling back to "panel": storing a value in a scope the caller did not ask
     for is how a private setting quietly becomes a shared one, and a typo in a scope name would be
-    the way it happened."""
+    the way it happened. A typo in the KEY ({"scop": "script"}) is the same leak, so any key but
+    "scope" is refused as well, sorted so every runtime names them in one order. A key that is a
+    number is a list entry and is left alone. `verb` is the call's namespaced path; the WebView
+    runtime's storageScopeOf says the same words."""
+    if isinstance(opts, dict):
+        unknown = sorted(str(k) for k in opts
+                         if isinstance(k, str) and k != "scope" and not k.isdigit())
+        if unknown:
+            quoted = ['"' + k + '"' for k in unknown]
+            listed = quoted[0] if len(quoted) == 1 else ", ".join(quoted[:-1]) + " and " + quoted[-1]
+            logError(verb + ": " + listed
+                     + (" is not one of its options" if len(unknown) == 1 else " are not among its options")
+                     + ", so nothing was done. Its only option is scope.")
+            return None
     raw = opts if isinstance(opts, str) else (opts.get("scope") if isinstance(opts, dict) else None)
     if raw is None or raw == "":
         return "panel"
     scope = str(raw)
     if scope in __CE_SCOPES:
         return scope
-    logError('ce.storage: "%s" is not a scope. One of: panel, script, local.' % scope)
+    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % scope)
     return None
 
 # Which of the host's two real stores a scope lives in.
@@ -2695,7 +3682,7 @@ def __storageKeyFrom(scope, stored):
     return None if stored.startswith(__CE_SCRIPT_PREFIX) else stored
 
 def saveSetting(key, value, opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.saveSetting")
     if scope is None:
         return False
     store = __storageStore(scope)
@@ -2707,7 +3694,7 @@ def saveSetting(key, value, opts=None):
     return True
 
 def loadSetting(key, fallback=None, opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.loadSetting")
     if scope is None:
         return fallback
     v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
@@ -2715,7 +3702,7 @@ def loadSetting(key, fallback=None, opts=None):
 
 # settings() lists every saved key; forget() deletes one and says whether there was one.
 def listSettings(opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.settings")
     if scope is None:
         return []
     out = []
@@ -2726,7 +3713,7 @@ def listSettings(opts=None):
     return out
 
 def forgetSetting(key, opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.forget")
     if scope is None:
         return False
     return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) is True
@@ -2734,7 +3721,7 @@ def forgetSetting(key, opts=None):
 # Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 # one was the only way before.
 def allSettings(opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.all")
     if scope is None:
         return {}
     return { k: loadSetting(k, None, opts) for k in listSettings(opts) }
@@ -2742,12 +3729,15 @@ def allSettings(opts=None):
 # Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
 # keys alone: "clear my settings" must not mean "clear everybody's".
 def clearSettings(opts=None):
+    # Checked here first, so a refusal names clear rather than the settings() it calls.
+    if __storageScope(opts, "ce.storage.clear") is None:
+        return 0
     return sum(1 for k in listSettings(opts) if forgetSetting(k, opts))
 
 # Which store a scope is talking to, and what is in it. `available` is the honest field: false means
 # writes in this scope will not stick, which is worth saying once rather than per key.
 def storageInfo(opts=None):
-    scope = __storageScope(opts)
+    scope = __storageScope(opts, "ce.storage.info")
     if scope is None:
         return None
     contents = allSettings(opts)
@@ -2904,6 +3894,88 @@ def decodeJson(text):
     return None if v is None else __jsonStripNulls(v)
 
 # @module -
+# BEGIN GENERATED option keys — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# An options table holding a key its member does not take REFUSES the call: nothing is done, the
+# console names the keys and the options the member has, and the call answers what the member
+# answers for any other refusal. The WebView runtime does the same from the same lists in
+# panelApi.js (panelRuntime.js, applyOptionChecks), in the same words. A key that is a number is a
+# list entry, not an option. The keys are named sorted, in every runtime, because a table keeps no
+# order a message could follow.
+# In Python an options argument can also be passed by its parameter's name, so it is looked for there.
+__CE_OPTIONS = {
+    "set": { "path": "set", "at": 2, "param": "opts", "refusal": "nothing", "names": ["transmit"] },
+    "requestDump": { "path": "ce.device.requestDump", "at": 2, "param": "opts", "refusal": "false", "names": ["timeout"] },
+    "recallPreset": { "path": "ce.device.recallPreset", "at": 1, "param": "opts", "refusal": "result", "names": ["role"] },
+    "animateTo": { "path": "ce.anim.to", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "animateSpring": { "path": "ce.anim.spring", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "animateEnvelope": { "path": "ce.anim.envelope", "at": 2, "param": "opts", "refusal": "false", "names": ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "syncTimer": { "path": "ce.time.syncTimer", "at": 2, "param": "opts", "refusal": "nothing", "names": ["follow"] },
+    "deviceParameters": { "path": "ce.device.parameters", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "query", "group", "type", "access", "limit"] },
+    "deviceDefineParameter": { "path": "ce.device.defineParameter", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], "nested": { "nrpn": { "names": ["msb", "lsb"] } } },
+    "deviceDefineDump": { "path": "ce.device.defineDump", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "request", "match", "prefix", "suffix", "offset", "size", "checksum", "fields"], "nested": { "match": { "names": ["prefix", "suffix"] } } },
+    "devicePorts": { "path": "ce.device.ports", "at": 0, "param": "opts", "refusal": "empty list", "names": ["direction"] },
+    "checksum": { "path": "ce.midi.checksum", "at": 2, "param": "opts", "refusal": "nothing", "names": ["offset"] },
+    "panic": { "path": "ce.midi.panic", "at": 0, "param": "opts", "refusal": "nothing", "names": ["channel", "resetControllers"] },
+    "encodeJson": { "path": "ce.storage.encode", "at": 1, "param": "opts", "refusal": "nothing", "names": ["indent"] },
+    "bytesRead": { "path": "ce.midi.read", "at": 3, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
+    "bytesWrite": { "path": "ce.midi.write", "at": 4, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
+}
+# The keys `opts` holds that `shape` does not list, in groups: its own, then those inside each
+# option that lists fields of its own, in the contract's order.
+def __ce_unknownOptions(opts, shape, parent, out):
+    names = shape["names"]
+    unknown = sorted(k for k in opts
+                     if isinstance(k, str) and k not in names and not (k.isascii() and k.isdigit()))
+    if unknown:
+        out.append({ "parent": parent, "keys": unknown, "shape": shape })
+    nested = shape.get("nested") or {}
+    for name in names:
+        if name in nested and isinstance(opts.get(name), dict):
+            __ce_unknownOptions(opts[name], nested[name], (parent + "." + name) if parent else name, out)
+    return out
+
+def __ce_optionsLine(path, group):
+    p = group["parent"]
+    quoted = ['"' + (p + "." if p else "") + k + '"' for k in group["keys"]]
+    if len(quoted) == 1:
+        what = quoted[0] + " is not one of its options, so nothing was done."
+    else:
+        what = ", ".join(quoted[:-1]) + " and " + quoted[-1] + " are not among its options, so nothing was done."
+    names = group["shape"]["names"]
+    if len(names) == 1:
+        listed = ("The only option of " + p if p else "Its only option") + " is " + names[0] + "."
+    else:
+        listed = ("The options of " + p if p else "Its options") + " are: " + ", ".join(names) + "."
+    return path + ": " + what + " " + listed
+
+def __ce_refused(refusal, lines):
+    if refusal == "false": return False
+    if refusal == "zero": return 0
+    if refusal == "empty list": return []
+    if refusal == "result": return { "ok": False, "error": " ".join(lines) }
+    return None
+
+def __ce_optionChecked(fn, spec):
+    def checked(*args, **kwargs):
+        at = spec["at"]
+        opts = args[at] if len(args) > at else kwargs.get(spec["param"])
+        if isinstance(opts, dict):
+            groups = __ce_unknownOptions(opts, spec, "", [])
+            if groups:
+                lines = [__ce_optionsLine(spec["path"], g) for g in groups]
+                for line in lines:
+                    logError(line)
+                return __ce_refused(spec["refusal"], lines)
+        return fn(*args, **kwargs)
+    return checked
+
+__ceOptionId = None
+for __ceOptionId in __CE_OPTIONS:
+    if callable(globals().get(__ceOptionId)):
+        globals()[__ceOptionId] = __ce_optionChecked(globals()[__ceOptionId], __CE_OPTIONS[__ceOptionId])
+# del, for the reason the stub list gives: a module-level loop variable outlives its loop.
+del __ceOptionId
+# END GENERATED option keys
 # BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 # on top. ce.core is global: its members are never namespaced, so they appear here only for
@@ -2911,9 +3983,9 @@ def decodeJson(text):
 import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
-    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
-    "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -3275,7 +4347,7 @@ public:
     {
         if (! interpreterTried) { interpreterTried = true; createInterpreter(); }
         if (! interpreterOk) { onError (def.id, initInfo.isNotEmpty() ? initInfo : juce::String ("Python interpreter failed to initialize")); return false; }
-        const Entry entry (*this); // module-level statements obey the execution budget too
+        const Entry entry (*this, false); // the clock starts below, after the prelude
 
         // Fresh namespace dict per script (isolation). Seed builtins + owner, then prelude + source.
         PyObject* ns = PyDict_New();
@@ -3297,10 +4369,21 @@ public:
         // Prelude, then the module gate, then the user source — the gate has to be in place before
         // any top-level statement runs. Each script gets its own namespace dict, so the gate is
         // applied per script here rather than once for the language (as Lua can).
-        const bool preludeOk = exec (kPrelude, ns)
-                             && exec (extensionBoot().toRawUTF8(), ns)
-                             && exec (moduleGateCall().toRawUTF8(), ns);
-        const bool sourceOk  = preludeOk && exec (def.source.toRawUTF8(), ns);
+        //
+        // The prelude is the app's own code and the same for every script, so it is not on the
+        // script's clock. Compiling it is most of a load, and on a slow machine it took longer than
+        // the two seconds a script gets: the watchdog stopped it before the script had run a line
+        // ("prelude error: script stopped: it ran for more than 2 s"), as a Windows CI runner did.
+        // What a panel brings, its extension modules and its script, still runs on the clock.
+        bool preludeOk = exec (kPrelude, ns);
+        bool sourceOk = false;
+        {
+            const Entry timedEntry (*this); // module-level statements obey the execution budget
+            preludeOk = preludeOk
+                     && exec (extensionBoot().toRawUTF8(), ns)
+                     && exec (moduleGateCall().toRawUTF8(), ns);
+            sourceOk = preludeOk && exec (def.source.toRawUTF8(), ns);
+        }
         currentScriptId = {};
         if (! preludeOk) { onError (def.id, "prelude error: " + pyError()); Py_DECREF (ns); return false; }
         if (! sourceOk)  { onError (def.id, "load error: " + pyError()); Py_DECREF (ns); return false; }

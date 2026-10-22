@@ -8,9 +8,13 @@
   // have one.
   //
   // The selection is the editor's own, and every tab switch clears it. So the screen opens on the
-  // control selected when the script tab took over (selectionBeforeScriptTab); "Show on the panel"
-  // goes back to the panel with the control selected; and while the panel is visible beside this
-  // tab (a split), picking a control in either selects it in both.
+  // control selected when the script tab took over (selectionBeforeScriptTab), or on one picked since
+  // to be the panel's selection (panelSelectionPick). Opening a control here picks it, as the Values
+  // tab's Select does, and a pick made there opens it here: the panel selects it once its tab is in
+  // front, whichever way it gets there, and "Show on the panel" is the one-click way. The canvas is
+  // never on screen with this tab, so the selection is not set from here: it was, and the way back
+  // to the panel cleared it, and setting it let go of the display panel's colour and gradient
+  // targets, which ended an edit the Values tab had open in them.
   //
   // WHOLE FILE: the same screen shows the whole file, as Save would write it now, to read. The outline
   // is then its table of contents: a row goes to its lines, and the row of the line being read (the
@@ -18,11 +22,19 @@
   // that item to edit; "Whole file" from an item goes to its lines. The text is written when the mode
   // is chosen, and again once the panel (or its device session, or its scripts) has stopped changing
   // for a moment.
+  //
+  // VALUES: the script editor's dock shows its Values tab beside this screen too (ValuesSidebar.svelte,
+  // over this JSON by readJsonValues). This screen owns the text, the caret and the editor, so it
+  // reports them through `onvalues`, and draws the highlights it is given in `marks`. A colour or a
+  // gradient edited from a row is written into the item's text as typing would be, and so becomes the
+  // item's draft, applied as any other. Every field and the whole file are to read: rows only.
   import { onMount, tick, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import CodeEditor from './CodeEditor.svelte';
   import FileViewer from './FileViewer.svelte';
-  import { panels, selectedComponentId, selectComponent, selectionBeforeScriptTab, serializePanelDocument, setActivePanel } from '../stores/panels.js';
+  import {
+    panels, panelSelectionPick, pickPanelSelection, selectionBeforeScriptTab, serializePanelDocument, setActivePanel,
+  } from '../stores/panels.js';
   import {
     PANEL_SETTINGS_ITEM, panelFileOutline, controlFileText, controlFullText, panelSettingsFileText, panelSettingsFullText,
     wholeFileText, wholeFileItemAt,
@@ -31,8 +43,9 @@
   import { projectDeviceSession } from '../stores/projectDeviceSession.js';
   import { scriptDocuments } from '../stores/scriptWorkspace.js';
   import { findControlById } from '../utils/containment.js';
+  import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
 
-  let { panelId = null } = $props();
+  let { panelId = null, marks = [], onvalues = null, valuesOpen = false, ontogglevalues = null } = $props();
 
   let panel = $derived($panels.find((p) => p.id === panelId) ?? null);
   let outline = $derived(panel ? panelFileOutline(panel) : []);
@@ -89,17 +102,51 @@
   let dirty = $derived(Boolean(draft && current && draft.text !== current.text));
   let stale = $derived(Boolean(draft && current && draft.base !== current.text));
 
-  // Start on the control selected when the script tab opened, and follow the selection after.
+  // --- what the Values tab reads (see VALUES above) ---
+  let itemCaret = $state(0);
+  let itemFolded = $state(false);
+  let wholeStarts = $derived(whole ? lineStartsOf(whole.text) : [0]);
+  // In the whole file there is no caret: the line being read stands for one, at its first character.
+  let wholeCaret = $derived.by(() => {
+    if (!whole) return 0;
+    const at = wholeStarts[Math.max(0, Math.min(wholeStarts.length - 1, wholeLine - 1))] ?? 0;
+    return at + (/^[ \t]*/.exec(whole.text.slice(at, at + 400))?.[0].length ?? 0);
+  });
+  let valuesContext = $derived(item
+    ? { itemKind: item.kind, control: item.kind === 'control' ? item.node : null, panel }
+    : { panel });
+  let itemName = $derived(!item ? '' : item.kind === 'panel' ? 'panel settings' : (item.node._children.Core.name || item.node._children.Core.id));
+  $effect(() => {
+    if (!onvalues) return;
+    if (mode === 'whole') {
+      onvalues(whole ? {
+        source: whole.text, caret: wholeCaret, context: { panel }, editor: null, readOnly: true, folded: false,
+        docKey: 'whole', itemName: '', onreveal: (start) => viewer?.revealLine(lineAt(wholeStarts, start) + 1),
+      } : null);
+      return;
+    }
+    if (!item || !current) { onvalues(null); return; }
+    onvalues({
+      source: showAll ? fullText : text, caret: itemCaret, context: valuesContext, editor, readOnly: showAll,
+      folded: itemFolded, docKey: `${selectedKey}:${showAll}`, itemName, onreveal: null,
+    });
+  });
+  $effect(() => () => onvalues?.(null));
+
+  // Start on the control selected when the script tab opened, or the one picked since to be the
+  // panel's selection, and follow the picks after (the Values tab's Select).
+  const ofThisPanel = (entry) => entry != null && String(entry.panelId) === String(panelId);
   onMount(() => {
-    const remembered = get(selectionBeforeScriptTab);
-    if (remembered && remembered.panelId === panelId && rowsByKey.has(remembered.id)) openItem(remembered.id, { fromCanvas: true });
+    const picked = get(panelSelectionPick);
+    const remembered = ofThisPanel(picked) ? picked : get(selectionBeforeScriptTab);
+    if (ofThisPanel(remembered) && rowsByKey.has(remembered.id)) openItem(remembered.id, { picked: true });
   });
   $effect(() => {
-    const id = $selectedComponentId;
+    const pick = $panelSelectionPick;
     untrack(() => {
-      if (id == null || !rowsByKey.has(id)) return;
-      if (mode === 'whole') { if (hereKey !== id) goTo(id, { fromCanvas: true }); }
-      else if (id !== selectedKey) openItem(id, { fromCanvas: true });
+      if (!ofThisPanel(pick) || !rowsByKey.has(pick.id)) return;
+      if (mode === 'whole') { if (hereKey !== pick.id) goTo(pick.id, { picked: true }); }
+      else if (pick.id !== selectedKey) openItem(pick.id, { picked: true });
     });
   });
 
@@ -150,8 +197,8 @@
     return whole.controls.get(key)?.start ?? null;
   }
 
-  // In the whole file: go to a row's lines, and select it on the panel as opening it would.
-  function goTo(key, { fromCanvas = false } = {}) {
+  // In the whole file: go to a row's lines, and pick it for the panel as opening it would.
+  function goTo(key, { picked = false } = {}) {
     if (!whole) return;
     const line = lineOf(key);
     if (line == null) {
@@ -160,7 +207,7 @@
     }
     wholeNote = '';
     viewer?.revealLine(line);
-    if (!fromCanvas && rowsByKey.get(key)?.kind === 'control') selectComponent(key);
+    if (!picked && rowsByKey.get(key)?.kind === 'control') pickPanelSelection(panelId, key);
   }
 
   // Keep the row of what is being read open and in view.
@@ -176,13 +223,13 @@
   });
   let outlineEl = $state(null);
 
-  function openItem(key, { fromCanvas = false } = {}) {
+  function openItem(key, { picked = false } = {}) {
     selectedKey = key;
     messages = { errors: [], warnings: [], note: '' };
     const next = new Set(expanded);
     for (let row = rowsByKey.get(key); row?.parentId != null; row = rowsByKey.get(row.parentId)) next.add(row.parentId);
     expanded = next;
-    if (!fromCanvas && key !== PANEL_SETTINGS_ITEM) selectComponent(key);
+    if (!picked && key !== PANEL_SETTINGS_ITEM) pickPanelSelection(panelId, key);
   }
 
   // A row picked in the outline: opened as the item, or gone to in the whole file.
@@ -257,11 +304,11 @@
     };
   }
 
-  function showOnPanel() {
-    if (!panel || selectedKey === PANEL_SETTINGS_ITEM) return;
-    const id = selectedKey;
+  // The panel, with the control selected: picked, then selected as its tab comes to the front.
+  function showOnPanel(id = selectedKey) {
+    if (!panel || id == null || id === PANEL_SETTINGS_ITEM) return;
+    pickPanelSelection(panel.id, id);
     setActivePanel(panel.id);
-    selectComponent(id);
   }
 
   function undoName(key) {
@@ -393,8 +440,12 @@
             <span class="lang">Whole file · {whole.lineCount.toLocaleString('en')} lines</span>
             <span class="pf-here" data-testid="panel-file-here">{wholeHere()}</span>
             <span class="pf-actions">
+              {#if ontogglevalues}
+                <button class={['btn', 'ghost', valuesOpen && 'primary']} onclick={ontogglevalues}
+                  title="The values in the object being read (docked right)">Values</button>
+              {/if}
               {#if wholeAt?.kind === 'control'}
-                <button class="btn ghost" onclick={() => { setActivePanel(panel.id); selectComponent(wholeAt.id); }}
+                <button class="btn ghost" onclick={() => showOnPanel(wholeAt.id)}
                   title="Switch to the panel with this control selected">Show on the panel</button>
               {/if}
               <button class="btn primary" onclick={() => setMode('item')} disabled={wholeAt?.kind === 'section'}
@@ -425,8 +476,12 @@
             <label class="pf-toggle" title="Show every field, defaults included, to read">
               <input type="checkbox" checked={showAll} onchange={(e) => showAll = e.target.checked} /> Every field
             </label>
+            {#if ontogglevalues}
+              <button class={['btn', 'ghost', valuesOpen && 'primary']} onclick={ontogglevalues}
+                title="The values in the object the caret is in, and what each means (docked right)">Values</button>
+            {/if}
             {#if item.kind === 'control'}
-              <button class="btn ghost" onclick={showOnPanel} title="Switch to the panel with this control selected">Show on the panel</button>
+              <button class="btn ghost" onclick={() => showOnPanel()} title="Switch to the panel with this control selected">Show on the panel</button>
             {/if}
             <button class="btn ghost" onclick={revert} disabled={!draft || showAll} title="Back to what the panel has">Revert</button>
             <button class="btn primary" onclick={apply} disabled={!dirty || showAll} title="Apply to the panel (Ctrl+Enter)">Apply</button>
@@ -447,6 +502,9 @@
             <CodeEditor bind:this={editor} language="json" minHeight={320}
               value={showAll ? fullText : text}
               readOnly={showAll}
+              {marks}
+              oncaret={(line, col, offset) => itemCaret = offset ?? 0}
+              onfold={(f) => itemFolded = f}
               oninput={onInput}
               onrun={apply} />
           {/key}

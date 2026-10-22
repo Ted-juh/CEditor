@@ -54,7 +54,10 @@
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
   import { displayTabRequest } from './CE_Application/stores/displayTab.js';
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
-  import { showDisplayPanel, showPropertiesPanel, showTreePanel, togglePanelVisibility } from './CE_Application/stores/panelVisibility.js';
+  import {
+    displayPanelVisible, displayPanelWorkspace, setPanelVisibility, showDisplayPanel, showDisplayPanelInScript,
+    showPropertiesPanel, showTreePanel, togglePanelVisibility,
+  } from './CE_Application/stores/panelVisibility.js';
   import { clampDockHeight, maxDisplayDockHeight, resolveDockHeight } from './CE_Application/utils/displayDock.js';
   import { advanceWorkspaceSwap, workspaceSwapPhase } from './CE_Application/utils/chromeMotion.js';
   import { startPerfDebugStallWatch, syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
@@ -232,8 +235,11 @@
     viewportWidth,
     showTreePanel: $showTreePanel,
     showDisplayPanel: $showDisplayPanel,
+    showDisplayPanelInScript: $showDisplayPanelInScript,
     showPropertiesPanel: $showPropertiesPanel,
   }));
+  // Before anything below reads or writes the display switch, so 'display' means the workspace in front.
+  $effect.pre(() => { displayPanelWorkspace.set(workspaceChrome.workspaceKind === 'script' ? 'script' : 'panel'); });
   let componentDesignerWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'component');
   let scriptWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'script');
   let chromeWorkspaceActive = $derived(workspaceChrome.chromeWorkspaceActive);
@@ -263,7 +269,7 @@
   });
   $effect(() => {
     if ($colorTarget || $gradientTarget || $displayTabRequest) {
-      showDisplayPanel.set(true);
+      setPanelVisibility('display', true);
     }
   });
 
@@ -399,10 +405,11 @@
 
     <div class="icon-panel-area" style:padding-top={`${iconPanelTop}px`}>
       <IconPanel
-        showDisplayPanel={$showDisplayPanel}
+        showDisplayPanel={$displayPanelVisible}
         showPropertiesPanel={$showPropertiesPanel}
         showTreePanel={$showTreePanel}
         togglesEnabled={workspaceChrome.railTogglesEnabled}
+        displayToggleEnabled={workspaceChrome.railDisplayToggleEnabled}
         insertEnabled={workspaceChrome.railInsertEnabled}
         previewEnabled={workspaceChrome.workspaceKind === 'panel'}
         onToggleDisplay={() => togglePanelVisibility('display')}
