@@ -1513,22 +1513,32 @@ export const COMMANDS = [
   },
   {
     id: 'drawCircle', category: 'Drawing', signature: 'drawCircle(cx, cy, r)',
-    summary: 'Draw a circle of radius `r`, centred on (`cx`, `cy`).',
+    summary: 'Draw a circle.',
+    example: '`drawCircle(50, 50, 20)` draws a circle of radius 20 centred on (50, 50).',
+    notes: [
+      'Drawn with the fill and stroke in force.',
+      'Returns true; no control to draw on: rejected with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'cx', type: 'number', required: true, kind: 'number' }, { name: 'cy', type: 'number', required: true, kind: 'number' },
-      { name: 'r', type: 'number', required: true, kind: 'number' },
+      { name: 'cx', type: 'number', required: true, kind: 'number', summary: 'Centre, in pixels from the control\'s left.' }, { name: 'cy', type: 'number', required: true, kind: 'number', summary: 'Centre, in pixels from the control\'s top.' },
+      { name: 'r', type: 'number', required: true, kind: 'number', summary: 'Radius in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.circle(${1:20}, ${2:20}, ${3:8})$0', javascript: 'ce.draw.circle(${1:20}, ${2:20}, ${3:8});$0' },
   },
   {
     id: 'drawLine', category: 'Drawing', signature: 'drawLine(x1, y1, x2, y2)',
-    summary: 'Draw a straight line from (`x1`, `y1`) to (`x2`, `y2`) in the current stroke colour and width. The fill colour does not apply to lines.',
+    summary: 'Draw a straight line.',
+    example: '`drawLine(0, 0, 100, 50)` draws a line from (0, 0) to (100, 50).',
+    notes: [
+      'Drawn with the stroke in force; the fill does not apply.',
+      'Returns true; no control to draw on: rejected with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'x1', type: 'number', required: true, kind: 'number' }, { name: 'y1', type: 'number', required: true, kind: 'number' },
-      { name: 'x2', type: 'number', required: true, kind: 'number' }, { name: 'y2', type: 'number', required: true, kind: 'number' },
+      { name: 'x1', type: 'number', required: true, kind: 'number', summary: 'Start, in pixels from the control\'s left.' }, { name: 'y1', type: 'number', required: true, kind: 'number', summary: 'Start, in pixels from the control\'s top.' },
+      { name: 'x2', type: 'number', required: true, kind: 'number', summary: 'End, in pixels from the control\'s left.' }, { name: 'y2', type: 'number', required: true, kind: 'number', summary: 'End, in pixels from the control\'s top.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.line(${1:0}, ${2:0}, ${3:100}, ${4:0})$0', javascript: 'ce.draw.line(${1:0}, ${2:0}, ${3:100}, ${4:0});$0' },
@@ -1615,11 +1625,16 @@ export const COMMANDS = [
   },
   {
     id: 'drawEllipse', category: 'Drawing', signature: 'drawEllipse(cx, cy, rx, ry)',
-    summary: 'Draw an oval centred on (`cx`, `cy`), with horizontal radius `rx` and vertical radius `ry`.',
+    summary: 'Draw an ellipse.',
+    example: '`drawEllipse(50, 25, 40, 20)` draws an ellipse 80 wide and 40 tall centred on (50, 25).',
+    notes: [
+      'Drawn with the fill and stroke in force.',
+      'Returns true; no control to draw on: rejected with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'cx', type: 'number', required: true, kind: 'number' }, { name: 'cy', type: 'number', required: true, kind: 'number' },
-      { name: 'rx', type: 'number', required: true, kind: 'number' }, { name: 'ry', type: 'number', required: true, kind: 'number' },
+      { name: 'cx', type: 'number', required: true, kind: 'number', summary: 'Centre, in pixels from the control\'s left.' }, { name: 'cy', type: 'number', required: true, kind: 'number', summary: 'Centre, in pixels from the control\'s top.' },
+      { name: 'rx', type: 'number', required: true, kind: 'number', summary: 'Horizontal radius in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' }, { name: 'ry', type: 'number', required: true, kind: 'number', summary: 'Vertical radius in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
     ],
     scopes: 'any',
   },

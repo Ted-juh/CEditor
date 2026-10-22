@@ -536,6 +536,11 @@ Done, approved by the owner:
   rejected with an error (it drew at 0, or wrote no text, in silence), and a size or radius below
   0 is 0 with the one-time warning (it drew nothing in silence). The introduction says both.
 
+- `circle`, `line`, `ellipse`: approved as one table (no decisions left: `rect`'s two rules cover
+  them). One sentence, an example, each coordinate "in pixels from the control's left / top", each
+  radius with `Range: ≥ 0.` / `< 0, or invalid: 0.`, and the two notes; `line`'s first note says
+  the fill does not apply.
+
 Left, in the order of the dump: `circle`, `line`, `path`, `arc`,
 `gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
 `points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
@@ -569,7 +574,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18, `clear`, `fill`, `stroke` and `rect` done |
+| ce.draw | 27 | 18; `clear`, `fill`, `stroke`, `rect`, `circle`, `line` and `ellipse` done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -627,7 +632,7 @@ not open a pull request unless asked.
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
 on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill,
-stroke, rect); continue with ce.draw.circle, in technical English, schematic, one rule per line, with ranges, as its table
+stroke, rect, circle, line, ellipse); continue with ce.draw.arc, in technical English, schematic, one rule per line, with ranges, as its table
 says, showing every parameter and option of the command in its item. Check each command at its
 edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.

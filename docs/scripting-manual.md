@@ -3537,7 +3537,18 @@ ce.draw.rect(0, 0, 40, 20);
 
 #### `ce.draw.circle(cx, cy, r)`
 
-Draw a circle of radius `r`, centred on (`cx`, `cy`).
+Draw a circle.
+
+Example: `drawCircle(50, 50, 20)` draws a circle of radius 20 centred on (50, 50).
+
+- `cx` (number, required): Centre, in pixels from the control's left.
+- `cy` (number, required): Centre, in pixels from the control's top.
+- `r` (number, required): Radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawCircle`.*
 
@@ -3552,7 +3563,19 @@ ce.draw.circle(20, 20, 8);
 
 #### `ce.draw.line(x1, y1, x2, y2)`
 
-Draw a straight line from (`x1`, `y1`) to (`x2`, `y2`) in the current stroke colour and width. The fill colour does not apply to lines.
+Draw a straight line.
+
+Example: `drawLine(0, 0, 100, 50)` draws a line from (0, 0) to (100, 50).
+
+- `x1` (number, required): Start, in pixels from the control's left.
+- `y1` (number, required): Start, in pixels from the control's top.
+- `x2` (number, required): End, in pixels from the control's left.
+- `y2` (number, required): End, in pixels from the control's top.
+
+Good to know:
+
+- Drawn with the stroke in force; the fill does not apply.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawLine`.*
 
@@ -3651,7 +3674,19 @@ ce.draw.transform({ rotate: 135, cx: w / 2, cy: h / 2 });
 
 #### `ce.draw.ellipse(cx, cy, rx, ry)`
 
-Draw an oval centred on (`cx`, `cy`), with horizontal radius `rx` and vertical radius `ry`.
+Draw an ellipse.
+
+Example: `drawEllipse(50, 25, 40, 20)` draws an ellipse 80 wide and 40 tall centred on (50, 25).
+
+- `cx` (number, required): Centre, in pixels from the control's left.
+- `cy` (number, required): Centre, in pixels from the control's top.
+- `rx` (number, required): Horizontal radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `ry` (number, required): Vertical radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawEllipse`.*
 
