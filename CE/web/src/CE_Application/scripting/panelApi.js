@@ -1455,9 +1455,15 @@ export const COMMANDS = [
   },
   {
     id: 'drawFill', category: 'Drawing', signature: 'drawFill(colour)',
-    summary: 'Set the fill colour for the shapes drawn after this: the panel\'s own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web\'s way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.',
+    summary: 'Set the fill colour for the shapes drawn after it.',
+    example: '`drawFill("#5B9BD5")` fills the shapes drawn after it with that blue.',
+    notes: [
+      'Applies to everything drawn after it; each onDraw starts with no fill and no stroke.',
+      'Returns no value.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'colour', type: 'string', required: false, kind: 'colour' }],
+    params: [{ name: 'colour', type: 'string', required: false, kind: 'colour',
+      summary: 'A colour (the table in the introduction), or a gradient from `ce.draw.gradient()`.\nLeft out, "" or "none": no fill.\nNot a colour: rejected with a console error; the fill stays as it was.' }],
     scopes: 'any',
     snippet: { lua: 'ce.draw.fill("${1:#5B9BD5}")$0', javascript: 'ce.draw.fill("${1:#5B9BD5}");$0' },
   },

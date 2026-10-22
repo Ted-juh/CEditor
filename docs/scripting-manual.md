@@ -3409,6 +3409,19 @@ Drawing your own graphics on top of a control, from its script's onDraw. Set the
 - An option with a wrong value: a console warning, the first time only, and the fallback in its row.
 - A required value that is missing or of the wrong type: rejected with a console error.
 
+**Colours that fill, stroke and gradient read**
+
+| Written as | Example |
+|---|---|
+| Six hex digits, the panel's form | "5B9BD5" |
+| Eight hex digits, alpha first, the panel's form | "805B9BD5" (drawn with that alpha) |
+| "#" with 3, 4, 6 or 8 digits, alpha last | "#F80", "#5B9BD580" |
+| A CSS colour name, in any case | "red", "steelblue", "transparent" |
+| rgb(), rgba(), hsl(), hsla() | "rgb(91, 155, 213)" |
+| A gradient from `ce.draw.gradient()` | |
+
+Not accepted: a number, three digits without "#", anything else: rejected with a console error; the colour in force stays.
+
 Everything in this chapter needs the panel window. With the window closed these commands do nothing and write a note to the log.
 
 #### `ce.draw.clear([target])`
@@ -3437,7 +3450,16 @@ ce.draw.clear();
 
 #### `ce.draw.fill(colour)`
 
-Set the fill colour for the shapes drawn after this: the panel's own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web's way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.
+Set the fill colour for the shapes drawn after it.
+
+Example: `drawFill("#5B9BD5")` fills the shapes drawn after it with that blue.
+
+- `colour` (colour, optional): A colour (the table in the introduction), or a gradient from `ce.draw.gradient()`.<br>Left out, "" or "none": no fill.<br>Not a colour: rejected with a console error; the fill stays as it was.
+
+Good to know:
+
+- Applies to everything drawn after it; each onDraw starts with no fill and no stroke.
+- Returns no value.
 
 *Short name: `drawFill`.*
 

@@ -515,7 +515,13 @@ Done, approved by the owner:
   and `stroke`'s `dash`, `cap` and `join` with a wrong value are warnings, not errors, since the
   default is drawn: an error always means the call did nothing (`drawDash.js` severities).
 
-Left, in the order of the dump: `fill`, `stroke`, `rect`, `circle`, `line`, `path`, `arc`,
+- `fill`: "Set the fill colour for the shapes drawn after it.", the example, `colour` (a colour
+  or a gradient; left out, "" or "none": no fill; not a colour: rejected, the fill stays), two
+  notes. The colour forms every drawing command reads are one table in the introduction, shared
+  by `fill`, `stroke` and `gradient`; the eight-digit panel form keeps its alpha here, unlike in
+  `ce.math`.
+
+Left, in the order of the dump: `stroke`, `rect`, `circle`, `line`, `path`, `arc`,
 `gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
 `points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
 if it is declared. What the probe found, for the items to come: `rect`, `circle`, `ellipse`,
@@ -548,7 +554,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18, `clear` done |
+| ce.draw | 27 | 18, `clear` and `fill` done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -605,8 +611,8 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear); continue
-with ce.draw.fill, in technical English, schematic, one rule per line, with ranges, as its table
+on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill);
+continue with ce.draw.stroke, in technical English, schematic, one rule per line, with ranges, as its table
 says, showing every parameter and option of the command in its item. Check each command at its
 edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
