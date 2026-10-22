@@ -375,13 +375,20 @@ function __armTimer(key, ms) {
 }
 function startTimer(id, ms) {
   var key = String(id === undefined || id === null ? "" : id);
-  if (!key) return undefined;
+  if (!key) {
+    logError("ce.time.startTimer: no id was given, so no timer was started.");
+    return undefined;
+  }
   if (__timeRefused('ce.time.startTimer("' + key + '")', ms, "milliseconds", "interval", true, "no timer was started"))
     return undefined;
   return __armTimer(key, ms);
 }
 function stopTimer(id) {
   var key = String(id === undefined || id === null ? "" : id);
+  if (!key) {
+    logError("ce.time.stopTimer: no id was given, so nothing was stopped.");
+    return undefined;
+  }
   delete __syncFollow[key];
   delete __timerIds[key];
   return __api.stopTimer(key);
@@ -2455,6 +2462,7 @@ function isPlaying() { return __transport().playing === true; }
 // gave nothing here, where the WebView used the tempo, and "fast" gave NaN.
 function beatsToMs(beats, bpm) {
   var b = __tread("beatsToMs", "beats", beats);
+  if (b === undefined) return undefined;
   var rate = __tread("beatsToMs", "bpm", bpm);
   if (rate === undefined) rate = tempo();
   if (!rate || rate <= 0) return null;
@@ -2462,6 +2470,7 @@ function beatsToMs(beats, bpm) {
 }
 function msToBeats(ms, bpm) {
   var m = __tread("msToBeats", "ms", ms);
+  if (m === undefined) return undefined;
   var rate = __tread("msToBeats", "bpm", bpm);
   if (rate === undefined) rate = tempo();
   if (!rate || rate <= 0) return null;
@@ -2474,11 +2483,15 @@ function msToBeats(ms, bpm) {
 // that is permanently at the wrong rate.
 function syncTimer(id, beats, opts) {
   var key = String(id === undefined || id === null ? "" : id);
+  if (!key) {
+    logError("ce.time.syncTimer: no id was given, so no timer was started.");
+    return;
+  }
   var length = __beatsOf('ce.time.syncTimer("' + key + '")', beats, true, "no timer was started");
   if (length === undefined) return;
   var ms = beatsToMs(length);
   if (ms === null) {
-    log("syncTimer(\"" + id + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.");
+    logError('ce.time.syncTimer("' + key + '"): no tempo is being reported, so no timer was started. Use startTimer with a millisecond interval, or wait for onTransport.');
     return;
   }
   __armTimer(key, ms);                                    // clears any previous follow…
@@ -2516,7 +2529,7 @@ on("*", "onTransport", function (t) {
 // are the running script's own (__CE_OWN).
 function after(ms, fn) {
   if (typeof fn !== "function") {
-    log("after(ms, fn) needs a function to run — nothing was scheduled");
+    logError("ce.time.after: fn is " + __shownValue(fn) + ", not a function, so nothing was scheduled.");
     return undefined;
   }
   if (__timeRefused("ce.time.after", ms, "milliseconds", "delay", false, "nothing was scheduled")) return undefined;
@@ -2547,11 +2560,15 @@ on("*", "onTimer", function (info) {
 // had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 // fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 function afterBeats(beats, fn) {
+  if (typeof fn !== "function") {
+    logError("ce.time.afterBeats: fn is " + __shownValue(fn) + ", not a function, so nothing was scheduled.");
+    return undefined;
+  }
   var length = __beatsOf("ce.time.afterBeats", beats, false, "nothing was scheduled");
   if (length === undefined) return undefined;
   var ms = beatsToMs(length);
   if (ms === null) {
-    log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.");
+    logError("ce.time.afterBeats: no tempo is being reported, so nothing was scheduled. Use after() with milliseconds, or wait for onTransport.");
     return undefined;
   }
   return after(ms, fn);
@@ -2570,12 +2587,14 @@ function __tclamp(v, lo, hi) { var n = __tnum(v, lo); return n < lo ? lo : (n > 
 // argument's default; each gave an answer for a number nobody wrote, without a word. For each
 // argument: what is used for one that is not a number, the least and the most it is read as, and
 // whether it is rounded first; a bpm falls back to the transport's tempo.
+// Each argument: [fallback, min, max, round, optional]. An argument the helper cannot do without,
+// left out, is rejected: it was the default without a word (position() was bar 1).
 var __TIME_NUMBERS = {
-  barBeatAt: ["ce.time.position", { beats: [0, 0], beatsPerBar: [4, 1] }],
+  barBeatAt: ["ce.time.position", { beats: [0, 0], beatsPerBar: [4, 1, undefined, false, true] }],
   stepAt: ["ce.time.step", { beats: [0, 0] }],
-  stepsBetween: ["ce.time.steps", { from: [0, 0], to: [0, 0], max: [16, 1, undefined, true] }],
+  stepsBetween: ["ce.time.steps", { from: [0, 0], to: [0, 0], max: [16, 1, undefined, true, true] }],
   swingOffset: ["ce.time.swing", { step: [0], amount: [0, 0, 1] }],
-  cycleAt: ["ce.time.cycle", { beats: [0, 0], bars: [0.25, 0.25, 64], beatsPerBar: [4, 1] }],
+  cycleAt: ["ce.time.cycle", { beats: [0, 0], bars: [0.25, 0.25, 64], beatsPerBar: [4, 1, undefined, false, true] }],
   loopedBeats: ["ce.time.looped", { beats: [0, 0], startBeats: [0, 0], lengthBeats: [0.01, 0.01] }],
   beatsToMs: ["ce.time.beatsToMs", { beats: [0], bpm: ["tempo"] }],
   msToBeats: ["ce.time.msToBeats", { ms: [0], bpm: ["tempo"] }]
@@ -2583,7 +2602,11 @@ var __TIME_NUMBERS = {
 var __timeWarned = {};
 function __tread(fn, name, v) {
   var helper = __TIME_NUMBERS[fn], s = helper[1][name], tempo = s[0] === "tempo";
-  if (v === undefined || v === null) return tempo ? undefined : s[0];
+  if (v === undefined || v === null) {
+    if (tempo || s[4]) return tempo ? undefined : s[0];
+    logError(helper[0] + ": " + name + " was not given, so there is no answer.");
+    return undefined;
+  }
   var read = __realNumber(v), n, why, used;
   if (tempo) {
     if (read !== undefined && read > 0) return read;
@@ -2641,6 +2664,7 @@ function divisionNames() {
 // beats count from 1 as musicians do; `text` is the Transport component's own readout.
 function barBeatAt(beats, beatsPerBar) {
   var b = __tread("barBeatAt", "beats", beats);
+  if (b === undefined) return undefined;
   var perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar);
   var bar = Math.floor(b / perBar) + 1;
   var beat = Math.floor(b % perBar) + 1;
@@ -2653,7 +2677,8 @@ function barBeatAt(beats, beatsPerBar) {
 function stepAt(beats, division) {
   var per = __division("ce.time.step", division);
   if (per === undefined) return undefined;
-  return Math.floor(__tread("stepAt", "beats", beats) / per);
+  var b = __tread("stepAt", "beats", beats);
+  return b === undefined ? undefined : Math.floor(b / per);
 }
 
 // The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
@@ -2664,7 +2689,9 @@ function stepsBetween(fromBeats, toBeats, division, maxSteps) {
   var per = __division("ce.time.steps", division);
   if (per === undefined) return undefined;
   var from = __tread("stepsBetween", "from", fromBeats);
+  if (from === undefined) return undefined;
   var to = __tread("stepsBetween", "to", toBeats);
+  if (to === undefined) return undefined;
   var cap = __tread("stepsBetween", "max", maxSteps);
   if (to <= from) return { steps: [], dropped: 0 };
   var first = Math.floor(from / per) + 1;
@@ -2683,7 +2710,9 @@ function swingOffset(step, amount, division) {
   var per = __division("ce.time.swing", division);
   if (per === undefined) return undefined;
   var n = __tread("swingOffset", "step", step);
+  if (n === undefined) return undefined;
   var s = __tread("swingOffset", "amount", amount);
+  if (s === undefined) return undefined;
   return (Math.abs(Math.round(n)) % 2 === 1) ? s * 0.5 * per : 0;
 }
 
@@ -2691,7 +2720,9 @@ function swingOffset(step, amount, division) {
 // never accumulated, so a cycle running for an hour is still exactly on the bar line.
 function cycleAt(beats, bars, beatsPerBar) {
   var b = __tread("cycleAt", "beats", beats);
+  if (b === undefined) return undefined;
   var n = __tread("cycleAt", "bars", bars);
+  if (n === undefined) return undefined;
   var len = n * __tread("cycleAt", "beatsPerBar", beatsPerBar);
   if (len < 0.01) len = 0.01;
   return { phase: (((b / len) % 1) + 1) % 1, count: Math.floor(b / len), length: len };
@@ -2702,8 +2733,11 @@ function cycleAt(beats, bars, beatsPerBar) {
 // reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
 function loopedBeats(beats, startBeats, lengthBeats) {
   var b = __tread("loopedBeats", "beats", beats);
+  if (b === undefined) return undefined;
   var st = __tread("loopedBeats", "startBeats", startBeats);
+  if (st === undefined) return undefined;
   var len = __tread("loopedBeats", "lengthBeats", lengthBeats);
+  if (len === undefined) return undefined;
   if (b < st) return { beats: b, pass: -1 };
   return { beats: st + ((b - st) % len), pass: Math.floor((b - st) / len) };
 }
@@ -2711,12 +2745,45 @@ function loopedBeats(beats, startBeats, lengthBeats) {
 // Tempo from tap times, in the milliseconds now() reports. Taps more than resetMs apart start a NEW
 // measurement rather than averaging across the pause — the thing every hand-rolled tap gets wrong,
 // because the first tap after a break poisons the average.
+// The times, and clockTempo's gaps, are the numbers above 0 in a list, with one that is not said
+// once; a list that is not one, or left out, is refused. Each was done in silence, and a list that
+// was not one gave no result as if the taps were too few.
+function __timeList(verb, name, what, value) {
+  if (value === undefined || value === null) {
+    logError(verb + ": " + name + " was not given, so there is no answer.");
+    return undefined;
+  }
+  if (typeof value !== "object") {
+    logError(verb + ": " + name + " is " + __shownValue(value) + ", not a list, so there is no answer.");
+    return undefined;
+  }
+  var items = Array.isArray(value) ? value : Object.keys(value).map(function (k) { return value[k]; });
+  var out = [];
+  for (var i = 0; i < items.length; i++) {
+    var n = __realNumber(items[i]);
+    if (n !== undefined && n > 0) { out.push(n); continue; }
+    var key = verb + " " + name;
+    if (!__timeWarned[key]) {
+      __timeWarned[key] = true;
+      logWarn(verb + ": " + __shownValue(items[i]) + " at position " + (i + 1) + " of " + name + " is not " + what
+        + " above 0, so it was left out. This is said only the first time.");
+    }
+  }
+  return out;
+}
 function tapTempo(timestamps, resetMs) {
-  if (!timestamps || timestamps.length === undefined) return undefined;
-  var list = [], i;
-  for (i = 0; i < timestamps.length; i++) { var v = __tnum(timestamps[i], 0); if (v > 0) list.push(v); }
+  var list = __timeList("ce.time.tap", "times", "a tap time in milliseconds", timestamps);
+  if (list === undefined) return undefined;
+  // A pause that is not a number above 0 gave nothing (every gap was "after a pause") or 2000, in
+  // silence; it is 2000, said once.
+  var reset = __realNumber(resetMs);
+  if (resetMs !== undefined && resetMs !== null && !(reset > 0) && !__timeWarned["tapTempo resetMs"]) {
+    __timeWarned["tapTempo resetMs"] = true;
+    logWarn("ce.time.tap: resetMs is " + __shownValue(resetMs) + ", which is " + (reset === undefined ? "not a number" : "not above 0")
+      + ", so 2000 was used. This is said only the first time.");
+  }
   if (list.length < 2) return undefined;
-  var limit = __tnum(resetMs, 2000), sum = 0, count = 0;
+  var limit = reset > 0 ? reset : 2000, sum = 0, count = 0, i;
   for (i = list.length - 1; i > 0; i--) {
     var gap = list[i] - list[i - 1];
     if (gap <= 0 || gap > limit) break;
@@ -2730,10 +2797,8 @@ function tapTempo(timestamps, resetMs) {
 // mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse
 // than a slightly stale one.
 function clockTempo(intervalsMs) {
-  if (!intervalsMs || intervalsMs.length === undefined) return undefined;
-  var list = [];
-  for (var i = 0; i < intervalsMs.length; i++) { var v = __tnum(intervalsMs[i], 0); if (v > 0) list.push(v); }
-  if (!list.length) return undefined;
+  var list = __timeList("ce.time.clockTempo", "intervalsMs", "a gap in milliseconds", intervalsMs);
+  if (list === undefined || !list.length) return undefined;
   list.sort(function (a, b) { return a - b; });
   var mid = Math.floor(list.length / 2);
   var median = (list.length % 2) ? list[mid] : (list[mid - 1] + list[mid]) / 2;

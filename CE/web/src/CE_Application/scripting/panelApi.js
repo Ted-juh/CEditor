@@ -827,20 +827,31 @@ export const COMMANDS = [
   // yours — start with the same id twice and the second call re-times the existing timer.
   {
     id: 'startTimer', category: 'Events & Flow', signature: 'startTimer(id, ms)',
-    summary: 'Start a repeating timer called `id` that fires every `ms` milliseconds. Each time it fires, your `onTimer` handler runs with `info.id` set to that name, until you call `ce.time.stopTimer()` with the same `id`. Starting an `id` that is already running restarts it with the new interval, and turns a `ce.time.syncTimer()` timer of that name into a plain millisecond one. `ms` must be a number above 0: a missing interval, text (even "250"), 0 or a negative number starts no timer and writes a message.',
+    summary: 'Start a repeating timer.',
+    example: '`startTimer("blink", 250)` runs onTimer with info.id "blink" every 250 ms.',
+    notes: [
+      'Runs onTimer each time, until `ce.time.stopTimer()` with the same id.',
+      'An id already running: restarted with the new interval; a `ce.time.syncTimer()` of that name becomes a millisecond one.',
+      'Returns no value; rejected with a console error: no timer is started.',
+    ],
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
+      { name: 'id', type: 'string', required: true, kind: 'sharedName', summary: 'The timer\'s name, as onTimer\'s info.id reports it.\nLeft out, or "": rejected with a console error.' },
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Interval in milliseconds.\nRange: > 0.\nText, even "250", ≤ 0, or invalid: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: { lua: 'startTimer("${1:id}", ${2:250})$0', javascript: 'startTimer("${1:id}", ${2:250})$0' },
   },
   {
     id: 'after', category: 'Events & Flow', signature: 'after(ms, fn) -> id',
-    summary: 'Run `fn` once, `ms` milliseconds from now. Returns an id you can pass to `ce.time.stopTimer()` to cancel it before it runs. 0 runs it as soon as the handler that asked has returned. A missing delay, text (even "1000") or a negative number schedules nothing and writes a message.',
+    summary: 'Run a function once, after a delay.',
+    example: '`after(500, function() set("gate", 0) end)` sets gate to 0 half a second from now.',
+    notes: [
+      'Returns an id for `ce.time.stopTimer()`, which cancels it before it runs.',
+      'Rejected with a console error: nothing is scheduled, no result.',
+    ],
     params: [
-      { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Delay in milliseconds.\nRange: ≥ 0.\n0: as soon as the handler has returned.\nText, even "1000", < 0, or invalid: rejected with a console error.' },
+      { name: 'fn', type: 'function', required: true, summary: 'The function to run.\nNot a function: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -850,8 +861,14 @@ export const COMMANDS = [
   },
   {
     id: 'stopTimer', category: 'Events & Flow', signature: 'stopTimer(id)',
-    summary: 'Stop a timer started with `ce.time.startTimer()` or `ce.time.syncTimer()`, or cancel a `ce.time.after()` before it runs. Stopping an id that is not running does nothing and is not an error.',
-    params: [{ name: 'id', type: 'string', required: true, kind: 'sharedName' }],
+    summary: 'Stop a timer, or cancel a one-off before it runs.',
+    example: '`stopTimer("blink")` stops the timer called blink.',
+    notes: [
+      'Stops a `ce.time.startTimer()` or `ce.time.syncTimer()` timer, or cancels an `after()` or `afterBeats()` by the id it returned.',
+      'An id that is not running: nothing happens, and nothing is said.',
+      'Returns no value.',
+    ],
+    params: [{ name: 'id', type: 'string', required: true, kind: 'sharedName', summary: 'The timer\'s name, or the id `after()` returned.\nLeft out, or "": rejected with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'stopTimer("${1:id}")$0', javascript: 'stopTimer("${1:id}")$0' },
   },
@@ -2578,19 +2595,33 @@ export const COMMANDS = [
      host. */
   {
     id: 'tempo', category: 'Time', signature: 'tempo()',
-    summary: 'Return the current tempo in beats per minute, or nothing if nothing is supplying a tempo. Read it rather than assuming 120.',
+    summary: 'Read the tempo in beats per minute.',
+    example: '`tempo()` gives 120 at 120 BPM.',
+    notes: [
+      'Returns the tempo; nothing supplying one: no result. Read it rather than assuming 120.',
+    ],
     scopes: 'any',
     snippet: { lua: 'local bpm = tempo() or 120$0', javascript: 'const bpm = tempo() ?? 120;$0' },
   },
   {
     id: 'isPlaying', category: 'Time', signature: 'isPlaying()',
-    summary: 'Return true while the transport is running. Returns false when it is stopped, and also when nothing is supplying a transport at all.',
+    summary: 'Read whether the transport is running.',
+    example: '`ce.time.playing()` gives true while the transport runs.',
+    notes: [
+      'Returns true while running; stopped, or nothing supplying a transport: false.',
+    ],
     scopes: 'any',
     snippet: { lua: 'if isPlaying() then $0 end', javascript: 'if (isPlaying()) { $0 }' },
   },
   {
     id: 'transportInfo', category: 'Time', signature: 'transportInfo()',
-    summary: 'Return everything about the transport in one table: `playing`, `bpm`, `beats`, `bar`, `beat`, `beatsPerBar`, `source` and `valid`. `beats` counts quarter notes from the very start (bar 1, beat 1), and `bar` and `beat` count from 1, as musicians do. `source` says what is driving the clock. If `valid` is false, nothing is supplying a position and the other values are only defaults, not real readings.',
+    summary: 'Read the whole transport state in one table.',
+    example: '`ce.time.transport().bar` gives the current bar, counted from 1.',
+    notes: [
+      'Returns { playing, bpm, beats, bar, beat, beatsPerBar, source, valid }.',
+      '`beats` counts quarter notes from the start (bar 1, beat 1); `bar` and `beat` count from 1.',
+      '`source` names what drives the clock. `valid` false: nothing supplies a position, and the rest are defaults.',
+    ],
     scopes: 'any',
     snippet: {
       lua: 'local t = ce.time.transport()\nif t.valid then log("bar " .. t.bar) end$0',
@@ -2599,35 +2630,50 @@ export const COMMANDS = [
   },
   {
     id: 'beatsToMs', category: 'Time', signature: 'beatsToMs(beats [, bpm])',
-    summary: 'Convert a number of beats to milliseconds at the current tempo, or at `bpm` if you give one. Returns nothing if there is no tempo to work from.',
+    summary: 'Convert beats to milliseconds.',
+    example: '`beatsToMs(0.75)` gives 375 at 120 BPM.',
+    notes: [
+      'Returns milliseconds; no tempo to work from: no result.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'beats', type: 'number', required: true, unit: 'beats' },
-      { name: 'bpm', type: 'number', required: false, unit: 'BPM' },
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'Length in beats (quarter notes).\nInvalid: 0.' },
+      { name: 'bpm', type: 'number', required: false, unit: 'BPM', summary: 'Tempo to convert at.\nRange: > 0.\nLeft out, ≤ 0, or invalid: the transport\'s tempo.' },
     ],
     scopes: 'any',
     snippet: { lua: 'set("delayTime", beatsToMs(0.75))$0', javascript: 'set("delayTime", beatsToMs(0.75));$0' },
   },
   {
     id: 'msToBeats', category: 'Time', signature: 'msToBeats(ms [, bpm])',
-    summary: 'Convert a length of time in milliseconds to beats (quarter notes) at the current tempo, or at `bpm` if you give one — the reverse of `ce.time.beatsToMs()`. Returns nothing if there is no tempo to work from.',
+    summary: 'Convert milliseconds to beats.',
+    example: '`msToBeats(500)` gives 1 at 120 BPM.',
+    notes: [
+      'Returns beats (quarter notes); no tempo to work from: no result.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'ms', type: 'number', required: true, unit: 'milliseconds' },
-      { name: 'bpm', type: 'number', required: false, unit: 'BPM' },
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Length in milliseconds.\nInvalid: 0.' },
+      { name: 'bpm', type: 'number', required: false, unit: 'BPM', summary: 'Tempo to convert at.\nRange: > 0.\nLeft out, ≤ 0, or invalid: the transport\'s tempo.' },
     ],
     scopes: 'any',
     snippet: { lua: 'local beats = msToBeats(${1:500})$0', javascript: 'const beats = msToBeats(${1:500});$0' },
   },
   {
     id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
-    summary: 'Start a repeating timer whose interval is measured in beats rather than milliseconds: `ce.time.syncTimer("step", 0.25)` fires every sixteenth note. It works like `ce.time.startTimer()` — your `onTimer` handler runs each time, and `ce.time.stopTimer()` stops it. When the tempo changes, the interval changes with it; the timer restarts from that moment, so it does not stay lined up with its earlier ticks. Set `opts.follow` to false to keep the interval fixed at the tempo it started with. `beats` may also be a division\'s name, such as "1/16" or "1/8T". Beats that are not above 0, a name that is not a division, no `beats` at all or no tempo to work from start no timer and write a message.',
+    summary: 'Start a repeating timer with an interval in beats.',
+    example: '`syncTimer("step", 0.25)` runs onTimer with info.id "step" every sixteenth note.',
+    notes: [
+      'Works as `ce.time.startTimer()`: onTimer each time, `ce.time.stopTimer()` stops it.',
+      'A tempo change changes the interval, and restarts the timer from that moment.',
+      'Returns no value; rejected with a console error, or no tempo to work from: no timer is started.',
+    ],
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'beats', type: 'number or division', required: true, kind: 'division' },
-      // Typed 'table' with no fields, so the one option the summary describes was unchecked.
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'id', type: 'string', required: true, kind: 'sharedName', summary: 'The timer\'s name, as onTimer\'s info.id reports it.\nLeft out, or "": rejected with a console error.' },
+      { name: 'beats', type: 'number or division', required: true, kind: 'division',
+        summary: 'Interval in beats, or a division name such as "1/16" or "1/8T" (any case).\nRange: > 0.\nText that is not a division, ≤ 0, or invalid: rejected with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: the interval follows the tempo.', fields: optionFields([
         { name: 'follow', type: 'true or false', default: 'true',
-          summary: 'Change the interval when the tempo changes. false keeps the interval the tempo '
-            + 'gave it when it started.' },
+          summary: 'Follow the tempo: the interval changes with it.\nfalse: the interval stays as the tempo at the start gave it.\nInvalid: true.' },
       ]) },
     ],
     scopes: 'any',
@@ -2635,10 +2681,16 @@ export const COMMANDS = [
   },
   {
     id: 'afterBeats', category: 'Time', signature: 'afterBeats(beats, fn) -> id',
-    summary: 'Run `fn` once after a number of beats: `ce.time.afterBeats(2, fn)` runs it two beats from now. The delay is worked out from the tempo at the moment you call it, so a later tempo change does not move it. Returns an id you can pass to `ce.time.stopTimer()` to cancel. `beats` may also be a division\'s name, such as "1/4", read as `ce.time.division()` reads it; 0 runs `fn` as soon as the handler has returned. A negative number, a name that is not a division, or no delay at all schedules nothing and writes a message. If there is no tempo to work from, nothing is scheduled — `fn` does not run straight away either — and a note is written to the script console.',
+    summary: 'Run a function once, after a number of beats.',
+    example: '`afterBeats(2, fn)` runs fn two beats from now.',
+    notes: [
+      'The delay is worked out from the tempo at the call; a later tempo change does not move it.',
+      'Returns an id for `ce.time.stopTimer()`; rejected with a console error, or no tempo to work from: nothing is scheduled, no result.',
+    ],
     params: [
-      { name: 'beats', type: 'number', required: true, kind: 'division' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'beats', type: 'number or division', required: true, kind: 'division',
+        summary: 'Delay in beats, or a division name such as "1/4" (any case).\nRange: ≥ 0.\n0: as soon as the handler has returned.\nText that is not a division, < 0, or invalid: rejected with a console error.' },
+      { name: 'fn', type: 'function', required: true, summary: 'The function to run.\nNot a function: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2648,7 +2700,12 @@ export const COMMANDS = [
   },
   {
     id: 'runningTimers', category: 'Time', signature: 'runningTimers() -> list',
-    summary: 'List the ids of the repeating timers that are running — the ones started with `ce.time.startTimer()` or `ce.time.syncTimer()` — in sorted order. One-off timers from `ce.time.after()` and `ce.time.afterBeats()` are not listed; you already have their ids from when you started them.',
+    summary: 'List the repeating timers that are running.',
+    example: '`ce.time.timers()` gives {"blink", "step"} with those two running.',
+    notes: [
+      'Returns the ids of `ce.time.startTimer()` and `ce.time.syncTimer()` timers, sorted.',
+      'One-off timers from `after()` and `afterBeats()` are not listed: their ids were returned when they were started.',
+    ],
     scopes: 'any',
     snippet: { lua: 'for _, id in ipairs(runningTimers()) do log(id) end$0', javascript: 'for (const id of runningTimers()) log(id);$0' },
   },
@@ -2665,9 +2722,10 @@ export const COMMANDS = [
      component's grid are the same grid. */
   {
     id: 'nowMs', category: 'Time', signature: 'nowMs() -> number',
-    summary: 'A clock in milliseconds, for measuring how long something takes.',
+    summary: 'Read a clock in milliseconds, for measuring how long something takes.',
+    example: '`ce.time.now() - t0` gives the milliseconds since t0 was read.',
     notes: [
-      'One reading alone means nothing: subtract an earlier reading to find how much time has passed.',
+      'Returns milliseconds. One reading alone means nothing: subtract an earlier reading to find how much time has passed.',
       'It is not the time of day or a date, and it does not jump when the computer\'s clock is changed.',
     ],
     scopes: 'any',
@@ -2675,90 +2733,146 @@ export const COMMANDS = [
   },
   {
     id: 'beatsPerDivision', category: 'Time', signature: 'beatsPerDivision(name) -> number',
-    summary: 'Return how many beats a note division lasts: "1/16" is 0.25, "1/8T" is 0.333… and "1/4D" is 1.5. These are the same names the sequencer components use for their division settings, and capitals do not matter ("1/8t" is "1/8T"). A name it does not recognise returns nothing and writes a message listing the divisions.',
-    params: [{ name: 'name', type: 'string', required: true, kind: 'division' }],
+    summary: 'Convert a note division to beats.',
+    example: '`ce.time.division("1/16")` gives 0.25.',
+    notes: [
+      'The names the sequencer components use: "1/1" to "1/32", "D" dotted, "T" triplet; any case.',
+      'Returns beats; not a division: rejected with a console error, no result.',
+    ],
+    params: [{ name: 'name', type: 'string', required: true, kind: 'division', summary: 'A division name: "1/16", "1/8T", "1/4D".\nAny case.\nInvalid: rejected with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'local beats = beatsPerDivision("1/16")$0', javascript: 'const beats = beatsPerDivision("1/16");$0' },
   },
   {
     id: 'divisionNames', category: 'Time', signature: 'divisionNames() -> list',
-    summary: 'List every note division available, in the order a division menu shows them. Each entry has an `id` such as "1/16", a display `label` such as "16th", and its length in `beats`. Build your menus from this list instead of typing the names in by hand.',
+    summary: 'List every note division.',
+    example: '`ce.time.divisions()` gives 14 entries, "1/1" first.',
+    notes: [
+      'Returns { id, label, beats } per division, in menu order: "1/16", "16th", 0.25.',
+    ],
     scopes: 'any',
     snippet: { lua: 'for _, d in ipairs(divisionNames()) do log(d.label) end$0', javascript: 'for (const d of divisionNames()) log(d.label);$0' },
   },
   {
     id: 'barBeatAt', category: 'Time', signature: 'barBeatAt(beats [, beatsPerBar]) -> table',
-    summary: 'Turn a position in beats into bars, beats and ticks — for any position, not only where the transport is now. Returns `bar`, `beat`, `tick` and `text`. Bars and beats count from 1, and `tick` splits each beat into 24 parts (0 to 23), the same resolution as MIDI clock. `text` is written the way the Transport component displays it, such as "3.2.00". `beatsPerBar` defaults to 4.',
+    summary: 'Convert a position in beats to bar, beat and tick.',
+    example: '`ce.time.position(4.5)` gives bar 2, beat 1, tick 12, text "2.1.12".',
+    notes: [
+      'Returns { bar, beat, tick, text }: bars and beats from 1, ticks 0 ↔ 23 (24 per beat, as MIDI clock), text as the Transport shows it.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'beats', type: 'number', required: true, unit: 'beats' },
-      { name: 'beatsPerBar', type: 'number', required: false, unit: 'beats' },
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'Position in beats from the start.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'beatsPerBar', type: 'number', required: false, unit: 'beats', summary: 'Beats in a bar.\nRange: ≥ 1.\nDefault: 4.\n< 1: 1.\nInvalid: default.' },
     ],
     scopes: 'any',
     snippet: { lua: 'log(barBeatAt(transportInfo().beats).text)$0', javascript: 'log(barBeatAt(transportInfo().beats).text);$0' },
   },
   {
     id: 'stepAt', category: 'Time', signature: 'stepAt(beats, division) -> number',
-    summary: 'Return which step of a note grid a position falls on — with `division` set to "1/16", for example, which sixteenth note. Steps count from 0 at the very start (bar 1, beat 1). Capitals in `division` do not matter; a name it does not recognise returns nothing and writes a message.',
+    summary: 'Find which step of a note grid a position is on.',
+    example: '`ce.time.step(2.5, "1/16")` gives 10.',
+    notes: [
+      'Steps count from 0 at the start.',
+      'Returns the step; rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'beats', type: 'number', required: true, unit: 'beats' },
-      { name: 'division', type: 'string', required: true, kind: 'division' },
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'Position in beats from the start.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'division', type: 'string', required: true, kind: 'division', summary: 'A division name, as `ce.time.division()` reads it.\nInvalid: rejected with a console error.' },
     ],
     scopes: 'any',
   },
   {
     id: 'stepsBetween', category: 'Time', signature: 'stepsBetween(from, to, division [, max]) -> table',
-    summary: 'Find the grid steps that start between two positions — after `from`, up to and including `to`. Returns `steps`, a list of the step numbers, and `dropped`, how many were left out. Use it to catch up on steps that went by between two updates, so a late update does not skip any. `max` limits how many are returned (16 by default); if more were crossed, the most recent ones are kept and the rest are counted in `dropped`. An unknown division returns nothing and writes a message.',
+    summary: 'Find the grid steps that start between two positions.',
+    example: '`ce.time.steps(0, 1, "1/16")` gives steps {1, 2, 3, 4}, dropped 0.',
+    notes: [
+      'Returns { steps, dropped }: the steps after from, up to and including to, and how many were left out.',
+      'More than max crossed: the most recent are kept, the rest counted in dropped. Use it to catch up after a late update.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'from', type: 'number', required: true, unit: 'beats' },
-      { name: 'to', type: 'number', required: true, unit: 'beats' },
-      { name: 'division', type: 'string', required: true, kind: 'division' },
-      { name: 'max', type: 'number', required: false, unit: 'steps' },
+      { name: 'from', type: 'number', required: true, unit: 'beats', summary: 'Position in beats from the start.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'to', type: 'number', required: true, unit: 'beats', summary: 'Position in beats from the start.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'division', type: 'string', required: true, kind: 'division', summary: 'A division name, as `ce.time.division()` reads it.\nInvalid: rejected with a console error.' },
+      { name: 'max', type: 'number', required: false, unit: 'steps', summary: 'Most steps returned.\nRange: ≥ 1, whole.\nDefault: 16.\nA fraction: rounded.\n< 1: 1.\nInvalid: default.' },
     ],
     scopes: 'any',
   },
   {
     id: 'swingOffset', category: 'Time', signature: 'swingOffset(step, amount, division) -> number',
-    summary: 'Return how far to delay a step to give it swing, in beats — add it to the step\'s position. Even-numbered steps (0, 2, 4…) stay put and odd ones are pushed later by up to half a step: `amount` runs from 0 (straight) to 1 (half a step), the same number the Transport\'s swing setting holds. It uses the Transport\'s own swing calculation, so your timing matches the panel\'s sequencers. An unknown division returns nothing and writes a message.',
+    summary: 'Find how far to delay a step for swing, in beats.',
+    example: '`ce.time.swing(1, 0.5, "1/16")` gives 0.0625: step 1 is delayed a quarter of a step.',
+    notes: [
+      'Even steps (0, 2, 4…) stay; odd steps are delayed by up to half a step. Add it to the step\'s position.',
+      'The Transport\'s own calculation, so a script\'s timing matches the panel\'s sequencers.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'step', type: 'number', required: true, unit: 'steps' },
-      { name: 'amount', type: 'number', required: true, unit: '0 to 1' },
-      { name: 'division', type: 'string', required: true, kind: 'division' },
+      { name: 'step', type: 'number', required: true, unit: 'steps', summary: 'Step number.\nA fraction: rounded.\nInvalid: 0.' },
+      { name: 'amount', type: 'number', required: true, unit: '0 to 1', summary: 'Swing amount.\nRange: 0 ↔ 1 (0: straight; 1: half a step).\nOutside the range: the nearest end.\nInvalid: 0.' },
+      { name: 'division', type: 'string', required: true, kind: 'division', summary: 'A division name, as `ce.time.division()` reads it.\nInvalid: rejected with a console error.' },
     ],
     scopes: 'any',
   },
   {
     id: 'cycleAt', category: 'Time', signature: 'cycleAt(beats, bars [, beatsPerBar]) -> table',
-    summary: 'Find where a position falls within a cycle that repeats every `bars` bars (0.25 to 64). Returns `phase`, how far through the current cycle you are, from 0 to 1; `count`, how many whole cycles have finished; and `length`, the cycle\'s length in beats. It is worked out fresh from the position each time rather than added up as it goes, so it does not drift, even after hours.',
+    summary: 'Find where a position falls in a cycle of bars.',
+    example: '`ce.time.cycle(6, 1)` gives phase 0.5, count 1, length 4.',
+    notes: [
+      'Returns { phase, count, length }: 0 ↔ 1 through the current cycle, whole cycles finished, and the cycle in beats.',
+      'Worked out from the position each time, so it does not drift.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'beats', type: 'number', required: true, unit: 'beats' },
-      { name: 'bars', type: 'number', required: true, unit: 'bars' },
-      { name: 'beatsPerBar', type: 'number', required: false, unit: 'beats' },
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'Position in beats from the start.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'bars', type: 'number', required: true, unit: 'bars', summary: 'Cycle length in bars.\nRange: 0.25 ↔ 64.\nOutside the range: the nearest end.\nInvalid: 0.25.' },
+      { name: 'beatsPerBar', type: 'number', required: false, unit: 'beats', summary: 'Beats in a bar.\nRange: ≥ 1.\nDefault: 4.\n< 1: 1.\nInvalid: default.' },
     ],
     scopes: 'any',
   },
   {
     id: 'loopedBeats', category: 'Time', signature: 'loopedBeats(beats, startBeats, lengthBeats) -> table',
-    summary: 'Map a position on the timeline into a loop that starts at `startBeats` and lasts `lengthBeats`. Returns `beats`, the position inside the loop, and `pass`, which time round the loop you are on, counting from 0. Positions before the loop start come back unchanged with `pass` set to -1, so a count-in or lead-in works. When `pass` changes, the loop has just wrapped round. Like `ce.time.cycle()`, it is worked out fresh from the position each time, so it does not drift over long runs.',
+    summary: 'Fold a position into a loop.',
+    example: '`ce.time.looped(13, 4, 8)` gives beats 5, pass 1.',
+    notes: [
+      'Returns { beats, pass }: the position inside the loop, and which time round, from 0.',
+      'Before the loop start: the position unchanged, pass -1, so a count-in works.',
+      'Worked out from the position each time, so it does not drift; a change of pass is a wrap.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'beats', type: 'number', required: true, unit: 'beats' },
-      { name: 'startBeats', type: 'number', required: true, unit: 'beats' },
-      { name: 'lengthBeats', type: 'number', required: true, unit: 'beats' },
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'Position in beats from the start.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'startBeats', type: 'number', required: true, unit: 'beats', summary: 'Loop start in beats.\nRange: ≥ 0.\n< 0: 0.\nInvalid: 0.' },
+      { name: 'lengthBeats', type: 'number', required: true, unit: 'beats', summary: 'Loop length in beats.\nRange: ≥ 0.01.\n< 0.01: 0.01.\nInvalid: 0.01.' },
     ],
     scopes: 'any',
   },
   {
     id: 'tapTempo', category: 'Time', signature: 'tapTempo(times [, resetMs]) -> number',
-    summary: 'Work out a tempo from a list of tap times, in milliseconds as `ce.time.now()` gives them. Only the taps since the last pause count: a gap longer than `resetMs` (2000 by default) starts a new measurement, so taps after a break are not averaged with the ones before it. Returns nothing if there are fewer than two usable taps. The result is kept between 20 and 300 bpm.',
+    summary: 'Work out a tempo from tap times.',
+    example: '`ce.time.tap({1000, 1500, 2000, 2500})` gives 120.',
+    notes: [
+      'Only the taps since the last pause count: a gap longer than resetMs starts a new measurement.',
+      'Returns BPM, 20 ↔ 300; fewer than two usable taps: no result.',
+      'Rejected with a console error: no result.',
+    ],
     params: [
-      { name: 'times', type: 'list', required: true },
-      { name: 'resetMs', type: 'number', required: false },
+      { name: 'times', type: 'list', required: true, summary: 'A list of tap times in milliseconds, as `ce.time.now()` gives them.\nAn item that is not a number above 0: left out.\nNot a list: rejected with a console error.' },
+      { name: 'resetMs', type: 'number', required: false, unit: 'milliseconds', summary: 'Gap that starts a new measurement, in milliseconds.\nRange: > 0.\nDefault: 2000.\n≤ 0, or invalid: default.' },
     ],
     scopes: 'any',
   },
   {
     id: 'clockTempo', category: 'Time', signature: 'clockTempo(intervalsMs) -> number',
-    summary: 'Work out the tempo from the gaps between incoming MIDI clock pulses, which arrive 24 times per beat — for example the times between `0xF8` messages you collected with `ce.midi.interceptIn()`. It uses the middle value of the gaps (the median), so one late pulse does not throw the result off. Returns nothing from an empty list. The result is kept between 20 and 300 bpm.',
-    params: [{ name: 'intervalsMs', type: 'list', required: true }],
+    summary: 'Work out a tempo from the gaps between MIDI clock pulses.',
+    example: '`ce.time.clockTempo({20.8, 20.8, 20.9})` gives 120.',
+    notes: [
+      '24 pulses per beat, as between the 0xF8 messages `ce.midi.interceptIn()` sees; the median gap, so one late pulse does not move the result.',
+      'Returns BPM, 20 ↔ 300; an empty list: no result.',
+      'Rejected with a console error: no result.',
+    ],
+    params: [{ name: 'intervalsMs', type: 'list', required: true, summary: 'A list of gaps in milliseconds.\nAn item that is not a number above 0: left out.\nNot a list: rejected with a console error.' }],
     scopes: 'any',
   },
 

@@ -59,7 +59,12 @@ const MODULE_INTROS = {
     + 'Every send command reads its numbers the same way. A channel, controller or note outside its range, or anything that is not a number, is refused with a message and nothing is sent. A value past the end of its range is sent as the nearest end, and the first time a warning says so. Text that is a number is read as one, and a fraction is rounded.',
   'ce.device': 'Working with the synth through its device profile — the description of the synth\'s parameters, messages and dumps that you build in the Device Profile Designer. With a profile you work in parameter names and real values, and the profile turns them into MIDI. These commands ask the synth for its settings, recall presets, read and change parameters by name, and describe a synth from a script when it has no profile. `role` picks which device to talk to when a panel uses more than one; it defaults to "mainSynth".',
   'ce.music': 'Helper functions for notes and harmony: note names and numbers, scales, chords, keeping a note in key, and building arpeggios. They only calculate — nothing is sent anywhere.',
-  'ce.time': 'Timers, and the musical clock. A timer runs your code later or repeatedly; the musical commands read the tempo and the song position, convert between beats and milliseconds, and help you step a sequence in time. Musical timing here is accurate to about a thirtieth of a second: right for lights, displays and stepping patterns, not for timing audio.',
+  'ce.time': 'Timers, and the musical clock. A timer runs your code later or repeatedly; the musical commands read the tempo and the song position, convert between beats and milliseconds, and help you step a sequence in time. Musical timing here is accurate to about a thirtieth of a second: right for lights, displays and stepping patterns, not for timing audio.\n\n'
+    + '- Beats are quarter notes; bars and beats count from 1, as musicians do.\n'
+    + '- A required value that is left out: rejected with a console error.\n'
+    + '- A number outside its range: the nearest end, with a console warning, the first time only.\n'
+    + '- A number that is not one: the fallback in its row, with a console warning, the first time only.\n'
+    + '- Number arguments also accept text that is a number, such as "500"; a timer\'s interval or delay does not.',
   'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.\n\n'
     + '**Colours that every colour command reads**\n'
     + '\n'

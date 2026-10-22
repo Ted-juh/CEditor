@@ -133,7 +133,7 @@ test('a callback that throws is reported, and does NOT leave the one-shot repeat
 test('calling it without a function schedules nothing and says so', () => {
   withApi((api) => {
     assert.equal(api.after(20), undefined);
-    assert.match(traced(), /needs a function to run/);
+    assert.match(traced(), /ce\.time\.after: fn is nothing, not a function, so nothing was scheduled\./);
   });
 });
 

@@ -14,7 +14,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptApiForTesting, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_Application/scripting/panelApi.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from '../src/CE_Application/scripting/timeTables.js';
@@ -501,4 +501,57 @@ test('with no tempo, syncTimer starts nothing rather than guessing an interval',
   } finally {
     api.stopTimer('nope');
   }
+});
+
+/* ------------------------------------------------------- a number left out, and a list that is not one */
+
+test('a number a helper cannot do without, left out, is rejected; one it can do without is its default', () => {
+  // position() with nothing was bar 1, beatsToMs() 0 ms and swing() no swing, each without a word:
+  // the first argument left out is said, as an error, and there is no answer. beatsPerBar, max and
+  // bpm have defaults, and say nothing.
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  const got = [api.barBeatAt(), api.stepAt(undefined, '1/16'), api.stepsBetween(0, undefined, '1/4'),
+    api.swingOffset(undefined, undefined, '1/16'), api.cycleAt(6), api.loopedBeats(4, 4), api.beatsToMs(), api.msToBeats(null)];
+  assert.deepEqual(got, [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined]);
+  assert.deepEqual(get(scriptTrace).map((t) => `${t.kind}: ${t.message}`), [
+    'error: ce.time.position: beats was not given, so there is no answer.',
+    'error: ce.time.step: beats was not given, so there is no answer.',
+    'error: ce.time.steps: to was not given, so there is no answer.',
+    'error: ce.time.swing: step was not given, so there is no answer.',
+    'error: ce.time.cycle: bars was not given, so there is no answer.',
+    'error: ce.time.looped: lengthBeats was not given, so there is no answer.',
+    'error: ce.time.beatsToMs: beats was not given, so there is no answer.',
+    'error: ce.time.msToBeats: ms was not given, so there is no answer.',
+  ], 'swing says step alone, not amount as well');
+  clearScriptTrace();
+  assert.deepEqual(api.barBeatAt(4), { bar: 2, beat: 1, tick: 0, text: '2.1.00' });
+  assert.deepEqual(api.stepsBetween(0, 1, '1/16').steps, [1, 2, 3, 4]);
+  assert.equal(api.cycleAt(6, 1).length, 4);
+  assert.equal(api.beatsToMs(1) > 0, true);
+  assert.deepEqual(get(scriptTrace), [], 'the defaults say nothing');
+});
+
+test('tap and clockTempo refuse what is not a list, and leave out an item that is not a time, once', () => {
+  // A list that was not one gave no result as if the taps were too few; an item that was not a
+  // number above 0 was left out, and a pause that was not a number above 0 was 2000 or made every
+  // gap "after a pause", all in silence.
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  assert.deepEqual([api.tapTempo(), api.tapTempo('x'), api.tapTempo(5), api.clockTempo(), api.clockTempo(true)],
+    [undefined, undefined, undefined, undefined, undefined]);
+  assert.equal(api.tapTempo([1000, 'x', 1500, 2000], 'x'), 120);
+  assert.equal(api.tapTempo([1000, 1500, 0, 2000], -1), 120, 'the second bad tap and pause are not said again');
+  assert.equal(Math.round(api.clockTempo([20.8333, 0, 20.8333])), 120);
+  assert.equal(api.clockTempo([]), undefined, 'an empty list is no result, and not a mistake');
+  assert.deepEqual(get(scriptTrace).map((t) => `${t.kind}: ${t.message}`), [
+    'error: ce.time.tap: times was not given, so there is no answer.',
+    'error: ce.time.tap: times is "x", not a list, so there is no answer.',
+    'error: ce.time.tap: times is 5, not a list, so there is no answer.',
+    'error: ce.time.clockTempo: intervalsMs was not given, so there is no answer.',
+    'error: ce.time.clockTempo: intervalsMs is true, not a list, so there is no answer.',
+    'warn: ce.time.tap: "x" at position 2 of times is not a tap time in milliseconds above 0, so it was left out. This is said only the first time.',
+    'warn: ce.time.tap: resetMs is "x", which is not a number, so 2000 was used. This is said only the first time.',
+    'warn: ce.time.clockTempo: 0 at position 2 of intervalsMs is not a gap in milliseconds above 0, so it was left out. This is said only the first time.',
+  ]);
 });

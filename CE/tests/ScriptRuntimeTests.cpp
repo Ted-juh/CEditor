@@ -1954,7 +1954,8 @@ int main()
         runtime.runAction ("onArmBad", juce::var());
         check (host.timerStarts.isEmpty(), "after() with no function schedules nothing");
         check (host.logs.contains ("bad nil"), "…and returns nil");
-        check (host.logs.joinIntoString ("\n").contains ("needs a function"), "…having explained why");
+        check (host.levelled.contains ("error:ce.time.after: fn is nothing, not a function, so nothing was scheduled."),
+               "…having explained why, as an error in the call's own name");
 
         // The JavaScript engine has no setTimeout either — same construction, same behaviour.
         juce::Array<juce::var> afterJs;

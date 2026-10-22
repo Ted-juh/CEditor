@@ -775,6 +775,7 @@ def isPlaying():
 # gave nothing here, where the WebView used the tempo, and "fast" raised a TypeError.
 def beatsToMs(beats, bpm=None):
     b = __tread("beatsToMs", "beats", beats)
+    if b is None: return None
     rate = __tread("beatsToMs", "bpm", bpm)
     if rate is None: rate = tempo()
     if not rate or rate <= 0:
@@ -783,6 +784,7 @@ def beatsToMs(beats, bpm=None):
 
 def msToBeats(ms, bpm=None):
     m = __tread("msToBeats", "ms", ms)
+    if m is None: return None
     rate = __tread("msToBeats", "bpm", bpm)
     if rate is None: rate = tempo()
     if not rate or rate <= 0:
@@ -796,11 +798,14 @@ def msToBeats(ms, bpm=None):
 # that is permanently at the wrong rate.
 def syncTimer(id, beats, opts=None):
     key = "" if id is None else str(id)
+    if not key:
+        logError("ce.time.syncTimer: no id was given, so no timer was started.")
+        return
     length = __beatsOf('ce.time.syncTimer("' + key + '")', beats, True, "no timer was started")
     if length is None: return
     ms = beatsToMs(length)
     if ms is None:
-        log("syncTimer(\"" + str(id) + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
+        logError('ce.time.syncTimer("' + key + '"): no tempo is being reported, so no timer was started. Use startTimer with a millisecond interval, or wait for onTransport.')
         return
     __armTimer(key, ms)                                   # clears any previous follow...
     follow = True
@@ -835,7 +840,7 @@ __after = {}
 __afterN = [0]
 def after(ms, fn):
     if not callable(fn):
-        log("after(ms, fn) needs a function to run — nothing was scheduled")
+        logError("ce.time.after: fn is " + __shownValue(fn) + ", not a function, so nothing was scheduled.")
         return None
     if __timeRefused("ce.time.after", ms, "milliseconds", "delay", False, "nothing was scheduled"): return None
     return __oneShot(ms, fn)
@@ -862,11 +867,14 @@ on("*", "onTimer", __afterTick)
 # had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
 # fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
 def afterBeats(beats, fn):
+    if not callable(fn):
+        logError("ce.time.afterBeats: fn is " + __shownValue(fn) + ", not a function, so nothing was scheduled.")
+        return None
     length = __beatsOf("ce.time.afterBeats", beats, False, "nothing was scheduled")
     if length is None: return None
     ms = beatsToMs(length)
     if ms is None:
-        log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
+        logError("ce.time.afterBeats: no tempo is being reported, so nothing was scheduled. Use after() with milliseconds, or wait for onTransport.")
         return None
     return after(ms, fn)
 
@@ -893,11 +901,11 @@ def __tclamp(v, lo, hi):
 # argument: what is used for one that is not a number, the least and the most it is read as, and
 # whether it is rounded first; a bpm falls back to the transport's tempo.
 __TIME_NUMBERS = {
-    "barBeatAt": ("ce.time.position", { "beats": { "fallback": 0, "min": 0 }, "beatsPerBar": { "fallback": 4, "min": 1 } }),
+    "barBeatAt": ("ce.time.position", { "beats": { "fallback": 0, "min": 0 }, "beatsPerBar": { "fallback": 4, "min": 1, "optional": True } }),
     "stepAt": ("ce.time.step", { "beats": { "fallback": 0, "min": 0 } }),
-    "stepsBetween": ("ce.time.steps", { "from": { "fallback": 0, "min": 0 }, "to": { "fallback": 0, "min": 0 }, "max": { "fallback": 16, "min": 1, "round": True } }),
+    "stepsBetween": ("ce.time.steps", { "from": { "fallback": 0, "min": 0 }, "to": { "fallback": 0, "min": 0 }, "max": { "fallback": 16, "min": 1, "round": True, "optional": True } }),
     "swingOffset": ("ce.time.swing", { "step": { "fallback": 0 }, "amount": { "fallback": 0, "min": 0, "max": 1 } }),
-    "cycleAt": ("ce.time.cycle", { "beats": { "fallback": 0, "min": 0 }, "bars": { "fallback": 0.25, "min": 0.25, "max": 64 }, "beatsPerBar": { "fallback": 4, "min": 1 } }),
+    "cycleAt": ("ce.time.cycle", { "beats": { "fallback": 0, "min": 0 }, "bars": { "fallback": 0.25, "min": 0.25, "max": 64 }, "beatsPerBar": { "fallback": 4, "min": 1, "optional": True } }),
     "loopedBeats": ("ce.time.looped", { "beats": { "fallback": 0, "min": 0 }, "startBeats": { "fallback": 0, "min": 0 }, "lengthBeats": { "fallback": 0.01, "min": 0.01 } }),
     "beatsToMs": ("ce.time.beatsToMs", { "beats": { "fallback": 0 }, "bpm": { "tempo": True } }),
     "msToBeats": ("ce.time.msToBeats", { "ms": { "fallback": 0 }, "bpm": { "tempo": True } }),
@@ -909,7 +917,12 @@ def __tread(fn, name, v):
     verb, args = __TIME_NUMBERS[fn]
     s = args[name]
     if v is None:
-        return None if s.get("tempo") else s["fallback"]
+        # An argument the helper cannot do without, left out, is rejected: it was the default
+        # without a word (position() was bar 1).
+        if s.get("tempo") or s.get("optional"):
+            return None if s.get("tempo") else s["fallback"]
+        logError(verb + ": " + name + " was not given, so there is no answer.")
+        return None
     read = __realNumber(v)
     n = None
     if s.get("tempo"):
@@ -962,6 +975,7 @@ def divisionNames():
 def barBeatAt(beats, beatsPerBar=None):
     import math
     b = __tread("barBeatAt", "beats", beats)
+    if b is None: return None
     perBar = __tread("barBeatAt", "beatsPerBar", beatsPerBar)
     bar = math.floor(b / perBar) + 1
     beat = math.floor(b % perBar) + 1
@@ -973,7 +987,8 @@ def stepAt(beats=None, division=None):
     import math
     per = __division("ce.time.step", division)
     if per is None: return None
-    return math.floor(__tread("stepAt", "beats", beats) / per)
+    b = __tread("stepAt", "beats", beats)
+    return None if b is None else math.floor(b / per)
 
 # The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
 # through rather than drop them - the difference between a stutter and a hole in the bar. Capped so
@@ -984,7 +999,9 @@ def stepsBetween(fromBeats=None, toBeats=None, division=None, maxSteps=None):
     per = __division("ce.time.steps", division)
     if per is None: return None
     frm = __tread("stepsBetween", "from", fromBeats)
+    if frm is None: return None
     to = __tread("stepsBetween", "to", toBeats)
+    if to is None: return None
     cap = __tread("stepsBetween", "max", maxSteps)
     if to <= frm: return { "steps": [], "dropped": 0 }
     first = math.floor(frm / per) + 1
@@ -1000,8 +1017,11 @@ def swingOffset(step=None, amount=None, division=None):
     import math
     per = __division("ce.time.swing", division)
     if per is None: return None
-    idx = math.floor(__tread("swingOffset", "step", step) + 0.5)
+    n = __tread("swingOffset", "step", step)
+    if n is None: return None
     s = __tread("swingOffset", "amount", amount)
+    if s is None: return None
+    idx = math.floor(n + 0.5)
     return s * 0.5 * per if abs(idx) % 2 == 1 else 0
 
 # For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
@@ -1009,7 +1029,9 @@ def swingOffset(step=None, amount=None, division=None):
 def cycleAt(beats, bars, beatsPerBar=None):
     import math
     b = __tread("cycleAt", "beats", beats)
+    if b is None: return None
     n = __tread("cycleAt", "bars", bars)
+    if n is None: return None
     length = n * __tread("cycleAt", "beatsPerBar", beatsPerBar)
     if length < 0.01: length = 0.01
     return { "phase": ((b / length) % 1 + 1) % 1, "count": math.floor(b / length), "length": length }
@@ -1020,19 +1042,53 @@ def cycleAt(beats, bars, beatsPerBar=None):
 def loopedBeats(beats, startBeats, lengthBeats):
     import math
     b = __tread("loopedBeats", "beats", beats)
+    if b is None: return None
     st = __tread("loopedBeats", "startBeats", startBeats)
+    if st is None: return None
     length = __tread("loopedBeats", "lengthBeats", lengthBeats)
+    if length is None: return None
     if b < st: return { "beats": b, "pass": -1 }
     return { "beats": st + ((b - st) % length), "pass": math.floor((b - st) / length) }
 
 # Tempo from tap times, in the milliseconds now() reports. Taps more than resetMs apart start a NEW
 # measurement rather than averaging across the pause - the thing every hand-rolled tap gets wrong,
 # because the first tap after a break poisons the average.
-def tapTempo(timestamps, resetMs=None):
-    if not isinstance(timestamps, (list, tuple)): return None
-    lst = [v for v in (__tnum(x, 0) for x in timestamps) if v > 0]
+# The times, and clockTempo's gaps, are the numbers above 0 in a list, with one that is not said
+# once; a list that is not one, or left out, is refused. Each was done in silence, and a list that
+# was not one gave no result as if the taps were too few.
+def __timeList(verb, name, what, value):
+    if value is None:
+        logError(verb + ": " + name + " was not given, so there is no answer.")
+        return None
+    if isinstance(value, dict):
+        value = list(value.values())
+    if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
+        logError(verb + ": " + name + " is " + __shownValue(value) + ", not a list, so there is no answer.")
+        return None
+    out = []
+    for i, item in enumerate(value):
+        n = __realNumber(item)
+        if n is not None and n > 0:
+            out.append(n)
+            continue
+        key = verb + " " + name
+        if key not in __timeWarned:
+            __timeWarned[key] = True
+            logWarn(verb + ": " + __shownValue(item) + " at position " + str(i + 1) + " of " + name + " is not " + what
+                    + " above 0, so it was left out. This is said only the first time.")
+    return out
+def tapTempo(timestamps=None, resetMs=None):
+    lst = __timeList("ce.time.tap", "times", "a tap time in milliseconds", timestamps)
+    if lst is None: return None
+    # A pause that is not a number above 0 gave nothing (every gap was "after a pause") or 2000, in
+    # silence; it is 2000, said once.
+    reset = __realNumber(resetMs)
+    if resetMs is not None and not (reset is not None and reset > 0) and "tapTempo resetMs" not in __timeWarned:
+        __timeWarned["tapTempo resetMs"] = True
+        logWarn("ce.time.tap: resetMs is " + __shownValue(resetMs) + ", which is " + ("not a number" if reset is None else "not above 0")
+                + ", so 2000 was used. This is said only the first time.")
     if len(lst) < 2: return None
-    limit = __tnum(resetMs, 2000)
+    limit = reset if (reset is not None and reset > 0) else 2000
     total = 0.0
     count = 0
     for i in range(len(lst) - 1, 0, -1):
@@ -1046,10 +1102,10 @@ def tapTempo(timestamps, resetMs=None):
 # Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not the
 # mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse
 # than a slightly stale one.
-def clockTempo(intervalsMs):
-    if not isinstance(intervalsMs, (list, tuple)): return None
-    lst = sorted([v for v in (__tnum(x, 0) for x in intervalsMs) if v > 0])
-    if not lst: return None
+def clockTempo(intervalsMs=None):
+    lst = __timeList("ce.time.clockTempo", "intervalsMs", "a gap in milliseconds", intervalsMs)
+    if lst is None or not lst: return None
+    lst = sorted(lst)
     mid = len(lst) // 2
     median = lst[mid] if len(lst) % 2 else (lst[mid - 1] + lst[mid]) / 2
     if median <= 0: return None
@@ -1264,14 +1320,19 @@ def __armTimer(key, ms):
     __syncFollow.pop(key, None)
     __timerIds[key] = True
     return __api.startTimer(key, int((ms or 0) + 0.5))
-def startTimer(id, ms=None):
+def startTimer(id=None, ms=None):
     key = "" if id is None else str(id)
-    if not key: return None
+    if not key:
+        logError("ce.time.startTimer: no id was given, so no timer was started.")
+        return None
     if __timeRefused('ce.time.startTimer("' + key + '")', ms, "milliseconds", "interval", True, "no timer was started"):
         return None
     return __armTimer(key, ms)
-def stopTimer(id):
+def stopTimer(id=None):
     key = "" if id is None else str(id)
+    if not key:
+        logError("ce.time.stopTimer: no id was given, so nothing was stopped.")
+        return None
     __syncFollow.pop(key, None)
     __timerIds.pop(key, None)
     return __api.stopTimer(key)

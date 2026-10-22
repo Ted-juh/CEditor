@@ -101,3 +101,23 @@ test('the runtime\'s own one-shots are not held to the script\'s rule', () => {
   // check refused would be a hung voice. A string duration is what sendNote has always read.
   assert.deepEqual(errorsOf(() => api.ce.midi.sendNote(1, 60, 100, '500')).errors, []);
 });
+
+test('a timer with no id, and a one-off with no function, are refused by name', () => {
+  // startTimer and syncTimer with no id started nothing (syncTimer a timer called ""), stopTimer
+  // with none stopped nothing, and after with no function said so as a plain line in after's
+  // words whichever call it was. Each is an error now, in the call's own name.
+  transport.update((t) => ({ ...t, bpm: 120 }));
+  for (const [call, line] of [
+    [() => api.ce.time.startTimer(undefined, 250), 'ce.time.startTimer: no id was given, so no timer was started.'],
+    [() => api.ce.time.startTimer('', 250), 'ce.time.startTimer: no id was given, so no timer was started.'],
+    [() => api.ce.time.syncTimer(null, 1), 'ce.time.syncTimer: no id was given, so no timer was started.'],
+    [() => api.ce.time.stopTimer(), 'ce.time.stopTimer: no id was given, so nothing was stopped.'],
+    [() => api.ce.time.after(10, 'x'), 'ce.time.after: fn is "x", not a function, so nothing was scheduled.'],
+    [() => api.ce.time.after(10), 'ce.time.after: fn is nothing, not a function, so nothing was scheduled.'],
+    [() => api.ce.time.afterBeats(1, 'x'), 'ce.time.afterBeats: fn is "x", not a function, so nothing was scheduled.'],
+  ]) {
+    assert.deepEqual(errorsOf(call), { out: undefined, errors: [line] });
+  }
+  assert.deepEqual(api.ce.time.timers(), [], 'none of them started a timer');
+  assert.deepEqual(errorsOf(() => api.ce.time.stopTimer('nosuch')).errors, [], 'an id that is not running is not a mistake');
+});

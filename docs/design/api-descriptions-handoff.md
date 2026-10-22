@@ -578,7 +578,43 @@ Done, approved by the owner:
   `Case-sensitive.` as `stroke`'s `cap` does. The phrase "with a console warning the first time"
   is not repeated in the option rows: the introduction says it once, and the rows say the fallback.
 
-`ce.draw` is done. Next in the table: `ce.time` (22 descriptions, 15 that need the most work).
+`ce.draw` is done.
+
+## `ce.time`: done
+
+Done the same way, without showing each item (the owner's "continue without abruption" on
+`ce.draw`): the 22 commands in the module's form, every parameter and option with its range, and
+the module introduction (`MODULE_INTROS['ce.time']`) saying once what every command shares: beats
+are quarter notes and bars and beats count from 1; a required value left out is rejected; a number
+outside its range is the nearest end, and one that is not a number the fallback in its row, each
+with the one-time warning; number arguments take text that is a number, a timer's interval or
+delay does not (`timeRefused` refuses "250", since two runtimes could not read it).
+
+The silences ended, in all four runtimes (`panelRuntime.js`, and the Lua, JavaScript and Python
+preludes in `CE/src/Scripting/*ScriptEngine.cpp`; `scriptPreludeAgreement.test.js` holds the four
+to the same words, with the sandboxes given a tempo so an accepted sync timer arms):
+
+- A number a helper cannot do without, left out, is rejected with an error (`timeWords.js`:
+  `rejected`, and `optional` on `beatsPerBar`, `max` and `bpm`, which keep their defaults). It
+  was the default without a word: `position()` was bar 1, `beatsToMs()` 0 ms, `swing(1)` no
+  swing. The first argument left out is said, alone. This reverses a decision an earlier session
+  recorded in `timeWords.js` ("an argument left out is its default without a word"); the owner's
+  rule for a required value left out is the one followed.
+- `startTimer` and `syncTimer` with no id (or "") are rejected; `syncTimer` started a timer called
+  "". `stopTimer` with no id is rejected; an id that is not running is not a mistake.
+- `after` and `afterBeats` with no function say so in the call's own name, as an error; it was a
+  plain line in `after`'s words. No tempo to work from is an error for `syncTimer` and
+  `afterBeats`; it was a plain line, and the call did nothing.
+- `tap` and `clockTempo` reject a list that is not one; an item that is not a number above 0 is
+  left out and said once, and `tap`'s `resetMs` that is not a number above 0 is 2000 and said once
+  (0 or below made every gap "after a pause", so there was never a result).
+
+Not changed, and documented as it is: a query with no result (`tempo()` with nothing supplying
+one, `tap` with fewer than two usable taps, `clockTempo` with an empty list, the conversions with
+no tempo) returns nothing without a word; `stopTimer` with an id that is not running says nothing;
+`syncTimer`'s `follow` that is not true or false is true (`Invalid: true.`).
+
+Next in the table: `ce.components.lcd` (37 descriptions, 22 that need the most work).
 
 ### The branch
 
@@ -600,7 +636,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
 | ce.draw | 27 | 18, all done |
-| ce.time | 22 | 15 |
+| ce.time | 22 | 15, all done |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
 | ce.components.pixel | 28 | 13 |
@@ -656,9 +692,10 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
-on 2026-10-22" and "ce.draw: done". ce.midi, ce.math, ce.anim and ce.draw are done; continue with
-ce.time, in technical English, schematic, one rule per line, with ranges, as its table says,
-showing every parameter and option of the command in its item. Check each command at its edges in
-the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a
-time, its text now and every field as proposed, and wait for my answer before the next.
+on 2026-10-22", "ce.draw: done" and "ce.time: done". ce.midi, ce.math, ce.anim, ce.draw and
+ce.time are done; continue with ce.components.lcd, in technical English, schematic, one rule per
+line, with ranges, as its table says, showing every parameter and option of the command in its
+item. Check each command at its edges in the runtime first, and put what is silent or wrong to me
+as a decision. Show me one item at a time, its text now and every field as proposed, and wait for
+my answer before the next.
 ```
