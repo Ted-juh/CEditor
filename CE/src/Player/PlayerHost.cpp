@@ -3,6 +3,7 @@
 #include "TrustedWebBrowser.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "EmbeddedWebBundle.h" // PlayerWebData — the embedded web bundle (player.html + assets)
+#include "HostKeyForwarding.h"
 
 #include <atomic>
 #include <cstring>
@@ -211,6 +212,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
             onRestoreAnswer (payload.getProperty ("answer", "").toString());
     });
 
+    // A key the page did not use, for the DAW (utils/hostKeys.js, HostKeyForwarding.h).
+    options = options.withEventListener ("hostKey", [this] (const juce::var& payload)
+    {
+        forwardKeyToHost (payload);
+    });
+
    #if CEDITOR_DEV_MODE
     options = options.withResourceProvider ([] (const juce::String& path) { return providePlayerResource (path); },
                                             juce::String ("http://localhost:5173"));
@@ -270,6 +277,31 @@ void PlayerHost::timerCallback()
         hostWindowShown = shown;
         sendHostWindow();
     }
+   #endif
+}
+
+bool PlayerHost::keysGoToHost() const
+{
+   #if JUCE_WINDOWS
+    return forwardKeysToHost;
+   #else
+    // A host off Windows already gets the keys an embedded view leaves (X11), or has a responder
+    // chain of its own (macOS): docs/known-issues.md. The page keeps its keys there.
+    return false;
+   #endif
+}
+
+void PlayerHost::forwardKeyToHost (const juce::var& payload)
+{
+   #if JUCE_WINDOWS
+    if (! keysGoToHost())
+        return;
+    const auto key = ceditor::player::hostkeys::keyEventFromPage (payload);
+    auto* peer = key ? getPeer() : nullptr;
+    if (peer != nullptr)
+        ceditor::player::hostkeys::postToParentWindow (static_cast<HWND> (peer->getNativeHandle()), *key);
+   #else
+    juce::ignoreUnused (payload);
    #endif
 }
 
@@ -350,10 +382,12 @@ void PlayerHost::loadPanelIntoWebView()
     // Before the panel, so the Player knows at connect time whether this is a reopened project,
     // whose saved sound must not be read over, or a new instance, which reads the synth.
     // The instance's ce.storage stores go with it, when there is an instance to have them.
+    // And whether the keys it does not use go to the host (utils/hostKeys.js).
     const bool restored = isSessionRestored != nullptr && isSessionRestored();
     const auto stores = scriptStores != nullptr ? juce::JSON::toString (scriptStores(), true) : juce::String ("null");
     webView->evaluateJavascript (juce::String ("window.__CE_PLAYER_SESSION__ = { restored: ")
-                                 + (restored ? "true" : "false") + ", storage: " + stores + " };"
+                                 + (restored ? "true" : "false") + ", storage: " + stores
+                                 + ", hostKeys: " + (keysGoToHost() ? "true" : "false") + " };"
                                  + "if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
 }
 

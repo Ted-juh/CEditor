@@ -862,8 +862,12 @@ Preview, without the editor around it.
   synth. When a project is reopened, **Hardware Restore** decides whether that sound is sent back to
   the synth.
 
-On Windows, while the plugin window has keyboard focus, the DAW does not receive key presses — the
-space bar will not start playback. Click outside the plugin first.
+- **Keys.** Keys the panel does not use go to the DAW, so the space bar starts and stops playback and
+  the DAW's shortcuts work while the plugin window has focus. The panel keeps what it uses: what you
+  type into a text field, Tab to move between controls, the arrow keys on a knob you clicked or in a
+  list it has open, and its panic key (Escape unless the panel sets another). Space and Enter go to
+  the DAW even after you click a control; they press a control only when you reached it with Tab.
+  This is on Windows, where the plugin's window would otherwise take every key.
 
 ## 13. HoSTage, the instrument host
 
@@ -931,8 +935,6 @@ CEditor is a beta. Things to know before you rely on it:
   the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot save: closing its tab
   asks first, then its pages are gone. It can only be opened from the start screen, with no documents
   open.
-- **The DAW and the keyboard.** On Windows, the DAW gets no key presses while the plugin window has
-  focus.
 
 [Known issues](known-issues.md) lists the open problems in detail, and the
 [release notes](../RELEASE-NOTES.md) say what this version is.

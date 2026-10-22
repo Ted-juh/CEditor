@@ -303,35 +303,48 @@ header-only) with a per-block byte budget; as a drop-in in the same harness it r
 cut the 99th-percentile callback time from about 16 µs to 6 µs. It changes where in the block
 script MIDI lands, which is why it is a change of its own and not a line in a review.
 
-## Keyboard shortcuts in a DAW while the exported editor has focus — scoped, not built
+## ~~Keyboard shortcuts in a DAW while the exported editor has focus~~ — FIXED on Windows
 
-*(Scoped 2026-10-01 from a review of webview-in-plug-in projects; nobody has reported it yet.)*
+*(Scoped 2026-10-01 from a review of webview-in-plug-in projects; built 2026-10-22. Not yet tried
+in a DAW by hand: `HostKeyForwardingTests` posts to real windows on the Windows runner, and
+`browser-checks/playerHostKeys.mjs` drives the page.)*
 
-While the plug-in's editor window has keyboard focus on Windows, every key goes to the page and
-none to the DAW: Space does not start the transport, and the host's own shortcuts are dead until the
-user clicks outside the editor. JUCE's WebView2 host (`juce_WebBrowserComponent_windows.cpp`)
-registers only `MoveFocusRequested`, for Tab traversal, and no `AcceleratorKeyPressed` handler, and
-the player (`PlayerHost.cpp`, `PluginProcessor.h`) adds no key handling of its own. A keyboard-first
-panel (a text field, the scripting console) does need the keys, so this is not simply "never take
-focus".
+While the plug-in's editor window had keyboard focus on Windows, every key went to the page and none
+to the DAW: Space did not start the transport, and the host's own shortcuts were dead until the user
+clicked outside the editor. JUCE hands a key its own components do not use to the window's parent,
+which is the host's (`forwardMessageToParent`, a `PostMessage` to `GetParent`, which the host's
+message loop then matches against its shortcuts), but a key inside the webview never reaches that
+code. A keyboard-first panel (a text field, a list it has open) does need its keys, so this was
+never simply "never take focus".
 
-What fixing it would take, when someone reports it:
+What was built is iPlug2's half of the scoping, step 2 below, and the first step was dropped:
 
-1. A vendored JUCE patch (the sixth) registering `add_AcceleratorKeyPressed` on the WebView2
-   controller. For a key the page has not claimed, mark it handled and post it to the plug-in
-   window's parent, which is the host's; a key the page has claimed passes through.
-2. "Claimed" comes from the page: a bridge message when an editable element gains or loses focus,
-   which the Svelte player can send from one `focusin`/`focusout` listener. Without it, pass
-   through the transport keys (Space, Enter, the arrows when nothing editable is focused) and keep
-   the rest.
-3. Linux (WebKitGTK) and macOS differ: X11 hosts generally receive keys the embedded view does not
-   consume, and WKWebView has its own first-responder chain. Scope each when there is a report.
+- **The page** (`utils/hostKeys.js`, installed by `Player.svelte`) decides each key after every
+  handler of its own has had it: a listener added to the window in the capture phase runs at the end
+  of the window's bubble phase, whatever order the panel's handlers were registered in (the panic
+  key's handler is registered after it, and a naive listener handed Escape to the host; the check
+  pins that). A key no handler used, outside a text field, a list or menu, and not Tab or a bare
+  modifier, is sent to C++ as `hostKey` and its default prevented; its key-up follows it. Space and
+  Enter are the exception the other way: the panel presses the focused control on them, and every
+  focusable control takes the focus when clicked, so after a click (not after Tab) those two are
+  taken for the host before any control sees them. Without that, turning a knob and pressing Space
+  pressed the knob.
+- **C++** (`HostKeyForwarding.h`, `PlayerHost::forwardKeyToHost`) makes the key message Windows would
+  have sent (`WM_KEYDOWN`, `WM_SYSKEYDOWN` with Alt or for F10, the scan code, the extended-key bit)
+  and posts it to the plug-in window's parent, as JUCE does with its own.
+- **Only a plug-in, only on Windows**: the editor sets `PlayerHost::forwardKeysToHost` unless it is
+  the plug-in's own Standalone window, and the page hears it in `__CE_PLAYER_SESSION__.hostKeys`.
 
-The wxp project (Rust, wry) carries parent-attachment and focus patches for exactly this situation
-and is the reference to diff against upstream wry when the work starts. iPlug2 does step 2 and
-nothing else: its Windows webview (`IPlug/Extras/WebView/IPlugWebView_win.cpp`) puts a `keydown`
-and a `keyup` listener on the page that forward the key to C++ through the bridge whenever the
-active element is not a text input (`docs/design/libraries-weighed-2026-10-01.md`).
+The JUCE patch the scoping proposed (registering WebView2's `AcceleratorKeyPressed`) would not have
+done it: WebView2 raises that event only for keys held with Ctrl or Alt and keys that type no
+character, and Space types one.
+
+Still scoped, not built: Linux (WebKitGTK) and macOS, where the page keeps every key as before. X11
+hosts generally receive keys the embedded view does not consume, and WKWebView has its own
+first-responder chain; scope each when there is a report. The wxp project (Rust, wry) carries
+parent-attachment and focus patches for exactly this situation and is the reference then. iPlug2's
+Windows webview (`IPlug/Extras/WebView/IPlugWebView_win.cpp`) is what the page half follows
+(`docs/design/libraries-weighed-2026-10-01.md`).
 
 ## ~~The GAIA panel's scripts, run window-closed in the plug-in~~ — CLOSED
 

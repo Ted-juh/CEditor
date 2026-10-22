@@ -133,6 +133,10 @@ window.__player = {
   bound: () => Object.keys(get(panelPreviewSessions) ?? {}).length,
   // Every RQ1 the read-back sent, as parameterId -> the byte count the request asks for. The size
   // is the last of the four size bytes, at offset 14 of the message.
+  // What the page sent the host under one event name, and a clean slate (playerHostKeys.mjs).
+  events: (name) => sent.filter((e) => e.name === name).map((e) => e.payload),
+  forget: () => { sent.length = 0; },
+  pressed: (controlId) => get(panelPreviewSessions)?.[controlId]?.pressed === true,
   requests: () => Object.fromEntries(sent
     .filter((e) => e.name === 'triggerRawMidiAction' && String(e.payload?.actionId ?? '').startsWith('rq1_'))
     .map((e) => [String(e.payload.actionId).slice(4), parseInt(String(e.payload.message).trim().split(/\s+/)[14], 16)])),

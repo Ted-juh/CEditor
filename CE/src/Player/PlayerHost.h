@@ -88,12 +88,21 @@ public:
     /** "page ready" when the page first answers, "panel shown" when it has the panel loaded. */
     std::function<void (const juce::String& stage)> onWebViewStage;
 
+    // --- Keys for the DAW --------------------------------------------------------------------------
+    /** Set by the plug-in's editor: the keys the page does not use go to the host's window, so Space
+        starts the transport and the DAW's shortcuts work while the panel has focus. Windows only,
+        where the webview takes every key (HostKeyForwarding.h); elsewhere, and in the CEditor Player
+        app, which has no host, the page keeps them. Set before the page loads, which is told. */
+    bool forwardKeysToHost = false;
+
 private:
     void timerCallback() override;
     void sendHostWindow();
     void showStatusMessage (const juce::String& title, const juce::String& message);
     void loadPanelIntoWebView();
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
+    bool keysGoToHost() const;
+    void forwardKeyToHost (const juce::var& payload);
 
     juce::File panelFile;
     juce::String panelJson;
