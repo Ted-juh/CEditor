@@ -283,7 +283,7 @@ function validateExamples(examples) {
  *  handoff.md, "The fields"). */
 function docOf(member) {
   if (!member) return '';
-  const params = (member.params ?? []).filter((p) => p.summary && !p.fields?.length).map((p) => `${p.name}: ${p.summary}`);
+  const params = (member.params ?? []).filter((p) => p.summary).map((p) => `${p.name} (${api.paramTypeLine(p, member)}): ${p.summary}`);
   const returns = (member.returns ?? []).map((r) => `Returning ${r.when}: ${r.then}`);
   const notes = (member.notes ?? []).map((n) => (typeof n === 'string' ? n : n?.text)).filter(Boolean);
   return [member.summary, member.example ? `Example: ${member.example}` : '', ...params, ...returns, ...notes].filter(Boolean).join(' ');
@@ -295,10 +295,12 @@ function docOf(member) {
  *  `info`, onDraw's. Those get the same field table (knowing that info.phase is "load" or
  *  "dispatch" is worth as much as knowing what `scope` accepts) but no "written like this"
  *  literal, because you never write one. */
-function describeArg(p, given = false) {
+function describeArg(p, member, given = false) {
   const fields = Array.isArray(p.fields) && p.fields.length ? p.fields : null;
   return {
-    name: p.name, type: p.type, required: p.required === true, fields, given,
+    // The type in the reference's words ("text", "control name"), not the contract's (string,
+    // targetRef): paramTypeLabel is what the manual and the hover card show too.
+    name: p.name, type: api.paramTypeLabel(p, member), required: p.required === true, fields, given,
     literal: fields && !given
       ? { lua: optionLiteral(fields, 'lua'), js: optionLiteral(fields, 'javascript') }
       : null,
@@ -332,7 +334,7 @@ function contract() {
         // NOT .map(describeArg): map passes the INDEX as the second argument, which would mark
         // every argument after the first as one the handler is given — and silently drop its
         // literal, which is the one thing this whole block exists to produce.
-        args: (member?.params ?? []).map((p) => describeArg(p)),
+        args: (member?.params ?? []).map((p) => describeArg(p, member)),
         eg: exampleFor(memberId),
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -376,7 +378,7 @@ function contract() {
       id: h.id, sig: h.signature, doc: docOf(h), rt: memberRuntime(h),
       // What the hook is handed. onPanelReady(info) told a reader `info` existed and left
       // `info.firstTime` — the whole reason to take the argument — to the summary prose.
-      args: (h.params ?? []).map((p) => describeArg(p, true)),
+      args: (h.params ?? []).map((p) => describeArg(p, { ...h, kind: 'lifecycle' }, true)),
     })),
     events: ALL_EVENTS.map((e) => ({
       id: e.id, fn: e.fn, group: e.group, payload: e.payload ?? null,

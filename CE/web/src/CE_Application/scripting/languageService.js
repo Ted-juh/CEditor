@@ -20,7 +20,7 @@ import { analyzeTs, foldTs } from './tsService.js';
 import { analyzeCsharp, foldCsharp } from './csharpPreview.js';
 import { analyzeJava, foldJava } from './javaPreview.js';
 import {
-  COMMANDS, HELPERS, PANEL_COMMANDS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
+  COMMANDS, HELPERS, PANEL_COMMANDS, VALUE_ACCESSORS, SELF, ALL_EVENTS, paramTypeLine,
 } from './panelApi.js';
 import { memberAppliesToType } from './componentSchema.js';
 import { jsonFoldRegions, jsonSyntaxError } from '../utils/jsonText.js';
@@ -43,6 +43,10 @@ const API_FUNCTIONS = ALL_API.map((m) => ({
   doc: hoverDoc(m),
 }));
 const API_BY_NAME = Object.fromEntries(API_FUNCTIONS.map((f) => [f.label, f]));
+// …and under it each described parameter: its name, its type and whether it is required ("number,
+// required", from the contract), and its own text.
+const HOVER_PARAMS = Object.fromEntries(ALL_API.map((m) => [m.id, (m.params ?? []).filter((p) => p.summary)
+  .map((p) => ({ name: p.name, type: paramTypeLine(p, m), summary: p.summary }))]));
 
 // Parameter names per API function, for signature help. Prefer the structured
 // params array (commands); fall back to parsing the signature string (helpers).
@@ -365,7 +369,7 @@ export function getHover(source, languageId, index) {
   if (decl) return { title: decl.detail, doc: decl.kind === 'parameter' ? 'parameter' : '' };
 
   // Panel API function.
-  if (API_BY_NAME[name]) return { title: API_BY_NAME[name].detail, doc: API_BY_NAME[name].doc };
+  if (API_BY_NAME[name]) return { title: API_BY_NAME[name].detail, doc: API_BY_NAME[name].doc, params: HOVER_PARAMS[name] ?? [] };
   // Event handler name.
   if (EVENT_BY_FN[name]) return { title: `${name}(${EVENT_BY_FN[name].payload ?? ''})`, doc: EVENT_BY_FN[name].summary };
   // Value accessor / self.

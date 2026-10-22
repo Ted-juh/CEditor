@@ -104,6 +104,12 @@ test('getHover describes panel API functions', () => {
   assert.match(h.doc, /CC/);
 });
 
+test('getHover lists the parameters with their type and whether each is required', () => {
+  const h = getHover('scale(64, 0, 127, 0, 100)', 'lua', 2);
+  assert.deepEqual(h.params[0], { name: 'v', type: 'number, required', summary: 'The value to move.' });
+  assert.equal(h.params.length, 5);
+});
+
 test('getHover describes a local declaration', () => {
   const src = 'function add(a, b)\n  return a + b\nend';
   const h = getHover(src, 'lua', 10); // inside "add"

@@ -1226,6 +1226,7 @@
       <div class="ce-hover-title">{hover.title}</div>
       <!-- The description and its example mark code with backticks: drawn as code, not shown as backticks. -->
       {#if hover.doc}<div class="ce-hover-doc">{#each codeParts(hover.doc) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</div>{/if}
+      {#if hover.params?.length}<ul class="ce-hover-params">{#each hover.params as p (p.name)}<li><code>{p.name}</code> <span class="ce-hover-type">({p.type})</span> {#each codeParts(p.summary) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</li>{/each}</ul>{/if}
     </div>
   {/if}
 
@@ -1676,6 +1677,10 @@
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
   .ce-hover-doc code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
+  .ce-hover-params { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--txt-dim); line-height: 1.4; }
+  .ce-hover-params li + li { margin-top: 3px; }
+  .ce-hover-params code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
+  .ce-hover-type { color: var(--txt-faint, var(--txt-dim)); font-style: italic; }
 
   /* signature help: inline after the end of the caret's line, or a box over the line before or after
      it; a line tall either way, its size set where it is placed (signatureHint.js, whose HINT holds

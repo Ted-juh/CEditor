@@ -100,7 +100,7 @@ optional.
 | --- | --- | --- |
 | `summary` | The one plain sentence (two or three at most). No example, no parameter names. | Everywhere |
 | `example` | One call with fixed values and what it gives: "`getBits(0xB4, 4, 3)` gives 3." | Insert picker, hover card, manual, API explorer. Never the sidebar. |
-| `params[].summary` | A parameter's facts: its range, counting from 0 or 1, its default, what is refused. A full sentence, capital first, full stop at the end, three words or more, not repeating the name. | Hover card, manual, sidebar row (as the row's tooltip) |
+| `params[].summary` | A parameter's facts: its range, counting from 0 or 1, its default, what is refused. A full sentence, capital first, full stop at the end, three words or more, not repeating the name. Not its type or whether it is required: those are shown beside it from `type` and `required` (below). | Hover card, manual, API explorer, the sidebar hint (on the parameter's name) |
 | `returns` | A choice the command makes from what a function gives back: `[{ when, then }]`, e.g. `{ when: 'false', then: 'The message is dropped.' }`. | Manual, sidebar ("What fn returns") |
 | `notes` | "Good to know": at most three short sentences that change what you write. | Manual, hover card, sidebar |
 
@@ -285,9 +285,9 @@ the way, for the modules after it:
 - **Parameters are written schematically**, not as sentences of options:
   `Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.`
   The parts, in this order, where they apply: what it is, `Range: a ↔ b (what a means ↔ what b
-  means)`, `Default: x` or `Left out: x`, `Must be given.`, `Must be below hi.`, `Outside the
-  range: …` (held at 0 or 1, not held, or an error in the console and no result). Use ↔, not
-  `<->`, which a page could read as the start of a tag.
+  means)`, `Default: x` or `Left out: x`, `Must be below hi.`, `Outside the range: …` (held at 0
+  or 1, not held, or an error in the console and no result). Use ↔, not `<->`, which a page could
+  read as the start of a tag.
 - **Plain technical wording.** Not "nothing comes back" or "gives nothing": "returns no value", "an
   error in the console and no result", "Empty: no result".
 - **Rules a module shares can be a table.** How a colour is read is two tables in the manual's
@@ -295,7 +295,23 @@ the way, for the modules after it:
   accepted), and the random rules are a short list there.
 - **Say what the runtime does at the edges**, checked, not assumed: a value left out, outside the
   range, or a range given the wrong way round. Where the result is meaningless (NaN), the parameter
-  says it must be given.
+  is required (`required: true`), and the type line says so.
+
+**Decided on 2026-10-22, starting `ce.anim`:**
+
+- **The type and whether a parameter is required are shown from the data**, not written in its
+  text: the manual, the hover card and the API explorer show `` `target` (number, required): The
+  end value. ``, and the sidebar hint shows "number, required. The end value." on the parameter's
+  name. The words come from `paramTypeLabel` in `panelApi.js`, a short plain list (number, text,
+  true or false, list, options, control name, any value…), and `manualReference.test.js` fails on
+  a type that has none. So a parameter's text never says "Required", "Must be given" or "Number
+  required". The 187 parameters typed only as `value` were given their real type where it is
+  known; `value` is left only where any value is taken (`set`, `log`, `saveSetting`…).
+- **A refused call is "rejected with a console error".** Not "nothing starts", "the animation is
+  not started" or "none of the list starts". What happens on a required value that is missing or
+  wrong can be said once in the module's introduction when it is the same for every command.
+- **Normal technical English throughout.** "Required", "rejected", "converted", "a console
+  warning": the words technical documentation uses, not a paraphrase of them.
 
 Found on the way and fixed at the owner's word, in all four runtimes (the WebView's and the Lua,
 JavaScript and Python preludes), with a case for each in `scriptPreludeAgreement.test.js` and the

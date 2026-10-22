@@ -18,8 +18,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  MODULES, ALL_MEMBERS, MODULE_GROUPS, COMPONENT_GROUPS, moduleTree, memberPath,
+  MODULES, ALL_MEMBERS, MODULE_GROUPS, COMPONENT_GROUPS, moduleTree, memberPath, paramTypeLabel,
+  paramTypeLine,
 } from '../src/CE_Application/scripting/panelApi.js';
+import { generateManual } from '../scripts/generate-scripting-manual.mjs';
 import {
   BACKGROUND_FITS, TEXT_FITS, IMAGE_BLENDS, IMAGE_CLIP_MODES, IMAGE_LAYER_IDS,
 } from '../src/CE_Application/utils/imageLayers.js';
@@ -197,6 +199,51 @@ test('no summary explains what the API used to do', () => {
     .filter((m) => /\bused to\b|design doc|§\d/i.test(m.summary ?? ''))
     .map((m) => memberPath(m.id));
   assert.deepEqual(historical, []);
+});
+
+/* -------------------------------------------------------------- parameter types, in words */
+// Each parameter is shown with its type and whether it is required, so its text does not have to
+// say "Number required." (docs/design/api-descriptions-handoff.md). The contract's types are its
+// own (string, targetRef, value…) and twenty-three of them were in use, so the reference shows
+// words from one short list, and a type with none falls through as itself and fails here.
+
+const TYPE_WORDS = new Set([
+  'number', 'text', 'true or false', 'function', 'list', 'options', 'table', 'path', 'colour', 'note',
+  'bytes', 'control name', 'event name', 'any value', 'number or text', 'text or list',
+  'list of numbers', 'list of bytes', 'list of notes', 'list of text', 'text or object',
+  'list of objects',
+]);
+
+test('every parameter\'s type is shown in a word from one short list', () => {
+  const odd = [];
+  for (const member of ALL_MEMBERS) {
+    for (const param of member.params ?? []) {
+      const word = paramTypeLabel(param, member);
+      if (!TYPE_WORDS.has(word)) odd.push(`${memberPath(member.id)}.${param.name}: ${param.type} → "${word}"`);
+    }
+  }
+  assert.deepEqual(odd, []);
+});
+
+test('the contract\'s own type names are not shown', () => {
+  const at = (id, name) => {
+    const member = ALL_MEMBERS.find((m) => m.id === id);
+    return paramTypeLabel(member.params.find((p) => p.name === name), member);
+  };
+  assert.equal(at('drumPadsLabel', 'target'), 'control name');
+  assert.equal(at('drumPadsLabel', 'label'), 'text');
+  assert.equal(at('animateTo', 'opts'), 'options');
+  assert.equal(at('onError', 'info'), 'table', 'a handler is given a table; it builds no options');
+  assert.equal(at('scale', 'v'), 'number');
+  assert.equal(at('sendNote', 'note'), 'note');
+  assert.equal(at('set', 'value'), 'any value');
+  assert.equal(paramTypeLine({ type: 'number', required: false }), 'number, optional');
+});
+
+test('the manual names each parameter with its type and whether it is required', () => {
+  const manual = generateManual();
+  assert.match(manual, /`v` \(number, required\): The value to move\./);
+  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make\./);
 });
 
 /* -------------------------------------------------------------------- the tree */

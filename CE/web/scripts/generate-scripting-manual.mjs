@@ -27,7 +27,7 @@ import {
   SCRIPT_LANGUAGES, SELF, VALUE_ACCESSORS,
   LIFECYCLE_HOOKS, CONTROL_EVENTS, PANEL_EVENTS, TIME_EVENTS, DEVICE_EVENTS, COMPONENT_EVENTS,
   MODULE_GROUPS, COMPONENT_GROUPS, moduleById, membersByModule, memberPath, memberRuntime,
-  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
+  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER, paramTypeLine,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 // The canonical handler in every language — REAL, toolchain-validated source (the fixture
@@ -213,8 +213,11 @@ function headingSignature(member) {
 
 // A command's text beyond its description (docs/design/api-descriptions-handoff.md, "The fields"):
 // its example, what each parameter is, the choice a function's answer makes, and "Good to know".
+// Each parameter is named with its type and whether it is required, from the contract, so its own
+// text does not have to say "Number required."; an options parameter's fields follow as a table.
 const noteText = (note) => (typeof note === 'string' ? note : note?.text ?? '');
-const described = (member) => (member.params ?? []).filter((p) => p.summary && !p.fields?.length);
+const described = (member) => (member.params ?? []).filter((p) => p.summary);
+const paramHead = (member, p) => `\`${p.name}\` (${paramTypeLine(p, member)})`;
 const fnName = (member) => (member.params ?? []).find((p) => p.type === 'function')?.name ?? 'fn';
 
 /** Under a heading: the example, the parameters as a list, the answers as a table, the notes as a list. */
@@ -222,7 +225,7 @@ function memberDetails(member) {
   let out = '';
   if (member.example) out += `\nExample: ${member.example}\n`;
   const params = described(member);
-  if (params.length) out += `\n${params.map((p) => `- \`${p.name}\`: ${p.summary}`).join('\n')}\n`;
+  if (params.length) out += `\n${params.map((p) => `- ${paramHead(member, p)}: ${p.summary}`).join('\n')}\n`;
   if (member.returns?.length) {
     out += `\n| What \`${fnName(member)}\` returns | What happens |\n|---|---|\n`
       + `${member.returns.map((r) => `| ${cell(r.when)} | ${cell(r.then)} |`).join('\n')}\n`;
@@ -236,7 +239,7 @@ function memberDetails(member) {
 function memberDetailsInline(member) {
   const parts = [];
   if (member.example) parts.push(`Example: ${member.example}`);
-  for (const p of described(member)) parts.push(`\`${p.name}\`: ${p.summary}`);
+  for (const p of described(member)) parts.push(`${paramHead(member, p)}: ${p.summary}`);
   if (member.returns?.length) {
     parts.push(`What \`${fnName(member)}\` returns: ${member.returns.map((r) => `${r.when}, ${r.then.charAt(0).toLowerCase()}${r.then.slice(1).replace(/\.$/, '')}`).join('; ')}.`);
   }
