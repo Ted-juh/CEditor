@@ -335,7 +335,121 @@ right answer pinned in `scriptMath.test.js`:
 The refusals share one helper per runtime (`mathNumber` here, `__mnum` in each prelude), worded
 "ce.math.hex: the red part is a number, and "x" is not, so there is no answer."
 
-Next: `ce.anim`, the same way: one command at a time.
+## `ce.anim`: state on 2026-10-22, for whoever continues
+
+The owner reviewed `ce.anim` one item at a time and is tired of correcting the same wording again
+and again. Read this section before writing a word.
+
+### Write technical English, not prose
+
+The owner rejected each of these, some more than once. Use the right-hand column.
+
+| Not this | This |
+| --- | --- |
+| "nothing comes back", "gives nothing" | "returns no value", "no result" |
+| "It must be given", "Required.", "Number required." | nothing: the type line beside the name shows "number, required" |
+| "nothing starts", "the animation is not started", "none of the list starts" | "rejected with a console error"; "the entire list is rejected" |
+| "Text containing a number is converted" | said once in the module introduction: "Number options also accept text that is a number, such as "500"." |
+| "Not a number: the default, with a console warning" in every row | "Invalid: default." in the row; the warning rule once in the module introduction |
+| "The shape of the move" | "Easing curve" |
+| "How quickly the wobble dies away", "how fast it wobbles" | "Spring damping", "Spring oscillation frequency" |
+| "Higher: settles sooner", "the wobble grows" | "0: undamped.", "Below 0: oscillation grows." |
+| a sentence listing cases ("one below 0 is a jump of 1 ms, and anything else moves in the default time") | schematic parts, each "Label: value.": `Range: 0 or more.` `0: immediate jump.` `Below 0: immediate jump.` `Invalid: default.` |
+
+Two more rules from the same review:
+
+- **Show the range whenever there is one:** `Range: 0 ↔ 1`, `Range: 0 or more`, `Range: above 0`,
+  `Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3`.
+- **Use the term the field uses** (easing, Bézier control points, damping, frequency, transport,
+  tempo), not a description of it.
+
+The module introduction (`MODULE_INTROS['ce.anim']` in `generate-scripting-manual.mjs`) now says
+the rules every command shares, so no row repeats them:
+
+- A required value that is missing or of the wrong type: the call is rejected with a console error.
+- An option with a wrong value: a console warning, the first time only, and the fallback in its
+  row is used.
+- Number options also accept text that is a number, such as "500".
+
+### Done and approved
+
+| Item | Where |
+| --- | --- |
+| `ce.anim.to`: description, example, `path`, `target`, `opts`, two notes | `panelApi.js`, `animateTo` |
+| `duration`, `beats`, `sync`, `delay`, shared by `to`, `spring` and `envelope` | `SHARED_OPTION_FIELDS` |
+| `ce.anim.stop` | approved in the first batch |
+
+`path` reads: "The value to animate, or a list of values. Colour property, or a control not on the
+panel: rejected with a console error. List containing either: the entire list is rejected."
+
+The owner was shown these in the running editor (Help, the hover card, the Values sidebar) before
+approving. When the owner asks for a mockup, put the text into the working tree, regenerate the
+manual and Help, and take screenshots with Playwright through `browser-checks/behaviourKit.mjs`
+(`boot`, `fresh`, `make`; the hover card is `.ce-hover`, the sidebar `.bd-app`, Help
+`.overlay-panel`).
+
+### Made on the way, at the owner's word
+
+- **Every parameter shows its type and whether it is required**, from the data (see "Decided on
+  2026-10-22" above).
+- **The hover card and the code's signature hint find a command written by its path**
+  (`ce.anim.to`), not only by its short name (`animateTo`): 677 of the 774 commands had neither in
+  the form scripts use. The card shows the description, the example, the parameters and the notes
+  as separate parts.
+- **ce.anim rejects a control the panel does not have**, which used to start a move that wrote an
+  error on every tick and called `done` with true, and **says so for an empty path or list**, which
+  returned false without a word. The fix is in both runtimes that run ce.anim: `startAnimationImpl`
+  in `panelRuntime.js` and `ScriptRuntime::startAnimation` (through the host's new
+  `namesMissingControl`, answered by `PanelValueModel`). The Lua, JavaScript and Python preludes
+  pass a missing path as empty. Tests: `scriptAnim.test.js`, `PythonScriptEngineTests.cpp`,
+  `PanelValueModelTests.cpp`. The release notes say it.
+
+### Waiting for the owner: item 3
+
+Proposed, in the owner's latest wording rule:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}. Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3. Invalid: linear. |
+| `damping` | number | 6 | Spring damping (curve = "spring"). 0: undamped. Below 0: oscillation grows. Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency (curve = "spring"). 0: no oscillation. Invalid: default. |
+
+The old `curve` text said x1 and x2 "are kept between 0 and 1". They are not: numbers outside the
+range are rejected and the move is linear (`bezierOf` in `easingTables.js`).
+
+Three decisions, each a change in both runtimes if made (the editor's `startAnimationImpl`, and
+`ScriptRuntime::startAnimation`, which applies the same rules):
+
+1. An unknown `curve` name or invalid control points are logged as an ordinary console line on
+   every call. Every other option gives a warning, once (`warnAnimTiming`). Make `curve` the same?
+2. `damping` below 0 makes the oscillation grow without limit: a move from 0 to 100 with damping -2
+   is at -161 halfway. Reject it as invalid (warning, default 6)?
+3. A `curve` that is neither text nor a list (`curve = 5`) is linear without a message. Warn?
+
+### Left to do in `ce.anim`
+
+1. Item 3 above.
+2. The other shared options, in `SHARED_OPTION_FIELDS`: `from` (`animFrom`), `stagger`, `repeat`,
+   `pingpong`, `done`. Check `from` first: it is read with `Number()`, so "abc" and "" start from 0
+   and `true` from 1, without a message, where every other number option uses `realNumber` and
+   warns.
+3. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows).
+4. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
+5. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+
+For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
+range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
+
+### The branch
+
+On `ccr-d7809877-w74329`, pushed, not merged, no pull request: `ae59f63` (type labels), `ed09bc6`
+(`ce.anim.to` and the timing options), `b759a41` (hover card and hint by path), `adf0367` (the two
+ce.anim rejections), and this handoff. The owner merges through a pull request when asked, after
+screenshots.
+
+Still deferred from `ce.midi`, by the owner's choice: the older helpers' silent wrong answers
+(`to7bit(20000, 2)`, `to14bit(20000)`, `fromNibbles(16, 0)`, `nibblize({300})`, `denibblize` with
+an odd count, `toSigned(-200, 8)`, `from7bit("02 2C")`, `toAscii` not cutting long text).
 
 How many descriptions each module has, and how many need the most work (first sentence built on
 parameter names, with a bracketed aside, or over 25 words):
@@ -344,7 +458,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | --- | --- | --- |
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
-| ce.anim | 12 | 12 |
+| ce.anim | 12 | 12, `to` and `stop` done |
 | ce.draw | 27 | 18 |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
@@ -401,8 +515,9 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it. The first batch, ce.midi and ce.math are
-done; rewrite the ce.anim descriptions by its rules and fields (summary, example, params[].summary,
-returns, notes). Before changing any file, show me one command at a time, its text now and every
-field as proposed, and wait for my answer before the next.
+Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
+on 2026-10-22". ce.anim.to and its timing options are done; item 3 (curve, damping, frequency) is
+proposed with three open decisions. Continue from there in technical English, schematic, with
+ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
+and wait for my answer before the next.
 ```
