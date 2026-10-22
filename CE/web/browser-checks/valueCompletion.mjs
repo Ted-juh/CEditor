@@ -421,8 +421,11 @@ end
   const inline = await hintAt(3);
   const above = await hintAt(4);
   const below = await hintAt(1);
-  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC written with tabs, the hint is on that line after its last character as drawn, a line tall, over no code, and drawn on a background of its own though it is moved to <body>; the line carries the accent bar the caret\'s line has',
-    { mode: 'inline', parent: 'BODY', text: 'sendCC(channel, cc, value)', opaque: true, onLine: true, after: true, oneLine: true, inside: true, bar: true },
+  // The hint names the command as the script writes it (ce.midi.sendCC, not its short name), since
+  // languageService finds a command by its path as well: a script that writes ce.anim.to( gets
+  // ce.anim.to(path, target, opts) over the line, where it got nothing.
+  led.check(S, 'the hint after the end of its line', 'with the caret in a short sendCC written with tabs, the hint is on that line after its last character as drawn, named as the script writes it, a line tall, over no code, and drawn on a background of its own though it is moved to <body>; the line carries the accent bar the caret\'s line has',
+    { mode: 'inline', parent: 'BODY', text: 'ce.midi.sendCC(channel, cc, value)', opaque: true, onLine: true, after: true, oneLine: true, inside: true, bar: true },
     { mode: inline.mode, parent: inline.parent, text: inline.text, opaque: inline.opaque, onLine: inline.onLine, after: inline.after, oneLine: inline.oneLine,
       inside: inline.inside, bar: inline.bar });
   led.check(S, 'no room after the line', 'on a line too long for it, the hint is a box a line tall exactly over the line before, so it covers that line and no other, with a border and a background, inside the editor; on the top visible line, exactly over the line after',
