@@ -356,6 +356,7 @@ The owner rejected each of these, some more than once. Use the right-hand column
 | "Higher: settles sooner", "the wobble grows" | "0: undamped.", "Below 0: oscillation grows." |
 | a sentence listing cases ("one below 0 is a jump of 1 ms, and anything else moves in the default time") | schematic parts, each "Label: value.", **one per line** (a `\n` in the text): `Range: ≥ 0.` / `0 or below: immediate jump.` / `Invalid: default.` |
 | "Range: 0 or more", "Range: above 0" | `Range: ≥ 0.`, `Range: > 0.`, `Range: 0 ↔ 1.` (symbols, not words) |
+| "Other values: "butt"", "Any other word draws…" | `Invalid: default.` (the owner: "The invalid:default is better") |
 | several rules in one paragraph | one rule per line. The owner: "Short. Viewable in a glance. Users don't want to read whole texts. Every new rule must be on a new line." |
 
 Two more rules from the same review:
@@ -448,7 +449,7 @@ formula is 1 - e^(-damping·x)·cos(frequency·x) in both runtimes, and cos is e
 | `from` | number | current value | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `stagger` | number (ms) | 0 | Delay added per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>A fraction is rounded.<br>0 or below: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (repeat is a keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 Four edges where both runtimes were silent, unlike every other option, each decided by the owner
@@ -521,7 +522,15 @@ Done, approved by the owner:
   by `fill`, `stroke` and `gradient`; the eight-digit panel form keeps its alpha here, unlike in
   `ce.math`.
 
-Left, in the order of the dump: `stroke`, `rect`, `circle`, `line`, `path`, `arc`,
+- `stroke`: "Set the line colour and width for the shapes drawn after it.", the example, `colour`
+  as `fill`'s, `width` with its range, `opts`, and the four options. The owner asked what "Other
+  values: "butt"" meant and chose **`Invalid: default.`** for that case everywhere: a value that
+  is not one of the words listed (a different word, the same word in capitals, a number) draws
+  the default, with the one-time warning. ce.anim's `sync` and `pingpong` say `Invalid: false.`
+  the same way. Two edges, warned about once now where they were silent: a `width` that is not a
+  number above 0 (drawn as 1), and a `dashOffset` that is not a number (none).
+
+Left, in the order of the dump: `rect`, `circle`, `line`, `path`, `arc`,
 `gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
 `points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
 if it is declared. What the probe found, for the items to come: `rect`, `circle`, `ellipse`,
@@ -554,7 +563,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18, `clear` and `fill` done |
+| ce.draw | 27 | 18, `clear`, `fill` and `stroke` done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -611,8 +620,8 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill);
-continue with ce.draw.stroke, in technical English, schematic, one rule per line, with ranges, as its table
+on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill,
+stroke); continue with ce.draw.rect, in technical English, schematic, one rule per line, with ranges, as its table
 says, showing every parameter and option of the command in its item. Check each command at its
 edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.

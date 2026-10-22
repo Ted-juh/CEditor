@@ -8674,7 +8674,13 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       const paint = drawPaint('ce.draw.stroke', 'the stroke', colour);
       if (paint === undefined) return;
       drawState.stroke = paint;
-      drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
+      // A width that is not a number above 0 is 1, and said once: it was 1 in silence. Text that
+      // is a number is read as one, as every drawing number is (realNumber).
+      const w = realNumber(width);
+      if (width !== undefined && width !== null && !(w > 0)) {
+        warnDrawStroke({ severity: 'warning', message: `ce.draw.stroke: the width is ${shownValue(width)}, not a number above 0, so 1 is drawn.` });
+      }
+      drawState.strokeWidth = w > 0 ? w : 1;
       // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
       // probe link) are "3 3" and "2 3". drawDash.js reads it, for this and for the script editor's
@@ -8691,7 +8697,13 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       drawState.join = join.value;
       // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
       // which is how a panel shows "this is recording" without redrawing the shape (§49).
-      drawState.dashOffset = Number.isFinite(Number(opts?.dashOffset)) ? Number(opts.dashOffset) : null;
+      // …and one that is not a number was none in silence; it is said once.
+      const offset = opts?.dashOffset;
+      const off = realNumber(offset);
+      if (offset !== undefined && offset !== null && off === undefined) {
+        warnDrawStroke({ severity: 'warning', message: `ce.draw.stroke: the dashOffset is ${shownValue(offset)}, not a number of pixels, so 0 is used.` });
+      }
+      drawState.dashOffset = off ?? null;
     },
     drawGradient: (stops, angle) => drawGradientImpl(stops, angle),
     // Applies to everything drawn after it, like fill and stroke — not to one shape, because the

@@ -297,7 +297,7 @@ const SHARED_OPTION_FIELDS = {
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
-    summary: '`true`: moves only while the transport plays, and follows tempo changes.\nOther values: false.',
+    summary: '`true`: moves only while the transport plays, and follows tempo changes.\nInvalid: false.',
   },
   delay: {
     name: 'delay', type: 'number', default: '0', unit: 'milliseconds',
@@ -316,7 +316,7 @@ const SHARED_OPTION_FIELDS = {
   },
   pingpong: {
     name: 'pingpong', type: 'true or false', default: 'false',
-    summary: '`true`: alternate runs play in reverse.\nRequires repeat 0, or ≥ 2.\nOther values: false.',
+    summary: '`true`: alternate runs play in reverse.\nRequires repeat 0, or ≥ 2.\nInvalid: false.',
   },
   // done(completed), which is what this always said. Every runtime used to pass one table,
   // { path, completed } or { paths, completed }, and a table is always true, so `if completed then`
@@ -1469,23 +1469,26 @@ export const COMMANDS = [
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.',
+    summary: 'Set the line colour and width for the shapes drawn after it.',
+    example: '`drawStroke("#5B9BD5", 2)` outlines the shapes drawn after it in that blue, 2 pixels wide.',
+    notes: [
+      'Applies to everything drawn after it; each onDraw starts with no fill and no stroke.',
+      'Returns no value.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'colour', type: 'value', required: false, kind: 'colour' },
-      { name: 'width', type: 'number', required: false, unit: 'pixels' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'colour', type: 'value', required: false, kind: 'colour',
+        summary: 'A colour (the table in the introduction), or a gradient from `ce.draw.gradient()`.\nLeft out, "" or "none": no outlines.\nNot a colour: rejected with a console error; the stroke stays as it was.' },
+      { name: 'width', type: 'number', required: false, unit: 'pixels', summary: 'Line width in pixels.\nRange: > 0.\nDefault: 1.\n≤ 0, or invalid: 1.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: solid lines, butt ends, mitred corners.', fields: optionFields([
         { name: 'dash', type: 'list of numbers', default: 'a solid line', kind: 'dash',
-          summary: 'Alternating on and off lengths in pixels. The panel\'s own beat marks are '
-            + '{ 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a '
-            + 'number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so.' },
+          summary: 'On and off lengths in pixels, alternating.\nA length < 0, or invalid: 0.\nNot a list: solid line.' },
         { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
-          summary: 'How far into the dash pattern to start. Advance it on a timer and the dashes '
-            + 'march along the line.' },
+          summary: 'Where the dash pattern starts.\nAdvanced on a timer: the dashes move.\nInvalid: 0.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so.' },
+          summary: 'Line ends: "butt", "round" or "square". Case-sensitive.\nInvalid: default.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
-          summary: 'How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so.' },
+          summary: 'Corners: "miter", "round" or "bevel". Case-sensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',

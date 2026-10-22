@@ -395,6 +395,27 @@ test('the overlay resolves a gradient with the app\'s own gradientCoords', () =>
 
 /* ----------------------------------------------------------------- dash / cap / join */
 
+test('a width that is not above 0, and a dashOffset that is not a number, are said once and drawn as the default', () => {
+  // Both were the default in silence. Text that is a number is read as one, as every number is.
+  withPanel(scopePanel(), 'screen', (api) => {
+    const lines = () => { const out = get(scriptTrace).map((t) => `${t.kind}: ${t.message}`); clearScriptTrace(); return out; };
+    const once = ' This is said only the first time.';
+    clearScriptTrace();
+    api.drawStroke('#FFF', 0); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).strokeWidth, 1);
+    assert.deepEqual(lines(), [`warn: ce.draw.stroke: the width is 0, not a number above 0, so 1 is drawn.${once}`]);
+    api.drawStroke('#FFF', 0); api.drawStroke('#FFF', '2'); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).strokeWidth, 2, 'text that is a number is read as one');
+    assert.deepEqual(lines(), [], 'said once, and nothing of a number');
+    api.drawStroke('#FFF', 1, { dash: [3, 3], dashOffset: 'x' }); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).dashOffset, null);
+    assert.deepEqual(lines(), [`warn: ce.draw.stroke: the dashOffset is "x", not a number of pixels, so 0 is used.${once}`]);
+    api.drawStroke('#FFF', 1, { dash: [3, 3], dashOffset: '4' }); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).dashOffset, 4);
+    assert.deepEqual(lines(), []);
+  });
+});
+
 test('a dash is a list of on/off lengths, the way every drawing API spells it', () => {
   withPanel(scopePanel(), 'screen', (api) => {
     api.drawStroke('#FFF', 1, { dash: [3, 3], cap: 'square', join: 'bevel' });

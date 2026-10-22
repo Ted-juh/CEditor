@@ -86,6 +86,8 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.draw.stroke` with a `dash` that is not a list, or a `cap` or `join` that is not one of its
   words, draws the default as before, but reports it as a warning, not an error: an error now
   always means the call did nothing.
+- `ce.draw.stroke` with a `width` that is not a number above 0, or a `dashOffset` that is not a
+  number, draws the default (1, and no offset) with a warning. Both were silent.
 
 ## What you get
 

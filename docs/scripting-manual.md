@@ -2560,7 +2560,7 @@ Good to know:
 |---|---|---|---|
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
-| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
 | `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
 | `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
@@ -2568,7 +2568,7 @@ Good to know:
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
@@ -2606,11 +2606,11 @@ Good to know:
 | `frequency` | number | 12 | Spring oscillation frequency.<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
 | `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
-| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
@@ -2692,11 +2692,11 @@ Good to know:
 | `to` | number | 1 | Value at y = 1.<br>Invalid: default. |
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
-| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
@@ -3474,7 +3474,18 @@ ce.draw.fill("#5B9BD5");
 
 #### `ce.draw.stroke([colour] [, width] [, opts])`
 
-Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.
+Set the line colour and width for the shapes drawn after it.
+
+Example: `drawStroke("#5B9BD5", 2)` outlines the shapes drawn after it in that blue, 2 pixels wide.
+
+- `colour` (colour, optional): A colour (the table in the introduction), or a gradient from `ce.draw.gradient()`.<br>Left out, "" or "none": no outlines.<br>Not a colour: rejected with a console error; the stroke stays as it was.
+- `width` (number, optional): Line width in pixels.<br>Range: > 0.<br>Default: 1.<br>≤ 0, or invalid: 1.
+- `opts` (options, optional): The options below.<br>Left out: solid lines, butt ends, mitred corners.
+
+Good to know:
+
+- Applies to everything drawn after it; each onDraw starts with no fill and no stroke.
+- Returns no value.
 
 *Short name: `drawStroke`.*
 
@@ -3482,10 +3493,10 @@ Set the line colour and thickness for the shapes drawn after this. `width` defau
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `dash` | list of numbers | a solid line | Alternating on and off lengths in pixels. The panel's own beat marks are { 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so. |
-| `dashOffset` | number (pixels) | 0 | How far into the dash pattern to start. Advance it on a timer and the dashes march along the line. |
-| `cap` | text | "butt" | The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so.<br>One of "butt", "round" or "square". |
-| `join` | text | "miter" | How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so.<br>One of "miter", "round" or "bevel". |
+| `dash` | list of numbers | a solid line | On and off lengths in pixels, alternating.<br>A length < 0, or invalid: 0.<br>Not a list: solid line. |
+| `dashOffset` | number (pixels) | 0 | Where the dash pattern starts.<br>Advanced on a timer: the dashes move.<br>Invalid: 0. |
+| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-sensitive.<br>Invalid: default. |
+| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-sensitive.<br>Invalid: default. |
 
 ```lua
 -- Lua

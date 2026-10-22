@@ -361,7 +361,9 @@ test('rows follow the call\'s order: options under their table, a call inside an
       '0:explain:ce.anim.to']);
   const nested = readStatement(NESTED, 'lua', NESTED.indexOf('ce.draw'), {});
   assert.deepEqual(statementRows(nested).map(row),
-    ['0:call:ce.draw.fill', '0:arg:colour', '1:call:ce.draw.gradient', '1:arg:stops', '2:arg:stop 1', '2:arg:stop 2', '1:arg:angle']);
+    // fill has "Good to know" notes now, so its own rows end with what it explains, before the
+    // call inside it.
+    ['0:call:ce.draw.fill', '0:arg:colour', '0:explain:ce.draw.fill', '1:call:ce.draw.gradient', '1:arg:stops', '2:arg:stop 1', '2:arg:stop 2', '1:arg:angle']);
   const fill = nested.calls[0];
   assert.equal(madeByChild(fill, fill.args[0]), true, 'the colour is the gradient call listed under it');
   assert.equal(meaningLine(fill.args[0], { madeBelow: true }), 'made by the call below: a colour');
