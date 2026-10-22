@@ -289,20 +289,19 @@ const SHARED_OPTION_FIELDS = {
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
   duration: {
     name: 'duration', type: 'number', default: '300', unit: 'milliseconds',
-    summary: 'How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once.',
+    summary: 'Length of the animation. Range: 0 or more (0: immediate jump). Below 0: immediate jump. Not a number: default.',
   },
   beats: {
     name: 'beats', type: 'number', sample: '2', unit: 'beats',
-    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move\'s length is its `duration`.',
+    summary: 'Length in beats. Overrides duration. Range: above 0. Tempo: read at the start; with sync, followed. Outside the range, or not a number: duration is used.',
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
-    summary: 'Follow the transport rather than the wall clock, so the move pauses when playback '
-      + 'does.',
+    summary: '`true`: moves only while the transport plays, and follows tempo changes. Other values: false.',
   },
   delay: {
     name: 'delay', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once.',
+    summary: 'Wait before the start. Range: 0 or more. Below 0, or not a number: no wait.',
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
@@ -1072,11 +1071,16 @@ export const COMMANDS = [
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
     refusal: 'false',
-    summary: 'Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one\'s `done` is called with false, because it was cancelled rather than finished.',
+    summary: 'Move a value smoothly to a new number over time.',
+    example: '`animateTo("cutoff", 127, {duration = 500})` moves cutoff to 127 in half a second.',
+    notes: [
+      'A new move on a value that is already moving replaces the old one, and the old one\'s `done` is called with false.',
+      'Returns false if the call is rejected.',
+    ],
     params: [
-      { name: 'path', type: 'path', required: true },
-      { name: 'target', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values. Colour property: rejected with a console error. List containing a colour property: the entire list is rejected.' },
+      { name: 'target', type: 'number', required: true, summary: 'The end value.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below. Left out: linear curve, 300 ms.',
         fields: optionFields([
           'duration', 'beats', 'sync',
           { name: 'curve', type: 'text or list', default: '"linear"', kind: 'curve',

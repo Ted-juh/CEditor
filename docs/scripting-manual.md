@@ -2533,9 +2533,24 @@ Good to know:
 
 Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.
 
+- A required value that is missing or of the wrong type: the call is rejected with a console error.
+- An option with a wrong value: a console warning, the first time only, and the fallback in its row is used.
+- Number options also accept text that is a number, such as "500".
+
 #### `ce.anim.to(path, target [, opts])`
 
-Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` is called with false, because it was cancelled rather than finished.
+Move a value smoothly to a new number over time.
+
+Example: `animateTo("cutoff", 127, {duration = 500})` moves cutoff to 127 in half a second.
+
+- `path` (path, required): The value to animate, or a list of values. Colour property: rejected with a console error. List containing a colour property: the entire list is rejected.
+- `target` (number, required): The end value.
+- `opts` (options, optional): The options below. Left out: linear curve, 300 ms.
+
+Good to know:
+
+- A new move on a value that is already moving replaces the old one, and the old one's `done` is called with false.
+- Returns false if the call is rejected.
 
 *Short name: `animateTo`.*
 
@@ -2543,14 +2558,14 @@ Move a value smoothly to `target` over time instead of jumping straight there. `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
-| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
-| `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
+| `duration` | number (milliseconds) | 300 | Length of the animation. Range: 0 or more (0: immediate jump). Below 0: immediate jump. Not a number: default. |
+| `beats` | number (beats) | — | Length in beats. Overrides duration. Range: above 0. Tempo: read at the start; with sync, followed. Outside the range, or not a number: duration is used. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes. Other values: false. |
 | `curve` | text or list | "linear" | The shape of the move. The first 4 names are the curves of `ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an animation that name the same curve move the same way. "spring" overshoots and settles like `ce.anim.spring()`, shaped by `damping` and `frequency`. Instead of a name you can give the four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an animation's `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name it does not know is reported, and the move runs in a straight line. One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it. |
 | `frequency` | number | 12 | With curve = "spring": how fast it wobbles, as ce.anim.spring reads it. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
+| `delay` | number (milliseconds) | 0 | Wait before the start. Range: 0 or more. Below 0, or not a number: no wait. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
 | `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
@@ -2575,13 +2590,13 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 600 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
+| `duration` | number (milliseconds) | 600 | Length of the animation. Range: 0 or more (0: immediate jump). Below 0: immediate jump. Not a number: default. |
 | `damping` | number | 6 | How quickly the wobble dies away. Higher settles sooner; lower keeps bouncing. |
 | `frequency` | number | 12 | How fast it wobbles. Higher is a tighter, faster bounce. |
 | `from` | number | — | Start from this value instead of wherever the control is now. |
-| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
-| `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
+| `beats` | number (beats) | — | Length in beats. Overrides duration. Range: above 0. Tempo: read at the start; with sync, followed. Outside the range, or not a number: duration is used. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes. Other values: false. |
+| `delay` | number (milliseconds) | 0 | Wait before the start. Range: 0 or more. Below 0, or not a number: no wait. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
 | `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
@@ -2645,10 +2660,10 @@ Move a value through a shape with several points — an attack and decay, say, o
 |---|---|---|---|
 | `from` | number | 0 | The value that y = 0 in the shape means. |
 | `to` | number | 1 | The value that y = 1 in the shape means. |
-| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
-| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
-| `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
+| `duration` | number (milliseconds) | 300 | Length of the animation. Range: 0 or more (0: immediate jump). Below 0: immediate jump. Not a number: default. |
+| `beats` | number (beats) | — | Length in beats. Overrides duration. Range: above 0. Tempo: read at the start; with sync, followed. Outside the range, or not a number: duration is used. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes. Other values: false. |
+| `delay` | number (milliseconds) | 0 | Wait before the start. Range: 0 or more. Below 0, or not a number: no wait. |
 | `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
 | `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
 | `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |

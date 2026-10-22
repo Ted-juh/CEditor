@@ -88,7 +88,10 @@ const MODULE_INTROS = {
     + '- Every random command takes its numbers from the script\'s own random sequence.\n'
     + '- `ce.math.seed(n)` sets where that sequence starts. The same seed gives the same numbers every time: in every scripting language, in the editor and in the exported plugin.\n'
     + '- `ce.math.stream(name, fn)` gives a block of code its own separate sequence, so two parts of a script don\'t affect each other\'s numbers.',
-  'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.',
+  'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.\n\n'
+    + '- A required value that is missing or of the wrong type: the call is rejected with a console error.\n'
+    + '- An option with a wrong value: a console warning, the first time only, and the fallback in its row is used.\n'
+    + '- Number options also accept text that is a number, such as "500".',
   'ce.panel': 'Changing the panel itself from a script: creating, copying and removing controls, finding them, lining them up, and editing the lists inside a control such as its states and animations. Most of these need the panel window; each entry says so. While you preview, everything a script changes is put back when the preview stops — `ce.panel.keep` is how you keep it.',
   'ce.storage': 'Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.',
   'ce.draw': 'Drawing your own graphics on top of a control, from its script\'s onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control\'s top-left corner.',
