@@ -21,6 +21,7 @@ import { scriptDrawings } from '../src/CE_Application/stores/scriptDraw.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { valueAtPath, setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import ScriptDrawOverlay from '../src/CE_Application/editor/ScriptDrawOverlay.svelte';
 import {
   WEBVIEW_ONLY_MEMBERS, LIFECYCLE_HOOKS, handlerNamesForRuntime,
@@ -106,13 +107,20 @@ test('a path takes the flat coordinate list every language writes the same way',
 
     api.drawClear();
     // An odd trailing value is dropped rather than silently pairing with a zero, which would put a
-    // point on the axis that the script never asked for.
+    // point on the axis that the script never asked for; it is said, once (drawShapes.test.js).
     api.drawPath([0, 1, 2, 3, 4]);
     assert.deepEqual(drawCommandsFor('screen')[0].points, [[0, 1], [2, 3]]);
 
     api.drawClear();
-    api.drawPath([0, 1, 'x', 3]);
-    assert.deepEqual(drawCommandsFor('screen')[0].points, [[0, 1]], 'a non-number is not a coordinate');
+    api.drawPath([0, 1, 'x', 3, 4, 5]);
+    assert.deepEqual(drawCommandsFor('screen')[0].points, [[0, 1], [4, 5]], 'a non-number is not a coordinate');
+
+    // With one point left there is no line to draw: rejected, where it drew nothing in silence.
+    api.drawClear();
+    clearScriptTrace();
+    assert.equal(api.drawPath([0, 1, 'x', 3]), false);
+    assert.deepEqual(drawCommandsFor('screen'), []);
+    assert.match(traced(), /ce\.draw\.path: points has one point, and a path needs at least two, so nothing was drawn\./);
   });
 });
 
@@ -365,12 +373,23 @@ test('bare colours space themselves evenly, which is what a two-colour fade is',
   });
 });
 
-test('fewer than two usable stops is not a gradient', () => {
+test('fewer than two usable stops is not a gradient, and is said', () => {
   withPanel(scopePanel(), 'screen', (api) => {
+    clearScriptTrace();
     assert.equal(api.drawGradient(['#000']), undefined, 'one colour and nothing is a colour');
     assert.equal(api.drawGradient([]), undefined);
     assert.equal(api.drawGradient(null), undefined);
+    assert.equal(api.drawGradient('#000'), undefined, 'text is not a list, and was read as its letters');
     assert.equal(api.drawGradient(['#000', '']), undefined, 'and an empty colour is not one');
+    // Each said as a rejection: the first three returned nothing in silence, and "#000" was four
+    // stops, the first of which "is not a colour".
+    assert.deepEqual(get(scriptTrace).map((t) => `${t.kind}: ${t.message}`), [
+      'error: ce.draw.gradient: stops has one colour, and a gradient needs at least two, so there is no gradient.',
+      'error: ce.draw.gradient: stops has no colours, and a gradient needs at least two, so there is no gradient.',
+      'error: ce.draw.gradient: stops was not given, so there is no gradient.',
+      'error: ce.draw.gradient: stops is "#000", not a list of colours, so there is no gradient.',
+      'error: ce.draw.gradient: stop 2 of 2 has no colour, so there is no gradient. A stop is a colour, or { at, colour, opacity }.',
+    ]);
   });
 });
 

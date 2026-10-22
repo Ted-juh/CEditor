@@ -510,10 +510,10 @@ test('a gradient stop is read like a fill, and one that cannot be read refuses t
       assert.equal(api.drawGradient(stops), undefined, JSON.stringify(stops));
       assert.deepEqual(errors(), [message]);
     }
-    // Fewer than two stops is documented as no gradient, and stays silent.
+    // Fewer than two stops is no gradient, and is said: it was documented as no gradient, and silent.
     clearScriptTrace();
     assert.equal(api.drawGradient(['#000']), undefined);
-    assert.deepEqual(errors(), []);
+    assert.deepEqual(errors(), ['ce.draw.gradient: stops has one colour, and a gradient needs at least two, so there is no gradient.']);
   });
 });
 

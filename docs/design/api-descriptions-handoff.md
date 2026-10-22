@@ -498,7 +498,7 @@ it says that no name was given, in the editor (the command is panel-window only)
 
 **`ce.anim` is done.**
 
-## `ce.draw`: in progress
+## `ce.draw`: done
 
 Every command was probed at its edges first (the probe is the pattern of `drawShapes.test.js`'s
 `run()`: a host panel with a Knob `K`, `scriptApiForTesting('K', …)`, then `drawCommandsFor('K')`
@@ -546,19 +546,39 @@ Done, approved by the owner:
   anticlockwise; 360 or more apart: a full circle, as `ScriptDrawOverlay`'s arcPath draws it), and
   the notes (a fill makes a pie slice through the centre).
 
-Left, in the order of the dump: `circle`, `line`, `path`, `arc`,
-`gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
-`points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
-if it is declared. What the probe found, for the items to come: `rect`, `circle`, `ellipse`,
-`arc` and `polygon` take a size or radius below 0 without a word; `path` takes one point or none
-and draws nothing, in silence, where `lines` and `points` reject an empty list; `grid` with `step`
-and `columns` together uses `step`; `polygon` with fewer than 3 sides, or sides that are not a
-number, draws a triangle in silence; `transform` with `cx` and no `cy` rotates about the corner in
-silence; `pixelText` with a scale of 0 or text uses 1 in silence; `blend` is case-sensitive;
-`text` with a size of 0 draws at 12 in silence.
+- `gradient`: approved with two decisions, and then the owner said "I think you get the idea.
+  Continue without abruption": the rest of the module was done the same way, without showing each
+  item. "Make a gradient to use as a fill or stroke colour.", the example, `stops` (colours, { at,
+  colour, opacity } tables, or a mix; at and opacity `Range: 0 ↔ 1`; fewer than two, not a list, a
+  colour that is not one, or a position outside its range: rejected) and `angle` (0 up, 90 right,
+  as the Background section's gradients; `Default: 180 (top to bottom).` / `Invalid: default.`),
+  one note (returns a gradient for `fill()` or `stroke()`; rejected: no result). The two
+  decisions: `stops` left out, not a list (text was read as its letters) or fewer than two colours
+  is rejected with an error where it returned nothing in silence, in the sidebar's words too
+  (`readDrawGradient` said it as a warning); an `angle` that is not a number is 180 with the
+  one-time warning.
 
-For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
-range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
+- The rest, in the same form (`panelApi.js`, and `drawShapes.js` for the readers: `drawOption`,
+  `textSize`, `polygonSides`, `gridCount`, `gridStep`, `flatPointList`, `segmentList`;
+  `drawShapes.test.js` for each edge; `RELEASE-NOTES.md` for the list a user reads). What was
+  silent and is said now, as warnings where the default is drawn and errors where the call did
+  nothing: `transform`'s options that are not numbers (the default), and `cx` without `cy` or the
+  reverse (about the top-left corner); `image`'s `fit` that is not one of its words ("fill");
+  `text`'s and `measure`'s `size` not above 0 (12); `measure` with no text (rejected; it measured
+  "") and a pixel `scale` it cannot use (1); `polygon`'s `sides` below 3, a fraction or no number
+  (3, or rounded) and a `rotation` that is not a number (0); `grid`'s count given with a spacing
+  (the count wins), a fraction of a count (rounded), a count or spacing it cannot use (ignored),
+  and its box numbers (read as every shape's); `path` with fewer than two points or no list
+  (rejected), a pair that is not two numbers or a trailing value (left out); `lines`' item that is
+  not a segment (left out); `batch` with no function (rejected); `redraw` with a name the panel
+  does not have (named); `blend` with no mode (rejected; it was "normal"); `clip` with some of its
+  four numbers left out (rejected; the missing ones were 0, which hid everything after it).
+  `opacity`'s `a` is optional in the data now, as it always was in the runtime (left out: solid).
+  `curve`'s and `path`'s `closed` say `Invalid: false.`; `blend` and `image`'s `fit` say
+  `Case-sensitive.` as `stroke`'s `cap` does. The phrase "with a console warning the first time"
+  is not repeated in the option rows: the introduction says it once, and the rows say the fallback.
+
+`ce.draw` is done. Next in the table: `ce.time` (22 descriptions, 15 that need the most work).
 
 ### The branch
 
@@ -579,7 +599,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18; `clear`, `fill`, `stroke`, `rect`, `circle`, `line`, `ellipse` and `arc` done |
+| ce.draw | 27 | 18, all done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -635,10 +655,10 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear, fill,
-stroke, rect, circle, line, ellipse, arc); continue with ce.draw.gradient, in technical English, schematic, one rule per line, with ranges, as its table
-says, showing every parameter and option of the command in its item. Check each command at its
-edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
-and wait for my answer before the next.
+Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
+on 2026-10-22" and "ce.draw: done". ce.midi, ce.math, ce.anim and ce.draw are done; continue with
+ce.time, in technical English, schematic, one rule per line, with ranges, as its table says,
+showing every parameter and option of the command in its item. Check each command at its edges in
+the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a
+time, its text now and every field as proposed, and wait for my answer before the next.
 ```

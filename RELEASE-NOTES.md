@@ -91,6 +91,33 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - A shape command with a required coordinate, size or text left out (`drawRect(0, 0)`,
   `drawText(0, 10)`) writes an error to the console and draws nothing. It drew at 0, or wrote no
   text, in silence. A size or radius below 0 is 0, with a warning; it drew nothing in silence.
+- `ce.draw.gradient` with `stops` left out, not a list, or fewer than two colours writes an error
+  and returns nothing. It returned nothing in silence, and read text in place of the list as its
+  letters, so `"red"` was three stops, the first of which "is not a colour". An `angle` that is
+  not a number is 180, with a warning.
+- `ce.draw.path` with fewer than two points, or `points` that is not a list, writes an error and
+  draws nothing; it drew nothing in silence. A pair that is not two numbers, and a trailing value
+  with no partner, are left out with a warning. `ce.draw.lines` leaves out an item that is not a
+  segment with a warning. Each was silent.
+- `ce.draw.grid`: `columns` or `rows` given with a spacing wins over it, with a warning; a
+  fraction of a column or row is rounded, with a warning; a count or spacing that cannot be used
+  is ignored, with a warning; `x`, `y`, `width` and `height` are read as every shape's numbers are.
+  Each was silent, and a fraction of a column drew a grid with no closing line.
+- `ce.draw.polygon` with `sides` below 3, a fraction or not a number draws three sides, or the
+  rounded number, with a warning, and a `rotation` that is not a number is 0 with a warning. Both
+  were silent.
+- `ce.draw.transform` with an option that is not a number uses its default, with a warning; `cx`
+  without `cy`, or the reverse, rotates about the top-left corner with a warning. Both were silent.
+- `ce.draw.text` and `ce.draw.measure` with a `size` that is not a number above 0 use 12, with a
+  warning; `ce.draw.measure` with `text` left out writes an error and returns nothing (it measured
+  ""), and a pixel `scale` it cannot use is 1 with a warning. `ce.draw.image` with a `fit` that is
+  not "fill", "contain" or "cover" draws "fill", with a warning. Each was silent.
+- `ce.draw.clip` with some of its four numbers left out writes an error and leaves the clip as it
+  was; it took the missing ones as 0, which hid everything drawn after it. `ce.draw.blend` with no
+  mode writes an error and leaves the blend as it was; it was "normal". `ce.draw.batch` with
+  something that is not a function writes an error; it returned false in silence.
+  `ce.draw.redraw` with a control name the panel does not have names it; it said "no control to
+  redraw", which reads as the script's attachment being wrong when its spelling is.
 
 ## What you get
 

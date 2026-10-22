@@ -37,11 +37,18 @@ export const DRAW_SHAPES = {
   drawCurve: { verb: 'ce.draw.curve', nums: [] },
 };
 
+/** The commands that draw no shape of their own but read numbers as the shapes do. */
+const DRAW_VERBS = {
+  drawGrid: 'ce.draw.grid', drawLines: 'ce.draw.lines', drawGradient: 'ce.draw.gradient',
+  drawTransform: 'ce.draw.transform', drawMeasure: 'ce.draw.measure',
+};
+const verbOf = (memberId) => DRAW_SHAPES[memberId]?.verb ?? DRAW_VERBS[memberId] ?? 'ce.draw';
+
 /** The numbers that are sizes, which cannot be below 0: one that was drew nothing, in silence.
  *  Not a clip's: it is no shape, and says itself when its area is empty. */
 const DRAW_SIZES = {
   drawRect: ['w', 'h', 'radius'], drawCircle: ['r'], drawEllipse: ['rx', 'ry'], drawArc: ['radius'],
-  drawPolygon: ['radius'], drawImage: ['w', 'h'],
+  drawPolygon: ['radius'], drawImage: ['w', 'h'], drawGrid: ['width', 'height'],
 };
 
 /** The arguments a shape cannot be drawn without. Left out, the call is rejected (drawMissing): it
@@ -50,14 +57,15 @@ export const DRAW_REQUIRED = {
   drawRect: ['x', 'y', 'w', 'h'], drawCircle: ['cx', 'cy', 'r'], drawEllipse: ['cx', 'cy', 'rx', 'ry'],
   drawArc: ['x', 'y', 'radius', 'from', 'to'], drawLine: ['x1', 'y1', 'x2', 'y2'],
   drawPolygon: ['cx', 'cy', 'radius', 'sides'], drawImage: ['x', 'y', 'w', 'h'],
-  drawText: ['x', 'y', 'text'], drawPixelText: ['text', 'x', 'y'],
+  drawText: ['x', 'y', 'text'], drawPixelText: ['text', 'x', 'y'], drawPath: ['points'],
+  drawClip: ['x', 'y', 'w', 'h'],
 };
 
 /** A coordinate as a shape reads it: `n`, and `said` for one that is not a number, or a size below
  *  0, each 0 (left out is 0 here; the call says so itself, through drawMissing). */
 export function drawNumber(memberId, name, value) {
   if (value === undefined || value === null) return { n: 0, said: null };
-  const verb = DRAW_SHAPES[memberId]?.verb ?? 'ce.draw';
+  const verb = verbOf(memberId);
   const n = realNumber(value);
   if (n === undefined) return { n: 0, said: `${verb}: ${name} is ${shown(value)}, which is not a number, so 0 was used.` };
   if (n < 0 && DRAW_SIZES[memberId]?.includes(name)) return { n: 0, said: `${verb}: ${name} is ${shown(n)}, which is less than 0, so 0 was used.` };
@@ -66,9 +74,101 @@ export function drawNumber(memberId, name, value) {
 
 /** Why a shape is not drawn for a required argument left out, or null. `given` holds each
  *  required argument by its name, as the call received it. */
-export function drawMissing(memberId, given) {
+export function drawMissing(memberId, given, outcome = 'so nothing was drawn.') {
   const name = (DRAW_REQUIRED[memberId] ?? []).find((k) => given[k] === undefined || given[k] === null);
-  return name ? `${DRAW_SHAPES[memberId]?.verb ?? 'ce.draw'}: ${name} was not given, so nothing was drawn.` : null;
+  return name ? `${verbOf(memberId)}: ${name} was not given, ${outcome}` : null;
+}
+
+/** An option that is a number with a default, as ce.draw.transform's and ce.draw.gradient's are:
+ *  `n`, and `said` for one that is not a number, which is the default. It was the default, or
+ *  nothing, in silence. */
+export function drawOption(memberId, name, value, fallback) {
+  if (value === undefined || value === null) return { n: fallback, said: null };
+  const n = realNumber(value);
+  if (n !== undefined) return { n, said: null };
+  return { n: fallback, said: `${verbOf(memberId)}: ${name} is ${shown(value)}, which is not a number, so ${shown(fallback)} was used.` };
+}
+
+/** A text size as ce.draw.text and ce.draw.measure read it: 12 when left out, and 12 and said for
+ *  one that is not a number above 0 (it was 12 in silence). */
+export function textSize(memberId, value) {
+  if (value === undefined || value === null) return { size: 12, said: null };
+  const n = realNumber(value);
+  if (n > 0) return { size: n, said: null };
+  return { size: 12, said: `${verbOf(memberId)}: size ${shown(value)} is ${n === undefined ? 'not a number' : 'not above 0'}, so 12 was used.` };
+}
+
+/** ce.draw.polygon's sides: a whole number of at least 3. Fewer, a fraction or no number drew a
+ *  triangle, or rounded, in silence. */
+export function polygonSides(value) {
+  const n = realNumber(value);
+  if (n === undefined) return { sides: 3, said: `ce.draw.polygon: sides ${shown(value)} is not a number, so 3 was used.` };
+  if (n < 3) return { sides: 3, said: `ce.draw.polygon: sides ${shown(value)} is below 3, so 3 was used.` };
+  const sides = Math.round(n);
+  if (sides === n) return { sides, said: null };
+  return { sides, said: `ce.draw.polygon: sides ${shown(value)} is not a whole number, so ${sides} was used.` };
+}
+
+/** ce.draw.grid's columns and rows: a whole number of at least 1, or null for one left out or
+ *  one that cannot be used, which is said. A fraction is rounded, and said. */
+export function gridCount(name, value) {
+  if (value === undefined || value === null) return { n: null, said: null };
+  const given = realNumber(value);
+  if (given === undefined) return { n: null, said: `ce.draw.grid: ${name} ${shown(value)} is not a number, so it was ignored.` };
+  if (given < 1) return { n: null, said: `ce.draw.grid: ${name} ${shown(value)} is below 1, so it was ignored.` };
+  const n = Math.round(given);
+  if (n === given) return { n, said: null };
+  return { n, said: `ce.draw.grid: ${name} ${shown(value)} is not a whole number, so ${n} was used.` };
+}
+
+/** ce.draw.grid's step, stepX and stepY: a number above 0, or null for one left out or one that
+ *  cannot be used, which is said. */
+export function gridStep(name, value) {
+  if (value === undefined || value === null) return { n: null, said: null };
+  const n = realNumber(value);
+  if (n > 0) return { n, said: null };
+  return { n: null, said: `ce.draw.grid: ${name} ${shown(value)} is ${n === undefined ? 'not a number' : 'not above 0'}, so it was ignored.` };
+}
+
+/**
+ * ce.draw.path's points, one flat list of coordinates: `points`, each [x, y]; `said` for the first
+ * pair that is not two numbers, which is left out; `odd` when a trailing value had no partner, which
+ * is left out too. Both were left out in silence. `notList` names what was given in place of a list.
+ */
+export function flatPointList(value) {
+  if (!value || typeof value !== 'object') {
+    return { points: [], said: null, odd: null, notList: `ce.draw.path: points is ${shown(value)}, not a list of numbers, so nothing was drawn.` };
+  }
+  const flat = Array.isArray(value) ? value : Object.values(value);
+  const points = [];
+  let said = null;
+  for (let i = 0; i + 1 < flat.length; i += 2) {
+    const [x, y] = [realNumber(flat[i]), realNumber(flat[i + 1])];
+    if (x !== undefined && y !== undefined) { points.push([x, y]); continue; }
+    said ??= `ce.draw.path: point ${i / 2 + 1} of points (${shown(flat[i])}, ${shown(flat[i + 1])}) is not a point, so it was left out.`;
+  }
+  const odd = flat.length % 2 ? `ce.draw.path: points has an odd number of values (${flat.length}), so the last one was left out.` : null;
+  return { points, said, odd, notList: null };
+}
+
+/**
+ * ce.draw.lines' segments, each [x1, y1, x2, y2] or { x1, y1, x2, y2 }: `segments`, and `said` for
+ * the first item that is not a segment, which is left out (it was, in silence).
+ */
+export function segmentList(value) {
+  if (!value || typeof value !== 'object') return { segments: [], said: null };
+  const list = Array.isArray(value) ? value : Object.values(value);
+  const segments = [];
+  let said = null;
+  list.forEach((item, i) => {
+    const seg = Array.isArray(item) ? item : (item && typeof item === 'object'
+      ? [item.x1 ?? item[0], item.y1 ?? item[1], item.x2 ?? item[2], item.y2 ?? item[3]]
+      : null);
+    const nums = seg ? seg.slice(0, 4).map((n) => realNumber(n)) : [];
+    if (nums.length === 4 && nums.every((n) => n !== undefined)) { segments.push(nums); return; }
+    said ??= `ce.draw.lines: ${shown(item)} at position ${i + 1} of segments is not a segment, so it was left out.`;
+  });
+  return { segments, said };
 }
 
 /**
@@ -108,14 +208,14 @@ export function curveTension(value) {
 
 /** ce.draw.pixelText's scale as it reads it: `scale`, a whole number from 1, and `said` for one not
  *  used as given (left out is 1). */
-export function pixelScale(value) {
+export function pixelScale(value, verb = 'ce.draw.pixelText') {
   if (value === undefined || value === null) return { scale: 1, said: null };
   const n = realNumber(value);
-  if (n === undefined) return { scale: 1, said: `ce.draw.pixelText: scale ${shown(value)} is not a number, so 1 was used.` };
+  if (n === undefined) return { scale: 1, said: `${verb}: scale ${shown(value)} is not a number, so 1 was used.` };
   const scale = Math.max(1, Math.round(n));
   if (scale === n) return { scale, said: null };
-  return { scale, said: n < 1 ? `ce.draw.pixelText: scale ${shown(value)} is below 1, so 1 was used.`
-    : `ce.draw.pixelText: scale ${shown(value)} is not a whole number, so ${scale} was used.` };
+  return { scale, said: n < 1 ? `${verb}: scale ${shown(value)} is below 1, so 1 was used.`
+    : `${verb}: scale ${shown(value)} is not a whole number, so ${scale} was used.` };
 }
 
 /** What ce.draw.pixelText says of the characters its font has no glyph for, which draw nothing, or null. */

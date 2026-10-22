@@ -290,7 +290,8 @@ export function readDrawGradient(stops, angle) {
     out.push(entry);
   });
   out.forEach((st, i) => { if (st.at == null) st.at = n === 1 ? 0 : i / (n - 1); });
-  if (n < 2) say('ce.draw.gradient: there are fewer than two colours, so there is no gradient.', 'warning');
+  // Rejected in the runtime's words: it was a warning here and silence there.
+  if (n < 2) say(`ce.draw.gradient: stops has ${n === 0 ? 'no colours' : 'one colour'}, and a gradient needs at least two, so there is no gradient.`);
   const complete = n >= 2 && out.every((s) => !s.computed && s.css !== null);
   return { meaning: { stops: out, angle: typeof angle === 'number' ? angle : null, defaultAngle: 180, stopsTakeOpacity: true, complete }, problem };
 }
