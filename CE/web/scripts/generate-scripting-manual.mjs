@@ -94,7 +94,25 @@ const MODULE_INTROS = {
     + '- Number options also accept text that is a number, such as "500".',
   'ce.panel': 'Changing the panel itself from a script: creating, copying and removing controls, finding them, lining them up, and editing the lists inside a control such as its states and animations. Most of these need the panel window; each entry says so. While you preview, everything a script changes is put back when the preview stops — `ce.panel.keep` is how you keep it.',
   'ce.storage': 'Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.',
-  'ce.draw': 'Drawing your own graphics on top of a control, from its script\'s onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control\'s top-left corner.',
+  'ce.draw': 'Drawing your own graphics on top of a control, from its script\'s onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control\'s top-left corner.\n\n'
+    + '- Drawing commands add to what is there: clear first.\n'
+    + '- A coordinate or size that is not a number, or a size below 0: 0, with a console warning, the first time only.\n'
+    + '- A shape wholly outside the control: a console warning, the first time only.\n'
+    + '- An option with a wrong value: a console warning, the first time only, and the fallback in its row.\n'
+    + '- A required value that is left out: rejected with a console error.\n'
+    + '\n'
+    + '**Colours that fill, stroke and gradient read**\n'
+    + '\n'
+    + '| Written as | Example |\n'
+    + '|---|---|\n'
+    + '| Six hex digits, the panel\'s form | "5B9BD5" |\n'
+    + '| Eight hex digits, alpha first, the panel\'s form | "805B9BD5" (drawn with that alpha) |\n'
+    + '| "#" with 3, 4, 6 or 8 digits, alpha last | "#F80", "#5B9BD580" |\n'
+    + '| A CSS colour name, in any case | "red", "steelblue", "transparent" |\n'
+    + '| rgb(), rgba(), hsl(), hsla() | "rgb(91, 155, 213)" |\n'
+    + '| A gradient from `ce.draw.gradient()` | |\n'
+    + '\n'
+    + 'Not accepted: a number, three digits without "#", anything else: rejected with a console error; the colour in force stays.',
   'ce.image': 'The pictures a control shows — its background image and overlay, an image inside its text, and its icon — and the icon library they come from. These commands also tell you whether a picture will still be there after you export.',
   'ce.text': 'Fonts and lettering: which fonts are available, setting a control\'s type in one call, variable-font settings, and measuring text so it fits.',
   'ce.ui': 'Talking to the person using the panel: short messages, a line in the status bar, questions with buttons, a line of text to type, a pick from a list, and copying to the clipboard. For messages meant for you while you build the panel, use `log` instead.',

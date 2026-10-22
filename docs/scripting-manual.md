@@ -2560,7 +2560,7 @@ Good to know:
 |---|---|---|---|
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
-| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
 | `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
 | `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
@@ -2568,7 +2568,7 @@ Good to know:
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
@@ -2606,11 +2606,11 @@ Good to know:
 | `frequency` | number | 12 | Spring oscillation frequency.<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
 | `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
-| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
@@ -2692,11 +2692,11 @@ Good to know:
 | `to` | number | 1 | Value at y = 1.<br>Invalid: default. |
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
-| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
@@ -3403,11 +3403,39 @@ Drawing, images, typography, and dialogs with the user.
 
 Drawing your own graphics on top of a control, from its script's onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control's top-left corner.
 
+- Drawing commands add to what is there: clear first.
+- A coordinate or size that is not a number, or a size below 0: 0, with a console warning, the first time only.
+- A shape wholly outside the control: a console warning, the first time only.
+- An option with a wrong value: a console warning, the first time only, and the fallback in its row.
+- A required value that is left out: rejected with a console error.
+
+**Colours that fill, stroke and gradient read**
+
+| Written as | Example |
+|---|---|
+| Six hex digits, the panel's form | "5B9BD5" |
+| Eight hex digits, alpha first, the panel's form | "805B9BD5" (drawn with that alpha) |
+| "#" with 3, 4, 6 or 8 digits, alpha last | "#F80", "#5B9BD580" |
+| A CSS colour name, in any case | "red", "steelblue", "transparent" |
+| rgb(), rgba(), hsl(), hsla() | "rgb(91, 155, 213)" |
+| A gradient from `ce.draw.gradient()` | |
+
+Not accepted: a number, three digits without "#", anything else: rejected with a console error; the colour in force stays.
+
 Everything in this chapter needs the panel window. With the window closed these commands do nothing and write a note to the log.
 
 #### `ce.draw.clear([target])`
 
-Erase everything drawn on this control, or on the control named `target`. Drawing commands add to what is already there rather than replacing it, so this is usually the first line of onDraw.
+Erase everything drawn on a control.
+
+Example: `drawClear("Scope")` erases what is drawn on Scope.
+
+- `target` (text, optional): The control's name.<br>Left out: the control the script is attached to.
+
+Good to know:
+
+- Drawing commands add to what is there, so this is usually the first line of onDraw.
+- Returns true; unknown control, or no control to draw on: rejected with a console error.
 
 *Short name: `drawClear`.*
 
@@ -3422,7 +3450,16 @@ ce.draw.clear();
 
 #### `ce.draw.fill(colour)`
 
-Set the fill colour for the shapes drawn after this: the panel's own "5B9BD5" or "FF5B9BD5" (what `get()` returns for a colour property), a web colour such as "#5B9BD5", "rgb(91, 155, 213)" or "steelblue", or a gradient from `ce.draw.gradient()`. "#" with eight digits is read the web's way, with the alpha last. A colour that cannot be drawn is refused with a message, and the fill stays as it was. Call it with no colour to stop filling. Each onDraw starts with no fill and no stroke, so set one of them before you draw shapes.
+Set the fill colour for the shapes drawn after it.
+
+Example: `drawFill("#5B9BD5")` fills the shapes drawn after it with that blue.
+
+- `colour` (colour, optional): A colour (the table in the introduction), or a gradient from `ce.draw.gradient()`.<br>Left out, "" or "none": no fill.<br>Not a colour: rejected with a console error; the fill stays as it was.
+
+Good to know:
+
+- Applies to everything drawn after it; each onDraw starts with no fill and no stroke.
+- Returns no value.
 
 *Short name: `drawFill`.*
 
@@ -3437,7 +3474,18 @@ ce.draw.fill("#5B9BD5");
 
 #### `ce.draw.stroke([colour] [, width] [, opts])`
 
-Set the line colour and thickness for the shapes drawn after this. `width` defaults to 1, and `colour` is read as `ce.draw.fill()` reads it, or is a gradient from `ce.draw.gradient()`; with no colour, outlines are not drawn. A colour that cannot be drawn is refused with a message, and the stroke stays as it was. `opts` adds dashes and sets the style of line ends and corners.
+Set the line colour and width for the shapes drawn after it.
+
+Example: `drawStroke("#5B9BD5", 2)` outlines the shapes drawn after it in that blue, 2 pixels wide.
+
+- `colour` (colour, optional): A colour (the table in the introduction), or a gradient from `ce.draw.gradient()`.<br>Left out, "" or "none": no outlines.<br>Not a colour: rejected with a console error; the stroke stays as it was.
+- `width` (number, optional): Line width in pixels.<br>Range: > 0.<br>Default: 1.<br>≤ 0, or invalid: 1.
+- `opts` (options, optional): The options below.<br>Left out: solid lines, butt ends, mitred corners.
+
+Good to know:
+
+- Applies to everything drawn after it; each onDraw starts with no fill and no stroke.
+- Returns no value.
 
 *Short name: `drawStroke`.*
 
@@ -3445,10 +3493,10 @@ Set the line colour and thickness for the shapes drawn after this. `width` defau
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `dash` | list of numbers | a solid line | Alternating on and off lengths in pixels. The panel's own beat marks are { 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so. |
-| `dashOffset` | number (pixels) | 0 | How far into the dash pattern to start. Advance it on a timer and the dashes march along the line. |
-| `cap` | text | "butt" | The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so.<br>One of "butt", "round" or "square". |
-| `join` | text | "miter" | How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so.<br>One of "miter", "round" or "bevel". |
+| `dash` | list of numbers | a solid line | On and off lengths in pixels, alternating.<br>A length < 0, or invalid: 0.<br>Not a list: solid line. |
+| `dashOffset` | number (pixels) | 0 | Where the dash pattern starts.<br>Advanced on a timer: the dashes move.<br>Invalid: 0. |
+| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-sensitive.<br>Invalid: default. |
+| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-sensitive.<br>Invalid: default. |
 
 ```lua
 -- Lua
@@ -3461,7 +3509,20 @@ ce.draw.stroke("#5B9BD5", 2);
 
 #### `ce.draw.rect(x, y, w, h [, radius])`
 
-Draw a rectangle at (`x`, `y`), `w` wide and `h` tall, measured from the control's top-left corner. `radius` rounds the corners.
+Draw a rectangle.
+
+Example: `drawRect(10, 10, 40, 20, 4)` draws a 40 × 20 rectangle at (10, 10) with rounded corners.
+
+- `x` (number, required): Left edge, in pixels from the control's left.
+- `y` (number, required): Top edge, in pixels from the control's top.
+- `w` (number, required): Width in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `h` (number, required): Height in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `radius` (number, optional): Corner radius in pixels.<br>Range: ≥ 0.<br>Default: 0.<br>< 0, or invalid: 0.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawRect`.*
 
@@ -3476,7 +3537,18 @@ ce.draw.rect(0, 0, 40, 20);
 
 #### `ce.draw.circle(cx, cy, r)`
 
-Draw a circle of radius `r`, centred on (`cx`, `cy`).
+Draw a circle.
+
+Example: `drawCircle(50, 50, 20)` draws a circle of radius 20 centred on (50, 50).
+
+- `cx` (number, required): Centre, in pixels from the control's left.
+- `cy` (number, required): Centre, in pixels from the control's top.
+- `r` (number, required): Radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawCircle`.*
 
@@ -3491,7 +3563,19 @@ ce.draw.circle(20, 20, 8);
 
 #### `ce.draw.line(x1, y1, x2, y2)`
 
-Draw a straight line from (`x1`, `y1`) to (`x2`, `y2`) in the current stroke colour and width. The fill colour does not apply to lines.
+Draw a straight line.
+
+Example: `drawLine(0, 0, 100, 50)` draws a line from (0, 0) to (100, 50).
+
+- `x1` (number, required): Start, in pixels from the control's left.
+- `y1` (number, required): Start, in pixels from the control's top.
+- `x2` (number, required): End, in pixels from the control's left.
+- `y2` (number, required): End, in pixels from the control's top.
+
+Good to know:
+
+- Drawn with the stroke in force; the fill does not apply.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawLine`.*
 
@@ -3506,7 +3590,18 @@ ce.draw.line(0, 0, 100, 0);
 
 #### `ce.draw.path(points [, closed])`
 
-Draw a line through a series of points, given as one flat list of coordinates: { x1, y1, x2, y2, ... }. Set `closed` to true to join the last point back to the first. Note the flat list: `ce.draw.curve()` and `ce.draw.points()` take a list of [x, y] pairs instead.
+Draw a line through a series of points.
+
+Example: `drawPath({0, 20, 10, 5, 20, 20})` draws a line through (0, 20), (10, 5) and (20, 20).
+
+- `points` (list, required): One flat list of coordinates: {x1, y1, x2, y2, …}.<br>A pair that is not two numbers: left out.<br>An odd number of values: the last left out.<br>Fewer than two points left, or not a list: rejected with a console error.
+- `closed` (true or false, optional): Join the last point to the first.<br>Default: false.<br>Invalid: false.
+
+Good to know:
+
+- Drawn with the stroke in force; closed, it is filled too.
+- One flat list of coordinates, unlike `ce.draw.curve()` and `ce.draw.points()`, which take a list of points.
+- Returns true; fewer than two points, or no control to draw on: rejected with a console error.
 
 *Short name: `drawPath`.*
 
@@ -3528,7 +3623,20 @@ ce.draw.path(pts);
 
 #### `ce.draw.arc(x, y, radius, from, to)`
 
-Draw part of a circle centred on (`x`, `y`), from angle `from` to angle `to`. Angles are in degrees, with 0 at twelve o'clock and increasing clockwise, the same as the Meter's `arcStart` and `arcSweep`. The arc is drawn in the stroke colour; if a fill is set, it is filled as a pie slice.
+Draw part of a circle.
+
+Example: `drawArc(50, 50, 40, 0, 90)` draws a quarter circle of radius 40 centred on (50, 50), from twelve o'clock clockwise to three o'clock.
+
+- `x` (number, required): Centre, in pixels from the control's left.
+- `y` (number, required): Centre, in pixels from the control's top.
+- `radius` (number, required): Radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `from` (number, required): Start angle in degrees.<br>0: twelve o'clock, increasing clockwise, as the Meter's arcStart.
+- `to` (number, required): End angle in degrees.<br>Above from: drawn clockwise; below from: anticlockwise.<br>360 or more apart: a full circle.
+
+Good to know:
+
+- Drawn with the stroke in force; with a fill, filled as a pie slice through the centre.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawArc`.*
 
@@ -3543,7 +3651,16 @@ ce.draw.arc(30, 30, 24, 135, 135 + 270 * value);
 
 #### `ce.draw.gradient(stops [, angle]) -> value`
 
-Make a gradient to pass to `ce.draw.fill()` or `ce.draw.stroke()` in place of a plain colour. Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place each one yourself (`at` and `opacity` run from 0 to 1); you can mix the two. Colours are read as `ce.draw.fill()` reads them. `angle` is in degrees, 0 pointing up and 90 pointing right, the same as the Background section's gradients; without it the gradient runs from top to bottom. Returns nothing if there are fewer than two colours, and refuses a stop it cannot read with a message, returning nothing.
+Make a gradient to use as a fill or stroke colour.
+
+Example: `drawGradient({"red", "blue"}, 90)` gives a gradient from red on the left to blue on the right.
+
+- `stops` (list, required): A list of colours (the table in the introduction), of { at, colour, opacity } tables, or a mix.<br>at: position along the gradient. Range: 0 ↔ 1. Left out: spaced evenly.<br>opacity: Range: 0 ↔ 1. Default: 1.<br>Fewer than two stops, not a list, a colour that is not one, or at or opacity outside its range: rejected with a console error.
+- `angle` (number, optional): Direction in degrees.<br>0: upwards; 90: to the right, as the Background section's gradients.<br>Default: 180 (top to bottom).<br>Invalid: default.
+
+Good to know:
+
+- Returns a gradient for `ce.draw.fill()` or `ce.draw.stroke()`. Rejected: no result.
 
 *Short name: `drawGradient`.*
 
@@ -3556,15 +3673,34 @@ ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "#0A1830" }, 180))
 ce.draw.fill(ce.draw.gradient(["#2A6BD4", "#0A1830"], 180));
 ```
 
-#### `ce.draw.opacity(a)`
+#### `ce.draw.opacity([a])`
 
-Set how solid everything drawn after this is, from 0 (invisible) to 1 (fully solid). Like fill and stroke, it applies to everything that follows, not to one shape. Call it with no number to switch it off again. A number outside 0 to 1, such as 50 written for 0.5, or anything that is not a number, is refused with a message, and the opacity stays as it was. To make a single colour see-through instead, use `ce.math.alpha()`.
+Set how solid the shapes drawn after it are.
+
+Example: `drawOpacity(0.5)` draws the shapes after it half see-through.
+
+- `a` (number, optional): Opacity.<br>Range: 0 ↔ 1 (0: invisible; 1: solid).<br>Left out: solid, which switches it off.<br>Outside the range, or invalid: rejected with a console error; the opacity stays as it was.
+
+Good to know:
+
+- Applies to everything drawn after it, like the fill and stroke.
+- One colour see-through instead: `ce.math.alpha()`.
+- Returns no value.
 
 *Short name: `drawOpacity`.*
 
 #### `ce.draw.transform([opts])`
 
-Rotate, move or scale everything drawn after this. To turn a shape about its own centre, such as a knob's pointer, give that centre as `opts.cx` and `opts.cy`. Each call replaces the previous transform rather than adding to it, and calling it with no options clears it.
+Rotate, move or scale the shapes drawn after it.
+
+Example: `drawTransform({rotate = 135, cx = 40, cy = 40})` turns the shapes after it 135° clockwise about (40, 40).
+
+- `opts` (options, optional): The options below.<br>Left out: no transform.
+
+Good to know:
+
+- Replaces the transform before it; left out, it clears it.
+- Returns no value.
 
 *Short name: `drawTransform`.*
 
@@ -3572,12 +3708,12 @@ Rotate, move or scale everything drawn after this. To turn a shape about its own
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `rotate` | number (degrees) | 0 | Turn everything drawn after this clockwise. |
-| `cx` | number (pixels) | the top-left corner | The horizontal point to rotate about. Give `cx` and `cy` together; without them the rotation turns about the top-left corner, which makes a shape orbit that corner. |
-| `cy` | number (pixels) | the top-left corner | The vertical point to rotate about. |
-| `x` | number (pixels) | 0 | Move everything sideways. |
-| `y` | number (pixels) | 0 | Move everything up or down. |
-| `scale` | number | 1 | Grow or shrink. 2 is double size, 0.5 is half. |
+| `rotate` | number (degrees) | 0 | Rotation in degrees, clockwise.<br>Invalid: default. |
+| `cx` | number (pixels) | the top-left corner | Centre of rotation, in pixels from the control's left.<br>Given without cy: the top-left corner.<br>Invalid: 0. |
+| `cy` | number (pixels) | the top-left corner | Centre of rotation, in pixels from the control's top.<br>Given without cx: the top-left corner.<br>Invalid: 0. |
+| `x` | number (pixels) | 0 | Shift to the right, in pixels.<br>Invalid: default. |
+| `y` | number (pixels) | 0 | Shift down, in pixels.<br>Invalid: default. |
+| `scale` | number | 1 | Size factor.<br>2: double; 0.5: half; negative: mirrored.<br>Invalid: default. |
 
 ```lua
 -- Lua
@@ -3590,19 +3726,55 @@ ce.draw.transform({ rotate: 135, cx: w / 2, cy: h / 2 });
 
 #### `ce.draw.ellipse(cx, cy, rx, ry)`
 
-Draw an oval centred on (`cx`, `cy`), with horizontal radius `rx` and vertical radius `ry`.
+Draw an ellipse.
+
+Example: `drawEllipse(50, 25, 40, 20)` draws an ellipse 80 wide and 40 tall centred on (50, 25).
+
+- `cx` (number, required): Centre, in pixels from the control's left.
+- `cy` (number, required): Centre, in pixels from the control's top.
+- `rx` (number, required): Horizontal radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `ry` (number, required): Vertical radius in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawEllipse`.*
 
 #### `ce.draw.pixelText(text, x, y [, scale])`
 
-Write text in the app's built-in 5x7 LCD font, the same one the LCD components show. `scale` is how many screen pixels make one font pixel, a whole number, 1 by default. Each lit pixel is drawn as a sharp square, with no smoothing. (`x`, `y`) is the top-left corner of the text, unlike `ce.draw.text()`, where `y` is the baseline.
+Write text in the built-in 5 × 7 LCD font.
+
+Example: `drawPixelText("128", 4, 4, 2)` writes 128 at (4, 4), each font pixel 2 screen pixels.
+
+- `text` (text, required): The text.<br>A number: written as text.
+- `x` (number, required): Left edge, in pixels from the control's left.
+- `y` (number, required): Top edge, in pixels from the control's top.
+- `scale` (number, optional): Screen pixels per font pixel.<br>Range: ≥ 1, whole.<br>Default: 1.<br>A fraction: rounded.<br>< 1, or invalid: 1.
+
+Good to know:
+
+- Drawn in the fill colour, or the stroke colour with no fill; each lit pixel a sharp square.
+- (`x`, `y`) is the top-left corner of the text, unlike `ce.draw.text()`, where `y` is the baseline.
+- A character the font has no glyph for: a gap, with a console warning the first time.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawPixelText`.*
 
 #### `ce.draw.measure(text [, opts]) -> table`
 
-Measure a piece of text before drawing it. Returns { width, height, exact }. Give `opts.size` and `opts.family` for ordinary text (size 12 by default), or set `opts.pixel` to true for the LCD font. The LCD font is a fixed grid, so its answer is always exact. Ordinary text has to be measured, and if that cannot be done the result is an estimate and `exact` is false.
+Measure text before drawing it.
+
+Example: `drawMeasure("Hello", {size = 14}).width` gives the width of Hello at size 14.
+
+- `text` (text, required): The text.<br>A number: measured as text.
+- `opts` (options, optional): The options below.<br>Left out: size 12, sans-serif.
+
+Good to know:
+
+- Returns { width, height, exact }: pixels, and whether the width was measured (true) or estimated (false; the LCD font is always exact).
+- Rejected: no result.
 
 *Short name: `drawMeasure`.*
 
@@ -3610,20 +3782,38 @@ Measure a piece of text before drawing it. Returns { width, height, exact }. Giv
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `size` | number (pixels) | — | The text size to measure at. |
-| `family` | text | — | The font family to measure in. |
-| `pixel` | true or false | false | Measure in the panel's built-in LCD font instead of a normal one. That font is a fixed grid, so the answer is exact arithmetic. |
-| `scale` | number | 1 | How many screen pixels one LCD pixel is. Only used with `pixel`. |
+| `size` | number (pixels) | 12 | Text size in pixels.<br>Range: > 0.<br>≤ 0, or invalid: default. |
+| `family` | text | — | Font family.<br>Left out: sans-serif. |
+| `pixel` | true or false | false | Measure in the LCD font of `ce.draw.pixelText()` instead.<br>Invalid: false. |
+| `scale` | number | 1 | Screen pixels per font pixel, with pixel.<br>Range: ≥ 1, whole.<br>A fraction: rounded.<br>< 1, or invalid: 1. |
 
 #### `ce.draw.batch(fn) -> boolean`
 
-Run `fn` and show all the drawing it does in one update, instead of one update per command. Use it when you draw in a loop, such as a waveform or a row of tick marks, where it is several times faster. `ce.draw.grid()`, `ce.draw.lines()` and `ce.draw.points()` already draw a whole set in one go and do not need it.
+Run a function and show everything it draws in one update.
+
+Example: `drawBatch(function() for i = 0, 63 do ce.draw.line(i, 0, i, 20) end end)` draws 64 lines in one update.
+
+- `fn` (function, required): The function to run.<br>An error in it: written to the console; what it drew before it stays.
+
+Good to know:
+
+- Several times faster for a loop of commands; `ce.draw.grid()`, `ce.draw.lines()` and `ce.draw.points()` are one command already.
+- Returns true; not a function: rejected with a console error.
 
 *Short name: `drawBatch`.*
 
 #### `ce.draw.grid([opts]) -> boolean`
 
-Draw a whole grid of lines in one command. It covers the control unless you give a box. Give either a spacing (`opts.step`, or `opts.stepX` and `opts.stepY`) or a number of `opts.columns` and `opts.rows`; with neither, nothing is drawn and it returns false. The closing lines are drawn too, so a 4-column grid has five vertical lines.
+Draw a grid of lines in one command.
+
+Example: `drawGrid({columns = 16, rows = 4})` draws 17 vertical and 5 horizontal lines over the control.
+
+- `opts` (options, optional): The options below: a box, and a spacing or a count.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Drawn with the stroke in force; the closing lines are drawn, so 4 columns are 5 lines.
+- Returns true; neither a spacing nor a count, or no control to draw on: rejected with a console error.
 
 *Short name: `drawGrid`.*
 
@@ -3631,31 +3821,61 @@ Draw a whole grid of lines in one command. It covers the control unless you give
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `x` | number (pixels) | the control's left edge | Where the grid starts horizontally. |
-| `y` | number (pixels) | the control's top edge | Where it starts vertically. |
-| `width` | number (pixels) | the control's width | How wide the grid is. |
-| `height` | number (pixels) | the control's height | How tall the grid is. |
-| `step` | number (pixels) | — | Spacing both ways — a line every this many pixels. Use this or `columns`, not both. |
-| `stepX` | number (pixels) | — | Horizontal spacing on its own. |
-| `stepY` | number (pixels) | — | Vertical spacing on its own. |
-| `columns` | number | — | How many columns to divide the width into. The closing line is drawn, so four columns give five vertical lines. |
-| `rows` | number | — | How many rows to divide the height into. |
+| `x` | number (pixels) | 0 | Left edge, in pixels from the control's left.<br>Invalid: 0. |
+| `y` | number (pixels) | 0 | Top edge, in pixels from the control's top.<br>Invalid: 0. |
+| `width` | number (pixels) | to the control's right edge | Width in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0. |
+| `height` | number (pixels) | to the control's bottom edge | Height in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0. |
+| `step` | number (pixels) | — | Spacing both ways, in pixels.<br>Range: > 0.<br>Given with columns or rows: ignored that way.<br>≤ 0, or invalid: ignored. |
+| `stepX` | number (pixels) | — | Spacing across, in pixels.<br>Range: > 0.<br>Given with columns: ignored.<br>≤ 0, or invalid: ignored. |
+| `stepY` | number (pixels) | — | Spacing down, in pixels.<br>Range: > 0.<br>Given with rows: ignored.<br>≤ 0, or invalid: ignored. |
+| `columns` | number | — | Number of columns across the width.<br>Range: ≥ 1, whole.<br>A fraction: rounded.<br>< 1, or invalid: ignored. |
+| `rows` | number | — | Number of rows down the height.<br>Range: ≥ 1, whole.<br>A fraction: rounded.<br>< 1, or invalid: ignored. |
 
 #### `ce.draw.lines(segments) -> boolean`
 
-Draw many separate straight lines in one command, from a list of [x1, y1, x2, y2]. Use it for things that are not joined up: tick marks, the rungs of a level meter, a grid you work out yourself. To draw one connected line through a series of points, use `ce.draw.path()`.
+Draw separate straight lines in one command.
+
+Example: `drawLines({{0, 0, 10, 0}, {0, 5, 10, 5}})` draws two horizontal lines.
+
+- `segments` (list, required): A list of segments, each {x1, y1, x2, y2} or {x1 = , y1 = , x2 = , y2 = }.<br>An item that is not a segment: left out.<br>Empty, or not a list: rejected with a console error.
+
+Good to know:
+
+- Drawn with the stroke in force; the fill does not apply.
+- One connected line through points: `ce.draw.path()`.
+- Returns true; no segments, or no control to draw on: rejected with a console error.
 
 *Short name: `drawLines`.*
 
 #### `ce.draw.points(points [, radius]) -> boolean`
 
-Draw a set of dots in one command, from a list of [x, y]. `radius` defaults to 1.5 and does not depend on the stroke width.
+Draw a set of dots in one command.
+
+Example: `drawPoints({{10, 10}, {20, 14}}, 2)` draws two dots of radius 2.
+
+- `points` (list, required): A list of points, each {x, y} or {x = , y = }.<br>An item that is not a point: left out.<br>Empty, or not a list: rejected with a console error.
+- `radius` (number, optional): Radius of each dot, in pixels.<br>Range: > 0.<br>Default: 1.5.<br>≤ 0, or invalid: default.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no points, or no control to draw on: rejected with a console error.
 
 *Short name: `drawPoints`.*
 
 #### `ce.draw.curve(points [, opts]) -> boolean`
 
-Draw a smooth curve that passes through a list of points, each given as [x, y], in one command. It needs at least two points. `opts.tension` sets how round the curve is, and `opts.closed` joins it into a loop, which is filled if a fill is set.
+Draw a smooth curve through a list of points in one command.
+
+Example: `drawCurve({{0, 30}, {30, 0}, {60, 30}}, {tension = 0.8})` draws a rounded curve through three points.
+
+- `points` (list, required): A list of points, each {x, y} or {x = , y = }.<br>An item that is not a point: left out.<br>Fewer than two left, or not a list: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: tension 0.5, open.
+
+Good to know:
+
+- Drawn with the stroke in force; closed, it is filled too.
+- Returns true; fewer than two points, or no control to draw on: rejected with a console error.
 
 *Short name: `drawCurve`.*
 
@@ -3663,12 +3883,25 @@ Draw a smooth curve that passes through a list of points, each given as [x, y], 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `tension` | number (0 to 1) | 0.5 | How round the curve is. 0 gives straight lines between the points, 1 is fully rounded. |
-| `closed` | true or false | false | Join the last point back to the first to make a loop. |
+| `tension` | number (0 to 1) | 0.5 | Roundness.<br>Range: 0 ↔ 1 (0: straight lines between the points; 1: fully rounded).<br>Outside the range: the nearest end.<br>Invalid: default. |
+| `closed` | true or false | false | Join the last point to the first.<br>Invalid: false. |
 
 #### `ce.draw.polygon(cx, cy, radius, sides [, opts]) -> boolean`
 
-Draw a shape with `sides` equal sides, such as a triangle or a hexagon, centred on (`cx`, `cy`) with its corners `radius` away from the centre. At rotation 0 a corner points to twelve o'clock; `opts.rotation` turns it clockwise in degrees, the same way `ce.draw.arc()` measures angles, so the two line up. Fewer than three sides counts as three.
+Draw a regular polygon.
+
+Example: `drawPolygon(50, 30, 20, 6)` draws a hexagon centred on (50, 30), its corners 20 pixels from the centre.
+
+- `cx` (number, required): Centre, in pixels from the control's left.
+- `cy` (number, required): Centre, in pixels from the control's top.
+- `radius` (number, required): Distance from the centre to each corner, in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `sides` (number, required): Number of sides.<br>Range: ≥ 3, whole.<br>A fraction: rounded.<br>< 3, or invalid: 3.
+- `opts` (options, optional): The options below.<br>Left out: a corner at twelve o'clock.
+
+Good to know:
+
+- Drawn with the fill and stroke in force.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawPolygon`.*
 
@@ -3676,11 +3909,24 @@ Draw a shape with `sides` equal sides, such as a triangle or a hexagon, centred 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `rotation` | number (degrees) | 0 | Turn the shape clockwise, with 0 putting a corner at twelve o'clock — the same convention drawArc uses, so a polygon and an arc at the same angle line up. |
+| `rotation` | number (degrees) | 0 | Rotation in degrees, clockwise.<br>0: a corner at twelve o'clock, as `ce.draw.arc()` measures its angles.<br>Invalid: default. |
 
 #### `ce.draw.image(src, x, y, w, h [, opts]) -> boolean`
 
-Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the image data itself: a data URL, or the `dataUrl` of a library icon from `ce.image.asset()`. Anything else, an asset's name included, is refused with a message and nothing is drawn. `opts.fit` sets how the image fills the box.
+Draw an image in a box.
+
+Example: `drawImage(ce.image.asset("logo").dataUrl, 0, 0, 64, 64, {fit = "contain"})` draws the library icon logo in a 64 × 64 box, keeping its shape.
+
+- `src` (text, required): The image data: a data URL, or the dataUrl of `ce.image.asset()`.<br>An icon's name: rejected with a console error, which names the call to use.
+- `x` (number, required): Left edge, in pixels from the control's left.
+- `y` (number, required): Top edge, in pixels from the control's top.
+- `w` (number, required): Width in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `h` (number, required): Height in pixels.<br>Range: ≥ 0.<br>< 0, or invalid: 0.
+- `opts` (options, optional): The options below.<br>Left out: fit "fill".
+
+Good to know:
+
+- Returns true; a source that is not image data, or no control to draw on: rejected with a console error.
 
 *Short name: `drawImage`.*
 
@@ -3688,35 +3934,85 @@ Draw an image in the box at (`x`, `y`), `w` wide and `h` tall. `src` must be the
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `fit` | text | "fill" | How the image fills the box you gave. "fill" stretches it to fit exactly, "contain" keeps its shape and leaves gaps, "cover" keeps its shape and crops. |
+| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.<br>Invalid: default. |
 
 #### `ce.draw.clip([x, y, w, h]) -> boolean`
 
-Limit everything drawn after this to the rectangle (`x`, `y`, `w`, `h`). Like fill and stroke, it stays in force until you change it, and `ce.draw.save()` and `ce.draw.restore()` include it. Call it with no arguments to remove it. Drawing never goes outside the control anyway, so a clip can only make the area smaller.
+Limit the shapes drawn after it to a rectangle.
+
+Example: `drawClip(0, 0, 60, 20)` shows only what the shapes after it draw inside the top-left 60 × 20.
+
+- `x` (number, optional): Left edge, in pixels from the control's left.<br>Invalid: 0.
+- `y` (number, optional): Top edge, in pixels from the control's top.<br>Invalid: 0.
+- `w` (number, optional): Width in pixels.<br>Range: > 0.<br>≤ 0, or invalid: 0, which hides everything drawn after it.
+- `h` (number, optional): Height in pixels.<br>Range: > 0.<br>≤ 0, or invalid: 0, which hides everything drawn after it.
+
+Good to know:
+
+- Applies to everything drawn after it, like the fill and stroke; `ce.draw.save()` and `ce.draw.restore()` include it.
+- All four left out: no clip.
+- Drawing never goes outside the control: a clip only makes the area smaller.
+- Returns true; some of the four left out: rejected with a console error; the clip stays as it was.
 
 *Short name: `drawClip`.*
 
 #### `ce.draw.blend(mode) -> boolean`
 
-Choose how what you draw next mixes with what is already underneath: "normal" (the default), "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". An unknown mode is refused with a message and returns false.
+Set how the shapes drawn after it mix with what is under them.
+
+Example: `drawBlend("multiply")` darkens what is under the shapes drawn after it.
+
+- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Applies to everything drawn after it, like the fill and stroke; "normal" switches it off.
+- Returns true; not a mode: rejected with a console error; the blend stays as it was.
 
 *Short name: `drawBlend`.*
 
 #### `ce.draw.save() -> boolean`
 
-Remember the current drawing style (fill, stroke, width, dashes, line ends and corners, opacity, transform, clip and blend) so `ce.draw.restore()` can bring it back. Saved styles are thrown away at the start of each onDraw, so a forgotten restore cannot affect the next drawing.
+Remember the drawing style, for `ce.draw.restore()`.
+
+Example: `drawSave()` remembers the style; `drawRestore()` brings it back.
+
+Good to know:
+
+- The style: fill, stroke, width, dash, cap, join, opacity, transform, clip and blend.
+- Saved styles are forgotten at the start of each onDraw.
+- Returns true.
 
 *Short name: `drawSave`.*
 
 #### `ce.draw.restore() -> boolean`
 
-Bring back the style saved by the most recent `ce.draw.save()`. If nothing was saved, it reports an error, returns false and leaves the style as it is, rather than quietly going back to the defaults.
+Bring back the style remembered by the last `ce.draw.save()`.
+
+Example: `drawRestore()` brings back the style `drawSave()` remembered.
+
+Good to know:
+
+- Returns true; nothing saved: rejected with a console error; the style stays as it was.
 
 *Short name: `drawRestore`.*
 
 #### `ce.draw.text(x, y, text [, opts])`
 
-Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on. With `opts.align` set to "left" (the default), "middle" or "right", `x` is the left end, the centre or the right end of the text; capitals do not matter, and "center", "centre" and "centred" also mean "middle". Any other word is refused with a message, and nothing is drawn. The size is 12 unless you set `opts.size`. Text is painted in the fill colour, or in the stroke colour if there is no fill.
+Write text.
+
+Example: `drawText(4, 12, "hello", {size = 10})` writes hello at size 10, its baseline at y 12.
+
+- `x` (number, required): Left end, centre or right end of the text, by align, in pixels from the control's left.
+- `y` (number, required): Baseline, in pixels from the control's top.
+- `text` (text, required): The text.<br>A number: written as text.
+- `opts` (options, optional): The options below.<br>Left out: size 12, left-aligned, the control's font.
+
+Good to know:
+
+- Drawn in the fill colour, or the stroke colour with no fill.
+- `y` is the baseline: the line the letters sit on. `ce.draw.pixelText()` takes the top-left corner.
+- Returns true; no control to draw on: rejected with a console error.
 
 *Short name: `drawText`.*
 
@@ -3724,9 +4020,9 @@ Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `size` | number (pixels) | — | How big the text is. |
-| `align` | text | "left" | Which part of the text sits at the x you gave. "center", "centre" and "centred" are read as "middle".<br>One of "left", "middle" or "right". |
-| `family` | text | — | The font family to draw in. |
+| `size` | number (pixels) | 12 | Text size in pixels.<br>Range: > 0.<br>≤ 0, or invalid: default. |
+| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".<br>Invalid: rejected with a console error. |
+| `family` | text | — | Font family.<br>Left out: the control's font. |
 
 ```lua
 -- Lua
@@ -3739,7 +4035,16 @@ ce.draw.text(4, 12, "hello");
 
 #### `ce.draw.redraw([target])`
 
-Ask for onDraw to run again, for this control or for the one named `target`. Nothing is redrawn on its own: to animate, call this from onTimer.
+Run onDraw again for a control.
+
+Example: `drawRedraw()` in onTimer redraws the control the script is attached to every tick.
+
+- `target` (text, optional): The control's name.<br>Left out: the control the script is attached to.
+
+Good to know:
+
+- Nothing is redrawn on its own: to animate, call this from onTimer.
+- Returns true; unknown control, or no control to redraw: rejected with a console error.
 
 *Short name: `drawRedraw`.*
 

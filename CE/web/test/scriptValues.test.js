@@ -668,6 +668,7 @@ test('a refusal is said in the words the runtime says it in', () => {
     ['ce.draw.image("knob-cap", 0, 0, 32, 32)', 'ce.', (c) => argOf(c, 'src'), (api) => api.ce.draw.image('knob-cap', 0, 0, 32, 32)],
     ['ce.draw.gradient({ "#2A6BD4", "redd" })', 'ce.', (c) => argOf(c, 'stops'), (api) => api.ce.draw.gradient(['#2A6BD4', 'redd'])],
     ['ce.draw.gradient({ "#2A6BD4", { at = 50, colour = "#000000" } })', 'ce.', (c) => argOf(c, 'stops'), (api) => api.ce.draw.gradient(['#2A6BD4', { at: 50, colour: '#000000' }])],
+    ['ce.draw.gradient({ "#2A6BD4" })', 'ce.', (c) => argOf(c, 'stops'), (api) => api.ce.draw.gradient(['#2A6BD4'])],
     ['ce.math.lighten("redd")', 'ce.', (c) => argOf(c, 'colour'), (api) => api.ce.math.lighten('redd')],
     ['ce.math.lighten("red", 40)', 'ce.', (c) => argOf(c, 'amount'), (api) => api.ce.math.lighten('red', 40)],
     ['ce.math.alpha("red", 2)', 'ce.', (c) => argOf(c, 'a'), (api) => api.ce.math.alpha('red', 2)],
@@ -792,8 +793,9 @@ test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in
     const said = runtime.said[0].message.replace(/ This is said only the first time\.$/, '');
     assert.ok(runtime.said[0].message.endsWith(' This is said only the first time.'), src);
     assert.ok(row.problem.message.startsWith(said), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${said}`);
-    assert.equal(runtime.said[0].kind, 'error', src);
-    assert.equal(row.problem.severity, 'error', src);
+    // A warning, not an error: the default is drawn. An error means the call did nothing.
+    assert.equal(runtime.said[0].kind, 'warn', src);
+    assert.equal(row.problem.severity, 'warning', src);
   }
   assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Round" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
     'ce.draw.stroke: the join is "Round", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');

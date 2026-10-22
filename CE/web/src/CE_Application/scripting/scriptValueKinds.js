@@ -290,7 +290,8 @@ export function readDrawGradient(stops, angle) {
     out.push(entry);
   });
   out.forEach((st, i) => { if (st.at == null) st.at = n === 1 ? 0 : i / (n - 1); });
-  if (n < 2) say('ce.draw.gradient: there are fewer than two colours, so there is no gradient.', 'warning');
+  // Rejected in the runtime's words: it was a warning here and silence there.
+  if (n < 2) say(`ce.draw.gradient: stops has ${n === 0 ? 'no colours' : 'one colour'}, and a gradient needs at least two, so there is no gradient.`);
   const complete = n >= 2 && out.every((s) => !s.computed && s.css !== null);
   return { meaning: { stops: out, angle: typeof angle === 'number' ? angle : null, defaultAngle: 180, stopsTakeOpacity: true, complete }, problem };
 }
@@ -707,7 +708,8 @@ export function readEnum(value, values, { path, name, refusal } = {}) {
 export const ENUM_REFUSALS = {
   drawBlend: (value, list) => `ce.draw.blend("${value}"): not a blend mode. One of: ${list.join(', ')}.`,
   // Its two lists are cap's and join's; drawDash.js says both, as the runtime draws them.
-  drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
+  // The problem as drawDash says it, severity included: a warning, since the default is drawn.
+  drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem ?? null : null),
   // ce.panel's arrangement verbs, each in its own sentence (layoutWords.js).
   ...Object.fromEntries(Object.keys(LAYOUT_WORDS).map((id) => [id, (value) => layoutWord(id, value).refused])),
   // ce.music's two words are not refused: one there is none of is the default, said once.

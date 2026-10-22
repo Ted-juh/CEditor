@@ -43,7 +43,8 @@ import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sec
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import {
-  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
+  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords, drawMissing,
+  drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
 import { recallNoProfileWords } from './presetWords.js';
@@ -5129,10 +5130,21 @@ let gradientSeq = 0;
  *  gradient set in the Properties panel run in the same direction, which two conventions would not.
  */
 function drawGradientImpl(stops, angle) {
-  const raw = Array.isArray(stops) ? stops : Object.values(stops ?? {});
-  // Fewer than two is documented as no gradient, and says nothing: a gradient between one colour
-  // and nothing is a colour.
-  if (raw.length < 2) return undefined;
+  // Stops left out, not a list, or fewer than two: no gradient, and said. Fewer than two said
+  // nothing (a gradient between one colour and nothing is a colour, and a colour is what the
+  // script got: nothing), and text in place of the list was read letter by letter, so "red" was
+  // three stops, the first of which "is not a colour".
+  const refuseAll = (why) => {
+    addScriptTrace('error', '', `ce.draw.gradient: ${why}, so there is no gradient.`);
+    return undefined;
+  };
+  if (stops === undefined || stops === null) return refuseAll('stops was not given');
+  if (typeof stops !== 'object') return refuseAll(`stops is ${shownValue(stops)}, not a list of colours`);
+  const raw = Array.isArray(stops) ? stops : Object.values(stops);
+  if (raw.length < 2) return refuseAll(`stops has ${raw.length === 0 ? 'no colours' : 'one colour'}, and a gradient needs at least two`);
+  // An angle that is not a number is the default, 180, and said once: it was 180 in silence.
+  const { n: degrees, said: angleSaid } = drawOption('drawGradient', 'angle', angle, 180);
+  drawSaid('drawGradient\u0000angle', angleSaid);
   const list = [];
   for (const [i, stop] of raw.entries()) {
     // Two spellings, because two shapes are natural: { at, colour } for a positioned stop, and a
@@ -5176,7 +5188,7 @@ function drawGradientImpl(stops, angle) {
   return {
     gradient: true,
     id: `ce-draw-grad-${gradientSeq}`,
-    angle: Number.isFinite(Number(angle)) ? Number(angle) : 180,
+    angle: degrees,
     stops: list,
   };
 }
@@ -5211,6 +5223,15 @@ function drawNum(memberId, name, value) {
   const { n, said } = drawNumber(memberId, name, value);
   drawSaid(`${memberId}\u0000${name}`, said);
   return n;
+}
+
+/** True, after saying so, when a shape's required argument is left out (drawShapes' drawMissing):
+ *  it was drawn at 0, or with no text, in silence. */
+function drawRejected(memberId, given) {
+  const said = drawMissing(memberId, given);
+  if (!said) return false;
+  addScriptTrace('error', '', said);
+  return true;
 }
 
 /** Append a command for `target`, with the style in force at this moment baked into it. `memberId`
@@ -5259,7 +5280,11 @@ let drawBatchDepth = 0;
 const drawBatchDirty = new Set();
 
 function runDrawBatch(fn) {
-  if (typeof fn !== 'function') return false;
+  if (typeof fn !== 'function') {
+    // Returned false in silence, and the drawing the script meant to batch was never done.
+    addScriptTrace('error', '', `ce.draw.batch: fn is ${shownValue(fn)}, not a function, so nothing ran.`);
+    return false;
+  }
   drawBatchDepth += 1;
   try {
     fn();
@@ -5287,22 +5312,6 @@ function runDrawBatch(fn) {
  * just the special case that computes a lattice, so both share one op and one renderer branch.
  */
 
-/** A flat list of [x1, y1, x2, y2] segments from whatever shape the script passed. */
-function toSegmentList(value) {
-  const out = [];
-  if (!value) return out;
-  const list = Array.isArray(value) ? value : Object.values(value);
-  for (const item of list) {
-    const seg = Array.isArray(item) ? item : (item && typeof item === 'object'
-      ? [item.x1 ?? item[0], item.y1 ?? item[1], item.x2 ?? item[2], item.y2 ?? item[3]]
-      : null);
-    if (!seg) continue;
-    const [a, b, c, d] = seg.map((n) => Number(n));
-    if ([a, b, c, d].every((n) => Number.isFinite(n))) out.push([a, b, c, d]);
-  }
-  return out;
-}
-
 function drawGridImpl(explicit, ownerName, opts) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
@@ -5311,17 +5320,31 @@ function drawGridImpl(explicit, ownerName, opts) {
   }
   const transform = control._children?.Transform ?? {};
   const o = opts && typeof opts === 'object' ? opts : {};
-  const x = Number(o.x ?? 0);
-  const y = Number(o.y ?? 0);
-  const w = Number(o.width ?? (Number(transform.width) || 0) - x);
-  const h = Number(o.height ?? (Number(transform.height) || 0) - y);
+  // The box is read as every shape's numbers are (drawShapes.js): one that is not a number is 0,
+  // a width or height below 0 is 0, each said once. Both drew nothing, in silence.
+  const x = drawNum('drawGrid', 'x', o.x);
+  const y = drawNum('drawGrid', 'y', o.y);
+  const w = o.width === undefined || o.width === null ? (Number(transform.width) || 0) - x : drawNum('drawGrid', 'width', o.width);
+  const h = o.height === undefined || o.height === null ? (Number(transform.height) || 0) - y : drawNum('drawGrid', 'height', o.height);
 
   // Spacing OR counts, because both are the natural way to ask depending on what you know: a step
-  // sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels.
-  const cols = Number(o.columns ?? 0);
-  const rows = Number(o.rows ?? 0);
-  const stepX = cols > 0 ? w / cols : Number(o.stepX ?? o.step ?? 0);
-  const stepY = rows > 0 ? h / rows : Number(o.stepY ?? o.step ?? 0);
+  // sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. A count wins
+  // over a spacing given with it, and says so; a count or a spacing that cannot be used is ignored,
+  // and said (a fraction of a column drew a grid with no closing line, a count of "x" nothing).
+  const count = (name) => { const r = gridCount(name, o[name]); drawSaid(`drawGrid\u0000${name}`, r.said); return r.n; };
+  const step = (name) => { const r = gridStep(name, o[name]); drawSaid(`drawGrid\u0000${name}`, r.said); return r.n; };
+  const cols = count('columns');
+  const rows = count('rows');
+  const stepAcross = o.stepX !== undefined && o.stepX !== null ? 'stepX' : 'step';
+  const stepDown = o.stepY !== undefined && o.stepY !== null ? 'stepY' : 'step';
+  if (cols && o[stepAcross] !== undefined && o[stepAcross] !== null) {
+    drawSaid(`drawGrid\u0000columns+${stepAcross}`, `ce.draw.grid: columns was given, so ${stepAcross} was ignored across.`);
+  }
+  if (rows && o[stepDown] !== undefined && o[stepDown] !== null) {
+    drawSaid(`drawGrid\u0000rows+${stepDown}`, `ce.draw.grid: rows was given, so ${stepDown} was ignored down.`);
+  }
+  const stepX = cols ? w / cols : (step(stepAcross) ?? 0);
+  const stepY = rows ? h / rows : (step(stepDown) ?? 0);
 
   if (!(stepX > 0) && !(stepY > 0)) {
     addScriptTrace('error', '',
@@ -5338,7 +5361,10 @@ function drawGridImpl(explicit, ownerName, opts) {
 }
 
 function drawLinesImpl(explicit, ownerName, value) {
-  const segments = toSegmentList(value);
+  // An item that is not a segment is left out and said once (drawShapes.js): it was left out in
+  // silence.
+  const { segments, said } = segmentList(value);
+  drawSaid('drawLines\u0000segments', said);
   if (!segments.length) {
     addScriptTrace('error', '',
       'ce.draw.lines: no segments. Pass a list of [x1, y1, x2, y2] — one command for all of them, '
@@ -5380,13 +5406,20 @@ function drawCurveImpl(explicit, ownerName, value, opts) {
 }
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
-  const n = Math.max(3, Math.round(Number(sides) || 3));
+  if (drawRejected('drawPolygon', { cx, cy, radius: r, sides })) return false;
+  // Fewer than three sides, a fraction or no number is three, or rounded, and said once
+  // (drawShapes.js): each drew a triangle, or rounded, in silence. So is a rotation that is not a
+  // number, which is 0.
+  const { sides: n, said: sidesSaid } = polygonSides(sides);
+  drawSaid('drawPolygon\u0000sides', sidesSaid);
   const radius = drawNum('drawPolygon', 'radius', r);
   const x = drawNum('drawPolygon', 'cx', cx);
   const y = drawNum('drawPolygon', 'cy', cy);
   // Rotation in the panel's drawing convention: degrees, 0 at twelve o'clock, clockwise — the same
   // one drawArc uses, so a polygon and an arc drawn at the same angle line up.
-  const from = ((Number(opts?.rotation) || 0) - 90) * (Math.PI / 180);
+  const { n: rotation, said: rotationSaid } = drawOption('drawPolygon', 'rotation', opts?.rotation, 0);
+  drawSaid('drawPolygon\u0000rotation', rotationSaid);
+  const from = (rotation - 90) * (Math.PI / 180);
   const points = [];
   for (let i = 0; i < n; i += 1) {
     const a = from + (i * 2 * Math.PI) / n;
@@ -5406,10 +5439,19 @@ function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
  * to an estimate rather than pretending. Panel view only either way, like everything in ce.draw.
  */
 function drawMeasureImpl(text, opts) {
-  const str = String(text ?? '');
-  const size = Number(opts?.size) > 0 ? Number(opts.size) : 12;
+  // Text left out measured as "" without a word, and a size or a scale that could not be used was
+  // the default in silence; each is said (drawShapes.js: textSize and pixelScale, as text and
+  // pixelText say them).
+  if (text === undefined || text === null) {
+    addScriptTrace('error', '', 'ce.draw.measure: text was not given, so there is no result.');
+    return undefined;
+  }
+  const str = String(text);
+  const { size, said: sizeSaid } = textSize('drawMeasure', opts?.size);
+  drawSaid('drawMeasure\u0000size', sizeSaid);
   if (opts?.pixel === true) {
-    const scale = Math.max(1, Math.round(Number(opts?.scale) || 1));
+    const { scale, said: scaleSaid } = pixelScale(opts?.scale, 'ce.draw.measure');
+    drawSaid('drawMeasure\u0000scale', scaleSaid);
     // FONT_ADVANCE per character, minus the trailing gap: a string ends at its last lit column.
     return { width: str.length ? str.length * PIXEL_ADVANCE * scale - scale : 0,
              height: PIXEL_FONT_H * scale, exact: true };
@@ -5909,25 +5951,19 @@ function textFitImpl(target, opts) {
 
 function drawClearImpl(explicit, ownerName) {
   const control = drawTarget(explicit, ownerName);
-  if (!control) return false;
+  if (!control) {
+    // Said, as every shape says it: a name the panel does not have, and no control at all,
+    // returned false in silence.
+    const wanted = explicit != null && String(explicit) !== '' ? String(explicit) : '';
+    addScriptTrace('error', '', wanted
+      ? `ce.draw.clear: no control named "${wanted}".`
+      : 'ce.draw.clear: no control to draw on. Attach the script to a control, or pass a target name.');
+    return false;
+  }
   const id = control._children.Core.id;
   drawCommands.delete(id);
   clearDrawing(id);
   return true;
-}
-
-function toPointList(points) {
-  // A flat { x1, y1, x2, y2, ... } list — the one shape every language expresses the same way: a
-  // Lua table, a JS array, a Python list. An odd trailing value is dropped rather than silently
-  // pairing with a zero.
-  const flat = Array.isArray(points) ? points : Object.values(points ?? {});
-  const out = [];
-  for (let i = 0; i + 1 < flat.length; i += 2) {
-    const x = Number(flat[i]);
-    const y = Number(flat[i + 1]);
-    if (Number.isFinite(x) && Number.isFinite(y)) out.push([x, y]);
-  }
-  return out;
 }
 
 /**
@@ -5970,8 +6006,12 @@ function runDrawPass(control) {
 function drawRedrawImpl(explicit, ownerName) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
-    addScriptTrace('error', '',
-      'ce.draw.redraw(): no control to redraw. Attach the script to a control, or pass a target name.');
+    // A name the panel does not have was "no control to redraw", which reads as the script's
+    // attachment being wrong when its spelling is.
+    const wanted = explicit != null && String(explicit) !== '' ? String(explicit) : '';
+    addScriptTrace('error', '', wanted
+      ? `ce.draw.redraw: no control named "${wanted}".`
+      : 'ce.draw.redraw(): no control to redraw. Attach the script to a control, or pass a target name.');
     return false;
   }
   return runDrawPass(control);
@@ -8666,7 +8706,13 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       const paint = drawPaint('ce.draw.stroke', 'the stroke', colour);
       if (paint === undefined) return;
       drawState.stroke = paint;
-      drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
+      // A width that is not a number above 0 is 1, and said once: it was 1 in silence. Text that
+      // is a number is read as one, as every drawing number is (realNumber).
+      const w = realNumber(width);
+      if (width !== undefined && width !== null && !(w > 0)) {
+        warnDrawStroke({ severity: 'warning', message: `ce.draw.stroke: the width is ${shownValue(width)}, not a number above 0, so 1 is drawn.` });
+      }
+      drawState.strokeWidth = w > 0 ? w : 1;
       // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
       // probe link) are "3 3" and "2 3". drawDash.js reads it, for this and for the script editor's
@@ -8683,7 +8729,13 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       drawState.join = join.value;
       // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
       // which is how a panel shows "this is recording" without redrawing the shape (§49).
-      drawState.dashOffset = Number.isFinite(Number(opts?.dashOffset)) ? Number(opts.dashOffset) : null;
+      // …and one that is not a number was none in silence; it is said once.
+      const offset = opts?.dashOffset;
+      const off = realNumber(offset);
+      if (offset !== undefined && offset !== null && off === undefined) {
+        warnDrawStroke({ severity: 'warning', message: `ce.draw.stroke: the dashOffset is ${shownValue(offset)}, not a number of pixels, so 0 is used.` });
+      }
+      drawState.dashOffset = off ?? null;
     },
     drawGradient: (stops, angle) => drawGradientImpl(stops, angle),
     // Applies to everything drawn after it, like fill and stroke — not to one shape, because the
@@ -8706,24 +8758,35 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // pointer ends up orbiting the wrong point.
     drawTransform: (opts) => {
       if (opts == null) { drawState.transform = null; return; }
+      // Each option that is not a number is its default, and said once (drawShapes.js): a rotate of
+      // "x" was no rotation, a scale of "x" no scaling, in silence. A centre half given (cx without
+      // cy) rotated about the top-left corner in silence, which makes a pointer orbit that corner.
+      const read = (name, fallback) => {
+        const { n, said } = drawOption('drawTransform', name, opts[name], fallback);
+        drawSaid(`drawTransform\u0000${name}`, said);
+        return n;
+      };
       const parts = [];
-      const x = Number(opts.x) || 0;
-      const y = Number(opts.y) || 0;
+      const x = read('x', 0);
+      const y = read('y', 0);
       if (x || y) parts.push(`translate(${x} ${y})`);
-      const rotate = Number(opts.rotate);
-      if (Number.isFinite(rotate) && rotate !== 0) {
+      const rotate = read('rotate', 0);
+      const given = (name) => opts[name] !== undefined && opts[name] !== null;
+      if (given('cx') !== given('cy')) {
+        const [has, lacks] = given('cx') ? ['cx', 'cy'] : ['cy', 'cx'];
+        drawSaid('drawTransform\u0000centre', `ce.draw.transform: ${has} was given without ${lacks}, so the rotation is about the top-left corner.`);
+      }
+      if (rotate !== 0) {
         // Around a named centre, or the origin. A rotation with no centre is almost never what a
         // pointer wants, so the centre is the argument people reach for first.
-        const cx = Number(opts.cx);
-        const cy = Number(opts.cy);
-        parts.push(Number.isFinite(cx) && Number.isFinite(cy)
-          ? `rotate(${rotate} ${cx} ${cy})` : `rotate(${rotate})`);
+        parts.push(given('cx') && given('cy')
+          ? `rotate(${rotate} ${read('cx', 0)} ${read('cy', 0)})` : `rotate(${rotate})`);
       }
-      const scale = Number(opts.scale);
-      if (Number.isFinite(scale) && scale !== 1) parts.push(`scale(${scale})`);
+      const scale = read('scale', 1);
+      if (scale !== 1) parts.push(`scale(${scale})`);
       drawState.transform = parts.length ? parts.join(' ') : null;
     },
-    drawEllipse: (cx, cy, rx, ry) => pushCommand(null, ownerName,
+    drawEllipse: (cx, cy, rx, ry) => drawRejected('drawEllipse', { cx, cy, rx, ry }) ? false : pushCommand(null, ownerName,
       { op: 'ellipse', cx: drawNum('drawEllipse', 'cx', cx), cy: drawNum('drawEllipse', 'cy', cy),
         rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
@@ -8731,6 +8794,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // Its numbers are read as every shape's are, and a character it has no glyph for is said
     // (drawShapes.js): each left a gap, without a word.
     drawPixelText: (text, x, y, scale) => {
+      if (drawRejected('drawPixelText', { text, x, y })) return false;
       const written = String(text ?? '');
       const { scale: s, said } = pixelScale(scale);
       drawSaid('drawPixelText\u0000scale', said);
@@ -8758,6 +8822,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
           'ce.draw.image: no source. Pass a data URL, or ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
+      if (drawRejected('drawImage', { x, y, w, h })) return false;
       if (!/^data:/i.test(source)) {
         const shown = source.length > 60 ? `${source.slice(0, 57)}…` : source;
         addScriptTrace('error', '', findAsset(imageCatalogue(), source)
@@ -8767,10 +8832,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
             + 'ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
+      // A fit that is not one of its three words is "fill", and said once: it was "fill" in silence.
+      const fit = opts?.fit;
+      const fits = ['fill', 'contain', 'cover'];
+      if (fit !== undefined && fit !== null && !fits.includes(fit)) {
+        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
+      }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
         x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
-        fit: ['fill', 'contain', 'cover'].includes(opts?.fit) ? opts.fit : 'fill',
+        fit: fits.includes(fit) ? fit : 'fill',
       }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
@@ -8778,7 +8849,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // A clip that leaves the control nothing to draw in hid everything after it without a word; it
     // is said, once (drawShapes.js), and its numbers are read as every shape's are.
     drawClip: (x, y, w, h) => {
-      if (x === undefined || x === null) { drawState.clip = null; return true; }
+      if ([x, y, w, h].every((v) => v === undefined || v === null)) { drawState.clip = null; return true; }
+      // Some of the four given and not the rest: rejected, and said. A missing width or height was
+      // 0, which hid everything drawn after it.
+      const missing = drawMissing('drawClip', { x, y, w, h }, 'so the clip stays as it was.');
+      if (missing) { addScriptTrace('error', '', missing); return false; }
       drawState.clip = {
         x: drawNum('drawClip', 'x', x), y: drawNum('drawClip', 'y', y),
         w: Math.max(0, drawNum('drawClip', 'w', w)), h: Math.max(0, drawNum('drawClip', 'h', h)),
@@ -8790,7 +8865,12 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     drawBlend: (mode) => {
       const legal = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
         'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'];
-      const wanted = String(mode ?? 'normal');
+      if (mode === undefined || mode === null) {
+        // It was "normal" in silence, which is what ce.draw.blend("normal") is for.
+        addScriptTrace('error', '', 'ce.draw.blend: mode was not given, so the blend stays as it was.');
+        return false;
+      }
+      const wanted = String(mode);
       if (!legal.includes(wanted)) {
         addScriptTrace('error', '',
           `ce.draw.blend("${wanted}"): not a blend mode. One of: ${legal.join(', ')}.`);
@@ -8849,27 +8929,45 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
-    drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
+    drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
         h: drawNum('drawRect', 'h', h), radius: Math.max(0, drawNum('drawRect', 'radius', radius)) }, 'drawRect'),
-    drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
+    drawCircle: (cx, cy, r) => drawRejected('drawCircle', { cx, cy, r }) ? false : pushCommand(null, ownerName,
       { op: 'circle', cx: drawNum('drawCircle', 'cx', cx), cy: drawNum('drawCircle', 'cy', cy), r: drawNum('drawCircle', 'r', r) }, 'drawCircle'),
     // Angles in DEGREES, 0 at twelve o'clock, clockwise — the way a knob's arc is described, and
     // the convention the Meter's arcStart/arcSweep already use. The renderer converts.
-    drawArc: (cx, cy, r, from, to) => pushCommand(null, ownerName,
+    drawArc: (cx, cy, r, from, to) => drawRejected('drawArc', { x: cx, y: cy, radius: r, from, to }) ? false : pushCommand(null, ownerName,
       { op: 'arc', cx: drawNum('drawArc', 'x', cx), cy: drawNum('drawArc', 'y', cy), r: drawNum('drawArc', 'radius', r),
         from: drawNum('drawArc', 'from', from), to: drawNum('drawArc', 'to', to) }, 'drawArc'),
-    drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
+    drawLine: (x1, y1, x2, y2) => drawRejected('drawLine', { x1, y1, x2, y2 }) ? false : pushCommand(null, ownerName,
       { op: 'line', x1: drawNum('drawLine', 'x1', x1), y1: drawNum('drawLine', 'y1', y1),
         x2: drawNum('drawLine', 'x2', x2), y2: drawNum('drawLine', 'y2', y2) }, 'drawLine'),
-    drawPath: (points, closed) => pushCommand(null, ownerName,
-      { op: 'path', points: toPointList(points), closed: closed === true }, 'drawPath'),
+    // A flat { x1, y1, x2, y2, ... } list — the one shape every language expresses the same way: a
+    // Lua table, a JS array, a Python list. One point or none drew nothing, and a pair that is not
+    // two numbers or a trailing value with no partner was left out, all in silence; each is said
+    // (drawShapes.js), the first two as a rejection.
+    drawPath: (points, closed) => {
+      if (drawRejected('drawPath', { points })) return false;
+      const { points: list, said, odd, notList } = flatPointList(points);
+      if (notList) { addScriptTrace('error', '', notList); return false; }
+      drawSaid('drawPath\u0000points', said);
+      drawSaid('drawPath\u0000odd', odd);
+      if (list.length < 2) {
+        addScriptTrace('error', '', `ce.draw.path: points has ${list.length === 0 ? 'no points' : 'one point'}, and a path needs at least two, so nothing was drawn.`);
+        return false;
+      }
+      return pushCommand(null, ownerName, { op: 'path', points: list, closed: closed === true }, 'drawPath');
+    },
     drawText: (x, y, text, opts) => {
+      if (drawRejected('drawText', { x, y, text })) return false;
       const align = drawTextAlign(opts?.align);
       if (align === undefined) return false;
+      // A size that is not a number above 0 is 12, and said once (drawShapes.js): it was 12 in silence.
+      const { size, said: sizeSaid } = textSize('drawText', opts?.size);
+      drawSaid('drawText\u0000size', sizeSaid);
       return pushCommand(null, ownerName,
         { op: 'text', x: drawNum('drawText', 'x', x), y: drawNum('drawText', 'y', y), text: String(text ?? ''),
-          size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
+          size,
           align,
           family: opts?.family ? String(opts.family) : null });
     },

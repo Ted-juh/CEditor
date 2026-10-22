@@ -356,6 +356,7 @@ The owner rejected each of these, some more than once. Use the right-hand column
 | "Higher: settles sooner", "the wobble grows" | "0: undamped.", "Below 0: oscillation grows." |
 | a sentence listing cases ("one below 0 is a jump of 1 ms, and anything else moves in the default time") | schematic parts, each "Label: value.", **one per line** (a `\n` in the text): `Range: ≥ 0.` / `0 or below: immediate jump.` / `Invalid: default.` |
 | "Range: 0 or more", "Range: above 0" | `Range: ≥ 0.`, `Range: > 0.`, `Range: 0 ↔ 1.` (symbols, not words) |
+| "Other values: "butt"", "Any other word draws…" | `Invalid: default.` (the owner: "The invalid:default is better") |
 | several rules in one paragraph | one rule per line. The owner: "Short. Viewable in a glance. Users don't want to read whole texts. Every new rule must be on a new line." |
 
 Two more rules from the same review:
@@ -448,7 +449,7 @@ formula is 1 - e^(-damping·x)·cos(frequency·x) in both runtimes, and cos is e
 | `from` | number | current value | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `stagger` | number (ms) | 0 | Delay added per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
 | `repeat` | number | 1 | Number of runs.<br>A fraction is rounded.<br>0 or below: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (repeat is a keyword). |
-| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Invalid: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 Four edges where both runtimes were silent, unlike every other option, each decided by the owner
@@ -495,11 +496,89 @@ table since each has one parameter: one sentence, an example, the parameter's te
 call returns as the first note. `play` with a name left out said `no control named "undefined"`;
 it says that no name was given, in the editor (the command is panel-window only).
 
-**`ce.anim` is done.** Next: the next module in the table below, `ce.draw`, the same way: one
-command at a time, every parameter and option in its item, one rule per line, with ranges.
+**`ce.anim` is done.**
 
-For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
-range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
+## `ce.draw`: done
+
+Every command was probed at its edges first (the probe is the pattern of `drawShapes.test.js`'s
+`run()`: a host panel with a Knob `K`, `scriptApiForTesting('K', …)`, then `drawCommandsFor('K')`
+and the trace). The module introduction (`MODULE_INTROS['ce.draw']`) says once what every command
+shares: commands add to what is there; a coordinate or size that is not a number is 0 with a
+one-time warning; a shape wholly outside the control is a one-time warning; an option with a
+wrong value is a one-time warning and its fallback; a required value missing or wrong is rejected
+with an error.
+
+Done, approved by the owner:
+
+- `clear`: "Erase everything drawn on a control.", the example, `target` ("The control's name. /
+  Left out: the control the script is attached to."), two notes. Two decisions: an unknown
+  control, or no control to draw on, is rejected with an error (both returned false in silence),
+  and `stroke`'s `dash`, `cap` and `join` with a wrong value are warnings, not errors, since the
+  default is drawn: an error always means the call did nothing (`drawDash.js` severities).
+
+- `fill`: "Set the fill colour for the shapes drawn after it.", the example, `colour` (a colour
+  or a gradient; left out, "" or "none": no fill; not a colour: rejected, the fill stays), two
+  notes. The colour forms every drawing command reads are one table in the introduction, shared
+  by `fill`, `stroke` and `gradient`; the eight-digit panel form keeps its alpha here, unlike in
+  `ce.math`.
+
+- `stroke`: "Set the line colour and width for the shapes drawn after it.", the example, `colour`
+  as `fill`'s, `width` with its range, `opts`, and the four options. The owner asked what "Other
+  values: "butt"" meant and chose **`Invalid: default.`** for that case everywhere: a value that
+  is not one of the words listed (a different word, the same word in capitals, a number) draws
+  the default, with the one-time warning. ce.anim's `sync` and `pingpong` say `Invalid: false.`
+  the same way. Two edges, warned about once now where they were silent: a `width` that is not a
+  number above 0 (drawn as 1), and a `dashOffset` that is not a number (none).
+
+- `rect`: "Draw a rectangle.", the example, `x`, `y`, `w`, `h`, `radius` with their ranges, two
+  notes. Two decisions, for every shape command (`drawShapes.js`: `DRAW_REQUIRED`, `DRAW_SIZES`,
+  `drawMissing`; `drawRejected` in the runtime): a required coordinate, size or text left out is
+  rejected with an error (it drew at 0, or wrote no text, in silence), and a size or radius below
+  0 is 0 with the one-time warning (it drew nothing in silence). The introduction says both.
+
+- `circle`, `line`, `ellipse`: approved as one table (no decisions left: `rect`'s two rules cover
+  them). One sentence, an example, each coordinate "in pixels from the control's left / top", each
+  radius with `Range: ≥ 0.` / `< 0, or invalid: 0.`, and the two notes; `line`'s first note says
+  the fill does not apply.
+
+- `arc`: "Draw part of a circle.", the example, the centre and radius as `circle`'s, `from` (0 at
+  twelve o'clock, clockwise, as the Meter's arcStart) and `to` (above from: clockwise; below:
+  anticlockwise; 360 or more apart: a full circle, as `ScriptDrawOverlay`'s arcPath draws it), and
+  the notes (a fill makes a pie slice through the centre).
+
+- `gradient`: approved with two decisions, and then the owner said "I think you get the idea.
+  Continue without abruption": the rest of the module was done the same way, without showing each
+  item. "Make a gradient to use as a fill or stroke colour.", the example, `stops` (colours, { at,
+  colour, opacity } tables, or a mix; at and opacity `Range: 0 ↔ 1`; fewer than two, not a list, a
+  colour that is not one, or a position outside its range: rejected) and `angle` (0 up, 90 right,
+  as the Background section's gradients; `Default: 180 (top to bottom).` / `Invalid: default.`),
+  one note (returns a gradient for `fill()` or `stroke()`; rejected: no result). The two
+  decisions: `stops` left out, not a list (text was read as its letters) or fewer than two colours
+  is rejected with an error where it returned nothing in silence, in the sidebar's words too
+  (`readDrawGradient` said it as a warning); an `angle` that is not a number is 180 with the
+  one-time warning.
+
+- The rest, in the same form (`panelApi.js`, and `drawShapes.js` for the readers: `drawOption`,
+  `textSize`, `polygonSides`, `gridCount`, `gridStep`, `flatPointList`, `segmentList`;
+  `drawShapes.test.js` for each edge; `RELEASE-NOTES.md` for the list a user reads). What was
+  silent and is said now, as warnings where the default is drawn and errors where the call did
+  nothing: `transform`'s options that are not numbers (the default), and `cx` without `cy` or the
+  reverse (about the top-left corner); `image`'s `fit` that is not one of its words ("fill");
+  `text`'s and `measure`'s `size` not above 0 (12); `measure` with no text (rejected; it measured
+  "") and a pixel `scale` it cannot use (1); `polygon`'s `sides` below 3, a fraction or no number
+  (3, or rounded) and a `rotation` that is not a number (0); `grid`'s count given with a spacing
+  (the count wins), a fraction of a count (rounded), a count or spacing it cannot use (ignored),
+  and its box numbers (read as every shape's); `path` with fewer than two points or no list
+  (rejected), a pair that is not two numbers or a trailing value (left out); `lines`' item that is
+  not a segment (left out); `batch` with no function (rejected); `redraw` with a name the panel
+  does not have (named); `blend` with no mode (rejected; it was "normal"); `clip` with some of its
+  four numbers left out (rejected; the missing ones were 0, which hid everything after it).
+  `opacity`'s `a` is optional in the data now, as it always was in the runtime (left out: solid).
+  `curve`'s and `path`'s `closed` say `Invalid: false.`; `blend` and `image`'s `fit` say
+  `Case-sensitive.` as `stroke`'s `cap` does. The phrase "with a console warning the first time"
+  is not repeated in the option rows: the introduction says it once, and the rows say the fallback.
+
+`ce.draw` is done. Next in the table: `ce.time` (22 descriptions, 15 that need the most work).
 
 ### The branch
 
@@ -520,7 +599,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18 |
+| ce.draw | 27 | 18, all done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -576,10 +655,10 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.midi, ce.math and ce.anim are done; continue with ce.draw, in technical
-English, schematic, one rule per line, with ranges, as its table says, showing every parameter and
-option of the command in its item. Check each command at its edges in the runtime first, and put
-what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
-and wait for my answer before the next.
+Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
+on 2026-10-22" and "ce.draw: done". ce.midi, ce.math, ce.anim and ce.draw are done; continue with
+ce.time, in technical English, schematic, one rule per line, with ranges, as its table says,
+showing every parameter and option of the command in its item. Check each command at its edges in
+the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a
+time, its text now and every field as proposed, and wait for my answer before the next.
 ```
