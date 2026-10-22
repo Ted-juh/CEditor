@@ -218,8 +218,10 @@ One source; every one of these reads it:
 
 - **The Insert picker** (`editor/ScriptPicker.svelte`): the description and the example under each
   command; its search reads the notes too, so a word moved into a note is still found.
-- **The hover card and completion** (`scripting/languageService.js`): the description, the example
-  and the notes.
+- **The hover card and completion** (`scripting/languageService.js`): the description, the example,
+  the parameters with their type, and the notes, each on its own line in the card. The card and
+  the code's signature hint find a command by its path (`ce.anim.to`) as well as by its short name
+  (`animateTo`); the middle of a path (`anim`) shows the module's description.
 - **The Values sidebar** (`editor/ValuesSidebar.svelte`, from `scripting/scriptValues.js`'s
   `call.doc`, `call.explain`, `call.returns` and `call.notes`): the description, the returns table
   and the notes, never the example.

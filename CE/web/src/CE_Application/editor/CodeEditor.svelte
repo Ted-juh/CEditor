@@ -1221,12 +1221,16 @@
       onblur={commitRename} />
   {/if}
 
+  {#snippet coded(text)}{#each codeParts(text) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}{/snippet}
+
   {#if hover}
     <div class="ce-hover" use:portal use:floating={{ anchor: { x: hover.cx, y: hover.cy }, placement: 'bottom-start', offset: { mainAxis: 16, crossAxis: 6 }, fallbackPlacements: ['top-start'], track: false }}>
       <div class="ce-hover-title">{hover.title}</div>
       <!-- The description and its example mark code with backticks: drawn as code, not shown as backticks. -->
-      {#if hover.doc}<div class="ce-hover-doc">{#each codeParts(hover.doc) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</div>{/if}
-      {#if hover.params?.length}<ul class="ce-hover-params">{#each hover.params as p (p.name)}<li><code>{p.name}</code> <span class="ce-hover-type">({p.type})</span> {#each codeParts(p.summary) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</li>{/each}</ul>{/if}
+      {#if hover.doc}<div class="ce-hover-doc">{@render coded(hover.doc)}</div>{/if}
+      {#if hover.example}<div class="ce-hover-doc ce-hover-example">Example: {@render coded(hover.example)}</div>{/if}
+      {#if hover.params?.length}<ul class="ce-hover-params">{#each hover.params as p (p.name)}<li><code>{p.name}</code> <span class="ce-hover-type">({p.type})</span> {@render coded(p.summary)}</li>{/each}</ul>{/if}
+      {#if hover.notes?.length}<ul class="ce-hover-notes">{#each hover.notes as note, k (k)}<li>{@render coded(note)}</li>{/each}</ul>{/if}
     </div>
   {/if}
 
@@ -1681,6 +1685,10 @@
   .ce-hover-params li + li { margin-top: 3px; }
   .ce-hover-params code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
   .ce-hover-type { color: var(--txt-faint, var(--txt-dim)); font-style: italic; }
+  .ce-hover-example { margin-top: 5px; }
+  .ce-hover-notes { margin: 6px 0 0; padding: 6px 0 0 14px; border-top: 1px solid var(--line-2); font-size: 12px; color: var(--txt-dim); line-height: 1.4; }
+  .ce-hover-notes li + li { margin-top: 3px; }
+  .ce-hover-notes code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
 
   /* signature help: inline after the end of the caret's line, or a box over the line before or after
      it; a line tall either way, its size set where it is placed (signatureHint.js, whose HINT holds
