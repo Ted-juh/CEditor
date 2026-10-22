@@ -269,6 +269,26 @@ test('a drawing is never written to the panel document', () => {
     'a scope trace on disk would be meaningless as well as wrong');
 });
 
+test('clear says when there is no such control, or no control to draw on', () => {
+  // Both returned false in silence, where every shape command says "no control to draw on".
+  resetScriptStateForTesting();
+  const panel = { id: 'p', name: 'P', width: 800, height: 400, controls: [createControl('Knob', { name: 'K' })], scripting: { modules: ['ce.core', 'ce.draw'] } };
+  setRuntimeHost({ panel, scripts: [], readValue: (c, p) => valueAtPath(c, p), writeValue: (c, p, v) => (setNestedValue(c, p, v), true) });
+  try {
+    clearScriptTrace();
+    const attached = scriptApiForTesting('K', 'clear-probe');
+    assert.equal(attached.drawClear(), true);
+    assert.equal(attached.drawClear('nosuch'), false);
+    const loose = scriptApiForTesting('', 'loose-probe');
+    assert.equal(loose.drawClear(), false);
+    assert.equal(loose.drawClear('K'), true, 'a target names the control for a script attached to none');
+    assert.deepEqual(get(scriptTrace).map((t) => `${t.kind}: ${t.message}`), [
+      'error: ce.draw.clear: no control named "nosuch".',
+      'error: ce.draw.clear: no control to draw on. Attach the script to a control, or pass a target name.',
+    ]);
+  } finally { setRuntimeHost(null); }
+});
+
 test('the draw verbs are webview-only and onDraw never fires window-closed', () => {
   for (const id of ['drawClear', 'drawFill', 'drawStroke', 'drawRect', 'drawCircle',
     'drawLine', 'drawPath', 'drawText', 'drawRedraw']) {
@@ -405,7 +425,8 @@ test('a dash length that cannot be drawn is drawn as 0 and said once; a dash tha
     assert.deepEqual(drawn([Infinity, 2])[0], '0 2', 'Infinity made the whole pattern one SVG drops');
     // Not a list: a number was dropped without a word, and text taken apart a character at a time
     // ("3 3" drew "3 0 3", and "10 5" drew "1 0 0 5").
-    const solid = (shown) => `error: ce.draw.stroke: the dash is ${shown}, not a list of lengths, so the line is solid. `
+    // A warning: the line is drawn, solid. An error means the call did nothing (the owner's rule).
+    const solid = (shown) => `warn: ce.draw.stroke: the dash is ${shown}, not a list of lengths, so the line is solid. `
       + `A dash is a list of lengths in pixels, drawn and skipped in turn.${once}`;
     assert.deepEqual(drawn(3), [null, [solid('3')]]);
     assert.deepEqual(drawn('3 3'), [null, [solid('"3 3"')]]);

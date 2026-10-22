@@ -495,8 +495,36 @@ table since each has one parameter: one sentence, an example, the parameter's te
 call returns as the first note. `play` with a name left out said `no control named "undefined"`;
 it says that no name was given, in the editor (the command is panel-window only).
 
-**`ce.anim` is done.** Next: the next module in the table below, `ce.draw`, the same way: one
-command at a time, every parameter and option in its item, one rule per line, with ranges.
+**`ce.anim` is done.**
+
+## `ce.draw`: in progress
+
+Every command was probed at its edges first (the probe is the pattern of `drawShapes.test.js`'s
+`run()`: a host panel with a Knob `K`, `scriptApiForTesting('K', …)`, then `drawCommandsFor('K')`
+and the trace). The module introduction (`MODULE_INTROS['ce.draw']`) says once what every command
+shares: commands add to what is there; a coordinate or size that is not a number is 0 with a
+one-time warning; a shape wholly outside the control is a one-time warning; an option with a
+wrong value is a one-time warning and its fallback; a required value missing or wrong is rejected
+with an error.
+
+Done, approved by the owner:
+
+- `clear`: "Erase everything drawn on a control.", the example, `target` ("The control's name. /
+  Left out: the control the script is attached to."), two notes. Two decisions: an unknown
+  control, or no control to draw on, is rejected with an error (both returned false in silence),
+  and `stroke`'s `dash`, `cap` and `join` with a wrong value are warnings, not errors, since the
+  default is drawn: an error always means the call did nothing (`drawDash.js` severities).
+
+Left, in the order of the dump: `fill`, `stroke`, `rect`, `circle`, `line`, `path`, `arc`,
+`gradient`, `opacity`, `transform`, `ellipse`, `pixelText`, `measure`, `batch`, `grid`, `lines`,
+`points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`, `restore`, `text`, and `redraw`
+if it is declared. What the probe found, for the items to come: `rect`, `circle`, `ellipse`,
+`arc` and `polygon` take a size or radius below 0 without a word; `path` takes one point or none
+and draws nothing, in silence, where `lines` and `points` reject an empty list; `grid` with `step`
+and `columns` together uses `step`; `polygon` with fewer than 3 sides, or sides that are not a
+number, draws a triangle in silence; `transform` with `cx` and no `cy` rotates about the corner in
+silence; `pixelText` with a scale of 0 or text uses 1 in silence; `blend` is case-sensitive;
+`text` with a size of 0 draws at 12 in silence.
 
 For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
 range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
@@ -520,7 +548,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
 | ce.anim | 12 | 12, all done |
-| ce.draw | 27 | 18 |
+| ce.draw | 27 | 18, `clear` done |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
 | ce.components.arp | 30 | 15 |
@@ -577,9 +605,9 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.midi, ce.math and ce.anim are done; continue with ce.draw, in technical
-English, schematic, one rule per line, with ranges, as its table says, showing every parameter and
-option of the command in its item. Check each command at its edges in the runtime first, and put
-what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.midi, ce.math and ce.anim are done and ce.draw is started (clear); continue
+with ce.draw.fill, in technical English, schematic, one rule per line, with ranges, as its table
+says, showing every parameter and option of the command in its item. Check each command at its
+edges in the runtime first, and put what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```

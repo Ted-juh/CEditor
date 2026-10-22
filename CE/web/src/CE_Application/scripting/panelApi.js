@@ -1442,9 +1442,14 @@ export const COMMANDS = [
      a drawing is a product of the script, never part of the document. */
   {
     id: 'drawClear', category: 'Drawing', signature: 'drawClear([target])',
-    summary: 'Erase everything drawn on this control, or on the control named `target`. Drawing commands add to what is already there rather than replacing it, so this is usually the first line of onDraw.',
+    summary: 'Erase everything drawn on a control.',
+    example: '`drawClear("Scope")` erases what is drawn on Scope.',
+    notes: [
+      'Drawing commands add to what is there, so this is usually the first line of onDraw.',
+      'Returns true; unknown control, or no control to draw on: rejected with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'target', type: 'string', required: false, kind: 'control' }],
+    params: [{ name: 'target', type: 'string', required: false, kind: 'control', summary: 'The control\'s name.\nLeft out: the control the script is attached to.' }],
     scopes: 'any',
     snippet: { lua: 'ce.draw.clear()$0', javascript: 'ce.draw.clear();$0' },
   },

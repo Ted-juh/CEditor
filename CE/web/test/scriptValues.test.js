@@ -792,8 +792,9 @@ test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in
     const said = runtime.said[0].message.replace(/ This is said only the first time\.$/, '');
     assert.ok(runtime.said[0].message.endsWith(' This is said only the first time.'), src);
     assert.ok(row.problem.message.startsWith(said), `${src}:\n  read:    ${row.problem.message}\n  runtime: ${said}`);
-    assert.equal(runtime.said[0].kind, 'error', src);
-    assert.equal(row.problem.severity, 'error', src);
+    // A warning, not an error: the default is drawn. An error means the call did nothing.
+    assert.equal(runtime.said[0].kind, 'warn', src);
+    assert.equal(row.problem.severity, 'warning', src);
   }
   assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Round" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
     'ce.draw.stroke: the join is "Round", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');

@@ -55,7 +55,8 @@ export function dashPattern(dash) {
   if (typeof dash !== 'object') {
     return {
       dasharray: null, lengths: null,
-      problem: { severity: 'error', message: `ce.draw.stroke: the dash is ${shown(dash)}, not a list of lengths, so the line is solid. `
+      // A warning, not an error: the line is drawn, solid. An error means the call did nothing.
+      problem: { severity: 'warning', message: `ce.draw.stroke: the dash is ${shown(dash)}, not a list of lengths, so the line is solid. `
         + 'A dash is a list of lengths in pixels, drawn and skipped in turn.' },
     };
   }
@@ -85,7 +86,7 @@ export const STROKE_ENDS = {
  *
  * @param {'cap'|'join'} name
  * @param {*} value  the option as the script gave it.
- * @returns {{ value: string|null, problem: { severity: 'error', message: string }|null }}
+ * @returns {{ value: string|null, problem: { severity: 'warning', message: string }|null }}
  *   `value` is what the overlay is handed (null: the default); `problem` what is said of it.
  */
 export function strokeEnd(name, value) {
@@ -95,6 +96,6 @@ export function strokeEnd(name, value) {
   const list = values.map((v) => `"${v}"`);
   return {
     value: null,
-    problem: { severity: 'error', message: `ce.draw.stroke: the ${name} is ${shown(value)}, not ${list[0]}, ${list[1]} or ${list[2]}, so "${otherwise}" is drawn.` },
+    problem: { severity: 'warning', message: `ce.draw.stroke: the ${name} is ${shown(value)}, not ${list[0]}, ${list[1]} or ${list[2]}, so "${otherwise}" is drawn.` },
   };
 }

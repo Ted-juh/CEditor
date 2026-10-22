@@ -79,6 +79,14 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.anim.envelope` with fewer than two points writes an error to the console, as every other
   rejection does. It wrote a plain line.
 
+**Scripts written for an earlier build: `ce.draw` says more.**
+
+- `ce.draw.clear` with a control name the panel does not have, or from a script attached to no
+  control and given no name, writes an error to the console. It returned false in silence.
+- `ce.draw.stroke` with a `dash` that is not a list, or a `cap` or `join` that is not one of its
+  words, draws the default as before, but reports it as a warning, not an error: an error now
+  always means the call did nothing.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

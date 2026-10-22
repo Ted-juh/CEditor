@@ -5909,7 +5909,15 @@ function textFitImpl(target, opts) {
 
 function drawClearImpl(explicit, ownerName) {
   const control = drawTarget(explicit, ownerName);
-  if (!control) return false;
+  if (!control) {
+    // Said, as every shape says it: a name the panel does not have, and no control at all,
+    // returned false in silence.
+    const wanted = explicit != null && String(explicit) !== '' ? String(explicit) : '';
+    addScriptTrace('error', '', wanted
+      ? `ce.draw.clear: no control named "${wanted}".`
+      : 'ce.draw.clear: no control to draw on. Attach the script to a control, or pass a target name.');
+    return false;
+  }
   const id = control._children.Core.id;
   drawCommands.delete(id);
   clearDrawing(id);

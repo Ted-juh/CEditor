@@ -3403,11 +3403,26 @@ Drawing, images, typography, and dialogs with the user.
 
 Drawing your own graphics on top of a control, from its script's onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control's top-left corner.
 
+- Drawing commands add to what is there: clear first.
+- A coordinate or size that is not a number: 0, with a console warning, the first time only.
+- A shape wholly outside the control: a console warning, the first time only.
+- An option with a wrong value: a console warning, the first time only, and the fallback in its row.
+- A required value that is missing or of the wrong type: rejected with a console error.
+
 Everything in this chapter needs the panel window. With the window closed these commands do nothing and write a note to the log.
 
 #### `ce.draw.clear([target])`
 
-Erase everything drawn on this control, or on the control named `target`. Drawing commands add to what is already there rather than replacing it, so this is usually the first line of onDraw.
+Erase everything drawn on a control.
+
+Example: `drawClear("Scope")` erases what is drawn on Scope.
+
+- `target` (text, optional): The control's name.<br>Left out: the control the script is attached to.
+
+Good to know:
+
+- Drawing commands add to what is there, so this is usually the first line of onDraw.
+- Returns true; unknown control, or no control to draw on: rejected with a console error.
 
 *Short name: `drawClear`.*
 

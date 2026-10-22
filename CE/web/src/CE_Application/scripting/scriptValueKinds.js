@@ -707,7 +707,8 @@ export function readEnum(value, values, { path, name, refusal } = {}) {
 export const ENUM_REFUSALS = {
   drawBlend: (value, list) => `ce.draw.blend("${value}"): not a blend mode. One of: ${list.join(', ')}.`,
   // Its two lists are cap's and join's; drawDash.js says both, as the runtime draws them.
-  drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem?.message ?? null : null),
+  // The problem as drawDash says it, severity included: a warning, since the default is drawn.
+  drawStroke: (value, _list, name) => (STROKE_ENDS[name] ? strokeEnd(name, value).problem ?? null : null),
   // ce.panel's arrangement verbs, each in its own sentence (layoutWords.js).
   ...Object.fromEntries(Object.keys(LAYOUT_WORDS).map((id) => [id, (value) => layoutWord(id, value).refused])),
   // ce.music's two words are not refused: one there is none of is the default, said once.
