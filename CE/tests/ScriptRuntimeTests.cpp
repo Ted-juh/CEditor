@@ -739,6 +739,31 @@ int main()
         check (host.levelled.size() == 5, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
     }
 
+    // 12c, continued) a done that is not a function, through the real Lua and QuickJS engines: the
+    // prelude passes it to the runtime as __badDone, the runtime says so once, and the move goes
+    // ahead. It was dropped without a word.
+    {
+        juce::Array<juce::var> doneScripts;
+        doneScripts.add (makeScript ("badDoneLua", "lua", "panel", "onBadDoneLua", "*",
+            "function onBadDoneLua()\n"
+            "  log('lua started ' .. tostring(ce.anim.to('cutoff', 50, { duration = 10, done = 'later' })))\n"
+            "end\n"));
+        doneScripts.add (makeScript ("badDoneJs", "javascript", "panel", "onBadDoneJs", "*",
+            "function onBadDoneJs() {\n"
+            "  log('js started ' + ce.anim.spring('cutoff', 50, { duration: 10, done: 5 }));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (doneScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onBadDoneLua", "panel", juce::var());
+        runtime.dispatchEvent ("onBadDoneJs", "panel", juce::var());
+        check (host.logs.contains ("lua started true") && host.logs.contains ("js started true"),
+               "a done that is not a function does not stop the move (got " + host.logs.joinIntoString (" | ") + ")");
+        check (host.levelled.joinIntoString (" | ") == "warn:ce.anim.to: \"later\" is not a function, so nothing is called when the move ends. This is said only the first time. | "
+                                                       "warn:ce.anim.spring: 5 is not a function, so nothing is called when the move ends. This is said only the first time.",
+               "...and is said once per command, in the runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
     // 12d) ce.math reads CSS's short forms as a colour property stores them, through the real Lua
     // and QuickJS engines: each prelude's own port of the WebView's reading, and the generated names
     // table. "red" was refused here while set() took it. The rounding is JavaScript's (30% of 255 is
@@ -3314,6 +3339,22 @@ int main()
             check (got == juce::String (juce::CharPointer_UTF8 ("warn:ce.anim.to: true is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.")) + once,
                    "a curve that is neither a name nor numbers is said, where it was linear in silence (got " + got + ")");
         }
+        // from, stagger, repeat and a done that is not a function (passed on by a prelude as
+        // __badDone): each was silent, and each is said once, as the WebView says it.
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("t"), 100.0, opts ({ { "from", "abc" } }));
+        check (said() == "warn:ce.anim.to: \"abc\" is not a number, so the move starts from the value as it is now, as it does when no from is given." + once,
+               "a from that is not a number is where the value is now, and said");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "u", "v" }), 100.0, opts ({ { "from", 0.0 }, { "stagger", -100.0 } }));
+        check (said() == "warn:ce.anim.to: a stagger of -100 is less than 0, so the moves start together, as they do when no stagger is given." + once,
+               "a stagger below 0 starts the moves together, and is said as a stagger, not as the delay each path got");
+        timing.startAnimation ("to", juce::var ("w"), 100.0, opts ({ { "repeat", "x" } }));
+        check (said() == "warn:ce.anim.to: \"x\" is not a number of runs, so the move runs once, as it does when no repeat is given." + once,
+               "a repeat that is not a number runs once, and is said");
+        timing.startAnimation ("to", juce::var ("x"), 100.0, opts ({ { "__badDone", "x" } }));
+        check (said() == "warn:ce.anim.to: \"x\" is not a function, so nothing is called when the move ends." + once,
+               "a done that is not a function is said, and the move goes ahead");
     }
 
     {

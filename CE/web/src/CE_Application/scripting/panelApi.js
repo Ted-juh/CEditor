@@ -305,23 +305,18 @@ const SHARED_OPTION_FIELDS = {
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'When `path` is a list, offset each move after the first by this much, so they start '
-      + 'in turn.',
+    summary: 'Delay per list entry: entry n starts n × stagger after the first.\nLists only.\nRange: ≥ 0.\nInvalid: 0.',
   },
   // The runs IN ALL, which is what this always said. Every runtime used to read it as runs after
   // the first (repeat = 1 ran twice, repeat = 0 once); startAnimationImpl and
   // ScriptRuntime::startAnimation now do what it says. apiContractRuntimes.test.js counts the runs.
   repeat: {
     name: 'repeat', type: 'number', default: '1',
-    summary: 'How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or '
-      + 'less repeats it until you stop it. A fraction is rounded to the nearest whole number, text '
-      + 'that is a number is read as one, and anything else runs it once. In Lua, where repeat is a '
-      + 'keyword, write it as ["repeat"] = 3.',
+    summary: 'Number of runs.\nFraction: rounded.\n≤ 0: repeats until stopped.\nInvalid: 1.\nLua: `["repeat"] = 3` (keyword).',
   },
   pingpong: {
     name: 'pingpong', type: 'true or false', default: 'false',
-    summary: 'On a repeat, run the move backwards every other time instead of jumping back to the '
-      + 'start.',
+    summary: '`true`: alternate runs play in reverse.\nRequires repeat 0, or ≥ 2.\nOther values: false.',
   },
   // done(completed), which is what this always said. Every runtime used to pass one table,
   // { path, completed } or { paths, completed }, and a table is always true, so `if completed then`
@@ -329,14 +324,11 @@ const SHARED_OPTION_FIELDS = {
   // listeners now pass the boolean alone.
   done: {
     name: 'done', type: 'function',
-    summary: 'Called once when the move ends, with one argument: done(completed). `completed` is '
-      + 'true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped '
-      + 'or replaced first. When `path` is a list it is called once, after the last of them ends, '
-      + 'and `completed` is true only if every one of them got to the end.',
+    summary: 'Callback at the end: done(completed).\ncompleted: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.\nList: called once, after the last entry; true only if every entry completed.\nInvalid: no callback.',
   },
   animFrom: {
     name: 'from', type: 'number', sample: '0',
-    summary: 'Start from this value instead of wherever the control is now.',
+    summary: 'Start value.\nDefault: the current value.\nInvalid: default.',
   },
 
   /* --- a control's props (ce.panel.create / .clone) ---------------------- */

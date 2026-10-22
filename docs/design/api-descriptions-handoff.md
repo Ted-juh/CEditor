@@ -437,7 +437,9 @@ and `ScriptRuntime::startAnimation`), with the release notes saying so:
 
 `ce.anim.spring`'s own `damping` and `frequency` rows still have their old text (step 2 below).
 
-### Item 4, proposed to the owner: `from`, `stagger`, `repeat`, `pingpong`, `done`
+### Item 4: done
+
+`from`, `stagger`, `repeat`, `pingpong` and `done`, approved by the owner, in `SHARED_OPTION_FIELDS`:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -447,23 +449,25 @@ and `ScriptRuntime::startAnimation`), with the release notes saying so:
 | `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
 | `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
-Four edges where both runtimes are silent, unlike every other option (checked in the editor's
-runtime; `ScriptRuntime.cpp` reads them the same way). Each would get the module's one-time
-warning and the fallback in its row:
+Four edges where both runtimes were silent, unlike every other option, each decided by the owner
+and applied in both runtimes with the module's one-time warning and the fallback in its row
+(`scriptAnim.test.js`, `ScriptRuntimeTests.cpp`, `PythonScriptEngineTests.cpp`; the release notes
+say so):
 
-1. `from` = "abc" or `true`: starts from 0 or 1 (`Number()`), no message. Warn and use the current value?
-2. `stagger` below 0: the per-entry delays go negative, are held at 0, and the warning names
-   `delay`, not `stagger`. Reject: warn, use 0?
-3. `repeat` = "x" or `true`: 1 run, no message. Warn?
-4. `done` = "x" or 5: ignored, no message. Warn?
+1. `from` = "abc" or `true` started from 0 or 1 (`Number()`). Warned; the current value is used.
+2. `stagger` below 0 gave each entry a delay below 0, held at 0, and the warning named `delay`.
+   Warned as a stagger; 0 is used.
+3. `repeat` = "x" or `true` ran once in silence. Warned.
+4. `done` = "x" or 5 was dropped in silence. Warned. The preludes own the functions and strip
+   `done` before the call, so they pass one that is not a function to the runtime as `__badDone`,
+   and the runtime says it (`ScriptRuntime::startAnimation`).
 
 ### Left to do in `ce.anim`
 
-1. Item 4 above, once the owner answers.
-2. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows,
+1. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows,
    which take item 3's text).
-3. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
-4. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+2. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
+3. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
 
 Write every one in the line form above.
 
@@ -546,8 +550,7 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to, its timing options and its curve options are done; item 4 (from,
-stagger, repeat, pingpong, done) is proposed with four open decisions: put those to me first.
-Continue in technical English, schematic, one rule per line, with ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.anim.to and every option it shares are done; continue with ce.anim.spring, in
+technical English, schematic, one rule per line, with ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```

@@ -4509,9 +4509,10 @@ function animTiming(verb, opts, name, fallback) {
   return n;
 }
 /** `stagger`, `damping` and `frequency`: a number, or text that is one, or after saying why not, the
- *  default. A stagger below 0 runs the list back to front behind a delay, and a frequency's sign
- *  makes no difference, so both are used as given. A damping below 0 makes the spring grow instead
- *  of settling (a move from 0 to 100 at -2 is at -161 halfway), so it is the default, and said. */
+ *  default. A frequency's sign makes no difference, so it is used as given. A damping below 0 makes
+ *  the spring grow instead of settling (a move from 0 to 100 at -2 is at -161 halfway), and a
+ *  stagger below 0 gave each path a delay below 0, held at 0 and said as a delay; both are the
+ *  default, and said as what they are. */
 const ANIM_OPTION_FALLBACK_WORDS = {
   stagger: () => 'not a number of milliseconds, so the moves start together, as they do when no stagger is given.',
   damping: (d) => `not a number, so the spring's damping is ${d}, as it is when none is given.`,
@@ -4526,10 +4527,24 @@ function animOption(verb, opts, name, fallback) {
       warnAnimTiming(verb, name, `a damping of ${shownValue(n)} is less than 0, so the spring would grow instead of settling: its damping is ${fallback}, as it is when none is given.`);
       return fallback;
     }
+    if (name === 'stagger' && n < 0) {
+      warnAnimTiming(verb, name, `a stagger of ${shownValue(n)} is less than 0, so the moves start together, as they do when no stagger is given.`);
+      return fallback;
+    }
     return n;
   }
   warnAnimTiming(verb, name, `${shownValue(v)} is ${ANIM_OPTION_FALLBACK_WORDS[name](fallback)}`);
   return fallback;
+}
+
+/** `done` as the function it is, or null: none given, or after saying why not. A done that was not
+ *  a function ("x", 5) was dropped without a word. The preludes pass theirs on as __badDone, and
+ *  ScriptRuntime::startAnimation says the same of it. */
+function animDone(verb, opts) {
+  const fn = opts?.done;
+  if (typeof fn === 'function') return fn;
+  if (fn !== undefined && fn !== null) warnAnimTiming(verb, 'done', `${shownValue(fn)} is not a function, so nothing is called when the move ends.`);
+  return null;
 }
 
 /** `beats` as a number above 0, or null: none given, or said why not. */
@@ -4563,7 +4578,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     if (refused.length) return false;
     const stagger = animOption(`ce.anim.${kind}`, opts, 'stagger', 0);
     const baseDelay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
-    const done = typeof opts?.done === 'function' ? opts.done : null;
+    const done = animDone(`ce.anim.${kind}`, opts);
     let groupId = null;
     if (done) {
       animationGroupSeq += 1;
@@ -4620,9 +4635,20 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   }
 
   // `from` defaults to where the value IS, so an animation starts from the truth rather than from
-  // wherever the previous one happened to stop.
-  const fromRaw = opts?.from != null ? Number(opts.from) : Number(getValue(key, 'value'));
-  const from = Number.isFinite(fromRaw) ? fromRaw : 0;
+  // wherever the previous one happened to stop. A number, or text that is one (realNumber), or
+  // after saying why not, the default: Number() read "abc" and "" as 0 and true as 1, in silence.
+  let from;
+  if (opts?.from !== undefined && opts?.from !== null) {
+    from = realNumber(opts.from);
+    if (from === undefined) {
+      warnAnimTiming(curveVerb, 'from',
+        `${shownValue(opts.from)} is not a number, so the move starts from the value as it is now, as it does when no from is given.`);
+    }
+  }
+  if (from === undefined) {
+    const now = Number(getValue(key, 'value'));
+    from = Number.isFinite(now) ? now : 0;
+  }
 
   // Nothing has ticked yet on a fresh panel, so seed the origin from the clock the interval below
   // will use — otherwise the first animation measures against zero and finishes instantly.
@@ -4659,6 +4685,9 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // Anything a script can start forever it must be able to stop, which is what list()/value() and
   // panel teardown are for. ScriptRuntime::startAnimation reads it the same way.
   const runsGiven = realNumber(opts?.repeat);
+  if (runsGiven === undefined && opts?.repeat !== undefined && opts?.repeat !== null) {
+    warnAnimTiming(curveVerb, 'repeat', `${shownValue(opts.repeat)} is not a number of runs, so the move runs once, as it does when no repeat is given.`);
+  }
   const runs = runsGiven === undefined ? 1 : Math.round(runsGiven);
   const repeat = runs <= 0 ? -1 : runs - 1;
 
@@ -4686,7 +4715,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     pingpong: opts?.pingpong === true,
     paused: false,
     heldProgress: 0,
-    done: typeof opts?.done === 'function' ? opts.done : null,
+    done: animDone(curveVerb, opts),
     scriptId: scriptId,
     groupId,
   });

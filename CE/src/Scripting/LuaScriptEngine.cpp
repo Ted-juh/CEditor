@@ -2912,6 +2912,8 @@ local function __animStart(kind, path, target, opts)
     local token = "lua:" .. tostring(__animSeq)
     __animDone[token] = opts.done
     o.__done = token
+  elseif opts.done ~= nil then
+    o.__badDone = opts.done   -- not a function: the host says so, once, and the move goes ahead
   end
   -- The host answers whether the move started: not when a colour property is the path or one of a
   -- list's paths, and then nothing in the list starts and its done is never called, so it is let go.

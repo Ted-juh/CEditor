@@ -67,6 +67,12 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - A `curve` that cannot be used (an unknown name, control points out of range, or a value that is
   neither a name nor four numbers) is warned about once per command, as every other option is, and
   the move is linear. It was logged on every call, and the last case was linear in silence.
+- A `from` that is not a number ("abc", true) starts from the current value, with a console
+  warning. It started from 0 or 1 in silence.
+- A `stagger` below 0 is replaced by 0, with a warning. It gave each path a delay below 0, and the
+  warning named `delay`.
+- A `repeat` that is not a number runs the move once, with a warning. It was silent.
+- A `done` that is not a function is reported with a warning. It was dropped in silence.
 
 ## What you get
 

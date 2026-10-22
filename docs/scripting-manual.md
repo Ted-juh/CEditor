@@ -2564,12 +2564,12 @@ Good to know:
 | `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
 | `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>0: no oscillation.<br>Invalid: default. |
-| `from` | number | — | Start from this value instead of wherever the control is now. |
+| `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
-| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
-| `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
+| `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
 -- Lua
@@ -2593,14 +2593,14 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 | `duration` | number (milliseconds) | 600 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `damping` | number | 6 | How quickly the wobble dies away. Higher settles sooner; lower keeps bouncing. |
 | `frequency` | number | 12 | How fast it wobbles. Higher is a tighter, faster bounce. |
-| `from` | number | — | Start from this value instead of wherever the control is now. |
+| `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
-| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
-| `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
+| `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
 -- Lua
@@ -2664,10 +2664,10 @@ Move a value through a shape with several points — an attack and decay, say, o
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
-| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
-| `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
+| `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
 -- Lua

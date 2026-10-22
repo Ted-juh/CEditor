@@ -59,8 +59,9 @@ function runsOf(opts, limit = 12) {
 test('repeat is the number of runs in all: 1 once, 3 three times, 0 or less until stopped', () => {
   for (const id of ANIMATING) {
     assert.equal(field(id, 'repeat').default, '1', `${id}: the default is a single run`);
-    assert.match(field(id, 'repeat').summary,
-      /How many times to run the move in all: 1 runs it once and 3 runs it three times\. 0 or less repeats it until you stop it\./);
+    // One rule per line (docs/design/api-descriptions-handoff.md): the count, and what 0 or less means.
+    assert.match(field(id, 'repeat').summary, /^Number of runs\.\n/);
+    assert.match(field(id, 'repeat').summary, /\n≤ 0: repeats until stopped\.\n/);
   }
   assert.equal(runsOf({}), 1, 'left out: once');
   assert.equal(runsOf({ repeat: 1 }), 1, 'repeat = 1: once, not twice');
@@ -118,7 +119,7 @@ test('pingpong and stagger count their runs the same way', () => {
 
 test('done is called with one argument, completed, exactly true or false', () => {
   for (const id of ANIMATING) {
-    assert.match(field(id, 'done').summary, /with one argument: done\(completed\)\./);
+    assert.match(field(id, 'done').summary, /^Callback at the end: done\(completed\)\.\n/);
     assert.doesNotMatch(field(id, 'done').summary, /table|info\.completed/);
   }
   withClock(() => {

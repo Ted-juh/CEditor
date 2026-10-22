@@ -1102,6 +1102,9 @@ def __animStart(kind, path, target, opts):
         token = "py:" + str(globals().get("__scriptId", "")) + ":" + str(__animSeq[0])
         __animDone[token] = fn
         o["__done"] = token
+    elif fn is not None:
+        # Not a function: the host says so, once, and the move goes ahead.
+        o["__badDone"] = fn if isinstance(fn, (bool, int, float, str)) else str(fn)
     # The host answers whether the move started: not when a colour property is the path or one of a
     # list's paths, and then nothing in the list starts and its done is never called, so it is let go.
     # A missing path is passed as empty, which the host says is no path, not as the text "None".

@@ -626,6 +626,21 @@ int main()
         anim.tickAnimations (6200.0);
         check (steps().isEmpty() && ! anim.animationRunning ("m"), "ce.anim: …nothing started, so no done is called");
         check (animErrors.isEmpty(), "ce.anim: no script raised on a missing path");
+
+        // A done that is not a function: the prelude passes it on as __badDone, the runtime says so
+        // once, and the move goes ahead. It was dropped without a word.
+        juce::Array<juce::var> badDoneScripts;
+        badDoneScripts.add (makeScript ("pyBadDone", "onBadDone", "*",
+            "def onBadDone(value=None):\n"
+            "    log('started ' + str(ce.anim.to('m', 1, { 'duration': 100, 'from': 0, 'done': 'x' })))\n"));
+        anim.loadScripts (juce::var (badDoneScripts));
+        anim.tickAnimations (7000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onBadDone", "panel", juce::var());
+        const auto badDone = steps();
+        check (badDone == "ce.anim.to: \"x\" is not a function, so nothing is called when the move ends. This is said only the first time. | started True",
+               "ce.anim: a done that is not a function is said, and the move goes ahead (got " + badDone + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised on a done that is not a function");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------

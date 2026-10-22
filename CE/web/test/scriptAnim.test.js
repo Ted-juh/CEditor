@@ -229,6 +229,48 @@ test('a curve that cannot be used is said once per command, as the other options
   });
 });
 
+test('from, stagger, repeat and done that cannot be used are said once, and the move goes ahead with the default', () => {
+  // The owner's four decisions on item 4 (docs/design/api-descriptions-handoff.md). Each was
+  // silent: from "abc" started at 0 and true at 1, a stagger below 0 was said as a delay, repeat
+  // "x" ran once and done "x" was dropped, all without a word. ScriptRuntimeTests checks the
+  // plug-in's runtime, and with PythonScriptEngineTests the preludes' done.
+  const panel = { id: 'p', name: 'P', width: 400, height: 300, scripting: { modules: ['ce.core', 'ce.anim'] },
+    controls: [createControl('Range', { name: 'K' }), createControl('Range', { name: 'L' })] };
+  setRuntimeHost({ panel, scripts: [], readValue: () => 40, writeValue: () => true });
+  const script = scriptApiForTesting('', 'item4-script');
+  const said = () => { const lines = getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`); clearScriptTrace(); return lines; };
+  const once = ' This is said only the first time.';
+  resetScriptStateForTesting();
+  try {
+    withClock(() => {
+      said();
+      assert.equal(script.animateTo('K', 100, { duration: 1000, from: 'abc' }), true);
+      assert.deepEqual(said(), [`warn:ce.anim.to: "abc" is not a number, so the move starts from the value as it is now, as it does when no from is given.${once}`]);
+      assert.equal(script.animateValue('K').from, 40, 'the value as it is now, not 0');
+      script.animateTo('K', 100, { duration: 1000, from: true });
+      assert.deepEqual(said(), [], 'said once');
+      script.animateTo('K', 100, { duration: 1000, from: '20' });
+      assert.equal(script.animateValue('K').from, 20, 'text that is a number is read as one');
+      assert.deepEqual(said(), []);
+
+      assert.equal(script.animateTo(['K', 'L'], 100, { duration: 1000, from: 0, stagger: -100 }), true);
+      assert.deepEqual(said(), [`warn:ce.anim.to: a stagger of -100 is less than 0, so the moves start together, as they do when no stagger is given.${once}`],
+        'said as a stagger, not as the delay each path got');
+      assert.equal(script.animateValue('K').remaining, script.animateValue('L').remaining, 'together');
+
+      script.animateTo('K', 100, { duration: 100, from: 0, repeat: 'x' });
+      assert.deepEqual(said(), [`warn:ce.anim.to: "x" is not a number of runs, so the move runs once, as it does when no repeat is given.${once}`]);
+      tickAnimations(150);
+      assert.equal(script.animateRunning('K'), false, 'once');
+
+      assert.equal(script.animateTo('K', 100, { duration: 100, from: 0, done: 'x' }), true);
+      assert.deepEqual(said(), [`warn:ce.anim.to: "x" is not a function, so nothing is called when the move ends.${once}`]);
+      tickAnimations(300);
+      assert.equal(script.animateRunning('K'), false, 'the move went ahead, and ended');
+    });
+  } finally { setRuntimeHost(null); }
+});
+
 test('every phase-13 verb is declared, cross-runtime, and namespaced under ce.anim', () => {
   for (const [id, path] of [
     ['animateEnvelope', 'ce.anim.envelope'], ['animateValue', 'ce.anim.value'],

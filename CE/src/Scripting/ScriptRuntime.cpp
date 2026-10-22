@@ -511,6 +511,12 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         return true;
     };
 
+    // A `done` that is not a function: the preludes own the functions and strip `done` before the
+    // call, so they pass one that is not a function on as __badDone, and it is said here, once,
+    // as the WebView's animDone says it. It was dropped without a word.
+    if (o != nullptr && o->hasProperty ("__badDone"))
+        warnTiming ("done", animationShown (o->getProperty ("__badDone")) + " is not a function, so nothing is called when the move ends.");
+
     // A LIST of paths is one call, one shape, one completion — and `stagger` is why the list is
     // worth having rather than a loop at the call site.
     if (auto* list = path.getArray())
@@ -531,7 +537,15 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         for (const auto& p : paths) refused = refusesMissing (p) || refusesColour (p) || refused;
         if (refused) return false;
 
-        const double stagger = option ("stagger", 0.0, "not a number of milliseconds, so the moves start together, as they do when no stagger is given.");
+        double stagger = option ("stagger", 0.0, "not a number of milliseconds, so the moves start together, as they do when no stagger is given.");
+        if (stagger < 0.0)
+        {
+            // Each path's delay went below 0, held at 0 and said as a delay; it is 0 now, and said
+            // as a stagger, as the WebView's animOption says it.
+            warnTiming ("stagger", "a stagger of " + animationShown (juce::var (stagger))
+                                   + " is less than 0, so the moves start together, as they do when no stagger is given.");
+            stagger = 0.0;
+        }
         const double baseDelay = juce::jmax (0.0, timing ("delay", 0.0));
         int groupId = 0;
         if (const auto token = o != nullptr ? o->getProperty ("__done").toString() : juce::String(); token.isNotEmpty())
@@ -548,6 +562,7 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
             auto* each = o != nullptr ? new juce::DynamicObject (*o) : new juce::DynamicObject();
             each->setProperty ("delay", baseDelay + stagger * (double) i);
             each->removeProperty ("__done");   // the list's, not each path's
+            each->removeProperty ("__badDone");   // said once above
             each->setProperty ("__group", groupId);
             startAnimation (kind, juce::var (paths[i]), target, juce::var (each));
         }
@@ -625,6 +640,14 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     // repeat = 1 ran twice and repeat = 0 once, where the contract always said otherwise. Held as
     // the runs left after this one, -1 for until stopped; clamped first, because llround of a number
     // past what it can hold is undefined.
+    // A repeat that is not a number of runs is said, and the move runs once (animationRuns).
+    if (o != nullptr && o->hasProperty ("repeat"))
+    {
+        const auto v = o->getProperty ("repeat");
+        double n = 0.0;
+        if (! v.isVoid() && ! v.isUndefined() && ! animationNumber (v, n))
+            warnTiming ("repeat", animationShown (v) + " is not a number of runs, so the move runs once, as it does when no repeat is given.");
+    }
     const auto runs = std::llround (juce::jlimit (-1.0, 2147483647.0, animationRuns (o)));
     a.repeat = runs <= 0 ? -1 : (int) (runs - 1);
 
@@ -657,9 +680,21 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     }
 
     // `from` defaults to where the value IS, so an animation always starts from the truth rather
-    // than from wherever the last one happened to end.
-    a.from = (o != nullptr && o->hasProperty ("from")) ? (double) o->getProperty ("from")
-                                                       : (double) host.getValue (key, "value");
+    // than from wherever the last one happened to end. A number, or text that is one
+    // (animationNumber), or after saying why not, that default: the (double) cast read "abc" as 0
+    // and true as 1, in silence. As the WebView's startAnimationImpl reads it.
+    bool fromGiven = false;
+    if (o != nullptr && o->hasProperty ("from"))
+    {
+        const auto v = o->getProperty ("from");
+        if (! v.isVoid() && ! v.isUndefined())
+        {
+            double n = 0.0;
+            if (animationNumber (v, n)) { a.from = n; fromGiven = true; }
+            else warnTiming ("from", animationShown (v) + " is not a number, so the move starts from the value as it is now, as it does when no from is given.");
+        }
+    }
+    if (! fromGiven) a.from = (double) host.getValue (key, "value");
     if (! std::isfinite (a.from)) a.from = 0.0;
     a.to = target;
 

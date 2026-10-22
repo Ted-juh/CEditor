@@ -2790,6 +2790,8 @@ function __animStart(kind, path, target, opts) {
     var token = "js:" + __animSeq;
     __animDone[token] = opts.done;
     o.__done = token;
+  } else if (opts.done != null) {
+    o.__badDone = opts.done;   // not a function: the host says so, once, and the move goes ahead
   }
   // The host answers whether the move started: not when a colour property is the path or one of a
   // list's paths, and then nothing in the list starts and its done is never called, so it is let go.
