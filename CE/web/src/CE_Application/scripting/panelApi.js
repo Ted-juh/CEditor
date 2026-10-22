@@ -1072,7 +1072,7 @@ export const COMMANDS = [
     params: [
       { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values.\nColour property, or a control not on the panel: rejected with a console error.\nList containing either: the entire list is rejected.' },
       { name: 'target', type: 'number', required: true, summary: 'The end value.' },
-      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: linear curve, 300 ms.',
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: curve "linear", duration 300.',
         fields: optionFields([
           'duration', 'beats', 'sync',
           { name: 'curve', type: 'text or list', default: '"linear"', kind: 'curve',
@@ -1081,7 +1081,7 @@ export const COMMANDS = [
           { name: 'damping', type: 'number', default: '6', kind: 'number',
             summary: 'Spring damping (curve = "spring").\nRange: ≥ 0.\n0: undamped.\nInvalid: default.' },
           { name: 'frequency', type: 'number', default: '12', kind: 'number',
-            summary: 'Spring oscillation frequency (curve = "spring").\n0: no oscillation.\nInvalid: default.' },
+            summary: 'Spring oscillation frequency (curve = "spring").\nRange: ≥ 0.\n0: no oscillation.\nBelow 0: sign ignored.\nInvalid: default.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],
@@ -1094,18 +1094,22 @@ export const COMMANDS = [
   {
     id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
     refusal: 'false',
-    summary: 'Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.',
+    summary: 'Move a value to a new number with a spring motion.',
+    example: '`animateSpring("cutoff", 127)` moves cutoff to 127 with a spring, in 600 ms.',
+    notes: [
+      'A new move on a value that is already moving replaces the old one, and the old one\'s `done` is called with false.',
+      'Returns false if the call is rejected.',
+    ],
     params: [
-      { name: 'path', type: 'path', required: true },
-      { name: 'target', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values.\nColour property, or a control not on the panel: rejected with a console error.\nList containing either: the entire list is rejected.' },
+      { name: 'target', type: 'number', required: true, summary: 'The end value.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: duration 600, damping 6, frequency 12.',
         fields: optionFields([
           { like: 'duration', default: '600' },
           { name: 'damping', type: 'number', default: '6', kind: 'number',
-            summary: 'How quickly the wobble dies away. Higher settles sooner; lower keeps '
-              + 'bouncing.' },
+            summary: 'Spring damping.\nRange: ≥ 0.\n0: undamped.\nInvalid: default.' },
           { name: 'frequency', type: 'number', default: '12', kind: 'number',
-            summary: 'How fast it wobbles. Higher is a tighter, faster bounce.' },
+            summary: 'Spring oscillation frequency.\nRange: ≥ 0.\n0: no oscillation.\nBelow 0: sign ignored.\nInvalid: default.' },
           'animFrom', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],

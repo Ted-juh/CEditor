@@ -2545,7 +2545,7 @@ Example: `animateTo("cutoff", 127, {duration = 500})` moves cutoff to 127 in hal
 
 - `path` (path, required): The value to animate, or a list of values.<br>Colour property, or a control not on the panel: rejected with a console error.<br>List containing either: the entire list is rejected.
 - `target` (number, required): The end value.
-- `opts` (options, optional): The options below.<br>Left out: linear curve, 300 ms.
+- `opts` (options, optional): The options below.<br>Left out: curve "linear", duration 300.
 
 Good to know:
 
@@ -2563,7 +2563,7 @@ Good to know:
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
 | `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
 | `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
-| `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>0: no oscillation.<br>Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
 | `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
 | `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
@@ -2582,7 +2582,18 @@ ce.anim.to("cutoff", 127, { duration: 500, curve: "s" });
 
 #### `ce.anim.spring(path, target [, opts])`
 
-Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.
+Move a value to a new number with a spring motion.
+
+Example: `animateSpring("cutoff", 127)` moves cutoff to 127 with a spring, in 600 ms.
+
+- `path` (path, required): The value to animate, or a list of values.<br>Colour property, or a control not on the panel: rejected with a console error.<br>List containing either: the entire list is rejected.
+- `target` (number, required): The end value.
+- `opts` (options, optional): The options below.<br>Left out: duration 600, damping 6, frequency 12.
+
+Good to know:
+
+- A new move on a value that is already moving replaces the old one, and the old one's `done` is called with false.
+- Returns false if the call is rejected.
 
 *Short name: `animateSpring`.*
 
@@ -2591,8 +2602,8 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `duration` | number (milliseconds) | 600 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
-| `damping` | number | 6 | How quickly the wobble dies away. Higher settles sooner; lower keeps bouncing. |
-| `frequency` | number | 12 | How fast it wobbles. Higher is a tighter, faster bounce. |
+| `damping` | number | 6 | Spring damping.<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency.<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
 | `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |

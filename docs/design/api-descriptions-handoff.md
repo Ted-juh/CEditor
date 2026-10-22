@@ -435,7 +435,9 @@ and `ScriptRuntime::startAnimation`), with the release notes saying so:
 3. A `curve` that is neither text nor a list (`curve = 5`) warns the same way. It was linear in
    silence.
 
-`ce.anim.spring`'s own `damping` and `frequency` rows still have their old text (step 2 below).
+`ce.anim.spring`'s own `damping` and `frequency` rows take the same text without the "(curve =
+"spring")" part, and both `frequency` rows say `Range: ≥ 0.` and `Below 0: sign ignored.` (the
+formula is 1 - e^(-damping·x)·cos(frequency·x) in both runtimes, and cos is even).
 
 ### Item 4: done
 
@@ -462,12 +464,19 @@ say so):
    `done` before the call, so they pass one that is not a function to the runtime as `__badDone`,
    and the runtime says it (`ScriptRuntime::startAnimation`).
 
+### `ce.anim.spring`: done
+
+Approved as "Move a value to a new number with a spring motion.", with the example
+`` `animateSpring("cutoff", 127)` moves cutoff to 127 with a spring, in 600 ms. ``, `to`'s `path`,
+`target` and notes, an `opts` row that names what is left out (`Left out: duration 600, damping 6,
+frequency 12.`, and `to`'s now says `Left out: curve "linear", duration 300.`), and every option
+shown to the owner with its range. The owner asked to see every option of a command in its item,
+the shared ones included, each with its range: do that for the commands left.
+
 ### Left to do in `ce.anim`
 
-1. `ce.anim.spring` (its `duration` defaults to 600, and its own `damping` and `frequency` rows,
-   which take item 3's text).
-2. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
-3. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+1. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
+2. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
 
 Write every one in the line form above.
 
@@ -550,7 +559,8 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to and every option it shares are done; continue with ce.anim.spring, in
-technical English, schematic, one rule per line, with ranges, as its table says. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.anim.to, ce.anim.spring and every option they share are done; continue with
+ce.anim.envelope, in technical English, schematic, one rule per line, with ranges, as its table
+says, showing every option of the command in its item. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```
