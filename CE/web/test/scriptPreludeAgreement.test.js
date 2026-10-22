@@ -898,10 +898,11 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
 
 /* ------------------------------------------------------ ce.anim.envelope's points, every way */
 
-// The refusals above, with what is taken and what is too few beside them: whether the move starts,
-// what is refused as an error and what is said as a note, compared with the WebView's for each. The
-// host's animate is stood in for by one that starts whatever it is given.
-test('ce.anim.envelope takes, refuses and notes the same points in every engine', async (t) => {
+// The refusals above, with what is taken and what is too few beside them: whether the move starts
+// and what is refused as an error, compared with the WebView's for each. Too few points was a note
+// (a plain line) until the owner asked for the error every other rejection is. The host's animate
+// is stood in for by one that starts whatever it is given.
+test('ce.anim.envelope takes and refuses the same points in every engine', async (t) => {
   const cases = [...ENVELOPE_REFUSED, ...ENVELOPE_TAKEN, ...ENVELOPE_TOO_FEW];
   const want = cases.map((points) => {
     clearScriptTrace();
@@ -913,7 +914,7 @@ test('ce.anim.envelope takes, refuses and notes the same points in every engine'
   resetScriptStateForTesting();
   assert.deepEqual(want.map((w) => w.started), cases.map((p) => ENVELOPE_TAKEN.includes(p)), 'the WebView starts exactly the taken ones');
   assert.ok(want.slice(0, ENVELOPE_REFUSED.length).every((w) => w.errors.length === 1 && !w.notes.length), 'each refusal is one error');
-  assert.ok(want.slice(-ENVELOPE_TOO_FEW.length).every((w) => w.notes.length === 1 && !w.errors.length), 'too few is one note');
+  assert.ok(want.slice(-ENVELOPE_TOO_FEW.length).every((w) => w.errors.length === 1 && !w.notes.length), 'too few is one error, as every rejection is');
   const label = (i) => `ce.anim.envelope("K.value", ${JSON.stringify(cases[i])})`;
 
   // JavaScript, under node:vm.

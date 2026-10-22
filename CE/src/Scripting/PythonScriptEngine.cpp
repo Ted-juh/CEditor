@@ -1144,7 +1144,7 @@ def animateSpring(path, target, opts=None):
 # word. A y past 0 to 1 is a level past `from` or `to`, and is read as it is.
 def animateEnvelope(path, points, opts=None):
     if not isinstance(points, (list, tuple)) or len(points) < 2:
-        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
+        logError("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
         return False
     def written(v):
         if v is None: return "none was given"
@@ -1172,9 +1172,16 @@ def animateEnvelope(path, points, opts=None):
             return False
     o = dict(opts or {})
     o["samples"] = __animSample(points)
-    o["from"] = float(o.get("from") or 0)
-    to = o.pop("to", None)
-    return __animStart("envelope", path, 1 if to is None else to, o)
+    # from and to: a number, or text that is one, or the default, which the host says (__badFrom,
+    # __badTo). float() raised on "abc" and read True as 1.
+    raw = o.get("from")
+    frm = __realNumber(raw)
+    if raw is not None and frm is None: o["__badFrom"] = raw if isinstance(raw, (bool, int, float, str)) else str(raw)
+    o["from"] = 0.0 if frm is None else float(frm)
+    raw = o.pop("to", None)
+    to = __realNumber(raw)
+    if raw is not None and to is None: o["__badTo"] = raw if isinstance(raw, (bool, int, float, str)) else str(raw)
+    return __animStart("envelope", path, 1.0 if to is None else float(to), o)
 
 def animateStop(path=None):
     __api.animateStop("" if path is None else str(path))

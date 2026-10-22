@@ -73,6 +73,11 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   warning named `delay`.
 - A `repeat` that is not a number runs the move once, with a warning. It was silent.
 - A `done` that is not a function is reported with a warning. It was dropped in silence.
+- `ce.anim.envelope` with a `from` or `to` that is not a number uses the default (0 and 1), with a
+  warning. "abc" was read as 0 and true as 1 in silence, so `to = "abc"` held the whole move at 0;
+  in Python, "abc" raised an error.
+- `ce.anim.envelope` with fewer than two points writes an error to the console, as every other
+  rejection does. It wrote a plain line.
 
 ## What you get
 

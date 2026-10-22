@@ -2957,7 +2957,7 @@ end
 -- to 1 is a level past `from` or `to`, and is read as it is.
 function animateEnvelope(path, points, opts)
   if type(points) ~= "table" or #points < 2 then
-    log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
+    logError("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
     return false
   end
   local function written(v)
@@ -2991,10 +2991,15 @@ function animateEnvelope(path, points, opts)
   local o = {}
   if opts ~= nil then for k, v in pairs(opts) do o[k] = v end end
   o.samples = __animSample(points)
-  o.from = tonumber(o.from) or 0
-  local to = tonumber(o.to) or 1
+  -- from and to: a number, or text that is one, or the default, which the host says (__badFrom,
+  -- __badTo). tonumber() read true as nothing and "abc" as nothing, both as the default in silence.
+  local from = __realNumber(o.from)
+  if o.from ~= nil and from == nil then o.__badFrom = o.from end
+  o.from = from or 0
+  local to = __realNumber(o.to)
+  if o.to ~= nil and to == nil then o.__badTo = o.to end
   o.to = nil
-  return __animStart("envelope", path, to, o)
+  return __animStart("envelope", path, to or 1, o)
 end
 function animateStop(path) __animateStop(path == nil and "" or tostring(path)) end
 function animateRunning(path) return __animateRunning(path == nil and "" or tostring(path)) end

@@ -1149,18 +1149,24 @@ export const COMMANDS = [
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
     refusal: 'false',
-    summary: 'Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points, or pairs, as the Envelope component has them: x, from 0 to 1, is how far through the animation, and y is the level, where 0 means `opts.from` (default 0) and 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. With fewer than two points, or a point that is not one or whose x is outside 0 to 1, nothing starts and the console says why. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it.',
+    summary: 'Move a value through a shape given as points.',
+    example: '`animateEnvelope("cutoff", {{0, 0}, {0.1, 1}, {1, 0}}, {duration = 800, to = 127})` moves cutoff to 127 in 80 ms, then back to 0 by 800 ms.',
+    notes: [
+      'A new move on a value that is already moving replaces the old one, and the old one\'s `done` is called with false.',
+      'Returns false if the call is rejected.',
+    ],
     params: [
-      { name: 'path', type: 'path', required: true },
+      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values.\nColour property, or a control not on the panel: rejected with a console error.\nList containing either: the entire list is rejected.' },
       // The Values tab draws the shape and, for points written out, edits them (scriptValueKinds'
       // readEnvelope, which reads them as the runtime does: scripting/animEnvelope.js).
-      { name: 'points', type: 'list', required: true, kind: 'envelope' },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'points', type: 'list', required: true, kind: 'envelope',
+        summary: 'The shape: a list of {x, y} or {x, y, curve}.\nx: position in the animation. Range: 0 ↔ 1. Outside the range: rejected with a console error.\ny: level. Range: 0 ↔ 1 (from ↔ to). Outside the range: not held.\ncurve: shape of the segment leading to the point: "linear", "exp", "log", "s" or "hold". Unknown: linear.\nPoints are sorted by x. Before the first and after the last: that point\'s y.\nFewer than 2 points: rejected.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: from 0, to 1, duration 300.',
         fields: optionFields([
           { name: 'from', type: 'number', default: '0',
-            summary: 'The value that y = 0 in the shape means.' },
+            summary: 'Value at y = 0.\nInvalid: default.' },
           { name: 'to', type: 'number', default: '1',
-            summary: 'The value that y = 1 in the shape means.' },
+            summary: 'Value at y = 1.\nInvalid: default.' },
           'duration', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],

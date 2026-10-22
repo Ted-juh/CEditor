@@ -2832,7 +2832,7 @@ function animateSpring(path, target, opts) {
 // has a length too, and was read as a list of its characters.
 function animateEnvelope(path, points, opts) {
   if (!Array.isArray(points) || points.length < 2) {
-    log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
+    logError("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
     return false;
   }
   var written = function (v) {
@@ -2863,10 +2863,15 @@ function animateEnvelope(path, points, opts) {
   var o = {}, k;
   if (opts) for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
   o.samples = __animSample(points);
-  o.from = Number(o.from) || 0;
-  var to = o.to === undefined || o.to === null ? 1 : Number(o.to);
+  // from and to: a number, or text that is one, or the default, which the host says (__badFrom,
+  // __badTo). Number() read "abc" as 0 and true as 1, in silence.
+  var from = __realNumber(o.from);
+  if (o.from != null && from === undefined) o.__badFrom = o.from;
+  o.from = from === undefined ? 0 : from;
+  var to = __realNumber(o.to);
+  if (o.to != null && to === undefined) o.__badTo = o.to;
   o.to = undefined;
-  return __animStart("envelope", path, to, o);
+  return __animStart("envelope", path, to === undefined ? 1 : to, o);
 }
 function animateStop(path) { __api.animateStop(path === undefined || path === null ? "" : String(path)); }
 function animateRunning(path) { return __api.animateRunning(path === undefined || path === null ? "" : String(path)); }

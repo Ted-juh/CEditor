@@ -365,11 +365,36 @@ test('the sampled shape is fine enough that nothing reads the difference', () =>
   });
 });
 
-test('an envelope needs at least two points, and says so', () => {
+test('an envelope needs at least two points, and says so, as an error', () => {
   withClock(() => {
+    clearScriptTrace();
     assert.equal(api.animateEnvelope('e', [{ x: 0, y: 0 }]), false);
     assert.equal(api.animateEnvelope('e', null), false);
     assert.equal(api.animateRunning('e'), false, 'and nothing was started');
+    // It was a plain console line; every other rejection is an error, and the owner asked for this
+    // one to be the same.
+    assert.deepEqual(getStore(scriptTrace).map((t) => t.kind), ['error', 'error']);
+  });
+});
+
+test('an envelope\'s from and to that are not numbers are the defaults, and said once', () => {
+  // Number() read true as 1 and "abc" as 0, in silence, so to = "abc" held the whole move at 0.
+  // ScriptRuntimeTests and PythonScriptEngineTests check the preludes pass theirs to the plug-in's
+  // runtime, which says the same.
+  resetScriptStateForTesting();
+  withClock(() => {
+    clearScriptTrace();
+    assert.equal(api.animateEnvelope('e', [[0, 0], [1, 1]], { duration: 100, from: true, to: 'abc' }), true);
+    const v = api.animateValue('e');
+    assert.deepEqual([v.from, v.to], [0, 1], 'the defaults, not the 1 and 0 the boolean and the text were read as');
+    assert.deepEqual(getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`), [
+      'warn:ce.anim.envelope: true is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time.',
+      'warn:ce.anim.envelope: "abc" is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time.',
+    ]);
+    clearScriptTrace();
+    api.animateEnvelope('e', [[0, 0], [1, 1]], { duration: 100, from: 'x', to: '50' });
+    assert.deepEqual([api.animateValue('e').from, api.animateValue('e').to], [0, 50], 'text that is a number is read as one');
+    assert.deepEqual(getStore(scriptTrace), [], 'and from was said already');
   });
 });
 

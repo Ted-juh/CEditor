@@ -473,10 +473,24 @@ frequency 12.`, and `to`'s now says `Left out: curve "linear", duration 300.`), 
 shown to the owner with its range. The owner asked to see every option of a command in its item,
 the shared ones included, each with its range: do that for the commands left.
 
+### `ce.anim.envelope`: done
+
+Approved as "Move a value through a shape given as points.", with an example, `to`'s `path` and
+notes, a `points` text of six lines (the shape, x with its range, y with its range and "not held",
+a point's curve and the names it takes, the sorting and what is before the first and after the
+last point, and fewer than 2 points), an `opts` row, `from` and `to` rows, and every shared option
+with its range. A point's curve shapes the segment leading to it; an unknown name is linear, as
+`ce.math.map` reads it, and that is documented rather than changed. Two decisions the owner made,
+both applied in both runtimes and all three preludes, with the release notes saying so:
+
+1. A `from` or `to` that is not a number was 0 or 1 in silence (and raised in Python). It is the
+   default, with the warning; the preludes pass what they could not read as `__badFrom` /
+   `__badTo`, as they pass `__badDone`.
+2. Fewer than two points was a plain console line. It is an error, as every other rejection is.
+
 ### Left to do in `ce.anim`
 
-1. `ce.anim.envelope`, with its `from` and `to` options and its `points`.
-2. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+1. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
 
 Write every one in the line form above.
 
@@ -559,8 +573,8 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to, ce.anim.spring and every option they share are done; continue with
-ce.anim.envelope, in technical English, schematic, one rule per line, with ranges, as its table
-says, showing every option of the command in its item. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.anim.to, spring and envelope and every option they share are done; continue
+with ce.anim.running and the seven after it, in technical English, schematic, one rule per line,
+with ranges, as its table says, showing every parameter of the command in its item. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```

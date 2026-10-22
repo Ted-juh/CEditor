@@ -516,6 +516,13 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     // as the WebView's animDone says it. It was dropped without a word.
     if (o != nullptr && o->hasProperty ("__badDone"))
         warnTiming ("done", animationShown (o->getProperty ("__badDone")) + " is not a function, so nothing is called when the move ends.");
+    // ce.anim.envelope's from and to the prelude could not read as numbers: it used the default
+    // (0 and 1) and passed the value on as __badFrom / __badTo, said here once, as the WebView's
+    // startEnvelopeImpl says it.
+    if (o != nullptr && o->hasProperty ("__badFrom"))
+        warnTiming ("from", animationShown (o->getProperty ("__badFrom")) + " is not a number, so y = 0 of the shape means 0, as it does when no from is given.");
+    if (o != nullptr && o->hasProperty ("__badTo"))
+        warnTiming ("to", animationShown (o->getProperty ("__badTo")) + " is not a number, so y = 1 of the shape means 1, as it does when no to is given.");
 
     // A LIST of paths is one call, one shape, one completion — and `stagger` is why the list is
     // worth having rather than a loop at the call site.
@@ -563,6 +570,8 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
             each->setProperty ("delay", baseDelay + stagger * (double) i);
             each->removeProperty ("__done");   // the list's, not each path's
             each->removeProperty ("__badDone");   // said once above
+            each->removeProperty ("__badFrom");
+            each->removeProperty ("__badTo");
             each->setProperty ("__group", groupId);
             startAnimation (kind, juce::var (paths[i]), target, juce::var (each));
         }

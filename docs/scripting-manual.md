@@ -2661,7 +2661,18 @@ if (!ce.anim.running("cutoff")) {  }
 
 #### `ce.anim.envelope(path, points [, opts])`
 
-Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points, or pairs, as the Envelope component has them: x, from 0 to 1, is how far through the animation, and y is the level, where 0 means `opts.from` (default 0) and 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. With fewer than two points, or a point that is not one or whose x is outside 0 to 1, nothing starts and the console says why. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it.
+Move a value through a shape given as points.
+
+Example: `animateEnvelope("cutoff", {{0, 0}, {0.1, 1}, {1, 0}}, {duration = 800, to = 127})` moves cutoff to 127 in 80 ms, then back to 0 by 800 ms.
+
+- `path` (path, required): The value to animate, or a list of values.<br>Colour property, or a control not on the panel: rejected with a console error.<br>List containing either: the entire list is rejected.
+- `points` (list, required): The shape: a list of {x, y} or {x, y, curve}.<br>x: position in the animation. Range: 0 ↔ 1. Outside the range: rejected with a console error.<br>y: level. Range: 0 ↔ 1 (from ↔ to). Outside the range: not held.<br>curve: shape of the segment leading to the point: "linear", "exp", "log", "s" or "hold". Unknown: linear.<br>Points are sorted by x. Before the first and after the last: that point's y.<br>Fewer than 2 points: rejected.
+- `opts` (options, optional): The options below.<br>Left out: from 0, to 1, duration 300.
+
+Good to know:
+
+- A new move on a value that is already moving replaces the old one, and the old one's `done` is called with false.
+- Returns false if the call is rejected.
 
 *Short name: `animateEnvelope`.*
 
@@ -2669,8 +2680,8 @@ Move a value through a shape with several points — an attack and decay, say, o
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `from` | number | 0 | The value that y = 0 in the shape means. |
-| `to` | number | 1 | The value that y = 1 in the shape means. |
+| `from` | number | 0 | Value at y = 0.<br>Invalid: default. |
+| `to` | number | 1 | Value at y = 1.<br>Invalid: default. |
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |

@@ -747,21 +747,26 @@ int main()
         doneScripts.add (makeScript ("badDoneLua", "lua", "panel", "onBadDoneLua", "*",
             "function onBadDoneLua()\n"
             "  log('lua started ' .. tostring(ce.anim.to('cutoff', 50, { duration = 10, done = 'later' })))\n"
+            "  log('lua shape ' .. tostring(ce.anim.envelope('cutoff', { {0, 0}, {1, 1} }, { duration = 10, from = 'abc' })))\n"
             "end\n"));
         doneScripts.add (makeScript ("badDoneJs", "javascript", "panel", "onBadDoneJs", "*",
             "function onBadDoneJs() {\n"
             "  log('js started ' + ce.anim.spring('cutoff', 50, { duration: 10, done: 5 }));\n"
+            "  log('js shape ' + ce.anim.envelope('cutoff', [[0, 0], [1, 1]], { duration: 10, to: true }));\n"
             "}\n"));
         runtime.loadScripts (juce::var (doneScripts));
         host.logs.clear();
         host.levelled.clear();
         runtime.dispatchEvent ("onBadDoneLua", "panel", juce::var());
         runtime.dispatchEvent ("onBadDoneJs", "panel", juce::var());
-        check (host.logs.contains ("lua started true") && host.logs.contains ("js started true"),
-               "a done that is not a function does not stop the move (got " + host.logs.joinIntoString (" | ") + ")");
+        check (host.logs.contains ("lua started true") && host.logs.contains ("js started true")
+                   && host.logs.contains ("lua shape true") && host.logs.contains ("js shape true"),
+               "a done that is not a function, or an envelope's from or to, does not stop the move (got " + host.logs.joinIntoString (" | ") + ")");
         check (host.levelled.joinIntoString (" | ") == "warn:ce.anim.to: \"later\" is not a function, so nothing is called when the move ends. This is said only the first time. | "
-                                                       "warn:ce.anim.spring: 5 is not a function, so nothing is called when the move ends. This is said only the first time.",
-               "...and is said once per command, in the runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
+                                                       "warn:ce.anim.envelope: \"abc\" is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time. | "
+                                                       "warn:ce.anim.spring: 5 is not a function, so nothing is called when the move ends. This is said only the first time. | "
+                                                       "warn:ce.anim.envelope: true is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time.",
+               "...and each is said once per command, in the runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
     }
 
     // 12d) ce.math reads CSS's short forms as a colour property stores them, through the real Lua
@@ -1448,7 +1453,11 @@ int main()
             check (host.levelled.joinIntoString (" | ")
                        == "error:ce.anim.envelope: the x of point 2 of 2 is a number from 0 to 1, and 50 is not, so nothing was "
                           "started. If you meant 50 out of 100, write 0.5. | "
-                          "error:ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started.",
+                          "error:ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started."
+                          // Too few points is an error too, as every rejection is (it was a plain line); the dash
+                          // needs CharPointer_UTF8, as a plain literal is read as ASCII.
+                          + juce::String (juce::CharPointer_UTF8 (" | error:ce.anim.envelope(path, points): needs at least two points, "
+                                                                  "each { x, y } in 0..1 — nothing was started.")),
                    juce::String (language) + ": a point the sampler cannot place is refused in the WebView's words (got "
                        + host.levelled.joinIntoString (" | ") + ")");
             check (host.logs.contains ("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started."),

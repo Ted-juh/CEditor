@@ -4733,21 +4733,31 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
  *  and the lookup is ce.math.map, which IS envValueAt, so a script's sweep and the Envelope drawn
  *  beside it trace the same line. */
 function startEnvelopeImpl(scriptId, path, points, opts = {}) {
-  // Fewer than two points is a note, as it always was; a point that is not one, or whose x is not
-  // from 0 to 1, is refused (animEnvelope.js says why each used to pass without a word). The
-  // preludes' animateEnvelope check the same, in the same words.
+  // Fewer than two points, a point that is not one, or one whose x is not from 0 to 1, is refused
+  // with an error (animEnvelope.js says why each used to pass without a word; too few was a plain
+  // line until the owner asked for the error every other rejection is). The preludes'
+  // animateEnvelope check the same, in the same words.
   const refused = envelopeRefusal(points);
   if (refused) {
-    addScriptTrace(refused.note ? 'log' : 'error', scriptId, refused.message);
+    addScriptTrace('error', scriptId, refused.message);
     return false;
   }
-  const lo = opts?.from != null ? Number(opts.from) : 0;
-  const hi = opts?.to != null ? Number(opts.to) : 1;
-  return startAnimationImpl(scriptId, 'envelope', path, hi, {
-    ...opts,
-    samples: sampleEnvelope(points),
-    from: Number.isFinite(lo) ? lo : 0,
-  });
+  // `from` and `to`: a number, or text that is one (realNumber), or after saying why not, the
+  // default. Number() read "abc" as 0 and true as 1 in silence, so to = "abc" held the whole move
+  // at 0. The preludes read theirs the same way and pass what they could not read on as
+  // __badFrom / __badTo, which ScriptRuntime::startAnimation says in these words.
+  const end = (name, fallback) => {
+    const v = opts?.[name];
+    if (v === undefined || v === null) return fallback;
+    const n = realNumber(v);
+    if (n !== undefined) return n;
+    warnAnimTiming('ce.anim.envelope', name,
+      `${shownValue(v)} is not a number, so y = ${fallback} of the shape means ${fallback}, as it does when no ${name} is given.`);
+    return fallback;
+  };
+  const from = end('from', 0);   // from before to: the order the plug-in's runtime says them in
+  const to = end('to', 1);
+  return startAnimationImpl(scriptId, 'envelope', path, to, { ...opts, samples: sampleEnvelope(points), from });
 }
 
 function stopAnimationImpl(path) {

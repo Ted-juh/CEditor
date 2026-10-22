@@ -632,15 +632,18 @@ int main()
         juce::Array<juce::var> badDoneScripts;
         badDoneScripts.add (makeScript ("pyBadDone", "onBadDone", "*",
             "def onBadDone(value=None):\n"
-            "    log('started ' + str(ce.anim.to('m', 1, { 'duration': 100, 'from': 0, 'done': 'x' })))\n"));
+            "    log('started ' + str(ce.anim.to('m', 1, { 'duration': 100, 'from': 0, 'done': 'x' })))\n"
+            "    log('shape ' + str(ce.anim.envelope('n', [(0, 0), (1, 1)], { 'duration': 100, 'from': 'abc', 'to': 'x' })))\n"));
         anim.loadScripts (juce::var (badDoneScripts));
         anim.tickAnimations (7000.0);
         animHost.logs.clear();
         anim.dispatchEvent ("onBadDone", "panel", juce::var());
         const auto badDone = steps();
-        check (badDone == "ce.anim.to: \"x\" is not a function, so nothing is called when the move ends. This is said only the first time. | started True",
-               "ce.anim: a done that is not a function is said, and the move goes ahead (got " + badDone + ")");
-        check (animErrors.isEmpty(), "ce.anim: no script raised on a done that is not a function");
+        check (badDone == "ce.anim.to: \"x\" is not a function, so nothing is called when the move ends. This is said only the first time. | started True | "
+                          "ce.anim.envelope: \"abc\" is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time. | "
+                          "ce.anim.envelope: \"x\" is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time. | shape True",
+               "ce.anim: a done that is not a function, and an envelope's from and to that are not numbers, are said, and the move goes ahead (got " + badDone + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised on a done that is not a function, or a from that float() would have");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------
