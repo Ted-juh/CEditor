@@ -348,6 +348,28 @@ parent-attachment and focus patches for exactly this situation and is the refere
 Windows webview (`IPlug/Extras/WebView/IPlugWebView_win.cpp`) is what the page half follows
 (`docs/design/libraries-weighed-2026-10-01.md`).
 
+## A field typed into on the panel's screen does not change in the Player
+
+Found 2026-10-22, while checking the DAW key forwarding. In the CEditor Player, and so in an exported
+plug-in, a click on an editable field of an LCD or pixel display puts it in edit and the keys go to
+it, but what is typed never appears: the field goes on showing what it held. It is the same with the
+key forwarding off, so the keys are not the problem.
+
+The preview writes the edit with `updateControlProperty` (`stores/controls.js`), which patches the
+editor's own stores: the active panel in `panels`, or, with no panel there, the component document
+with that control's id. The Player keeps its document in `Player.svelte`'s `panel` and puts nothing
+in either store, so the write lands nowhere. The Player's scripts do reach its document, through
+`createPlayerHost`'s `onDocumentWrite`; the preview's own writes have no such route.
+
+Measured on the `@edit` field (`Display.editText`): the `screen` panel in
+`browser-checks/playerInbound.entry.js` shows it, and `playerHostKeys.mjs` checks where the keys go
+rather than the text for this reason. A Label edited from the screen (`Text.content`) goes through
+the same code. The other preview interactions that write through `updateControlProperty` (about
+thirty in `PanelPreviewSurface.svelte`: envelope points, joystick, crossfader, ribbon, macro, the
+arpeggiator's mutes, the phrase pattern, the setlist index, the recorder's takes and more) take the
+same path and were not checked one by one; those that draw from the preview session may look right
+while they move, but their writes do not reach the Player's document either.
+
 ## ~~The GAIA panel's scripts, run window-closed in the plug-in~~ — CLOSED
 
 *(Logged 2026-09-30 as panel-script behaviour; both turned out to be defects in CEditor, fixed the
