@@ -658,7 +658,7 @@ Runs when any script on the panel fails. `info` says which script failed, what i
 | `script` | text | The name of the script that failed. |
 | `scriptId` | text | Its id, which stays the same when it is renamed. |
 | `event` | text | The handler that was running, such as "onValueChanged". |
-| `phase` | text | Whether it failed while being loaded or while handling an event. One of "load" or "dispatch". |
+| `phase` | text | Whether it failed while being loaded or while handling an event.<br>One of "load" or "dispatch". |
 | `message` | text | The error message. |
 
 ```lua
@@ -1107,9 +1107,9 @@ Send a CC message.
 
 Example: `sendCC(1, 74, 100)` sets controller 74 to 100 on channel 1.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `cc`: The controller number, from 0 to 127.
-- `value`: The new value, from 0 to 127.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `cc` (number, required): The controller number, from 0 to 127.
+- `value` (number, required): The new value, from 0 to 127.
 
 Good to know:
 
@@ -1127,10 +1127,10 @@ Send an NRPN message.
 
 Example: `sendNRPN(1, 0, 5, 9000)` sets parameter 0 / 5 to 9000 on channel 1.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `msb`: The first half of the parameter number, from 0 to 127.
-- `lsb`: The second half of the parameter number, from 0 to 127.
-- `value`: The new value, from 0 to 16383. It is sent as two 7-bit halves.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `msb` (number, required): The first half of the parameter number, from 0 to 127.
+- `lsb` (number, required): The second half of the parameter number, from 0 to 127.
+- `value` (number, required): The new value, from 0 to 16383. It is sent as two 7-bit halves.
 
 Good to know:
 
@@ -1148,10 +1148,10 @@ Set the pitch-bend range or the tuning with an RPN message.
 
 Example: `sendRPN(1, 0, 0, 12 * 128)` sets the pitch-bend range on channel 1 to 12 semitones.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `msb`: The first half of the parameter number, from 0 to 127.
-- `lsb`: The second half of the parameter number, from 0 to 127. With msb 0, 0 is the pitch-bend range, 1 fine tuning and 2 coarse tuning.
-- `value`: The new value, from 0 to 16383. For the pitch-bend range it is the semitones × 128, plus cents.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `msb` (number, required): The first half of the parameter number, from 0 to 127.
+- `lsb` (number, required): The second half of the parameter number, from 0 to 127. With msb 0, 0 is the pitch-bend range, 1 fine tuning and 2 coarse tuning.
+- `value` (number, required): The new value, from 0 to 16383. For the pitch-bend range it is the semitones × 128, plus cents.
 
 Good to know:
 
@@ -1175,7 +1175,7 @@ Tell a sequencer where in the song to continue from.
 
 Example: `sendSongPosition(16)` is the start of bar 2 in 4/4.
 
-- `beats`: The position from the start of the song, in sixteenth notes, from 0 to 16383. One sixteenth note is six clock ticks.
+- `beats` (number, required): The position from the start of the song, in sixteenth notes, from 0 to 16383. One sixteenth note is six clock ticks.
 
 Good to know:
 
@@ -1198,7 +1198,7 @@ Send MIDI bytes exactly as written.
 
 Example: `sendMidi("90 3C 64")` starts note 60 on channel 1.
 
-- `bytes`: A list of bytes from 0 to 255, or hex text such as "90 3C 64": one or two digits a byte, with spaces or commas between. Text with a longer run, such as "903C64", is refused with a message and nothing is sent.
+- `bytes` (bytes, required): A list of bytes from 0 to 255, or hex text such as "90 3C 64": one or two digits a byte, with spaces or commas between. Text with a longer run, such as "903C64", is refused with a message and nothing is sent.
 
 Good to know:
 
@@ -1221,10 +1221,10 @@ Play a note.
 
 Example: `sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `note`: A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
-- `velocity`: How hard the note is played, from 0 to 127. It must be given, and 0 means note off.
-- `ms`: How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `velocity` (number, required): How hard the note is played, from 0 to 127. 0 means note off.
+- `ms` (number, optional): How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.
 
 *Short name: `sendNote`.*
 
@@ -1236,7 +1236,7 @@ ce.midi.sendNote(1, 60, 100)
 
 See every MIDI message from the synth before the panel uses it.
 
-- `fn`: Called with the bytes of each message. What it returns decides what happens to the message.
+- `fn` (function, required): Called with the bytes of each message. What it returns decides what happens to the message.
 
 | What `fn` returns | What happens |
 |---|---|
@@ -1269,7 +1269,7 @@ ce.midi.interceptIn((bytes) => {
 
 See every MIDI message the panel sends before it goes out.
 
-- `fn`: Called with the bytes of each message. What it returns decides what happens to the message.
+- `fn` (function, required): Called with the bytes of each message. What it returns decides what happens to the message.
 
 | What `fn` returns | What happens |
 |---|---|
@@ -1305,7 +1305,7 @@ Act as if a MIDI message came from the synth.
 
 Example: `feedMidi("B0 4A 40")` gives the controls on CC 74, channel 1, the value 64.
 
-- `bytes`: A list of bytes from 0 to 255, or hex text such as "90 3C 64": one or two digits a byte, with spaces or commas between. Text with a longer run, such as "903C64", is refused with a message and nothing is sent.
+- `bytes` (bytes, required): A list of bytes from 0 to 255, or hex text such as "90 3C 64": one or two digits a byte, with spaces or commas between. Text with a longer run, such as "903C64", is refused with a message and nothing is sent.
 
 Good to know:
 
@@ -1326,8 +1326,8 @@ ce.midi.feed([0x90, 60, 100])
 
 Send everything a block of code sends to another device instead of the main synth.
 
-- `role`: The device's role, such as "drums". The MIDI settings give each role its output.
-- `fn`: The code whose MIDI goes to that device. Only what it sends is affected, as with noTransmit.
+- `role` (text, required): The device's role, such as "drums". The MIDI settings give each role its output.
+- `fn` (function, required): The code whose MIDI goes to that device. Only what it sends is affected, as with noTransmit.
 
 *Short name: `routeMidi`.*
 
@@ -1350,9 +1350,9 @@ Release a note.
 
 Example: `sendNoteOff(1, "C3")` releases C3 on channel 1.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `note`: A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
-- `velocity`: The release velocity, from 0 to 127. It is 0 when left out.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `velocity` (number, optional): The release velocity, from 0 to 127. It is 0 when left out.
 
 Good to know:
 
@@ -1370,10 +1370,10 @@ Switch the synth to another sound with a Program Change.
 
 Example: `sendProgramChange(1, 0)` picks the sound most synths call 1.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `program`: The program number, from 0 to 127. Most synths count from 1, so 0 is the one they call 1.
-- `bankMsb`: The first half of the bank number, from 0 to 127. Given, a Bank Select is sent before the Program Change: controller 0, and controller 32 when bankLsb is given too.
-- `bankLsb`: The second half of the bank number, from 0 to 127.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `program` (number, required): The program number, from 0 to 127. Most synths count from 1, so 0 is the one they call 1.
+- `bankMsb` (number, optional): The first half of the bank number, from 0 to 127. Given, a Bank Select is sent before the Program Change: controller 0, and controller 32 when bankLsb is given too.
+- `bankLsb` (number, optional): The second half of the bank number, from 0 to 127.
 
 *Short name: `sendProgramChange`.*
 
@@ -1387,8 +1387,8 @@ Send pitch bend.
 
 Example: `sendPitchBend(1, 8192)` is no bend on channel 1.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `value`: From 0, all the way down, to 16383, all the way up; 8192 is the centre. Left out, the bend goes back to the centre.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `value` (number, required): From 0, all the way down, to 16383, all the way up; 8192 is the centre. Left out, the bend goes back to the centre.
 
 Good to know:
 
@@ -1406,9 +1406,9 @@ Send aftertouch, the pressure on keys while they are held.
 
 Example: `sendAftertouch(1, 80)` sends pressure 80 for the whole of channel 1.
 
-- `channel`: The MIDI channel, from 1 to 16.
-- `pressure`: How hard, from 0 to 127. It must be given.
-- `note`: One note, for polyphonic aftertouch, as a number or a name as for sendNote. Left out, the pressure is for the whole channel: channel pressure.
+- `channel` (number, required): The MIDI channel, from 1 to 16.
+- `pressure` (number, required): How hard, from 0 to 127.
+- `note` (note, optional): One note, for polyphonic aftertouch, as a number or a name as for sendNote. Left out, the pressure is for the whole channel: channel pressure.
 
 *Short name: `sendAftertouch`.*
 
@@ -1436,7 +1436,7 @@ Start, continue or stop a connected sequencer or drum machine.
 
 Example: `sendTransport("start")` starts it from the beginning.
 
-- `action`: "start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.
+- `action` (text, required): "start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.
 
 *Short name: `sendTransport`.*
 
@@ -1450,7 +1450,7 @@ Send a SysEx message.
 
 Example: `sendSysex("F0 7E 7F 06 01 F7")` asks the synth what model it is.
 
-- `bytes`: A list of bytes, or hex text such as "F0 41 10 42 F7": one or two digits a byte, with spaces or commas between. In a list, a byte is a whole number from 0 to 255 or text that is one hex byte, such as "F7". Anything else, such as "F04110" or 300, is refused with a message and nothing is sent.
+- `bytes` (bytes, required): A list of bytes, or hex text such as "F0 41 10 42 F7": one or two digits a byte, with spaces or commas between. In a list, a byte is a whole number from 0 to 255 or text that is one hex byte, such as "F7". Anything else, such as "F04110" or 300, is refused with a message and nothing is sent.
 
 Good to know:
 
@@ -1469,8 +1469,8 @@ Work out the checksum a synth expects at the end of a SysEx message.
 
 Example: `checksum("roland", {0x40, 0x00, 0x7F, 0x00})` gives 0x41.
 
-- `type`: How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.
-- `bytes`: The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.
+- `type` (text, required): How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.
+- `bytes` (bytes, required): The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.
 
 Good to know:
 
@@ -1513,31 +1513,31 @@ ce.midi.panic()
 
 | Function | What it does |
 |---|---|
-| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v`: The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count`: How many bytes of 7 bits to make. Two when it is left out. `order`: Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `to7bit`. |
-| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes`: The 7-bit bytes, as a list of numbers. `order`: Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `from7bit`. |
-| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v`: The number, from 0 to 16383. Short name: `to14bit`. |
-| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb`: The high half, from 0 to 127. `lsb`: The low half, from 0 to 127. Short name: `from14bit`. |
-| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte`: A byte, from 0 to 255. Short name: `toNibbles`. |
-| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi`: The high half, from 0 to 15. `lo`: The low half, from 0 to 15. Short name: `fromNibbles`. |
-| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes`: The bytes, as a list. The high half comes first, so the list comes back twice as long. Short name: `nibblize`. |
-| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes`: Pairs of 4-bit halves, the high half first. The list comes back half as long. Short name: `denibblize`. |
-| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str`: The text to turn into codes. `length`: The length to fill out to with spaces. Longer text is not cut. Short name: `toAscii`. |
-| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes`: The character codes, as a list. Short name: `fromAscii`. |
-| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v`: The value, which may be negative. `center`: The number that stands for zero, often 64. Short name: `toOffset`. |
-| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b`: The byte, as the synth sends it. `center`: The number that stands for zero, often 64. Short name: `fromOffset`. |
-| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v`: The number. A positive number comes back unchanged. `bits`: How many bits the synth uses for it, such as 7 or 8. This is called two's complement. fromSigned reads it back. Short name: `toSigned`. |
-| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b`: The stored value, as the synth sends it. `bits`: How many bits the synth uses for it, such as 7 or 8. This reads two's complement, as toSigned writes it. Short name: `fromSigned`. |
-| `ce.midi.getBits(value, start, count) -> number` | Read a setting from a byte. Example: `getBits(0xB4, 4, 3)` gives 3. `value`: A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message. `start`: The first bit of the setting, counted from 0 at the right, the lowest bit. `count`: How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0. Short name: `getBits`. |
-| `ce.midi.setBits(value, start, count, bits) -> number\|list` | Change a setting in a byte. Example: `setBits(0xB4, 4, 3, 5)` gives 0xD4. `value`: A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed. `start`: The first bit of the setting, counted from 0 at the right, the lowest bit. `count`: How many bits the setting has, from 1 to 32. `bits`: The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit. Short name: `setBits`. |
-| `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read a number from a SysEx message. Example: `bytesRead(msg, 6, 2)` reads bytes 6 and 7. `bytes`: The message, as a list of bytes or as hex text. `offset`: Where the number starts, counted from 0. `count`: How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. By default the bytes are SysEx's 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise. Short name: `bytesRead`. |
-| `ce.midi.write(bytes, offset, count, value [, opts]) -> list` | Write a number into a SysEx message. Example: `bytesWrite(msg, 6, 2, 1000)` writes 1000 into bytes 6 and 7. `bytes`: The message, as a list of bytes or as hex text. It is not changed: a new list comes back. `offset`: Where the number starts, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end. `count`: How many bytes the number takes, from 1 to 4. `value`: The number to write. A number that does not fit in the bytes is refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. An option other than bits and order is refused with a message, and nothing comes back. Short name: `bytesWrite`. |
-| `ce.midi.slice(bytes, offset [, count]) -> list` | Copy part of a list of bytes into a new list. Example: `fromAscii(bytesSlice(dump, 10, 12))` reads the 12-letter name at byte 10. `bytes`: The list, or hex text. `offset`: Where to start copying, counted from 0. `count`: How many bytes to copy. Left out, every byte to the end. Bytes past the end are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. Short name: `bytesSlice`. |
-| `ce.midi.put(bytes, offset, values) -> list` | Write a run of bytes into a copy of a list. Example: `bytesPut(dump, 10, toAscii("Lead", 12))` writes a patch name from byte 10. `bytes`: The list, or hex text. It is not changed: a new list comes back. `offset`: Where to start writing, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end. `values`: The bytes to write, as a list or as hex text. Offsets count from 0 in every language, Lua included, as dump layouts count them. Short name: `bytesPut`. |
-| `ce.midi.find(bytes, pattern [, from]) -> number` | Find where a run of bytes first appears in a list, such as a patch's header in a bulk dump. Example: `bytesFind(dump, "F0 41")` gives the offset of the first F0 41. `bytes`: The list to search, or hex text. `pattern`: The bytes to find, as a list or as hex text. `from`: Where to start looking, counted from 0. It is 0 when left out. When the bytes are not there it gives nothing, without a message. Short name: `bytesFind`. |
-| `ce.midi.toHex(bytes) -> string` | Write bytes as hex text. Example: `bytesToHex({240, 65, 16, 247})` gives "F0 41 10 F7". `bytes`: The bytes, as a list. It is the form the console shows MIDI in, and the form every send reads. Short name: `bytesToHex`. |
-| `ce.midi.fromHex(text) -> list` | Read hex text into a list of bytes. Example: `bytesFromHex("F0 41 10 F7")` gives {240, 65, 16, 247}. `text`: One or two digits a byte, with or without 0x, with spaces or commas between, as every send reads it. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text. Short name: `bytesFromHex`. |
-| `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, to keep a dump in a setting or in state. Example: `bytesToBase64({240, 65, 16, 247})` gives "8EEQ9w==". `bytes`: The bytes, as a list. Base64 is about a third shorter than hex. It uses the standard alphabet, with = padding. Short name: `bytesToBase64`. |
-| `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Example: `bytesFromBase64("8EEQ9w==")` gives {240, 65, 16, 247}. `text`: The base64 text. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
+| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count` (number, optional): How many bytes of 7 bits to make. Two when it is left out. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `to7bit`. |
+| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): The 7-bit bytes, as a list of numbers. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `from7bit`. |
+| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v` (number, required): The number, from 0 to 16383. Short name: `to14bit`. |
+| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb` (number, required): The high half, from 0 to 127. `lsb` (number, required): The low half, from 0 to 127. Short name: `from14bit`. |
+| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte` (number, required): A byte, from 0 to 255. Short name: `toNibbles`. |
+| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi` (number, required): The high half, from 0 to 15. `lo` (number, required): The low half, from 0 to 15. Short name: `fromNibbles`. |
+| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes` (list of bytes, required): The bytes, as a list. The high half comes first, so the list comes back twice as long. Short name: `nibblize`. |
+| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes` (list of bytes, required): Pairs of 4-bit halves, the high half first. The list comes back half as long. Short name: `denibblize`. |
+| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str` (text, required): The text to turn into codes. `length` (number, optional): The length to fill out to with spaces. Longer text is not cut. Short name: `toAscii`. |
+| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes` (list of bytes, required): The character codes, as a list. Short name: `fromAscii`. |
+| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v` (number, required): The value, which may be negative. `center` (number, required): The number that stands for zero, often 64. Short name: `toOffset`. |
+| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b` (number, required): The byte, as the synth sends it. `center` (number, required): The number that stands for zero, often 64. Short name: `fromOffset`. |
+| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v` (number, required): The number. A positive number comes back unchanged. `bits` (number, required): How many bits the synth uses for it, such as 7 or 8. This is called two's complement. fromSigned reads it back. Short name: `toSigned`. |
+| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b` (number, required): The stored value, as the synth sends it. `bits` (number, required): How many bits the synth uses for it, such as 7 or 8. This reads two's complement, as toSigned writes it. Short name: `fromSigned`. |
+| `ce.midi.getBits(value, start, count) -> number` | Read a setting from a byte. Example: `getBits(0xB4, 4, 3)` gives 3. `value` (number, required): A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message. `start` (number, required): The first bit of the setting, counted from 0 at the right, the lowest bit. `count` (number, required): How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0. Short name: `getBits`. |
+| `ce.midi.setBits(value, start, count, bits) -> number\|list` | Change a setting in a byte. Example: `setBits(0xB4, 4, 3, 5)` gives 0xD4. `value` (number, required): A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed. `start` (number, required): The first bit of the setting, counted from 0 at the right, the lowest bit. `count` (number, required): How many bits the setting has, from 1 to 32. `bits` (number, required): The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit. Short name: `setBits`. |
+| `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read a number from a SysEx message. Example: `bytesRead(msg, 6, 2)` reads bytes 6 and 7. `bytes` (bytes, required): The message, as a list of bytes or as hex text. `offset` (number, required): Where the number starts, counted from 0. `count` (number, required): How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. By default the bytes are SysEx's 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise. Short name: `bytesRead`. |
+| `ce.midi.write(bytes, offset, count, value [, opts]) -> list` | Write a number into a SysEx message. Example: `bytesWrite(msg, 6, 2, 1000)` writes 1000 into bytes 6 and 7. `bytes` (bytes, required): The message, as a list of bytes or as hex text.<br>It is not changed: a new list comes back. `offset` (number, required): Where the number starts, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end. `count` (number, required): How many bytes the number takes, from 1 to 4. `value` (number, required): The number to write. A number that does not fit in the bytes is refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. An option other than bits and order is refused with a message, and nothing comes back. Short name: `bytesWrite`. |
+| `ce.midi.slice(bytes, offset [, count]) -> list` | Copy part of a list of bytes into a new list. Example: `fromAscii(bytesSlice(dump, 10, 12))` reads the 12-letter name at byte 10. `bytes` (bytes, required): The list, or hex text. `offset` (number, required): Where to start copying, counted from 0. `count` (number, optional): How many bytes to copy. Left out, every byte to the end. Bytes past the end are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. Short name: `bytesSlice`. |
+| `ce.midi.put(bytes, offset, values) -> list` | Write a run of bytes into a copy of a list. Example: `bytesPut(dump, 10, toAscii("Lead", 12))` writes a patch name from byte 10. `bytes` (bytes, required): The list, or hex text.<br>It is not changed: a new list comes back. `offset` (number, required): Where to start writing, counted from 0. The write may run past the end, and the list grows, but it cannot start past the end. `values` (bytes, required): The bytes to write, as a list or as hex text. Offsets count from 0 in every language, Lua included, as dump layouts count them. Short name: `bytesPut`. |
+| `ce.midi.find(bytes, pattern [, from]) -> number` | Find where a run of bytes first appears in a list, such as a patch's header in a bulk dump. Example: `bytesFind(dump, "F0 41")` gives the offset of the first F0 41. `bytes` (bytes, required): The list to search, or hex text. `pattern` (bytes, required): The bytes to find, as a list or as hex text. `from` (number, optional): Where to start looking, counted from 0. It is 0 when left out. When the bytes are not there it gives nothing, without a message. Short name: `bytesFind`. |
+| `ce.midi.toHex(bytes) -> string` | Write bytes as hex text. Example: `bytesToHex({240, 65, 16, 247})` gives "F0 41 10 F7". `bytes` (bytes, required): The bytes, as a list. It is the form the console shows MIDI in, and the form every send reads. Short name: `bytesToHex`. |
+| `ce.midi.fromHex(text) -> list` | Read hex text into a list of bytes. Example: `bytesFromHex("F0 41 10 F7")` gives {240, 65, 16, 247}. `text` (text, required): One or two digits a byte, with or without 0x, with spaces or commas between, as every send reads it. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text. Short name: `bytesFromHex`. |
+| `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, to keep a dump in a setting or in state. Example: `bytesToBase64({240, 65, 16, 247})` gives "8EEQ9w==". `bytes` (bytes, required): The bytes, as a list. Base64 is about a third shorter than hex. It uses the standard alphabet, with = padding. Short name: `bytesToBase64`. |
+| `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Example: `bytesFromBase64("8EEQ9w==")` gives {240, 65, 16, 247}. `text` (text, required): The base64 text. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
 
 ### ce.device: your synth
 
@@ -1868,7 +1868,7 @@ List the MIDI ports, each as { id, name, direction, type, hardware, role }. `har
 
 | Name | Type | What it is |
 |---|---|---|
-| `direction` | text | List only the ports that receive, or only the ones that send. One of "in" or "out". |
+| `direction` | text | List only the ports that receive, or only the ones that send.<br>One of "in" or "out". |
 
 ```lua
 -- Lua
@@ -2333,8 +2333,8 @@ Make a colour lighter.
 
 Example: `lighten("#336699", 0.5)` gives "#99B3CC".
 
-- `colour`: The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).
-- `amount`: Range: 0 ↔ 1 (unchanged ↔ white). Default: 0.4. Outside the range: an error in the console and no result.
+- `colour` (colour, required): The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).
+- `amount` (number, optional): Range: 0 ↔ 1 (unchanged ↔ white).<br>Default: 0.4.<br>Outside the range: an error in the console and no result.
 
 *Short name: `lighten`.*
 
@@ -2344,8 +2344,8 @@ Make a colour darker.
 
 Example: `darken("#336699", 0.5)` gives "#1A334D".
 
-- `colour`: The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).
-- `amount`: Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.
+- `colour` (colour, required): The colour, in any form a colour property takes, such as "#FF8800", "red" or rgb(255, 136, 0).
+- `amount` (number, optional): Range: 0 ↔ 1 (black ↔ unchanged).<br>Default: 0.55.<br>Outside the range: an error in the console and no result.
 
 Good to know:
 
@@ -2359,9 +2359,9 @@ Blend two colours.
 
 Example: `mixColour("#00FF00", "#FF0000", 0.5)` gives "#808000".
 
-- `a`: The first colour, in any form a colour property takes.
-- `b`: The second colour, in any form a colour property takes.
-- `t`: Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway. Left out: 0. Outside the range: held at 0 or 1. Not a number: an error in the console and no result.
+- `a` (colour, required): The first colour, in any form a colour property takes.
+- `b` (colour, required): The second colour, in any form a colour property takes.
+- `t` (number, required): Range: 0 ↔ 1 (first colour ↔ second colour). 0.5 is halfway.<br>Left out: 0.<br>Outside the range: held at 0 or 1.<br>Not a number: an error in the console and no result.
 
 Good to know:
 
@@ -2375,8 +2375,8 @@ Give a colour a transparency, ready to store in a control's colour property.
 
 Example: `colourAlpha("#FF0000", 0.5)` gives "80FF0000".
 
-- `colour`: The colour, in any form a colour property takes. Any alpha it already has is replaced.
-- `a`: Range: 0 ↔ 1 (fully transparent ↔ fully solid). Outside the range or left out: an error in the console and no result.
+- `colour` (colour, required): The colour, in any form a colour property takes. Any alpha it already has is replaced.
+- `a` (number, required): Range: 0 ↔ 1 (fully transparent ↔ fully solid).<br>Outside the range or left out: an error in the console and no result.
 
 Good to know:
 
@@ -2392,7 +2392,7 @@ Split a colour into its red, green and blue parts.
 
 Example: `hexToRgb("#FF8000")` gives r 255, g 128 and b 0.
 
-- `colour`: The colour, in any form a colour property takes. Any alpha is ignored.
+- `colour` (colour, required): The colour, in any form a colour property takes. Any alpha is ignored.
 
 Good to know:
 
@@ -2406,9 +2406,9 @@ Build a colour from red, green and blue parts.
 
 Example: `rgbToHex(255, 128, 0)` gives "#FF8000".
 
-- `r`: Red. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.
-- `g`: Green. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.
-- `b`: Blue. Range: 0 ↔ 255. Left out: 0. Outside the range: held at 0 or 255. A fraction is rounded. Not a number: an error in the console and no result.
+- `r` (number, required): Red.<br>Range: 0 ↔ 255.<br>Left out: 0.<br>Outside the range: held at 0 or 255. A fraction is rounded.<br>Not a number: an error in the console and no result.
+- `g` (number, required): Green.<br>Range: 0 ↔ 255.<br>Left out: 0.<br>Outside the range: held at 0 or 255. A fraction is rounded.<br>Not a number: an error in the console and no result.
+- `b` (number, required): Blue.<br>Range: 0 ↔ 255.<br>Left out: 0.<br>Outside the range: held at 0 or 255. A fraction is rounded.<br>Not a number: an error in the console and no result.
 
 *Short name: `rgbToHex`.*
 
@@ -2418,7 +2418,7 @@ Read a colour written with its alpha first, as AARRGGBB.
 
 Example: `colourFromArgb("#80FF0000")` gives "80FF0000".
 
-- `colour`: 8 or 4 hex digits, alpha first, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.
+- `colour` (colour, required): 8 or 4 hex digits, alpha first, with or without "#". 6 or 3 hex digits: no alpha, returned solid.<br>Anything else, such as "red": an error in the console and no result.
 
 Good to know:
 
@@ -2433,7 +2433,7 @@ Read a colour written with its alpha last, as RRGGBBAA, the web's order.
 
 Example: `colourFromRgba("#FF000080")` gives "80FF0000".
 
-- `colour`: 8 or 4 hex digits, alpha last, with or without "#". 6 or 3 hex digits: no alpha, returned solid. Anything else, such as "red": an error in the console and no result.
+- `colour` (colour, required): 8 or 4 hex digits, alpha last, with or without "#". 6 or 3 hex digits: no alpha, returned solid.<br>Anything else, such as "red": an error in the console and no result.
 
 Good to know:
 
@@ -2448,7 +2448,7 @@ Describe a colour by its hue, saturation and lightness.
 
 Example: `hexToHsl("#FF0000")` gives h 0, s 100 and l 50.
 
-- `colour`: The colour, in any form a colour property takes. Any alpha is ignored.
+- `colour` (colour, required): The colour, in any form a colour property takes. Any alpha is ignored.
 
 Good to know:
 
@@ -2463,9 +2463,9 @@ Build a colour from hue, saturation and lightness.
 
 Example: `hslToHex(120, 100, 50)` gives "#00FF00".
 
-- `h`: Hue. Range: 0 ↔ 360. Left out: 0. Outside the range: wraps round, so -120 is 240 and 480 is 120. Not a number: an error in the console and no result.
-- `s`: Saturation. Range: 0 ↔ 100. Left out: 0. Outside the range: held at 0 or 100. Not a number: an error in the console and no result.
-- `l`: Lightness. Range: 0 ↔ 100. Left out: 0. Outside the range: held at 0 or 100. Not a number: an error in the console and no result.
+- `h` (number, required): Hue.<br>Range: 0 ↔ 360.<br>Left out: 0.<br>Outside the range: wraps round, so -120 is 240 and 480 is 120.<br>Not a number: an error in the console and no result.
+- `s` (number, required): Saturation.<br>Range: 0 ↔ 100.<br>Left out: 0.<br>Outside the range: held at 0 or 100.<br>Not a number: an error in the console and no result.
+- `l` (number, required): Lightness.<br>Range: 0 ↔ 100.<br>Left out: 0.<br>Outside the range: held at 0 or 100.<br>Not a number: an error in the console and no result.
 
 Good to know:
 
@@ -2477,65 +2477,80 @@ Good to know:
 
 | Function | What it does |
 |---|---|
-| `ce.math.scale(v, inLo, inHi, outLo, outHi)` | Move a value from one range to another. Example: `scale(64, 0, 127, 0, 100)` gives about 50. `v`: The value to move. `inLo`: The low end of the range the value is in. `inHi`: The high end of the range the value is in. If it equals the low end, the result is the new range's low end. `outLo`: The low end of the range to move it to. `outHi`: The high end of the range to move it to. The result is not kept inside the new range: a value outside the first range lands outside the second. Use `ce.math.norm()` and `ce.math.denorm()` when it must stay inside. Short name: `scale`. |
-| `ce.math.clamp(v, lo, hi)` | Keep a value inside a range. Example: `clamp(140, 0, 127)` gives 127. `v`: The value to keep in range. `lo`: The bottom of the range. Must be below hi. A value below it gives lo. `hi`: The top of the range. A value above it gives hi. Short name: `clamp`. |
-| `ce.math.round(v)` | Round to the nearest whole number. Example: `round(2.5)` gives 3. `v`: The number to round. A half always rounds up, so -2.5 gives -2. To keep decimal places, use `ce.math.roundTo`. Short name: `round`. |
-| `ce.math.snap(v, step)` | Round a value to the nearest step. Example: `snap(37, 10)` gives 40. `v`: The value to round. `step`: The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged. Left out: an error in the console and no result. Halfway rounds up, as with `ce.math.round`: 35 gives 40. For steps that are not evenly spaced, use `ce.math.quantize`. Short name: `snap`. |
-| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v`: The value. Range: 0 ↔ 1. Outside the range: not held at 0 or 1. `shape`: "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
-| `ce.math.lerp(a, b, t)` | Blend between two numbers. Example: `lerp(10, 20, 0.25)` gives 12.5. `a`: The first number. `b`: The second number. `t`: Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway. Left out: an error in the console and no result. Outside the range: not held at 0 or 1, so the result goes past a or b. For whole lists of numbers, use `ce.math.blend`. Short name: `lerp`. |
-| `ce.math.wrap(v, lo, hi)` | Wrap a value into a range, so going past the top starts again from the bottom. Example: `wrap(-1, 0, 12)` gives 11. `v`: The value to wrap. `lo`: The bottom of the range. Must be below hi. The result can equal lo. `hi`: The top of the range. The result never equals hi: wrap(12, 0, 12) gives 0. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator. With a negative number, % differs between languages: -1 % 12 gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
-| `ce.math.map(v, points)` | Map a value through a curve you draw as points. Example: `mapCurve(0.25, {{0, 0}, {0.5, 0.9}, {1, 1}})` gives 0.45. `v`: The value to map. `points`: A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends. Left out or empty: the value is returned unchanged. Below the first point or above the last: held at that point's y. Two points with the same x make a step, and the later one wins. {1, 1, "exp"} rises slowly, then fast. Short name: `mapCurve`. |
-| `ce.math.quantize(v, values)` | Snap a value to the nearest entry in a list. Example: `quantizeTo(9, {0, 8, 16})` gives 8. `v`: The value to snap. `values`: The entries to choose from, in any order. Left out or empty: the value is returned unchanged. Exactly halfway between two entries, the lower one wins: 12 gives 8. For evenly spaced steps, use `ce.math.snap`. Short name: `quantizeTo`. |
-| `ce.math.choice(values [, weights])` | Pick an entry from a list at random. Example: `randomChoice({"C", "E", "G"}, {3, 1, 1})` picks "C" three times as often as "E" or "G". `values`: The entries. Empty: no result. `weights`: How likely each entry is: its weight divided by the total. Default: all equal. A missing or negative weight counts as 0; if every weight is 0, all are equal. It uses one random number, with or without weights, so adding weights does not change later random numbers. Short name: `randomChoice`. |
-| `ce.math.dbToGain(db)` | Convert decibels to a linear gain. Example: `dbToGain(-6)` gives about 0.5. `db`: The level in dB. 0 dB gives 1. Short name: `dbToGain`. |
-| `ce.math.gainToDb(gain)` | Convert a linear gain to decibels. Example: `gainToDb(0.5)` gives about -6. `gain`: The linear gain. 1 gives 0 dB. 0 or below gives -144 dB, the floor of 24-bit audio; no result is lower than that. Short name: `gainToDb`. |
-| `ce.math.norm(v, lo, hi)` | Turn a value into its position within a range, from 0 to 1. Example: `norm(64, 0, 127)` gives about 0.5. `v`: The value. Outside the range: held at 0 or 1. `lo`: The value that gives 0. `hi`: The value that gives 1. It may be below lo, for a range that runs the other way. The reverse is `ce.math.denorm`. Short name: `norm`. |
-| `ce.math.denorm(t, lo, hi)` | Turn a position from 0 to 1 back into a value in a range. Example: `denorm(0.5, 0, 127)` gives 63.5. `t`: Range: 0 ↔ 1 (lo ↔ hi). Outside the range: held at 0 or 1. `lo`: The value at 0. `hi`: The value at 1. It may be below lo, for a range that runs the other way. The reverse of `ce.math.norm`. Short name: `denorm`. |
-| `ce.math.bipolar(t)` | Turn a value from 0 to 1 into one from -1 to +1. Example: `bipolar(0.75)` gives 0.5. `t`: Range: 0 ↔ 1 (-1 ↔ +1). 0.5 gives 0. Outside the range: not held. The reverse is `ce.math.unipolar`. Short name: `bipolar`. |
-| `ce.math.unipolar(v)` | Turn a value from -1 to +1 into one from 0 to 1. Example: `unipolar(0.5)` gives 0.75. `v`: Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5. Outside the range: not held. The reverse of `ce.math.bipolar`. Short name: `unipolar`. |
-| `ce.math.fold(v, lo, hi)` | Bounce a value back off the ends of a range. Example: `fold(12, 0, 10)` gives 8. `v`: The value. Past the top it heads back down; below the bottom it heads back up. `lo`: The bottom of the range. Must be below hi. `hi`: The top of the range. Where `ce.math.wrap` jumps from the top to the bottom, fold keeps the movement smooth. Fold suits modulation depths; wrap suits pitch classes. Short name: `fold`. |
-| `ce.math.index(t, count)` | Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks. Example: `indexOfRange(0.5, 8)` gives 4. `t`: Range: 0 ↔ 1 (first slot ↔ last slot). Outside the range: held at the first or last slot. `count`: How many slots. They count from 0, so the last is count - 1. Short name: `indexOfRange`. |
-| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a`: The value at 0. `b`: The value at 1. `t`: Range: 0 ↔ 1 (a ↔ b). Left out: 0. Outside the range: held at 0 or 1. `law`: "linear", "equalPower" or "sharp". Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
-| `ce.math.approach(current, target, maxStep)` | Move a value toward a target by no more than a set step. Example: `approach(10, 50, 15)` gives 25. `current`: The value now. `target`: Where it is going. Within one step of it: the target exactly. `maxStep`: The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive. It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value. Short name: `approach`. |
-| `ce.math.roundTo(v, decimals)` | Round to a number of decimal places. Example: `roundTo(3.14159, 2)` gives 3.14. `v`: The number to round. `decimals`: How many decimal places to keep. Default: 0. Below 0: 0. It returns a number, not text, so you can keep calculating with it. Short name: `roundTo`. |
-| `ce.math.almost(a, b [, epsilon])` | Check whether two numbers are equal to within a small margin. Example: `almost(0.1 + 0.2, 0.3)` gives true. `a`: The first number. `b`: The second number. `epsilon`: How far apart they may be. Default: 0.000000001. Use it instead of == on numbers that have been through arithmetic such as `ce.math.scale`, where rounding can leave two numbers that should match very slightly apart. Short name: `almost`. |
-| `ce.math.min(values)` | Find the smallest number in a list. Example: `minOf({3, 1, 2})` gives 1. `values`: The numbers. Empty or left out: no result. Short name: `minOf`. |
-| `ce.math.max(values)` | Find the largest number in a list. Example: `maxOf({3, 1, 2})` gives 3. `values`: The numbers. Empty or left out: no result. Short name: `maxOf`. |
-| `ce.math.sum(values)` | Add up a list of numbers. Example: `sumOf({1, 2, 3})` gives 6. `values`: The numbers. Empty or left out: 0. Short name: `sumOf`. |
-| `ce.math.mean(values)` | Find the average of a list of numbers. Example: `meanOf({1, 2, 6})` gives 3. `values`: The numbers. Empty or left out: no result. Short name: `meanOf`. |
-| `ce.math.blend(fromList, toList, t) -> list` | Blend one list of numbers into another, entry by entry. Example: `blend({0, 100}, {10, 0}, 0.5)` gives {5, 50}. `fromList`: The list at 0. `toList`: The list at 1. If the lists differ in length, the result is as long as the shorter one. `t`: Range: 0 ↔ 1 (fromList ↔ toList). Left out: 0. Outside the range: not held at 0 or 1. Use it to morph between two snapshots. For two single numbers, use `ce.math.lerp`. Short name: `blend`. |
-| `ce.math.randomFloat(lo, hi)` | Get a random number with a fractional part. Example: `randomFloat(0.5, 2)` gives a number from 0.5 up to, but not including, 2. `lo`: The bottom of the range. Both left out: 0 ↔ 1. Given alone: the top of a range from 0, so randomFloat(5) is from 0 up to 5. `hi`: The top of the range, which it never reaches. It may be below lo. `ce.math.random` with two numbers gives whole numbers; use this one for fractions. Short name: `randomFloat`. |
-| `ce.math.gaussian([mean, sd])` | Get a random number on a bell curve, so most results land near the middle. Example: `randomGaussian(100, 5)` gives a number near 100: within 5 of it about two times in three. `mean`: Where most results land. Default: 0. `sd`: How widely they spread, the standard deviation: about two thirds land within one sd of the mean. Default: 1. Use it to humanise velocity or timing, where an even spread sounds mechanical. It always uses two random numbers, so a replayed seed stays in step. Short name: `randomGaussian`. |
-| `ce.math.walk(current, step, lo, hi)` | Take one step of a random walk, for a value that drifts instead of jumping. Example: `randomWalk(64, 3, 0, 127)` gives a number from 61 to 67. `current`: The value now. Pass back what the last call returned. `step`: The most it moves, either way. `lo`: The bottom. At it, the walk bounces back. Left out, with hi: no limits. `hi`: The top. At it, the walk bounces back. Short name: `randomWalk`. |
-| `ce.math.chance([chance])` | Get true or false at random. Example: `randomBool(0.25)` gives true about one time in four. `chance`: The probability of true. Range: 0 ↔ 1 (never ↔ always). Default: 0.5. Outside the range: held at 0 or 1. Use it as a probability gate on sequencer steps. Short name: `randomBool`. |
-| `ce.math.shuffle(values)` | Put a list in random order. Example: `shuffle({1, 2, 3})` gives the same three numbers in a random order. `values`: The list. It is not changed: a new list is returned. Empty or left out: an empty list. It uses one random number for each entry after the first, so the same seed always shuffles the same way. Short name: `shuffle`. |
-| `ce.math.degrees(radians)` | Convert an angle from radians to degrees. Example: `toDegrees(3.14159)` gives about 180. `radians`: The angle in radians. ce.draw measures arcs in degrees. Short name: `toDegrees`. |
-| `ce.math.radians(degrees)` | Convert an angle from degrees to radians. Example: `toRadians(180)` gives about 3.14159. `degrees`: The angle in degrees. Your language's own sin and cos take radians. Short name: `toRadians`. |
-| `ce.math.distance(x1, y1, x2, y2)` | Measure the straight-line distance between two points. Example: `distance(0, 0, 3, 4)` gives 5. `x1`: The first point's x. `y1`: The first point's y. `x2`: The second point's x. `y2`: The second point's y. Use it for XY pads, joysticks and the Orbit, or to check whether a click landed on something you drew. Short name: `distance`. |
-| `ce.math.angle(x1, y1, x2, y2)` | Find the angle from one point to another. Example: `angleOf(0, 0, 10, 0)` gives 90. `x1`: The first point's x. `y1`: The first point's y. `x2`: The second point's x. `y2`: The second point's y. It returns degrees in the range 0 ↔ 360: 0 at twelve o'clock, increasing clockwise, as ce.draw measures them. y counts downwards, as on screen, so a point straight above gives 0. The same point twice gives 0. Short name: `angleOf`. |
-| `ce.math.polar(angle, radius)` | Turn an angle and a distance into x and y offsets from a centre. Example: `polar(0, 10)` gives x 0 and y -10: straight up, as y counts downwards. `angle`: The angle in degrees: 0 at twelve o'clock, increasing clockwise, as ce.math.angle returns it. `radius`: The distance from the centre. Left out: 0. Add the offsets to your centre to find, for example, the tip of a knob's pointer. Short name: `polar`. |
-| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v`: The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1. `curve`: "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Left out or unknown: "linear". `tension`: How strongly "exp" and "log" bend. Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
-| `ce.math.deadzone(v, amount [, invert])` | Add a dead zone to the bottom of a value from 0 to 1, as the Expression Router does. Example: `deadzone(0.55, 0.1)` gives 0.5. `v`: The value. Range: 0 ↔ 1. Outside the range: held at 0 or 1. `amount`: The size of the dead zone. At or below it: 0. The rest is stretched to fill 0 ↔ 1. `invert`: true flips the value first. Default: false. The response starts at the edge of the dead zone instead of jumping up from it. Short name: `deadzone`. |
-| `ce.math.weights(points, x, y [, power])` | Work out how much each anchor point counts at a position, as a Timbre Space or Preset Constellation does. `points`: The anchors, as a list of {x, y}. Empty: an empty list. `x`: The position's x. Range: 0 ↔ 1. `y`: The position's y. Range: 0 ↔ 1. `power`: How sharp the blend is: higher lets the nearest anchor take over sooner. Default: 2. It returns one weight per anchor, adding up to 1: the closer the anchor, the bigger its share. Pass the result to `ce.math.blendBy` to morph values. Short name: `weightsFor`. |
-| `ce.math.blendBy(values, weights)` | Combine many values into one weighted average. Example: `blendBy({0, 100}, {3, 1})` gives 25. `values`: The values to combine. `weights`: How much each value counts. They need not add up to 1. Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides. This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead. Short name: `blendBy`. |
-| `ce.math.ticks(major [, minor])` | Get the positions of a slider's scale marks, the same ones the app draws. Example: `tickStops(3, 1)` gives major {0, 0.5, 1} and minor {0.25, 0.75}. `major`: How many major marks, counting both ends. Default: 11. `minor`: How many smaller marks between each pair of major ones. Default: 0. It returns two lists, major and minor, of positions in the range 0 ↔ 1. Use it when you draw your own scale, so its marks line up with the app's. Short name: `tickStops`. |
-| `ce.math.dbPosition(fraction [, floorDb, ceilDb])` | Find how far up a dB meter a level reaches. Example: `dbPosition(1)` gives about 0.91: 0 dB on a meter from -60 to +6. `fraction`: The level, as a linear value. Range: 0 ↔ 1. Outside the range: held at 0 or 1. `floorDb`: The bottom of the meter, in dB. Default: -60, as on the Meter component. `ceilDb`: The top of the meter, in dB. Default: +6. It returns a position in the range 0 ↔ 1 (bottom ↔ top). Short name: `dbPosition`. |
-| `ce.math.smooth(current, target, coefficient [, epsilon])` | Move a value part of the way toward a target, so it eases in as it gets close. Example: `smooth(0, 100, 0.2)` gives 20. `current`: The value now. `target`: Where it is going. `coefficient`: The share of the remaining distance covered in each call. Range: 0 ↔ 1 (stays put ↔ jumps to the target). Outside the range: held at 0 or 1. `epsilon`: How close counts as arrived: within it, the value lands on the target. Default: 0.0001. Use it to steady a jittery pedal or a noisy CC. For a fixed step size, use `ce.math.approach`. Short name: `smooth`. |
-| `ce.math.hysteresis(value, on, low, high)` | Turn a changing value into an on/off state that does not flicker. Example: `hysteresis(0.5, true, 0.3, 0.7)` gives true: between the two thresholds the state stays as it was. `value`: The changing value. `on`: The state now. Pass back what the last call returned. `low`: At or below this, the state switches off. Must be below high. `high`: At or above this, the state switches on. With two thresholds, a value hovering around one line cannot flip the state back and forth. Electronics calls this a Schmitt trigger. Short name: `hysteresis`. |
-| `ce.math.median(values)` | Find the middle value of a list. Example: `median({1, 2, 100})` gives 2. `values`: The numbers, in any order. With an even count: the average of the two middle ones. Empty or left out: no result. Unlike the average, one stray spike does not move it. Short name: `median`. |
-| `ce.math.euclid(steps, pulses [, rotation])` | Make a Euclidean rhythm: hits spread as evenly as possible across a number of steps. Example: `euclid(8, 3)` gives {false, false, true, false, false, true, false, true}. `steps`: How many steps. Range: 1 ↔ 64. Outside the range: held at 1 or 64. `pulses`: How many of the steps are hits. More than steps: every step is a hit. `rotation`: How many steps to shift the pattern by, without changing the spacing. Default: 0. Negative shifts the other way. It returns a list of true and false, the same pattern the Arpeggiator uses for its rests. Short name: `euclid`. |
-| `ce.math.unshape(y, curve [, tension])` | Undo a curve: give a value after the curve and get the value from before it. Example: `unshape(shapeCurve(0.3, "exp"), "exp")` gives 0.3. `y`: The value after the curve. `curve`: The same curve that was used. `tension`: The same tension that was used. Default: 1.6. The reverse of `ce.math.shape`. Use it when a value returns from the synth through a taper, so the control lands where it started. "hold" has no exact reverse: it returns the earliest value that gives the same result. Short name: `unshape`. |
-| `ce.math.random([lo, hi])` | Get a random number. Example: `random(1, 6)` gives a whole number from 1 to 6, as a die does. `lo`: The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1. `hi`: The highest whole number it can return. It may be below lo. Only whole numbers inside the range: random(1.5, 3.5) gives 2 or 3. With none inside, such as random(1.2, 1.8): an error in the console and no result. Short name: `random`. |
-| `ce.math.seed(n)` | Set where this script's random numbers start, so the same seed gives the same sequence. `n`: The seed. 0 uses the default. Until you set one, every script starts from the same default, so its numbers repeat each time it loads. Every script and every named stream has its own sequence, so this never affects another script. Short name: `randomSeed`. |
-| `ce.math.stream(name, fn)` | Run a block of code with random numbers from a separate, named sequence. `name`: The sequence's name. Two scripts using the same name get separate sequences. `fn`: The code to run. The script's own sequence returns when it ends, even if it ends in an error. Use it so two parts of one script, such as a melody and a drum pattern, do not affect each other's random numbers or seeds. Short name: `randomStream`. |
+| `ce.math.scale(v, inLo, inHi, outLo, outHi)` | Move a value from one range to another. Example: `scale(64, 0, 127, 0, 100)` gives about 50. `v` (number, required): The value to move. `inLo` (number, required): The low end of the range the value is in. `inHi` (number, required): The high end of the range the value is in. If it equals the low end, the result is the new range's low end. `outLo` (number, required): The low end of the range to move it to. `outHi` (number, required): The high end of the range to move it to. The result is not kept inside the new range: a value outside the first range lands outside the second. Use `ce.math.norm()` and `ce.math.denorm()` when it must stay inside. Short name: `scale`. |
+| `ce.math.clamp(v, lo, hi)` | Keep a value inside a range. Example: `clamp(140, 0, 127)` gives 127. `v` (number, required): The value to keep in range. `lo` (number, required): The bottom of the range. Must be below hi. A value below it gives lo. `hi` (number, required): The top of the range. A value above it gives hi. Short name: `clamp`. |
+| `ce.math.round(v)` | Round to the nearest whole number. Example: `round(2.5)` gives 3. `v` (number, required): The number to round. A half always rounds up, so -2.5 gives -2. To keep decimal places, use `ce.math.roundTo`. Short name: `round`. |
+| `ce.math.snap(v, step)` | Round a value to the nearest step. Example: `snap(37, 10)` gives 40. `v` (number, required): The value to round. `step` (number, required): The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged.<br>Left out: an error in the console and no result. Halfway rounds up, as with `ce.math.round`: 35 gives 40. For steps that are not evenly spaced, use `ce.math.quantize`. Short name: `snap`. |
+| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: not held at 0 or 1. `shape` (text, optional): "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends).<br>Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
+| `ce.math.lerp(a, b, t)` | Blend between two numbers. Example: `lerp(10, 20, 0.25)` gives 12.5. `a` (number, required): The first number. `b` (number, required): The second number. `t` (number, required): Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway.<br>Left out: an error in the console and no result.<br>Outside the range: not held at 0 or 1, so the result goes past a or b. For whole lists of numbers, use `ce.math.blend`. Short name: `lerp`. |
+| `ce.math.wrap(v, lo, hi)` | Wrap a value into a range, so going past the top starts again from the bottom. Example: `wrap(-1, 0, 12)` gives 11. `v` (number, required): The value to wrap. `lo` (number, required): The bottom of the range. Must be below hi. The result can equal lo. `hi` (number, required): The top of the range.<br>The result never equals hi: wrap(12, 0, 12) gives 0. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator. With a negative number, % differs between languages: -1 % 12 gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
+| `ce.math.map(v, points)` | Map a value through a curve you draw as points. Example: `mapCurve(0.25, {{0, 0}, {0.5, 0.9}, {1, 1}})` gives 0.45. `v` (number, required): The value to map. `points` (list, optional): A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends.<br>Left out or empty: the value is returned unchanged. Below the first point or above the last: held at that point's y. Two points with the same x make a step, and the later one wins. {1, 1, "exp"} rises slowly, then fast. Short name: `mapCurve`. |
+| `ce.math.quantize(v, values)` | Snap a value to the nearest entry in a list. Example: `quantizeTo(9, {0, 8, 16})` gives 8. `v` (number, required): The value to snap. `values` (list of numbers, optional): The entries to choose from, in any order.<br>Left out or empty: the value is returned unchanged. Exactly halfway between two entries, the lower one wins: 12 gives 8. For evenly spaced steps, use `ce.math.snap`. Short name: `quantizeTo`. |
+| `ce.math.choice(values [, weights])` | Pick an entry from a list at random. Example: `randomChoice({"C", "E", "G"}, {3, 1, 1})` picks "C" three times as often as "E" or "G". `values` (list, required): The entries.<br>Empty: no result. `weights` (list of numbers, optional): How likely each entry is: its weight divided by the total.<br>Default: all equal. A missing or negative weight counts as 0; if every weight is 0, all are equal. It uses one random number, with or without weights, so adding weights does not change later random numbers. Short name: `randomChoice`. |
+| `ce.math.dbToGain(db)` | Convert decibels to a linear gain. Example: `dbToGain(-6)` gives about 0.5. `db` (number, required): The level in dB. 0 dB gives 1. Short name: `dbToGain`. |
+| `ce.math.gainToDb(gain)` | Convert a linear gain to decibels. Example: `gainToDb(0.5)` gives about -6. `gain` (number, required): The linear gain. 1 gives 0 dB. 0 or below gives -144 dB, the floor of 24-bit audio; no result is lower than that. Short name: `gainToDb`. |
+| `ce.math.norm(v, lo, hi)` | Turn a value into its position within a range, from 0 to 1. Example: `norm(64, 0, 127)` gives about 0.5. `v` (number, required): The value.<br>Outside the range: held at 0 or 1. `lo` (number, required): The value that gives 0. `hi` (number, required): The value that gives 1. It may be below lo, for a range that runs the other way. The reverse is `ce.math.denorm`. Short name: `norm`. |
+| `ce.math.denorm(t, lo, hi)` | Turn a position from 0 to 1 back into a value in a range. Example: `denorm(0.5, 0, 127)` gives 63.5. `t` (number, required): Range: 0 ↔ 1 (lo ↔ hi).<br>Outside the range: held at 0 or 1. `lo` (number, required): The value at 0. `hi` (number, required): The value at 1. It may be below lo, for a range that runs the other way. The reverse of `ce.math.norm`. Short name: `denorm`. |
+| `ce.math.bipolar(t)` | Turn a value from 0 to 1 into one from -1 to +1. Example: `bipolar(0.75)` gives 0.5. `t` (number, required): Range: 0 ↔ 1 (-1 ↔ +1). 0.5 gives 0.<br>Outside the range: not held. The reverse is `ce.math.unipolar`. Short name: `bipolar`. |
+| `ce.math.unipolar(v)` | Turn a value from -1 to +1 into one from 0 to 1. Example: `unipolar(0.5)` gives 0.75. `v` (number, required): Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5.<br>Outside the range: not held. The reverse of `ce.math.bipolar`. Short name: `unipolar`. |
+| `ce.math.fold(v, lo, hi)` | Bounce a value back off the ends of a range. Example: `fold(12, 0, 10)` gives 8. `v` (number, required): The value. Past the top it heads back down; below the bottom it heads back up. `lo` (number, required): The bottom of the range. Must be below hi. `hi` (number, required): The top of the range. Where `ce.math.wrap` jumps from the top to the bottom, fold keeps the movement smooth. Fold suits modulation depths; wrap suits pitch classes. Short name: `fold`. |
+| `ce.math.index(t, count)` | Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks. Example: `indexOfRange(0.5, 8)` gives 4. `t` (number, required): Range: 0 ↔ 1 (first slot ↔ last slot).<br>Outside the range: held at the first or last slot. `count` (number, required): How many slots. They count from 0, so the last is count - 1. Short name: `indexOfRange`. |
+| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a` (number, required): The value at 0. `b` (number, required): The value at 1. `t` (number, required): Range: 0 ↔ 1 (a ↔ b).<br>Left out: 0.<br>Outside the range: held at 0 or 1. `law` (text, optional): "linear", "equalPower" or "sharp".<br>Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
+| `ce.math.approach(current, target, maxStep)` | Move a value toward a target by no more than a set step. Example: `approach(10, 50, 15)` gives 25. `current` (number, required): The value now. `target` (number, required): Where it is going.<br>Within one step of it: the target exactly. `maxStep` (number, required): The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive. It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value. Short name: `approach`. |
+| `ce.math.roundTo(v, decimals)` | Round to a number of decimal places. Example: `roundTo(3.14159, 2)` gives 3.14. `v` (number, required): The number to round. `decimals` (number, optional): How many decimal places to keep.<br>Default: 0.<br>Below 0: 0. It returns a number, not text, so you can keep calculating with it. Short name: `roundTo`. |
+| `ce.math.almost(a, b [, epsilon])` | Check whether two numbers are equal to within a small margin. Example: `almost(0.1 + 0.2, 0.3)` gives true. `a` (number, required): The first number. `b` (number, required): The second number. `epsilon` (number, optional): How far apart they may be.<br>Default: 0.000000001. Use it instead of == on numbers that have been through arithmetic such as `ce.math.scale`, where rounding can leave two numbers that should match very slightly apart. Short name: `almost`. |
+| `ce.math.min(values)` | Find the smallest number in a list. Example: `minOf({3, 1, 2})` gives 1. `values` (list of numbers, required): The numbers.<br>Empty or left out: no result. Short name: `minOf`. |
+| `ce.math.max(values)` | Find the largest number in a list. Example: `maxOf({3, 1, 2})` gives 3. `values` (list of numbers, required): The numbers.<br>Empty or left out: no result. Short name: `maxOf`. |
+| `ce.math.sum(values)` | Add up a list of numbers. Example: `sumOf({1, 2, 3})` gives 6. `values` (list of numbers, required): The numbers.<br>Empty or left out: 0. Short name: `sumOf`. |
+| `ce.math.mean(values)` | Find the average of a list of numbers. Example: `meanOf({1, 2, 6})` gives 3. `values` (list of numbers, required): The numbers.<br>Empty or left out: no result. Short name: `meanOf`. |
+| `ce.math.blend(fromList, toList, t) -> list` | Blend one list of numbers into another, entry by entry. Example: `blend({0, 100}, {10, 0}, 0.5)` gives {5, 50}. `fromList` (list of numbers, required): The list at 0. `toList` (list of numbers, required): The list at 1. If the lists differ in length, the result is as long as the shorter one. `t` (number, required): Range: 0 ↔ 1 (fromList ↔ toList).<br>Left out: 0.<br>Outside the range: not held at 0 or 1. Use it to morph between two snapshots. For two single numbers, use `ce.math.lerp`. Short name: `blend`. |
+| `ce.math.randomFloat(lo, hi)` | Get a random number with a fractional part. Example: `randomFloat(0.5, 2)` gives a number from 0.5 up to, but not including, 2. `lo` (number, optional): The bottom of the range.<br>Both left out: 0 ↔ 1.<br>Given alone: the top of a range from 0, so randomFloat(5) is from 0 up to 5. `hi` (number, optional): The top of the range, which it never reaches. It may be below lo. `ce.math.random` with two numbers gives whole numbers; use this one for fractions. Short name: `randomFloat`. |
+| `ce.math.gaussian([mean, sd])` | Get a random number on a bell curve, so most results land near the middle. Example: `randomGaussian(100, 5)` gives a number near 100: within 5 of it about two times in three. `mean` (number, optional): Where most results land.<br>Default: 0. `sd` (number, optional): How widely they spread, the standard deviation: about two thirds land within one sd of the mean.<br>Default: 1. Use it to humanise velocity or timing, where an even spread sounds mechanical. It always uses two random numbers, so a replayed seed stays in step. Short name: `randomGaussian`. |
+| `ce.math.walk(current, step, lo, hi)` | Take one step of a random walk, for a value that drifts instead of jumping. Example: `randomWalk(64, 3, 0, 127)` gives a number from 61 to 67. `current` (number, required): The value now. Pass back what the last call returned. `step` (number, required): The most it moves, either way. `lo` (number, optional): The bottom. At it, the walk bounces back.<br>Left out, with hi: no limits. `hi` (number, optional): The top. At it, the walk bounces back. Short name: `randomWalk`. |
+| `ce.math.chance([chance])` | Get true or false at random. Example: `randomBool(0.25)` gives true about one time in four. `chance` (number, optional): The probability of true.<br>Range: 0 ↔ 1 (never ↔ always).<br>Default: 0.5.<br>Outside the range: held at 0 or 1. Use it as a probability gate on sequencer steps. Short name: `randomBool`. |
+| `ce.math.shuffle(values)` | Put a list in random order. Example: `shuffle({1, 2, 3})` gives the same three numbers in a random order. `values` (list, required): The list.<br>It is not changed: a new list is returned.<br>Empty or left out: an empty list. It uses one random number for each entry after the first, so the same seed always shuffles the same way. Short name: `shuffle`. |
+| `ce.math.degrees(radians)` | Convert an angle from radians to degrees. Example: `toDegrees(3.14159)` gives about 180. `radians` (number, required): The angle in radians. ce.draw measures arcs in degrees. Short name: `toDegrees`. |
+| `ce.math.radians(degrees)` | Convert an angle from degrees to radians. Example: `toRadians(180)` gives about 3.14159. `degrees` (number, required): The angle in degrees. Your language's own sin and cos take radians. Short name: `toRadians`. |
+| `ce.math.distance(x1, y1, x2, y2)` | Measure the straight-line distance between two points. Example: `distance(0, 0, 3, 4)` gives 5. `x1` (number, required): The first point's x. `y1` (number, required): The first point's y. `x2` (number, required): The second point's x. `y2` (number, required): The second point's y. Use it for XY pads, joysticks and the Orbit, or to check whether a click landed on something you drew. Short name: `distance`. |
+| `ce.math.angle(x1, y1, x2, y2)` | Find the angle from one point to another. Example: `angleOf(0, 0, 10, 0)` gives 90. `x1` (number, required): The first point's x. `y1` (number, required): The first point's y. `x2` (number, required): The second point's x. `y2` (number, required): The second point's y. It returns degrees in the range 0 ↔ 360: 0 at twelve o'clock, increasing clockwise, as ce.draw measures them. y counts downwards, as on screen, so a point straight above gives 0. The same point twice gives 0. Short name: `angleOf`. |
+| `ce.math.polar(angle, radius)` | Turn an angle and a distance into x and y offsets from a centre. Example: `polar(0, 10)` gives x 0 and y -10: straight up, as y counts downwards. `angle` (number, required): The angle in degrees: 0 at twelve o'clock, increasing clockwise, as ce.math.angle returns it. `radius` (number, required): The distance from the centre.<br>Left out: 0. Add the offsets to your centre to find, for example, the tip of a knob's pointer. Short name: `polar`. |
+| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `curve` (text, optional): "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1).<br>Left out or unknown: "linear". `tension` (number, optional): How strongly "exp" and "log" bend.<br>Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
+| `ce.math.deadzone(v, amount [, invert])` | Add a dead zone to the bottom of a value from 0 to 1, as the Expression Router does. Example: `deadzone(0.55, 0.1)` gives 0.5. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `amount` (number, required): The size of the dead zone.<br>At or below it: 0. The rest is stretched to fill 0 ↔ 1. `invert` (true or false, optional): true flips the value first.<br>Default: false. The response starts at the edge of the dead zone instead of jumping up from it. Short name: `deadzone`. |
+| `ce.math.weights(points, x, y [, power])` | Work out how much each anchor point counts at a position, as a Timbre Space or Preset Constellation does. `points` (list, required): The anchors, as a list of {x, y}.<br>Empty: an empty list. `x` (number, required): The position's x.<br>Range: 0 ↔ 1. `y` (number, required): The position's y.<br>Range: 0 ↔ 1. `power` (number, optional): How sharp the blend is: higher lets the nearest anchor take over sooner.<br>Default: 2. It returns one weight per anchor, adding up to 1: the closer the anchor, the bigger its share. Pass the result to `ce.math.blendBy` to morph values. Short name: `weightsFor`. |
+| `ce.math.blendBy(values, weights)` | Combine many values into one weighted average. Example: `blendBy({0, 100}, {3, 1})` gives 25. `values` (list of numbers, required): The values to combine. `weights` (list of numbers, required): How much each value counts. They need not add up to 1.<br>Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides. This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead. Short name: `blendBy`. |
+| `ce.math.ticks(major [, minor])` | Get the positions of a slider's scale marks, the same ones the app draws. Example: `tickStops(3, 1)` gives major {0, 0.5, 1} and minor {0.25, 0.75}. `major` (number, optional): How many major marks, counting both ends.<br>Default: 11. `minor` (number, optional): How many smaller marks between each pair of major ones.<br>Default: 0. It returns two lists, major and minor, of positions in the range 0 ↔ 1. Use it when you draw your own scale, so its marks line up with the app's. Short name: `tickStops`. |
+| `ce.math.dbPosition(fraction [, floorDb, ceilDb])` | Find how far up a dB meter a level reaches. Example: `dbPosition(1)` gives about 0.91: 0 dB on a meter from -60 to +6. `fraction` (number, required): The level, as a linear value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `floorDb` (number, optional): The bottom of the meter, in dB.<br>Default: -60, as on the Meter component. `ceilDb` (number, optional): The top of the meter, in dB.<br>Default: +6. It returns a position in the range 0 ↔ 1 (bottom ↔ top). Short name: `dbPosition`. |
+| `ce.math.smooth(current, target, coefficient [, epsilon])` | Move a value part of the way toward a target, so it eases in as it gets close. Example: `smooth(0, 100, 0.2)` gives 20. `current` (number, required): The value now. `target` (number, required): Where it is going. `coefficient` (number, required): The share of the remaining distance covered in each call.<br>Range: 0 ↔ 1 (stays put ↔ jumps to the target).<br>Outside the range: held at 0 or 1. `epsilon` (number, optional): How close counts as arrived: within it, the value lands on the target.<br>Default: 0.0001. Use it to steady a jittery pedal or a noisy CC. For a fixed step size, use `ce.math.approach`. Short name: `smooth`. |
+| `ce.math.hysteresis(value, on, low, high)` | Turn a changing value into an on/off state that does not flicker. Example: `hysteresis(0.5, true, 0.3, 0.7)` gives true: between the two thresholds the state stays as it was. `value` (number, required): The changing value. `on` (true or false, required): The state now. Pass back what the last call returned. `low` (number, required): At or below this, the state switches off. Must be below high. `high` (number, required): At or above this, the state switches on. With two thresholds, a value hovering around one line cannot flip the state back and forth. Electronics calls this a Schmitt trigger. Short name: `hysteresis`. |
+| `ce.math.median(values)` | Find the middle value of a list. Example: `median({1, 2, 100})` gives 2. `values` (list of numbers, required): The numbers, in any order.<br>With an even count: the average of the two middle ones.<br>Empty or left out: no result. Unlike the average, one stray spike does not move it. Short name: `median`. |
+| `ce.math.euclid(steps, pulses [, rotation])` | Make a Euclidean rhythm: hits spread as evenly as possible across a number of steps. Example: `euclid(8, 3)` gives {false, false, true, false, false, true, false, true}. `steps` (number, required): How many steps.<br>Range: 1 ↔ 64.<br>Outside the range: held at 1 or 64. `pulses` (number, required): How many of the steps are hits.<br>More than steps: every step is a hit. `rotation` (number, optional): How many steps to shift the pattern by, without changing the spacing.<br>Default: 0. Negative shifts the other way. It returns a list of true and false, the same pattern the Arpeggiator uses for its rests. Short name: `euclid`. |
+| `ce.math.unshape(y, curve [, tension])` | Undo a curve: give a value after the curve and get the value from before it. Example: `unshape(shapeCurve(0.3, "exp"), "exp")` gives 0.3. `y` (number, required): The value after the curve. `curve` (text, required): The same curve that was used. `tension` (number, optional): The same tension that was used.<br>Default: 1.6. The reverse of `ce.math.shape`. Use it when a value returns from the synth through a taper, so the control lands where it started. "hold" has no exact reverse: it returns the earliest value that gives the same result. Short name: `unshape`. |
+| `ce.math.random([lo, hi])` | Get a random number. Example: `random(1, 6)` gives a whole number from 1 to 6, as a die does. `lo` (number, optional): The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1. `hi` (number, optional): The highest whole number it can return. It may be below lo. Only whole numbers inside the range: random(1.5, 3.5) gives 2 or 3. With none inside, such as random(1.2, 1.8): an error in the console and no result. Short name: `random`. |
+| `ce.math.seed(n)` | Set where this script's random numbers start, so the same seed gives the same sequence. `n` (number, required): The seed. 0 uses the default. Until you set one, every script starts from the same default, so its numbers repeat each time it loads. Every script and every named stream has its own sequence, so this never affects another script. Short name: `randomSeed`. |
+| `ce.math.stream(name, fn)` | Run a block of code with random numbers from a separate, named sequence. `name` (text, required): The sequence's name. Two scripts using the same name get separate sequences. `fn` (function, required): The code to run. The script's own sequence returns when it ends, even if it ends in an error. Use it so two parts of one script, such as a melody and a drum pattern, do not affect each other's random numbers or seeds. Short name: `randomStream`. |
 
 ### ce.anim: smooth movement
 
 Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.
 
+- A required value that is missing or of the wrong type: the call is rejected with a console error.
+- An option with a wrong value: a console warning, the first time only, and the fallback in its row is used.
+- Number options also accept text that is a number, such as "500".
+
 #### `ce.anim.to(path, target [, opts])`
 
-Move a value smoothly to `target` over time instead of jumping straight there. `target` is a number, or text that is one; anything else is refused with a message and nothing moves. So is a colour property as `path`, with the plugin window open or closed, since a move writes numbers. Pass a list of controls to move them all with one call; `opts.stagger` starts each one a little after the one before. A list with a colour property in it is refused whole, and nothing in it moves. Starting a new move on a value that is already animating replaces the old move, and the old one's `done` is called with false, because it was cancelled rather than finished.
+Move a value smoothly to a new number over time.
+
+Example: `animateTo("cutoff", 127, {duration = 500})` moves cutoff to 127 in half a second.
+
+- `path` (path, required): The value to animate, or a list of values.<br>Colour property, or a control not on the panel: rejected with a console error.<br>List containing either: the entire list is rejected.
+- `target` (number, required): The end value.
+- `opts` (options, optional): The options below.<br>Left out: curve "linear", duration 300.
+
+Good to know:
+
+- A new move on a value that is already moving replaces the old one, and the old one's `done` is called with false.
+- Returns false if the call is rejected.
 
 *Short name: `animateTo`.*
 
@@ -2543,18 +2558,18 @@ Move a value smoothly to `target` over time instead of jumping straight there. `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
-| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
-| `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `curve` | text or list | "linear" | The shape of the move. The first 4 names are the curves of `ce.math.curve()`; the rest are the easings the Animation tab offers, so a script and an animation that name the same curve move the same way. "spring" overshoots and settles like `ce.anim.spring()`, shaped by `damping` and `frequency`. Instead of a name you can give the four numbers of a custom curve — x1, y1, x2, y2, as the Animation tab shows them — so an animation's `bezier` can be passed straight in; x1 and x2 are kept between 0 and 1. A name it does not know is reported, and the move runs in a straight line. One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
-| `damping` | number | 6 | With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it. |
-| `frequency` | number | 12 | With curve = "spring": how fast it wobbles, as ce.anim.spring reads it. |
-| `from` | number | — | Start from this value instead of wherever the control is now. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
-| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
-| `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
+| `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
+| `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
+| `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
+| `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
+| `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
+| `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
 -- Lua
@@ -2567,7 +2582,18 @@ ce.anim.to("cutoff", 127, { duration: 500, curve: "s" });
 
 #### `ce.anim.spring(path, target [, opts])`
 
-Move a value to `target` with a springy motion: it overshoots, wobbles and settles. `opts.damping` sets how quickly the wobble dies away and `opts.frequency` how fast it wobbles; the move lasts 600 ms unless you set `opts.duration`. Every other option `ce.anim.to()` takes works here too except `curve`, and you can pass a list of controls the same way. A `target` that is not a number, or a colour property as `path` or in the list, is refused with a message, as it is there.
+Move a value to a new number with a spring motion.
+
+Example: `animateSpring("cutoff", 127)` moves cutoff to 127 with a spring, in 600 ms.
+
+- `path` (path, required): The value to animate, or a list of values.<br>Colour property, or a control not on the panel: rejected with a console error.<br>List containing either: the entire list is rejected.
+- `target` (number, required): The end value.
+- `opts` (options, optional): The options below.<br>Left out: duration 600, damping 6, frequency 12.
+
+Good to know:
+
+- A new move on a value that is already moving replaces the old one, and the old one's `done` is called with false.
+- Returns false if the call is rejected.
 
 *Short name: `animateSpring`.*
 
@@ -2575,17 +2601,17 @@ Move a value to `target` with a springy motion: it overshoots, wobbles and settl
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `duration` | number (milliseconds) | 600 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
-| `damping` | number | 6 | How quickly the wobble dies away. Higher settles sooner; lower keeps bouncing. |
-| `frequency` | number | 12 | How fast it wobbles. Higher is a tighter, faster bounce. |
-| `from` | number | — | Start from this value instead of wherever the control is now. |
-| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
-| `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
-| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
-| `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
+| `duration` | number (milliseconds) | 600 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
+| `damping` | number | 6 | Spring damping.<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency.<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
+| `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
+| `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
+| `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
 -- Lua
@@ -2600,7 +2626,7 @@ ce.anim.spring("cutoff", 127);
 
 Stop an animation where it is.
 
-- `path`: The value being animated. Leave it out to stop every animation on the panel.
+- `path` (path, optional): The value.<br>Left out: every animation on the panel.
 
 Good to know:
 
@@ -2620,7 +2646,15 @@ ce.anim.stop("cutoff");
 
 #### `ce.anim.running([path])`
 
-Return true if `path` is being animated right now; a paused animation still counts. With no `path`, return true if any animation is running.
+Report whether a value is being animated.
+
+Example: `animateRunning("cutoff")` gives true while cutoff is being animated.
+
+- `path` (path, optional): The value.<br>Left out: any value on the panel.
+
+Good to know:
+
+- Returns true while an animation is on the value, paused or not.
 
 *Short name: `animateRunning`.*
 
@@ -2635,7 +2669,18 @@ if (!ce.anim.running("cutoff")) {  }
 
 #### `ce.anim.envelope(path, points [, opts])`
 
-Move a value through a shape with several points — an attack and decay, say, or a hold and then a fall — so it can rise and fall within one animation, which `ce.anim.to()` cannot do. `points` is a list of { x, y } points, or pairs, as the Envelope component has them: x, from 0 to 1, is how far through the animation, and y is the level, where 0 means `opts.from` (default 0) and 1 means `opts.to` (default 1), so to sweep a 0–127 knob, set `opts.to` to 127. With fewer than two points, or a point that is not one or whose x is outside 0 to 1, nothing starts and the console says why. A colour property as `path`, or anywhere in a list of paths, is refused as `ce.anim.to()` refuses it.
+Move a value through a shape given as points.
+
+Example: `animateEnvelope("cutoff", {{0, 0}, {0.1, 1}, {1, 0}}, {duration = 800, to = 127})` moves cutoff to 127 in 80 ms, then back to 0 by 800 ms.
+
+- `path` (path, required): The value to animate, or a list of values.<br>Colour property, or a control not on the panel: rejected with a console error.<br>List containing either: the entire list is rejected.
+- `points` (list, required): The shape: a list of {x, y} or {x, y, curve}.<br>x: position in the animation. Range: 0 ↔ 1. Outside the range: rejected with a console error.<br>y: level. Range: 0 ↔ 1 (from ↔ to). Outside the range: not held.<br>curve: shape of the segment leading to the point: "linear", "exp", "log", "s" or "hold". Unknown: linear.<br>Points are sorted by x. Before the first and after the last: that point's y.<br>Fewer than 2 points: rejected.
+- `opts` (options, optional): The options below.<br>Left out: from 0, to 1, duration 300.
+
+Good to know:
+
+- A new move on a value that is already moving replaces the old one, and the old one's `done` is called with false.
+- Returns false if the call is rejected.
 
 *Short name: `animateEnvelope`.*
 
@@ -2643,16 +2688,16 @@ Move a value through a shape with several points — an attack and decay, say, o
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `from` | number | 0 | The value that y = 0 in the shape means. |
-| `to` | number | 1 | The value that y = 1 in the shape means. |
-| `duration` | number (milliseconds) | 300 | How long the move takes. A number, or text that is one; one below 0 is a jump of 1 ms, and anything else moves in the default time. Either is said once. |
-| `beats` | number (beats) | — | Length in beats instead of milliseconds. Overrides `duration` and follows the tempo. A number above 0, or text that is one; anything else is said once, and the move's length is its `duration`. |
-| `sync` | true or false | false | Follow the transport rather than the wall clock, so the move pauses when playback does. |
-| `delay` | number (milliseconds) | 0 | Wait this long before starting. A number, or text that is one; one below 0, or anything else, starts at once, and is said once. |
-| `stagger` | number (milliseconds) | 0 | When `path` is a list, offset each move after the first by this much, so they start in turn. |
-| `repeat` | number | 1 | How many times to run the move in all: 1 runs it once and 3 runs it three times. 0 or less repeats it until you stop it. A fraction is rounded to the nearest whole number, text that is a number is read as one, and anything else runs it once. In Lua, where repeat is a keyword, write it as ["repeat"] = 3. |
-| `pingpong` | true or false | false | On a repeat, run the move backwards every other time instead of jumping back to the start. |
-| `done` | function | — | Called once when the move ends, with one argument: done(completed). `completed` is true if the move got to the end, or `ce.anim.finish()` ended it, and false if it was stopped or replaced first. When `path` is a list it is called once, after the last of them ends, and `completed` is true only if every one of them got to the end. |
+| `from` | number | 0 | Value at y = 0.<br>Invalid: default. |
+| `to` | number | 1 | Value at y = 1.<br>Invalid: default. |
+| `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
+| `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
+| `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Other values: false. |
+| `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
+| `stagger` | number (milliseconds) | 0 | Delay per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>Fraction: rounded.<br>≤ 0: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
 
 ```lua
 -- Lua
@@ -2665,43 +2710,107 @@ ce.anim.envelope("cutoff", [{x:0,y:0},{x:0.1,y:1},{x:0.4,y:0.6},{x:1,y:0}], { du
 
 #### `ce.anim.value(path) -> table`
 
-Describe the animation running on `path`. The table has `path`, `kind` ("to", "spring" or "envelope"), `value` (where it is now), `progress` (0 to 1), `from`, `to`, `elapsed`, `remaining`, `paused`, `cycle` and `sync`. Returns nothing if `path` is not animating. For an animation that follows the transport, `elapsed` and `remaining` are empty, because its timing depends on the transport rather than the clock.
+Describe the animation on a value.
+
+Example: `animateValue("cutoff").progress` gives how far the move is, 0 ↔ 1.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns {path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync}.
+- kind: "to", "spring" or "envelope". progress: 0 ↔ 1. elapsed, remaining: ms; none with sync.
+- No animation on the value: no result.
 
 *Short name: `animateValue`.*
 
 #### `ce.anim.list() -> list`
 
-List every running animation, sorted by path, each described the same way `ce.anim.value()` describes one.
+List every running animation.
+
+Example: `animateList()` gives {} while nothing is animated.
+
+Good to know:
+
+- Returns a list of tables as `ce.anim.value()` returns them, sorted by path.
+- None running: an empty list.
 
 *Short name: `animateList`.*
 
 #### `ce.anim.pause(path)`
 
-Hold an animation where it is without ending it; `ce.anim.resume()` carries on from the same point. Returns false if nothing is animating on `path` or it is already paused.
+Hold an animation where it is.
+
+Example: `animatePause("cutoff")` holds cutoff's animation.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was running; false if none, or already paused.
+- `ce.anim.resume()` continues from the held point.
 
 *Short name: `animatePause`.*
 
 #### `ce.anim.resume(path)`
 
-Carry on a paused animation from where `ce.anim.pause()` held it, rather than starting it again. Returns false if there is no paused animation on `path`.
+Continue a paused animation from where it was held.
+
+Example: `animateResume("cutoff")` continues cutoff's animation.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was paused; false otherwise.
 
 *Short name: `animateResume`.*
 
 #### `ce.anim.reverse(path)`
 
-Turn a running animation round so it heads back to where it started, at the same speed — a move that was 80% done takes 80% of its time to get back. An envelope plays its shape backwards as well. Returns false if nothing is animating on `path`.
+Turn a running animation around, back to its start at the same speed.
+
+Example: `animateReverse("cutoff")` sends cutoff's animation back to where it started.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was running; false otherwise.
+- An envelope plays its shape backwards; a paused animation turns around and stays paused.
+- Arriving back at the start counts as completed: `done` is called with true.
 
 *Short name: `animateReverse`.*
 
 #### `ce.anim.finish(path)`
 
-End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` is called with true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.
+End an animation at its end value now.
+
+Example: `animateFinish("cutoff")` sets cutoff to the end value of its animation.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was running; false otherwise.
+- The value is set to the end of the current run (its start, on a reversed run); an envelope to the end of its shape. `done` is called with true.
+- To stop where it is instead: `ce.anim.stop()`.
 
 *Short name: `animateFinish`.*
 
 #### `ce.anim.play(control, animation)`
 
-Play one of a control's keyframe animations (the ones made in the Animation tab) right now, from its first frame — restarting it if it is already playing. Returns true if the control has a keyframe animation with that name; the name is not case-sensitive. A transition cannot be started this way, because it plays when its own trigger happens: asking for one returns false and writes a message to the script console listing the keyframe animations the control does have.
+Play one of a control's keyframe animations from its first frame.
+
+Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation.
+
+- `control` (text, required): The control's name.
+- `animation` (text, required): The animation's name, as in the Animation tab. Not case-sensitive.
+
+Good to know:
+
+- Returns true if the control has a keyframe animation of that name. Already playing: restarts.
+- A transition cannot be played this way: rejected with a console error listing the keyframe animations.
 
 *Short name: `animatePlay` · Panel window only.*
 
@@ -2959,7 +3068,7 @@ Change which controls are drawn on top of which: "front", "forward", "backward" 
 
 Make a set of changes count as one step, so one undo takes them all back.
 
-- `fn`: The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.
+- `fn` (function, required): The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.
 
 Good to know:
 
@@ -3338,8 +3447,8 @@ Set the line colour and thickness for the shapes drawn after this. `width` defau
 |---|---|---|---|
 | `dash` | list of numbers | a solid line | Alternating on and off lengths in pixels. The panel's own beat marks are { 3, 3 } — three pixels drawn, three skipped. A length below 0, or one that is not a number, is drawn as 0, and a dash that is not a list draws a solid line; the console says so. |
 | `dashOffset` | number (pixels) | 0 | How far into the dash pattern to start. Advance it on a timer and the dashes march along the line. |
-| `cap` | text | "butt" | The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so. One of "butt", "round" or "square". |
-| `join` | text | "miter" | How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so. One of "miter", "round" or "bevel". |
+| `cap` | text | "butt" | The shape a line ends in. Any other word, or the same word in capitals, draws "butt", and the console says so.<br>One of "butt", "round" or "square". |
+| `join` | text | "miter" | How two line segments meet at a corner. Any other word, or the same word in capitals, draws "miter", and the console says so.<br>One of "miter", "round" or "bevel". |
 
 ```lua
 -- Lua
@@ -3616,7 +3725,7 @@ Write text at (`x`, `y`), where `y` is the baseline, the line the letters sit on
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `size` | number (pixels) | — | How big the text is. |
-| `align` | text | "left" | Which part of the text sits at the x you gave. "center", "centre" and "centred" are read as "middle". One of "left", "middle" or "right". |
+| `align` | text | "left" | Which part of the text sits at the x you gave. "center", "centre" and "centred" are read as "middle".<br>One of "left", "middle" or "right". |
 | `family` | text | — | The font family to draw in. |
 
 ```lua
@@ -3678,12 +3787,12 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported. One of "image", "overlay", "textImage" or "textTexture". |
-| `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit. One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
-| `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens. One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
+| `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported.<br>One of "image", "overlay", "textImage" or "textTexture". |
+| `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit.<br>One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
+| `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens.<br>One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
 | `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
 | `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
-| `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only. One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
+| `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only.<br>One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
 | `offsetX` | number (pixels) | 0 | Nudge the image sideways. |
 | `offsetY` | number (pixels) | 0 | Nudge it up or down. |
@@ -3695,7 +3804,7 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `brightness` | number | 1 | Lighten above 1, darken below. Background layers only. |
 | `contrast` | number | 1 | Increase above 1, flatten below. Background layers only. |
 | `tileScale` | number | 1 | How big each tile is when the image repeats. Never less than 0.1. |
-| `clipMode` | text | "shape" | Whether the image is clipped to the control's drawn shape or to its plain rectangle. Background layers only. One of "shape" or "box". |
+| `clipMode` | text | "shape" | Whether the image is clipped to the control's drawn shape or to its plain rectangle. Background layers only.<br>One of "shape" or "box". |
 | `muted` | true or false | false | Keep the layer configured but hide it, so you can switch it back on without setting it up again. Background layers only. |
 
 #### `ce.image.clear(target [, layer]) -> boolean`
@@ -3778,9 +3887,9 @@ Set a control's typography in one call: font, size, weight, spacing, alignment a
 | `weight` | number or text | — | How heavy the text is, either as a number from 100 to 900 or as a name such as "Bold". The panel stores this as a pair of fields that must agree, and this always writes both. |
 | `bold` | true or false | — | A shorthand for a heavy weight. |
 | `italic` | true or false | — | Slant the text over. |
-| `caseMode` | text | "normal" | Re-case the text as it is drawn, without changing what it says. One of "normal", "uppercase", "lowercase", "title", "sentence" or "smallcaps". |
-| `scriptMode` | text | "normal" | Draw the text smaller and raised or lowered, as superscript or subscript. One of "normal", "superscript" or "subscript". |
-| `justification` | text | — | Where the text sits inside the control. One of "topLeft", "top", "topRight", "left", "centred", "right", "bottomLeft", "bottom" or "bottomRight". |
+| `caseMode` | text | "normal" | Re-case the text as it is drawn, without changing what it says.<br>One of "normal", "uppercase", "lowercase", "title", "sentence" or "smallcaps". |
+| `scriptMode` | text | "normal" | Draw the text smaller and raised or lowered, as superscript or subscript.<br>One of "normal", "superscript" or "subscript". |
+| `justification` | text | — | Where the text sits inside the control.<br>One of "topLeft", "top", "topRight", "left", "centred", "right", "bottomLeft", "bottom" or "bottomRight". |
 | `letterSpacing` | number (pixels) | 0 | Extra space between letters. Negative tightens them up. |
 | `wordSpacing` | number (pixels) | 0 | Extra space between words. |
 | `baselineShift` | number (pixels) | 0 | Move the text off its baseline, up for positive. |
@@ -3848,7 +3957,7 @@ Show a short pop-up message to the person using the panel, and return its ID. It
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
 | `duration` | number (milliseconds) | 3000 | How long the message stays up. 0 or less keeps it visible until something dismisses it. |
 
 ```lua
@@ -3870,7 +3979,7 @@ Show a line of text in the status bar. It stays until you replace it; call this 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
 
 ```lua
 -- Lua
@@ -3894,7 +4003,7 @@ Ask a question with buttons. The answer arrives later through `onChoice`, which 
 | `title` | text | — | The bold line at the top. |
 | `message` | text | — | The body text under the heading. |
 | `buttons` | list of text | one button labelled "OK" | The button labels, left to right. Whichever is clicked is what `onChoice` is given. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
 | `default` | text | the first button | The label of the button focused when the dialog opens. |
 
 ```lua
@@ -3930,7 +4039,7 @@ Ask the user to type some text. The answer arrives through `onAnswer`: the text 
 | `placeholder` | text | — | Grey hint text shown while the field is empty. |
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
 | `default` | text | the accept label | Which of the two buttons is drawn as the default one: the accept label or the cancel label. Pressing Enter in the field accepts either way. |
 
 ```lua
@@ -3963,7 +4072,7 @@ Ask the user to pick from a list. The answer arrives through `onAnswer`: the cho
 | `multiple` | true or false | false | Allow more than one to be picked, in which case the answer is a list. |
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
 
 ```lua
 -- Lua
@@ -4003,7 +4112,7 @@ Change the text of a message that is already showing, in place. To show progress
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon. One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
 | `duration` | number | unchanged | A new lifetime for the message. If omitted, a sticky message stays sticky and a timed one gets its full time back. |
 
 ```lua

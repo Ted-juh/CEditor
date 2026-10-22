@@ -1102,9 +1102,13 @@ def __animStart(kind, path, target, opts):
         token = "py:" + str(globals().get("__scriptId", "")) + ":" + str(__animSeq[0])
         __animDone[token] = fn
         o["__done"] = token
+    elif fn is not None:
+        # Not a function: the host says so, once, and the move goes ahead.
+        o["__badDone"] = fn if isinstance(fn, (bool, int, float, str)) else str(fn)
     # The host answers whether the move started: not when a colour property is the path or one of a
     # list's paths, and then nothing in the list starts and its done is never called, so it is let go.
-    started = __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o) is True
+    # A missing path is passed as empty, which the host says is no path, not as the text "None".
+    started = __api.animate(kind, lst if lst is not None else ("" if path is None else str(path)), float(target or 0), o) is True
     if not started and "__done" in o: __animDone.pop(o["__done"], None)
     return started
 
@@ -1140,7 +1144,7 @@ def animateSpring(path, target, opts=None):
 # word. A y past 0 to 1 is a level past `from` or `to`, and is read as it is.
 def animateEnvelope(path, points, opts=None):
     if not isinstance(points, (list, tuple)) or len(points) < 2:
-        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
+        logError("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.")
         return False
     def written(v):
         if v is None: return "none was given"
@@ -1168,9 +1172,16 @@ def animateEnvelope(path, points, opts=None):
             return False
     o = dict(opts or {})
     o["samples"] = __animSample(points)
-    o["from"] = float(o.get("from") or 0)
-    to = o.pop("to", None)
-    return __animStart("envelope", path, 1 if to is None else to, o)
+    # from and to: a number, or text that is one, or the default, which the host says (__badFrom,
+    # __badTo). float() raised on "abc" and read True as 1.
+    raw = o.get("from")
+    frm = __realNumber(raw)
+    if raw is not None and frm is None: o["__badFrom"] = raw if isinstance(raw, (bool, int, float, str)) else str(raw)
+    o["from"] = 0.0 if frm is None else float(frm)
+    raw = o.pop("to", None)
+    to = __realNumber(raw)
+    if raw is not None and to is None: o["__badTo"] = raw if isinstance(raw, (bool, int, float, str)) else str(raw)
+    return __animStart("envelope", path, 1.0 if to is None else float(to), o)
 
 def animateStop(path=None):
     __api.animateStop("" if path is None else str(path))

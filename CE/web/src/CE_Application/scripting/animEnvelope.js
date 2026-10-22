@@ -56,25 +56,25 @@ function shownWritten(value) {
 
 /**
  * Why ce.anim.envelope starts nothing for `points`, in its words, or null when it starts.
- * `index` is the point the message is about (from 0), or -1 for the list as a whole; `note` is true
- * for the one the runtimes write as a note rather than an error (fewer than two points), as they
- * always have.
+ * `index` is the point the message is about (from 0), or -1 for the list as a whole. Every one is
+ * an error in the console: fewer than two points was a plain line, until the owner asked for it
+ * to be rejected as every other call is.
  *
- * @returns {{ message: string, index: number, note: boolean }|null}
+ * @returns {{ message: string, index: number }|null}
  */
 export function envelopeRefusal(points) {
-  if (!Array.isArray(points) || points.length < 2) return { message: ENVELOPE_TOO_FEW, index: -1, note: true };
+  if (!Array.isArray(points) || points.length < 2) return { message: ENVELOPE_TOO_FEW, index: -1 };
   const n = points.length;
   for (let i = 0; i < n; i += 1) {
     const which = `point ${i + 1} of ${n}`;
     const parts = envelopePointParts(points[i]);
     if (!parts) {
-      return { message: `ce.anim.envelope: ${which} is { x, y } or the two as a pair, and ${shownWritten(points[i])}, so nothing was started.`, index: i, note: false };
+      return { message: `ce.anim.envelope: ${which} is { x, y } or the two as a pair, and ${shownWritten(points[i])}, so nothing was started.`, index: i };
     }
     const x = unitProblem(`the x of ${which}`, parts.x);
-    if (x) return { message: `ce.anim.envelope: ${x.why}, so nothing was started.${x.hint}`, index: i, note: false };
+    if (x) return { message: `ce.anim.envelope: ${x.why}, so nothing was started.${x.hint}`, index: i };
     if (realNumber(parts.y) === undefined) {
-      return { message: `ce.anim.envelope: the y of ${which} is a number, and ${shownWritten(parts.y)}, so nothing was started.`, index: i, note: false };
+      return { message: `ce.anim.envelope: the y of ${which} is a number, and ${shownWritten(parts.y)}, so nothing was started.`, index: i };
     }
   }
   return null;

@@ -739,6 +739,36 @@ int main()
         check (host.levelled.size() == 5, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
     }
 
+    // 12c, continued) a done that is not a function, through the real Lua and QuickJS engines: the
+    // prelude passes it to the runtime as __badDone, the runtime says so once, and the move goes
+    // ahead. It was dropped without a word.
+    {
+        juce::Array<juce::var> doneScripts;
+        doneScripts.add (makeScript ("badDoneLua", "lua", "panel", "onBadDoneLua", "*",
+            "function onBadDoneLua()\n"
+            "  log('lua started ' .. tostring(ce.anim.to('cutoff', 50, { duration = 10, done = 'later' })))\n"
+            "  log('lua shape ' .. tostring(ce.anim.envelope('cutoff', { {0, 0}, {1, 1} }, { duration = 10, from = 'abc' })))\n"
+            "end\n"));
+        doneScripts.add (makeScript ("badDoneJs", "javascript", "panel", "onBadDoneJs", "*",
+            "function onBadDoneJs() {\n"
+            "  log('js started ' + ce.anim.spring('cutoff', 50, { duration: 10, done: 5 }));\n"
+            "  log('js shape ' + ce.anim.envelope('cutoff', [[0, 0], [1, 1]], { duration: 10, to: true }));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (doneScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onBadDoneLua", "panel", juce::var());
+        runtime.dispatchEvent ("onBadDoneJs", "panel", juce::var());
+        check (host.logs.contains ("lua started true") && host.logs.contains ("js started true")
+                   && host.logs.contains ("lua shape true") && host.logs.contains ("js shape true"),
+               "a done that is not a function, or an envelope's from or to, does not stop the move (got " + host.logs.joinIntoString (" | ") + ")");
+        check (host.levelled.joinIntoString (" | ") == "warn:ce.anim.to: \"later\" is not a function, so nothing is called when the move ends. This is said only the first time. | "
+                                                       "warn:ce.anim.envelope: \"abc\" is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time. | "
+                                                       "warn:ce.anim.spring: 5 is not a function, so nothing is called when the move ends. This is said only the first time. | "
+                                                       "warn:ce.anim.envelope: true is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time.",
+               "...and each is said once per command, in the runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
     // 12d) ce.math reads CSS's short forms as a colour property stores them, through the real Lua
     // and QuickJS engines: each prelude's own port of the WebView's reading, and the generated names
     // table. "red" was refused here while set() took it. The rounding is JavaScript's (30% of 255 is
@@ -1423,7 +1453,11 @@ int main()
             check (host.levelled.joinIntoString (" | ")
                        == "error:ce.anim.envelope: the x of point 2 of 2 is a number from 0 to 1, and 50 is not, so nothing was "
                           "started. If you meant 50 out of 100, write 0.5. | "
-                          "error:ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started.",
+                          "error:ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started."
+                          // Too few points is an error too, as every rejection is (it was a plain line); the dash
+                          // needs CharPointer_UTF8, as a plain literal is read as ASCII.
+                          + juce::String (juce::CharPointer_UTF8 (" | error:ce.anim.envelope(path, points): needs at least two points, "
+                                                                  "each { x, y } in 0..1 — nothing was started.")),
                    juce::String (language) + ": a point the sampler cannot place is refused in the WebView's words (got "
                        + host.levelled.joinIntoString (" | ") + ")");
             check (host.logs.contains ("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started."),
@@ -3280,13 +3314,56 @@ int main()
         check (said() == "warn:ce.anim.spring: \"soft\" is not a number, so the spring's damping is 6, as it is when none is given." + once
                        + "\nwarn:ce.anim.spring: true is not a number, so the spring's frequency is 12, as it is when none is given." + once,
                "a spring's damping and frequency that are not numbers are their defaults, and say so");
-        timing.startAnimation ("spring", juce::var ("o"), 100.0, opts ({ { "damping", -2.0 }, { "frequency", "8" } }));
-        check (said().isEmpty(), "a number below 0, and text that is a number, are used as they are");
+        // "to", because spring's damping was said already, by "n" above.
+        timing.startAnimation ("to", juce::var ("o"), 100.0, opts ({ { "curve", "spring" }, { "damping", -2.0 }, { "frequency", "8" } }));
+        {
+            const auto got = said();
+            check (got == "warn:ce.anim.to: a damping of -2 is less than 0, so the spring would grow instead of settling: "
+                          "its damping is 6, as it is when none is given." + once,
+                   "a damping below 0 would grow instead of settling, so it is the default, and said; text that is a number is used (got " + got + ")");
+        }
         timing.loadScripts (juce::var (juce::Array<juce::var>()));
         said();
         timing.startAnimation ("to", juce::var ("k"), 100.0, opts ({ { "duration", -1.0 } }));
         check (said() == "warn:ce.anim.to: a duration of -1 is less than 0, so the move takes 1 ms: it jumps." + once,
                "a script set loaded afresh is told again");
+        // A curve that cannot be used is said once per command too. It was a line on every call,
+        // and a curve that was neither a name nor numbers was linear without a word.
+        timing.startAnimation ("to", juce::var ("p"), 100.0, opts ({ { "curve", "outBak" } }));
+        {
+            const auto got = said();
+            // CharPointer_UTF8: a plain literal is read as ASCII, and the dash is not.
+            check (got == juce::String (juce::CharPointer_UTF8 ("warn:ce.anim.to: \"outBak\" is not a curve this build knows — animating linear.")) + once,
+                   "an unknown curve is said once, as every other option is (got " + got + ")");
+        }
+        timing.startAnimation ("to", juce::var ("q"), 100.0,
+                               opts ({ { "curve", juce::var (juce::Array<juce::var> { 1.5, 0.0, 0.0, 1.0 }) } }));
+        timing.startAnimation ("to", juce::var ("r"), 100.0, opts ({ { "curve", 5.0 } }));
+        check (said().isEmpty(), "…and not again by the same command, whatever the curve was");
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("s"), 100.0, opts ({ { "curve", true } }));
+        {
+            const auto got = said();
+            check (got == juce::String (juce::CharPointer_UTF8 ("warn:ce.anim.to: true is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.")) + once,
+                   "a curve that is neither a name nor numbers is said, where it was linear in silence (got " + got + ")");
+        }
+        // from, stagger, repeat and a done that is not a function (passed on by a prelude as
+        // __badDone): each was silent, and each is said once, as the WebView says it.
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("t"), 100.0, opts ({ { "from", "abc" } }));
+        check (said() == "warn:ce.anim.to: \"abc\" is not a number, so the move starts from the value as it is now, as it does when no from is given." + once,
+               "a from that is not a number is where the value is now, and said");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "u", "v" }), 100.0, opts ({ { "from", 0.0 }, { "stagger", -100.0 } }));
+        check (said() == "warn:ce.anim.to: a stagger of -100 is less than 0, so the moves start together, as they do when no stagger is given." + once,
+               "a stagger below 0 starts the moves together, and is said as a stagger, not as the delay each path got");
+        timing.startAnimation ("to", juce::var ("w"), 100.0, opts ({ { "repeat", "x" } }));
+        check (said() == "warn:ce.anim.to: \"x\" is not a number of runs, so the move runs once, as it does when no repeat is given." + once,
+               "a repeat that is not a number runs once, and is said");
+        timing.startAnimation ("to", juce::var ("x"), 100.0, opts ({ { "__badDone", "x" } }));
+        check (said() == "warn:ce.anim.to: \"x\" is not a function, so nothing is called when the move ends." + once,
+               "a done that is not a function is said, and the move goes ahead");
     }
 
     {

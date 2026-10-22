@@ -27,7 +27,7 @@ import {
   SCRIPT_LANGUAGES, SELF, VALUE_ACCESSORS,
   LIFECYCLE_HOOKS, CONTROL_EVENTS, PANEL_EVENTS, TIME_EVENTS, DEVICE_EVENTS, COMPONENT_EVENTS,
   MODULE_GROUPS, COMPONENT_GROUPS, moduleById, membersByModule, memberPath, memberRuntime,
-  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
+  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER, paramTypeLine,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 // The canonical handler in every language — REAL, toolchain-validated source (the fixture
@@ -88,7 +88,10 @@ const MODULE_INTROS = {
     + '- Every random command takes its numbers from the script\'s own random sequence.\n'
     + '- `ce.math.seed(n)` sets where that sequence starts. The same seed gives the same numbers every time: in every scripting language, in the editor and in the exported plugin.\n'
     + '- `ce.math.stream(name, fn)` gives a block of code its own separate sequence, so two parts of a script don\'t affect each other\'s numbers.',
-  'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.',
+  'ce.anim': 'Moving a value smoothly over time instead of jumping: to a target, with a spring, or through a shape you draw. Moves can wait, repeat, follow the tempo, and call you back when they finish. These keep working when the plugin window is closed, so they can also sweep a synth parameter.\n\n'
+    + '- A required value that is missing or of the wrong type: the call is rejected with a console error.\n'
+    + '- An option with a wrong value: a console warning, the first time only, and the fallback in its row is used.\n'
+    + '- Number options also accept text that is a number, such as "500".',
   'ce.panel': 'Changing the panel itself from a script: creating, copying and removing controls, finding them, lining them up, and editing the lists inside a control such as its states and animations. Most of these need the panel window; each entry says so. While you preview, everything a script changes is put back when the preview stops — `ce.panel.keep` is how you keep it.',
   'ce.storage': 'Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.',
   'ce.draw': 'Drawing your own graphics on top of a control, from its script\'s onDraw. Set the colours and line style first, then draw shapes and text; everything is measured in pixels from the control\'s top-left corner.',
@@ -154,7 +157,10 @@ const anchor = (text) => String(text).toLowerCase().replace(/[^\w\s-]/g, '').tri
 const moduleHeading = (id) => `${id}: ${MODULE_TITLES[id]}`;
 const moduleLink = (id) => `[${id}](#${anchor(moduleHeading(id))})`;
 
-const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+// A line break in a text is a rule of its own (a parameter's Range, Default, Invalid…): <br> in a
+// cell and in a list item, which GitHub and the app's Help (utils/markdown.js) both render.
+const cell = (text) => String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+const lines = (text) => String(text ?? '').replace(/\n/g, '<br>');
 
 /** The value list a field accepts, as a sentence fragment. */
 function valuesText(values) {
@@ -175,7 +181,7 @@ function fieldTable(param, lifecycle) {
     const type = f.unit ? `${f.type} (${f.unit})` : f.type;
     // The list, unless the description already names every value in it.
     const named = f.values?.every((v) => f.summary.includes(`"${v}"`));
-    const values = f.values?.length && !named ? ` One of ${valuesText(f.values)}.` : '';
+    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.` : '';
     const what = `${f.summary}${values}`;
     if (!withDefault) return `| \`${f.name}\` | ${cell(type)} | ${cell(what)} |`;
     const def = f.required ? 'required' : (f.default ?? '—');
@@ -213,8 +219,11 @@ function headingSignature(member) {
 
 // A command's text beyond its description (docs/design/api-descriptions-handoff.md, "The fields"):
 // its example, what each parameter is, the choice a function's answer makes, and "Good to know".
+// Each parameter is named with its type and whether it is required, from the contract, so its own
+// text does not have to say "Number required."; an options parameter's fields follow as a table.
 const noteText = (note) => (typeof note === 'string' ? note : note?.text ?? '');
-const described = (member) => (member.params ?? []).filter((p) => p.summary && !p.fields?.length);
+const described = (member) => (member.params ?? []).filter((p) => p.summary);
+const paramHead = (member, p) => `\`${p.name}\` (${paramTypeLine(p, member)})`;
 const fnName = (member) => (member.params ?? []).find((p) => p.type === 'function')?.name ?? 'fn';
 
 /** Under a heading: the example, the parameters as a list, the answers as a table, the notes as a list. */
@@ -222,7 +231,7 @@ function memberDetails(member) {
   let out = '';
   if (member.example) out += `\nExample: ${member.example}\n`;
   const params = described(member);
-  if (params.length) out += `\n${params.map((p) => `- \`${p.name}\`: ${p.summary}`).join('\n')}\n`;
+  if (params.length) out += `\n${params.map((p) => `- ${paramHead(member, p)}: ${lines(p.summary)}`).join('\n')}\n`;
   if (member.returns?.length) {
     out += `\n| What \`${fnName(member)}\` returns | What happens |\n|---|---|\n`
       + `${member.returns.map((r) => `| ${cell(r.when)} | ${cell(r.then)} |`).join('\n')}\n`;
@@ -236,7 +245,7 @@ function memberDetails(member) {
 function memberDetailsInline(member) {
   const parts = [];
   if (member.example) parts.push(`Example: ${member.example}`);
-  for (const p of described(member)) parts.push(`\`${p.name}\`: ${p.summary}`);
+  for (const p of described(member)) parts.push(`${paramHead(member, p)}: ${cell(p.summary)}`);
   if (member.returns?.length) {
     parts.push(`What \`${fnName(member)}\` returns: ${member.returns.map((r) => `${r.when}, ${r.then.charAt(0).toLowerCase()}${r.then.slice(1).replace(/\.$/, '')}`).join('; ')}.`);
   }

@@ -246,6 +246,16 @@ public:
         return scripting::colours::colourFieldAt (control, resolveModelPath (control, split.second)).has_value();
     }
 
+    /** Whether `scriptPath` names a control the panel does not have, for ce.anim to refuse it as a
+        path (animatesNoControl in panelRuntime.js): every tick of the move would be a write set()
+        refuses. `panel.*` is the panel document, which is always there. */
+    bool namesMissingControl (const juce::String& scriptPath) const
+    {
+        const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return false;
+        return ! findControlByName (split.first).isObject();
+    }
+
     /** Every control's name, in document order, containers included — what ce.panel.snapshot walks.
         Public because panelQuery("controls") answers from it; the walk itself stays private. */
     juce::StringArray controlNames() const

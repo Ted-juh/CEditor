@@ -55,6 +55,30 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   A value that is not a number is refused in `rgbToHex`, `hslToHex`, `mixColour`, `snap` and `lerp`,
   where it was read as 0 or gave NaN, and the console says which one.
 
+**Scripts written for an earlier build: `ce.anim` rejects a control the panel does not have.**
+
+- `ce.anim.to`, `ce.anim.spring` and `ce.anim.envelope` given a control name the panel does not
+  have, such as a misspelt `"cutof"`, return false and write one error to the console. The move
+  used to start: it returned true, wrote an error on every step, and called `done` with true at
+  the end. A list with such a name in it is rejected whole, as a list with a colour property is.
+- An empty path, or none, writes an error to the console. It returned false without a word.
+- A `damping` below 0 is replaced by the default, 6, with a console warning. It made the spring
+  grow without limit instead of settling.
+- A `curve` that cannot be used (an unknown name, control points out of range, or a value that is
+  neither a name nor four numbers) is warned about once per command, as every other option is, and
+  the move is linear. It was logged on every call, and the last case was linear in silence.
+- A `from` that is not a number ("abc", true) starts from the current value, with a console
+  warning. It started from 0 or 1 in silence.
+- A `stagger` below 0 is replaced by 0, with a warning. It gave each path a delay below 0, and the
+  warning named `delay`.
+- A `repeat` that is not a number runs the move once, with a warning. It was silent.
+- A `done` that is not a function is reported with a warning. It was dropped in silence.
+- `ce.anim.envelope` with a `from` or `to` that is not a number uses the default (0 and 1), with a
+  warning. "abc" was read as 0 and true as 1 in silence, so `to = "abc"` held the whole move at 0;
+  in Python, "abc" raised an error.
+- `ce.anim.envelope` with fewer than two points writes an error to the console, as every other
+  rejection does. It wrote a plain line.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

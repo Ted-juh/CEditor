@@ -74,7 +74,12 @@ export function renderInline(escaped) {
   text = text
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?![*\w])/g, '$1<em>$2</em>')
-    .replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+    // The one tag let through, as GitHub lets it through: the scripting manual writes a line break
+    // inside a table cell or a list item as <br>, where a parameter's rules are one per line
+    // (generate-scripting-manual.mjs). It comes here escaped, like every other tag, and only this
+    // exact one goes back; a <br> inside a code span is already out of reach above.
+    .replace(/&lt;br\s*\/?&gt;/g, '<br>');
 
   return text.replace(new RegExp(`${CODE_MARK}(\\d+)${CODE_MARK}`, 'g'),
     (_, i) => `<code>${codeSpans[Number(i)]}</code>`);

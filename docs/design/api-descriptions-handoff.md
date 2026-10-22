@@ -100,7 +100,7 @@ optional.
 | --- | --- | --- |
 | `summary` | The one plain sentence (two or three at most). No example, no parameter names. | Everywhere |
 | `example` | One call with fixed values and what it gives: "`getBits(0xB4, 4, 3)` gives 3." | Insert picker, hover card, manual, API explorer. Never the sidebar. |
-| `params[].summary` | A parameter's facts: its range, counting from 0 or 1, its default, what is refused. A full sentence, capital first, full stop at the end, three words or more, not repeating the name. | Hover card, manual, sidebar row (as the row's tooltip) |
+| `params[].summary` | A parameter's facts: its range, counting from 0 or 1, its default, what is refused. A full sentence, capital first, full stop at the end, three words or more, not repeating the name. Not its type or whether it is required: those are shown beside it from `type` and `required` (below). | Hover card, manual, API explorer, the sidebar hint (on the parameter's name) |
 | `returns` | A choice the command makes from what a function gives back: `[{ when, then }]`, e.g. `{ when: 'false', then: 'The message is dropped.' }`. | Manual, sidebar ("What fn returns") |
 | `notes` | "Good to know": at most three short sentences that change what you write. | Manual, hover card, sidebar |
 
@@ -218,8 +218,10 @@ One source; every one of these reads it:
 
 - **The Insert picker** (`editor/ScriptPicker.svelte`): the description and the example under each
   command; its search reads the notes too, so a word moved into a note is still found.
-- **The hover card and completion** (`scripting/languageService.js`): the description, the example
-  and the notes.
+- **The hover card and completion** (`scripting/languageService.js`): the description, the example,
+  the parameters with their type, and the notes, each on its own line in the card. The card and
+  the code's signature hint find a command by its path (`ce.anim.to`) as well as by its short name
+  (`animateTo`); the middle of a path (`anim`) shows the module's description.
 - **The Values sidebar** (`editor/ValuesSidebar.svelte`, from `scripting/scriptValues.js`'s
   `call.doc`, `call.explain`, `call.returns` and `call.notes`): the description, the returns table
   and the notes, never the example.
@@ -285,9 +287,9 @@ the way, for the modules after it:
 - **Parameters are written schematically**, not as sentences of options:
   `Range: 0 ↔ 1 (black ↔ unchanged). Default: 0.55. Outside the range: an error in the console and no result.`
   The parts, in this order, where they apply: what it is, `Range: a ↔ b (what a means ↔ what b
-  means)`, `Default: x` or `Left out: x`, `Must be given.`, `Must be below hi.`, `Outside the
-  range: …` (held at 0 or 1, not held, or an error in the console and no result). Use ↔, not
-  `<->`, which a page could read as the start of a tag.
+  means)`, `Default: x` or `Left out: x`, `Must be below hi.`, `Outside the range: …` (held at 0
+  or 1, not held, or an error in the console and no result). Use ↔, not `<->`, which a page could
+  read as the start of a tag.
 - **Plain technical wording.** Not "nothing comes back" or "gives nothing": "returns no value", "an
   error in the console and no result", "Empty: no result".
 - **Rules a module shares can be a table.** How a colour is read is two tables in the manual's
@@ -295,7 +297,23 @@ the way, for the modules after it:
   accepted), and the random rules are a short list there.
 - **Say what the runtime does at the edges**, checked, not assumed: a value left out, outside the
   range, or a range given the wrong way round. Where the result is meaningless (NaN), the parameter
-  says it must be given.
+  is required (`required: true`), and the type line says so.
+
+**Decided on 2026-10-22, starting `ce.anim`:**
+
+- **The type and whether a parameter is required are shown from the data**, not written in its
+  text: the manual, the hover card and the API explorer show `` `target` (number, required): The
+  end value. ``, and the sidebar hint shows "number, required. The end value." on the parameter's
+  name. The words come from `paramTypeLabel` in `panelApi.js`, a short plain list (number, text,
+  true or false, list, options, control name, any value…), and `manualReference.test.js` fails on
+  a type that has none. So a parameter's text never says "Required", "Must be given" or "Number
+  required". The 187 parameters typed only as `value` were given their real type where it is
+  known; `value` is left only where any value is taken (`set`, `log`, `saveSetting`…).
+- **A refused call is "rejected with a console error".** Not "nothing starts", "the animation is
+  not started" or "none of the list starts". What happens on a required value that is missing or
+  wrong can be said once in the module's introduction when it is the same for every command.
+- **Normal technical English throughout.** "Required", "rejected", "converted", "a console
+  warning": the words technical documentation uses, not a paraphrase of them.
 
 Found on the way and fixed at the owner's word, in all four runtimes (the WebView's and the Lua,
 JavaScript and Python preludes), with a case for each in `scriptPreludeAgreement.test.js` and the
@@ -317,7 +335,182 @@ right answer pinned in `scriptMath.test.js`:
 The refusals share one helper per runtime (`mathNumber` here, `__mnum` in each prelude), worded
 "ce.math.hex: the red part is a number, and "x" is not, so there is no answer."
 
-Next: `ce.anim`, the same way: one command at a time.
+## `ce.anim`: state on 2026-10-22, for whoever continues
+
+The owner reviewed `ce.anim` one item at a time and is tired of correcting the same wording again
+and again. Read this section before writing a word.
+
+### Write technical English, not prose
+
+The owner rejected each of these, some more than once. Use the right-hand column.
+
+| Not this | This |
+| --- | --- |
+| "nothing comes back", "gives nothing" | "returns no value", "no result" |
+| "It must be given", "Required.", "Number required." | nothing: the type line beside the name shows "number, required" |
+| "nothing starts", "the animation is not started", "none of the list starts" | "rejected with a console error"; "the entire list is rejected" |
+| "Text containing a number is converted" | said once in the module introduction: "Number options also accept text that is a number, such as "500"." |
+| "Not a number: the default, with a console warning" in every row | "Invalid: default." in the row; the warning rule once in the module introduction |
+| "The shape of the move" | "Easing curve" |
+| "How quickly the wobble dies away", "how fast it wobbles" | "Spring damping", "Spring oscillation frequency" |
+| "Higher: settles sooner", "the wobble grows" | "0: undamped.", "Below 0: oscillation grows." |
+| a sentence listing cases ("one below 0 is a jump of 1 ms, and anything else moves in the default time") | schematic parts, each "Label: value.", **one per line** (a `\n` in the text): `Range: ≥ 0.` / `0 or below: immediate jump.` / `Invalid: default.` |
+| "Range: 0 or more", "Range: above 0" | `Range: ≥ 0.`, `Range: > 0.`, `Range: 0 ↔ 1.` (symbols, not words) |
+| several rules in one paragraph | one rule per line. The owner: "Short. Viewable in a glance. Users don't want to read whole texts. Every new rule must be on a new line." |
+
+Two more rules from the same review:
+
+- **Show the range whenever there is one:** `Range: 0 ↔ 1`, `Range: ≥ 0`, `Range: > 0`,
+  `Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3`.
+- **A line break in a text is a rule of its own**, and every place renders it: the manual writes
+  it as `<br>` in a cell or a list item (`cell()` and `lines()` in `generate-scripting-manual.mjs`),
+  which GitHub renders and the app's Help lets through as the one tag (`utils/markdown.js`); the
+  hover card uses `white-space: pre-line`; the API explorer turns it into `<br>`; the sidebar hint's
+  tooltip shows it as it is. The schematic parameters of `ce.math` and `ce.midi` were split the
+  same way, mechanically, before each "Label: value" sentence (63 texts).
+- **Use the term the field uses** (easing, Bézier control points, damping, frequency, transport,
+  tempo), not a description of it.
+
+The module introduction (`MODULE_INTROS['ce.anim']` in `generate-scripting-manual.mjs`) now says
+the rules every command shares, so no row repeats them:
+
+- A required value that is missing or of the wrong type: the call is rejected with a console error.
+- An option with a wrong value: a console warning, the first time only, and the fallback in its
+  row is used.
+- Number options also accept text that is a number, such as "500".
+
+### Done and approved
+
+| Item | Where |
+| --- | --- |
+| `ce.anim.to`: description, example, `path`, `target`, `opts`, two notes | `panelApi.js`, `animateTo` |
+| `duration`, `beats`, `sync`, `delay`, shared by `to`, `spring` and `envelope` | `SHARED_OPTION_FIELDS` |
+| `ce.anim.stop` | approved in the first batch |
+
+`path` reads: "The value to animate, or a list of values. Colour property, or a control not on the
+panel: rejected with a console error. List containing either: the entire list is rejected."
+
+The owner was shown these in the running editor (Help, the hover card, the Values sidebar) before
+approving. When the owner asks for a mockup, put the text into the working tree, regenerate the
+manual and Help, and take screenshots with Playwright through `browser-checks/behaviourKit.mjs`
+(`boot`, `fresh`, `make`; the hover card is `.ce-hover`, the sidebar `.bd-app`, Help
+`.overlay-panel`).
+
+### Made on the way, at the owner's word
+
+- **Every parameter shows its type and whether it is required**, from the data (see "Decided on
+  2026-10-22" above).
+- **The hover card and the code's signature hint find a command written by its path**
+  (`ce.anim.to`), not only by its short name (`animateTo`): 677 of the 774 commands had neither in
+  the form scripts use. The card shows the description, the example, the parameters and the notes
+  as separate parts.
+- **ce.anim rejects a control the panel does not have**, which used to start a move that wrote an
+  error on every tick and called `done` with true, and **says so for an empty path or list**, which
+  returned false without a word. The fix is in both runtimes that run ce.anim: `startAnimationImpl`
+  in `panelRuntime.js` and `ScriptRuntime::startAnimation` (through the host's new
+  `namesMissingControl`, answered by `PanelValueModel`). The Lua, JavaScript and Python preludes
+  pass a missing path as empty. Tests: `scriptAnim.test.js`, `PythonScriptEngineTests.cpp`,
+  `PanelValueModelTests.cpp`. The release notes say it.
+
+### Item 3: done
+
+`animateTo`'s `curve`, `damping` and `frequency` rows, approved by the owner:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}. Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3. Invalid: linear. |
+| `damping` | number | 6 | Spring damping (curve = "spring"). Range: 0 or more. 0: undamped. Invalid: default. |
+| `frequency` | number | 12 | Spring oscillation frequency (curve = "spring"). 0: no oscillation. Invalid: default. |
+
+The old `curve` text said x1 and x2 "are kept between 0 and 1". They are not: numbers outside the
+range are rejected and the move is linear (`bezierOf` in `easingTables.js`).
+
+Three decisions the owner made, each applied in both runtimes (the editor's `startAnimationImpl`
+and `ScriptRuntime::startAnimation`), with the release notes saying so:
+
+1. An invalid `curve` is a console warning, once per command, as every other option is
+   (`warnAnimTiming` / `warnTiming`). It was an ordinary console line on every call.
+2. `damping` below 0 is invalid: a warning, and the default 6. It made the oscillation grow without
+   limit.
+3. A `curve` that is neither text nor a list (`curve = 5`) warns the same way. It was linear in
+   silence.
+
+`ce.anim.spring`'s own `damping` and `frequency` rows take the same text without the "(curve =
+"spring")" part, and both `frequency` rows say `Range: ≥ 0.` and `Below 0: sign ignored.` (the
+formula is 1 - e^(-damping·x)·cos(frequency·x) in both runtimes, and cos is even).
+
+### Item 4: done
+
+`from`, `stagger`, `repeat`, `pingpong` and `done`, approved by the owner, in `SHARED_OPTION_FIELDS`:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `from` | number | current value | Start value.<br>Default: the current value.<br>Invalid: default. |
+| `stagger` | number (ms) | 0 | Delay added per list entry: entry n starts n × stagger after the first.<br>Lists only.<br>Range: ≥ 0.<br>Invalid: 0. |
+| `repeat` | number | 1 | Number of runs.<br>A fraction is rounded.<br>0 or below: repeats until stopped.<br>Invalid: 1.<br>Lua: `["repeat"] = 3` (repeat is a keyword). |
+| `pingpong` | true or false | false | `true`: alternate runs play in reverse.<br>Requires repeat 0, or ≥ 2.<br>Other values: false. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
+
+Four edges where both runtimes were silent, unlike every other option, each decided by the owner
+and applied in both runtimes with the module's one-time warning and the fallback in its row
+(`scriptAnim.test.js`, `ScriptRuntimeTests.cpp`, `PythonScriptEngineTests.cpp`; the release notes
+say so):
+
+1. `from` = "abc" or `true` started from 0 or 1 (`Number()`). Warned; the current value is used.
+2. `stagger` below 0 gave each entry a delay below 0, held at 0, and the warning named `delay`.
+   Warned as a stagger; 0 is used.
+3. `repeat` = "x" or `true` ran once in silence. Warned.
+4. `done` = "x" or 5 was dropped in silence. Warned. The preludes own the functions and strip
+   `done` before the call, so they pass one that is not a function to the runtime as `__badDone`,
+   and the runtime says it (`ScriptRuntime::startAnimation`).
+
+### `ce.anim.spring`: done
+
+Approved as "Move a value to a new number with a spring motion.", with the example
+`` `animateSpring("cutoff", 127)` moves cutoff to 127 with a spring, in 600 ms. ``, `to`'s `path`,
+`target` and notes, an `opts` row that names what is left out (`Left out: duration 600, damping 6,
+frequency 12.`, and `to`'s now says `Left out: curve "linear", duration 300.`), and every option
+shown to the owner with its range. The owner asked to see every option of a command in its item,
+the shared ones included, each with its range: do that for the commands left.
+
+### `ce.anim.envelope`: done
+
+Approved as "Move a value through a shape given as points.", with an example, `to`'s `path` and
+notes, a `points` text of six lines (the shape, x with its range, y with its range and "not held",
+a point's curve and the names it takes, the sorting and what is before the first and after the
+last point, and fewer than 2 points), an `opts` row, `from` and `to` rows, and every shared option
+with its range. A point's curve shapes the segment leading to it; an unknown name is linear, as
+`ce.math.map` reads it, and that is documented rather than changed. Two decisions the owner made,
+both applied in both runtimes and all three preludes, with the release notes saying so:
+
+1. A `from` or `to` that is not a number was 0 or 1 in silence (and raised in Python). It is the
+   default, with the warning; the preludes pass what they could not read as `__badFrom` /
+   `__badTo`, as they pass `__badDone`.
+2. Fewer than two points was a plain console line. It is an error, as every other rejection is.
+
+### The eight small commands: done
+
+`running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish` and `play`, approved as one
+table since each has one parameter: one sentence, an example, the parameter's text, and what the
+call returns as the first note. `play` with a name left out said `no control named "undefined"`;
+it says that no name was given, in the editor (the command is panel-window only).
+
+**`ce.anim` is done.** Next: the next module in the table below, `ce.draw`, the same way: one
+command at a time, every parameter and option in its item, one rule per line, with ranges.
+
+For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
+range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
+
+### The branch
+
+On `ccr-d7809877-w74329`, pushed, not merged, no pull request: `ae59f63` (type labels), `ed09bc6`
+(`ce.anim.to` and the timing options), `b759a41` (hover card and hint by path), `adf0367` (the two
+ce.anim rejections), and this handoff. The owner merges through a pull request when asked, after
+screenshots.
+
+Still deferred from `ce.midi`, by the owner's choice: the older helpers' silent wrong answers
+(`to7bit(20000, 2)`, `to14bit(20000)`, `fromNibbles(16, 0)`, `nibblize({300})`, `denibblize` with
+an odd count, `toSigned(-200, 8)`, `from7bit("02 2C")`, `toAscii` not cutting long text).
 
 How many descriptions each module has, and how many need the most work (first sentence built on
 parameter names, with a bracketed aside, or over 25 words):
@@ -326,7 +519,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | --- | --- | --- |
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
-| ce.anim | 12 | 12 |
+| ce.anim | 12 | 12, all done |
 | ce.draw | 27 | 18 |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
@@ -383,8 +576,10 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it. The first batch, ce.midi and ce.math are
-done; rewrite the ce.anim descriptions by its rules and fields (summary, example, params[].summary,
-returns, notes). Before changing any file, show me one command at a time, its text now and every
-field as proposed, and wait for my answer before the next.
+Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
+on 2026-10-22". ce.midi, ce.math and ce.anim are done; continue with ce.draw, in technical
+English, schematic, one rule per line, with ranges, as its table says, showing every parameter and
+option of the command in its item. Check each command at its edges in the runtime first, and put
+what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
+and wait for my answer before the next.
 ```

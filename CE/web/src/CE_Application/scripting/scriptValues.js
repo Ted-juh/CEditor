@@ -33,7 +33,7 @@ import {
 import { builtColourOf, builtWords } from './builtColours.js';
 import {
   ALL_MEMBERS, MEMBER_BY_ID, memberPath, memberModule, allModules, memberMapFor, extensionMembers, memberNames,
-  unknownOptionsMessage,
+  unknownOptionsMessage, paramTypeLine,
 } from './panelApi.js';
 import { colourFieldAt, panelColourFieldAt, realNumber } from './scriptColours.js';
 import { unknownModuleCall, unknownModuleCallMessage } from './unknownCalls.js';
@@ -463,7 +463,12 @@ function buildCall(raw, env) {
     const names = params.map((p) => p.name);
     call.doc = {
       id: member.id,
-      params: params.map((p) => ({ name: p.name, optional: !p.required, summary: p.summary ?? '' })),
+      // `type` is "number, required" and the like, shown with the summary when the pointer is on the
+      // name; a parameter read only from the signature line has no type to show.
+      params: params.map((p) => ({
+        name: p.name, optional: !p.required, summary: p.summary ?? '',
+        type: p.fromSignature ? '' : paramTypeLine(p, member),
+      })),
       colours: paramColours(member.id, names),
       summary: member.summary ?? '',
       returns: member.returns ?? null,

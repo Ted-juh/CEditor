@@ -353,11 +353,14 @@ end
 `;
 
 test('rows follow the call\'s order: options under their table, a call inside another under it', () => {
+  // A call's own rows end with what it explains, here ce.anim.to's "Good to know" notes.
+  const row = (r) => `${r.depth}:${r.type}:${r.type === 'arg' ? r.arg.name : r.call.path}`;
   const opts = readStatement(NESTED, 'lua', NESTED.indexOf('duration'), {});
-  assert.deepEqual(statementRows(opts).map((r) => `${r.depth}:${r.type}:${r.type === 'call' ? r.call.path : r.arg.name}`),
-    ['0:call:ce.anim.to', '0:arg:path', '0:arg:target', '0:arg:opts', '1:arg:duration', '1:arg:curve', '1:arg:easing']);
+  assert.deepEqual(statementRows(opts).map(row),
+    ['0:call:ce.anim.to', '0:arg:path', '0:arg:target', '0:arg:opts', '1:arg:duration', '1:arg:curve', '1:arg:easing',
+      '0:explain:ce.anim.to']);
   const nested = readStatement(NESTED, 'lua', NESTED.indexOf('ce.draw'), {});
-  assert.deepEqual(statementRows(nested).map((r) => `${r.depth}:${r.type}:${r.type === 'call' ? r.call.path : r.arg.name}`),
+  assert.deepEqual(statementRows(nested).map(row),
     ['0:call:ce.draw.fill', '0:arg:colour', '1:call:ce.draw.gradient', '1:arg:stops', '2:arg:stop 1', '2:arg:stop 2', '1:arg:angle']);
   const fill = nested.calls[0];
   assert.equal(madeByChild(fill, fill.args[0]), true, 'the colour is the gradient call listed under it');

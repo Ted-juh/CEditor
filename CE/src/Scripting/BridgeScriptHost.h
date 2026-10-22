@@ -181,6 +181,9 @@ public:
         // Whether a path is a colour property, which ce.anim refuses to move (isColourProperty).
         // Unset: nothing is, as before.
         std::function<bool (const juce::String& path)> isColourProperty;
+        // Whether a path names a control the panel does not have, which ce.anim refuses to move
+        // (namesMissingControl). Unset: none does, as before.
+        std::function<bool (const juce::String& path)> namesMissingControl;
         // Whether a transmitting write to `path` would reach the synth at all — the path is bound to
         // a device parameter. Only those writes spend the MIDI flood budget. Unset: every
         // transmitting write counts, which is how every set() was counted before this existed.
@@ -630,6 +633,8 @@ public:
     { if (runtime) runtime->stopAnimation (path); }
     bool isColourProperty (const juce::String& path) override
     { return callbacks.isColourProperty && callbacks.isColourProperty (path); }
+    bool namesMissingControl (const juce::String& path) override
+    { return callbacks.namesMissingControl && callbacks.namesMissingControl (path); }
     bool animationRunning (const juce::String& path) override
     { return runtime && runtime->animationRunning (path); }
     juce::var animationValue (const juce::String& path) override

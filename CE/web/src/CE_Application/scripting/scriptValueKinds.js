@@ -317,9 +317,19 @@ export function readStoredGradient(value) {
 
 const CURVE_NUMBERS = Object.entries(EASING_BEZIERS);
 
-/** ce.anim's `curve`: a name, or four numbers. */
+/** ce.anim.to's `curve`: a name, or four numbers. A problem is said in the runtime's words
+ *  (startAnimationImpl), which says it once per command; here it is on the row. */
 export function readCurve(value) {
   const meaning = { name: null, bezier: null, choices: [...ANIM_CURVE_NAMES] };
+  if (value !== undefined && value !== null && typeof value !== 'string' && typeof value !== 'object') {
+    return {
+      meaning,
+      problem: {
+        severity: 'warning',
+        message: `ce.anim.to: ${String(value)} is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.`,
+      },
+    };
+  }
   if (typeof value === 'string') {
     if (ANIM_CURVE_NAMES.includes(value)) {
       meaning.name = value;
@@ -330,7 +340,7 @@ export function readCurve(value) {
       meaning,
       problem: {
         severity: 'warning',
-        message: `ce.anim: "${value}" is not a curve this build knows — animating linear. `
+        message: `ce.anim.to: "${value}" is not a curve this build knows — animating linear. `
           + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.${didYouMean(value, ANIM_CURVE_NAMES)}`,
       },
     };
@@ -343,7 +353,7 @@ export function readCurve(value) {
       meaning,
       problem: {
         severity: 'warning',
-        message: 'ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.',
+        message: 'ce.anim.to: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.',
       },
     };
   }

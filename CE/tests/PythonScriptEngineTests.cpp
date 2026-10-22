@@ -78,6 +78,9 @@ public:
     { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
     // A stand-in for the panel model's question: here a path ending in ".colour" is a colour.
     bool isColourProperty (const juce::String& path) override { return path.endsWithIgnoreCase (".colour"); }
+    // …and here a control called "nosuch" is the one the panel does not have.
+    bool namesMissingControl (const juce::String& path) override
+    { return path.upToFirstOccurrenceOf (".", false, false).equalsIgnoreCase ("nosuch"); }
 };
 
 static int failures = 0;
@@ -594,6 +597,53 @@ int main()
         check (listEnd == "numbers done True",
                "ce.anim: only the list that started calls its done (got " + listEnd + ")");
         check (animErrors.isEmpty(), "ce.anim: no script raised refusing a list");
+
+        // A control the panel does not have used to start a move that wrote a refused set() on
+        // every tick and called done with True; an empty path answered False without a word, and a
+        // missing one reached the host as the text "None". Each is rejected with an error now, a
+        // list with a missing control in it whole, and nothing starts, as in the WebView.
+        juce::Array<juce::var> missingScripts;
+        missingScripts.add (makeScript ("pyMissing", "onMissing", "*",
+            "def onMissing(value=None):\n"
+            "    a = ce.anim.to('nosuch', 1, { 'duration': 100, 'done': lambda c: log('missing done ' + str(c)) })\n"
+            "    b = ce.anim.spring(['m', 'nosuch.value'], 1, { 'duration': 100, 'done': lambda c: log('list done ' + str(c)) })\n"
+            "    c = ce.anim.to('', 1)\n"
+            "    d = ce.anim.to(None, 1)\n"
+            "    e = ce.anim.envelope([], [(0, 0), (1, 1)])\n"
+            "    log('answers ' + str(a) + ' ' + str(b) + ' ' + str(c) + ' ' + str(d) + ' ' + str(e))\n"));
+        anim.loadScripts (juce::var (missingScripts));
+        anim.tickAnimations (6000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onMissing", "panel", juce::var());
+        const auto missing = steps();
+        check (missing == "ce.anim.to: control \"nosuch\" not found on the active panel, so nothing was started. | "
+                          "ce.anim.spring: control \"nosuch\" not found on the active panel, so nothing was started. | "
+                          "ce.anim.to: no path was given, so nothing was started. | "
+                          "ce.anim.to: no path was given, so nothing was started. | "
+                          "ce.anim.envelope: the list has no paths, so nothing was started. | "
+                          "answers False False False False False",
+               "ce.anim: a missing control, an empty path and an empty list are rejected with an error (got " + missing + ")");
+        anim.tickAnimations (6200.0);
+        check (steps().isEmpty() && ! anim.animationRunning ("m"), "ce.anim: …nothing started, so no done is called");
+        check (animErrors.isEmpty(), "ce.anim: no script raised on a missing path");
+
+        // A done that is not a function: the prelude passes it on as __badDone, the runtime says so
+        // once, and the move goes ahead. It was dropped without a word.
+        juce::Array<juce::var> badDoneScripts;
+        badDoneScripts.add (makeScript ("pyBadDone", "onBadDone", "*",
+            "def onBadDone(value=None):\n"
+            "    log('started ' + str(ce.anim.to('m', 1, { 'duration': 100, 'from': 0, 'done': 'x' })))\n"
+            "    log('shape ' + str(ce.anim.envelope('n', [(0, 0), (1, 1)], { 'duration': 100, 'from': 'abc', 'to': 'x' })))\n"));
+        anim.loadScripts (juce::var (badDoneScripts));
+        anim.tickAnimations (7000.0);
+        animHost.logs.clear();
+        anim.dispatchEvent ("onBadDone", "panel", juce::var());
+        const auto badDone = steps();
+        check (badDone == "ce.anim.to: \"x\" is not a function, so nothing is called when the move ends. This is said only the first time. | started True | "
+                          "ce.anim.envelope: \"abc\" is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time. | "
+                          "ce.anim.envelope: \"x\" is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time. | shape True",
+               "ce.anim: a done that is not a function, and an envelope's from and to that are not numbers, are said, and the move goes ahead (got " + badDone + ")");
+        check (animErrors.isEmpty(), "ce.anim: no script raised on a done that is not a function, or a from that float() would have");
     }
 
     // ---- Two instances in one process ------------------------------------------------------------

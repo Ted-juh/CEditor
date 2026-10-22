@@ -493,6 +493,16 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         else return n;
         return 0.0;
     };
+    // A control the panel does not have, said in the words of the WebView's animatesNoControl.
+    // The move used to start: it answered true, every tick's write was refused, and done was
+    // called with true at the end.
+    auto refusesMissing = [this, &verb] (const juce::String& key)
+    {
+        if (! host.namesMissingControl (key)) return false;
+        host.logAt ("error", "ce.anim." + verb + ": control \"" + key.upToFirstOccurrenceOf (".", false, false)
+                             + "\" not found on the active panel, so nothing was started.", juce::var());
+        return true;
+    };
     auto refusesColour = [this, &verb] (const juce::String& key)
     {
         if (! host.isColourProperty (key)) return false;
@@ -501,22 +511,48 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         return true;
     };
 
+    // A `done` that is not a function: the preludes own the functions and strip `done` before the
+    // call, so they pass one that is not a function on as __badDone, and it is said here, once,
+    // as the WebView's animDone says it. It was dropped without a word.
+    if (o != nullptr && o->hasProperty ("__badDone"))
+        warnTiming ("done", animationShown (o->getProperty ("__badDone")) + " is not a function, so nothing is called when the move ends.");
+    // ce.anim.envelope's from and to the prelude could not read as numbers: it used the default
+    // (0 and 1) and passed the value on as __badFrom / __badTo, said here once, as the WebView's
+    // startEnvelopeImpl says it.
+    if (o != nullptr && o->hasProperty ("__badFrom"))
+        warnTiming ("from", animationShown (o->getProperty ("__badFrom")) + " is not a number, so y = 0 of the shape means 0, as it does when no from is given.");
+    if (o != nullptr && o->hasProperty ("__badTo"))
+        warnTiming ("to", animationShown (o->getProperty ("__badTo")) + " is not a number, so y = 1 of the shape means 1, as it does when no to is given.");
+
     // A LIST of paths is one call, one shape, one completion — and `stagger` is why the list is
     // worth having rather than a loop at the call site.
     if (auto* list = path.getArray())
     {
         juce::StringArray paths;
         for (const auto& p : *list) { const auto str = p.toString(); if (str.isNotEmpty()) paths.add (str); }
-        if (paths.isEmpty()) return false;
+        if (paths.isEmpty())
+        {
+            host.logAt ("error", "ce.anim." + verb + ": the list has no paths, so nothing was started.", juce::var());
+            return false;
+        }
 
-        // A colour among them refuses the whole call, each one named, and nothing starts, as the
-        // WebView's startAnimationImpl refuses it. The colour alone was refused and the rest moved,
-        // and the list's done waited for a path that never started, so it was never called.
-        bool colour = false;
-        for (const auto& p : paths) colour = refusesColour (p) || colour;
-        if (colour) return false;
+        // A colour among them, or a control the panel does not have, refuses the whole call, each
+        // one named, and nothing starts, as the WebView's startAnimationImpl refuses it. The colour
+        // alone was refused and the rest moved, and the list's done waited for a path that never
+        // started, so it was never called.
+        bool refused = false;
+        for (const auto& p : paths) refused = refusesMissing (p) || refusesColour (p) || refused;
+        if (refused) return false;
 
-        const double stagger = option ("stagger", 0.0, "not a number of milliseconds, so the moves start together, as they do when no stagger is given.");
+        double stagger = option ("stagger", 0.0, "not a number of milliseconds, so the moves start together, as they do when no stagger is given.");
+        if (stagger < 0.0)
+        {
+            // Each path's delay went below 0, held at 0 and said as a delay; it is 0 now, and said
+            // as a stagger, as the WebView's animOption says it.
+            warnTiming ("stagger", "a stagger of " + animationShown (juce::var (stagger))
+                                   + " is less than 0, so the moves start together, as they do when no stagger is given.");
+            stagger = 0.0;
+        }
         const double baseDelay = juce::jmax (0.0, timing ("delay", 0.0));
         int groupId = 0;
         if (const auto token = o != nullptr ? o->getProperty ("__done").toString() : juce::String(); token.isNotEmpty())
@@ -533,6 +569,9 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
             auto* each = o != nullptr ? new juce::DynamicObject (*o) : new juce::DynamicObject();
             each->setProperty ("delay", baseDelay + stagger * (double) i);
             each->removeProperty ("__done");   // the list's, not each path's
+            each->removeProperty ("__badDone");   // said once above
+            each->removeProperty ("__badFrom");
+            each->removeProperty ("__badTo");
             each->setProperty ("__group", groupId);
             startAnimation (kind, juce::var (paths[i]), target, juce::var (each));
         }
@@ -540,11 +579,17 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     }
 
     const auto key = path.toString();
-    if (key.isEmpty()) return false;
+    if (key.isEmpty())
+    {
+        // An empty path used to answer false without a word. The preludes pass a missing one
+        // (nil, undefined, None) as empty, not as the text "nil".
+        host.logAt ("error", "ce.anim." + verb + ": no path was given, so nothing was started.", juce::var());
+        return false;
+    }
 
     // Asked here, where every engine's ce.anim arrives, a list's paths after the list has been
     // asked. Nothing starts, so nothing ends and no done is called, as in the WebView.
-    if (refusesColour (key)) return false;
+    if (refusesMissing (key) || refusesColour (key)) return false;
 
     Animation a;
     a.kind = verb;
@@ -553,6 +598,9 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     if (o != nullptr) a.doneToken = o->getProperty ("__done").toString();
     a.scriptSet = animationScriptSet;
 
+    // A curve that cannot be used is said once per command, as every other option is (warnTiming),
+    // and the move is linear. It was a line on every call, and a curve that was neither a name nor
+    // numbers (curve = 5) was linear without a word. The WebView's startAnimationImpl says the same.
     const auto curveVar = o != nullptr ? o->getProperty ("curve") : juce::var();
     if (curveVar.isArray() || curveVar.isObject())
     {
@@ -560,22 +608,22 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         // the same custom curve an animation in the Animation tab uses.
         a.hasBezier = drawnCurve (curveVar, a.bezier);
         if (a.hasBezier) a.curve = "custom";
-        else host.log ("[panel] ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), "
-                       "with x1 and x2 between 0 and 1 — animating linear.", juce::var());
+        else warnTiming ("curve", juce::String (juce::CharPointer_UTF8 ("a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), "
+                                                                        "with x1 and x2 between 0 and 1 — animating linear.")));
     }
-    else if (o != nullptr && o->hasProperty ("curve"))
+    else if (curveVar.isString())
     {
-        const auto name = o->getProperty ("curve").toString();
+        const auto name = curveVar.toString();
         bool known = true;
         animationEase (0.5, name, &known);
-        if (! known)
-        {
-            // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name
-            // the Properties panel offers three feet away, and it was linear here in every runtime.
-            host.log ("[panel] ce.anim: \"" + name + "\" is not a curve this build knows — animating linear.",
-                      juce::var());
-        }
+        // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
+        // Properties panel offers three feet away, and it was linear here in every runtime.
+        if (! known) warnTiming ("curve", "\"" + name + juce::String (juce::CharPointer_UTF8 ("\" is not a curve this build knows — animating linear.")));
         else a.curve = name;
+    }
+    else if (! curveVar.isVoid() && ! curveVar.isUndefined())
+    {
+        warnTiming ("curve", animationShown (curveVar) + juce::String (juce::CharPointer_UTF8 (" is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.")));
     }
 
     if (a.kind == "envelope")
@@ -585,6 +633,14 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     const double defaultMs = a.kind == "spring" ? 600.0 : 300.0;
     a.duration = juce::jmax (1.0, timing ("duration", defaultMs));
     a.damping = option ("damping", 6.0, "not a number, so the spring's damping is 6, as it is when none is given.");
+    if (a.damping < 0.0)
+    {
+        // Below 0 the spring grows instead of settling (a move from 0 to 100 at -2 is at -161
+        // halfway), so it is the default, and said, as the WebView's animOption says it.
+        warnTiming ("damping", "a damping of " + animationShown (juce::var (a.damping))
+                               + " is less than 0, so the spring would grow instead of settling: its damping is 6, as it is when none is given.");
+        a.damping = 6.0;
+    }
     a.frequency = option ("frequency", 12.0, "not a number, so the spring's frequency is 12, as it is when none is given.");
     a.delay = juce::jmax (0.0, timing ("delay", 0.0));
     a.pingpong = flag ("pingpong");
@@ -593,6 +649,14 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     // repeat = 1 ran twice and repeat = 0 once, where the contract always said otherwise. Held as
     // the runs left after this one, -1 for until stopped; clamped first, because llround of a number
     // past what it can hold is undefined.
+    // A repeat that is not a number of runs is said, and the move runs once (animationRuns).
+    if (o != nullptr && o->hasProperty ("repeat"))
+    {
+        const auto v = o->getProperty ("repeat");
+        double n = 0.0;
+        if (! v.isVoid() && ! v.isUndefined() && ! animationNumber (v, n))
+            warnTiming ("repeat", animationShown (v) + " is not a number of runs, so the move runs once, as it does when no repeat is given.");
+    }
     const auto runs = std::llround (juce::jlimit (-1.0, 2147483647.0, animationRuns (o)));
     a.repeat = runs <= 0 ? -1 : (int) (runs - 1);
 
@@ -625,9 +689,21 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     }
 
     // `from` defaults to where the value IS, so an animation always starts from the truth rather
-    // than from wherever the last one happened to end.
-    a.from = (o != nullptr && o->hasProperty ("from")) ? (double) o->getProperty ("from")
-                                                       : (double) host.getValue (key, "value");
+    // than from wherever the last one happened to end. A number, or text that is one
+    // (animationNumber), or after saying why not, that default: the (double) cast read "abc" as 0
+    // and true as 1, in silence. As the WebView's startAnimationImpl reads it.
+    bool fromGiven = false;
+    if (o != nullptr && o->hasProperty ("from"))
+    {
+        const auto v = o->getProperty ("from");
+        if (! v.isVoid() && ! v.isUndefined())
+        {
+            double n = 0.0;
+            if (animationNumber (v, n)) { a.from = n; fromGiven = true; }
+            else warnTiming ("from", animationShown (v) + " is not a number, so the move starts from the value as it is now, as it does when no from is given.");
+        }
+    }
+    if (! fromGiven) a.from = (double) host.getValue (key, "value");
     if (! std::isfinite (a.from)) a.from = 0.0;
     a.to = target;
 

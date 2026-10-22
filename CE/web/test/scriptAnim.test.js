@@ -21,7 +21,7 @@ import { EASING_BEZIERS, ANIM_CURVE_NAMES } from '../src/CE_Application/scriptin
 import { EASING_BEZIERS as PANEL_BEZIERS } from '../src/CE_Application/utils/interactionRuntime.js';
 import { OVERSHOOTING_EASINGS } from '../src/CE_Application/utils/easing.js';
 import { get as getStore } from 'svelte/store';
-import { setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { setRuntimeHost, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { animationPlays } from '../src/CE_Application/stores/animationActivity.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -191,6 +191,86 @@ test('a drawn curve that is not one says so, and animates linear', () => {
   });
 });
 
+test('a curve that cannot be used is said once per command, as the other options are; damping below 0 is the default', () => {
+  // The owner's three decisions on item 3 (docs/design/api-descriptions-handoff.md): an invalid
+  // curve was a line on every call, a curve that was neither a name nor numbers was linear in
+  // silence, and a damping below 0 made the spring grow instead of settling. ScriptRuntimeTests
+  // checks the plug-in's runtime says the same.
+  const said = () => {
+    const lines = getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`).filter((l) => !l.startsWith('error:set:'));
+    clearScriptTrace();
+    return lines;
+  };
+  const once = ' This is said only the first time.';
+  resetScriptStateForTesting();
+  withClock(() => {
+    said();
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: 'outBak' });
+    assert.deepEqual(said(), [`warn:ce.anim.to: "outBak" is not a curve this build knows — animating linear. `
+      + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.${once}`]);
+    api.animateTo('b', 100, { duration: 1000, from: 0, curve: [1.5, 0, 0, 1] });
+    api.animateTo('c', 100, { duration: 1000, from: 0, curve: 5 });
+    assert.deepEqual(said(), [], 'not again by the same command, whatever the curve was');
+    tickAnimations(250);
+    assert.deepEqual(['a', 'b', 'c'].map((p) => api.animateValue(p).value), [25, 25, 25], 'each move is linear');
+  });
+  resetScriptStateForTesting();
+  withClock(() => {
+    said();
+    api.animateTo('d', 100, { duration: 1000, from: 0, curve: true });
+    assert.deepEqual(said(), [`warn:ce.anim.to: true is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.${once}`],
+      'neither a name nor numbers is said, where it was linear in silence');
+    api.animateSpring('e', 100, { duration: 1000, from: 0, damping: -2 });
+    api.animateSpring('f', 100, { duration: 1000, from: 0 });
+    assert.deepEqual(said(), [`warn:ce.anim.spring: a damping of -2 is less than 0, so the spring would grow instead of settling: its damping is 6, as it is when none is given.${once}`]);
+    tickAnimations(500);
+    assert.equal(api.animateValue('e').value, api.animateValue('f').value, 'the default damping, not a spring that grows');
+    assert.ok(api.animateValue('e').value > 0 && api.animateValue('e').value < 110, 'and it settles');
+  });
+});
+
+test('from, stagger, repeat and done that cannot be used are said once, and the move goes ahead with the default', () => {
+  // The owner's four decisions on item 4 (docs/design/api-descriptions-handoff.md). Each was
+  // silent: from "abc" started at 0 and true at 1, a stagger below 0 was said as a delay, repeat
+  // "x" ran once and done "x" was dropped, all without a word. ScriptRuntimeTests checks the
+  // plug-in's runtime, and with PythonScriptEngineTests the preludes' done.
+  const panel = { id: 'p', name: 'P', width: 400, height: 300, scripting: { modules: ['ce.core', 'ce.anim'] },
+    controls: [createControl('Range', { name: 'K' }), createControl('Range', { name: 'L' })] };
+  setRuntimeHost({ panel, scripts: [], readValue: () => 40, writeValue: () => true });
+  const script = scriptApiForTesting('', 'item4-script');
+  const said = () => { const lines = getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`); clearScriptTrace(); return lines; };
+  const once = ' This is said only the first time.';
+  resetScriptStateForTesting();
+  try {
+    withClock(() => {
+      said();
+      assert.equal(script.animateTo('K', 100, { duration: 1000, from: 'abc' }), true);
+      assert.deepEqual(said(), [`warn:ce.anim.to: "abc" is not a number, so the move starts from the value as it is now, as it does when no from is given.${once}`]);
+      assert.equal(script.animateValue('K').from, 40, 'the value as it is now, not 0');
+      script.animateTo('K', 100, { duration: 1000, from: true });
+      assert.deepEqual(said(), [], 'said once');
+      script.animateTo('K', 100, { duration: 1000, from: '20' });
+      assert.equal(script.animateValue('K').from, 20, 'text that is a number is read as one');
+      assert.deepEqual(said(), []);
+
+      assert.equal(script.animateTo(['K', 'L'], 100, { duration: 1000, from: 0, stagger: -100 }), true);
+      assert.deepEqual(said(), [`warn:ce.anim.to: a stagger of -100 is less than 0, so the moves start together, as they do when no stagger is given.${once}`],
+        'said as a stagger, not as the delay each path got');
+      assert.equal(script.animateValue('K').remaining, script.animateValue('L').remaining, 'together');
+
+      script.animateTo('K', 100, { duration: 100, from: 0, repeat: 'x' });
+      assert.deepEqual(said(), [`warn:ce.anim.to: "x" is not a number of runs, so the move runs once, as it does when no repeat is given.${once}`]);
+      tickAnimations(150);
+      assert.equal(script.animateRunning('K'), false, 'once');
+
+      assert.equal(script.animateTo('K', 100, { duration: 100, from: 0, done: 'x' }), true);
+      assert.deepEqual(said(), [`warn:ce.anim.to: "x" is not a function, so nothing is called when the move ends.${once}`]);
+      tickAnimations(300);
+      assert.equal(script.animateRunning('K'), false, 'the move went ahead, and ended');
+    });
+  } finally { setRuntimeHost(null); }
+});
+
 test('every phase-13 verb is declared, cross-runtime, and namespaced under ce.anim', () => {
   for (const [id, path] of [
     ['animateEnvelope', 'ce.anim.envelope'], ['animateValue', 'ce.anim.value'],
@@ -285,11 +365,36 @@ test('the sampled shape is fine enough that nothing reads the difference', () =>
   });
 });
 
-test('an envelope needs at least two points, and says so', () => {
+test('an envelope needs at least two points, and says so, as an error', () => {
   withClock(() => {
+    clearScriptTrace();
     assert.equal(api.animateEnvelope('e', [{ x: 0, y: 0 }]), false);
     assert.equal(api.animateEnvelope('e', null), false);
     assert.equal(api.animateRunning('e'), false, 'and nothing was started');
+    // It was a plain console line; every other rejection is an error, and the owner asked for this
+    // one to be the same.
+    assert.deepEqual(getStore(scriptTrace).map((t) => t.kind), ['error', 'error']);
+  });
+});
+
+test('an envelope\'s from and to that are not numbers are the defaults, and said once', () => {
+  // Number() read true as 1 and "abc" as 0, in silence, so to = "abc" held the whole move at 0.
+  // ScriptRuntimeTests and PythonScriptEngineTests check the preludes pass theirs to the plug-in's
+  // runtime, which says the same.
+  resetScriptStateForTesting();
+  withClock(() => {
+    clearScriptTrace();
+    assert.equal(api.animateEnvelope('e', [[0, 0], [1, 1]], { duration: 100, from: true, to: 'abc' }), true);
+    const v = api.animateValue('e');
+    assert.deepEqual([v.from, v.to], [0, 1], 'the defaults, not the 1 and 0 the boolean and the text were read as');
+    assert.deepEqual(getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`), [
+      'warn:ce.anim.envelope: true is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time.',
+      'warn:ce.anim.envelope: "abc" is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time.',
+    ]);
+    clearScriptTrace();
+    api.animateEnvelope('e', [[0, 0], [1, 1]], { duration: 100, from: 'x', to: '50' });
+    assert.deepEqual([api.animateValue('e').from, api.animateValue('e').to], [0, 50], 'text that is a number is read as one');
+    assert.deepEqual(getStore(scriptTrace), [], 'and from was said already');
   });
 });
 
@@ -544,5 +649,45 @@ test('ce.anim.play refuses a transition and a typo, and says what it can play', 
     clearScriptTrace();
     assert.equal(script.animatePlay('Nobody', 'flash'), false);
     assert.match(traced(), /no control named "Nobody"/);
+    // A name left out was looked up as the text "undefined", and said so.
+    clearScriptTrace();
+    assert.equal(script.animatePlay('Lamp'), false);
+    assert.equal(traced(), 'error:ce.anim.play: no animation name was given. Its keyframe animations: flash.');
+    clearScriptTrace();
+    assert.equal(script.animatePlay(), false);
+    assert.equal(traced(), 'error:ce.anim.play: no control name was given.');
   });
+});
+
+/* --------------------------------------------------------------------- what is not a path */
+// A name the panel does not have used to start a move: the call answered true, every tick wrote
+// `set: control "…" not found` to the console, sixty times a second, and done was called with true.
+// An empty path answered false without a word. Both are rejected with an error now, as a colour
+// property is, and in a list either rejects the whole list. ScriptRuntime::startAnimation does the
+// same in the plug-in (PythonScriptEngineTests.cpp).
+
+const errorsTraced = () => getStore(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+
+test('a control the panel does not have, or no path at all, is rejected with an error, and nothing starts', () => {
+  withLamp((script) => withClock(() => {
+    let done = 'not called';
+    assert.equal(script.animateTo('Lamb', 1, { duration: 10, done: (c) => { done = c; } }), false);
+    assert.equal(script.animateSpring(['Lamp.value', 'Nobody.value'], 1, { duration: 10, done: (c) => { done = c; } }), false);
+    assert.equal(script.animateTo('', 1), false);
+    assert.equal(script.animateTo(undefined, 1), false);
+    assert.equal(script.animateEnvelope([], [[0, 0], [1, 1]]), false);
+    assert.deepEqual(errorsTraced(), [
+      'ce.anim.to: control "Lamb" not found on the active panel, so nothing was started.',
+      'ce.anim.spring: control "Nobody" not found on the active panel, so nothing was started.',
+      'ce.anim.to: no path was given, so nothing was started.',
+      'ce.anim.to: no path was given, so nothing was started.',
+      'ce.anim.envelope: the list has no paths, so nothing was started.',
+    ]);
+    tickAnimations(1000);
+    assert.equal(script.animateRunning(), false, 'nothing started, not even the list\'s good path');
+    assert.equal(done, 'not called', 'and no done: nothing started, so nothing ended');
+    // A control the panel has, any case, and the panel's own numbers still move.
+    assert.equal(script.animateTo('lamp.value', 1, { duration: 10 }), true);
+    assert.equal(script.animateTo('panel.width', 500, { duration: 10 }), true);
+  }));
 });

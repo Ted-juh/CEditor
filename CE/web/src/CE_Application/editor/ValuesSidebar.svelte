@@ -1053,7 +1053,7 @@
              command does, in one plain sentence. -->
         <div class="vsig">
           <span class="vpath">{callName(headCall)}</span>{#if headCall.doc}(<!--
-          -->{#each headCall.doc.params as p, i (p.name)}<span class={['vsig-param', headCall.doc.colours[i] && `c-${headCall.doc.colours[i]}`, p.name === headParam && 'active']}>{p.optional ? `[${p.name}]` : p.name}</span>{#if i < headCall.doc.params.length - 1}{', '}{/if}{/each}<!--
+          -->{#each headCall.doc.params as p, i (p.name)}<span class={['vsig-param', headCall.doc.colours[i] && `c-${headCall.doc.colours[i]}`, p.name === headParam && 'active']} title={[p.type, p.summary].filter(Boolean).join('. ') || undefined}>{p.optional ? `[${p.name}]` : p.name}</span>{#if i < headCall.doc.params.length - 1}{', '}{/if}{/each}<!--
           -->){/if}
         </div>
         {#if headCall.doc?.summary}<div class="vdesc">{#each codeParts(headCall.doc.summary) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}</div>{/if}

@@ -792,6 +792,12 @@ int main()
                    && colourModel.isColourProperty ("bare.Background.Border.top.gradient.stops.2.color")
                    && ! colourModel.isColourProperty ("lbl.background.fill.gradient.stops.0.position"),
                "colours: a control's gradient stop is one, on a control that has no gradient yet");
+
+        // ce.anim's other question: a name the panel does not have, which it refuses to move.
+        check (colourModel.namesMissingControl ("nosuch") && colourModel.namesMissingControl ("nosuch.transform.x")
+                   && ! colourModel.namesMissingControl ("lbl.transform.x") && ! colourModel.namesMissingControl ("LBL")
+                   && ! colourModel.namesMissingControl ("panel.width") && ! colourModel.namesMissingControl ("PANEL.bgColour"),
+               "ce.anim: a control the panel does not have is named missing, one it has and the panel itself are not");
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

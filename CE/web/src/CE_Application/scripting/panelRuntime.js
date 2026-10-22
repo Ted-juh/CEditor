@@ -4466,6 +4466,17 @@ function animatesColour(verb, path) {
   return true;
 }
 
+/** True, after saying so, when `path` names a control the panel does not have. The move used to
+ *  start anyway: the call answered true, every tick wrote `set: control "…" not found` to the
+ *  console, sixty times a second, and done was called with true at the end. With no panel to ask
+ *  nothing is refused, as the plug-in's ScriptRuntime refuses nothing with no panel document. */
+function animatesNoControl(verb, path) {
+  const { name } = splitScriptPath(String(path));
+  if (isPanelTarget(name) || !activePanel() || findControlByName(name)) return false;
+  addScriptTrace('error', '', `${verb}: control "${name}" not found on the active panel, so nothing was started.`);
+  return true;
+}
+
 // A move's timing: a number, or text that is one (realNumber). A duration or a delay that cannot be
 // read, or is below 0, and beats that are not a number above 0, are said once per command, and the
 // move goes ahead as it always did: a duration in its default time, or 1 ms below 0; a delay of
@@ -4498,8 +4509,10 @@ function animTiming(verb, opts, name, fallback) {
   return n;
 }
 /** `stagger`, `damping` and `frequency`: a number, or text that is one, or after saying why not, the
- *  default. A number below 0 is used as it is: a stagger below 0 runs the list back to front behind
- *  a delay, and a damping or frequency is the curve's own business. */
+ *  default. A frequency's sign makes no difference, so it is used as given. A damping below 0 makes
+ *  the spring grow instead of settling (a move from 0 to 100 at -2 is at -161 halfway), and a
+ *  stagger below 0 gave each path a delay below 0, held at 0 and said as a delay; both are the
+ *  default, and said as what they are. */
 const ANIM_OPTION_FALLBACK_WORDS = {
   stagger: () => 'not a number of milliseconds, so the moves start together, as they do when no stagger is given.',
   damping: (d) => `not a number, so the spring's damping is ${d}, as it is when none is given.`,
@@ -4509,9 +4522,29 @@ function animOption(verb, opts, name, fallback) {
   const v = opts?.[name];
   if (v === undefined || v === null) return fallback;
   const n = realNumber(v);
-  if (n !== undefined) return n;
+  if (n !== undefined) {
+    if (name === 'damping' && n < 0) {
+      warnAnimTiming(verb, name, `a damping of ${shownValue(n)} is less than 0, so the spring would grow instead of settling: its damping is ${fallback}, as it is when none is given.`);
+      return fallback;
+    }
+    if (name === 'stagger' && n < 0) {
+      warnAnimTiming(verb, name, `a stagger of ${shownValue(n)} is less than 0, so the moves start together, as they do when no stagger is given.`);
+      return fallback;
+    }
+    return n;
+  }
   warnAnimTiming(verb, name, `${shownValue(v)} is ${ANIM_OPTION_FALLBACK_WORDS[name](fallback)}`);
   return fallback;
+}
+
+/** `done` as the function it is, or null: none given, or after saying why not. A done that was not
+ *  a function ("x", 5) was dropped without a word. The preludes pass theirs on as __badDone, and
+ *  ScriptRuntime::startAnimation says the same of it. */
+function animDone(verb, opts) {
+  const fn = opts?.done;
+  if (typeof fn === 'function') return fn;
+  if (fn !== undefined && fn !== null) warnAnimTiming(verb, 'done', `${shownValue(fn)} is not a function, so nothing is called when the move ends.`);
+  return null;
 }
 
 /** `beats` as a number above 0, or null: none given, or said why not. */
@@ -4532,16 +4565,20 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // delays was the alternative, and `stagger` is why the list is worth having at all.
   if (Array.isArray(path)) {
     const paths = path.map((p) => String(p ?? '')).filter(Boolean);
-    if (!paths.length) return false;
-    // A colour among them refuses the whole call, each one named in the words a single path is
-    // refused in, and nothing starts. The colour alone was refused and the rest moved, and the
-    // list's done waited for a path that never started, so it was never called. The plug-in's
-    // ScriptRuntime::startAnimation checks a list the same way before it starts any of it.
-    const refused = paths.filter((p) => animatesColour(`ce.anim.${kind}`, p));
+    if (!paths.length) {
+      addScriptTrace('error', '', `ce.anim.${kind}: the list has no paths, so nothing was started.`);
+      return false;
+    }
+    // A colour among them, or a control the panel does not have, refuses the whole call, each one
+    // named in the words a single path is refused in, and nothing starts. The colour alone was
+    // refused and the rest moved, and the list's done waited for a path that never started, so it
+    // was never called. The plug-in's ScriptRuntime::startAnimation checks a list the same way
+    // before it starts any of it.
+    const refused = paths.filter((p) => animatesNoControl(`ce.anim.${kind}`, p) || animatesColour(`ce.anim.${kind}`, p));
     if (refused.length) return false;
     const stagger = animOption(`ce.anim.${kind}`, opts, 'stagger', 0);
     const baseDelay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
-    const done = typeof opts?.done === 'function' ? opts.done : null;
+    const done = animDone(`ce.anim.${kind}`, opts);
     let groupId = null;
     if (done) {
       animationGroupSeq += 1;
@@ -4560,8 +4597,12 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   }
 
   const key = String(path ?? '');
-  if (!key) return false;
-  if (animatesColour(`ce.anim.${kind}`, key)) return false;
+  if (!key) {
+    // An empty path used to answer false without a word.
+    addScriptTrace('error', '', `ce.anim.${kind}: no path was given, so nothing was started.`);
+    return false;
+  }
+  if (animatesNoControl(`ce.anim.${kind}`, key) || animatesColour(`ce.anim.${kind}`, key)) return false;
 
   const groupId = group;
   const spring = kind === 'spring';
@@ -4570,27 +4611,44 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
   // Properties panel offers three feet away, and it was linear here in every runtime. A curve can
   // also be drawn — four numbers, see drawnCurve — which is how a script moves along the same
-  // custom curve an animation in the Animation tab uses.
+  // custom curve an animation in the Animation tab uses. Said once per command, as every other
+  // option is (warnAnimTiming): it was a line on every call, and a curve that was neither a name
+  // nor numbers (curve = 5) was linear without a word. ScriptRuntime::startAnimation says the same.
+  const curveVerb = `ce.anim.${kind}`;
   let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
   let bezier = null;
   if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
     bezier = drawnCurve(opts.curve);
     curve = bezier ? 'custom' : 'linear';
     if (!bezier) {
-      addScriptTrace('log', scriptId,
-        'ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
+      warnAnimTiming(curveVerb, 'curve',
+        'a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
     }
-  } else if (!spring && !envelope && animationEase(0.5, curve) === undefined) {
-    addScriptTrace('log', scriptId,
-      `ce.anim: "${curve}" is not a curve this build knows — animating linear. `
+  } else if (!spring && !envelope && typeof opts?.curve === 'string' && animationEase(0.5, curve) === undefined) {
+    warnAnimTiming(curveVerb, 'curve',
+      `"${curve}" is not a curve this build knows — animating linear. `
       + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.`);
     curve = 'linear';
+  } else if (!spring && !envelope && opts?.curve !== undefined && opts?.curve !== null && typeof opts.curve !== 'string') {
+    warnAnimTiming(curveVerb, 'curve',
+      `${shownValue(opts.curve)} is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.`);
   }
 
   // `from` defaults to where the value IS, so an animation starts from the truth rather than from
-  // wherever the previous one happened to stop.
-  const fromRaw = opts?.from != null ? Number(opts.from) : Number(getValue(key, 'value'));
-  const from = Number.isFinite(fromRaw) ? fromRaw : 0;
+  // wherever the previous one happened to stop. A number, or text that is one (realNumber), or
+  // after saying why not, the default: Number() read "abc" and "" as 0 and true as 1, in silence.
+  let from;
+  if (opts?.from !== undefined && opts?.from !== null) {
+    from = realNumber(opts.from);
+    if (from === undefined) {
+      warnAnimTiming(curveVerb, 'from',
+        `${shownValue(opts.from)} is not a number, so the move starts from the value as it is now, as it does when no from is given.`);
+    }
+  }
+  if (from === undefined) {
+    const now = Number(getValue(key, 'value'));
+    from = Number.isFinite(now) ? now : 0;
+  }
 
   // Nothing has ticked yet on a fresh panel, so seed the origin from the clock the interval below
   // will use — otherwise the first animation measures against zero and finishes instantly.
@@ -4627,6 +4685,9 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // Anything a script can start forever it must be able to stop, which is what list()/value() and
   // panel teardown are for. ScriptRuntime::startAnimation reads it the same way.
   const runsGiven = realNumber(opts?.repeat);
+  if (runsGiven === undefined && opts?.repeat !== undefined && opts?.repeat !== null) {
+    warnAnimTiming(curveVerb, 'repeat', `${shownValue(opts.repeat)} is not a number of runs, so the move runs once, as it does when no repeat is given.`);
+  }
   const runs = runsGiven === undefined ? 1 : Math.round(runsGiven);
   const repeat = runs <= 0 ? -1 : runs - 1;
 
@@ -4654,7 +4715,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     pingpong: opts?.pingpong === true,
     paused: false,
     heldProgress: 0,
-    done: typeof opts?.done === 'function' ? opts.done : null,
+    done: animDone(curveVerb, opts),
     scriptId: scriptId,
     groupId,
   });
@@ -4672,21 +4733,31 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
  *  and the lookup is ce.math.map, which IS envValueAt, so a script's sweep and the Envelope drawn
  *  beside it trace the same line. */
 function startEnvelopeImpl(scriptId, path, points, opts = {}) {
-  // Fewer than two points is a note, as it always was; a point that is not one, or whose x is not
-  // from 0 to 1, is refused (animEnvelope.js says why each used to pass without a word). The
-  // preludes' animateEnvelope check the same, in the same words.
+  // Fewer than two points, a point that is not one, or one whose x is not from 0 to 1, is refused
+  // with an error (animEnvelope.js says why each used to pass without a word; too few was a plain
+  // line until the owner asked for the error every other rejection is). The preludes'
+  // animateEnvelope check the same, in the same words.
   const refused = envelopeRefusal(points);
   if (refused) {
-    addScriptTrace(refused.note ? 'log' : 'error', scriptId, refused.message);
+    addScriptTrace('error', scriptId, refused.message);
     return false;
   }
-  const lo = opts?.from != null ? Number(opts.from) : 0;
-  const hi = opts?.to != null ? Number(opts.to) : 1;
-  return startAnimationImpl(scriptId, 'envelope', path, hi, {
-    ...opts,
-    samples: sampleEnvelope(points),
-    from: Number.isFinite(lo) ? lo : 0,
-  });
+  // `from` and `to`: a number, or text that is one (realNumber), or after saying why not, the
+  // default. Number() read "abc" as 0 and true as 1 in silence, so to = "abc" held the whole move
+  // at 0. The preludes read theirs the same way and pass what they could not read on as
+  // __badFrom / __badTo, which ScriptRuntime::startAnimation says in these words.
+  const end = (name, fallback) => {
+    const v = opts?.[name];
+    if (v === undefined || v === null) return fallback;
+    const n = realNumber(v);
+    if (n !== undefined) return n;
+    warnAnimTiming('ce.anim.envelope', name,
+      `${shownValue(v)} is not a number, so y = ${fallback} of the shape means ${fallback}, as it does when no ${name} is given.`);
+    return fallback;
+  };
+  const from = end('from', 0);   // from before to: the order the plug-in's runtime says them in
+  const to = end('to', 1);
+  return startAnimationImpl(scriptId, 'envelope', path, to, { ...opts, samples: sampleEnvelope(points), from });
 }
 
 function stopAnimationImpl(path) {
@@ -4804,18 +4875,23 @@ function animationFinishImpl(path) {
  * animations the control does have, so a typo is one message away from fixed.
  */
 function animatePlayImpl(controlName, animationName) {
+  // A name left out was looked up as the text "undefined", and said so.
+  const given = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  if (!given(controlName)) { addScriptTrace('error', '', 'ce.anim.play: no control name was given.'); return false; }
   const control = controlNamed(controlName);
   if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
   const all = control?._children?.Animations?._children ?? {};
-  const wanted = String(animationName ?? '').toLowerCase();
+  const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+  const have = playable.length
+    ? `Its keyframe animations: ${playable.join(', ')}.`
+    : 'It has no keyframe animations — make one in the Animation tab.';
+  if (!given(animationName)) { addScriptTrace('error', '', `ce.anim.play: no animation name was given. ${have}`); return false; }
+  const wanted = String(animationName).toLowerCase();
   const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);
   const node = key == null ? null : all[key];
   if (!node || String(node.kind ?? '') !== 'keyframes') {
-    const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
     const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${animationName}"`;
-    addScriptTrace('error', '', `ce.anim.play: ${why}. ${playable.length
-      ? `Its keyframe animations: ${playable.join(', ')}.`
-      : 'It has no keyframe animations — make one in the Animation tab.'}`);
+    addScriptTrace('error', '', `ce.anim.play: ${why}. ${have}`);
     return false;
   }
   return requestAnimationPlay(control._children?.Core?.id, String(node.name ?? key));

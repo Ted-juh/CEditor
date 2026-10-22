@@ -198,6 +198,10 @@ public:
         which ScriptRuntime::startAnimation refuses to move: every tick would write a number into it.
         Default false: a host with no panel document cannot tell, and moves what it is asked to. */
     virtual bool isColourProperty (const juce::String& path) { juce::ignoreUnused (path); return false; }
+    /** Whether `path` names a control the host's panel does not have, which startAnimation refuses:
+        the move used to start, and every tick's write was refused. Default false, for the same
+        reason as above: a host with no panel document cannot tell. */
+    virtual bool namesMissingControl (const juce::String& path) { juce::ignoreUnused (path); return false; }
     virtual void stopAnimation (const juce::String& path) { juce::ignoreUnused (path); }
     virtual bool animationRunning (const juce::String& path) { juce::ignoreUnused (path); return false; }
     /** Where an animation IS, and everything running. running() answers whether; these answer how
