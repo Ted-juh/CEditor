@@ -2543,7 +2543,7 @@ Move a value smoothly to a new number over time.
 
 Example: `animateTo("cutoff", 127, {duration = 500})` moves cutoff to 127 in half a second.
 
-- `path` (path, required): The value to animate, or a list of values. Colour property: rejected with a console error. List containing a colour property: the entire list is rejected.
+- `path` (path, required): The value to animate, or a list of values. Colour property, or a control not on the panel: rejected with a console error. List containing either: the entire list is rejected.
 - `target` (number, required): The end value.
 - `opts` (options, optional): The options below. Left out: linear curve, 300 ms.
 

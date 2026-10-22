@@ -493,6 +493,16 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
         else return n;
         return 0.0;
     };
+    // A control the panel does not have, said in the words of the WebView's animatesNoControl.
+    // The move used to start: it answered true, every tick's write was refused, and done was
+    // called with true at the end.
+    auto refusesMissing = [this, &verb] (const juce::String& key)
+    {
+        if (! host.namesMissingControl (key)) return false;
+        host.logAt ("error", "ce.anim." + verb + ": control \"" + key.upToFirstOccurrenceOf (".", false, false)
+                             + "\" not found on the active panel, so nothing was started.", juce::var());
+        return true;
+    };
     auto refusesColour = [this, &verb] (const juce::String& key)
     {
         if (! host.isColourProperty (key)) return false;
@@ -507,14 +517,19 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     {
         juce::StringArray paths;
         for (const auto& p : *list) { const auto str = p.toString(); if (str.isNotEmpty()) paths.add (str); }
-        if (paths.isEmpty()) return false;
+        if (paths.isEmpty())
+        {
+            host.logAt ("error", "ce.anim." + verb + ": the list has no paths, so nothing was started.", juce::var());
+            return false;
+        }
 
-        // A colour among them refuses the whole call, each one named, and nothing starts, as the
-        // WebView's startAnimationImpl refuses it. The colour alone was refused and the rest moved,
-        // and the list's done waited for a path that never started, so it was never called.
-        bool colour = false;
-        for (const auto& p : paths) colour = refusesColour (p) || colour;
-        if (colour) return false;
+        // A colour among them, or a control the panel does not have, refuses the whole call, each
+        // one named, and nothing starts, as the WebView's startAnimationImpl refuses it. The colour
+        // alone was refused and the rest moved, and the list's done waited for a path that never
+        // started, so it was never called.
+        bool refused = false;
+        for (const auto& p : paths) refused = refusesMissing (p) || refusesColour (p) || refused;
+        if (refused) return false;
 
         const double stagger = option ("stagger", 0.0, "not a number of milliseconds, so the moves start together, as they do when no stagger is given.");
         const double baseDelay = juce::jmax (0.0, timing ("delay", 0.0));
@@ -540,11 +555,17 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     }
 
     const auto key = path.toString();
-    if (key.isEmpty()) return false;
+    if (key.isEmpty())
+    {
+        // An empty path used to answer false without a word. The preludes pass a missing one
+        // (nil, undefined, None) as empty, not as the text "nil".
+        host.logAt ("error", "ce.anim." + verb + ": no path was given, so nothing was started.", juce::var());
+        return false;
+    }
 
     // Asked here, where every engine's ce.anim arrives, a list's paths after the list has been
     // asked. Nothing starts, so nothing ends and no done is called, as in the WebView.
-    if (refusesColour (key)) return false;
+    if (refusesMissing (key) || refusesColour (key)) return false;
 
     Animation a;
     a.kind = verb;

@@ -546,3 +546,36 @@ test('ce.anim.play refuses a transition and a typo, and says what it can play', 
     assert.match(traced(), /no control named "Nobody"/);
   });
 });
+
+/* --------------------------------------------------------------------- what is not a path */
+// A name the panel does not have used to start a move: the call answered true, every tick wrote
+// `set: control "…" not found` to the console, sixty times a second, and done was called with true.
+// An empty path answered false without a word. Both are rejected with an error now, as a colour
+// property is, and in a list either rejects the whole list. ScriptRuntime::startAnimation does the
+// same in the plug-in (PythonScriptEngineTests.cpp).
+
+const errorsTraced = () => getStore(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
+
+test('a control the panel does not have, or no path at all, is rejected with an error, and nothing starts', () => {
+  withLamp((script) => withClock(() => {
+    let done = 'not called';
+    assert.equal(script.animateTo('Lamb', 1, { duration: 10, done: (c) => { done = c; } }), false);
+    assert.equal(script.animateSpring(['Lamp.value', 'Nobody.value'], 1, { duration: 10, done: (c) => { done = c; } }), false);
+    assert.equal(script.animateTo('', 1), false);
+    assert.equal(script.animateTo(undefined, 1), false);
+    assert.equal(script.animateEnvelope([], [[0, 0], [1, 1]]), false);
+    assert.deepEqual(errorsTraced(), [
+      'ce.anim.to: control "Lamb" not found on the active panel, so nothing was started.',
+      'ce.anim.spring: control "Nobody" not found on the active panel, so nothing was started.',
+      'ce.anim.to: no path was given, so nothing was started.',
+      'ce.anim.to: no path was given, so nothing was started.',
+      'ce.anim.envelope: the list has no paths, so nothing was started.',
+    ]);
+    tickAnimations(1000);
+    assert.equal(script.animateRunning(), false, 'nothing started, not even the list\'s good path');
+    assert.equal(done, 'not called', 'and no done: nothing started, so nothing ended');
+    // A control the panel has, any case, and the panel's own numbers still move.
+    assert.equal(script.animateTo('lamp.value', 1, { duration: 10 }), true);
+    assert.equal(script.animateTo('panel.width', 500, { duration: 10 }), true);
+  }));
+});

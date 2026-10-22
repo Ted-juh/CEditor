@@ -2915,7 +2915,8 @@ local function __animStart(kind, path, target, opts)
   end
   -- The host answers whether the move started: not when a colour property is the path or one of a
   -- list's paths, and then nothing in the list starts and its done is never called, so it is let go.
-  local started = __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o) == true
+  -- A missing path is passed as empty, which the host says is no path, not as the text "nil".
+  local started = __animate(kind, list ~= nil and list or (path == nil and "" or tostring(path)), tonumber(target) or 0, o) == true
   if not started and o.__done ~= nil then __animDone[o.__done] = nil end
   return started
 end

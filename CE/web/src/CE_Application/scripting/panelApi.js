@@ -1078,7 +1078,7 @@ export const COMMANDS = [
       'Returns false if the call is rejected.',
     ],
     params: [
-      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values. Colour property: rejected with a console error. List containing a colour property: the entire list is rejected.' },
+      { name: 'path', type: 'path', required: true, summary: 'The value to animate, or a list of values. Colour property, or a control not on the panel: rejected with a console error. List containing either: the entire list is rejected.' },
       { name: 'target', type: 'number', required: true, summary: 'The end value.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below. Left out: linear curve, 300 ms.',
         fields: optionFields([

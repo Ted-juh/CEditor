@@ -2793,7 +2793,8 @@ function __animStart(kind, path, target, opts) {
   }
   // The host answers whether the move started: not when a colour property is the path or one of a
   // list's paths, and then nothing in the list starts and its done is never called, so it is let go.
-  var started = __api.animate(kind, list ? list : String(path), Number(target) || 0, o) === true;
+  // A missing path is passed as empty, which the host says is no path, not as the text "undefined".
+  var started = __api.animate(kind, list ? list : (path == null ? "" : String(path)), Number(target) || 0, o) === true;
   if (!started && o.__done !== undefined) delete __animDone[o.__done];
   return started;
 }

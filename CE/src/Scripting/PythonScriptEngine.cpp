@@ -1104,7 +1104,8 @@ def __animStart(kind, path, target, opts):
         o["__done"] = token
     # The host answers whether the move started: not when a colour property is the path or one of a
     # list's paths, and then nothing in the list starts and its done is never called, so it is let go.
-    started = __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o) is True
+    # A missing path is passed as empty, which the host says is no path, not as the text "None".
+    started = __api.animate(kind, lst if lst is not None else ("" if path is None else str(path)), float(target or 0), o) is True
     if not started and "__done" in o: __animDone.pop(o["__done"], None)
     return started
 

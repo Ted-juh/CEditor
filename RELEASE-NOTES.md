@@ -55,6 +55,14 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   A value that is not a number is refused in `rgbToHex`, `hslToHex`, `mixColour`, `snap` and `lerp`,
   where it was read as 0 or gave NaN, and the console says which one.
 
+**Scripts written for an earlier build: `ce.anim` rejects a control the panel does not have.**
+
+- `ce.anim.to`, `ce.anim.spring` and `ce.anim.envelope` given a control name the panel does not
+  have, such as a misspelt `"cutof"`, return false and write one error to the console. The move
+  used to start: it returned true, wrote an error on every step, and called `done` with true at
+  the end. A list with such a name in it is rejected whole, as a list with a colour property is.
+- An empty path, or none, writes an error to the console. It returned false without a word.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

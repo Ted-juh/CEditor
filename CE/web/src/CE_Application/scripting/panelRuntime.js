@@ -4466,6 +4466,17 @@ function animatesColour(verb, path) {
   return true;
 }
 
+/** True, after saying so, when `path` names a control the panel does not have. The move used to
+ *  start anyway: the call answered true, every tick wrote `set: control "…" not found` to the
+ *  console, sixty times a second, and done was called with true at the end. With no panel to ask
+ *  nothing is refused, as the plug-in's ScriptRuntime refuses nothing with no panel document. */
+function animatesNoControl(verb, path) {
+  const { name } = splitScriptPath(String(path));
+  if (isPanelTarget(name) || !activePanel() || findControlByName(name)) return false;
+  addScriptTrace('error', '', `${verb}: control "${name}" not found on the active panel, so nothing was started.`);
+  return true;
+}
+
 // A move's timing: a number, or text that is one (realNumber). A duration or a delay that cannot be
 // read, or is below 0, and beats that are not a number above 0, are said once per command, and the
 // move goes ahead as it always did: a duration in its default time, or 1 ms below 0; a delay of
@@ -4532,12 +4543,16 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // delays was the alternative, and `stagger` is why the list is worth having at all.
   if (Array.isArray(path)) {
     const paths = path.map((p) => String(p ?? '')).filter(Boolean);
-    if (!paths.length) return false;
-    // A colour among them refuses the whole call, each one named in the words a single path is
-    // refused in, and nothing starts. The colour alone was refused and the rest moved, and the
-    // list's done waited for a path that never started, so it was never called. The plug-in's
-    // ScriptRuntime::startAnimation checks a list the same way before it starts any of it.
-    const refused = paths.filter((p) => animatesColour(`ce.anim.${kind}`, p));
+    if (!paths.length) {
+      addScriptTrace('error', '', `ce.anim.${kind}: the list has no paths, so nothing was started.`);
+      return false;
+    }
+    // A colour among them, or a control the panel does not have, refuses the whole call, each one
+    // named in the words a single path is refused in, and nothing starts. The colour alone was
+    // refused and the rest moved, and the list's done waited for a path that never started, so it
+    // was never called. The plug-in's ScriptRuntime::startAnimation checks a list the same way
+    // before it starts any of it.
+    const refused = paths.filter((p) => animatesNoControl(`ce.anim.${kind}`, p) || animatesColour(`ce.anim.${kind}`, p));
     if (refused.length) return false;
     const stagger = animOption(`ce.anim.${kind}`, opts, 'stagger', 0);
     const baseDelay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
@@ -4560,8 +4575,12 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   }
 
   const key = String(path ?? '');
-  if (!key) return false;
-  if (animatesColour(`ce.anim.${kind}`, key)) return false;
+  if (!key) {
+    // An empty path used to answer false without a word.
+    addScriptTrace('error', '', `ce.anim.${kind}: no path was given, so nothing was started.`);
+    return false;
+  }
+  if (animatesNoControl(`ce.anim.${kind}`, key) || animatesColour(`ce.anim.${kind}`, key)) return false;
 
   const groupId = group;
   const spring = kind === 'spring';

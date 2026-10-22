@@ -1701,6 +1701,7 @@ private:
         cb.colourWrites = [this] (const juce::String& call, const juce::String& path, const juce::var& value,
                                   const juce::String& form) { return scriptValues.colourWrites (call, path, value, form); };
         cb.isColourProperty = [this] (const juce::String& path) { return scriptValues.isColourProperty (path); };
+        cb.namesMissingControl = [this] (const juce::String& path) { return scriptValues.namesMissingControl (path); };
         cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER
