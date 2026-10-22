@@ -488,11 +488,15 @@ both applied in both runtimes and all three preludes, with the release notes say
    `__badTo`, as they pass `__badDone`.
 2. Fewer than two points was a plain console line. It is an error, as every other rejection is.
 
-### Left to do in `ce.anim`
+### The eight small commands: done
 
-1. `ce.anim.running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish`, `play`.
+`running`, `value`, `list`, `pause`, `resume`, `reverse`, `finish` and `play`, approved as one
+table since each has one parameter: one sentence, an example, the parameter's text, and what the
+call returns as the first note. `play` with a name left out said `no control named "undefined"`;
+it says that no name was given, in the editor (the command is panel-window only).
 
-Write every one in the line form above.
+**`ce.anim` is done.** Next: the next module in the table below, `ce.draw`, the same way: one
+command at a time, every parameter and option in its item, one rule per line, with ranges.
 
 For each: read the current text in `panelApi.js`, check the edges in the runtime (left out, out of
 range, not a number, a list), write it in the table's terms, show it to the owner, and wait.
@@ -515,7 +519,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | --- | --- | --- |
 | ce.midi | 44 | 29, all done |
 | ce.math | 61 | 35, all done |
-| ce.anim | 12 | 12, `to` and `stop` done |
+| ce.anim | 12 | 12, all done |
 | ce.draw | 27 | 18 |
 | ce.time | 22 | 15 |
 | ce.components.lcd | 37 | 22 |
@@ -573,8 +577,9 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the section "ce.anim: state
-on 2026-10-22". ce.anim.to, spring and envelope and every option they share are done; continue
-with ce.anim.running and the seven after it, in technical English, schematic, one rule per line,
-with ranges, as its table says, showing every parameter of the command in its item. Show me one item at a time, its text now and every field as proposed,
+on 2026-10-22". ce.midi, ce.math and ce.anim are done; continue with ce.draw, in technical
+English, schematic, one rule per line, with ranges, as its table says, showing every parameter and
+option of the command in its item. Check each command at its edges in the runtime first, and put
+what is silent or wrong to me as a decision. Show me one item at a time, its text now and every field as proposed,
 and wait for my answer before the next.
 ```

@@ -2626,7 +2626,7 @@ ce.anim.spring("cutoff", 127);
 
 Stop an animation where it is.
 
-- `path` (path, optional): The value being animated. Leave it out to stop every animation on the panel.
+- `path` (path, optional): The value.<br>Left out: every animation on the panel.
 
 Good to know:
 
@@ -2646,7 +2646,15 @@ ce.anim.stop("cutoff");
 
 #### `ce.anim.running([path])`
 
-Return true if `path` is being animated right now; a paused animation still counts. With no `path`, return true if any animation is running.
+Report whether a value is being animated.
+
+Example: `animateRunning("cutoff")` gives true while cutoff is being animated.
+
+- `path` (path, optional): The value.<br>Left out: any value on the panel.
+
+Good to know:
+
+- Returns true while an animation is on the value, paused or not.
 
 *Short name: `animateRunning`.*
 
@@ -2702,43 +2710,107 @@ ce.anim.envelope("cutoff", [{x:0,y:0},{x:0.1,y:1},{x:0.4,y:0.6},{x:1,y:0}], { du
 
 #### `ce.anim.value(path) -> table`
 
-Describe the animation running on `path`. The table has `path`, `kind` ("to", "spring" or "envelope"), `value` (where it is now), `progress` (0 to 1), `from`, `to`, `elapsed`, `remaining`, `paused`, `cycle` and `sync`. Returns nothing if `path` is not animating. For an animation that follows the transport, `elapsed` and `remaining` are empty, because its timing depends on the transport rather than the clock.
+Describe the animation on a value.
+
+Example: `animateValue("cutoff").progress` gives how far the move is, 0 ↔ 1.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns {path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync}.
+- kind: "to", "spring" or "envelope". progress: 0 ↔ 1. elapsed, remaining: ms; none with sync.
+- No animation on the value: no result.
 
 *Short name: `animateValue`.*
 
 #### `ce.anim.list() -> list`
 
-List every running animation, sorted by path, each described the same way `ce.anim.value()` describes one.
+List every running animation.
+
+Example: `animateList()` gives {} while nothing is animated.
+
+Good to know:
+
+- Returns a list of tables as `ce.anim.value()` returns them, sorted by path.
+- None running: an empty list.
 
 *Short name: `animateList`.*
 
 #### `ce.anim.pause(path)`
 
-Hold an animation where it is without ending it; `ce.anim.resume()` carries on from the same point. Returns false if nothing is animating on `path` or it is already paused.
+Hold an animation where it is.
+
+Example: `animatePause("cutoff")` holds cutoff's animation.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was running; false if none, or already paused.
+- `ce.anim.resume()` continues from the held point.
 
 *Short name: `animatePause`.*
 
 #### `ce.anim.resume(path)`
 
-Carry on a paused animation from where `ce.anim.pause()` held it, rather than starting it again. Returns false if there is no paused animation on `path`.
+Continue a paused animation from where it was held.
+
+Example: `animateResume("cutoff")` continues cutoff's animation.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was paused; false otherwise.
 
 *Short name: `animateResume`.*
 
 #### `ce.anim.reverse(path)`
 
-Turn a running animation round so it heads back to where it started, at the same speed — a move that was 80% done takes 80% of its time to get back. An envelope plays its shape backwards as well. Returns false if nothing is animating on `path`.
+Turn a running animation around, back to its start at the same speed.
+
+Example: `animateReverse("cutoff")` sends cutoff's animation back to where it started.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was running; false otherwise.
+- An envelope plays its shape backwards; a paused animation turns around and stays paused.
+- Arriving back at the start counts as completed: `done` is called with true.
 
 *Short name: `animateReverse`.*
 
 #### `ce.anim.finish(path)`
 
-End an animation by jumping straight to its end: the value lands exactly where the animation was heading, and `done` is called with true. To cancel instead and leave the value where it is, use `ce.anim.stop()`. Returns false if nothing is animating on `path`.
+End an animation at its end value now.
+
+Example: `animateFinish("cutoff")` sets cutoff to the end value of its animation.
+
+- `path` (path, required): The value.
+
+Good to know:
+
+- Returns true if it was running; false otherwise.
+- The value is set to the end of the current run (its start, on a reversed run); an envelope to the end of its shape. `done` is called with true.
+- To stop where it is instead: `ce.anim.stop()`.
 
 *Short name: `animateFinish`.*
 
 #### `ce.anim.play(control, animation)`
 
-Play one of a control's keyframe animations (the ones made in the Animation tab) right now, from its first frame — restarting it if it is already playing. Returns true if the control has a keyframe animation with that name; the name is not case-sensitive. A transition cannot be started this way, because it plays when its own trigger happens: asking for one returns false and writes a message to the script console listing the keyframe animations the control does have.
+Play one of a control's keyframe animations from its first frame.
+
+Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation.
+
+- `control` (text, required): The control's name.
+- `animation` (text, required): The animation's name, as in the Animation tab. Not case-sensitive.
+
+Good to know:
+
+- Returns true if the control has a keyframe animation of that name. Already playing: restarts.
+- A transition cannot be played this way: rejected with a console error listing the keyframe animations.
 
 *Short name: `animatePlay` · Panel window only.*
 

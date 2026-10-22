@@ -649,6 +649,13 @@ test('ce.anim.play refuses a transition and a typo, and says what it can play', 
     clearScriptTrace();
     assert.equal(script.animatePlay('Nobody', 'flash'), false);
     assert.match(traced(), /no control named "Nobody"/);
+    // A name left out was looked up as the text "undefined", and said so.
+    clearScriptTrace();
+    assert.equal(script.animatePlay('Lamp'), false);
+    assert.equal(traced(), 'error:ce.anim.play: no animation name was given. Its keyframe animations: flash.');
+    clearScriptTrace();
+    assert.equal(script.animatePlay(), false);
+    assert.equal(traced(), 'error:ce.anim.play: no control name was given.');
   });
 });
 

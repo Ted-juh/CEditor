@@ -4875,18 +4875,23 @@ function animationFinishImpl(path) {
  * animations the control does have, so a typo is one message away from fixed.
  */
 function animatePlayImpl(controlName, animationName) {
+  // A name left out was looked up as the text "undefined", and said so.
+  const given = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  if (!given(controlName)) { addScriptTrace('error', '', 'ce.anim.play: no control name was given.'); return false; }
   const control = controlNamed(controlName);
   if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
   const all = control?._children?.Animations?._children ?? {};
-  const wanted = String(animationName ?? '').toLowerCase();
+  const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+  const have = playable.length
+    ? `Its keyframe animations: ${playable.join(', ')}.`
+    : 'It has no keyframe animations — make one in the Animation tab.';
+  if (!given(animationName)) { addScriptTrace('error', '', `ce.anim.play: no animation name was given. ${have}`); return false; }
+  const wanted = String(animationName).toLowerCase();
   const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);
   const node = key == null ? null : all[key];
   if (!node || String(node.kind ?? '') !== 'keyframes') {
-    const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
     const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${animationName}"`;
-    addScriptTrace('error', '', `ce.anim.play: ${why}. ${playable.length
-      ? `Its keyframe animations: ${playable.join(', ')}.`
-      : 'It has no keyframe animations — make one in the Animation tab.'}`);
+    addScriptTrace('error', '', `ce.anim.play: ${why}. ${have}`);
     return false;
   }
   return requestAnimationPlay(control._children?.Core?.id, String(node.name ?? key));
