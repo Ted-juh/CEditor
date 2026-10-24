@@ -9,6 +9,106 @@ To start a session on it, paste [the prompt at the end](#prompt-for-claude-code)
 
 ---
 
+## State on 2026-10-24: what is done, what it built, what is left
+
+For thinking about what comes next. The sections further down hold the detail, module by module.
+
+### Done
+
+Five modules, 166 of the 783 command descriptions, each merged to `main` through a pull request the
+owner asked for and merged when CI was green:
+
+| Module | Commands | Merged as | Runtime fixes that came with it |
+| --- | --- | --- | --- |
+| `ce.midi` | 44 | `a4f5920` (the rest of ce.midi, and code marks drawn as code) | none; the older helpers' silent answers are deferred, below |
+| `ce.math` | 61 | `8274838` (six wrong answers fixed in every runtime) | negative hue, `random` ends, `randomFloat` with one number, `angleOf`, text as numbers, `snap`/`lerp` without a number |
+| `ce.anim` | 12 | #63, `b75ff53` | a control the panel does not have, empty paths, curve/damping/stagger/from/repeat/done fallbacks said once, envelope points |
+| `ce.draw` | 27 | #65, `b13f8fa` | 25 silences: a required argument left out, a size below 0, every option with a wrong value, stroke's fallbacks as warnings |
+| `ce.time` | 22 | #66, `9f13990` | a required number left out, a timer with no id, a one-shot with no function, no tempo, tap and clock lists; in all four runtimes |
+
+The format itself is settled and approved: one sentence, an `example`, every parameter and option
+with its type and whether it is required (from the data), its range and what an invalid value
+gives, **one rule per line**, the notes with what the call returns, and the rules a module shares
+said once in its introduction. [Write technical English, not prose](#write-technical-english-not-prose)
+is the table of wording the owner rejected and what replaced it; read it before writing a word.
+
+### What was built to carry it, and is there for the next modules
+
+- **Type lines from the data.** `paramTypeLabel` / `paramTypeLine` in `panelApi.js`: the manual,
+  the hover card, the sidebar hint and the API explorer show `(number, required)` beside each
+  parameter, so no text says "Required". `manualReference.test.js` fails on a type with no word.
+- **Line breaks render everywhere.** A `\n` in a text is a rule of its own: `<br>` in the manual
+  and the explorer, `pre-line` in the hover card, as it is in the hint. The option-values list sits
+  on its own line.
+- **Hover card and hint by dotted path.** `ce.midi.sendCC(...)` finds its command as `sendCC` does
+  (`API_BY_PATH`, `apiCommandAt` in `languageService.js`); 677 commands had no hint in that form.
+- **Module introductions** (`MODULE_INTROS` in `generate-scripting-manual.mjs`) for ce.midi,
+  ce.math, ce.anim, ce.draw and ce.time, with the shared rules and the colour tables.
+- **One-time warnings, per command and argument**, so a fallback is said once and not every frame:
+  `warnAnimTiming` (ce.anim), `drawSaid` and `warnDrawStroke` (ce.draw), `timeArg` / `timeSaid`
+  (ce.time), and their equivalents in the three preludes. `resetScriptState` clears them.
+- **Shared readers**, so the runtime and the Values sidebar say the same words: `drawShapes.js`
+  (`drawNumber`, `drawMissing`, `drawOption`, `textSize`, `polygonSides`, `gridCount`, `gridStep`,
+  `flatPointList`, `segmentList`), `drawDash.js`, `timeWords.js` (`TIME_NUMBERS` with `optional`
+  and `rejected`), `animEnvelope.js`.
+- **Four runtimes held to one set of words.** `scriptPreludeAgreement.test.js` runs the Lua,
+  JavaScript and Python preludes extracted from `CE/src/Scripting/*ScriptEngine.cpp` under
+  wasmoon, node:vm and python3, against the WebView runtime: answers, refusals and one-time
+  warnings. Its sandboxes report a tempo now, so musical timers arm there. A change to a prelude is
+  verified by the web suite alone; the C++ test targets (`CEditorScriptingTests`,
+  `CEditorPythonScriptTests`, `CEditorPlayerScriptTests`) pin a few messages and were rebuilt for
+  ce.anim and ce.time.
+- **Regeneration after a text change**: `npm run docs:manual`, `npm run docs:help` (the release
+  notes are bundled too, so run it after editing them), `gen-api-explorer.mjs`,
+  `gen-script-modules.mjs --write` (the module cost table weighs the preludes and
+  `panelRuntime.js`). `helpDocs.test.js` and `panelApiParity.test.js` fail on a stale bundle or
+  table.
+
+### Decisions that hold for every module to come
+
+- A required value left out, or of the wrong type: rejected with a console error. A query with no
+  result for a legitimate reason (nothing animated, no tempo, too few taps) returns nothing without
+  a word. An error always means the call did nothing.
+- An option or number with a wrong value: the fallback in its row, with a console warning the
+  first time only. `Invalid: default.` in the row; the rule once in the introduction.
+- A value outside its range: the nearest end, said once, where the helper is the transport's or
+  the panel's own arithmetic; rejected where the result would be meaningless.
+- Text that is a number is read as one, except a timer's interval or delay (two runtimes could not
+  read it, so "250" is refused everywhere).
+- Shown to the owner one item at a time for a new module, until the owner says to continue without
+  showing each item (said on `ce.draw.gradient`); then the rest of the module in one pass, with
+  the decisions recorded in this file for review.
+- The process per command: probe its edges in the runtime first (a probe script in the scratchpad
+  against `scriptApiForTesting`), decide each silence by the rules above, write the text, add the
+  edge to the module's test file, regenerate, run the full suite, one commit per module, push,
+  pull request, merge when green, rebuild the branch from `main`.
+
+### Deferred, for the owner to decide
+
+- `ce.midi`'s older helpers answer outside their range without a word: `to7bit(20000, 2)`,
+  `to14bit(20000)`, `fromNibbles(16, 0)`, `nibblize({300})`, `denibblize` with an odd count,
+  `toSigned(-200, 8)`, `from7bit("02 2C")`, `toAscii` not cutting long text. Their parameters say
+  the ranges, not that a value outside them goes unnoticed. Rejecting them is the rule above; it
+  was left for the owner since it is behaviour older scripts may lean on.
+- `ce.time`'s helpers took a required number left out as its default (bar 1, 0 ms) by an earlier
+  session's decision; `ce.time` reversed it under the rule above. If the owner prefers the old
+  behaviour for the transport helpers, it is `optional: true` on those arguments in `timeWords.js`
+  and the three `__TIME_NUMBERS` tables.
+
+### Left
+
+The table under [The branch](#the-branch): 617 descriptions in the modules not yet done, of which
+176 need the most work by the 2026-10-21 measure. The `ce.components.*` modules are the bulk
+(roughly 400 descriptions over 20 components); they are panel-window only, so their runtime is
+`panelRuntime.js` and the C++ engines define them as explaining stubs: no prelude work, and the
+sidebar's `readDrawShape`-style readers do not apply. Then `ce.panel`, `ce.device`, `ce.music`,
+`ce.core`, `ce.storage`, `ce.image`, `ce.text`, `ce.ui` and the lifecycle hooks. After the
+commands: the module descriptions (41, the picker's group headings) and the event descriptions
+(38), with the same rules. Next by the table: `ce.components.lcd` (37 descriptions, 22 that need
+the most work).
+
+---
+
 ## Why
 
 The owner, looking at the Values tab on 2026-10-21, about the line under `ce.midi.setBits`:
