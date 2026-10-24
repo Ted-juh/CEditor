@@ -600,9 +600,13 @@ function formMeant(text) {
   return VALUE_ACCESSOR_IDS.find((id) => id.toLowerCase() === canonical) ?? '';
 }
 
+/** A form in any case and with spaces around it, as the list spells it, or '': "NormalizedValue" is
+ *  normalizedValue (utils/wordLists.js). Another spelling ("normalised") is still not a form. */
+const formWord = (text) => listWord(VALUE_ACCESSOR_IDS, text) ?? '';
+
 /** The console's line refusing `form`, given explicitly to `call`, or '' when it is a form or none. */
 function formRefusal(call, outcome, form) {
-  if (typeof form !== 'string' || form === '' || VALUE_ACCESSOR_IDS.includes(form)) return '';
+  if (typeof form !== 'string' || form === '' || formWord(form)) return '';
   const meant = formMeant(form);
   return `${call}: "${form}" is not a value form, so ${outcome}. The forms are ${andList(VALUE_ACCESSOR_IDS)}.`
     + (meant ? ` Write ${meant}.` : '');
@@ -610,10 +614,10 @@ function formRefusal(call, outcome, form) {
 
 function splitAccessor(path, explicitForm) {
   const text = String(path ?? '');
-  const form = VALUE_ACCESSOR_IDS.includes(explicitForm) ? explicitForm : '';
+  const form = formWord(explicitForm);
   const dot = text.lastIndexOf('.');
   if (dot > 0) {
-    const tail = text.slice(dot + 1);
+    const tail = formWord(text.slice(dot + 1));
     if (DERIVED_ACCESSORS.has(tail)) return { path: text.slice(0, dot), form: form || tail };
   }
   return { path: text, form: form || 'value' };
@@ -8342,10 +8346,11 @@ function storageScopeOf(opts, scriptId, verb) {
   }
   const raw = typeof opts === 'string' ? opts : opts?.scope;
   if (raw == null || raw === '') return 'panel';
-  const scope = String(raw);
+  // In any case, as every word from a list is read: "Local" is "local".
+  const scope = String(raw).trim().toLowerCase();
   if (STORAGE_SCOPES.includes(scope)) return scope;
   addScriptTrace('error', scriptId ?? '',
-    `${verb}: "${scope}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
+    `${verb}: "${String(raw)}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
   return undefined;
 }
 

@@ -296,7 +296,6 @@ int main()
         const juce::StringArray expectedRefusals {
             "get(\"cutoff\"): \"normalisedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
             "set(\"cutoff\"): \"normalisedValue\" is not a value form, so nothing was set." + forms + " Write normalizedValue.",
-            "get(\"cutoff\"): \"NormalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
             "set(\"cutoff\"): \"percent\" is not a value form, so nothing was set." + forms,
             "set(\"cutoff.value\"): \"Normalized\" is not a value form, so nothing was set." + forms,
             "get(\"cutoff.value\"): \".normalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
@@ -325,10 +324,11 @@ int main()
                 expectedRefusals[0], "a " + nothing,
                 expectedRefusals[1],
                 "b 100",
-                expectedRefusals[2], "c " + nothing,
+                // A form in any case is that form: "NormalizedValue" was refused with "Write normalizedValue".
+                "c 0.5",
+                expectedRefusals[2],
                 expectedRefusals[3],
-                expectedRefusals[4],
-                expectedRefusals[5], "d " + nothing,
+                expectedRefusals[4], "d " + nothing,
                 "e 100",
                 "f 50",
                 "g 0.75",
@@ -342,6 +342,8 @@ int main()
         check (BridgeScriptHost::formMeant ("normalised") == "" && BridgeScriptHost::formMeant (" Normalisedvalue ") == "normalizedValue"
                    && BridgeScriptHost::formMeant ("MIDIVALUE") == "midiValue" && BridgeScriptHost::formMeant (".value") == "value"
                    && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "normalizedValue").isEmpty()
+                   && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", " MIDIValue ").isEmpty()
+                   && BridgeScriptHost::splitAccessor ("cutoff.NormalizedValue", {}).second == "normalizedValue"
                    && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "").isEmpty(),
                "formMeant names the form written another way, and formRefusal passes a form and no form");
     }

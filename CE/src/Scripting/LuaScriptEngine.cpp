@@ -3311,9 +3311,10 @@ function __storageScope(opts, verb)
     raw = opts.scope
   end
   if raw == nil or raw == "" then return "panel" end
-  local scope = tostring(raw)
+  -- In any case, as every word from a list is read: "Local" is "local".
+  local scope = tostring(raw):lower():match("^%s*(.-)%s*$")
   for _, known in ipairs(__CE_SCOPES) do if known == scope then return scope end end
-  logError(verb .. ': "' .. scope .. '" is not a scope, so nothing was done. One of: panel, script, local.')
+  logError(verb .. ': "' .. tostring(raw) .. '" is not a scope, so nothing was done. One of: panel, script, local.')
   return nil
 end
 

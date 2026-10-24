@@ -3179,9 +3179,10 @@ function __storageScope(opts, verb) {
   }
   var raw = (typeof opts === "string") ? opts : (opts ? opts.scope : undefined);
   if (raw === undefined || raw === null || raw === "") return "panel";
-  var scope = String(raw);
+  // In any case, as every word from a list is read: "Local" is "local".
+  var scope = String(raw).trim().toLowerCase();
   if (__CE_SCOPES.indexOf(scope) >= 0) return scope;
-  logError(verb + ': "' + scope + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
+  logError(verb + ': "' + String(raw) + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
   return undefined;
 }
 // Which of the host's two real stores a scope lives in.

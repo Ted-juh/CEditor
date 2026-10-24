@@ -821,6 +821,9 @@ int main()
         "  saveSetting(\"lastPatch\", 42)\n"
         "  log(\"read \" .. tostring(loadSetting(\"lastPatch\")))\n"
         "  log(\"fallback \" .. tostring(loadSetting(\"never\", \"none\")))\n"
+        // A scope in any case is the scope, as every word from a list is: "Script" was refused.
+        "  saveSetting(\"mine\", 5, { scope = \"Script\" })\n"
+        "  log(\"scoped \" .. tostring(loadSetting(\"mine\", nil, { scope = \" SCRIPT \" })))\n"
         "end\n"));
     runtime.loadScripts (juce::var (storeScripts));
 
@@ -830,6 +833,7 @@ int main()
     check (host.logs.contains ("count 1"), "state starts empty");
     check (host.logs.contains ("read 42"), "saveSetting/loadSetting round-trip through the host");
     check (host.logs.contains ("fallback none"), "loadSetting returns the fallback for an unknown key");
+    check (host.logs.contains ("scoped 5"), "a scope in any case is the scope (got " + host.logs.joinIntoString (" | ") + ")");
 
     // state must SURVIVE the next dispatch — that is the whole point of it.
     host.logs.clear();

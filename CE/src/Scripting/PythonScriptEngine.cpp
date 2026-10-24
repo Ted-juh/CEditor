@@ -3733,10 +3733,11 @@ def __storageScope(opts, verb):
     raw = opts if isinstance(opts, str) else (opts.get("scope") if isinstance(opts, dict) else None)
     if raw is None or raw == "":
         return "panel"
-    scope = str(raw)
+    # In any case, as every word from a list is read: "Local" is "local".
+    scope = str(raw).strip().lower()
     if scope in __CE_SCOPES:
         return scope
-    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % scope)
+    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % str(raw))
     return None
 
 # Which of the host's two real stores a scope lives in.

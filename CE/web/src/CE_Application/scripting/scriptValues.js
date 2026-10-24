@@ -604,7 +604,7 @@ function sibling(site, name) {
 const moduleOf = (memberId) => memberModule()[memberId]?.module ?? '';
 // The modules whose calls read a word from a list in any case (utils/wordLists.js), as the component
 // verbs do: the Values tab takes "Multiply" there.
-const ANY_CASE_MODULES = new Set(['ce.ui', 'ce.draw', 'ce.image', 'ce.text', 'ce.panel', 'ce.anim', 'ce.math', 'ce.midi', 'ce.music', 'ce.time']);
+const ANY_CASE_MODULES = new Set(['ce.ui', 'ce.draw', 'ce.image', 'ce.text', 'ce.panel', 'ce.anim', 'ce.math', 'ce.midi', 'ce.music', 'ce.time', 'ce.storage', 'ce.device', 'ce.core']);
 
 /** Fill in an Arg's kind, meaning, problem, options and editable. */
 function classify(arg, node, param, site, index) {

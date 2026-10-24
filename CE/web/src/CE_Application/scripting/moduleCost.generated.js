@@ -12,7 +12,7 @@
 // today; the number is what the panel's scripting surface weighs, and it is the figure the Export
 // tab shows beside the (far larger) Python runtime cost.
 export const MODULE_COST = {
-  "-": { "javascript": 47168, "lua": 36262, "python": 39072, "webview": 193706 },
+  "-": { "javascript": 47168, "lua": 36262, "python": 39072, "webview": 193927 },
   "ce.anim": { "javascript": 8893, "lua": 8526, "python": 8661, "webview": 35679 },
   "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 36753 },
   "ce.components.arp": { "javascript": 407, "lua": 407, "python": 407, "webview": 0 },
@@ -51,7 +51,7 @@ export const MODULE_COST = {
   "ce.midi": { "javascript": 32209, "lua": 30356, "python": 31267, "webview": 46432 },
   "ce.music": { "javascript": 21872, "lua": 22055, "python": 20852, "webview": 16650 },
   "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 56117 },
-  "ce.storage": { "javascript": 9304, "lua": 17028, "python": 12794, "webview": 20981 },
+  "ce.storage": { "javascript": 9404, "lua": 17139, "python": 12887, "webview": 21081 },
   "ce.text": { "javascript": 84, "lua": 84, "python": 84, "webview": 0 },
   "ce.time": { "javascript": 23315, "lua": 23774, "python": 23248, "webview": 22848 },
   "ce.ui": { "javascript": 946, "lua": 731, "python": 716, "webview": 4026 },
