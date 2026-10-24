@@ -781,7 +781,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 4. `animPreset`: done, below.
 5. `valueMin` and `valueMax`: kept as merged, below.
 6. `glyph`: done, below.
-7. `text`: a fraction of a row (1.5) writes row 2, which the text does not say.
+7. `text`: done, below.
 8. Parameter texts that are only the name: "Brightness.", "Contrast.", "Value.", "Value min.",
    "Value max.", "Value precision.", "Value prefix.", "Value suffix.", "Edit text.", "Anim fps.".
 9. `showGhost` and `showGlass`: "Show or hide the ghost." says nothing of what the ghost is;
@@ -794,6 +794,8 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 12. The manual shows none of these texts: its component chapter lists the verbs' names only.
 13. Case "everywhere": done, below.
 14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
+15. `clear`: `clear("Screen", 2)` blanks every line. It takes the control only, and a second
+    argument is dropped without a word, as every verb drops one it does not take.
 
 **Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
 
@@ -908,6 +910,26 @@ alike, what it names.
 | `bits` (text, required) | Eight rows of five: "#" lit, "." unlit, rows separated by "\|". / Shown in a line by \x00 to \x07 for slots 1 to 8. / "1" and "0": the same as "#" and ".". / Fewer than eight rows, or fewer than five cells in a row: the rest unlit. / Empty, or nothing lit: the slot is cleared. / Other characters: rejected with a console error. / More than eight rows, or a row longer than five: rejected with a console error. |
 
 Description, example and `index` unchanged.
+
+**Item 7, `text`: done.** Two decisions the owner made, from the probe:
+
+- A fraction of a row was rounded without the text saying so: 1.5 wrote row 2, 0.5 row 1, and 2.5
+  on two rows was refused. `indexOf` does it for every number counted from 1, so a glyph slot, a
+  pad, a step and a lane round alike. Kept, as `cursorAt` rounds, and every such parameter says
+  "A fraction: rounded." after its first line: the 37 indexed verbs (line, item, cell, the
+  Arpeggiator's `mute` set, and the glyph slot's own text) and each family's `read`, `insert` and
+  `remove`, which take a position counted from 1 and round it too. The hand-written families'
+  zones, slots and cells are their modules' reviews.
+- Text left out (`text("Screen", 1)`, or nil/None/null) blanked the row and returned true under a
+  type that says "required". It is refused with "No text was given.", as every text verb's is;
+  `""` still blanks a row on purpose.
+
+| Field | Text |
+| --- | --- |
+| `row` (number, required) | Row, counted from 1. / A fraction: rounded. / Not a row the display has: rejected with a console error. |
+| `text` (text, required) | The four lines as merged, then: Left out: rejected with a console error. |
+
+Description and example unchanged.
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music

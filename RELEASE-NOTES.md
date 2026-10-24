@@ -183,6 +183,11 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   three dots of the top row. A character that is not a cell (`"abc"`), more than eight rows or a
   row longer than five is refused with a console error saying which; it was stored, and the slot
   drew nothing or cut the glyph off.
+- `ce.components.lcd.text` called with the text left out, or nil, None or null, writes an error to
+  the console and changes nothing, as the other text verbs do. It blanked the line. `""` still
+  blanks it.
+- Every component parameter counted from 1 (a row, a slot, a pad, a step, a position for `read`,
+  `insert` or `remove`) says that a fraction is rounded, as it always was: row 1.5 is row 2.
 
 ## What you get
 

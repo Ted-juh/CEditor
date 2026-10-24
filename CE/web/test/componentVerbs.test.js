@@ -727,6 +727,46 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.deepEqual(MEMBER_BY_ID.lcdRead.notes.slice(-2), ['Returns the value.', 'Rejected: no result, with a console error.']);
 });
 
+test('a number counted from 1 is rounded, and every such parameter says so', () => {
+  // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
+  const lines = { lines: ['A', 'B'] };
+  const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
+  assert.deepEqual(componentScriptPatch(text, lines, [1.5, 'X']), { lines: ['A', 'X'] });
+  assert.deepEqual(componentScriptPatch(text, lines, [1.4, 'X']), { lines: ['X', 'B'] });
+  assert.equal(componentRefusalReason(text, lines, [2.5, 'X']), 'There is no line 2.5: the lines are 1 to 2.');
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const slots = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
+  assert.equal(componentScriptPatch(glyph, slots, [1.5, '#']).glyphs[1].bits, '#');
+  let counted = 0;
+  for (const verb of COMPONENT_VERBS) {
+    for (const param of MEMBER_BY_ID[verb.id].params) {
+      const rules = param.summary.split('\n');
+      if (!/counted from 1/.test(rules[0])) continue;
+      counted += 1;
+      assert.ok(rules.includes('A fraction: rounded.'), `${verb.id}.${param.name}: ${param.summary}`);
+    }
+  }
+  assert.ok(counted > 40, `only ${counted} parameters count from 1`);
+  assert.equal(MEMBER_BY_ID.lcdGlyph.params.find((p) => p.name === 'index').summary,
+    'Glyph slot.\nRange: 1 ↔ 8.\nA fraction: rounded.\nOutside the range: rejected with a console error.');
+});
+
+test('a line\'s text left out is refused, as every text verb\'s is; "" still blanks it', () => {
+  // text(t, 1) and text(t, 1, null) blanked the row and returned true.
+  const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
+  const lines = { lines: ['A', 'B'] };
+  for (const left of [[1], [1, undefined], [1, null]]) {
+    assert.deepEqual(componentScriptPatch(text, lines, left), {});
+    assert.equal(componentRequestLegal(text, lines, left), false);
+    assert.equal(componentRefusalReason(text, lines, left), 'No text was given.');
+  }
+  assert.deepEqual(componentScriptPatch(text, lines, [1, '']), { lines: ['', 'B'] });
+  assert.deepEqual(componentScriptPatch(text, lines, [2, 42]), { lines: ['A', '42'] });
+  assert.match(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'text').summary, /\nLeft out: rejected with a console error\.$/);
+  assert.equal(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'row').summary,
+    'Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.');
+});
+
 test('the LCD\'s blink rate is the time on, then off, from 60 ms as the display draws it', () => {
   // The text said "Period" and "250 blinks four times a second"; the renderer lights the text for
   // blinkRate ms and darkens it for as long, and draws nothing faster than 60, where 50 was stored.

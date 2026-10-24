@@ -657,7 +657,7 @@ export const COMPONENT_FAMILIES = [
       v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true, refuseValue: glyphBitsRefusal,
         doc: 'Define one of the eight user glyphs.',
         ex: ['1, ".#.#.|#####|#####|.###.|..#..|.....|.....|....."', 'puts a heart in slot 1, shown in a line by \\x00'],
-        argDocs: { index: 'Glyph slot.\nRange: 1 ↔ 8.\nOutside the range: rejected with a console error.',
+        argDocs: { index: 'Glyph slot.\nRange: 1 ↔ 8.\nA fraction: rounded.\nOutside the range: rejected with a console error.',
           bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a line by \\x00 to \\x07 for slots 1 to 8.\n'
             + '"1" and "0": the same as "#" and ".".\nFewer than eight rows, or fewer than five cells in a row: the rest unlit.\n'
             + 'Empty, or nothing lit: the slot is cleared.\nOther characters: rejected with a console error.\n'
@@ -1109,8 +1109,9 @@ export function componentScriptPatch(verb, cfg, args = []) {
         return { [verb.f]: list.map(() => '') };
       }
       const at = indexOf(a, list.length);
-      if (at === null) return {};
-      const text = String(b ?? '');
+      // Text left out is refused, as every text verb's is; "" blanks the line on purpose.
+      if (at === null || b === undefined || b === null) return {};
+      const text = String(b);
       if (text === list[at]) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? text : x)) };
     }
@@ -1170,7 +1171,7 @@ export function componentRequestLegal(verb, cfg, args = []) {
     }
     case LINE: {
       const list = listOf(verb.f);
-      return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null;
+      return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null && b !== undefined && b !== null;
     }
     case CELL: {
       const list = listOf(verb.f);
@@ -1282,7 +1283,7 @@ export function componentRefusalReason(verb, cfg, args = []) {
     case LINE: {
       if (verb.clear) return null;
       const range = componentIndexRange(verb, c);
-      return range ? indexRefusal(a, range.count, noun) : `It has no ${noun}s.`;
+      return range ? indexRefusal(a, range.count, noun) ?? valueOf(STR, b) : `It has no ${noun}s.`;
     }
     case INDEXSET: {
       const n = Number(a);
@@ -1644,7 +1645,7 @@ export function verbParamSummary(verb, name, kind) {
   if (name === 'target') return `The ${verb.label}'s control, by name.\nNot ${verb.article ?? article(verb.label)} ${verb.label}: rejected with a console error.`;
   const words = cap(fieldWords(verb.f) || name);
   const noun = itemNoun(verb);
-  const indexLines = (what, plural) => `${cap(what)} number, counted from 1.\nNot one of the ${plural}: rejected with a console error.`;
+  const indexLines = (what, plural) => `${cap(what)} number, counted from 1.\nA fraction: rounded.\nNot one of the ${plural}: rejected with a console error.`;
   switch (verb.k) {
     case NUM: case INT: return [`${words}.`, ...RANGE_LINES(verb, verb.k)].join('\n');
     case BOOL: return verb.toggle ? `Left out: toggles.\n${OFF_RULE}` : OFF_RULE;
@@ -1658,8 +1659,8 @@ export function verbParamSummary(verb, name, kind) {
         'Left out: unchanged.', 'Invalid: rejected with a console error.', 'Both left out: rejected with a console error.'].join('\n');
     }
     case LINE:
-      if (name === 'row') return `Row, counted from 1.\nNot a row the display has: rejected with a console error.`;
-      return 'The line.\nLonger than the display: cut at its width unless it scrolls, with a console warning the first time.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.';
+      if (name === 'row') return `Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.`;
+      return 'The line.\nLonger than the display: cut at its width unless it scrolls, with a console warning the first time.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.\nLeft out: rejected with a console error.';
     case ITEM:
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
@@ -1673,27 +1674,27 @@ export function verbParamSummary(verb, name, kind) {
         : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case CELL:
-      if (name === 'row') return 'Row, counted from 1.\nNot a row the grid has: rejected with a console error.';
-      if (name === 'col') return 'Column, counted from 1.\nNot a column the grid has: rejected with a console error.';
+      if (name === 'row') return 'Row, counted from 1.\nA fraction: rounded.\nNot a row the grid has: rejected with a console error.';
+      if (name === 'col') return 'Column, counted from 1.\nA fraction: rounded.\nNot a column the grid has: rejected with a console error.';
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return [`${cap(name)}.`, ...RANGE_LINES(verb, NUM)].join('\n');
     case INDEXSET:
-      if (name === 'index') return `${cap(noun)} number, counted from 1.\nBelow 1, or invalid: rejected with a console error.`;
+      if (name === 'index') return `${cap(noun)} number, counted from 1.\nA fraction: rounded.\nBelow 1, or invalid: rejected with a console error.`;
       return 'Left out: toggles.\n0, "", "false", "off" or "0": off. Case-insensitive.\nAny other value: on.';
     case LINK: return `The driving control's name.\nLeft out, or "": unlinked.\nNot on this panel, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}: rejected with a console error.`;
     case READ:
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
-      return 'Element number of a list verb, counted from 1.\nLeft out: the whole list.\nNot one the list has: rejected with a console error.';
+      return 'Element number of a list verb, counted from 1.\nA fraction: rounded.\nLeft out: the whole list.\nNot one the list has: rejected with a console error.';
     case SIZE: return 'A list verb of this component, by name.\nLeft out: every list, as a table.\nNot a list verb: rejected with a console error.';
     case FILL:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb: rejected with a console error.';
       return 'A list, one value per element from the first.\nLonger than the list: rejected with a console error.\nNot a list: rejected with a console error.';
     case INSERT:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb, or a list that cannot grow: rejected with a console error.';
-      return 'Position of the new element, counted from 1.\nLeft out: after the last.\nNot one the list has: rejected with a console error.';
+      return 'Position of the new element, counted from 1.\nA fraction: rounded.\nLeft out: after the last.\nNot one the list has: rejected with a console error.';
     case REMOVE:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb, or a list that cannot shrink: rejected with a console error.';
-      return 'Element number, counted from 1.\nLeft out: the last.\nNot one the list has: rejected with a console error.';
+      return 'Element number, counted from 1.\nA fraction: rounded.\nLeft out: the last.\nNot one the list has: rejected with a console error.';
     default: return `${words}.`;
   }
 }
