@@ -1424,7 +1424,8 @@ export function readJsonValues(source, caret, context = {}) {
     if ((node.type === 'string' || node.type === 'number') && controlNode && rel.length === 2) {
       const values = sectionValues(rel[0], key);
       if (values) {
-        setRead(row, 'enum', readEnum(node.value, values, { name: key }), 'choice');
+        // Written straight into the property, which the renderer reads only as it is spelled.
+        setRead(row, 'enum', readEnum(node.value, values, { name: key, anyCase: false }), 'choice');
         rows.push(row);
       }
     }

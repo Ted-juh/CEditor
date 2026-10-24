@@ -261,11 +261,22 @@ public:
     static std::pair<juce::String, juce::String> splitAccessor (const juce::String& path,
                                                                 const juce::String& explicitForm)
     {
-        const bool explicitIsDerived = explicitForm == "normalizedValue" || explicitForm == "midiValue";
-        const auto tail = path.fromLastOccurrenceOf (".", false, false);
+        const auto form = formWord (explicitForm);
+        const bool explicitIsDerived = form == "normalizedValue" || form == "midiValue";
+        const auto tail = path.containsChar ('.') ? formWord (path.fromLastOccurrenceOf (".", false, false)) : juce::String();
         if (tail == "normalizedValue" || tail == "midiValue")
-            return { path.upToLastOccurrenceOf (".", false, false), explicitIsDerived ? explicitForm : tail };
-        return { path, explicitIsDerived ? explicitForm : juce::String ("value") };
+            return { path.upToLastOccurrenceOf (".", false, false), explicitIsDerived ? form : tail };
+        return { path, explicitIsDerived ? form : juce::String ("value") };
+    }
+
+    /** A form in any case and with spaces around it, as it is spelled, or empty: "NormalizedValue"
+        is normalizedValue, as the WebView's formWord reads it. "normalised" is still not a form. */
+    static juce::String formWord (const juce::String& text)
+    {
+        const auto written = text.trim();
+        for (const auto* form : { "value", "normalizedValue", "midiValue" })
+            if (written.equalsIgnoreCase (form)) return form;
+        return {};
     }
 
     /** The form `text` is another way of writing (other capitals, the label's leading dot, or
@@ -295,7 +306,7 @@ public:
         calls in the same words (formRefusal in panelRuntime.js; scriptGetReports.test.js). */
     static juce::String formRefusal (const juce::String& call, const juce::String& outcome, const juce::String& form)
     {
-        if (form.isEmpty() || form == "value" || form == "normalizedValue" || form == "midiValue") return {};
+        if (form.isEmpty() || formWord (form).isNotEmpty()) return {};
         const auto meant = formMeant (form);
         return call + ": \"" + form + "\" is not a value form, so " + outcome
              + ". The forms are value, normalizedValue and midiValue." + (meant.isNotEmpty() ? " Write " + meant + "." : juce::String());

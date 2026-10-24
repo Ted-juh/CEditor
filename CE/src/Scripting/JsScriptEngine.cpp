@@ -431,12 +431,14 @@ function lerp(a, b, t) {
 }
 function curve(v, shape) {
   shape = shape || "linear";
-  if (shape === "exp") return v * v;
-  if (shape === "log") return Math.sqrt(Math.max(0, v));
-  if (shape === "s") return v * v * (3 - 2 * v);
+  // A name in any case, as every word from a list is read: "EXP" is "exp".
+  var name = String(shape).trim().toLowerCase();
+  if (name === "exp") return v * v;
+  if (name === "log") return Math.sqrt(Math.max(0, v));
+  if (name === "s") return v * v * (3 - 2 * v);
   // A shape the list does not have used to return v in SILENCE, which reads as a curve that does
   // nothing rather than as a name that was never applied.
-  if (shape !== "linear" && shape !== "")
+  if (name !== "linear" && name !== "")
     log("curve(v, \"" + shape + "\"): unknown shape — using linear. The names are \"linear\", "
         + "\"exp\", \"log\" and \"s\"; for any other shape use map(v, points).");
   return v;
@@ -583,7 +585,7 @@ function indexOfRange(t, count) {
 // that matters: a linear fade between two sounds dips in the middle, audibly.
 function crossfade(a, b, t, law) {
   var x = norm(t, 0, 1), from = __num(a), to = __num(b);
-  law = String(law === undefined || law === null ? "linear" : law).toLowerCase();
+  law = String(law === undefined || law === null ? "linear" : law).trim().toLowerCase();
   if (law === "equalpower") {
     var angle = x * Math.PI / 2;
     return from * Math.cos(angle) + to * Math.sin(angle);
@@ -714,7 +716,7 @@ function shapeCurve(v, curve, tension) {
   var t = norm(v, 0, 1);
   var ten = __num(tension, 0) || 1.6;
   var k = 1 + Math.max(0, ten);
-  var name = String(curve);
+  var name = String(curve).trim().toLowerCase();   // in any case: "SCurve" is "scurve"
   if (name === "exp") return Math.pow(t, k);
   if (name === "log") return 1 - Math.pow(1 - t, k);
   if (name === "scurve" || name === "s") return t * t * (3 - 2 * t);
@@ -821,7 +823,7 @@ function unshape(y, curve, tension) {
   var v = norm(y, 0, 1);
   var ten = __num(tension, 0) || 1.6;
   var k = 1 + Math.max(0, ten);
-  var name = String(curve);
+  var name = String(curve).trim().toLowerCase();
   if (name === "exp") return Math.pow(v, 1 / k);
   if (name === "log") return 1 - Math.pow(1 - v, 1 / k);
   // The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.
@@ -1226,11 +1228,13 @@ function noteName(n, flats) {
 // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is UNDEFINED, not 0 — 0 is a
 // real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
 function noteNumber(name) {
-  var m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b"));
+  // In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
+  var m = /^([A-Ga-g])([#bB]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b").trim());
   if (!m) return undefined;
-  var pc = m[2] === "b" ? __FLAT_LETTER[m[1]] : __NOTES.indexOf(m[1] + m[2]);
+  var letter = m[1].toUpperCase(), acc = m[2] === "B" ? "b" : m[2];
+  var pc = acc === "b" ? __FLAT_LETTER[letter] : __NOTES.indexOf(letter + acc);
   if (pc === undefined || pc < 0) return undefined;
-  var oct = parseInt(m[3], 10) + ((m[2] === "b" && m[1] === "C") ? 0 : 1);
+  var oct = parseInt(m[3], 10) + ((acc === "b" && letter === "C") ? 0 : 1);
   return oct * 12 + pc;
 }
 
@@ -1374,7 +1378,19 @@ function __pitch(v) {
   if (typeof v === "string") return noteNumber(v);
   return typeof v === "number" && isFinite(v) ? Math.floor(v) : undefined;
 }
-function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
+// A word from a list, in any case and with spaces around it, as the list spells it (an array's
+// entries, or an object's keys), or undefined: "Dorian" is "dorian", "MAJ7" is "maj7".
+function __word(list, name) {
+  if (typeof name !== "string") return undefined;
+  var want = name.trim().toLowerCase(), keys = Array.isArray(list) ? list : Object.keys(list);
+  for (var i = 0; i < keys.length; i++) if (String(keys[i]).toLowerCase() === want) return keys[i];
+  return undefined;
+}
+function __steps(tbl, name, fallback) {
+  if (name === undefined || name === null) return tbl[fallback];
+  var key = __word(tbl, String(name));
+  return key === undefined ? undefined : tbl[key];
+}
 function __pitchOf(verb, v) {
   // A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
   if (v === undefined || v === null) {
@@ -1385,7 +1401,7 @@ function __pitchOf(verb, v) {
   if (n === undefined) {
     logError(typeof v === "string"
       ? verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
-        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+        + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
       : verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
         + 'number or a name, such as 60 or "C4".');
   }
@@ -1429,7 +1445,7 @@ function quantizeNote(note, root, scale) {
 // Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 // chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 function noteSpelling(root, scale) {
-  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var nm = (scale === undefined || scale === null) ? "major" : (__word(__CE_SCALES, String(scale)) || String(scale));
   if (!__setOf("ce.music.spelling", "scale", scale)) return undefined;
   var pitch = __pitchOf("ce.music.spelling", root); if (pitch === undefined) return undefined;
   var pc = __m12(pitch);
@@ -1495,7 +1511,7 @@ function __roman(rootSemitone, quality) {
 // The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 // scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size) {
-  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var nm = (scale === undefined || scale === null) ? "major" : (__word(__CE_SCALES, String(scale)) || String(scale));
   var s = __setOf("ce.music.degreeChord", "scale", scale);
   if (!s || !s.length) return undefined;
   if (__pitchOf("ce.music.degreeChord", root) === undefined) return undefined;
@@ -1547,7 +1563,7 @@ function __noteList(fn, name, list, mayBeAbsent) {
     var n = __noteListItem(list[i]);
     if (n === undefined) {
       var where = __shownValue(list[i]) + " at position " + (i + 1) + " of " + name;
-      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
         : say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".');
     }
     out.push(n);
@@ -1583,7 +1599,7 @@ function voiceLead(notes, previous, mode) {
   var before = read && __noteList("voiceLead", "previous", previous, true);
   if (!read || !before) return [];
   var chord = __sortedNotes(read), prev = __sortedNotes(before);
-  var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  var how = (mode === undefined || mode === null) ? "closest" : (__word(__VOICE_LEAD_MODES, String(mode)) || String(mode));
   if (__VOICE_LEAD_MODES.indexOf(how) < 0) {
     __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.');
     how = "closest";
@@ -1650,10 +1666,10 @@ function arpOrder(notes, pattern) {
   if (pattern === undefined || pattern === null) {
     __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
     p = "up";
-  } else if (__ARP_ORDER_PATTERNS.indexOf(String(pattern)) < 0) {
+  } else if (__word(__ARP_ORDER_PATTERNS, String(pattern)) === undefined) {
     __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
     p = "up";
-  } else p = String(pattern);
+  } else p = __word(__ARP_ORDER_PATTERNS, String(pattern));
   if (!asc.length) return [];
   if (p === "chord") return [asc];
   if (p === "down") { seq = asc.slice().reverse(); }
@@ -1667,8 +1683,8 @@ function arpOrder(notes, pattern) {
 // @module ce.midi
 function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
 function from14bit(msb, lsb) { return msb * 128 + lsb; }
-function to7bit(v, count, order) { count = count || 2; order = order || "msb"; v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
-function from7bit(bytes, order) { order = order || "msb"; var v = 0; var b = order === "msb" ? bytes : bytes.slice().reverse(); for (var i = 0; i < b.length; i++) v = v * 128 + b[i]; return v; }
+function to7bit(v, count, order) { count = count || 2; order = String(order || "msb").trim().toLowerCase(); v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
+function from7bit(bytes, order) { order = String(order || "msb").trim().toLowerCase(); var v = 0; var b = order === "msb" ? bytes : bytes.slice().reverse(); for (var i = 0; i < b.length; i++) v = v * 128 + b[i]; return v; }
 function toNibbles(b) { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; }
 function fromNibbles(hi, lo) { return hi * 16 + lo; }
 function nibblize(bytes) { var o = []; for (var i = 0; i < bytes.length; i++) { var n = toNibbles(bytes[i]); o.push(n.hi, n.lo); } return o; }
@@ -1788,7 +1804,7 @@ function checksum(kind, bytes, opts) {
   if (bytes === undefined || bytes === null) {
     // checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
     if (kind === undefined || kind === null
-        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase()))) {
+        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.trim().toLowerCase()))) {
       logError(verb + ": no bytes given, so there is no checksum.");
       return undefined;
     }
@@ -1797,8 +1813,8 @@ function checksum(kind, bytes, opts) {
   bytes = __scriptBytes(verb, bytes, "there is no checksum");
   if (bytes === undefined) return undefined;
   // An own key only: "constructor" or "toString" would otherwise be found on Object's prototype.
-  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase())
-    ? __CE_CKSUM_ALIAS[kind.toLowerCase()] : undefined;
+  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.trim().toLowerCase())
+    ? __CE_CKSUM_ALIAS[kind.trim().toLowerCase()] : undefined;
   if (id === undefined) {
     // The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
     var which = kind === undefined || kind === null ? ": no algorithm given" : "(" + __shownValue(kind) + "): no such algorithm";
@@ -1860,6 +1876,8 @@ function __shape(verb, opts) {
     if (opts.bits !== undefined && opts.bits !== null) bits = opts.bits;
     if (opts.order !== undefined && opts.order !== null) order = opts.order;
   }
+  // In any case, as every word from a list is read: "MSB" is "msb".
+  if (typeof order === "string") order = order.trim().toLowerCase();
   if (bits !== 7 && bits !== 8) return __refuse(verb, "bits must be 7 or 8");
   if (order !== "msb" && order !== "lsb") return __refuse(verb, 'order must be "msb" or "lsb"');
   return { bits: bits, order: order };
@@ -2207,14 +2225,14 @@ var __WEBVIEW_ONLY = [
   "lcdBlink","lcdCursor","lcdCursorAt","lcdValue","lcdAnim","lcdAnimPreset","lcdAnimSpeed",
   "lcdAnimFps","lcdAnimLoop","lcdScrollMode","lcdScrollRepeat","lcdBlinkRate","lcdCursorBlink",
   "lcdValueMin","lcdValueMax","lcdValuePrecision","lcdValuePrefix","lcdValueSuffix",
-  "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText",
+  "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText","lcdLayout",
   "lcdShowGlass","lcdShowGhost","lcdShowScanlines","lcdShowGrid","lcdRead","lcdSize","lcdFill",
 // @module ce.components.pixel
   "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH",
   "pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow",
   "pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
   "pixelLayoutTransition","pixelTransitionMs","pixelBrightnessSource","pixelBacklightSource",
-  "pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
+  "pixelLayout","pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
 ];
 // @module -
 var __global = (typeof globalThis !== 'undefined') ? globalThis : this;
@@ -2311,7 +2329,7 @@ function __badNote(verb, note) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === "string") {
     why = noteNumber(note) === undefined
-      ? '"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+      ? '"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + range;
   } else if (typeof note === "number" && isFinite(note)) {
@@ -2425,7 +2443,7 @@ function sendTransport(action) {
     logError("sendTransport: no action given, so nothing was sent. " + actions);
     return;
   }
-  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.toLowerCase()] : undefined;
+  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.trim().toLowerCase()] : undefined;
   if (status === undefined) {
     logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions);
     return;
@@ -3161,9 +3179,10 @@ function __storageScope(opts, verb) {
   }
   var raw = (typeof opts === "string") ? opts : (opts ? opts.scope : undefined);
   if (raw === undefined || raw === null || raw === "") return "panel";
-  var scope = String(raw);
+  // In any case, as every word from a list is read: "Local" is "local".
+  var scope = String(raw).trim().toLowerCase();
   if (__CE_SCOPES.indexOf(scope) >= 0) return scope;
-  logError(verb + ': "' + scope + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
+  logError(verb + ': "' + String(raw) + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
   return undefined;
 }
 // Which of the host's two real stores a scope lives in.
@@ -3440,8 +3459,8 @@ var __CE_MODULES = {
   "ce.components.meter": { "dbCeil": "meterDbCeil", "dbFloor": "meterDbFloor", "decay": "meterDecay", "fill": "meterFill", "gradient": "meterGradient", "holdMs": "meterHoldMs", "insert": "meterInsert", "label": "meterLabel", "orientation": "meterOrientation", "peakHold": "meterPeakHold", "read": "meterRead", "remove": "meterRemove", "scale": "meterScale", "showScaleLabels": "meterShowScaleLabels", "showTicks": "meterShowTicks", "showValue": "meterShowValue", "size": "meterSize", "source": "meterSource", "value": "meterValue", "valueMax": "meterValueMax", "valueMin": "meterValueMin", "valuePrecision": "meterValuePrecision", "valuePrefix": "meterValuePrefix", "valueSuffix": "meterValueSuffix", "zoneAt": "meterZoneAt" },
   "ce.components.transport": { "beatUnit": "transportBeatUnit", "beatsPerBar": "transportBeatsPerBar", "bpm": "transportBpm", "clockDevice": "transportClockDevice", "clockOut": "transportClockOut", "countIn": "transportCountIn", "editable": "transportEditable", "loop": "transportLoop", "loopBars": "transportLoopBars", "loopStart": "transportLoopStart", "read": "transportRead", "runOnLoad": "transportRunOnLoad", "showPosition": "transportShowPosition", "showTap": "transportShowTap", "source": "transportSource", "swing": "transportSwing" },
   "ce.components.panic": { "centreBend": "panicSetCentreBend", "channel": "panicSetChannel", "clearLocal": "panicSetClearLocal", "editable": "panicSetEditable", "label": "panicSetLabel", "read": "panicSetRead", "resetControllers": "panicSetResetControllers", "scope": "panicSetScope", "showSummary": "panicSetShowSummary" },
-  "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
-  "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
+  "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "layout": "lcdLayout", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
+  "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layout": "pixelLayout", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
 var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];

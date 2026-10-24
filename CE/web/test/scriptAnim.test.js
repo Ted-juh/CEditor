@@ -191,6 +191,20 @@ test('a drawn curve that is not one says so, and animates linear', () => {
   });
 });
 
+test('a curve\'s name is read in any case, as every word from a list is', () => {
+  // "OutCubic" and "EXP" were "not a curve this build knows", and the move was linear.
+  resetScriptStateForTesting();
+  withClock(() => {
+    clearScriptTrace();
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: 'EXP' });
+    api.animateTo('b', 100, { duration: 1000, from: 0, curve: ' OutCubic ' });
+    tickAnimations(500);
+    assert.equal(api.animateValue('a').value, 25, 'exp is t squared');
+    assert.equal(api.animateValue('b').value, 100 * animationEase(0.5, 'outCubic'));
+    assert.deepEqual(getStore(scriptTrace).filter((t) => t.kind === 'warn'), []);
+  });
+});
+
 test('a curve that cannot be used is said once per command, as the other options are; damping below 0 is the default', () => {
   // The owner's three decisions on item 3 (docs/design/api-descriptions-handoff.md): an invalid
   // curve was a line on every call, a curve that was neither a name nor numbers was linear in

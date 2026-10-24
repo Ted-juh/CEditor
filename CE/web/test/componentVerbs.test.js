@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
+  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, componentClampWarning, familyVerbNamed, familyVerbRefusal, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -161,6 +161,35 @@ test('an xy verb moves one axis or both, and leaves the other alone', () => {
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [undefined, 0.8]), { y: 0.8 });
 });
 
+test('an xy verb given an axis that is not a number refuses the call, and moves neither', () => {
+  // timbre.move(t, "x", 0.8) moved y and dropped the "x" without a word, and returned true.
+  const verb = byId('timbreMove');
+  const cfg = cfgFor('Timbre');
+  assert.deepEqual(componentScriptPatch(verb, cfg, ['x', 0.8]), {});
+  assert.equal(componentRequestLegal(verb, cfg, ['x', 0.8]), false);
+  assert.equal(componentRefusalReason(verb, cfg, ['x', 0.8]), '"x" is not a number.');
+  assert.equal(componentRefusalReason(verb, cfg, []), 'No number was given.');
+  assert.equal(componentRequestLegal(verb, cfg, [undefined, 0.8]), true, 'one left out is still a move');
+  assert.deepEqual(verbArgOptional(verb), [true, true]);
+  assert.equal(MEMBER_BY_ID.timbreMove.signature, 'timbreMove(target [, x] [, y]) -> boolean');
+});
+
+test('the LCD cursor is held to the display, counted from 1, and whole', () => {
+  // cursorAt(t, 40, 9) on a 2 x 16 display was stored as it was and drawn nowhere; 2.6 was stored
+  // as 2.6, read back as 2.6 and drawn at 3.
+  const verb = byId('lcdCursorAt');
+  const display = { ...cfgFor('Display'), rows: 2, cols: 16, cursorCol: 0, cursorRow: 0 };
+  assert.deepEqual(componentScriptPatch(verb, display, [40, 9]), { cursorCol: 15, cursorRow: 1 });
+  assert.deepEqual(componentScriptPatch(verb, { ...display, cols: 20, rows: 4 }, [40, 9]), { cursorCol: 19, cursorRow: 3 });
+  assert.deepEqual(componentScriptPatch(verb, display, [2.6, 2]), { cursorCol: 2, cursorRow: 1 });
+  assert.deepEqual(componentScriptPatch(verb, display, [0, 1]), {}, '0 is column 1, where it is');
+  assert.equal(componentClampWarning(verb, 'Screen', [40, 9], display),
+    'lcd Screen: cursorAt(40, 9) — the col 40 is outside 1 to 16, so 16 was used.');
+  assert.equal(componentClampWarning(verb, 'Screen', [40, 'x'], display), null, 'a refused call used nothing');
+  assert.deepEqual(componentScriptPatch(verb, display, [5, 'x']), {});
+  assert.equal(componentRequestLegal(verb, display, [5, 'x']), false);
+});
+
 test('a nested xy verb merges into the object rather than replacing it', () => {
   // Kinetic.initial carries x, y, vx and vy. Setting the launch point must not wipe the velocity.
   const cfg = cfgFor('Kinetic');
@@ -242,7 +271,8 @@ test('a verb that needs a list finds none and yields nothing', () => {
 // they have no patch to make and are exercised in scriptComponents.test.js instead.
 // …and `link`, which resolves a control NAME against the live panel — something the reducer is
 // deliberately blind to. Driven end to end in scriptControlSources.test.js instead.
-const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link'];
+// …and `layout`, which shows a layout the preview keeps, not the panel (lcdPositions.test.js).
+const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link', 'layout'];
 
 test('every verb either changes something or explains why it cannot', () => {
   // The catch-all. For each verb, feed it a plausible argument and assert the reducer produced a
@@ -280,7 +310,11 @@ test('every verb either changes something or explains why it cannot', () => {
         const current = itemCurrent(verb, cfgFor(verb.section), 0);
         if (verb.kind === 'bool') return [1, !(current === true)];
         if (verb.kind === 'enum') return [1, verb.values.find((x) => x !== current)];
-        if (verb.kind === 'str') return [1, current === 'spec-probe' ? 'spec-probe-2' : 'spec-probe'];
+        if (verb.kind === 'str') {
+          // A verb that refuses what it cannot use (glyph takes only cells) is fed something it can.
+          const [one, two] = verb.refuseValue ? ['#', '.#'] : ['spec-probe', 'spec-probe-2'];
+          return [1, current === one ? two : one];
+        }
         // A number inside the ITEM's own range rather than a fixed 0.375, which lands on the
         // default of any integer item whose range does not happen to start near it.
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
@@ -678,16 +712,156 @@ test('every component verb has an example, notes and a text for each parameter, 
 test('the LCD\'s verbs say what each setting is, with its range and what is rejected', () => {
   const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
   assert.equal(MEMBER_BY_ID.lcdBrightness.summary, 'Set the brightness of the lit segments or pixels.');
-  assert.equal(text('lcdBrightness', 'brightness'), 'Brightness.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdBrightness', 'brightness'), 'How bright the lit characters are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // Item 8: no LCD parameter's text is only its name ("Brightness.", "Value prefix."), except
+  // valueMin and valueMax, kept as merged at the owner's word (item 5).
+  const nameOnly = COMPONENT_VERBS.filter((v) => v.family === 'lcd')
+    .flatMap((v) => MEMBER_BY_ID[v.id].params.map((p) => [v, p]))
+    .filter(([v, p]) => p.name !== 'target' && !['valueMin', 'valueMax'].includes(v.v)
+      && p.summary.split('\n')[0].toLowerCase().replace(/[^a-z]/g, '') === p.name.toLowerCase())
+    .map(([v, p]) => `${v.v}.${p.name}`);
+  assert.deepEqual(nameOnly, []);
+  assert.deepEqual(MEMBER_BY_ID.lcdValue.notes[0], 'While `valueSource()` links a control, that control sets the value and its range.');
+  assert.equal(text('lcdEditText', 'editText').split('\n')[1], 'Not held to the field\'s characters or length: those apply to typing.');
+  // Item 9: the four overlays say what each is, and a plural takes "they" in every example.
+  assert.equal(MEMBER_BY_ID.lcdShowGhost.summary, 'Show or hide the ghost: the faint unlit cells behind the text.');
+  assert.equal(MEMBER_BY_ID.lcdShowGrid.summary, 'Show or hide the grid: faint lines between the cells or pixels.');
+  assert.equal(MEMBER_BY_ID.lcdShowScanlines.example,
+    '`ce.components.lcd.showScanlines("Screen")` shows the scanlines if they are hidden, and hides them if they are shown.');
+  assert.equal(MEMBER_BY_ID.drumPadsZones.example,
+    '`ce.components.drumpads.zones("DrumPads")` switches the zones on if they are off, and off if they are on.');
+  assert.equal(MEMBER_BY_ID.lcdShowGlass.example,
+    '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
+  // Item 10: read's, size's and fill's texts name the component's own lists.
+  assert.equal(MEMBER_BY_ID.lcdRead.notes[0], '`read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1.');
+  assert.equal(MEMBER_BY_ID.lcdSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number.');
+  assert.equal(MEMBER_BY_ID.lcdFill.example, '`ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2.');
+  assert.equal(MEMBER_BY_ID.lcdFill.notes[0], 'One undo step for the whole list, instead of one per element.');
+  assert.equal(MEMBER_BY_ID.transportRead.notes[0], '`read(target)`: every setting as a table, by verb name.', 'no lists: no list sentence');
+  assert.equal(MEMBER_BY_ID.matrixSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "cell")`: { rows, cols }.');
+  // Item 11: a source any control can be says so once, and when it lights the backlight.
+  assert.equal(text('lcdBacklightSource', 'name'), 'The driving control\'s name.\nLeft out, or "": unlinked.\nOn while the control is on, or past halfway.\nNot on this panel: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.lcdBacklightSource.example, '`ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.');
+  assert.match(text('lcdValueSource', 'name'), /Not on this panel, or not a knob, slider or other range control: rejected with a console error\.$/);
+  for (const verb of COMPONENT_VERBS.filter((v) => v.k === 'fill')) {
+    assert.doesNotMatch(MEMBER_BY_ID[verb.id].example, /, values\)/, `${verb.id}: a list written out`);
+  }
   assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
-  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-sensitive.\nInvalid: rejected with a console error.');
-  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0 or "": false; any other value: true.');
+  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(text('lcdBacklight', 'target'), 'The LCD Display\'s control, by name.\nNot an LCD Display: rejected with a console error.');
-  assert.equal(text('lcdCursorAt', 'col').split('\n')[0], 'Column, counted from 1.');
+  assert.equal(text('lcdCursorAt', 'col'), 'Column, counted from 1.\nRange: 1 ↔ the display\'s columns.\nA fraction: rounded.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.');
+  assert.equal(text('lcdCursorAt', 'row').split('\n')[1], 'Range: 1 ↔ the display\'s rows.');
+  assert.equal(MEMBER_BY_ID.lcdCursorAt.params.find((p) => p.name === 'col').required, false);
+  assert.equal(MEMBER_BY_ID.lcdCursorAt.notes[0], 'The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".');
   assert.equal(MEMBER_BY_ID.lcdBacklight.example, '`ce.components.lcd.backlight("Screen")` switches the backlight on if it is off, and off if it is on.');
   assert.equal(MEMBER_BY_ID.lcdShowGlass.example, '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
   assert.equal(MEMBER_BY_ID.lcdValueSource.example, '`ce.components.lcd.valueSource("Screen", "Cutoff")` makes the control called Cutoff drive the value.');
-  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true; already that way: true, with a line in the console.', 'Rejected with a console error: false, and nothing changed.']);
+  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true. Already set: true, with a console line.', 'Rejected: false, with a console error. Nothing changes.']);
+  assert.deepEqual(MEMBER_BY_ID.lcdRead.notes.slice(-2), ['Returns the value.', 'Rejected: no result, with a console error.']);
+});
+
+test('a number counted from 1 is rounded, and every such parameter says so', () => {
+  // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
+  const lines = { lines: ['A', 'B'] };
+  const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
+  assert.deepEqual(componentScriptPatch(text, lines, [1.5, 'X']), { lines: ['A', 'X'] });
+  assert.deepEqual(componentScriptPatch(text, lines, [1.4, 'X']), { lines: ['X', 'B'] });
+  assert.equal(componentRefusalReason(text, lines, [2.5, 'X']), 'There is no row 2.5: the rows are 1 to 2.');
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const slots = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
+  assert.equal(componentScriptPatch(glyph, slots, [1.5, '#']).glyphs[1].bits, '#');
+  let counted = 0;
+  for (const verb of COMPONENT_VERBS) {
+    for (const param of MEMBER_BY_ID[verb.id].params) {
+      const rules = param.summary.split('\n');
+      if (!/counted from 1/.test(rules[0])) continue;
+      counted += 1;
+      assert.ok(rules.includes('A fraction: rounded.'), `${verb.id}.${param.name}: ${param.summary}`);
+    }
+  }
+  assert.ok(counted > 40, `only ${counted} parameters count from 1`);
+  assert.equal(MEMBER_BY_ID.lcdGlyph.params.find((p) => p.name === 'index').summary,
+    'Glyph slot.\nRange: 1 ↔ 8.\nA fraction: rounded.\nOutside the range: rejected with a console error.');
+});
+
+test('a line\'s text left out is refused, as every text verb\'s is; "" still blanks it', () => {
+  // text(t, 1) and text(t, 1, null) blanked the row and returned true.
+  const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
+  const lines = { lines: ['A', 'B'] };
+  for (const left of [[1], [1, undefined], [1, null]]) {
+    assert.deepEqual(componentScriptPatch(text, lines, left), {});
+    assert.equal(componentRequestLegal(text, lines, left), false);
+    assert.equal(componentRefusalReason(text, lines, left), 'No text was given.');
+  }
+  assert.deepEqual(componentScriptPatch(text, lines, [1, '']), { lines: ['', 'B'] });
+  assert.deepEqual(componentScriptPatch(text, lines, [2, 42]), { lines: ['A', '42'] });
+  assert.match(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'text').summary, /\nLeft out: rejected with a console error\.$/);
+  const at = MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'at').summary.split('\n');
+  assert.equal(at[0], 'Row, counted from 1, of the layout showing.');
+  assert.ok(at.includes('A fraction: rounded.'));
+});
+
+test('the LCD\'s blink rate is the time on, then off, from 60 ms as the display draws it', () => {
+  // The text said "Period" and "250 blinks four times a second"; the renderer lights the text for
+  // blinkRate ms and darkens it for as long, and draws nothing faster than 60, where 50 was stored.
+  const verb = byId('lcdBlinkRate');
+  const display = cfgFor('Display');
+  assert.deepEqual(componentScriptPatch(verb, display, [55]), { blinkRate: 60 });
+  assert.equal(componentClampWarning(verb, 'Screen', [55]), 'lcd Screen: blinkRate(55) — the blinkRate 55 is outside 60 to 5000, so 60 was used.');
+  const member = MEMBER_BY_ID.lcdBlinkRate;
+  assert.equal(member.summary, 'Set how fast the text blinks.');
+  assert.equal(member.example, '`ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second.');
+  assert.equal(member.params.find((p) => p.name === 'blinkRate').summary,
+    'Time on, then the same time off, in milliseconds.\nRange: 60 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(member.notes.slice(0, 2), ['Has an effect only while `blink()` is on. Default: off.', 'The cursor blinks at its own fixed speed.']);
+});
+
+test('an on/off verb reads false, off and 0 as off, as words in any case too', () => {
+  // Any text but "" was on, so blink(t, "false") and blink(t, "OFF") switched blinking on.
+  const verb = byId('lcdBlink');
+  const on = { ...cfgFor('Display'), blink: true };
+  const off = { ...cfgFor('Display'), blink: false };
+  for (const word of [false, 0, '', 'false', 'FALSE', 'False', 'off', 'OFF', ' Off ', '0']) {
+    assert.deepEqual(componentScriptPatch(verb, on, [word]), { blink: false }, `${JSON.stringify(word)} is off`);
+  }
+  for (const word of [true, 1, -1, 'true', 'on', 'ON', 'x', '1']) {
+    assert.deepEqual(componentScriptPatch(verb, off, [word]), { blink: true }, `${JSON.stringify(word)} is on`);
+  }
+  // The set of steps that are on reads its second argument the same way.
+  const mute = COMPONENT_VERBS.find((v) => v.k === 'indexset');
+  const muted = { ...cfgFor(COMPONENT_FAMILIES.find((f) => f.id === mute.family).section), [mute.f]: [0] };
+  assert.deepEqual(componentScriptPatch(mute, muted, [1, 'Off']), { [mute.f]: [] });
+  const member = MEMBER_BY_ID.lcdBlink;
+  assert.equal(member.summary, 'Switch the text blinking on or off.');
+  assert.equal(member.example, '`ce.components.lcd.blink("Screen", true)` makes the text blink.');
+  assert.equal(member.params.find((p) => p.name === 'blink').summary,
+    'true: the text blinks.\nfalse: the text is steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(member.notes.slice(0, 2), ['Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.',
+    'The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.']);
+});
+
+test('a word from a list is read in any case, and a preset animation is one of the six it draws', () => {
+  // animPreset stored any word and the display drew nothing for one it did not know; every list of
+  // words was case-sensitive, so scroll(t, "LEFT") was refused.
+  const preset = byId('lcdAnimPreset');
+  const display = cfgFor('Display');
+  assert.deepEqual(preset.values, ['wave', 'scanner', 'rain', 'starfield', 'spinner', 'plasma']);
+  assert.deepEqual(byId('pixelAnimPreset').values, preset.values);
+  assert.deepEqual(componentScriptPatch(preset, display, ['PLASMA']), { animPreset: 'plasma' });
+  assert.deepEqual(componentScriptPatch(preset, display, [' Starfield ']), { animPreset: 'starfield' });
+  for (const bad of ['bogus', 5, undefined]) {
+    assert.deepEqual(componentScriptPatch(preset, display, [bad]), {});
+    assert.equal(componentRequestLegal(preset, display, [bad]), false, `${JSON.stringify(bad)} is refused`);
+  }
+  assert.deepEqual(componentScriptPatch(byId('lcdScroll'), display, ['LEFT']), { scroll: 'left' });
+  assert.equal(MEMBER_BY_ID.lcdAnimPreset.params.find((p) => p.name === 'animPreset').summary,
+    'One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.lcdAnimPreset.notes[0], 'Plays only on a graphic display, while `anim()` is "preset".');
+  // …and the verb names read, size, fill, insert and remove take.
+  assert.equal(familyVerbNamed('lcd', 'SCROLLSPEED')?.v, 'scrollSpeed');
+  assert.equal(familyVerbNamed('lcd', 'toString'), null, 'never one of Object\'s own');
+  assert.equal(familyVerbRefusal('lcd', 'size', 'GLYPH'), null);
 });
 
 test('text left out is refused, where it was written as ""', () => {
@@ -704,4 +878,25 @@ test('text left out is refused, where it was written as ""', () => {
   const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
   assert.equal(componentRequestLegal(glyph, display, [1, undefined]), false);
   assert.equal(componentRefusalReason(glyph, display, [1, undefined]), 'No text was given.');
+});
+
+test('glyph refuses what it cannot draw as written, and stores what it can', () => {
+  // "abc" was stored and the slot drew nothing; a ninth row or a sixth cell was cut off. Both are
+  // rejected with the reason. A short glyph is still drawn as far as it goes, and "" clears.
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '#####' })) };
+  for (const [bits, why] of [
+    ['abc', '"a", "b", "c" are not cells of a glyph: "#" or "1" is lit, "." or "0" unlit, and "|" ends a row.'],
+    ['#|#|#|#|#|#|#|#|#', 'It has 9 rows, and a glyph has 8.'],
+    ['######|#', 'Row 1 has 6 cells, and a row has 5.'],
+  ]) {
+    assert.deepEqual(componentScriptPatch(glyph, display, [1, bits]), {}, bits);
+    assert.equal(componentRequestLegal(glyph, display, [1, bits]), false, bits);
+    assert.equal(componentRefusalReason(glyph, display, [1, bits]), why);
+  }
+  for (const bits of ['#|#|#', '']) {
+    assert.equal(componentScriptPatch(glyph, display, [1, bits]).glyphs[0].bits, bits);
+    assert.equal(componentRequestLegal(glyph, display, [1, bits]), true);
+    assert.equal(componentRefusalReason(glyph, display, [1, bits]), null);
+  }
 });

@@ -4,8 +4,10 @@
 // script editor's Values tab offers them and says the refusal in the runtime's words.
 //
 // Each verb refused an unknown word in a sentence of its own, but the API documented the words only
-// in prose, so the Values tab had nothing to offer and nothing to say. The words are case-sensitive,
-// as the runtime has always read them: "Left" is refused.
+// in prose, so the Values tab had nothing to offer and nothing to say. The words are read in any
+// case (utils/wordLists.js) and used as the list spells them: "Left" is "left", "HCENTER" "hCenter".
+
+import { listWord } from '../utils/wordLists.js';
 
 export const LAYOUT_WORDS = {
   panelAlign: {
@@ -34,6 +36,6 @@ export const LAYOUT_WORDS = {
 /** The word an arrangement verb reads `value` as, or `refused`, its sentence for one it does not take. */
 export function layoutWord(memberId, value) {
   const spec = LAYOUT_WORDS[memberId];
-  const which = String(value ?? spec.absent ?? '');
-  return spec.values.includes(which) ? { which, refused: null } : { which, refused: spec.refusal(value, spec.values) };
+  const which = listWord(spec.values, value ?? spec.absent ?? '');
+  return which ? { which, refused: null } : { which: String(value ?? ''), refused: spec.refusal(value, spec.values) };
 }

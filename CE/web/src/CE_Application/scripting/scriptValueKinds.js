@@ -21,6 +21,7 @@ import {
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, divisionIdOf } from './timeTables.js';
 import { ANIM_CURVE_NAMES, EASING_BEZIERS, bezierOf } from './easingTables.js';
+import { listWord } from '../utils/wordLists.js';
 import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, checksumNames, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
@@ -33,7 +34,7 @@ import {
   DRAW_SHAPES, drawNumber, shapeOutline, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
 } from './drawShapes.js';
 import {
-  COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
+  COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, familyVerbNamed, indexRefusal, itemCurrent, listNoun,
   familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
 } from './componentVerbs.js';
 import {
@@ -51,6 +52,7 @@ import {
 } from './deviceWords.js';
 import { countRolesInControls } from '../utils/deviceRoles.js';
 import { lcdLine, lcdLineWords } from './lcdLines.js';
+import { lcdPosition, lcdPositionWords, lcdReadAt, lcdRows, lcdWriteAt, lcdClearAt, isPositionTable, lcdLayoutIndex, lcdLayoutCount } from './lcdPositions.js';
 import { findFont, findAxis, axisWords, axisClampWords, axisRefusalWords } from './textStyle.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
@@ -332,9 +334,10 @@ export function readCurve(value) {
     };
   }
   if (typeof value === 'string') {
-    if (ANIM_CURVE_NAMES.includes(value)) {
-      meaning.name = value;
-      meaning.bezier = EASING_BEZIERS[value] ? [...EASING_BEZIERS[value]] : null;
+    const name = listWord(ANIM_CURVE_NAMES, value);   // in any case, as the runtime reads it
+    if (name) {
+      meaning.name = name;
+      meaning.bezier = EASING_BEZIERS[name] ? [...EASING_BEZIERS[name]] : null;
       return { meaning, problem: null };
     }
     return {
@@ -422,7 +425,7 @@ export function readNote(value, { verb, outcome, midi }) {
         meaning,
         problem: {
           severity: 'error',
-          message: `${verb}: "${value}" is not a note name, so ${outcome}. A name is a capital letter, then # or b if it `
+          message: `${verb}: "${value}" is not a note name, so ${outcome}. A name is a letter from A to G, then # or b if it `
             + 'has one, then the octave: "C4", "Eb3", "F#-1".',
         },
       };
@@ -444,18 +447,19 @@ export function readScaleOrChord(value, kind, { verb, root, musicWords }) {
   const table = kind === 'chord' ? CHORDS : SCALES;
   const meaning = { label: null, choices: [...names] };
   if (typeof value !== 'string') return { meaning, problem: null };
-  if (!Object.hasOwn(table, value)) {
+  const word = listWord(names, value);   // in any case, as the runtimes read it: "Dorian" is dorian
+  if (!word) {
     const list = names.join(', ');
     const message = musicWords
       ? `${verb}: "${value}" is not a ${kind}, so there is no answer. The ${kind}s are ${list}.`
       : `"${value}" is not a ${kind}. The ${kind}s are ${list}.`;
     return { meaning, problem: { severity: 'error', message: `${message}${didYouMean(value, names)}` } };
   }
-  meaning.label = value;
+  meaning.label = word;
   if (Number.isFinite(root)) {
-    const numbers = table[value].map((x) => root + x);
+    const numbers = table[word].map((x) => root + x);
     meaning.numbers = numbers;
-    meaning.notes = spellNotes(numbers, ((root % 12) + 12) % 12, kind === 'chord' ? 'major' : value);
+    meaning.notes = spellNotes(numbers, ((root % 12) + 12) % 12, kind === 'chord' ? 'major' : word);
   }
   return { meaning, problem: null };
 }
@@ -682,15 +686,17 @@ export const OPACITY_SCALE_WARNINGS = {
 
 /**
  * A value from a closed list. `refusal(value, list, name)` gives the runtime's own sentence where it
- * has one, and then it is said of a word in another case too: a call with a sentence of its own
- * reads only its spelling (ce.draw.blend, ce.draw.stroke's cap and join), and refuses "Multiply" in
- * the words it refuses "sausage" in, with the spelling it wanted as the "Did you mean".
+ * has one. Every call reads its words in any case (utils/wordLists.js), so "Multiply" is "multiply".
+ * `anyCase: false` is for a value written straight into a property, which the renderer reads only
+ * as it is spelled: a word in another case is said to be refused there.
  */
-export function readEnum(value, values, { path, name, refusal } = {}) {
+export function readEnum(value, values, { path, name, refusal, anyCase = true } = {}) {
   const meaning = { choices: values.map(String) };
   if (value === undefined || value === null) return { meaning, problem: null };
   if (values.some((v) => v === value)) return { meaning, problem: null };
-  const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.toLowerCase()) : undefined;
+  const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.trim().toLowerCase()) : undefined;
+  // A call that reads its words in any case takes "LEFT" as "left".
+  if (exactish !== undefined && anyCase) return { meaning, problem: null };
   if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };
   }
@@ -1319,6 +1325,31 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     const range = componentIndexRange(verb, cfg);
     const noun = verb.grid ? (at === 0 ? 'row' : 'column') : listNoun(verb);
     const say = (reason) => ({ meaning, problem: reason ? { severity: 'error', message: literal ? componentRefusalLine(verb, target, args, cfg) : reason } : null });
+    // The LCD's text and clear take a position (lcdPositions.js): a row of the layout showing, or a
+    // table of layout, row and col. Judged by what the position says alone, as the text after it
+    // has a row of its own.
+    // A layout, by its number or its name, as layout() takes it.
+    if (verb.k === 'layout') {
+      const layouts = Array.isArray(cfg.layouts) ? cfg.layouts : [];
+      meaning.choices = layouts.map((l) => String(l?.name ?? '')).filter(Boolean);
+      Object.assign(meaning, { min: 1, max: lcdLayoutCount(cfg) });
+      const named = lcdLayoutIndex(cfg, value, verb.flat);
+      if (named.refusal) return say(named.refusal);
+      const name = layouts[named.index]?.name;
+      meaning.hint = `layout ${named.index + 1} of ${lcdLayoutCount(cfg)}${layouts.length ? (name ? ` · ${name}` : '') : ` · ${verb.flat}`}`;
+      return { meaning, problem: null };
+    }
+    if (verb.k === 'line' && verb.section === 'Display') {
+      const pos = lcdPosition(cfg, value);
+      const refused = pos.refusal ?? (verb.clear ? lcdClearAt(cfg, value) : lcdWriteAt(cfg, value, '')).refusal;
+      if (refused) return say(refused);
+      if (!isPositionTable(value)) Object.assign(meaning, { min: 1, max: lcdRows(cfg) });
+      else meaning.integer = false;
+      const now = pos.rows && pos.rows[0] === pos.rows[1] ? lcdReadAt(cfg, value).value : undefined;
+      meaning.hint = value === undefined || value === null ? null
+        : `${isPositionTable(value) ? lcdPositionWords(cfg, value) : `row ${pos.rows[0] + 1} of ${lcdRows(cfg)}`}${typeof now === 'string' ? ` · now ${shownValue(now)}` : ''}`;
+      return { meaning, problem: pos.clamped ? { severity: 'warning', message: pos.clamped } : null };
+    }
     if (verb.k === 'elem') {
       meaning.choices = range?.names ?? [];
       meaning.hint = elementSites(cfg, value).length ? `an element of ${target}` : null;
@@ -1423,7 +1454,7 @@ function readFamilyVerbName(value, verb, control) {
   const meaning = { hint: null, choices: familyVerbNames(verb.family, verb.k === 'read' ? 'read' : 'list') };
   const refused = typeof value === 'string' || typeof value === 'number' ? familyVerbRefusal(verb.family, verb.k, value) : null;
   if (refused) return { meaning, problem: { severity: 'error', message: refused } };
-  const named = COMPONENT_VERBS.find((v) => v.family === verb.family && v.v === String(value));
+  const named = familyVerbNamed(verb.family, value);
   const cfg = control?._children?.[verb.section] ?? null;
   if (named && cfg) {
     const range = componentIndexRange(named, cfg);

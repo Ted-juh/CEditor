@@ -190,9 +190,9 @@ int main()
         juce::Array<juce::var> noteScripts;
         noteScripts.add (makeScript ("pyNotes", "onPanelReady", "*",
             "def onPanelReady(info):\n"
-            "    sendNote(1, 'c4', 100)\n"
-            "    sendNoteOff(1, 'c4')\n"
-            "    sendAftertouch(1, 90, 'c4')\n"
+            "    sendNote(1, 'H4', 100)\n"
+            "    sendNoteOff(1, 'H4')\n"
+            "    sendAftertouch(1, 90, 'H4')\n"
             "    sendNote(1, 'C-1', 100)\n"));
         runtime.loadScripts (juce::var (noteScripts));
         host.rawSends.clear();
@@ -202,8 +202,8 @@ int main()
                "Notes: an unreadable name sends nothing; C-1 by name still plays (got "
                    + host.rawSends.joinIntoString (" | ") + ")");
         for (const auto* verb : { "sendNote", "sendNoteOff", "sendAftertouch" })
-            check (host.logs.contains (juce::String (verb) + ": \"c4\" is not a note name, so nothing was sent. "
-                                       "A name is a capital letter, then # or b if it has one, then the octave: "
+            check (host.logs.contains (juce::String (verb) + ": \"H4\" is not a note name, so nothing was sent. "
+                                       "A name is a letter from A to G, then # or b if it has one, then the octave: "
                                        "\"C4\", \"Eb3\", \"F#-1\"."),
                    juce::String ("Notes: ") + verb + " names the note it refused");
     }

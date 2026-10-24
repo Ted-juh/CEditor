@@ -212,6 +212,18 @@ double ScriptRuntime::animationEase (double progress, const juce::String& curve,
     return v;
 }
 
+/** A curve's name as a script wrote it, in any case and with spaces around it, as the tables spell
+    it: "OutCubic" is "outCubic", as the WebView's utils/wordLists.js reads it. Unknown: as given. */
+static juce::String animCurveName (const juce::String& written)
+{
+    const auto name = written.trim();
+    for (const auto* known : { "linear", "exp", "log", "s", "spring" })
+        if (name.equalsIgnoreCase (known)) return known;
+    for (const auto& entry : animEasings())
+        if (name.equalsIgnoreCase (entry.first)) return entry.first;
+    return name;
+}
+
 bool ScriptRuntime::drawnCurve (const juce::var& value, std::array<double, 4>& out)
 {
     juce::Array<juce::var> list;
@@ -613,7 +625,7 @@ bool ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     }
     else if (curveVar.isString())
     {
-        const auto name = curveVar.toString();
+        const auto name = animCurveName (curveVar.toString());
         bool known = true;
         animationEase (0.5, name, &known);
         // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the

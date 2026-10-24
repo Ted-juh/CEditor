@@ -137,6 +137,20 @@ test('status carries a kind, the same vocabulary notify uses', () => {
   });
 });
 
+test('a kind is read in any case, as every word from a list is', () => {
+  // "Warn" and "ERROR" were not kinds, so the message went out as plain info.
+  fresh(() => {
+    api.uiStatus('Device not responding', { kind: 'Warn' });
+    assert.equal(get(scriptStatus).kind, 'warn');
+    const id = api.uiNotify('Saved', { kind: ' ERROR ' });
+    assert.equal(get(scriptNotifications)[0].kind, 'error');
+    api.uiUpdate(id, 'Saved again', { kind: 'Info' });
+    assert.equal(get(scriptNotifications)[0].kind, 'info');
+    api.uiDialog({ message: 'Overwrite?', kind: 'WARN' });
+    assert.equal(get(scriptDialog).kind, 'warn');
+  });
+});
+
 test('status still clears with no message, and clearing forgets the kind too', () => {
   fresh(() => {
     api.uiStatus('Recording', { kind: 'error' });

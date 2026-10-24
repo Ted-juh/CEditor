@@ -269,10 +269,11 @@ test('a fit that is not one, a text size that cannot be used, and measure\'s siz
       api.drawMeasure(5).width > 0, api.drawMeasure('').width];
   });
   const drawn = drawingFor(panel.controls[0]._children.Core.id);
-  assert.deepEqual(drawn.map((c) => c.fit ?? c.size), ['fill', 'fill', 12, 12, 14], 'text that is a number is read as one');
+  // "COVER" is "cover": a word from a list is read in any case.
+  assert.deepEqual(drawn.map((c) => c.fit ?? c.size), ['cover', 'fill', 12, 12, 14], 'text that is a number is read as one');
   assert.deepEqual(measured, [undefined, 12, { width: 11, height: 7, exact: true }, true, 0]);
   assert.deepEqual(lines, [
-    'ce.draw.image: fit is "COVER", not "fill", "contain" or "cover", so "fill" was used.' + ONCE,
+    'ce.draw.image: fit is "stretch", not "fill", "contain" or "cover", so "fill" was used.' + ONCE,
     'ce.draw.text: size 0 is not above 0, so 12 was used.' + ONCE,
     'ce.draw.measure: text was not given, so there is no result.',
     'ce.draw.measure: size "x" is not a number, so 12 was used.' + ONCE,
@@ -343,7 +344,7 @@ test('lines says an item that is not a segment once; batch, redraw, blend and cl
   let got;
   const { panel, lines } = run((api) => {
     got = [api.drawLines([[0, 0, 10, 10], [1, 2, 3], 'x', { x1: 1, y1: 1, x2: 2, y2: 2 }]), api.drawLines('abc'),
-      api.drawBatch('x'), api.drawRedraw('nosuch'), api.drawBlend(), api.drawBlend('Multiply'),
+      api.drawBatch('x'), api.drawRedraw('nosuch'), api.drawBlend(), api.drawBlend('Sausage'),
       api.drawClip(0, 0), api.drawClip(0, 0, 10, 10), api.drawClip(0, 0, 10), api.drawClip()];
     api.drawRect(0, 0, 5, 5);
   });
@@ -357,7 +358,7 @@ test('lines says an item that is not a segment once; batch, redraw, blend and cl
     'ce.draw.batch: fn is "x", not a function, so nothing ran.',
     'ce.draw.redraw: no control named "nosuch".',
     'ce.draw.blend: mode was not given, so the blend stays as it was.',
-    'ce.draw.blend("Multiply"): not a blend mode. One of: normal, multiply, screen, overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion.',
+    'ce.draw.blend("Sausage"): not a blend mode. One of: normal, multiply, screen, overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion.',
     'ce.draw.clip: w was not given, so the clip stays as it was.',
     'ce.draw.clip: h was not given, so the clip stays as it was.',
   ]);

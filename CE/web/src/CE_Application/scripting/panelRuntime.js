@@ -38,6 +38,7 @@ import {
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS, colourFromRgb, colourFromHsl, hslOfChannels,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
+import { listWord } from '../utils/wordLists.js';
 import { timeNumber } from './timeWords.js';
 import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
@@ -47,6 +48,8 @@ import {
   drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
+import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout } from './lcdPositions.js';
+import { layoutShowing, showLayout } from '../stores/displayLayouts.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
@@ -146,8 +149,8 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, readIndexRefusal, LIST_KINDS,
-  itemListLength, LINK_KIND, ELEM_KIND,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, familyVerbNamed, readIndexRefusal, LIST_KINDS,
+  itemListLength, LINK_KIND, ELEM_KIND, LAYOUT_KIND,
 } from './componentVerbs.js';
 import {
   SOURCE_KINDS, sourceAccepts, sourceByName, sourceName,
@@ -599,9 +602,13 @@ function formMeant(text) {
   return VALUE_ACCESSOR_IDS.find((id) => id.toLowerCase() === canonical) ?? '';
 }
 
+/** A form in any case and with spaces around it, as the list spells it, or '': "NormalizedValue" is
+ *  normalizedValue (utils/wordLists.js). Another spelling ("normalised") is still not a form. */
+const formWord = (text) => listWord(VALUE_ACCESSOR_IDS, text) ?? '';
+
 /** The console's line refusing `form`, given explicitly to `call`, or '' when it is a form or none. */
 function formRefusal(call, outcome, form) {
-  if (typeof form !== 'string' || form === '' || VALUE_ACCESSOR_IDS.includes(form)) return '';
+  if (typeof form !== 'string' || form === '' || formWord(form)) return '';
   const meant = formMeant(form);
   return `${call}: "${form}" is not a value form, so ${outcome}. The forms are ${andList(VALUE_ACCESSOR_IDS)}.`
     + (meant ? ` Write ${meant}.` : '');
@@ -609,10 +616,10 @@ function formRefusal(call, outcome, form) {
 
 function splitAccessor(path, explicitForm) {
   const text = String(path ?? '');
-  const form = VALUE_ACCESSOR_IDS.includes(explicitForm) ? explicitForm : '';
+  const form = formWord(explicitForm);
   const dot = text.lastIndexOf('.');
   if (dot > 0) {
-    const tail = text.slice(dot + 1);
+    const tail = formWord(text.slice(dot + 1));
     if (DERIVED_ACCESSORS.has(tail)) return { path: text.slice(0, dot), form: form || tail };
   }
   return { path: text, form: form || 'value' };
@@ -1169,7 +1176,13 @@ const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
 // G9 does), since these compute pitches; a sender refuses one that is not a MIDI note.
 const musicPitch = (v) => (typeof v === 'string' ? helpers.noteNumber(v)
   : typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined);
-const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
+// A name in any case (utils/wordLists.js): "Dorian" and "MAJ7" are dorian and maj7. Never one of
+// Object's own: table["toString"] was a function.
+const musicSteps = (table, name) => {
+  if (name == null) return table.major;
+  const word = listWord(Object.keys(table), String(name));
+  return word ? table[word] : undefined;
+};
 function musicPitchOf(verb, v) {
   // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
   if (v === undefined || v === null) {
@@ -1181,7 +1194,7 @@ function musicPitchOf(verb, v) {
   if (n === undefined) {
     addScriptTrace('error', '', typeof v === 'string'
       ? `${verb}: "${v}" is not a note name, so there is no answer. A name is `
-        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+        + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
       : `${verb}: ${shownValue(v)} is not a note, so there is no answer. A note is a MIDI `
         + 'number or a name, such as 60 or "C4".');
   }
@@ -1580,7 +1593,7 @@ function indexImpl(t, count) {
 function crossfadeImpl(a, b, t, law) {
   const x = normImpl(t, 0, 1);
   const from = num(a), to = num(b);
-  const kind = String(law ?? 'linear').toLowerCase();
+  const kind = String(law ?? 'linear').trim().toLowerCase();
   if (kind === 'equalpower') {
     const angle = (x * Math.PI) / 2;
     return from * Math.cos(angle) + to * Math.sin(angle);
@@ -1785,7 +1798,7 @@ function polarImpl(angle, radius) {
 function shapeImpl(v, curve, tension) {
   const t = normImpl(v, 0, 1);
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
-  switch (String(curve)) {
+  switch (String(curve).trim().toLowerCase()) {   // in any case: "SCurve" is "scurve"
     case 'exp': return t ** k;
     case 'log': return 1 - (1 - t) ** k;
     // Both spellings, because the panel says "scurve" and the script API has always said "s".
@@ -1978,7 +1991,7 @@ function unshapeImpl(y, curve, tension) {
   // The same k as shape(), including the 1.6 default — an inverse computed against a different
   // exponent would be an inverse of nothing.
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
-  switch (String(curve)) {
+  switch (String(curve).trim().toLowerCase()) {
     case 'exp': return v ** (1 / k);
     case 'log': return 1 - (1 - v) ** (1 / k);
     // The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and
@@ -2013,10 +2026,12 @@ const helpers = {
   // A shape the list does not have used to return v in silence, which reads as a curve that does
   // nothing rather than as a name that was never applied.
   curve: (v, shape) => {
-    if (shape === 'exp') return v * v;
-    if (shape === 'log') return Math.sqrt(Math.max(0, v));
-    if (shape === 's') return v * v * (3 - 2 * v);
-    if (shape !== undefined && shape !== null && shape !== '' && shape !== 'linear') {
+    // A name in any case, as every word from a list is read: "EXP" is "exp".
+    const name = shape === undefined || shape === null ? 'linear' : String(shape).trim().toLowerCase();
+    if (name === 'exp') return v * v;
+    if (name === 'log') return Math.sqrt(Math.max(0, v));
+    if (name === 's') return v * v * (3 - 2 * v);
+    if (name !== '' && name !== 'linear') {
       addScriptTrace('log', '',
         `curve(v, ${JSON.stringify(String(shape))}): unknown shape — using linear. `
         + 'The names are "linear", "exp", "log" and "s"; for any other shape use map(v, points).');
@@ -2106,7 +2121,7 @@ const helpers = {
   noteSpelling: (root, scale) => {
     const steps = musicSetOf('ce.music.spelling', 'scale', scale);
     if (!steps) return undefined;
-    const name = scale == null ? 'major' : String(scale);
+    const name = scale == null ? 'major' : (listWord(SCALE_NAMES, String(scale)) ?? String(scale));
     const pitch = musicPitchOf('ce.music.spelling', root);
     if (pitch === undefined) return undefined;
     const pc = musicMod12(pitch);
@@ -2387,14 +2402,15 @@ const helpers = {
   // script packs a value identically whether it runs here or in the shipped plugin.
   to14bit: (v) => { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; },
   from14bit: (msb, lsb) => msb * 128 + lsb,
+  // The order in any case, as every word from a list is read: "MSB" is "msb".
   to7bit: (v, count = 2, order = 'msb') => {
     v = Math.floor(v);
     const out = [];
     for (let i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); }
-    return order === 'msb' ? out.reverse() : out;
+    return String(order).trim().toLowerCase() === 'msb' ? out.reverse() : out;
   },
   from7bit: (bytes, order = 'msb') => {
-    const b = order === 'msb' ? bytes : [...bytes].reverse();
+    const b = String(order).trim().toLowerCase() === 'msb' ? bytes : [...bytes].reverse();
     let v = 0;
     for (const x of b) v = v * 128 + x;
     return v;
@@ -2555,7 +2571,8 @@ const doesNotFit = (v, bits) => (v === undefined || v === null ? 'the value to w
     : v < 0 || v >= 2 ** bits ? `${v} does not fit in ${plural(bits, 'bit')}` : '');
 function bytesOpts(verb, opts) {
   const bits = opts?.bits ?? 7;
-  const order = opts?.order ?? 'msb';
+  // In any case, as every word from a list is read: "MSB" is "msb".
+  const order = typeof opts?.order === 'string' ? opts.order.trim().toLowerCase() : (opts?.order ?? 'msb');
   if (bits !== 7 && bits !== 8) return bytesRefuse(verb, 'bits must be 7 or 8');
   if (order !== 'msb' && order !== 'lsb') return bytesRefuse(verb, 'order must be "msb" or "lsb"');
   return { bits, order };
@@ -2880,7 +2897,7 @@ function refuseNote(verb, note) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === 'string') {
     why = helpers.noteNumber(note) === undefined
-      ? `"${note}" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it `
+      ? `"${note}" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it `
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : `"${note}" is outside the MIDI notes, so nothing was sent. ${range}`;
   } else if (typeof note === 'number' && Number.isFinite(note)) {
@@ -3076,7 +3093,7 @@ const midiApi = {
       addScriptTrace('error', '', `${verb}: no action given, so nothing was sent. ${actions}`);
       return;
     }
-    const a = typeof action === 'string' ? action.toLowerCase() : '';
+    const a = typeof action === 'string' ? action.trim().toLowerCase() : '';
     const status = { start: 0xFA, continue: 0xFB, stop: 0xFC }[a];
     if (status === undefined) {
       addScriptTrace('error', '', `${verb}: ${shownValue(action)} is not a transport action, so nothing was sent. ${actions}`);
@@ -3475,19 +3492,34 @@ function writeComponentFields(verb, path, patch) {
   return true;
 }
 
+/** The LCD's text and clear, and read's "text": addressed by position, on a layout (lcdPositions.js). */
+const isLcdText = (verb) => verb.family === 'lcd' && verb.k === 'line';
+
+/**
+ * A display's section with the layout it is showing, as the preview hands it to the renderer
+ * (`__page.activeLayoutId`), so text(), clear() and read() with no layout act on the layout on
+ * screen. The preview decides it (stores/displayLayouts.js); with none, the display rests on its
+ * default and lcdPositions.js finds that itself.
+ */
+function withLayoutShowing(path, section) {
+  const id = layoutShowing(findControlByName(path)?._children?.Core?.id);
+  return id ? { ...section, __page: { activeLayoutId: id } } : section;
+}
+
 const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
-  const cfg = getValue(`${path}.${verb.section}`);
-  if (!cfg || typeof cfg !== 'object') {
+  const stored = getValue(`${path}.${verb.section}`);
+  if (!stored || typeof stored !== 'object') {
     addScriptTrace('error', '', `${verb.family}: ${wrongTargetMessage(path, verb.section, verb.label)}`);
     return false;
   }
+  const cfg = isLcdText(verb) ? withLayoutShowing(path, stored) : stored;
   const patch = componentScriptPatch(verb, cfg, args);
   const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
   // A number past the verb's range is used as the nearest end, and said once per verb.
-  const clamped = componentClampWarning(verb, path, args);
+  const clamped = componentClampWarning(verb, path, args, cfg);
   if (clamped && !componentClampWarned.has(verb.id)) {
     componentClampWarned.add(verb.id);
     addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
@@ -3518,8 +3550,11 @@ function componentVerbAction(verb, target, args) {
 const lcdLineWarned = new Set();   // resetScriptState clears it
 function lcdLineSaid(verb, path, display, args, shown) {
   if (verb.family !== 'lcd' || verb.v !== 'text') return;
-  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, args[1])) {
-    const key = `${path}\u0000${args[0]}\u0000${reason}`;
+  // The row as written, which from a column on is more than the text given.
+  const { line } = lcdWriteAt(display, args[0], args[1]);
+  if (line === undefined) return;
+  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, line)) {
+    const key = `${path}\u0000${JSON.stringify(args[0])}\u0000${reason}`;
     if (lcdLineWarned.has(key)) continue;
     lcdLineWarned.add(key);
     addScriptTrace('warn', '', `${message} This is said only the first time.`);
@@ -3629,18 +3664,21 @@ function componentReadAction(verb, path, args) {
       // A link reads back as the NAME it was written by — '' when it points at nothing, which is
       // the truthful answer for both "unlinked" and "linked to a control that has been deleted".
       if (spec.k === LINK_KIND) out[verbName] = sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+      else if (spec.k === LAYOUT_KIND) out[verbName] = lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
       else if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
     }
     return out;
   }
 
-  const spec = specs[String(name)];
+  const spec = familyVerbNamed(verb.family, name);
   const refusedName = familyVerbRefusal(verb.family, 'read', name);
   if (refusedName) {
     addScriptTrace('error', '', refusedName);
     return undefined;
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+  // The layout showing, counted from 1 as layout() takes it: 1 on a display without layouts.
+  if (spec.k === LAYOUT_KIND) return lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
   if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
 
   // A name-addressed scene reads back BY NAME, in both shapes: the whole table, which is also how a
@@ -3657,6 +3695,14 @@ function componentReadAction(verb, path, args) {
       return undefined;
     }
     return elementAt(cfg, sites[0])?.[spec.item];
+  }
+
+  // The LCD's text is read by position (lcdPositions.js): every row of the layout showing, one row,
+  // the columns of one, or another layout's.
+  if (isLcdText(spec)) {
+    const { value, refusal } = lcdReadAt(withLayoutShowing(path, cfg), index);
+    if (refusal) addScriptTrace('error', '', `${verb.family}.read("${spec.v}", ${JSON.stringify(index)}): ${refusal}`);
+    return refusal ? undefined : value;
   }
 
   const list = componentListValue(cfg, spec);
@@ -3687,6 +3733,7 @@ function componentSizeAction(verb, path, args) {
   const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
 
   const sizeOf = (spec) => {
+    if (isLcdText(spec)) return lcdRows(cfg);
     const list = componentList(cfg, spec);
     if (!list) return undefined;
     if (spec.k === 'cell' && spec.grid) {
@@ -3701,7 +3748,7 @@ function componentSizeAction(verb, path, args) {
   if (name === undefined || name === null || name === '') {
     return Object.fromEntries(lists.map(([verbName, spec]) => [verbName, sizeOf(spec)]));
   }
-  const spec = specs[String(name)];
+  const spec = familyVerbNamed(verb.family, name);
   if (!spec || !LIST_KINDS.includes(spec.k)) {
     addScriptTrace('error', '', familyVerbRefusal(verb.family, 'size', name));
     return undefined;
@@ -3714,8 +3761,7 @@ function componentFillAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'fill');
   if (!cfg) return false;
   const [name, values] = args;
-  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const spec = specs[String(name ?? '')];
+  const spec = familyVerbNamed(verb.family, name);
   if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
     addScriptTrace('error', '', familyVerbRefusal(verb.family, 'fill', name));
     return false;
@@ -3724,6 +3770,7 @@ function componentFillAction(verb, path, args) {
     addScriptTrace('error', '', `${verb.family}.fill("${name}"): needs a list of values.`);
     return false;
   }
+  if (isLcdText(spec)) return lcdFill(verb, path, cfg, name, values);
   const list = componentList(cfg, spec);
   if (!list) return false;
 
@@ -3774,6 +3821,35 @@ function componentFillAction(verb, path, args) {
   return true;
 }
 
+/** fill(t, "text", rows): the rows of the layout showing from the first, as text() writes each. */
+function lcdFill(verb, path, cfg, name, values) {
+  const rows = lcdRows(cfg);
+  if (values.length > rows) {
+    addScriptTrace('error', '',
+      `${verb.family}.fill("${name}"): ${values.length} values for ${rows} rows — refused. `
+      + `${verb.family}.size("${name}") says how many there are.`);
+    return false;
+  }
+  let work = withLayoutShowing(path, cfg);
+  let patch = {};
+  for (const [i, value] of values.entries()) {
+    const done = lcdWriteAt(work, i + 1, value);
+    if (done.refusal) {
+      addScriptTrace('error', '', `${verb.family}.fill("${name}"): row ${i + 1}: ${done.refusal} Nothing was written.`);
+      return false;
+    }
+    patch = { ...patch, ...done.patch };
+    work = { ...work, ...done.patch };
+  }
+  if (!Object.keys(patch).length) {
+    addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") — already that way`);
+    return true;
+  }
+  if (!writeComponentFields(verb, path, patch)) return false;
+  addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${values.length} value(s)`);
+  return true;
+}
+
 /** Add one element to a component's list, using the template the canvas uses. */
 function componentInsertAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'insert');
@@ -3818,8 +3894,7 @@ function componentRemoveAction(verb, path, args) {
 
 /** The list-addressing verb a name refers to, having complained if it is not one. */
 function componentListSpec(verb, forWhat, name) {
-  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const spec = specs[String(name ?? '')];
+  const spec = familyVerbNamed(verb.family, name);
   if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
   addScriptTrace('error', '', familyVerbRefusal(verb.family, forWhat, name));
   return null;
@@ -3885,6 +3960,29 @@ function componentLinkAction(verb, path, args) {
   return true;
 }
 
+/**
+ * layout(t, which): show one of a display's layouts, as a soft key does (stores/displayLayouts.js).
+ * Not a write to the panel: which layout shows is the preview's, and is not saved.
+ */
+function componentLayoutAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'layout');
+  if (!cfg) return false;
+  const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  const named = lcdLayoutIndex(cfg, args[0], verb.flat);
+  if (named.refusal) {
+    addScriptTrace('error', '', `${verb.family} ${path}: layout(${shown}) — refused, nothing changed. ${named.refusal}`);
+    return false;
+  }
+  const layouts = Array.isArray(cfg.layouts) ? cfg.layouts : [];
+  const already = !layouts.length || lcdShownLayout(withLayoutShowing(path, cfg)) === named.index;
+  // Shown again even when it is showing, as a second press of a soft key restarts its timeout.
+  if (layouts.length) showLayout(findControlByName(path)?._children?.Core?.id, layouts[named.index]?.id);
+  addScriptTrace('log', '', already
+    ? `${verb.family} ${path}: layout(${shown}) — already that way`
+    : `${verb.family} ${path}: layout → ${named.index + 1}`);
+  return true;
+}
+
 /** The five kinds every family gets are not writes of a field, so they dispatch elsewhere. */
 const COMPONENT_KIND_ACTION = {
   read: componentReadAction,
@@ -3893,6 +3991,7 @@ const COMPONENT_KIND_ACTION = {
   insert: componentInsertAction,
   remove: componentRemoveAction,
   [LINK_KIND]: componentLinkAction,
+  [LAYOUT_KIND]: componentLayoutAction,
 };
 
 const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
@@ -4652,7 +4751,8 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // option is (warnAnimTiming): it was a line on every call, and a curve that was neither a name
   // nor numbers (curve = 5) was linear without a word. ScriptRuntime::startAnimation says the same.
   const curveVerb = `ce.anim.${kind}`;
-  let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
+  // A name in any case (utils/wordLists.js): "OutCubic" is "outCubic". ScriptRuntime reads it so too.
+  let curve = typeof opts?.curve === 'string' ? (listWord(ANIM_CURVE_NAMES, opts.curve) ?? opts.curve) : 'linear';
   let bezier = null;
   if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
     bezier = drawnCurve(opts.curve);
@@ -5799,7 +5899,10 @@ function imageIconImpl(target, idOrName, opts) {
       }
       tint = read.colour;
     }
-    const value = key === 'tint' ? tint.replace(/^#/, '') : opts[key];
+    // A fit is one of the Icon section's two words, in any case (utils/wordLists.js): the renderer
+    // reads "cover" and takes anything else as "contain", so "Cover" was drawn contained.
+    const value = key === 'tint' ? tint.replace(/^#/, '')
+      : key === 'fit' ? (listWord(['contain', 'cover'], opts.fit) ?? opts.fit) : opts[key];
     setValue(`${name}.Icon.${field}`, value);
     // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
     // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading, and
@@ -8329,10 +8432,11 @@ function storageScopeOf(opts, scriptId, verb) {
   }
   const raw = typeof opts === 'string' ? opts : opts?.scope;
   if (raw == null || raw === '') return 'panel';
-  const scope = String(raw);
+  // In any case, as every word from a list is read: "Local" is "local".
+  const scope = String(raw).trim().toLowerCase();
   if (STORAGE_SCOPES.includes(scope)) return scope;
   addScriptTrace('error', scriptId ?? '',
-    `${verb}: "${scope}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
+    `${verb}: "${String(raw)}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
   return undefined;
 }
 
@@ -8922,16 +9026,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
             + 'ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
-      // A fit that is not one of its three words is "fill", and said once: it was "fill" in silence.
-      const fit = opts?.fit;
-      const fits = ['fill', 'contain', 'cover'];
-      if (fit !== undefined && fit !== null && !fits.includes(fit)) {
-        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
+      // A fit that is not one of its three words, in any case, is "fill", and said once: it was
+      // "fill" in silence.
+      const fit = listWord(['fill', 'contain', 'cover'], opts?.fit);
+      if (opts?.fit !== undefined && opts?.fit !== null && !fit) {
+        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(opts.fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
       }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
         x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
-        fit: fits.includes(fit) ? fit : 'fill',
+        fit: fit ?? 'fill',
       }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
@@ -8960,10 +9064,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
         addScriptTrace('error', '', 'ce.draw.blend: mode was not given, so the blend stays as it was.');
         return false;
       }
-      const wanted = String(mode);
-      if (!legal.includes(wanted)) {
+      // In any case: "Multiply" is "multiply", handed on as the list spells it.
+      const wanted = listWord(legal, String(mode));
+      if (!wanted) {
         addScriptTrace('error', '',
-          `ce.draw.blend("${wanted}"): not a blend mode. One of: ${legal.join(', ')}.`);
+          `ce.draw.blend("${String(mode)}"): not a blend mode. One of: ${legal.join(', ')}.`);
         return false;
       }
       drawState.blend = wanted === 'normal' ? null : wanted;

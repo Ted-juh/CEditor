@@ -1398,12 +1398,14 @@ def lerp(a=None, b=None, t=None):
     return x + (y - x) * f
 def curve(v, shape="linear"):
     import math
-    if shape == "exp": return v * v
-    if shape == "log": return math.sqrt(max(0, v))
-    if shape == "s":   return v * v * (3 - 2 * v)
+    # A name in any case, as every word from a list is read: "EXP" is "exp".
+    name = str(shape).strip().lower() if shape is not None else "linear"
+    if name == "exp": return v * v
+    if name == "log": return math.sqrt(max(0, v))
+    if name == "s":   return v * v * (3 - 2 * v)
     # A shape the list does not have used to return v in SILENCE, which reads as a curve that does
     # nothing rather than as a name that was never applied.
-    if shape not in ("linear", "", None):
+    if name not in ("linear", ""):
         log("curve(v, \"" + str(shape) + "\"): unknown shape — using linear. The names are "
             "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     return v
@@ -1582,7 +1584,7 @@ def indexOfRange(t, count):
 def crossfade(a, b, t, law=None):
     import math
     x, frm, to = norm(t, 0, 1), __num(a), __num(b)
-    law = str(law if law is not None else "linear").lower()
+    law = str(law if law is not None else "linear").strip().lower()
     if law == "equalpower":
         angle = x * math.pi / 2
         return frm * math.cos(angle) + to * math.sin(angle)
@@ -1716,7 +1718,7 @@ def shapeCurve(v, curve, tension=None):
     t = norm(v, 0, 1)
     ten = __num(tension, 0) or 1.6
     k = 1 + max(0, ten)
-    name = str(curve)
+    name = str(curve).strip().lower()   # in any case: "SCurve" is "scurve"
     if name == "exp": return t ** k
     if name == "log": return 1 - (1 - t) ** k
     if name in ("scurve", "s"): return t * t * (3 - 2 * t)
@@ -1835,7 +1837,7 @@ def unshape(y, curve, tension=None):
     v = norm(y, 0, 1)
     ten = __num(tension, 0) or 1.6
     k = 1 + max(0, ten)
-    name = str(curve)
+    name = str(curve).strip().lower()
     if name == "exp": return v ** (1 / k)
     if name == "log": return 1 - (1 - v) ** (1 / k)
     # The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.
@@ -2262,9 +2264,10 @@ def noteName(n, flats=None):
 # real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
 def noteNumber(name):
     import re
-    m = re.match(r"^([A-G])([#b]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b"))
+    # In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E-flat 4 and B-flat 3.
+    m = re.match(r"^([A-Ga-g])([#bB]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b").strip())
     if not m: return None
-    letter, acc = m.group(1), m.group(2)
+    letter, acc = m.group(1).upper(), ("b" if m.group(2) == "B" else m.group(2))
     if acc == "b":
         pc = __FLAT_LETTER[letter]
     else:
@@ -2414,8 +2417,18 @@ def __pitch(v):
     if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
         return math.floor(v)
     return None
+# A word from a list, in any case and with spaces around it, as the list spells it (a list's
+# entries, or a dict's keys), or None: "Dorian" is "dorian", "MAJ7" is "maj7".
+def __word(lst, name):
+    if not isinstance(name, str): return None
+    want = name.strip().lower()
+    for k in lst:
+        if isinstance(k, str) and k.lower() == want: return k
+    return None
 def __steps(tbl, name, fallback):
-    return tbl.get(fallback if name is None else str(name))
+    if name is None: return tbl.get(fallback)
+    key = __word(tbl, str(name))
+    return tbl.get(key) if key is not None else None
 def __pitchOf(verb, v):
     # A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
     if v is None:
@@ -2425,7 +2438,7 @@ def __pitchOf(verb, v):
     if n is None:
         if isinstance(v, str):
             logError(verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
-                     + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+                     + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
             logError(verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
                      + 'number or a name, such as 60 or "C4".')
@@ -2473,7 +2486,7 @@ def quantizeNote(note, root, scale=None):
 # Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 # chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 def noteSpelling(root, scale=None):
-    nm = "major" if scale is None else str(scale)
+    nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     if __setOf("ce.music.spelling", "scale", scale) is None: return None
     pitch = __pitchOf("ce.music.spelling", root)
     if pitch is None: return None
@@ -2535,7 +2548,7 @@ def __noteList(fn, name, lst, mayBeAbsent=False):
         n = __noteListItem(v)
         if n is None:
             where = __shownValue(v) + " at position " + str(i + 1) + " of " + name
-            if isinstance(v, str): return say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+            if isinstance(v, str): return say(where + " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
             return say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
         out.append(n)
     return out
@@ -2601,7 +2614,7 @@ def __roman(rootSemitone, quality):
 # scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 def degreeChord(root, scale, degree, size=None):
     import math
-    nm = "major" if scale is None else str(scale)
+    nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     s = __setOf("ce.music.degreeChord", "scale", scale)
     if not s: return None
     if __pitchOf("ce.music.degreeChord", root) is None: return None
@@ -2635,7 +2648,7 @@ def voiceLead(notes, previous=None, mode=None):
     before = __noteList("voiceLead", "previous", previous, True) if read is not None else None
     if read is None or before is None: return []
     chord = __sortedNotes(read); prev = __sortedNotes(before)
-    how = "closest" if mode is None else str(mode)
+    how = "closest" if mode is None else (__word(__VOICE_LEAD_MODES, str(mode)) or str(mode))
     if how not in __VOICE_LEAD_MODES:
         __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
         how = "closest"
@@ -2691,11 +2704,11 @@ def arpOrder(notes, pattern=None):
     if pattern is None:
         __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
         p = "up"
-    elif str(pattern) not in __ARP_ORDER_PATTERNS:
+    elif __word(__ARP_ORDER_PATTERNS, str(pattern)) is None:
         __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
         p = "up"
     else:
-        p = str(pattern)
+        p = __word(__ARP_ORDER_PATTERNS, str(pattern))
     if not asc: return []
     if p == "chord": return [list(asc)]
     if p == "down":
@@ -2714,9 +2727,9 @@ def from14bit(msb, lsb): return msb * 128 + lsb
 def to7bit(v, count=2, order="msb"):
     import math; v = math.floor(v); out = []
     for _ in range(count): out.append(v % 128); v = math.floor(v / 128)
-    return list(reversed(out)) if order == "msb" else out
+    return list(reversed(out)) if str(order).strip().lower() == "msb" else out
 def from7bit(b, order="msb"):
-    v = 0; seq = b if order == "msb" else list(reversed(b))
+    v = 0; seq = b if str(order).strip().lower() == "msb" else list(reversed(b))
     for x in seq: v = v * 128 + x
     return v
 def toNibbles(b):
@@ -2850,13 +2863,13 @@ def checksum(kind=None, bytes=None, opts=None):
     verb = "ce.midi.checksum"
     if bytes is None:
         # checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
-        if kind is None or (isinstance(kind, str) and kind.lower() in __CE_CKSUM_ALIAS):
+        if kind is None or (isinstance(kind, str) and kind.strip().lower() in __CE_CKSUM_ALIAS):
             logError(verb + ": no bytes given, so there is no checksum.")
             return None
         bytes = kind; kind = "roland"
     bytes = __scriptBytes(verb, bytes, "there is no checksum")
     if bytes is None: return None
-    cid = __CE_CKSUM_ALIAS.get(kind.lower()) if isinstance(kind, str) else None
+    cid = __CE_CKSUM_ALIAS.get(kind.strip().lower()) if isinstance(kind, str) else None
     if cid is None:
         # The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
         which = ": no algorithm given" if kind is None else "(" + __shownValue(kind) + "): no such algorithm"
@@ -2922,6 +2935,8 @@ def __shape(verb, opts):
     if isinstance(opts, dict):
         if opts.get("bits") is not None: bits = opts.get("bits")
         if opts.get("order") is not None: order = opts.get("order")
+    # In any case, as every word from a list is read: "MSB" is "msb".
+    if isinstance(order, str): order = order.strip().lower()
     if isinstance(bits, bool) or bits not in (7, 8): return __refuse(verb, "bits must be 7 or 8")
     if order not in ("msb", "lsb"): return __refuse(verb, 'order must be "msb" or "lsb"')
     return { "bits": int(bits), "order": order }
@@ -3258,14 +3273,14 @@ __WEBVIEW_ONLY = [
   "lcdBlink","lcdCursor","lcdCursorAt","lcdValue","lcdAnim","lcdAnimPreset","lcdAnimSpeed",
   "lcdAnimFps","lcdAnimLoop","lcdScrollMode","lcdScrollRepeat","lcdBlinkRate","lcdCursorBlink",
   "lcdValueMin","lcdValueMax","lcdValuePrecision","lcdValuePrefix","lcdValueSuffix",
-  "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText",
+  "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText","lcdLayout",
   "lcdShowGlass","lcdShowGhost","lcdShowScanlines","lcdShowGrid","lcdRead","lcdSize","lcdFill",
 # @module ce.components.pixel
   "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH",
   "pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow",
   "pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
   "pixelLayoutTransition","pixelTransitionMs","pixelBrightnessSource","pixelBacklightSource",
-  "pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
+  "pixelLayout","pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
 ]
 # @module -
 def __webviewOnly(name):
@@ -3361,7 +3376,7 @@ def __badNote(verb, note):
         why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
     elif isinstance(note, str):
         if noteNumber(note) is None:
-            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
                    + 'has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
             why = '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + rng
@@ -3495,7 +3510,7 @@ def sendTransport(action=None):
     if action is None:
         logError("sendTransport: no action given, so nothing was sent. " + actions)
         return
-    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.lower()) if isinstance(action, str) else None
+    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.strip().lower()) if isinstance(action, str) else None
     if status is None:
         logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions)
         return
@@ -3718,10 +3733,11 @@ def __storageScope(opts, verb):
     raw = opts if isinstance(opts, str) else (opts.get("scope") if isinstance(opts, dict) else None)
     if raw is None or raw == "":
         return "panel"
-    scope = str(raw)
+    # In any case, as every word from a list is read: "Local" is "local".
+    scope = str(raw).strip().lower()
     if scope in __CE_SCOPES:
         return scope
-    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % scope)
+    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % str(raw))
     return None
 
 # Which of the host's two real stores a scope lives in.
@@ -4082,8 +4098,8 @@ __CE_MODULES = {
     "ce.components.meter": { "dbCeil": "meterDbCeil", "dbFloor": "meterDbFloor", "decay": "meterDecay", "fill": "meterFill", "gradient": "meterGradient", "holdMs": "meterHoldMs", "insert": "meterInsert", "label": "meterLabel", "orientation": "meterOrientation", "peakHold": "meterPeakHold", "read": "meterRead", "remove": "meterRemove", "scale": "meterScale", "showScaleLabels": "meterShowScaleLabels", "showTicks": "meterShowTicks", "showValue": "meterShowValue", "size": "meterSize", "source": "meterSource", "value": "meterValue", "valueMax": "meterValueMax", "valueMin": "meterValueMin", "valuePrecision": "meterValuePrecision", "valuePrefix": "meterValuePrefix", "valueSuffix": "meterValueSuffix", "zoneAt": "meterZoneAt" },
     "ce.components.transport": { "beatUnit": "transportBeatUnit", "beatsPerBar": "transportBeatsPerBar", "bpm": "transportBpm", "clockDevice": "transportClockDevice", "clockOut": "transportClockOut", "countIn": "transportCountIn", "editable": "transportEditable", "loop": "transportLoop", "loopBars": "transportLoopBars", "loopStart": "transportLoopStart", "read": "transportRead", "runOnLoad": "transportRunOnLoad", "showPosition": "transportShowPosition", "showTap": "transportShowTap", "source": "transportSource", "swing": "transportSwing" },
     "ce.components.panic": { "centreBend": "panicSetCentreBend", "channel": "panicSetChannel", "clearLocal": "panicSetClearLocal", "editable": "panicSetEditable", "label": "panicSetLabel", "read": "panicSetRead", "resetControllers": "panicSetResetControllers", "scope": "panicSetScope", "showSummary": "panicSetShowSummary" },
-    "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
-    "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
+    "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "layout": "lcdLayout", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
+    "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layout": "pixelLayout", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
 __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [

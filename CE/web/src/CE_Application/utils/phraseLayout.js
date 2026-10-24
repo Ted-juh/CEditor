@@ -17,6 +17,7 @@ import { DIVISION_IDS, DIVISION_LABELS, beatsPerStep, secondsPerBeat } from './t
 // on the same beat, and two implementations of "delay the odd steps" would
 // eventually disagree about it.
 import { swingDelay } from './arpLayout.js';
+import { listWord } from './wordLists.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -545,8 +546,9 @@ export function phraseScriptPatch(cfg, action, args = {}, roll = () => 0.5) {
       return { key: ((Math.round(k) % 12) + 12) % 12 };
     }
     case 'scale': {
-      const s = String(a.scale ?? '');
-      return SCALES[s] ? { scale: s } : {};
+      // In any case, as every word from a list is read: "Dorian" is "dorian" (utils/wordLists.js).
+      const s = listWord(Object.keys(SCALES), String(a.scale ?? ''));
+      return s ? { scale: s } : {};
     }
     case 'transpose': {
       const t = Number(a.transpose);

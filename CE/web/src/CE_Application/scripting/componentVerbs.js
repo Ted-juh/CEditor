@@ -44,9 +44,22 @@ import {
 } from '../utils/drumPadLayout.js';
 import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } from '../utils/pixelElements.js';
 import { shownValue } from './shownValue.js';
+import { listWord } from '../utils/wordLists.js';
+import { glyphBitsRefusal } from '../utils/lcdUserGlyphs.js';
+import { lcdWriteAt, lcdClearAt, lcdRows, lcdLayoutIndex, lcdLayoutCount } from './lcdPositions.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
+// What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
+// case. Any other text was on, so blink(t, "false") and blink(t, "OFF") switched it on.
+const OFF_WORDS = new Set(['', 'false', 'off', '0']);
+const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
+const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
+// The kind of LINE's first argument: a row number, or a table of layout, row and col (lcdPositions.js).
+const POSITION = 'position';
+// The LCD's lines are addressed by position, on a layout (lcdPositions.js); the Joystick's corner
+// labels, the other LINE verb, by a plain number into its list, as before.
+const lcdLines = (verb) => verb.k === LINE && verb.section === 'Display';
 // One property of one element of a pixel display's scene, addressed by the NAME the author typed
 // beside it. Not `item`, and the two reasons are written out in utils/pixelElements.js: the list
 // starts empty, so an index addresses nothing on a fresh display; and the index is the paint order,
@@ -64,6 +77,11 @@ const READ = 'read', SIZE = 'size', FILL = 'fill', INSERT = 'insert', REMOVE = '
 // by name and an opaque `ctl_…` is not something it could have got hold of.
 const LINK = 'link';
 export const LINK_KIND = LINK;
+// Which layout a display shows (the LCD's and the Pixel Display's). Not a field either: the layout
+// showing is the preview's, transient, as a soft key's is (stores/displayLayouts.js), so it
+// dispatches in the runtime, and read(t, "layout") answers it there.
+const LAYOUT = 'layout';
+export const LAYOUT_KIND = LAYOUT;
 export const READ_KINDS = [READ, SIZE];
 export const ARRAY_KINDS = [FILL, INSERT, REMOVE];
 /** The kinds that address an array by a verb name — what `size`, `fill`, `insert` and `remove`
@@ -84,9 +102,15 @@ const v = (name, field, kind, extra = {}) => ({ v: name, f: field, k: kind, ...e
 /** "scrollSpeed" -> "scroll speed": a field's name in words, for the generated texts. */
 const fieldWords = (field) => String(field ?? '').replace(/(SourceId|ControlId|Id|On)$/, '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
 /** What a boolean's example says it does: a show flag shows or hides, the rest switch on or off. */
-const toggleGloss = (field) => (/^show[A-Z]/.test(String(field ?? ''))
-  ? `shows the ${fieldWords(String(field).slice(4))} if it is hidden, and hides it if it is shown`
-  : `switches the ${fieldWords(field)} on if it is off, and off if it is on`);
+// A plural name takes "they" and "them": "shows the scanlines if they are hidden".
+const toggleGloss = (field) => {
+  const show = /^show[A-Z]/.test(String(field ?? ''));
+  const words = fieldWords(show ? String(field).slice(4) : field);
+  const [is, it] = /[^s]s$/.test(words) ? ['they are', 'them'] : ['it is', 'it'];
+  return show
+    ? `shows the ${words} if ${is} hidden, and hides ${it} if ${is} shown`
+    : `switches the ${words} on if ${is} off, and off if ${is} on`;
+};
 
 // A verb whose field the inspector draws from data takes its range from that field set instead of
 // repeating it here (models/inspectorFieldSets.js), so a script and the inspector cannot disagree.
@@ -584,44 +608,78 @@ export const COMPONENT_FAMILIES = [
     id: 'lcd', section: 'Display', prefix: 'lcd', label: 'LCD Display', sample: 'Screen', article: 'an',
     summary: 'Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.',
     verbs: [
-      v('text', 'lines', LINE, { valueKind: 'lcdLine', doc: 'Write one line of the display.',
-        ex: ['1, "PATCH 12"', 'writes PATCH 12 on the first row'] }),
-      v('clear', 'lines', LINE, { clear: true, doc: 'Blank every line.', ex: ['', 'blanks the display'] }),
+      // A row of a layout, or the display's lines when it has none: the owner's script model,
+      // docs/design/api-descriptions-handoff.md ("The LCD's script model"), and lcdPositions.js.
+      v('text', 'lines', LINE, { valueKind: 'lcdLine', doc: 'Write one row of the display.',
+        ex: ['1, "PATCH 12"', 'writes PATCH 12 on the first row'],
+        notes: ['On a display with layouts: written on the layout, shown where no zone paints.'] }),
+      v('clear', 'lines', LINE, { clear: true, doc: 'Blank the layout showing, or part of it.', ex: ['', 'blanks the display'],
+        notes: ['Only text is blanked: a zone still shows its control.'] }),
       v('backlight', 'backlightOn', BOOL, { toggle: true, doc: 'Switch the backlight on or off.' }),
-      v('brightness', 'brightness', NUM, { min: 0, max: 100, doc: 'Set the brightness of the lit segments or pixels.', ex: ['80', 'sets the brightness to 80'] }),
-      v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast, which is how visible the unlit segments are.', ex: ['55', 'sets the contrast to 55'] }),
+      // Brightness 0 is not dark: the renderer draws the lit text at 35% + 65% of it. And while a
+      // control is linked as the source, that control sets what is shown (PanelPreviewSurface).
+      v('brightness', 'brightness', NUM, { min: 0, max: 100, doc: 'Set the brightness of the lit segments or pixels.', ex: ['80', 'sets the brightness to 80'],
+        argDocs: { brightness: 'How bright the lit characters are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While `brightnessSource()` links a control, that control sets the brightness.'] }),
+      // Contrast is the unlit cells' visibility, and the backlight glow's strength (35% + 50% of it).
+      v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast, which is how visible the unlit segments are.', ex: ['55', 'sets the contrast to 55'],
+        argDocs: { contrast: 'How visible the unlit segments are.\nAlso how strongly the backlight glows.\nRange: 0 ↔ 100.\n0: unlit segments hidden.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('scroll', 'scroll', ENUM, { doc: 'Set which way the lines scroll, or stop them scrolling.', ex: ['"left"', 'scrolls the lines to the left'] }),
       v('scrollSpeed', 'scrollSpeed', NUM, { min: 0, max: 60, doc: 'Set the scrolling speed, in characters per second.',
         argDocs: { scrollSpeed: 'Characters per second.\nRange: 0 ↔ 60.\n0: no scrolling.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('blink', 'blink', BOOL, { toggle: true, doc: 'Switch blinking of the whole display on or off.' }),
+      // Only the lit text blinks: the renderer hides the glyphs on the off phase and draws the
+      // unlit segments, the backlight, the cursor, images and animations throughout.
+      v('blink', 'blink', BOOL, { toggle: true, doc: 'Switch the text blinking on or off.', ex: ['true', 'makes the text blink'],
+        argDocs: { blink: `true: the text blinks.\nfalse: the text is steady.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.',
+          'The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.'] }),
       v('cursor', 'cursor', ENUM, { doc: 'Set the cursor\'s shape, or hide it.', ex: ['"block"', 'shows a block cursor'] }),
+      // `fit`: a cell of the display, so 1 to its columns and rows, not to 256. Column 40 of a
+      // 16-column display was stored without a word and the cursor was drawn nowhere.
       v('cursorAt', '', XY, { fx: 'cursorCol', fy: 'cursorRow', min: 1, max: 256, flat: true, oneBased: true,
-        args: ['col', 'row'], doc: 'Put the cursor on a cell.', ex: ['5, 2', 'puts the cursor on column 5 of row 2'] }),
-      v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'] }),
+        fit: { cursorCol: 'cols', cursorRow: 'rows' },
+        args: ['col', 'row'], doc: 'Put the cursor on a cell.', ex: ['5, 2', 'puts the cursor on column 5 of row 2'],
+        notes: ['The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".'] }),
+      v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'],
+        argDocs: { value: 'The number shown.\nOutside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends.\nInvalid: rejected with a console error.' },
+        notes: ['While `valueSource()` links a control, that control sets the value and its range.'] }),
       v('anim', 'animMode', ENUM, { doc: 'Set the animation behind the text of a graphic display: off, a file, or a preset.', ex: ['"preset"', 'plays the chosen preset animation'] }),
-      v('animPreset', 'animPreset', STR, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
-        argDocs: { animPreset: 'The preset\'s name: "wave", "scanner", "rain", "starfield", "spinner" or "plasma".' } }),
+      // A list of names, as scroll and cursor are: any word was stored, and the display drew nothing
+      // for one it did not know.
+      v('animPreset', 'animPreset', ENUM, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
+        notes: ['Plays only on a graphic display, while `anim()` is "preset".'] }),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16, doc: 'Set the speed of the preset animation, as a multiple of its normal speed.', ex: ['2', 'plays the preset animation at twice its normal speed'],
         // The graphic canvas reads it as Math.max(0.05, Number(animSpeed) || 1): 0 is normal speed,
         // not a pause, and anything below 0.05 is 0.05.
         argDocs: { animSpeed: 'Speed factor.\nRange: 0 ↔ 16.\n1: normal; 0 is read as 1.\nBelow 0.05: 0.05.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'] }),
+      v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'],
+        argDocs: { animFps: 'Frames per second.\nOnly for a sprite sheet: a GIF or APNG plays at its own speed.\nRange: 1 ↔ 120.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('animLoop', 'animLoop', BOOL, { toggle: true, doc: 'Switch looping of the animation on or off.',
-        argDocs: { animLoop: 'Left out: toggles.\nfalse: the last frame holds.\n0 or "": false; any other value: true.' } }),
+        argDocs: { animLoop: `Left out: toggles.\nfalse: the last frame holds.\n${OFF_RULE}` } }),
       v('scrollMode', 'scrollMode', ENUM, { doc: 'Set whether scrolled text loops round or bounces.', ex: ['"bounce"', 'bounces the text between its ends'] }),
       v('scrollRepeat', 'scrollRepeat', INT, { min: 0, max: 999, doc: 'Set how many times the text scrolls through.', ex: ['3', 'scrolls the text through three times, then stops'],
         argDocs: { scrollRepeat: 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('blinkRate', 'blinkRate', NUM, { min: 50, max: 5000, doc: 'Set the blink period.', ex: ['250', 'blinks four times a second'],
-        argDocs: { blinkRate: 'Period in milliseconds.\nRange: 50 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      // Time lit, then the same time dark: the renderer's half-cycle, so 250 blinks twice a second.
+      // 60 is the fastest it draws (LcdDisplayRenderer) and the inspector's minimum; 50 was stored
+      // and read back as 50 and drawn as 60.
+      v('blinkRate', 'blinkRate', NUM, { min: 60, max: 5000, doc: 'Set how fast the text blinks.',
+        ex: ['250', 'shows the text for 250 ms, then hides it for 250 ms: two blinks a second'],
+        argDocs: { blinkRate: 'Time on, then the same time off, in milliseconds.\nRange: 60 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Has an effect only while `blink()` is on. Default: off.', 'The cursor blinks at its own fixed speed.'] }),
       v('cursorBlink', 'cursorBlink', BOOL, { toggle: true, doc: 'Switch blinking of the cursor on or off.' }),
       v('valueMin', 'valueMin', NUM, { min: -1e9, max: 1e9, doc: 'Set the low end of the value\'s range, for the {pct} and {bar} tokens.', ex: ['0', 'makes 0 the empty end of the bar'] }),
       v('valueMax', 'valueMax', NUM, { min: -1e9, max: 1e9, doc: 'Set the high end of the value\'s range, for the {pct} and {bar} tokens.', ex: ['127', 'makes 127 the full end of the bar'] }),
-      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Set how many decimal places the value shows.', ex: ['2', 'shows the value with two decimal places'] }),
-      v('valuePrefix', 'valuePrefix', STR, { doc: 'Set the text written before the value.', ex: ['"Vol "', 'shows the value as Vol 64'] }),
-      v('valueSuffix', 'valueSuffix', STR, { doc: 'Set the text written after the value.', ex: ['" dB"', 'shows the value as 64 dB'] }),
+      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Set how many decimal places the value shows.', ex: ['2', 'shows the value with two decimal places'],
+        argDocs: { valuePrecision: 'Decimal places `{value}` shows. `{pct}` is always whole.\nRange: 0 ↔ 6, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('valuePrefix', 'valuePrefix', STR, { doc: 'Set the text written before the value.', ex: ['"Vol "', 'shows the value as Vol 64'],
+        argDocs: { valuePrefix: 'Text before the number in `{value}`. Not used by `{pct}` or `{bar}`.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
+      v('valueSuffix', 'valueSuffix', STR, { doc: 'Set the text written after the value.', ex: ['" dB"', 'shows the value as 64 dB'],
+        argDocs: { valueSuffix: 'Text after the number in `{value}`. Not used by `{pct}` or `{bar}`.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
       v('valueSource', 'valueSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the value.' }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the brightness.' }),
-      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any', doc: 'Name the control that drives the backlight.' }),
+      // Any control: on while it is on, or past halfway along its range (lcdZones' backlightOnFrom).
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any', doc: 'Name the control that drives the backlight.',
+        ex: ['"Light"', 'makes the control called Light switch the backlight'], linkRule: 'On while the control is on, or past halfway.' }),
       // CGRAM, 1-based. This one CAN be an `item` verb where Pixel.elements could not, and the
       // difference is the hardware: a display has exactly eight glyph slots and always has, so
       // slot 1 is always there to write to. `Pixel.elements` starts empty, which is what made the
@@ -631,17 +689,33 @@ export const COMPONENT_FAMILIES = [
       // a script. CGRAM is eight slots on the hardware and eight here, always — an insert would
       // mint a ninth that nothing can address, since the addressing is \\x00..\\x07. Without it the
       // family picks up insert/remove for free, which scriptComponents.test.js catches.
-      v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true,
+      v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true, refuseValue: glyphBitsRefusal,
         doc: 'Define one of the eight user glyphs.',
         ex: ['1, ".#.#.|#####|#####|.###.|..#..|.....|.....|....."', 'puts a heart in slot 1, shown in a line by \\x00'],
-        argDocs: { index: 'Glyph slot.\nRange: 1 ↔ 8.\nOutside the range: rejected with a console error.',
-          bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a line by \\x00 to \\x07 for slots 1 to 8.' } }),
+        argDocs: { index: 'Glyph slot.\nRange: 1 ↔ 8.\nA fraction: rounded.\nOutside the range: rejected with a console error.',
+          bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a line by \\x00 to \\x07 for slots 1 to 8.\n'
+            + '"1" and "0": the same as "#" and ".".\nFewer than eight rows, or fewer than five cells in a row: the rest unlit.\n'
+            + 'Empty, or nothing lit: the slot is cleared.\nOther characters: rejected with a console error.\n'
+            + 'More than eight rows, or a row longer than five: rejected with a console error.' } }),
       // The on-screen editable field — the buffer a zone with show:'edit' bound to '@edit' shows,
       // and the one genuinely EDITABLE value a display owns. It was reachable by typing at the
       // screen and by a device binding on the `text` port, and by nothing else: no script could
       // read the patch name the user had just entered, which is the obvious thing to want.
+      // A script's text is stored as given: the field's character set and length govern typing.
       v('editText', 'editText', STR, { doc: 'Set the text in the display\'s editable field.', ex: ['"INIT VOICE"', 'puts INIT VOICE in the field'],
+        argDocs: { editText: 'The text in the field.\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.' },
         notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.'] }),
+      v('layout', 'layouts', LAYOUT, { flat: 'its lines', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
+        notes: ['Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.'] }),
+      // The four overlays, declared here rather than derived (derivedFlagVerbs) for what each is.
+      v('showGlass', 'showGlass', BOOL, { toggle: true, doc: 'Show or hide the glass: a sheen across the screen.',
+        notes: ['Its tint is set in the inspector, under Colour ▸ Glass. Default: shown.'] }),
+      v('showGhost', 'showGhost', BOOL, { toggle: true, doc: 'Show or hide the ghost: the faint unlit cells behind the text.',
+        notes: ['How faint is set by `contrast()`. Default: shown.'] }),
+      v('showScanlines', 'showScanlines', BOOL, { toggle: true, doc: 'Show or hide the scanlines: thin horizontal lines across the screen.',
+        notes: ['Default: hidden.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the grid: faint lines between the cells or pixels.',
+        notes: ['Default: hidden.'] }),
     ],
   },
   {
@@ -692,14 +766,17 @@ export const COMPONENT_FAMILIES = [
       v('gamma', 'gamma', NUM, { min: 0.1, max: 4 }),
       v('glow', 'glow', NUM, UNIT),
       v('anim', 'animMode', ENUM),
-      v('animPreset', 'animPreset', STR),
+      v('animPreset', 'animPreset', ENUM),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16 }),
       v('animLoop', 'animLoop', BOOL, { toggle: true }),
       v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
       v('layoutTransition', 'layoutTransition', ENUM, { doc: 'How one layout gives way to the next.' }),
       v('transitionMs', 'transitionMs', NUM, { min: 0, max: 5000 }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
-      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any',
+        ex: ['"Light"', 'makes the control called Light switch the backlight'], linkRule: 'On while the control is on, or past halfway.' }),
+      v('layout', 'layouts', LAYOUT, { flat: 'its elements', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
+        notes: ['Shown until an overlay or the Selector changes it.'] }),
     ],
   },
 ];
@@ -746,22 +823,24 @@ for (const fam of COMPONENT_FAMILIES) {
  * They address an array by its VERB name (`fill(t, "step", …)`, not `fill(t, "steps", …)`), so the
  * vocabulary a script learns for writing is the vocabulary it uses for everything else.
  */
+// What a call gives back, as every component verb's notes say it. A list that cannot grow is
+// refused with a console error like any other refusal, so `insert` says the same.
+const RETURNS_TRUE = ['Returns true.', 'Rejected: false, with a console error. Nothing changes.'];
+const RETURNS_SET = ['Returns true. Already set: true, with a console line.', 'Rejected: false, with a console error. Nothing changes.'];
+const RETURNS_VALUE = (what) => [`Returns the ${what}.`, 'Rejected: no result, with a console error.'];
+
 const FAMILY_VERBS = [
-  { v: 'read', k: READ, doc: 'Read back a setting, or every setting.',
-    notes: ['`read(target)`: every setting as a table, by verb name. `read(target, "step")`: the whole list of a list verb; `read(target, "step", 3)`: one element, counted from 1.',
-      'Returns the value; rejected with a console error: no result.'] },
-  { v: 'size', k: SIZE, doc: 'Read how many elements a list has.',
-    notes: ['`size(target)`: every list as a table, by verb name; `size(target, "node")`: one number. The Mod Matrix answers { rows, cols }.',
-      'Returns the number; rejected with a console error: no result.'] },
-  { v: 'fill', k: FILL, doc: 'Write a whole list in one call.',
-    notes: ['One document change and one undo step, instead of one per element.',
-      'Returns true; rejected with a console error: false.'] },
+  // read's, size's and fill's notes name the family's own lists (familyNotes, below): they named a
+  // "step" and a "node" list and the Mod Matrix on every component, and only one had each.
+  { v: 'read', k: READ, doc: 'Read back a setting, or every setting.' },
+  { v: 'size', k: SIZE, doc: 'Read how many elements a list has.' },
+  { v: 'fill', k: FILL, doc: 'Write a whole list in one call.' },
   { v: 'insert', k: INSERT, doc: 'Add one element to a list.',
     notes: ['The new element is the canvas\'s own template. Appended; with an index, inserted before that position, counted from 1.',
-      'Returns true; a list that cannot grow, or rejected with a console error: false.'] },
+      ...RETURNS_TRUE] },
   { v: 'remove', k: REMOVE, doc: 'Remove one element from a list.',
     notes: ['The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.',
-      'Returns true; rejected with a console error: false.'] },
+      ...RETURNS_TRUE] },
 ];
 
 /* ------------------------------------------------- the two every component spells the same
@@ -859,6 +938,25 @@ function clampInt(value, spec) {
   return n === null ? null : Math.round(n);
 }
 
+/**
+ * The range one axis of an XY verb takes: the spec's own, or, for an axis that addresses a cell of
+ * the control (`fit`: the LCD's cursor), 1 to the size the control has, read as the renderer reads
+ * it. Without the control's settings, the spec's own.
+ */
+function axisRange(verb, field, c) {
+  const sizeField = verb.fit?.[field];
+  if (!sizeField || !c || typeof c !== 'object') return verb;
+  const own = Number(c[sizeField]);
+  const size = Number.isFinite(own) ? own : Number(SECTION_DEFAULTS[verb.section]?.[sizeField]);
+  return Number.isFinite(size) ? { ...verb, max: Math.max(1, Math.round(size)) } : verb;
+}
+
+// An XY call's two numbers: either may be left out, but not both, and one that is given has to be
+// a number. `cursorAt(t, "x", 2)` moved the row and dropped the "x" without a word.
+const xyGiven = (x) => x !== undefined && x !== null;
+const xyNumber = (x) => Number.isFinite(Number(x));
+const xyLegal = (a, b) => (xyGiven(a) || xyGiven(b)) && [a, b].every((x) => !xyGiven(x) || xyNumber(x));
+
 /** Coerce one argument to the kind a verb (or an array item) declares. null means "no-op". */
 function coerce(kind, value, spec, current) {
   switch (kind) {
@@ -867,14 +965,15 @@ function coerce(kind, value, spec, current) {
     case BOOL:
       // No argument toggles, so one footswitch can do both jobs. `current` is what it toggles from.
       if (value === undefined || value === null) return !(current === true);
-      return value !== false && value !== 0 && value !== '';
+      return !isOff(value);
     // Text left out is refused, as every required value left out is: it was written as "".
     case STR: return value === undefined || value === null ? null : String(value);
     case ENUM: {
       // An unrecognised value is a NO-OP, never a silently wrong setting: a typo that leaves the
-      // arpeggiator alone is debuggable, one that quietly sets it to "up" is not.
-      const want = typeof value === 'number' ? value : String(value ?? '');
-      return spec.values.some((x) => x === want) ? want : null;
+      // arpeggiator alone is debuggable, one that quietly sets it to "up" is not. A word in another
+      // case is the word: "LEFT" is "left", stored as the list spells it.
+      if (typeof value === 'number') return spec.values.some((x) => x === value) ? value : null;
+      return listWord(spec.values, value);
     }
     default: return null;
   }
@@ -947,13 +1046,17 @@ export function componentScriptPatch(verb, cfg, args = []) {
 
     case XY: {
       // Two numbers at once. Either may be omitted to move only the other axis — a script sweeping
-      // the x of a puck should not have to know where the y currently is.
+      // the x of a puck should not have to know where the y currently is. One given that is not a
+      // number refuses the whole call (xyLegal), rather than moving the other axis alone.
+      if (!xyLegal(a, b)) return {};
       const patch = {};
       const put = (field, value) => {
         if (value === undefined || value === null) return;
-        const n = clampNum(value, verb);
+        const n = clampNum(value, axisRange(verb, field, c));
         if (n === null) return;
-        const stored = verb.oneBased ? n - 1 : n;
+        // A one-based axis addresses a cell, which is whole: 2.6 was stored, read back as 2.6 and
+        // drawn at 3.
+        const stored = verb.oneBased ? Math.round(n) - 1 : n;
         if (verb.flat) { if (stored !== c[field]) patch[field] = stored; return; }
         patch.__nested = { ...(patch.__nested ?? {}), [field]: stored };
       };
@@ -981,7 +1084,8 @@ export function componentScriptPatch(verb, cfg, args = []) {
       const row = list[at] && typeof list[at] === 'object' ? list[at] : {};
       const current = itemCurrent(verb, c, at);
       const next = coerce(verb.kind, b, verb, current);
-      if (next === null || next === current) return {};
+      // A value the component cannot use as written (a glyph it cannot draw) is refused, not stored.
+      if (next === null || next === current || verb.refuseValue?.(next)) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x)) };
     }
 
@@ -1038,13 +1142,20 @@ export function componentScriptPatch(verb, cfg, args = []) {
       // elsewhere — so the only illegal index is one that is not a whole number at or above zero.
       if (!Number.isFinite(at) || at < 0) return {};
       const on = list.includes(at);
-      const want = b === undefined || b === null ? !on : (b !== false && b !== 0 && b !== '');
+      const want = b === undefined || b === null ? !on : !isOff(b);
       if (want === on) return {};
       const next = want ? [...list, at].sort((x, y) => x - y) : list.filter((n) => n !== at);
       return { [verb.f]: next };
     }
 
     case LINE: {
+      if (lcdLines(verb)) {
+        // Where on the display, and on which layout: lcdPositions.js reads a row number or a table
+        // of layout, row and col, and writes the layout's own text (the display's lines when it has
+        // no layouts). A section with neither lines nor rows is not a display, and has nothing.
+        if (!Array.isArray(c.lines) && !isFinite_(Number(c.rows))) return {};
+        return verb.clear ? lcdClearAt(c, a).patch : lcdWriteAt(c, a, b).patch;
+      }
       const list = Array.isArray(c[verb.f]) ? c[verb.f] : null;
       if (!list) return {};
       if (verb.clear) {
@@ -1052,8 +1163,9 @@ export function componentScriptPatch(verb, cfg, args = []) {
         return { [verb.f]: list.map(() => '') };
       }
       const at = indexOf(a, list.length);
-      if (at === null) return {};
-      const text = String(b ?? '');
+      // Text left out is refused, as every text verb's is; "" blanks the line on purpose.
+      if (at === null || b === undefined || b === null) return {};
+      const text = String(b);
       if (text === list[at]) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? text : x)) };
     }
@@ -1089,11 +1201,9 @@ export function componentRequestLegal(verb, cfg, args = []) {
       return a === undefined || a === null ? false : Number.isFinite(Number(a));
     case ENUM:
       return coerce(ENUM, a, verb, c[verb.f]) !== null;
-    case XY: {
-      // At least one axis has to be a usable number — moving neither is not a move.
-      const usable = (x) => x !== undefined && x !== null && Number.isFinite(Number(x));
-      return usable(a) || usable(b);
-    }
+    case XY:
+      // At least one axis, and no axis given that is not a number — moving neither is not a move.
+      return xyLegal(a, b);
     case INDEXSET:
       return Number.isFinite(Number(a)) && Math.round(Number(a)) - 1 >= 0;
     case ITEM: {
@@ -1101,7 +1211,8 @@ export function componentRequestLegal(verb, cfg, args = []) {
       if (length === null) return false;
       const at = indexOf(a, length);
       if (at === null) return false;
-      return coerce(verb.kind, b, verb, itemCurrent(verb, c, at)) !== null;
+      const next = coerce(verb.kind, b, verb, itemCurrent(verb, c, at));
+      return next !== null && !verb.refuseValue?.(next);
     }
     case ELEM: {
       // A name this display has nothing under is a REFUSAL, not a no-op, and that is the whole
@@ -1112,9 +1223,11 @@ export function componentRequestLegal(verb, cfg, args = []) {
       if (!sites.length) return false;
       return coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]) !== null;
     }
+    case LAYOUT: return !lcdLayoutIndex(c, a, verb.flat).refusal;
     case LINE: {
+      if (lcdLines(verb)) return !(verb.clear ? lcdClearAt(c, a) : lcdWriteAt(c, a, b)).refusal;
       const list = listOf(verb.f);
-      return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null;
+      return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null && b !== undefined && b !== null;
     }
     case CELL: {
       const list = listOf(verb.f);
@@ -1143,7 +1256,7 @@ const LIST_NOUNS = {
   'DrumPads.pads': 'pad', 'Turing.steps': 'step', 'Looper.lanes': 'lane', 'Orbit.nodes': 'node',
   'Timbre.anchors': 'anchor', 'Router.destinations': 'destination', 'Router.curve': 'point',
   'Macro.slots': 'slot', 'Constraint.members': 'member', 'Envelope.points': 'point',
-  'Joystick.cornerLabels': 'corner', 'Meter.zones': 'zone', 'Display.lines': 'line', 'Display.glyphs': 'glyph',
+  'Joystick.cornerLabels': 'corner', 'Meter.zones': 'zone', 'Display.lines': 'row', 'Display.glyphs': 'glyph',
   'Arp.mutes': 'step',
 };
 
@@ -1161,7 +1274,8 @@ export function verbIndexArgs(verb) {
     case ITEM: case INDEXSET: return ['index'];
     case ELEM: return ['name'];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col'] : ['index']);
-    case LINE: return verb.clear ? [] : ['row'];
+    case LINE: return lcdLines(verb) ? ['at'] : (verb.clear ? [] : ['row']);
+    case LAYOUT: return ['layout'];
     default: return [];
   }
 }
@@ -1175,7 +1289,10 @@ export function componentIndexRange(verb, cfg) {
     case CELL:
       if (verb.grid) return { rows: Array.isArray(c.rows) ? c.rows.length : 0, cols: Array.isArray(c.cols) ? c.cols.length : 0 };
       return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
-    case LINE: return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
+    case LAYOUT: return { count: lcdLayoutCount(c) };
+    case LINE:
+      if (lcdLines(verb)) return { count: lcdRows(c) };
+      return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
     case ELEM: {
       const names = [];
       for (const { elements } of elementLists(c)) for (const el of elements) { const n = elementLabel(el); if (n && !names.includes(n)) names.push(n); }
@@ -1210,7 +1327,8 @@ export function componentRefusalReason(verb, cfg, args = []) {
     case ITEM: {
       const range = componentIndexRange(verb, c);
       if (!range) return `It has no ${noun}s.`;
-      return indexRefusal(a, range.count, noun) ?? valueOf(verb.kind, b);
+      return indexRefusal(a, range.count, noun) ?? valueOf(verb.kind, b)
+        ?? (b === undefined || b === null ? null : verb.refuseValue?.(coerce(verb.kind, b, verb)) ?? null);
     }
     case CELL: {
       if (verb.clear) return null;
@@ -1222,14 +1340,20 @@ export function componentRefusalReason(verb, cfg, args = []) {
       if (!range) return `It has no ${noun}s.`;
       return indexRefusal(a, range.count, noun) ?? valueOf(NUM, b);
     }
+    case LAYOUT: return lcdLayoutIndex(c, a, verb.flat).refusal ?? null;
     case LINE: {
+      if (lcdLines(verb)) return (verb.clear ? lcdClearAt(c, a) : lcdWriteAt(c, a, b)).refusal ?? null;
       if (verb.clear) return null;
       const range = componentIndexRange(verb, c);
-      return range ? indexRefusal(a, range.count, noun) : `It has no ${noun}s.`;
+      return range ? indexRefusal(a, range.count, noun) ?? valueOf(STR, b) : `It has no ${noun}s.`;
     }
     case INDEXSET: {
       const n = Number(a);
       return Number.isFinite(n) && Math.round(n) >= 1 ? null : `${shownValue(a)} is not a ${noun}: the ${noun}s count from 1.`;
+    }
+    case XY: {
+      const bad = [a, b].find((x) => xyGiven(x) && !xyNumber(x));
+      return bad !== undefined ? `${shownValue(bad)} is not a number.` : xyGiven(a) || xyGiven(b) ? null : 'No number was given.';
     }
     case ELEM: {
       if (elementSites(c, a).length) return null;
@@ -1246,23 +1370,31 @@ export function componentRefusalReason(verb, cfg, args = []) {
  * stored as 127 without a word, and the row said "the note is from 0 to 127, and 200 is not", as
  * though the call had been refused.
  */
-export function componentClampWarning(verb, path, args = []) {
+export function componentClampWarning(verb, path, args = [], cfg = null) {
   const names = verbArgs(verb);
   const given = [];
+  // A refused call used nothing, so it has no nearest end to say.
+  if (verb.k === XY && !xyLegal(args[0], args[1])) return null;
+  // A range of rows or columns that runs past the display's edge stops at it.
+  if (lcdLines(verb)) {
+    const said = (verb.clear ? lcdClearAt(cfg, args[0]) : lcdWriteAt(cfg, args[0], args[1])).clamped;
+    return said ? `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — ${said}` : null;
+  }
   if (verb.k === NUM || verb.k === INT) given.push([names[0], args[0]]);
   else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
   else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
-  else if (verb.k === XY) given.push([names[0], args[0]], [names[1], args[1]]);
-  for (const [name, value] of given) {
+  else if (verb.k === XY) given.push([names[0], args[0], verb.fx], [names[1], args[1], verb.fy]);
+  for (const [name, value, field] of given) {
     if (value === undefined || value === null || typeof value === 'boolean') continue;
     const n = Number(value);
     if (!isFinite_(n)) continue;
-    const lo = isFinite_(verb.min) ? verb.min : -Infinity;
-    const hi = isFinite_(verb.max) ? verb.max : Infinity;
+    const spec = field ? axisRange(verb, field, cfg) : verb;
+    const lo = isFinite_(spec.min) ? spec.min : -Infinity;
+    const hi = isFinite_(spec.max) ? spec.max : Infinity;
     if (n >= lo && n <= hi) continue;
     const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
-    const span = isFinite_(verb.min) && isFinite_(verb.max) ? `outside ${verb.min} to ${verb.max}`
-      : n < lo ? `below ${verb.min}` : `above ${verb.max}`;
+    const span = isFinite_(spec.min) && isFinite_(spec.max) ? `outside ${spec.min} to ${spec.max}`
+      : n < lo ? `below ${spec.min}` : `above ${spec.max}`;
     return `${verb.family} ${path}: ${verb.v}(${shown}) — the ${name} ${shownValue(n)} is ${span}, so ${n < lo ? lo : hi} was used.`;
   }
   return null;
@@ -1286,9 +1418,18 @@ export function familyVerbNames(family, forWhat) {
   return Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear).map(([k]) => k).sort();
 }
 
+/** A family's verb by the name a script wrote, in any case: `read(t, "SCROLLSPEED")` reads
+ *  scrollSpeed. null when it has none by that name (and never one of Object's own, "toString"). */
+export function familyVerbNamed(family, name) {
+  const specs = VERBS_BY_FAMILY[family] ?? {};
+  const want = String(name ?? '').trim();
+  if (Object.hasOwn(specs, want)) return specs[want];
+  return Object.values(specs).find((s) => s.v.toLowerCase() === want.toLowerCase()) ?? null;
+}
+
 /** What `read`, `size`, `fill`, `insert` or `remove` says of a name it has no verb by, or null. */
 export function familyVerbRefusal(family, forWhat, name) {
-  const spec = (VERBS_BY_FAMILY[family] ?? {})[String(name ?? '')];
+  const spec = familyVerbNamed(family, name);
   if (forWhat === 'read') {
     const names = familyVerbNames(family, 'read').join(', ');
     if (!spec) return `${family}.read: "${name}" is not a verb of this component. One of: ${names}.`;
@@ -1341,12 +1482,13 @@ export function verbArgs(verb) {
     case ITEM: return ['index', verb.item];
     case ELEM: return ['name', verb.item];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col', 'amount'] : ['index', 'value']);
-    case LINE: return verb.clear ? [] : ['row', 'text'];
+    case LINE: return lcdLines(verb) ? (verb.clear ? ['at'] : ['at', 'text']) : (verb.clear ? [] : ['row', 'text']);
     case INDEXSET: return ['index', 'on'];
     case BOOL: return [verb.v];
     // The five every family gets. Their optional arguments are rendered in verbSignature, which is
     // why they read as a plain list here.
     case LINK: return ['name'];
+    case LAYOUT: return ['layout'];
     case READ: return ['name', 'index'];
     case SIZE: return ['name'];
     case FILL: return ['name', 'values'];
@@ -1369,9 +1511,10 @@ export function verbArgKinds(verb) {
     case ITEM: return [INT, verb.kind];
     case ELEM: return [STR, verb.kind];
     case CELL: return verb.clear ? [] : (verb.grid ? [INT, INT, NUM] : [INT, NUM]);
-    case LINE: return verb.clear ? [] : [INT, STR];
+    case LINE: return lcdLines(verb) ? (verb.clear ? [POSITION] : [POSITION, STR]) : (verb.clear ? [] : [INT, STR]);
     case INDEXSET: return [INT, BOOL];
     case LINK: return [STR];
+    case LAYOUT: return ['layoutRef'];
     case READ: return [STR, INT];
     case SIZE: return [STR];
     case FILL: return [STR, 'list'];
@@ -1398,6 +1541,8 @@ export function verbArgOptional(verb) {
     case INDEXSET: return [false, true];
     case ITEM: case ELEM: return [false, boolValue];
     case BOOL: return [Boolean(verb.toggle)];
+    case XY: return [true, true];                     // either axis alone; both left out is refused
+    case LINE: return lcdLines(verb) && verb.clear ? [true] : verbArgs(verb).map(() => false);
     default: return verbArgs(verb).map(() => false);
   }
 }
@@ -1452,12 +1597,54 @@ export function verbSummary(verb) {
     case LINE: return verb.clear ? 'Blank every line.' : 'Write one line.';
     case INDEXSET: return `Switch one ${itemNoun(verb)} on or off.`;
     case LINK: return `Name the control that drives the ${words || 'input'}.`;
+    case LAYOUT: return 'Show one of the display\'s layouts.';
     default: return `Set the ${words}.`;
   }
 }
 
 /** A sample value for a verb's own value, for its example: a number inside its range, the first of
  *  an enum's words, text. */
+/** A family's list verbs, in the order they are declared: what fill's example writes. */
+function declaredLists(verb) {
+  return Object.values(VERBS_BY_FAMILY[verb.family] ?? {}).filter((spec) => LIST_KINDS.includes(spec.k) && !spec.clear);
+}
+
+/** A few values a list takes, written out as a script would: `{0.25, 0.5, 0.75}`. */
+function sampleList(spec) {
+  if (spec.k === CELL && spec.grid) return { text: '{{0.5, 0}, {0, 0.5}}', count: 2 };
+  if (spec.k === LINE) return spec.section === 'Display' ? { text: '{"PATCH 12", "VOL 100"}', count: 2 } : { text: '{"One", "Two"}', count: 2 };
+  const kind = spec.k === ITEM ? spec.kind : NUM;
+  if (kind === BOOL) return { text: '{true, false, true}', count: 3 };
+  if (kind === ENUM && Array.isArray(spec.values) && spec.values.length > 1) return { text: `{"${spec.values[0]}", "${spec.values[1]}"}`, count: 2 };
+  if (kind === STR || kind === ENUM) return { text: '{"One", "Two"}', count: 2 };
+  const lo = Number.isFinite(spec.min) && Math.abs(spec.min) < 1e6 ? spec.min : 0;
+  const hi = Number.isFinite(spec.max) && Math.abs(spec.max) < 1e6 ? spec.max : 1;
+  const at = (t) => (kind === INT ? Math.round(lo + (hi - lo) * t) : Math.round((lo + (hi - lo) * t) * 100) / 100);
+  return { text: `{${[0.25, 0.5, 0.75].map(at).join(', ')}}`, count: 3 };
+}
+
+/** read's and size's notes, from the family's own lists: the first by name, as firstList takes it. */
+function familyNotes(verb) {
+  const lists = Object.values(VERBS_BY_FAMILY[verb.family] ?? {})
+    .filter((spec) => LIST_KINDS.includes(spec.k) && !spec.clear).sort((a, b) => a.v.localeCompare(b.v));
+  const named = Object.values(VERBS_BY_FAMILY[verb.family] ?? {}).filter((spec) => spec.k === ELEM).sort((a, b) => a.v.localeCompare(b.v));
+  const first = lists[0];
+  const grid = lists.find((spec) => spec.k === CELL && spec.grid);
+  if (verb.k === SIZE) {
+    if (!first) return [];
+    const one = first === grid ? `\`size(target, "${first.v}")\`: { rows, cols }.` : `\`size(target, "${first.v}")\`: one number.`;
+    const rows = grid && grid !== first ? ` \`size(target, "${grid.v}")\`: { rows, cols }.` : '';
+    return [`\`size(target)\`: every list as a table, by verb name; ${one}${rows}`];
+  }
+  const all = '`read(target)`: every setting as a table, by verb name.';
+  if (first === grid && first) return [`${all} \`read(target, "${first.v}")\`: the whole grid, as rows; \`read(target, "${first.v}", 2, 3)\`: row 2, column 3.`];
+  if (first) return [`${all} \`read(target, "${first.v}")\`: the whole list; \`read(target, "${first.v}", 3)\`: one ${itemNoun(first)}, counted from 1.`];
+  // An element's text is what a reader of a pixel display reads first.
+  const element = named.find((spec) => spec.v === 'text') ?? named[0];
+  if (element) return [`${all} \`read(target, "${element.v}")\`: every element's, by name; \`read(target, "${element.v}", "title")\`: one element's.`];
+  return [all];
+}
+
 function sampleValue(verb, kind) {
   const spec = verb.k === ITEM || verb.k === ELEM ? { ...verb, min: verb.min, max: verb.max } : verb;
   switch (kind) {
@@ -1504,9 +1691,17 @@ export function verbExample(verb) {
     case ENUM: { const w = sampleValue(verb, ENUM); return `\`${call}(${target}, ${w})\` sets the ${words} to ${w}.`; }
     case STR: return `\`${call}(${target}, "text")\` sets the ${words} to text.`;
     case LINK: return `\`${call}(${target}, "Cutoff")\` makes the control called Cutoff drive the ${words}.`;
+    case LAYOUT: return `\`${call}(${target}, 2)\` shows layout 2.`;
     case READ: return `\`${call}(${target})\` gives every setting as a table.`;
     case SIZE: return `\`${call}(${target})\` gives the length of every list as a table.`;
-    case FILL: { const [name, noun] = firstList(verb); return `\`${call}(${target}, "${name}", values)\` writes the ${noun}s from the first, one value per element.`; }
+    case FILL: {
+      // A list written out, as ce.draw's examples write theirs, rather than a `values` never shown.
+      const spec = declaredLists(verb)[0];
+      if (!spec) break;
+      const { text, count } = sampleList(spec);
+      const noun = spec.k === CELL && spec.grid ? 'row' : itemNoun(spec);
+      return `\`${call}(${target}, "${spec.v}", ${text})\` writes ${noun}s 1 ${count === 2 ? 'and 2' : `to ${count}`}${spec.k === CELL && spec.grid ? ' of the grid' : ''}.`;
+    }
     case INSERT: { const [name, noun] = firstList(verb, true); return `\`${call}(${target}, "${name}")\` adds ${article(noun)} ${noun} at the end.`; }
     case REMOVE: { const [name, noun] = firstList(verb, true); return `\`${call}(${target}, "${name}")\` removes the last ${noun}.`; }
     case ITEM: return verb.kind === BOOL
@@ -1528,9 +1723,13 @@ export function verbExample(verb) {
 export function verbNotes(verb) {
   const own = Array.isArray(verb.notes) ? verb.notes : [];
   switch (verb.k) {
-    case READ: case SIZE: case FILL: case INSERT: case REMOVE: return own;
-    case LINK: return [...own, 'Returns true; rejected with a console error: false. `read(target, "' + verb.v + '")` gives the control\'s name.'];
-    default: return [...own, 'Returns true; already that way: true, with a line in the console.', 'Rejected with a console error: false, and nothing changed.'];
+    case READ: return [...familyNotes(verb), ...RETURNS_VALUE('value')];
+    case SIZE: return [...familyNotes(verb), ...RETURNS_VALUE('number')];
+    case FILL: return ['One undo step for the whole list, instead of one per element.', ...RETURNS_TRUE];
+    case INSERT: case REMOVE: return own;
+    case LINK: return [...own, ...RETURNS_SET, '`read(target, "' + verb.v + '")` gives the control\'s name.'];
+    case LAYOUT: return [...own, ...RETURNS_SET, '`read(target, "layout")` gives the number of the layout showing.'];
+    default: return [...own, ...RETURNS_SET];
   }
 }
 
@@ -1551,6 +1750,8 @@ const RANGE_LINES = (verb, kind) => {
 };
 const cap = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 const AXIS_WORDS = { col: 'column', row: 'row', x: 'x', y: 'y' };
+/** The size an axis with `fit` is held to, in words. */
+const FIT_WORDS = { cols: 'the display\'s columns', rows: 'the display\'s rows' };
 /** `"off", "left" or "right"`: an enum's words as a list. */
 const oneOfWords = (values) => {
   const quoted = (values ?? []).map((x) => `"${x}"`);
@@ -1568,50 +1769,84 @@ export function verbParamSummary(verb, name, kind) {
   if (name === 'target') return `The ${verb.label}'s control, by name.\nNot ${verb.article ?? article(verb.label)} ${verb.label}: rejected with a console error.`;
   const words = cap(fieldWords(verb.f) || name);
   const noun = itemNoun(verb);
-  const indexLines = (what, plural) => `${cap(what)} number, counted from 1.\nNot one of the ${plural}: rejected with a console error.`;
+  const indexLines = (what, plural) => `${cap(what)} number, counted from 1.\nA fraction: rounded.\nNot one of the ${plural}: rejected with a console error.`;
   switch (verb.k) {
     case NUM: case INT: return [`${words}.`, ...RANGE_LINES(verb, verb.k)].join('\n');
-    case BOOL: return verb.toggle ? 'Left out: toggles.\n0 or "": false; any other value: true.' : '0 or "": false; any other value: true.';
-    case ENUM: return `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`;
+    case BOOL: return verb.toggle ? `Left out: toggles.\n${OFF_RULE}` : OFF_RULE;
+    case ENUM: return `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`;
     case STR: return `${words}.\nA number: written as text.\nLeft out: rejected with a console error.`;
-    case XY: return [`${cap(AXIS_WORDS[name] ?? name)}${verb.oneBased ? ', counted from 1' : ''}.`, ...RANGE_LINES(verb, NUM).filter((l) => !l.startsWith('Invalid')), 'Left out, or invalid: unchanged.', 'Both left out or invalid: rejected with a console error.'].join('\n');
+    case XY: {
+      const size = verb.fit?.[name === verbArgs(verb)[0] ? verb.fx : verb.fy];
+      const range = size ? [`Range: ${verb.min} ↔ ${FIT_WORDS[size]}.`, ...(verb.oneBased ? ['A fraction: rounded.'] : []), 'Outside the range: the nearest end.']
+        : RANGE_LINES(verb, NUM).filter((l) => !l.startsWith('Invalid'));
+      return [`${cap(AXIS_WORDS[name] ?? name)}${verb.oneBased ? ', counted from 1' : ''}.`, ...range,
+        'Left out: unchanged.', 'Invalid: rejected with a console error.', 'Both left out: rejected with a console error.'].join('\n');
+    }
     case LINE:
-      if (name === 'row') return `Row, counted from 1.\nNot a row the display has: rejected with a console error.`;
-      return 'The line.\nLonger than the display: cut at its width unless it scrolls, with a console warning the first time.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.';
+      if (name === 'row') return `Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.`;
+      if (name === 'at' && verb.clear) {
+        return ['Row, counted from 1, of the layout showing.',
+          'Or a table: {layout = 2, row = 4, col = 15}, each part optional.',
+          '`layout`: its number, counted from 1, or its name. Left out: the layout showing.',
+          '`row`, `col`: a number, or a range {5, 10}. Left out: every row, every column.',
+          'A fraction: rounded.', 'A range past the display: to its last row or column.',
+          'Left out: the whole layout showing.', 'Not on the display: rejected with a console error.'].join('\n');
+      }
+      if (name === 'at') {
+        return ['Row, counted from 1, of the layout showing.',
+          'Or a table: {layout = 2, row = 4, col = 15}, `layout` and `col` optional.',
+          '`layout`: its number, counted from 1, or its name. Left out: the layout showing.',
+          '`col`: written from that column on, the rest of the row kept.',
+          '`col` as a range {5, 10}: written into those columns, padded with blanks or cut.',
+          'A fraction: rounded.', 'A range past the display: to its last column.',
+          'Not on the display: rejected with a console error.'].join('\n');
+      }
+      return 'The text.\nLonger than the display: cut at its width, with a console warning the first time.\nOn a display without layouts that scrolls: scrolled in instead.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.\nLeft out: rejected with a console error.';
     case ITEM:
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
-        : kind === BOOL ? 'Left out: toggles.\n0 or "": false; any other value: true.'
-        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`
+        : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
+        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case ELEM:
       if (name === 'name') return 'The element\'s name, as given in the inspector.\nNot an element of this display: rejected with a console error.';
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
-        : kind === BOOL ? 'Left out: toggles.\n0 or "": false; any other value: true.'
-        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`
+        : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
+        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case CELL:
-      if (name === 'row') return 'Row, counted from 1.\nNot a row the grid has: rejected with a console error.';
-      if (name === 'col') return 'Column, counted from 1.\nNot a column the grid has: rejected with a console error.';
+      if (name === 'row') return 'Row, counted from 1.\nA fraction: rounded.\nNot a row the grid has: rejected with a console error.';
+      if (name === 'col') return 'Column, counted from 1.\nA fraction: rounded.\nNot a column the grid has: rejected with a console error.';
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return [`${cap(name)}.`, ...RANGE_LINES(verb, NUM)].join('\n');
     case INDEXSET:
-      if (name === 'index') return `${cap(noun)} number, counted from 1.\nBelow 1, or invalid: rejected with a console error.`;
-      return 'Left out: toggles.\n0 or "": off; any other value: on.';
-    case LINK: return `The driving control's name.\nLeft out, or "": unlinked.\nNot on this panel, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}: rejected with a console error.`;
+      if (name === 'index') return `${cap(noun)} number, counted from 1.\nA fraction: rounded.\nBelow 1, or invalid: rejected with a console error.`;
+      return 'Left out: toggles.\n0, "", "false", "off" or "0": off. Case-insensitive.\nAny other value: on.';
+    case LAYOUT:
+      return ['Its number, counted from 1, or its name.', 'A name: case-insensitive.', 'A fraction: rounded.',
+        `A display without layouts: 1, ${verb.flat}.`, 'Not a layout of the display: rejected with a console error.'].join('\n');
+    case LINK: {
+      // A source any control can be needs no kind in its refusal: "not a control on this panel"
+      // only repeated "not on this panel".
+      const what = verb.sourceKind === 'any' ? '' : `, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}`;
+      return ['The driving control\'s name.', 'Left out, or "": unlinked.', ...(verb.linkRule ? [verb.linkRule] : []),
+        `Not on this panel${what}: rejected with a console error.`].join('\n');
+    }
     case READ:
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
-      return 'Element number of a list verb, counted from 1.\nLeft out: the whole list.\nNot one the list has: rejected with a console error.';
+      return ['Element number of a list verb, counted from 1.', 'A fraction: rounded.',
+        ...(verb.family === 'lcd' ? ['For "text": a row or a table, as `text()` takes it.'] : []),
+        'Left out: the whole list.', 'Not one the list has: rejected with a console error.'].join('\n');
     case SIZE: return 'A list verb of this component, by name.\nLeft out: every list, as a table.\nNot a list verb: rejected with a console error.';
     case FILL:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb: rejected with a console error.';
       return 'A list, one value per element from the first.\nLonger than the list: rejected with a console error.\nNot a list: rejected with a console error.';
     case INSERT:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb, or a list that cannot grow: rejected with a console error.';
-      return 'Position of the new element, counted from 1.\nLeft out: after the last.\nNot one the list has: rejected with a console error.';
+      return 'Position of the new element, counted from 1.\nA fraction: rounded.\nLeft out: after the last.\nNot one the list has: rejected with a console error.';
     case REMOVE:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb, or a list that cannot shrink: rejected with a console error.';
-      return 'Element number, counted from 1.\nLeft out: the last.\nNot one the list has: rejected with a console error.';
+      return 'Element number, counted from 1.\nA fraction: rounded.\nLeft out: the last.\nNot one the list has: rejected with a console error.';
     default: return `${words}.`;
   }
 }

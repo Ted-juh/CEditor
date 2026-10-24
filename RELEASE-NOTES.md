@@ -144,7 +144,71 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - Every component verb has an example, a note saying what it returns, and a text for each
   parameter with its range and what is rejected, in the Insert picker, the hover card and the API
   explorer. The LCD Display's verbs say what each setting is: the scrolling speed in characters
-  per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show.
+  per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show,
+  that brightness 0 is the dimmest and still lit, that a control linked as the source sets the
+  brightness or the value whatever a script writes, and that a script's edit-field text is not held
+  to the characters and length that typing is.
+- `ce.components.lcd.cursorAt` keeps the cursor on the display: a column or row past the
+  display's own size is its last column or row, with a console warning the first time. It took
+  anything up to 256, and column 40 of a 16-column display put the cursor nowhere. A fraction is
+  rounded, so `read` gives back the cell the cursor is drawn on.
+- A verb that takes two numbers (`cursorAt`, `joystick.move`, `timbre.move`, `kinetic.launch`,
+  `kinetic.velocity`, `constellation.probe`) given one that is not a number is refused with a
+  console error and moves nothing. It moved the other one and dropped this one without a word.
+  Either number may still be left out to move only the other.
+- The LCD Display's inspector counts the cursor's row and column from 1, as scripts do. It counted
+  from 0, so its column 0 was a script's column 1.
+- `ce.components.lcd.blinkRate` takes 60 to 5000 ms, as the display and the inspector do: 50 to 59
+  are 60, with a console warning the first time. They were stored as given and drawn as 60. The
+  inspector's Blink Rate stops at 5000, as a script does.
+- A component verb that switches something on or off reads the text "false", "off" and "0", in
+  any case, as off, as it reads `false`, 0 and "". Any text but "" was on, so
+  `ce.components.lcd.blink("Screen", "false")` or `"OFF"` switched blinking on. This is every
+  on/off verb of every component, 134 of them, the Arpeggiator's `mute` among them.
+- A component verb that takes a word from a list reads it in any case: `ce.components.lcd.scroll
+  ("Screen", "LEFT")` is "left", and `read`, `size`, `fill`, `insert` and `remove` take a verb's
+  name in any case too. A word in another case was refused. Control names and a pixel display's
+  element names were matched in any case already.
+- Every word a script takes from a list the app defines is read in any case, and with spaces
+  around it, in the panel window and with it shut: blend modes, stroke caps and joins, image fits
+  and alignments, text styles, the arrangement words, easing curves, `ce.math`'s curve, shape and
+  crossfade names, note names (`"c4"`, `"eb4"`), byte order, a checksum's name, scale, chord, arp
+  pattern and voice-leading names, the storage scope, a message's kind, and `get`'s and `set`'s
+  value form. A capital letter was refused (`"Dorian"`, `"NormalizedValue"`, `"Multiply"`), drew or
+  played the default (`"COVER"`, `"EXP"`, `"DOWN"`), or, for `to7bit`'s `"MSB"`, reversed the bytes.
+  A name you or a script make up is matched as it was; a control's and an element's, in any case,
+  as they always were.
+- `ce.components.lcd.animPreset` and `ce.components.pixel.animPreset` take one of the six presets,
+  "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Any other word is refused with a
+  console error that lists them; it was stored, and the display drew no animation.
+- `ce.components.lcd.glyph` reads each row between "|" on its own, padding a short one with
+  unlit cells: `"#|#|#"` is a dot in each of three rows. The rows ran into each other, and it lit
+  three dots of the top row. A character that is not a cell (`"abc"`), more than eight rows or a
+  row longer than five is refused with a console error saying which; it was stored, and the slot
+  drew nothing or cut the glyph off.
+- `ce.components.lcd.text` called with the text left out, or nil, None or null, writes an error to
+  the console and changes nothing, as the other text verbs do. It blanked the line. `""` still
+  blanks it.
+- Every component parameter counted from 1 (a row, a slot, a pad, a step, a position for `read`,
+  `insert` or `remove`) says that a fraction is rounded, as it always was: row 1.5 is row 2.
+- An LCD Display's layouts have text of their own, shown wherever no zone paints, with `{value}`,
+  `{pct}` and `{bar}` filled in. `ce.components.lcd.text` writes it on the layout showing; on a
+  display with layouts it wrote lines that were never drawn. The inspector's Text rows edit the
+  layout being edited, "+ Enable" gives the first layout the lines so the screen does not go
+  blank, and every list of layouts shows each one's number beside its name ("1 · Home").
+- `ce.components.lcd.text`, `clear` and `read` take a position: a row, as before, or a table
+  naming the layout, the row and the column. `text("Screen", {row = 2, col = 15}, "X")` writes from
+  column 15 and keeps the rest of the row; `clear("Screen", {layout = 2, row = 4, col = {5, 10}})`
+  blanks columns 5 to 10 of row 4 of layout 2; `read("Screen", "text", {row = 1, col = 3})` gives
+  one character. A layout is its number or its name; a range is a list, `col = {5, 10}`. A part the
+  display does not have is refused with a console error that says why.
+- `ce.components.lcd.clear("Screen", 2)` blanks row 2. It blanked every row, the 2 dropped.
+- A knob or slider linked as a display's backlight source lights it from halfway along its range,
+  on the LCD and the Pixel Display. It lit it at 0.5 of the control's own number, so a knob from 0
+  to 127 switched it on at 1. A switch or a button works as before.
+- `ce.components.lcd.layout` and `ce.components.pixel.layout` show a layout by its number or its
+  name, as a soft key does, and `read(t, "layout")` gives the number of the one showing. Nothing is
+  written to the panel.
 
 ## What you get
 

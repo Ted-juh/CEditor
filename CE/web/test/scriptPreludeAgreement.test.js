@@ -70,6 +70,9 @@ const CASES = [
   ['distance', [0, 0, 3, 4]], ['euclid', [8, 3]], ['almost', [0.1 + 0.2, 0.3]],
   ['indexOfRange', [0.5, 4]], ['approach', [0, 10, 0.5]],
   ['curve', [0.5, 'exp']], ['curve', [0.25, 'log']], ['curve', [0.5, 's']], ['curve', [0.5, 'linear']],
+  // A name in any case is the name, in every runtime: "EXP" was an unknown shape, and linear.
+  ['curve', [0.5, 'EXP']], ['curve', [0.5, ' S ']], ['crossfade', [0, 1, 0.5, 'EqualPower']],
+  ['shapeCurve', [0.3, 'SCurve']], ['unshape', [0.5, 'Exp']], ['mapCurve', [0.5, [[0, 0], [1, 1, 'HOLD']]]],
   ['noteName', [60]], ['noteName', [61]], ['noteName', [0]],
   // The panel's spelling, selected by the second argument being PRESENT — so all three states
   // (absent, true, false) are cases, not just the two values.
@@ -78,12 +81,20 @@ const CASES = [
   // Every accidental spelling the panel can print, plus the two that must be REFUSED. "Eb4"
   // returning 0 rather than nothing is how a misspelling used to play C-1 in silence.
   ['noteNumber', ['C♯4']], ['noteNumber', ['Eb4']], ['noteNumber', ['E♭4']],
+  // …and in any case: the letter, and "B" as the flat after it, since the octave follows.
+  ['noteNumber', ['c4']], ['noteNumber', ['eb4']], ['noteNumber', ['BB3']], ['noteNumber', [' f#2 ']], ['noteNumber', ['H4']],
   ['noteNumber', ['Db-1']], ['noteNumber', ['Cb3']], ['noteNumber', ['Fb4']],
   ['noteNumber', ['B#3']], ['noteNumber', ['H4']], ['noteNumber', ['C']],
   ['noteNumber', [60]],
   ['noteSpelling', [60, 'major']], ['noteSpelling', [60, 'minor']], ['noteSpelling', ['F4', 'major']],
   ['noteSpelling', ['A4', 'minor']], ['noteSpelling', [60]], ['noteSpelling', [60, 'bogus']],
-  ['noteSpelling', ['c4', 'major']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
+  // A scale, chord, arp pattern or lead mode in any case, in every runtime: "Dorian" and "MAJ7" were
+  // not names, "DOWN" was "up" and "SMOOTH" was "closest", each with a message.
+  ['scaleNotes', ['C4', 'Dorian']], ['chordNotes', ['C4', ' MAJ7 ']], ['noteSpelling', ['A4', 'MINOR']],
+  ['degreeChord', ['C4', 'HarmonicMinor', 5]], ['inScale', [61, 60, 'Phrygian']],
+  ['arpOrder', [[60, 64, 67], 'DOWN']], ['arpOrder', [[60, 64, 67], 'asplayed']],
+  ['voiceLead', [[60, 64, 67], [65, 69, 72], 'SMOOTH']], ['scaleNotes', ['C4', 'toString']],
+  ['noteSpelling', ['H4', 'major']], ['inScale', ['H4', 60, 'major']], ['scaleDegree', [60, 'H4', 'major']],
   ['inScale', [62, 60, 'major']], ['inScale', [61, 60, 'major']], ['inScale', [61, 60]],
   ['inScale', [75, 60, 'minor']], ['inScale', [61, 60, 'bogus']],
   ['scaleDegree', [60, 60, 'major']], ['scaleDegree', [67, 60, 'major']],
@@ -140,6 +151,9 @@ const CASES = [
   ['hslToHex', [210, 50, 40]], ['hslToHex', [0, 0, 100]], ['hslToHex', [359, 100, 50]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
   ['from7bit', [[1, 0], 'msb']], ['from7bit', [[1, 0], 'lsb']], ['from7bit', [[1, 0]]],
+  // A word in any case, in every runtime: "LSB" was read as "msb" by to7bit and refused by read.
+  ['from7bit', [[1, 0], 'LSB']], ['to7bit', [128, 2, ' Lsb ']], ['bytesRead', [[1, 2], 0, 2, { order: 'LSB' }]],
+  ['checksum', [' Roland ', [0x01, 0x02, 0x03]]], ['checksum', ['CRC8', [0x01, 0x02, 0x03]]],
   ['fromNibbles', [0xA, 0xB]],
   ['fromAscii', [[72, 105]]],
   ['toOffset', [-64, 64]], ['fromOffset', [0, 64]],
@@ -255,8 +269,8 @@ const STRUCT_CASES = [
   ['toAscii', ['Hi', 4]],
   ['scaleNotes', [60, 'dorian']], ['scaleNotes', [60]], ['scaleNotes', [60, 'bogus']],
   // An unreadable root is no answer in every runtime, not the scale on C-1.
-  ['scaleNotes', ['c4', 'major']], ['chordNotes', ['c4', 'major']], ['quantizeNote', ['c4', 60, 'major']],
-  ['degreeChord', ['c4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
+  ['scaleNotes', ['H4', 'major']], ['chordNotes', ['H4', 'major']], ['quantizeNote', ['H4', 60, 'major']],
+  ['degreeChord', ['H4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
   ['scaleNotes', [null, 'major']], ['degreeChord', [null, 'major', 1]],
   ['chordNotes', ['C4', 'min7']], ['chordNotes', [60, 'bogus']],
   ['quantizeNote', [61, 60, 'major']], ['quantizeNote', [66, 60, 'major']], ['quantizeNote', [61, 60, 'bogus']],
@@ -648,7 +662,7 @@ const ENVELOPE_TAKEN = [
 const ENVELOPE_TOO_FEW = [[{ x: 0, y: 0 }], [], 'up', 5, null];
 const REFUSAL_CASES = [
   // MIDI senders: an unreadable note name sends nothing.
-  ['sendNote', [1, 'c4', 100]], ['sendNoteOff', [1, 'c4']], ['sendAftertouch', [1, 90, 'c4']],
+  ['sendNote', [1, 'H4', 100]], ['sendNoteOff', [1, 'H4']], ['sendAftertouch', [1, 90, 'H4']],
   ['sendNote', [1, 'C4', 100]],
   // Divisions: any case is read, and a name that is not a division says so.
   ['beatsPerDivision', ['1/6']], ['stepAt', [2, 'nope']], ['stepsBetween', [0, 1, '1/3']],
@@ -666,10 +680,10 @@ const REFUSAL_CASES = [
   ['clockTempo', [null]], ['clockTempo', ['x']], ['clockTempo', [[20.8, 20.8]]],
   ['beatsPerDivision', ['1/8t']], ['stepAt', [2.5, '1/16D']], ['swingOffset', [1, 0.5, '1/4d']],
   // Music helpers: an unreadable note name, an unknown scale or chord, the scale checked first.
-  ['scaleNotes', ['c4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
-  ['chordNotes', ['Hb2', 'min7']], ['quantizeNote', [61, 'c4', 'major']], ['quantizeNote', ['x', 'y', 'nope']],
-  ['noteSpelling', ['c4', 'minor']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
-  ['degreeChord', ['c4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
+  ['scaleNotes', ['H4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
+  ['chordNotes', ['Hb2', 'min7']], ['quantizeNote', [61, 'H4', 'major']], ['quantizeNote', ['x', 'y', 'nope']],
+  ['noteSpelling', ['H4', 'minor']], ['inScale', ['H4', 60, 'major']], ['scaleDegree', [60, 'H4', 'major']],
+  ['degreeChord', ['H4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
   ['scaleNotes', ['C-1', 'major']], ['degreeChord', [60, 'major', 5]],
   // checksum reads hex text a byte at a time, and names the algorithms it knows.
   ['checksum', ['roland', '40007F00']], ['checksum', ['roland', '40 00 zz 00']], ['checksum', ['40 0 7F 00']],
@@ -1885,7 +1899,7 @@ test('the note lists and their words are read, refused and said alike in every e
   resetScriptStateForTesting();
   assert.deepEqual(said[0], [], 'a chord by name is read');
   assert.deepEqual(said[2], ['error: ce.music.quality: "X9" at position 2 of notes is not a note name, so there is no answer. '
-    + 'A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
+    + 'A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
   assert.deepEqual([said[7].length, said[8].length], [1, 0], 'a word used as its default is said once');
   // JavaScript, under node:vm.
   {

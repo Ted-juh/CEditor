@@ -52,7 +52,7 @@ test('a generated verb says which element there is no such one of, and which the
     [(api) => api.ce.components.drumpads.note('Pads', 3, 'x'), 'drumpads Pads: note(3, "x") — refused, nothing changed. "x" is not a number.'],
     [(api) => api.ce.components.matrix.cell('Mat', 9, 1, 0.5), 'matrix Mat: cell(9, 1, 0.5) — refused, nothing changed. There is no row 9: the rows are 1 to 4.'],
     [(api) => api.ce.components.matrix.cell('Mat', 1, 9, 0.5), 'matrix Mat: cell(1, 9, 0.5) — refused, nothing changed. There is no column 9: the columns are 1 to 4.'],
-    [(api) => api.ce.components.lcd.text('Lcd', 9, 'hi'), 'lcd Lcd: text(9, "hi") — refused, nothing changed. There is no line 9: the lines are 1 to 2.'],
+    [(api) => api.ce.components.lcd.text('Lcd', 9, 'hi'), 'lcd Lcd: text(9, "hi") — refused, nothing changed. There is no row 9: the rows are 1 to 2.'],
     [(api) => api.ce.components.pixel.text('Pix', 'tempo', '120'), 'pixel Pix: text("tempo", "120") — refused, nothing changed. There is no element called "tempo". It has none yet.'],
     [(api) => api.ce.components.turing.step('Tur', 40, 0.5), 'turing Tur: step(40, 0.5) — refused, nothing changed. There is no step 40: the steps are 1 to 8.'],
     [(api) => api.ce.components.arp.mute('Arp', 0), 'arp Arp: mute(0) — refused, nothing changed. 0 is not a step: the steps count from 1.'],
@@ -134,7 +134,7 @@ test('the rows say what an index addresses, and the refusal in the console\'s wo
 
   // What a good index addresses, now.
   assert.equal(meaningLine(rowNamed('ce.components.drumpads.note("Pads", 3, 40)', 'index')), 'pad 3 of 16 · note now 38');
-  assert.equal(meaningLine(rowNamed('ce.components.lcd.text("Lcd", 1, "hi")', 'row')), 'line 1 of 2 · now "PATCH:INIT VOICE"');
+  assert.equal(meaningLine(rowNamed('ce.components.lcd.text("Lcd", 1, "hi")', 'at')), 'row 1 of 2 · now "PATCH:INIT VOICE"');
   assert.equal(meaningLine(rowNamed('splitMute("Split", 2, false)', 'zone')), 'zone 2 is "Lead"');
   assert.equal(meaningLine(rowNamed('splitChannel("Split", "Bass", 3)', 'zone')), 'zone 1 of 2');
   assert.deepEqual(['min', 'max'].map((k) => rowNamed('splitMute("Split", 2, false)', 'zone').meaning[k]), [1, 2]);

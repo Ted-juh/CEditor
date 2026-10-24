@@ -211,7 +211,7 @@ const TYPE_WORDS = new Set([
   'number', 'text', 'true or false', 'function', 'list', 'options', 'table', 'path', 'colour', 'note',
   'bytes', 'control name', 'event name', 'any value', 'number or text', 'text or list',
   'list of numbers', 'list of bytes', 'list of notes', 'list of text', 'text or object',
-  'list of objects',
+  'list of objects', 'number or table', 'number or name',
 ]);
 
 test('every parameter\'s type is shown in a word from one short list', () => {

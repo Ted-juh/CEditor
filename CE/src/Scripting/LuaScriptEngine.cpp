@@ -183,13 +183,15 @@ function lerp(a, b, t)
 end
 function curve(v, shape)
   shape = shape or "linear"
-  if shape == "exp" then return v * v
-  elseif shape == "log" then return math.sqrt(math.max(0, v))
-  elseif shape == "s" then return v * v * (3 - 2 * v)
+  -- A name in any case, as every word from a list is read: "EXP" is "exp".
+  local name = tostring(shape):lower():match("^%s*(.-)%s*$")
+  if name == "exp" then return v * v
+  elseif name == "log" then return math.sqrt(math.max(0, v))
+  elseif name == "s" then return v * v * (3 - 2 * v)
   else
     -- A shape the list does not have used to return v in SILENCE, which reads as a curve that does
     -- nothing rather than as a name that was never applied.
-    if shape ~= "linear" and shape ~= "" then
+    if name ~= "linear" and name ~= "" then
       log("curve(v, \"" .. tostring(shape) .. "\"): unknown shape — using linear. The names are "
           .. "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     end
@@ -355,7 +357,7 @@ end
 -- that matters: a linear fade between two sounds dips in the middle, audibly.
 function crossfade(a, b, t, law)
   local x, from, to = norm(t, 0, 1), __num(a), __num(b)
-  law = tostring(law or "linear"):lower()
+  law = tostring(law or "linear"):lower():match("^%s*(.-)%s*$")
   if law == "equalpower" then
     local angle = x * math.pi / 2
     return from * math.cos(angle) + to * math.sin(angle)
@@ -497,7 +499,7 @@ function shapeCurve(v, curve, tension)
   local ten = __num(tension, 0)
   if ten == 0 then ten = 1.6 end
   local k = 1 + math.max(0, ten)
-  local name = tostring(curve)
+  local name = tostring(curve):lower():match("^%s*(.-)%s*$")   -- in any case: "SCurve" is "scurve"
   if name == "exp" then return t ^ k
   elseif name == "log" then return 1 - (1 - t) ^ k
   elseif name == "scurve" or name == "s" then return t * t * (3 - 2 * t)
@@ -632,7 +634,7 @@ function unshape(y, curve, tension)
   local ten = __num(tension, 0)
   if ten == 0 then ten = 1.6 end
   local k = 1 + math.max(0, ten)
-  local name = tostring(curve)
+  local name = tostring(curve):lower():match("^%s*(.-)%s*$")
   if name == "exp" then return v ^ (1 / k)
   elseif name == "log" then return 1 - (1 - v) ^ (1 / k)
   -- The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and would
@@ -1162,8 +1164,11 @@ end
 function noteNumber(name)
   local s = string.gsub(tostring(name), "♯", "#")
   s = string.gsub(s, "♭", "b")
-  local letter, acc, oct = string.match(s, "^([A-G])([#b]?)(-?%d+)$")
+  -- In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
+  local letter, acc, oct = string.match(s:match("^%s*(.-)%s*$"), "^([A-Ga-g])([#bB]?)(-?%d+)$")
   if not letter then return nil end
+  letter = letter:upper()
+  if acc == "B" then acc = "b" end
   local pc = nil
   if acc == "b" then
     pc = __FLAT_LETTER[letter]
@@ -1316,9 +1321,18 @@ local function __pitch(v)
   if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then return math.floor(v) end
   return nil
 end
+-- A word from a list, in any case and with spaces around it, as the list spells it (the keys of
+-- `set`), or nil: "Dorian" is "dorian", "MAJ7" is "maj7", "AsPlayed" is "asPlayed".
+local function __word(set, name)
+  if type(name) ~= "string" then return nil end
+  local want = name:lower():match("^%s*(.-)%s*$")
+  for k, _ in pairs(set) do if type(k) == "string" and k:lower() == want then return k end end
+  return nil
+end
 local function __steps(tbl, name, fallback)
-  local s = tbl[name == nil and fallback or tostring(name)]
-  return s
+  if name == nil then return tbl[fallback] end
+  local key = __word(tbl, tostring(name))
+  return key and tbl[key] or nil
 end
 local function __pitchOf(verb, v)
   -- A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
@@ -1330,7 +1344,7 @@ local function __pitchOf(verb, v)
   if n == nil then
     if type(v) == "string" then
       logError(verb .. ': "' .. v .. '" is not a note name, so there is no answer. A name is '
-        .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        .. 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
     else
       logError(verb .. ': ' .. __shownValue(v) .. ' is not a note, so there is no answer. A note is a MIDI '
         .. 'number or a name, such as 60 or "C4".')
@@ -1425,7 +1439,7 @@ local function __noteList(fn, name, list, mayBeAbsent)
     local n = __noteListItem(list[i])
     if n == nil then
       local where = __shownValue(list[i]) .. " at position " .. i .. " of " .. name
-      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
+      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
       return say(where .. " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
     end
     out[#out + 1] = n
@@ -1448,7 +1462,7 @@ end
 local __VOICE_LEAD_MODES = { closest = true, smooth = true, off = true }
 local __ARP_ORDER_PATTERNS = { up = true, down = true, updown = true, downup = true, asPlayed = true, random = true, chord = true }
 function noteSpelling(root, scale)
-  local nm = (scale == nil) and "major" or tostring(scale)
+  local nm = (scale == nil) and "major" or (__word(__CE_SCALES, tostring(scale)) or tostring(scale))
   if __setOf("ce.music.spelling", "scale", scale) == nil then return nil end
   local pitch = __pitchOf("ce.music.spelling", root)
   if pitch == nil then return nil end
@@ -1527,7 +1541,7 @@ end
 -- The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 -- scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size)
-  local nm = (scale == nil) and "major" or tostring(scale)
+  local nm = (scale == nil) and "major" or (__word(__CE_SCALES, tostring(scale)) or tostring(scale))
   local s = __setOf("ce.music.degreeChord", "scale", scale)
   if s == nil or #s == 0 then return nil end
   if __pitchOf("ce.music.degreeChord", root) == nil then return nil end
@@ -1573,7 +1587,7 @@ function voiceLead(notes, previous, mode)
   local before = read and __noteList("voiceLead", "previous", previous, true)
   if read == nil or before == nil then return {} end
   local chord, prev = __sortedNotes(read), __sortedNotes(before)
-  local how = (mode == nil) and "closest" or tostring(mode)
+  local how = (mode == nil) and "closest" or (__word(__VOICE_LEAD_MODES, tostring(mode)) or tostring(mode))
   if not __VOICE_LEAD_MODES[how] then
     __musicSaid("ce.music.lead: " .. __shownValue(mode) .. ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
     how = "closest"
@@ -1642,7 +1656,7 @@ end
 function arpOrder(notes, pattern)
   local asc = __noteList("arpOrder", "notes", notes)
   if asc == nil then return {} end
-  local p = pattern ~= nil and tostring(pattern) or nil
+  local p = pattern ~= nil and (__word(__ARP_ORDER_PATTERNS, tostring(pattern)) or tostring(pattern)) or nil
   if p == nil then
     __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
     p = "up"
@@ -1673,14 +1687,14 @@ end
 function to14bit(v) v = math.floor(v) return { msb = math.floor(v / 128) % 128, lsb = v % 128 } end
 function from14bit(msb, lsb) return msb * 128 + lsb end
 function to7bit(v, count, order)
-  count = count or 2; order = order or "msb"; v = math.floor(v)
+  count = count or 2; order = tostring(order or "msb"):lower():match("^%s*(.-)%s*$"); v = math.floor(v)
   local out = {}
   for i = 1, count do out[i] = v % 128; v = math.floor(v / 128) end
   if order == "msb" then local r = {} for i = count, 1, -1 do r[#r + 1] = out[i] end return r end
   return out
 end
 function from7bit(bytes, order)
-  order = order or "msb"; local v = 0
+  order = tostring(order or "msb"):lower():match("^%s*(.-)%s*$"); local v = 0
   if order == "msb" then for i = 1, #bytes do v = v * 128 + bytes[i] end
   else for i = #bytes, 1, -1 do v = v * 128 + bytes[i] end end
   return v
@@ -1797,7 +1811,7 @@ function checksum(kind, bytes, opts)
   local verb = "ce.midi.checksum"
   if bytes == nil then
     -- checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
-    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] ~= nil) then
+    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind):match("^%s*(.-)%s*$")] ~= nil) then
       logError(verb .. ": no bytes given, so there is no checksum.")
       return nil
     end
@@ -1805,7 +1819,7 @@ function checksum(kind, bytes, opts)
   end
   bytes = __scriptBytes(verb, bytes, "there is no checksum")
   if bytes == nil then return nil end
-  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] or nil
+  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind):match("^%s*(.-)%s*$")] or nil
   if id == nil then
     -- The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
     local names = {}
@@ -1875,6 +1889,8 @@ local function __shape(verb, opts)
     if opts.bits ~= nil then bits = opts.bits end
     if opts.order ~= nil then order = opts.order end
   end
+  -- In any case, as every word from a list is read: "MSB" is "msb".
+  if type(order) == "string" then order = order:lower():match("^%s*(.-)%s*$") end
   if bits ~= 7 and bits ~= 8 then return __refuse(verb, "bits must be 7 or 8") end
   if order ~= "msb" and order ~= "lsb" then return __refuse(verb, 'order must be "msb" or "lsb"') end
   return { bits = math.floor(bits), order = order }
@@ -2280,14 +2296,14 @@ local WEBVIEW_ONLY = {
   "lcdBlink","lcdCursor","lcdCursorAt","lcdValue","lcdAnim","lcdAnimPreset","lcdAnimSpeed",
   "lcdAnimFps","lcdAnimLoop","lcdScrollMode","lcdScrollRepeat","lcdBlinkRate","lcdCursorBlink",
   "lcdValueMin","lcdValueMax","lcdValuePrecision","lcdValuePrefix","lcdValueSuffix",
-  "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText",
+  "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText","lcdLayout",
   "lcdShowGlass","lcdShowGhost","lcdShowScanlines","lcdShowGrid","lcdRead","lcdSize","lcdFill",
 -- @module ce.components.pixel
   "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH",
   "pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow",
   "pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
   "pixelLayoutTransition","pixelTransitionMs","pixelBrightnessSource","pixelBacklightSource",
-  "pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
+  "pixelLayout","pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
 }
 -- @module -
 for _, name in ipairs(WEBVIEW_ONLY) do
@@ -2336,7 +2352,7 @@ local function __badNote(verb, note)
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
   elseif type(note) == "string" then
     if noteNumber(note) == nil then
-      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         .. 'has one, then the octave: "C4", "Eb3", "F#-1".'
     else
       why = '"' .. note .. '" is outside the MIDI notes, so nothing was sent. ' .. range
@@ -2449,7 +2465,7 @@ function sendTransport(action)
   end
   local status = nil
   if type(action) == "string" then
-    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action)]
+    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action):match("^%s*(.-)%s*$")]
   end
   if status == nil then
     logError("sendTransport: " .. __shownValue(action) .. " is not a transport action, so nothing was sent. " .. actions)
@@ -3295,9 +3311,10 @@ function __storageScope(opts, verb)
     raw = opts.scope
   end
   if raw == nil or raw == "" then return "panel" end
-  local scope = tostring(raw)
+  -- In any case, as every word from a list is read: "Local" is "local".
+  local scope = tostring(raw):lower():match("^%s*(.-)%s*$")
   for _, known in ipairs(__CE_SCOPES) do if known == scope then return scope end end
-  logError(verb .. ': "' .. scope .. '" is not a scope, so nothing was done. One of: panel, script, local.')
+  logError(verb .. ': "' .. tostring(raw) .. '" is not a scope, so nothing was done. One of: panel, script, local.')
   return nil
 end
 
@@ -3807,8 +3824,8 @@ local __CE_MODULES = {
   ["ce.components.meter"] = { dbCeil = "meterDbCeil", dbFloor = "meterDbFloor", decay = "meterDecay", fill = "meterFill", gradient = "meterGradient", holdMs = "meterHoldMs", insert = "meterInsert", label = "meterLabel", orientation = "meterOrientation", peakHold = "meterPeakHold", read = "meterRead", remove = "meterRemove", scale = "meterScale", showScaleLabels = "meterShowScaleLabels", showTicks = "meterShowTicks", showValue = "meterShowValue", size = "meterSize", source = "meterSource", value = "meterValue", valueMax = "meterValueMax", valueMin = "meterValueMin", valuePrecision = "meterValuePrecision", valuePrefix = "meterValuePrefix", valueSuffix = "meterValueSuffix", zoneAt = "meterZoneAt" },
   ["ce.components.transport"] = { beatUnit = "transportBeatUnit", beatsPerBar = "transportBeatsPerBar", bpm = "transportBpm", clockDevice = "transportClockDevice", clockOut = "transportClockOut", countIn = "transportCountIn", editable = "transportEditable", loop = "transportLoop", loopBars = "transportLoopBars", loopStart = "transportLoopStart", read = "transportRead", runOnLoad = "transportRunOnLoad", showPosition = "transportShowPosition", showTap = "transportShowTap", source = "transportSource", swing = "transportSwing" },
   ["ce.components.panic"] = { centreBend = "panicSetCentreBend", channel = "panicSetChannel", clearLocal = "panicSetClearLocal", editable = "panicSetEditable", label = "panicSetLabel", read = "panicSetRead", resetControllers = "panicSetResetControllers", scope = "panicSetScope", showSummary = "panicSetShowSummary" },
-  ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
-  ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
+  ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", layout = "lcdLayout", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
+  ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layout = "pixelLayout", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
 local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {

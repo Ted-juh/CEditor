@@ -8,7 +8,10 @@
 //     16-character display a 48-character line showed its first 16 and dropped the rest;
 //   · a segment display has no shape for many characters ("%", "K" on seven segments), and a
 //     graphic display's pixel font no glyph for some, and those cells stay blank;
-//   · a display that has layouts shows their zones and not its lines at all.
+//   · a display that has layouts showed their zones and not its lines at all. A layout has text of
+//     its own now (lcdPositions.js), which text() writes and the display draws where no zone
+//     paints, so that is no longer a line nobody sees. It does not scroll: a layout's rows are
+//     composed at the display's width, so on one a line longer than the display is cut.
 // A line holding the renderer's {value}, {pct} or {bar} tokens is as long as what they expand to,
 // which is known only when it is drawn, so its width is not judged, and the tokens are not
 // characters to draw.
@@ -31,7 +34,8 @@ export function lcdDisplayOf(display) {
   const segmentType = String(d.segmentType ?? '16').trim().toLowerCase();
   return {
     cols: Math.max(1, Math.round(numberOr(d.cols, 16))),
-    scrolls: (scroll === 'left' || scroll === 'right') && Math.max(0, numberOr(d.scrollSpeed, 4)) > 0,
+    scrolls: !(Array.isArray(d.layouts) && d.layouts.length > 0)
+      && (scroll === 'left' || scroll === 'right') && Math.max(0, numberOr(d.scrollSpeed, 4)) > 0,
     layouts: Array.isArray(d.layouts) && d.layouts.length > 0,
     panelType: panelType === 'segment' || panelType === 'graphic' ? panelType : 'character',
     segmentType: SEGMENT_NAMES[segmentType] ? segmentType : '16',
@@ -85,13 +89,11 @@ const quotedList = (chars) => chars.map((ch) => JSON.stringify(ch)).join(', ');
  */
 export function lcdLineWords(display, call, text) {
   const line = lcdLine(display, text);
-  if (line.layouts) {
-    return [{ reason: 'layouts', message: `${call} — the display shows the zones of its layouts, not its lines, so this line is not shown.` }];
-  }
   const said = [];
   if (line.cut) {
-    said.push({ reason: 'width', message: `${call} — the display is ${line.cols} characters wide and does not scroll, `
-      + `so only ${JSON.stringify(line.shown)} shows.` });
+    // A layout's rows never scroll, whatever scroll() says; the display's lines do when it is set.
+    said.push({ reason: 'width', message: `${call} — the display is ${line.cols} characters wide and `
+      + `${line.layouts ? 'a layout\'s text does not scroll' : 'does not scroll'}, so only ${JSON.stringify(line.shown)} shows.` });
   }
   if (line.undrawn.length) {
     const what = line.panelType === 'segment' ? `${SEGMENT_NAMES[line.segmentType]} cells have no shape for`

@@ -281,7 +281,7 @@ const SHARED_OPTION_FIELDS = {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
     summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
       + 'it; "script" is private to this one; "local" stays on this machine and is never written '
-      + 'into the panel document. A scope that is not one of these is refused, and so is an options '
+      + 'into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options '
       + 'table with any other key, such as a misspelled `scop`: nothing is saved or read, and a '
       + 'message says why, because falling back to "panel" would share a private setting.',
   },
@@ -399,7 +399,7 @@ const SHARED_OPTION_FIELDS = {
   },
   bytesOrder: {
     name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
-    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").',
+    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb"). Case-insensitive.',
   },
 
   /* --- image layers (ce.image) -------------------------------------------- */
@@ -1503,9 +1503,9 @@ export const COMMANDS = [
         { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
           summary: 'Where the dash pattern starts.\nAdvanced on a timer: the dashes move.\nInvalid: 0.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'Line ends: "butt", "round" or "square". Case-sensitive.\nInvalid: default.' },
+          summary: 'Line ends: "butt", "round" or "square". Case-insensitive.\nInvalid: default.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
-          summary: 'Corners: "miter", "round" or "bevel". Case-sensitive.\nInvalid: default.' },
+          summary: 'Corners: "miter", "round" or "bevel". Case-insensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',
@@ -1857,7 +1857,7 @@ export const COMMANDS = [
       { name: 'h', type: 'number', required: true, kind: 'number', summary: 'Height in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: fit "fill".', fields: optionFields([
         { name: 'fit', type: 'text', default: '"fill"', values: ['fill', 'contain', 'cover'],
-          summary: 'How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.\nInvalid: default.' },
+          summary: 'How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-insensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',
@@ -1893,7 +1893,7 @@ export const COMMANDS = [
     params: [{ name: 'mode', type: 'string', required: true,
       values: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge',
         'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'],
-      summary: 'One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.\nInvalid: rejected with a console error.' }],
+      summary: 'One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive.\nInvalid: rejected with a console error.' }],
     scopes: 'any',
   },
   {
@@ -2209,7 +2209,7 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: size 12, left-aligned, the control\'s font.', fields: optionFields([
         { name: 'size', type: 'number', default: '12', unit: 'pixels', sample: '12', summary: 'Text size in pixels.\nRange: > 0.\n≤ 0, or invalid: default.' },
         { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
-          summary: 'Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".\nInvalid: rejected with a console error.' },
+          summary: 'Which part of the text sits at x: "left", "middle" or "right". Case-insensitive.\n"center", "centre" and "centred": "middle".\nInvalid: rejected with a console error.' },
         { name: 'family', type: 'text', sample: '"Inter Tight"', kind: 'font', summary: 'Font family.\nLeft out: the control\'s font.' },
       ]) },
     ],
@@ -3345,7 +3345,7 @@ export const COMMANDS = [
     example: '`sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
-      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
+      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
       { name: 'velocity', type: 'number', required: true, unit: '0 to 127', summary: 'How hard the note is played, from 0 to 127. 0 means note off.' },
       { name: 'ms', type: 'number', required: false, unit: 'milliseconds', summary: 'How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.' },
     ],
@@ -3416,7 +3416,7 @@ export const COMMANDS = [
     notes: ['Every note started with sendNote without a length needs its own note off.'],
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
-      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
+      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
       { name: 'velocity', type: 'number', required: false, unit: '0 to 127', summary: 'The release velocity, from 0 to 127. It is 0 when left out.' },
     ],
     scopes: 'any',
@@ -3471,7 +3471,7 @@ export const COMMANDS = [
     id: 'sendTransport', category: 'Device / MIDI', signature: 'sendTransport(action)',
     summary: 'Start, continue or stop a connected sequencer or drum machine.',
     example: '`sendTransport("start")` starts it from the beginning.',
-    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'], summary: '"start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.' }],
+    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'], summary: '"start" (FA), "continue" (FB) or "stop" (FC). Case-insensitive. Any other action, or none, is refused with a message and nothing is sent.' }],
     scopes: 'any',
     snippet: { lua: 'sendTransport("${1:start}")$0', javascript: 'sendTransport("${1:start}")$0' },
   },
@@ -3494,7 +3494,7 @@ export const COMMANDS = [
     notes: ['The 7-bit types fit in one SysEx byte. The CRC types do not: split their result into bytes with to7bit before sending.'],
     params: [
       { name: 'type', type: 'string', required: true,
-        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.',
+        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". Case-insensitive. An unknown name, or none, returns nothing and prints the names it accepts.',
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
           'sum-8bit', 'twos-complement-8bit', 'crc8', 'crc16-ccitt', 'crc16-modbus', 'crc32'] },
       { name: 'bytes', type: 'bytes', required: true, summary: 'The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.' },
@@ -3688,6 +3688,9 @@ export const COMMANDS = [
 const PARAM_TYPE_FOR = {
   num: 'number', int: 'number', bool: 'boolean', str: 'string', enum: 'string',
   list: 'list',
+  // Where on an LCD (lcdPositions.js): a row, or a table of layout, row and col. And a layout, by
+  // its number or its name.
+  position: 'number or table', layoutRef: 'number or name',
 };
 
 /** What the value a component verb writes may be, as the spec says it: the closed list an enum
@@ -3978,7 +3981,7 @@ export const HELPERS = [
     notes: ['For a curve of your own, use `ce.math.map`. For the curves the panel\'s Envelopes use, use `ce.math.shape`.'],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: not held at 0 or 1.' },
-      { name: 'shape', type: 'text', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends).\nLeft out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used.' },
+      { name: 'shape', type: 'text', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Case-insensitive.\nLeft out: "linear". An unknown name: a note in the console, and "linear" is used.' },
     ],
   },
   {
@@ -4142,7 +4145,7 @@ export const HELPERS = [
       { name: 'a', type: 'number', required: true, summary: 'The value at 0.' },
       { name: 'b', type: 'number', required: true, summary: 'The value at 1.' },
       { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b).\nLeft out: 0.\nOutside the range: held at 0 or 1.' },
-      { name: 'law', type: 'text', required: false, summary: '"linear", "equalPower" or "sharp".\nDefault: "linear". An unknown name is used as "linear".' },
+      { name: 'law', type: 'text', required: false, summary: '"linear", "equalPower" or "sharp". Case-insensitive.\nDefault: "linear". An unknown name is used as "linear".' },
     ],
   },
   {
@@ -4351,7 +4354,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: held at 0 or 1.' },
-      { name: 'curve', type: 'text', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1).\nLeft out or unknown: "linear".' },
+      { name: 'curve', type: 'text', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Case-insensitive.\nLeft out or unknown: "linear".' },
       { name: 'tension', type: 'number', required: false, summary: 'How strongly "exp" and "log" bend.\nDefault: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses.' },
     ],
   },
@@ -4639,7 +4642,7 @@ export const HELPERS = [
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455.' },
       { name: 'count', type: 'number', required: false, summary: 'How many bytes of 7 bits to make. Two when it is left out.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive.' },
     ],
   },
   {
@@ -4648,7 +4651,7 @@ export const HELPERS = [
     example: '`from7bit({7, 104})` gives 1000.',
     params: [
       { name: 'bytes', type: 'list of bytes', required: true, summary: 'The 7-bit bytes, as a list of numbers.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive.' },
     ],
   },
   // `to14Bit` is the spelling the WebView runtime shipped with before the contract was
@@ -5702,6 +5705,7 @@ const TYPE_WORDS = {
   number: 'number', string: 'text', dumpKind: 'text', scriptRef: 'text', boolean: 'true or false',
   array: 'list', targetRef: 'control name', eventName: 'event name',
   'number or division': 'number or text', value: 'any value',
+  'number or table': 'number or table', 'number or name': 'number or name',
 };
 const KIND_WORDS = {
   note: 'note', noteList: 'list of notes', colour: 'colour', bytes: 'bytes',

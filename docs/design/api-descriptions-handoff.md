@@ -75,6 +75,14 @@ is the table of wording the owner rejected and what replaced it; read it before 
   the panel's own arithmetic; rejected where the result would be meaningless.
 - Text that is a number is read as one, except a timer's interval or delay (two runtimes could not
   read it, so "250" is refused everywhere).
+- A word from a list the app defines is read in any case, and with spaces around it, everywhere
+  (the owner, 2026-10-24, on `ce.components.lcd.animPreset`), and stored or used as the list spells
+  it: `listWord` in `utils/wordLists.js`, `__word` in each prelude. A name an author makes up is
+  matched as it was: this rule does not reach it. (A control's name and a pixel element's were
+  matched in any case and trimmed already, `nameIndexFor` and `elementAnswersTo`; the records
+  below said "exact" of them until 2026-10-24, which was never so.) The text says
+  `Case-insensitive.` on the line that lists the words; the manual and the API explorer add it to
+  a list they print from `values`.
 - Shown to the owner one item at a time for a new module, until the owner says to continue without
   showing each item (said on `ce.draw.gradient`); then the rest of the module in one pass, with
   the decisions recorded in this file for review.
@@ -106,7 +114,8 @@ sidebar's `readDrawShape`-style readers do not apply. Then `ce.panel`, `ce.devic
 `ce.core`, `ce.storage`, `ce.image`, `ce.text`, `ce.ui` and the lifecycle hooks. After the
 commands: the module descriptions (41, the picker's group headings) and the event descriptions
 (38), with the same rules. Next by the table: `ce.components.arp` (30 descriptions, 15 that need
-the most work).
+the most work), once the owner's review of `ce.components.lcd` is finished: it was merged without
+the owner seeing each item, and [its queue](#the-owners-review-one-item-at-a-time) says what is left.
 
 ---
 
@@ -729,8 +738,11 @@ form at once:
 - `verbExample`: `` `ce.components.lcd.brightness("Screen", 80)` sets the brightness to 80. `` from
   the kind and a sample inside the range, a verb's own `ex` ([arguments, gloss]) winning; the
   family's `sample` names the control in them ("Screen" for the LCD).
-- `verbNotes`: what the call returns (true; already that way: true with a console line; rejected:
-  false), a verb's own `notes` first.
+- `verbNotes`: what the call returns, a verb's own `notes` first. Reworded at the owner's word on
+  2026-10-24 (`RETURNS_SET`, `RETURNS_TRUE`, `RETURNS_VALUE`): "Returns true. Already set: true,
+  with a console line." / "Rejected: false, with a console error. Nothing changes." for a verb that
+  sets something; "Returns the value." / "Rejected: no result, with a console error." for `read`
+  and `size`. It said "Returns true; already that way: true, with a line in the console."
 - `verbParamSummary`: each parameter's text, one rule per line, by kind and place: the target
   ("The LCD Display's control, by name. / Not an LCD Display: rejected…"), a number's `Range: lo ↔
   hi.` with "Outside the range: the nearest end." (the reducer clamps) and "Invalid: rejected",
@@ -757,6 +769,371 @@ example reads mechanically, `argDocs` where a parameter means more than its name
 control name; probe its reducer edges (they share `componentScriptPatch`, so most are done); then
 widen the one-sentence check in `componentVerbs.test.js` to that family. Next by the table:
 `ce.components.arp` (30 descriptions, 15 that need the most work).
+
+### The owner's review, one item at a time
+
+`ce.components.lcd` was merged (#69) without the owner seeing its items; the owner's "Ok, next
+module?" was taken as the "continue without abruption" of `ce.draw`. On 2026-10-24 the owner asked
+for it to be gone through one item at a time, as a new module is. The queue, from a read of every
+LCD text against the rules above and a probe of each verb's edges in the runtime:
+
+1. `cursorAt`: done, below.
+2. `blinkRate`: done, below.
+3. `blink`: done, below.
+4. `animPreset`: done, below.
+5. `valueMin` and `valueMax`: kept as merged, below.
+6. `glyph`: done, below.
+7. `text`: done, below.
+8. Parameter texts that are only the name: done, below.
+9. `showGhost`, `showGlass`, `showScanlines`, `showGrid`: done, below.
+10. The notes every family shares: done, below.
+11. `backlightSource`: done, below.
+12. The manual shows none of these texts: its component chapter lists the verbs' names only.
+13. Case "everywhere": done, below.
+14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
+15. `clear`: done, by the LCD's script model, below: `clear("Screen", 2)` blanks row 2. That
+    every verb drops an argument it does not take, without a word, is wider than the LCD and is
+    not on this queue unless the owner puts it there.
+
+**Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
+
+- A column or row past the display (`cursorAt("Screen", 40, 9)` on 2 x 16) was stored and the
+  cursor drawn nowhere; the range was 1 to 256 whatever the display. It is the display's last
+  column or row now, with the one-time warning, rather than refused as `text` refuses a row the
+  display does not have: a script stepping the cursor right stops at the last column. The spec
+  says so with `fit: { cursorCol: 'cols', cursorRow: 'rows' }`, which `axisRange` reads in the
+  reducer, in `componentClampWarning` (which the runtime now hands the control's settings) and in
+  the parameter's text ("Range: 1 ↔ the display's columns.").
+- One number given that is not a number (`cursorAt("Screen", "x", 2)`) moved the row, dropped the
+  "x" without a word and returned true. The call is refused with a console error ("\"x\" is not
+  a number.") and moves nothing. This is the XY kind's rule, so `joystick.move`, `timbre.move`,
+  `kinetic.launch`, `kinetic.velocity` and `constellation.probe` follow it too. Either number may
+  still be left out, so both are optional in the data (`verbArgOptional`): the type line said
+  "number, required" beside "Left out: unchanged."
+- A fraction (2.6) was stored as 2.6, read back as 2.6 and drawn at 3. A one-based axis is rounded
+  when written.
+
+The inspector's Cursor Row and Cursor Col counted from 0 ("0-based") where the script counts from
+1; at the owner's word they count from 1 now and stop at the display's size (`DisplayEditor.svelte`).
+
+The owner asked why the text as merged was better than the one proposed. It was better in two
+ways, both kept: every rule about a parameter sat in its own row, where the sidebar hint shows it
+on the parameter's name (the proposal had moved "Both left out" into the notes, which the hint does
+not show), and its range line had no bracket ("16 by default" went). It was wrong in four, after
+the decisions: "required", "1 ↔ 256", "invalid: unchanged", and no word on a fraction. As written:
+
+| Field | Text |
+| --- | --- |
+| `col` (number, optional) | Column, counted from 1. / Range: 1 ↔ the display's columns. / A fraction: rounded. / Outside the range: the nearest end. / Left out: unchanged. / Invalid: rejected with a console error. / Both left out: rejected with a console error. |
+| `row` (number, optional) | The same, with "Row" and "the display's rows". |
+| notes | The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off". Then the two every verb has. |
+
+**Item 2, `blinkRate`: done.** The text said "Period in milliseconds" and its example "250 blinks
+four times a second". The renderer lights the text for `blinkRate` ms and darkens it for as long
+(`Math.floor(frameTime / rate) % 2`; the inspector's hint said "half-cycle"), so 250 blinks twice a
+second. What the number means is kept: the full cycle would make every saved panel blink twice as
+fast. Two decisions the owner made: the range is 60 ↔ 5000, since the renderer draws nothing faster
+than 60 and the inspector's minimum was 60 (55 was stored, read back as 55 and drawn as 60; it is
+60 with the one-time warning now), and the inspector's Blink Rate stops at 5000 as a script does.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how fast the text blinks. |
+| Example | `ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second. |
+| `blinkRate` (number, required) | Time on, then the same time off, in milliseconds. / Range: 60 ↔ 5000. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Has an effect only while `blink()` is on. Default: off. / The cursor blinks at its own fixed speed. / Then the two every verb has. |
+| Inspector hint | Time on, then off, in milliseconds. |
+
+**Item 3, `blink`: done.** "Switch blinking of the whole display on or off." was wrong: the
+renderer hides only the lit glyphs on the off phase, and draws the unlit segments, the backlight,
+the cursor, images and animations throughout. The owner's decision, for every on/off verb of every
+component (134, through `coerce` BOOL and the Arpeggiator's `mute` set; `isOff` in `componentVerbs.js`): the
+text "false", "off" and "0", in any case and with spaces around it, is off, as `false`, 0 and ""
+are. Any text but "" was on, so `blink(t, "false")` and `blink(t, "OFF")` switched it on. Every
+on/off parameter's text says it: `0, "", "false", "off" or "0": false. Case-insensitive.` / `Any
+other value: true.` (`OFF_RULE`).
+
+| Field | Text |
+| --- | --- |
+| Description | Switch the text blinking on or off. |
+| Example | `ce.components.lcd.blink("Screen", true)` makes the text blink. |
+| `blink` (true or false, optional) | true: the text blinks. / false: the text is steady. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
+| notes | Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay. / The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off. / Then the two every verb has. |
+
+**Item 4, `animPreset`: done.** Any word was stored ("bogus", "RAIN", 5) and returned true, and
+the display drew nothing for a name `presetInto` does not know. Two decisions the owner made:
+
+- An unknown name is refused with a console error that lists the six, as `scroll` and `cursor`
+  refuse one: `animPreset` is an enum now, for the LCD and the Pixel Display alike, its list
+  `ANIM_PRESETS` in `componentTables.js`.
+- Case does not matter, "everywhere". For the component verbs that is every list of words
+  (`coerce` ENUM through `wordIn`: any case, spaces trimmed, stored as the list spells it; the text
+  says `Case-insensitive.` where it said `Case-sensitive.`), and the verb names `read`, `size`,
+  `fill`, `insert` and `remove` take (`familyVerbNamed`, which also stops "toString" finding
+  Object's own). The Values sidebar takes "LEFT" for a component verb (`readEnum`'s `anyCase`).
+  Control names and element names are not touched by it. (This said they "stay exact"; they were
+  matched in any case already, and still are.) The rest of the API is the next item.
+
+| Field | Text |
+| --- | --- |
+| `animPreset` (options, required) | One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive. / Invalid: rejected with a console error. |
+| notes | Plays only on a graphic display, while `anim()` is "preset". / Then the two every verb has. |
+
+Found on the way, for the queue: `animSpeed`'s range is 0 ↔ 16 in a script and 0.1 ↔ 5 on the
+inspector's preset Speed.
+
+**Item 5, `valueMin` and `valueMax`: kept as merged**, at the owner's word: the parameter lines
+proposed ("The value at 0 % and an empty bar.", the reversed range, the equal pair) and the notes
+on {value} and a value outside the range were worse than the text as it stands. Texts and
+behaviour are unchanged: a minimum above the maximum is still a reversed range, accepted without a
+word, and an equal pair still gives {pct} 0 and an empty bar.
+
+**Item 6, `glyph`: done.** Three decisions the owner made, from the probe:
+
+- A character that is not a cell ("abc", "#x###") was stored and the slot drew nothing. It is
+  refused with a console error that names it.
+- The "|" was dropped and the rest read five at a time, so a short row ran into the next: "#|#|#"
+  lit three cells of the top row. Each row between "|" is read on its own and padded to five
+  (`parseGlyph`). A flat string without "|" is read five at a time, as before; the inspector writes
+  full rows, so no saved panel draws differently.
+- More than eight rows, or a row longer than five, was cut off without a word. It is refused with a
+  console error ("It has 9 rows, and a glyph has 8.", "Row 1 has 6 cells, and a row has 5.").
+
+The three refusals are `glyphBitsRefusal` in `utils/lcdUserGlyphs.js`, which the verb names as its
+`refuseValue`; an ITEM verb with one refuses, in the reducer, the legality check and the reason
+alike, what it names.
+
+| Field | Text |
+| --- | --- |
+| `bits` (text, required) | Eight rows of five: "#" lit, "." unlit, rows separated by "\|". / Shown in a line by \x00 to \x07 for slots 1 to 8. / "1" and "0": the same as "#" and ".". / Fewer than eight rows, or fewer than five cells in a row: the rest unlit. / Empty, or nothing lit: the slot is cleared. / Other characters: rejected with a console error. / More than eight rows, or a row longer than five: rejected with a console error. |
+
+Description, example and `index` unchanged.
+
+**Item 7, `text`: done.** Two decisions the owner made, from the probe:
+
+- A fraction of a row was rounded without the text saying so: 1.5 wrote row 2, 0.5 row 1, and 2.5
+  on two rows was refused. `indexOf` does it for every number counted from 1, so a glyph slot, a
+  pad, a step and a lane round alike. Kept, as `cursorAt` rounds, and every such parameter says
+  "A fraction: rounded." after its first line: the 37 indexed verbs (line, item, cell, the
+  Arpeggiator's `mute` set, and the glyph slot's own text) and each family's `read`, `insert` and
+  `remove`, which take a position counted from 1 and round it too. The hand-written families'
+  zones, slots and cells are their modules' reviews.
+- Text left out (`text("Screen", 1)`, or nil/None/null) blanked the row and returned true under a
+  type that says "required". It is refused with "No text was given.", as every text verb's is;
+  `""` still blanks a row on purpose.
+
+| Field | Text |
+| --- | --- |
+| `row` (number, required) | Row, counted from 1. / A fraction: rounded. / Not a row the display has: rejected with a console error. |
+| `text` (text, required) | The four lines as merged, then: Left out: rejected with a console error. |
+
+Description and example unchanged.
+
+**Item 8, texts that were only the name: done.** Eight parameters said their own name and nothing
+else ("Brightness.", "Value prefix."); `valueMin` and `valueMax` stay as merged (item 5). Each first
+line now says what the setting is, and the probe added what it found unsaid. Three decisions the
+owner made, each the recommendation, all texts and no change to behaviour:
+
+- `editText` from a script is stored as given: the field's character set (upper case by default)
+  and its length (16) govern typing at the screen. A script may set a name read from the synth.
+- A linked control wins: while `brightnessSource()` or `valueSource()` links one, the script's
+  `brightness()` or `value()` is stored and the control sets what is shown. Said in a note.
+- Brightness 0 is not dark (the lit text is drawn at 35% + 65% of it), and the text says so; the
+  drawing is as it was.
+
+| Parameter | Text |
+| --- | --- |
+| `brightness` | How bright the lit characters are. / Range: 0 ↔ 100. / 0: the dimmest, still lit. / Outside the range: the nearest end. / Invalid: rejected with a console error. Note: While `brightnessSource()` links a control, that control sets the brightness. |
+| `contrast` | How visible the unlit segments are. / Also how strongly the backlight glows. / Range: 0 ↔ 100. / 0: unlit segments hidden. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| `value` | The number shown. / Outside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends. / Invalid: rejected with a console error. Note: While `valueSource()` links a control, that control sets the value and its range. |
+| `valuePrecision` | Decimal places `{value}` shows. `{pct}` is always whole. / then its range lines. |
+| `valuePrefix`, `valueSuffix` | Text before (after) the number in `{value}`. Not used by `{pct}` or `{bar}`. / A number: written as text. / Left out: rejected with a console error. |
+| `editText` | The text in the field. / Not held to the field's characters or length: those apply to typing. / A number: written as text. / Left out: rejected with a console error. |
+| `animFps` | Frames per second. / Only for a sprite sheet: a GIF or APNG plays at its own speed. / then its range lines. |
+
+The Pixel Display's `brightness`, `contrast`, `editText` and `animFps` say only their names too;
+they are that module's review.
+
+**Item 9, the four overlays: done.** "Show or hide the ghost." said nothing of what the ghost
+is, and `showScanlines`' example said "if it is hidden" of a plural. The four are declared in the
+LCD's family now, rather than derived from the model (`derivedFlagVerbs`), for what each is. Two
+decisions the owner made, each the recommendation:
+
+- The example generator (`toggleGloss`) gives a plural name "they" and "them": "shows the
+  scanlines if they are hidden, and hides them if they are shown", "switches the zones on if they
+  are off". Thirty-one examples across the components changed, in grammar only.
+- The grid is "between the cells or pixels": a graphic display draws it between pixels.
+
+| Command | Description | Note |
+| --- | --- | --- |
+| `showGlass` | Show or hide the glass: a sheen across the screen. | Its tint is set in the inspector, under Colour ▸ Glass. Default: shown. |
+| `showGhost` | Show or hide the ghost: the faint unlit cells behind the text. | How faint is set by `contrast()`. Default: shown. |
+| `showScanlines` | Show or hide the scanlines: thin horizontal lines across the screen. | Default: hidden. |
+| `showGrid` | Show or hide the grid: faint lines between the cells or pixels. | Default: hidden. |
+
+The Pixel Display's four are still derived, and say only their names: that module's review.
+
+**Item 10, the notes every family shares: done.** `read`'s note named a `"step"` list, `size`'s a
+`"node"` one and the Mod Matrix, on all 23 components, and only the Turing Machine, the Orbit and
+the Mod Matrix have each; eight components have no lists at all and their `read` note described
+reading one. `fill`'s example passed a `values` never shown, and its note said "One document
+change". Two decisions the owner made, each the recommendation:
+
+- The texts are made from each component's own lists, for all 23 (`familyNotes` and `sampleList`
+  in `componentVerbs.js`): `read` and `size` name the first list by name, a grid answers in rows
+  and columns, a Pixel Display's elements are read by name, and a component without lists has only
+  the first sentence of `read`'s note.
+- `fill`'s example writes its list out, as `ce.draw`'s do, in the first list's own kind of value:
+  `{"PATCH 12", "VOL 100"}` on the LCD, `{0.25, 0.5, 0.75}` for steps, `{true, false, true}` for
+  lanes, `{{0.5, 0}, {0, 0.5}}` for the Mod Matrix.
+
+| Field, on the LCD | Text |
+| --- | --- |
+| `read` note | `read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. |
+| `size` note | `size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number. |
+| `fill` example | `ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2. |
+| `fill` note | One undo step for the whole list, instead of one per element. |
+
+**Item 11, `backlightSource`: done.** Its refusal line said "Not on this panel, or not a control
+on this panel": any control can drive the backlight, so the second half only repeated the first.
+The text never said when the backlight is on, and the example drove it with a knob called Cutoff.
+Two decisions the owner made, each the recommendation:
+
+- A control lights the backlight while it is on, or at or past halfway along its range
+  (`backlightOnFrom` in `utils/lcdZones.js`, which the preview uses for the LCD and the Pixel
+  Display alike). It was 0.5 of the control's own number, so a knob from 0 to 127 lit it at 1 and
+  one from -64 to 63 stayed dark up to 0. A saved panel that links a knob switches at a different
+  point; a switch or a button is as it was. The inspector's hint says the same.
+- The example is a switch called Light, on both displays.
+
+| Field | Text |
+| --- | --- |
+| Example | `ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight. |
+| `name` | The driving control's name. / Left out, or "": unlinked. / On while the control is on, or past halfway. / Not on this panel: rejected with a console error. |
+
+**Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
+and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
+with ce.time, ce.storage with ce.device and ce.core), the owner having agreed the split: a word
+from a list the app defines is read in any case; a name an author makes up is matched as it was.
+
+- One helper per runtime: `listWord(values, value)` in `utils/wordLists.js` (the list's spelling,
+  or null), `__word` beside `__steps` in each prelude, and `animCurveName` / `formWord` on the C++
+  side (`ScriptRuntime.cpp`, `BridgeScriptHost.h`). Where every word in a list is lower-case
+  (`ce.math`'s names, the storage scope, the byte order), the runtimes compare trimmed and
+  lower-cased.
+- Reversed on the way: `ce.draw`'s "Case-sensitive." on `cap`, `join`, `fit` and `blend`, which the
+  owner had approved; note names' "a capital letter" (the refusal says "a letter from A to G" in
+  every runtime, and "H4" is the unreadable example in the tests where "c4" was); `get`'s form in
+  another case, refused with "Write normalizedValue" (another spelling, ".normalizedValue" or
+  "normalised", still is).
+- Already any case, and left: `ce.time`'s divisions, `ce.device`'s type, encoding, direction and
+  filters, crossfade's law, a checksum's name, `sendTransport`'s action, the image layer, colour
+  names.
+- The Values tab reads every list in any case (`readEnum`'s `anyCase` defaults to true), except a
+  value written straight into a property, which the renderer reads only as it is spelled.
+- Verified: the full web suite, `scriptPreludeAgreement.test.js` for every prelude change, and the
+  C++ targets that run the preludes and the host (ScriptRuntime, PlayerScriptIntegration,
+  PythonScriptEngine with Python 3.13, PanelValueModel), built and run with GCC. MSVC has not seen
+  the C++ changes; CI will.
+
+Not done, and noted for the owner: an unknown `ce.ui` kind still falls back to "info" without a
+word, and `ce.image.icon`'s fit still stores an unknown word as it is; both are those modules'
+reviews.
+
+### The LCD's script model
+
+Item 15 raised it. The owner read `clear("System1", 2)` as "page 2" as readily as "row 2", and
+asked for the whole of the LCD's scripting to be rethought as display → page → row → character.
+The owner's five decisions, 2026-10-24, from the proposal:
+
+1. Every display has pages. A display without layouts has one: its lines.
+2. A script writes a page's own text, drawn where no zone paints. Zones keep showing their
+   controls.
+3. A position is one table, every part optional: `{page = 2, row = 4, col = 15}` in Lua,
+   `{page: 2, row: 4, col: 15}` in JavaScript, `{"page": 2, "row": 4, "col": 15}` in Python. The
+   bare forms stay: `text(t, row, text)`, `clear(t)`, `clear(t, row)`.
+4. A page left out is the page showing.
+5. The Pixel Display has the same pages.
+
+The facts it is built on. A display without layouts draws `lines`, one text per row. A display
+with layouts draws the page showing from its zones (`composeLayout`, which starts from a blank grid
+and paints each zone's region) and never shows `lines`. A page stores no characters. Which page
+shows is decided as the panel runs: a soft key's `{ layout }` press (`lcdPressedLayout` in
+`PanelPreviewSurface.svelte`, transient), an overlay, the Selector's value, the default, with a
+page's `timeoutMs` returning it; in design mode, the inspector's Edit/Preview layout. Component
+verbs run only with the panel window open (the preludes' webview-only stubs), so the page showing
+is always there to ask.
+
+Then, from the owner's later answers: **the word is "layout"**, the inspector's own, so nothing in
+it was renamed (its Layouts are the screens and its Pages the rules that switch between them, and
+"page" in a script would have meant the one while the inspector said the other); and **a range is
+a list**, `col = {5, 10}`, because "col = 5, 10" cannot be written in a table (Lua reads the 10 as
+an entry of its own; JavaScript and Python refuse it). Open points a to e below were not answered
+one by one: the owner's go-ahead was on the summary that carried them, so their recommendations
+hold.
+
+**The model, as built** (`scripting/lcdPositions.js`):
+
+- **A layout** is addressed by its number in the inspector (counted from 1) or its name (in any
+  case and trimmed, as a control's name and a pixel element's are matched). A number is a
+  position, text a name, and text that names no layout but reads as a number is that number. A
+  display without layouts has layout 1: an LCD's lines, a Pixel Display's elements.
+- **A layout's text** is stored on the layout as `lines`, one string per row, saved as the
+  display's `lines` are. `composeLayout` starts from it, so a cell no zone paints shows it, with
+  `{value}`, `{pct}` and `{bar}` filled in. It never scrolls: a layout's rows are composed at the
+  display's width. Panels that already have layouts are not changed (they carry default lines
+  nobody sees, which would appear under their zones); "+ Enable" gives the first layout the lines,
+  so the screen does not go blank when an author turns layouts on.
+- **The position** is a row number, or a table of `layout`, `row` and `col` (the names in any
+  case). `row` and `col` are a number or a range; each counted from 1, a fraction rounded. A part
+  the display does not have is refused with why; a range past its edge stops there, said once.
+  Another key (`{pg = 2}`), an entry without a name (Lua's `{row = 2, col = 5, 10}`), a list for
+  the whole position, a range that is not two numbers or runs backwards: refused with why.
+- **The layout showing** comes from the preview, through `stores/displayLayouts.js`, which the
+  preview provides while it is mounted: the same answer it gives the renderer. With no preview,
+  the layout the design canvas shows (the inspector's Edit / Preview Layout).
+
+| Call | Does |
+| --- | --- |
+| `text(t, 2, "VOL")` | Row 2 of the layout showing: replaced. On a display without layouts, as before. |
+| `text(t, {layout = 2, row = 4}, "VOL")` | Row 4 of layout 2: replaced. |
+| `text(t, {row = 4, col = 15}, "X")` | From column 15 of row 4: written over, the rest of the row kept, as a hardware LCD prints at its cursor. |
+| `text(t, {row = 4, col = {5, 10}}, "VOL")` | Into columns 5 to 10: padded with blanks, or cut at 10. |
+| `text(t, {layout = 2}, "VOL")`, `text(t, {row = {1, 2}}, "VOL")` | Rejected: text writes one row. |
+| `clear(t)` | The layout showing's text: blanked. |
+| `clear(t, 4)`, `clear(t, {row = 4})` | Row 4 of the layout showing. It blanked every row, the 4 dropped. |
+| `clear(t, {layout = 2})`, `clear(t, {col = {1, 3}})` | All of layout 2's text; columns 1 to 3 of every row. |
+| `clear(t, {layout = 2, row = 4, col = 15})` | One character. |
+| `read(t, "text")`, `read(t, "text", 2)`, `read(t, "text", {row = 4, col = {5, 10}})` | Every row, one row, columns of one; one `col` is one character. |
+| `layout(t, 2)`, `layout(t, "Edit")` | Shows it as a soft key does (`lcdPressedLayout`, and the layout's timeout), until a soft key, an overlay or the Selector changes it. Not written to the panel. New, on the LCD and the Pixel Display. |
+| `read(t, "layout")` | The number of the layout showing; 1 without layouts. New. |
+| `fill(t, "text", {...})`, `size(t, "text")` | The layout showing's rows. |
+
+`clear` takes away only text: a zone still shows its control. On a display with layouts,
+`text(t, 2, "VOL")` wrote `lines` nobody saw and warned so; it writes the layout showing now. The
+Joystick's `cornerLabel`, the other LINE verb, is as it was. The Values tab reads a position and a
+layout as the runtime does.
+
+**The open points, as built:** (a) the inspector's Text rows (Row 1, Row 2, ...) edit the text of
+the layout being edited once there are layouts, and every list of layouts shows its number
+("1 · Home"); (b) `read(t, "layout")` gives a number, as names can repeat; (c) tokens filled in,
+no scrolling; (d) the cursor stays one per display and `cursorAt` is as it was; (e) the Pixel
+Display's element verbs stay by name.
+
+| Field | Text |
+| --- | --- |
+| `text` description | Write one row of the display. |
+| `text` `at` (number or table, required) | Row, counted from 1, of the layout showing. / Or a table: {layout = 2, row = 4, col = 15}, `layout` and `col` optional. / `layout`: its number, counted from 1, or its name. Left out: the layout showing. / `col`: written from that column on, the rest of the row kept. / `col` as a range {5, 10}: written into those columns, padded with blanks or cut. / A fraction: rounded. / A range past the display: to its last column. / Not on the display: rejected with a console error. |
+| `text` `text` | The text. / Longer than the display: cut at its width, with a console warning the first time. / On a display without layouts that scrolls: scrolled in instead. / The other three lines as they were. |
+| `text` notes | On a display with layouts: written on the layout, shown where no zone paints. |
+| `clear` description | Blank the layout showing, or part of it. |
+| `clear` `at` (number or table, optional) | As `text`'s, with `row`, `col`: a number, or a range {5, 10}. Left out: every row, every column. / Left out: the whole layout showing. |
+| `clear` notes | Only text is blanked: a zone still shows its control. |
+| `layout` `layout` (number or name, required) | Its number, counted from 1, or its name. / A name: case-insensitive. / A fraction: rounded. / A display without layouts: 1, its lines (its elements). / Not a layout of the display: rejected with a console error. |
+| `layout` notes | Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it. (Pixel: until an overlay or the Selector changes it.) / `read(target, "layout")` gives the number of the layout showing. |
+| `read` `index`, the LCD's | One line more: For "text": a row or a table, as `text()` takes it. |
+
+Then items 8 to 14, one at a time.
 
 ### The branch
 
@@ -837,7 +1214,9 @@ not open a pull request unless asked.
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
 on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
-ce.anim, ce.draw, ce.time and ce.components.lcd are done; continue with ce.components.arp, in
+ce.anim, ce.draw, ce.time and ce.components.lcd are done, but ce.components.lcd is still being
+reviewed by the owner one item at a time: take the next item in its queue ("The owner's review, one
+item at a time") first. Then continue with ce.components.arp, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check

@@ -1222,7 +1222,7 @@ Play a note.
 Example: `sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.
 
 - `channel` (number, required): The MIDI channel, from 1 to 16.
-- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
 - `velocity` (number, required): How hard the note is played, from 0 to 127. 0 means note off.
 - `ms` (number, optional): How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.
 
@@ -1351,7 +1351,7 @@ Release a note.
 Example: `sendNoteOff(1, "C3")` releases C3 on channel 1.
 
 - `channel` (number, required): The MIDI channel, from 1 to 16.
-- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
 - `velocity` (number, optional): The release velocity, from 0 to 127. It is 0 when left out.
 
 Good to know:
@@ -1436,7 +1436,7 @@ Start, continue or stop a connected sequencer or drum machine.
 
 Example: `sendTransport("start")` starts it from the beginning.
 
-- `action` (text, required): "start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.
+- `action` (text, required): "start" (FA), "continue" (FB) or "stop" (FC). Case-insensitive. Any other action, or none, is refused with a message and nothing is sent.
 
 *Short name: `sendTransport`.*
 
@@ -1469,7 +1469,7 @@ Work out the checksum a synth expects at the end of a SysEx message.
 
 Example: `checksum("roland", {0x40, 0x00, 0x7F, 0x00})` gives 0x41.
 
-- `type` (text, required): How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.
+- `type` (text, required): How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". Case-insensitive. An unknown name, or none, returns nothing and prints the names it accepts.
 - `bytes` (bytes, required): The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.
 
 Good to know:
@@ -1513,8 +1513,8 @@ ce.midi.panic()
 
 | Function | What it does |
 |---|---|
-| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count` (number, optional): How many bytes of 7 bits to make. Two when it is left out. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `to7bit`. |
-| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): The 7-bit bytes, as a list of numbers. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `from7bit`. |
+| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count` (number, optional): How many bytes of 7 bits to make. Two when it is left out. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive. Short name: `to7bit`. |
+| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): The 7-bit bytes, as a list of numbers. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive. Short name: `from7bit`. |
 | `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v` (number, required): The number, from 0 to 16383. Short name: `to14bit`. |
 | `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb` (number, required): The high half, from 0 to 127. `lsb` (number, required): The low half, from 0 to 127. Short name: `from14bit`. |
 | `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte` (number, required): A byte, from 0 to 255. Short name: `toNibbles`. |
@@ -1868,7 +1868,7 @@ List the MIDI ports, each as { id, name, direction, type, hardware, role }. `har
 
 | Name | Type | What it is |
 |---|---|---|
-| `direction` | text | List only the ports that receive, or only the ones that send.<br>One of "in" or "out". |
+| `direction` | text | List only the ports that receive, or only the ones that send.<br>One of "in" or "out". Case-insensitive. |
 
 ```lua
 -- Lua
@@ -2695,7 +2695,7 @@ Good to know:
 | `ce.math.clamp(v, lo, hi)` | Keep a value inside a range. Example: `clamp(140, 0, 127)` gives 127. `v` (number, required): The value to keep in range. `lo` (number, required): The bottom of the range. Must be below hi. A value below it gives lo. `hi` (number, required): The top of the range. A value above it gives hi. Short name: `clamp`. |
 | `ce.math.round(v)` | Round to the nearest whole number. Example: `round(2.5)` gives 3. `v` (number, required): The number to round. A half always rounds up, so -2.5 gives -2. To keep decimal places, use `ce.math.roundTo`. Short name: `round`. |
 | `ce.math.snap(v, step)` | Round a value to the nearest step. Example: `snap(37, 10)` gives 40. `v` (number, required): The value to round. `step` (number, required): The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged.<br>Left out: an error in the console and no result. Halfway rounds up, as with `ce.math.round`: 35 gives 40. For steps that are not evenly spaced, use `ce.math.quantize`. Short name: `snap`. |
-| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: not held at 0 or 1. `shape` (text, optional): "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends).<br>Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
+| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: not held at 0 or 1. `shape` (text, optional): "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Case-insensitive.<br>Left out: "linear". An unknown name: a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
 | `ce.math.lerp(a, b, t)` | Blend between two numbers. Example: `lerp(10, 20, 0.25)` gives 12.5. `a` (number, required): The first number. `b` (number, required): The second number. `t` (number, required): Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway.<br>Left out: an error in the console and no result.<br>Outside the range: not held at 0 or 1, so the result goes past a or b. For whole lists of numbers, use `ce.math.blend`. Short name: `lerp`. |
 | `ce.math.wrap(v, lo, hi)` | Wrap a value into a range, so going past the top starts again from the bottom. Example: `wrap(-1, 0, 12)` gives 11. `v` (number, required): The value to wrap. `lo` (number, required): The bottom of the range. Must be below hi. The result can equal lo. `hi` (number, required): The top of the range.<br>The result never equals hi: wrap(12, 0, 12) gives 0. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator. With a negative number, % differs between languages: -1 % 12 gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
 | `ce.math.map(v, points)` | Map a value through a curve you draw as points. Example: `mapCurve(0.25, {{0, 0}, {0.5, 0.9}, {1, 1}})` gives 0.45. `v` (number, required): The value to map. `points` (list, optional): A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends.<br>Left out or empty: the value is returned unchanged. Below the first point or above the last: held at that point's y. Two points with the same x make a step, and the later one wins. {1, 1, "exp"} rises slowly, then fast. Short name: `mapCurve`. |
@@ -2709,7 +2709,7 @@ Good to know:
 | `ce.math.unipolar(v)` | Turn a value from -1 to +1 into one from 0 to 1. Example: `unipolar(0.5)` gives 0.75. `v` (number, required): Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5.<br>Outside the range: not held. The reverse of `ce.math.bipolar`. Short name: `unipolar`. |
 | `ce.math.fold(v, lo, hi)` | Bounce a value back off the ends of a range. Example: `fold(12, 0, 10)` gives 8. `v` (number, required): The value. Past the top it heads back down; below the bottom it heads back up. `lo` (number, required): The bottom of the range. Must be below hi. `hi` (number, required): The top of the range. Where `ce.math.wrap` jumps from the top to the bottom, fold keeps the movement smooth. Fold suits modulation depths; wrap suits pitch classes. Short name: `fold`. |
 | `ce.math.index(t, count)` | Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks. Example: `indexOfRange(0.5, 8)` gives 4. `t` (number, required): Range: 0 ↔ 1 (first slot ↔ last slot).<br>Outside the range: held at the first or last slot. `count` (number, required): How many slots. They count from 0, so the last is count - 1. Short name: `indexOfRange`. |
-| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a` (number, required): The value at 0. `b` (number, required): The value at 1. `t` (number, required): Range: 0 ↔ 1 (a ↔ b).<br>Left out: 0.<br>Outside the range: held at 0 or 1. `law` (text, optional): "linear", "equalPower" or "sharp".<br>Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
+| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a` (number, required): The value at 0. `b` (number, required): The value at 1. `t` (number, required): Range: 0 ↔ 1 (a ↔ b).<br>Left out: 0.<br>Outside the range: held at 0 or 1. `law` (text, optional): "linear", "equalPower" or "sharp". Case-insensitive.<br>Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
 | `ce.math.approach(current, target, maxStep)` | Move a value toward a target by no more than a set step. Example: `approach(10, 50, 15)` gives 25. `current` (number, required): The value now. `target` (number, required): Where it is going.<br>Within one step of it: the target exactly. `maxStep` (number, required): The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive. It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value. Short name: `approach`. |
 | `ce.math.roundTo(v, decimals)` | Round to a number of decimal places. Example: `roundTo(3.14159, 2)` gives 3.14. `v` (number, required): The number to round. `decimals` (number, optional): How many decimal places to keep.<br>Default: 0.<br>Below 0: 0. It returns a number, not text, so you can keep calculating with it. Short name: `roundTo`. |
 | `ce.math.almost(a, b [, epsilon])` | Check whether two numbers are equal to within a small margin. Example: `almost(0.1 + 0.2, 0.3)` gives true. `a` (number, required): The first number. `b` (number, required): The second number. `epsilon` (number, optional): How far apart they may be.<br>Default: 0.000000001. Use it instead of == on numbers that have been through arithmetic such as `ce.math.scale`, where rounding can leave two numbers that should match very slightly apart. Short name: `almost`. |
@@ -2728,7 +2728,7 @@ Good to know:
 | `ce.math.distance(x1, y1, x2, y2)` | Measure the straight-line distance between two points. Example: `distance(0, 0, 3, 4)` gives 5. `x1` (number, required): The first point's x. `y1` (number, required): The first point's y. `x2` (number, required): The second point's x. `y2` (number, required): The second point's y. Use it for XY pads, joysticks and the Orbit, or to check whether a click landed on something you drew. Short name: `distance`. |
 | `ce.math.angle(x1, y1, x2, y2)` | Find the angle from one point to another. Example: `angleOf(0, 0, 10, 0)` gives 90. `x1` (number, required): The first point's x. `y1` (number, required): The first point's y. `x2` (number, required): The second point's x. `y2` (number, required): The second point's y. It returns degrees in the range 0 ↔ 360: 0 at twelve o'clock, increasing clockwise, as ce.draw measures them. y counts downwards, as on screen, so a point straight above gives 0. The same point twice gives 0. Short name: `angleOf`. |
 | `ce.math.polar(angle, radius)` | Turn an angle and a distance into x and y offsets from a centre. Example: `polar(0, 10)` gives x 0 and y -10: straight up, as y counts downwards. `angle` (number, required): The angle in degrees: 0 at twelve o'clock, increasing clockwise, as ce.math.angle returns it. `radius` (number, required): The distance from the centre.<br>Left out: 0. Add the offsets to your centre to find, for example, the tip of a knob's pointer. Short name: `polar`. |
-| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `curve` (text, optional): "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1).<br>Left out or unknown: "linear". `tension` (number, optional): How strongly "exp" and "log" bend.<br>Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
+| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `curve` (text, optional): "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Case-insensitive.<br>Left out or unknown: "linear". `tension` (number, optional): How strongly "exp" and "log" bend.<br>Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
 | `ce.math.deadzone(v, amount [, invert])` | Add a dead zone to the bottom of a value from 0 to 1, as the Expression Router does. Example: `deadzone(0.55, 0.1)` gives 0.5. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `amount` (number, required): The size of the dead zone.<br>At or below it: 0. The rest is stretched to fill 0 ↔ 1. `invert` (true or false, optional): true flips the value first.<br>Default: false. The response starts at the edge of the dead zone instead of jumping up from it. Short name: `deadzone`. |
 | `ce.math.weights(points, x, y [, power])` | Work out how much each anchor point counts at a position, as a Timbre Space or Preset Constellation does. `points` (list, required): The anchors, as a list of {x, y}.<br>Empty: an empty list. `x` (number, required): The position's x.<br>Range: 0 ↔ 1. `y` (number, required): The position's y.<br>Range: 0 ↔ 1. `power` (number, optional): How sharp the blend is: higher lets the nearest anchor take over sooner.<br>Default: 2. It returns one weight per anchor, adding up to 1: the closer the anchor, the bigger its share. Pass the result to `ce.math.blendBy` to morph values. Short name: `weightsFor`. |
 | `ce.math.blendBy(values, weights)` | Combine many values into one weighted average. Example: `blendBy({0, 100}, {3, 1})` gives 25. `values` (list of numbers, required): The values to combine. `weights` (list of numbers, required): How much each value counts. They need not add up to 1.<br>Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides. This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead. Short name: `blendBy`. |
@@ -2775,7 +2775,7 @@ Good to know:
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
-| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
+| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". Case-insensitive. |
 | `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
 | `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
 | `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
@@ -3468,7 +3468,7 @@ Save a value under `key` so it outlasts the script — unlike `ce.storage.state`
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 ce.storage.saveSetting("key", value)
@@ -3484,7 +3484,7 @@ Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if n
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -3505,7 +3505,7 @@ List the keys saved in one scope, in no particular order. An empty list only mea
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -3526,7 +3526,7 @@ Delete a saved setting. Returns true if there was a value to delete and false if
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -3547,7 +3547,7 @@ Return every setting in one scope as a table of keys and values. `opts.scope` is
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 ```lua
 -- Lua
@@ -3568,7 +3568,7 @@ Delete every setting in one scope and return how many were deleted. Clearing the
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 #### `ce.storage.info([opts]) -> table`
 
@@ -3580,7 +3580,7 @@ Describe where one scope's settings are kept: `scope`, `backing`, `available`, `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
 
 #### `ce.storage.encode(value [, opts]) -> string`
 
@@ -3709,8 +3709,8 @@ Good to know:
 |---|---|---|---|
 | `dash` | list of numbers | a solid line | On and off lengths in pixels, alternating.<br>A length < 0, or invalid: 0.<br>Not a list: solid line. |
 | `dashOffset` | number (pixels) | 0 | Where the dash pattern starts.<br>Advanced on a timer: the dashes move.<br>Invalid: 0. |
-| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-sensitive.<br>Invalid: default. |
-| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-sensitive.<br>Invalid: default. |
+| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-insensitive.<br>Invalid: default. |
+| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-insensitive.<br>Invalid: default. |
 
 ```lua
 -- Lua
@@ -4148,7 +4148,7 @@ Good to know:
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.<br>Invalid: default. |
+| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-insensitive.<br>Invalid: default. |
 
 #### `ce.draw.clip([x, y, w, h]) -> boolean`
 
@@ -4176,7 +4176,7 @@ Set how the shapes drawn after it mix with what is under them.
 
 Example: `drawBlend("multiply")` darkens what is under the shapes drawn after it.
 
-- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.<br>Invalid: rejected with a console error.
+- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
@@ -4235,7 +4235,7 @@ Good to know:
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `size` | number (pixels) | 12 | Text size in pixels.<br>Range: > 0.<br>≤ 0, or invalid: default. |
-| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".<br>Invalid: rejected with a console error. |
+| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case-insensitive.<br>"center", "centre" and "centred": "middle".<br>Invalid: rejected with a console error. |
 | `family` | text | — | Font family.<br>Left out: the control's font. |
 
 ```lua
@@ -4306,12 +4306,12 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported.<br>One of "image", "overlay", "textImage" or "textTexture". |
-| `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit.<br>One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
-| `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens.<br>One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
+| `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported.<br>One of "image", "overlay", "textImage" or "textTexture". Case-insensitive. |
+| `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit.<br>One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". Case-insensitive. |
+| `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens.<br>One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". Case-insensitive. |
 | `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
 | `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
-| `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only.<br>One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
+| `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only.<br>One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive. |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
 | `offsetX` | number (pixels) | 0 | Nudge the image sideways. |
 | `offsetY` | number (pixels) | 0 | Nudge it up or down. |
@@ -4323,7 +4323,7 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `brightness` | number | 1 | Lighten above 1, darken below. Background layers only. |
 | `contrast` | number | 1 | Increase above 1, flatten below. Background layers only. |
 | `tileScale` | number | 1 | How big each tile is when the image repeats. Never less than 0.1. |
-| `clipMode` | text | "shape" | Whether the image is clipped to the control's drawn shape or to its plain rectangle. Background layers only.<br>One of "shape" or "box". |
+| `clipMode` | text | "shape" | Whether the image is clipped to the control's drawn shape or to its plain rectangle. Background layers only.<br>One of "shape" or "box". Case-insensitive. |
 | `muted` | true or false | false | Keep the layer configured but hide it, so you can switch it back on without setting it up again. Background layers only. |
 
 #### `ce.image.clear(target [, layer]) -> boolean`
@@ -4406,9 +4406,9 @@ Set a control's typography in one call: font, size, weight, spacing, alignment a
 | `weight` | number or text | — | How heavy the text is, either as a number from 100 to 900 or as a name such as "Bold". The panel stores this as a pair of fields that must agree, and this always writes both. |
 | `bold` | true or false | — | A shorthand for a heavy weight. |
 | `italic` | true or false | — | Slant the text over. |
-| `caseMode` | text | "normal" | Re-case the text as it is drawn, without changing what it says.<br>One of "normal", "uppercase", "lowercase", "title", "sentence" or "smallcaps". |
-| `scriptMode` | text | "normal" | Draw the text smaller and raised or lowered, as superscript or subscript.<br>One of "normal", "superscript" or "subscript". |
-| `justification` | text | — | Where the text sits inside the control.<br>One of "topLeft", "top", "topRight", "left", "centred", "right", "bottomLeft", "bottom" or "bottomRight". |
+| `caseMode` | text | "normal" | Re-case the text as it is drawn, without changing what it says.<br>One of "normal", "uppercase", "lowercase", "title", "sentence" or "smallcaps". Case-insensitive. |
+| `scriptMode` | text | "normal" | Draw the text smaller and raised or lowered, as superscript or subscript.<br>One of "normal", "superscript" or "subscript". Case-insensitive. |
+| `justification` | text | — | Where the text sits inside the control.<br>One of "topLeft", "top", "topRight", "left", "centred", "right", "bottomLeft", "bottom" or "bottomRight". Case-insensitive. |
 | `letterSpacing` | number (pixels) | 0 | Extra space between letters. Negative tightens them up. |
 | `wordSpacing` | number (pixels) | 0 | Extra space between words. |
 | `baselineShift` | number (pixels) | 0 | Move the text off its baseline, up for positive. |
@@ -4476,7 +4476,7 @@ Show a short pop-up message to the person using the panel, and return its ID. It
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `duration` | number (milliseconds) | 3000 | How long the message stays up. 0 or less keeps it visible until something dismisses it. |
 
 ```lua
@@ -4498,7 +4498,7 @@ Show a line of text in the status bar. It stays until you replace it; call this 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 
 ```lua
 -- Lua
@@ -4522,7 +4522,7 @@ Ask a question with buttons. The answer arrives later through `onChoice`, which 
 | `title` | text | — | The bold line at the top. |
 | `message` | text | — | The body text under the heading. |
 | `buttons` | list of text | one button labelled "OK" | The button labels, left to right. Whichever is clicked is what `onChoice` is given. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `default` | text | the first button | The label of the button focused when the dialog opens. |
 
 ```lua
@@ -4558,7 +4558,7 @@ Ask the user to type some text. The answer arrives through `onAnswer`: the text 
 | `placeholder` | text | — | Grey hint text shown while the field is empty. |
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `default` | text | the accept label | Which of the two buttons is drawn as the default one: the accept label or the cancel label. Pressing Enter in the field accepts either way. |
 
 ```lua
@@ -4591,7 +4591,7 @@ Ask the user to pick from a list. The answer arrives through `onAnswer`: the cho
 | `multiple` | true or false | false | Allow more than one to be picked, in which case the answer is a list. |
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 
 ```lua
 -- Lua
@@ -4631,7 +4631,7 @@ Change the text of a message that is already showing, in place. To show progress
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `duration` | number | unchanged | A new lifetime for the message. If omitted, a sticky message stays sticky and a timed one gets its full time back. |
 
 ```lua
@@ -4742,8 +4742,8 @@ Components you play with directly.
 
 Components that show something rather than set it.
 
-- **LCD Display** — `ce.components.lcd`. Write to a character LCD: a line at a time, plus backlight, brightness and scrolling. Commands: `text`, `clear`, `backlight`, `brightness`, `contrast`, `scroll`, `scrollSpeed`, `blink`, `cursor`, `cursorAt`, `value`, `anim`, `animPreset`, `animSpeed`, `animFps`, `animLoop`, `scrollMode`, `scrollRepeat`, `blinkRate`, `cursorBlink`, `valueMin`, `valueMax`, `valuePrecision`, `valuePrefix`, `valueSuffix`, `valueSource`, `brightnessSource`, `backlightSource`, `glyph`, `editText`, `showGlass`, `showGhost`, `showScanlines`, `showGrid`, `read`, `size`, `fill`.
-- **Pixel Display** — `ce.components.pixel`. Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation. Commands: `text`, `label`, `show`, `blink`, `x`, `y`, `w`, `h`, `editText`, `backlight`, `brightness`, `contrast`, `gamma`, `glow`, `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`, `layoutTransition`, `transitionMs`, `brightnessSource`, `backlightSource`, `showGlass`, `showGhost`, `showScanlines`, `showGrid`, `read`.
+- **LCD Display** — `ce.components.lcd`. Write to a character LCD: a line at a time, plus backlight, brightness and scrolling. Commands: `text`, `clear`, `backlight`, `brightness`, `contrast`, `scroll`, `scrollSpeed`, `blink`, `cursor`, `cursorAt`, `value`, `anim`, `animPreset`, `animSpeed`, `animFps`, `animLoop`, `scrollMode`, `scrollRepeat`, `blinkRate`, `cursorBlink`, `valueMin`, `valueMax`, `valuePrecision`, `valuePrefix`, `valueSuffix`, `valueSource`, `brightnessSource`, `backlightSource`, `glyph`, `editText`, `layout`, `showGlass`, `showGhost`, `showScanlines`, `showGrid`, `read`, `size`, `fill`.
+- **Pixel Display** — `ce.components.pixel`. Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation. Commands: `text`, `label`, `show`, `blink`, `x`, `y`, `w`, `h`, `editText`, `backlight`, `brightness`, `contrast`, `gamma`, `glow`, `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`, `layoutTransition`, `transitionMs`, `brightnessSource`, `backlightSource`, `layout`, `showGlass`, `showGhost`, `showScanlines`, `showGrid`, `read`.
 
 ### Panel-wide
 
