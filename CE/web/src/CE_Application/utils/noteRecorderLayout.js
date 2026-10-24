@@ -13,6 +13,7 @@
 // Pure: a take and a phase in, notes out. The clock, the MIDI and the timers
 // live in the preview surface.
 import { SCALES, noteName, useFlats } from './chordPadLayout.js';
+import { listWord } from './wordLists.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -198,7 +199,7 @@ export function quantizeTime(t, grid, strength = 1) {
 // Snap a pitch to the nearest note of the scale. Ties go DOWN, deterministically
 // — a coin-flip here means the same take quantises two different ways.
 export function snapNoteToScale(note, keyPc, scaleName) {
-  const scale = SCALES[String(scaleName)] ?? null;
+  const scale = SCALES[listWord(Object.keys(SCALES), String(scaleName)) ?? ''] ?? null;   // in any case
   if (!scale) return clampInt(note, 0, 127);
   const n = clampInt(note, 0, 127);
   const key = ((Math.round(num(keyPc, 0)) % 12) + 12) % 12;

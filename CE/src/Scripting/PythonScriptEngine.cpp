@@ -2417,8 +2417,18 @@ def __pitch(v):
     if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
         return math.floor(v)
     return None
+# A word from a list, in any case and with spaces around it, as the list spells it (a list's
+# entries, or a dict's keys), or None: "Dorian" is "dorian", "MAJ7" is "maj7".
+def __word(lst, name):
+    if not isinstance(name, str): return None
+    want = name.strip().lower()
+    for k in lst:
+        if isinstance(k, str) and k.lower() == want: return k
+    return None
 def __steps(tbl, name, fallback):
-    return tbl.get(fallback if name is None else str(name))
+    if name is None: return tbl.get(fallback)
+    key = __word(tbl, str(name))
+    return tbl.get(key) if key is not None else None
 def __pitchOf(verb, v):
     # A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
     if v is None:
@@ -2476,7 +2486,7 @@ def quantizeNote(note, root, scale=None):
 # Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 # chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 def noteSpelling(root, scale=None):
-    nm = "major" if scale is None else str(scale)
+    nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     if __setOf("ce.music.spelling", "scale", scale) is None: return None
     pitch = __pitchOf("ce.music.spelling", root)
     if pitch is None: return None
@@ -2604,7 +2614,7 @@ def __roman(rootSemitone, quality):
 # scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 def degreeChord(root, scale, degree, size=None):
     import math
-    nm = "major" if scale is None else str(scale)
+    nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     s = __setOf("ce.music.degreeChord", "scale", scale)
     if not s: return None
     if __pitchOf("ce.music.degreeChord", root) is None: return None
@@ -2638,7 +2648,7 @@ def voiceLead(notes, previous=None, mode=None):
     before = __noteList("voiceLead", "previous", previous, True) if read is not None else None
     if read is None or before is None: return []
     chord = __sortedNotes(read); prev = __sortedNotes(before)
-    how = "closest" if mode is None else str(mode)
+    how = "closest" if mode is None else (__word(__VOICE_LEAD_MODES, str(mode)) or str(mode))
     if how not in __VOICE_LEAD_MODES:
         __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
         how = "closest"
@@ -2694,11 +2704,11 @@ def arpOrder(notes, pattern=None):
     if pattern is None:
         __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
         p = "up"
-    elif str(pattern) not in __ARP_ORDER_PATTERNS:
+    elif __word(__ARP_ORDER_PATTERNS, str(pattern)) is None:
         __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
         p = "up"
     else:
-        p = str(pattern)
+        p = __word(__ARP_ORDER_PATTERNS, str(pattern))
     if not asc: return []
     if p == "chord": return [list(asc)]
     if p == "down":

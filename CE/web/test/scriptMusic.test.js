@@ -86,6 +86,16 @@ test('scale transposes rather than wrapping — the notes keep going up', () => 
   assert.deepEqual(api.scaleNotes(71), [71, 73, 75, 76, 78, 80, 82]);
 });
 
+test('a scale, chord, pattern or mode is read in any case, as every word from a list is', () => {
+  assert.deepEqual(api.scaleNotes('C4', 'Dorian'), api.scaleNotes('C4', 'dorian'));
+  assert.deepEqual(api.chordNotes('C4', ' MAJ7 '), api.chordNotes('C4', 'maj7'));
+  assert.equal(api.noteSpelling('C4', 'MINOR'), api.noteSpelling('C4', 'minor'));
+  assert.deepEqual(api.degreeChord('C4', 'HarmonicMinor', 5), api.degreeChord('C4', 'harmonicMinor', 5));
+  assert.deepEqual(api.arpOrder([60, 64, 67], 'DOWN'), [[67], [64], [60]]);
+  assert.deepEqual(api.voiceLead([60, 64, 67], [65, 69, 72], 'Off'), [60, 64, 67]);
+  assert.equal(api.scaleNotes('C4', 'toString'), undefined, 'never one of Object\'s own');
+});
+
 test('a note name is read in any case, as every word from a list is', () => {
   assert.deepEqual(api.scaleNotes('c4', 'major'), api.scaleNotes('C4', 'major'));
   assert.deepEqual(api.chordNotes(' eb4 ', 'major'), api.chordNotes('Eb4', 'major'));

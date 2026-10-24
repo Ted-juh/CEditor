@@ -49,7 +49,7 @@ export const MODULE_COST = {
   "ce.image": { "javascript": 106, "lua": 106, "python": 106, "webview": 0 },
   "ce.math": { "javascript": 41240, "lua": 48651, "python": 41468, "webview": 44338 },
   "ce.midi": { "javascript": 32209, "lua": 30356, "python": 31267, "webview": 46432 },
-  "ce.music": { "javascript": 21145, "lua": 21394, "python": 20254, "webview": 16360 },
+  "ce.music": { "javascript": 21872, "lua": 22055, "python": 20852, "webview": 16650 },
   "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 56117 },
   "ce.storage": { "javascript": 9304, "lua": 17028, "python": 12794, "webview": 20981 },
   "ce.text": { "javascript": 84, "lua": 84, "python": 84, "webview": 0 },

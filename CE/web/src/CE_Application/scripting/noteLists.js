@@ -17,6 +17,7 @@
 import { realNumber } from './scriptColours.js';
 import { shownValue as shown } from './shownValue.js';
 import { noteNumberOf as noteNumber } from './musicTheory.js';
+import { listWord } from '../utils/wordLists.js';
 
 // Each helper: the call as a script writes it, the lists it takes (by argument), and what it gives
 // back when it cannot read one.
@@ -70,8 +71,8 @@ export const ARP_ORDER_PATTERNS = ['up', 'down', 'updown', 'downup', 'asPlayed',
 /** voiceLead's mode as it reads it: `how`, and `said` for one it has none of (none given is "closest"). */
 export function voiceLeadMode(mode) {
   if (mode === undefined || mode === null) return { how: 'closest', said: null };
-  const how = String(mode);
-  if (VOICE_LEAD_MODES.includes(how)) return { how, said: null };
+  const how = listWord(VOICE_LEAD_MODES, String(mode));   // in any case: "Smooth" is "smooth"
+  if (how) return { how, said: null };
   return { how: 'closest', said: `ce.music.lead: ${shown(mode)} is not a mode, so "closest" was used. One of: ${VOICE_LEAD_MODES.join(', ')}.` };
 }
 
@@ -80,8 +81,8 @@ export function arpOrderPattern(pattern) {
   if (pattern === undefined || pattern === null) {
     return { which: 'up', said: `ce.music.arp: no pattern was given, so "up" was used. One of: ${ARP_ORDER_PATTERNS.join(', ')}.` };
   }
-  const which = String(pattern);
-  if (ARP_ORDER_PATTERNS.includes(which)) return { which, said: null };
+  const which = listWord(ARP_ORDER_PATTERNS, String(pattern));   // in any case: "UP" is "up"
+  if (which) return { which, said: null };
   return { which: 'up', said: `ce.music.arp: ${shown(pattern)} is not a pattern, so "up" was used. One of: ${ARP_ORDER_PATTERNS.join(', ')}.` };
 }
 

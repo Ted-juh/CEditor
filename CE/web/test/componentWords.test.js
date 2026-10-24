@@ -128,7 +128,8 @@ test('a word from a list is read in any case, by ce.panel and the hand-written f
   for (const call of [(api) => api.panelAlign(['K'], 'LEFT'), (api) => api.panelFlip(['K'], 'Vertical'),
     (api) => api.panelOrder(['K'], ' Front '), (api) => api.splitPreset('Split', 'Classic'),
     (api) => api.harmonyMode('Harm', 'Memory'), (api) => api.harmonyVoicing('Harm', 'CLOSE'),
-    (api) => api.phraseDirection('Phr', 'Forward')]) {
+    (api) => api.phraseDirection('Phr', 'Forward'), (api) => api.phraseScale('Phr', 'Dorian'),
+    (api) => api.harmonyScale('Harm', 'MIXOLYDIAN')]) {
     const { result, lines } = run(call);
     assert.notEqual(result, false, `${call}: ${lines.join(' / ')}`);
     assert.ok(!lines.some((l) => /refused|is not/.test(l)), `${call}: ${lines.join(' / ')}`);

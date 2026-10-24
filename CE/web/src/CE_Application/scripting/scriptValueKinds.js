@@ -446,18 +446,19 @@ export function readScaleOrChord(value, kind, { verb, root, musicWords }) {
   const table = kind === 'chord' ? CHORDS : SCALES;
   const meaning = { label: null, choices: [...names] };
   if (typeof value !== 'string') return { meaning, problem: null };
-  if (!Object.hasOwn(table, value)) {
+  const word = listWord(names, value);   // in any case, as the runtimes read it: "Dorian" is dorian
+  if (!word) {
     const list = names.join(', ');
     const message = musicWords
       ? `${verb}: "${value}" is not a ${kind}, so there is no answer. The ${kind}s are ${list}.`
       : `"${value}" is not a ${kind}. The ${kind}s are ${list}.`;
     return { meaning, problem: { severity: 'error', message: `${message}${didYouMean(value, names)}` } };
   }
-  meaning.label = value;
+  meaning.label = word;
   if (Number.isFinite(root)) {
-    const numbers = table[value].map((x) => root + x);
+    const numbers = table[word].map((x) => root + x);
     meaning.numbers = numbers;
-    meaning.notes = spellNotes(numbers, ((root % 12) + 12) % 12, kind === 'chord' ? 'major' : value);
+    meaning.notes = spellNotes(numbers, ((root % 12) + 12) % 12, kind === 'chord' ? 'major' : word);
   }
   return { meaning, problem: null };
 }

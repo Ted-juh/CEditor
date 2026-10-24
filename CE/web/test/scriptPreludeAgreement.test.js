@@ -88,6 +88,12 @@ const CASES = [
   ['noteNumber', [60]],
   ['noteSpelling', [60, 'major']], ['noteSpelling', [60, 'minor']], ['noteSpelling', ['F4', 'major']],
   ['noteSpelling', ['A4', 'minor']], ['noteSpelling', [60]], ['noteSpelling', [60, 'bogus']],
+  // A scale, chord, arp pattern or lead mode in any case, in every runtime: "Dorian" and "MAJ7" were
+  // not names, "DOWN" was "up" and "SMOOTH" was "closest", each with a message.
+  ['scaleNotes', ['C4', 'Dorian']], ['chordNotes', ['C4', ' MAJ7 ']], ['noteSpelling', ['A4', 'MINOR']],
+  ['degreeChord', ['C4', 'HarmonicMinor', 5]], ['inScale', [61, 60, 'Phrygian']],
+  ['arpOrder', [[60, 64, 67], 'DOWN']], ['arpOrder', [[60, 64, 67], 'asplayed']],
+  ['voiceLead', [[60, 64, 67], [65, 69, 72], 'SMOOTH']], ['scaleNotes', ['C4', 'toString']],
   ['noteSpelling', ['H4', 'major']], ['inScale', ['H4', 60, 'major']], ['scaleDegree', [60, 'H4', 'major']],
   ['inScale', [62, 60, 'major']], ['inScale', [61, 60, 'major']], ['inScale', [61, 60]],
   ['inScale', [75, 60, 'minor']], ['inScale', [61, 60, 'bogus']],

@@ -1321,9 +1321,18 @@ local function __pitch(v)
   if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then return math.floor(v) end
   return nil
 end
+-- A word from a list, in any case and with spaces around it, as the list spells it (the keys of
+-- `set`), or nil: "Dorian" is "dorian", "MAJ7" is "maj7", "AsPlayed" is "asPlayed".
+local function __word(set, name)
+  if type(name) ~= "string" then return nil end
+  local want = name:lower():match("^%s*(.-)%s*$")
+  for k, _ in pairs(set) do if type(k) == "string" and k:lower() == want then return k end end
+  return nil
+end
 local function __steps(tbl, name, fallback)
-  local s = tbl[name == nil and fallback or tostring(name)]
-  return s
+  if name == nil then return tbl[fallback] end
+  local key = __word(tbl, tostring(name))
+  return key and tbl[key] or nil
 end
 local function __pitchOf(verb, v)
   -- A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
@@ -1453,7 +1462,7 @@ end
 local __VOICE_LEAD_MODES = { closest = true, smooth = true, off = true }
 local __ARP_ORDER_PATTERNS = { up = true, down = true, updown = true, downup = true, asPlayed = true, random = true, chord = true }
 function noteSpelling(root, scale)
-  local nm = (scale == nil) and "major" or tostring(scale)
+  local nm = (scale == nil) and "major" or (__word(__CE_SCALES, tostring(scale)) or tostring(scale))
   if __setOf("ce.music.spelling", "scale", scale) == nil then return nil end
   local pitch = __pitchOf("ce.music.spelling", root)
   if pitch == nil then return nil end
@@ -1532,7 +1541,7 @@ end
 -- The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 -- scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size)
-  local nm = (scale == nil) and "major" or tostring(scale)
+  local nm = (scale == nil) and "major" or (__word(__CE_SCALES, tostring(scale)) or tostring(scale))
   local s = __setOf("ce.music.degreeChord", "scale", scale)
   if s == nil or #s == 0 then return nil end
   if __pitchOf("ce.music.degreeChord", root) == nil then return nil end
@@ -1578,7 +1587,7 @@ function voiceLead(notes, previous, mode)
   local before = read and __noteList("voiceLead", "previous", previous, true)
   if read == nil or before == nil then return {} end
   local chord, prev = __sortedNotes(read), __sortedNotes(before)
-  local how = (mode == nil) and "closest" or tostring(mode)
+  local how = (mode == nil) and "closest" or (__word(__VOICE_LEAD_MODES, tostring(mode)) or tostring(mode))
   if not __VOICE_LEAD_MODES[how] then
     __musicSaid("ce.music.lead: " .. __shownValue(mode) .. ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
     how = "closest"
@@ -1647,7 +1656,7 @@ end
 function arpOrder(notes, pattern)
   local asc = __noteList("arpOrder", "notes", notes)
   if asc == nil then return {} end
-  local p = pattern ~= nil and tostring(pattern) or nil
+  local p = pattern ~= nil and (__word(__ARP_ORDER_PATTERNS, tostring(pattern)) or tostring(pattern)) or nil
   if p == nil then
     __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
     p = "up"

@@ -1378,7 +1378,19 @@ function __pitch(v) {
   if (typeof v === "string") return noteNumber(v);
   return typeof v === "number" && isFinite(v) ? Math.floor(v) : undefined;
 }
-function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
+// A word from a list, in any case and with spaces around it, as the list spells it (an array's
+// entries, or an object's keys), or undefined: "Dorian" is "dorian", "MAJ7" is "maj7".
+function __word(list, name) {
+  if (typeof name !== "string") return undefined;
+  var want = name.trim().toLowerCase(), keys = Array.isArray(list) ? list : Object.keys(list);
+  for (var i = 0; i < keys.length; i++) if (String(keys[i]).toLowerCase() === want) return keys[i];
+  return undefined;
+}
+function __steps(tbl, name, fallback) {
+  if (name === undefined || name === null) return tbl[fallback];
+  var key = __word(tbl, String(name));
+  return key === undefined ? undefined : tbl[key];
+}
 function __pitchOf(verb, v) {
   // A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
   if (v === undefined || v === null) {
@@ -1433,7 +1445,7 @@ function quantizeNote(note, root, scale) {
 // Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 // chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 function noteSpelling(root, scale) {
-  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var nm = (scale === undefined || scale === null) ? "major" : (__word(__CE_SCALES, String(scale)) || String(scale));
   if (!__setOf("ce.music.spelling", "scale", scale)) return undefined;
   var pitch = __pitchOf("ce.music.spelling", root); if (pitch === undefined) return undefined;
   var pc = __m12(pitch);
@@ -1499,7 +1511,7 @@ function __roman(rootSemitone, quality) {
 // The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 // scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size) {
-  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var nm = (scale === undefined || scale === null) ? "major" : (__word(__CE_SCALES, String(scale)) || String(scale));
   var s = __setOf("ce.music.degreeChord", "scale", scale);
   if (!s || !s.length) return undefined;
   if (__pitchOf("ce.music.degreeChord", root) === undefined) return undefined;
@@ -1587,7 +1599,7 @@ function voiceLead(notes, previous, mode) {
   var before = read && __noteList("voiceLead", "previous", previous, true);
   if (!read || !before) return [];
   var chord = __sortedNotes(read), prev = __sortedNotes(before);
-  var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  var how = (mode === undefined || mode === null) ? "closest" : (__word(__VOICE_LEAD_MODES, String(mode)) || String(mode));
   if (__VOICE_LEAD_MODES.indexOf(how) < 0) {
     __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.');
     how = "closest";
@@ -1654,10 +1666,10 @@ function arpOrder(notes, pattern) {
   if (pattern === undefined || pattern === null) {
     __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
     p = "up";
-  } else if (__ARP_ORDER_PATTERNS.indexOf(String(pattern)) < 0) {
+  } else if (__word(__ARP_ORDER_PATTERNS, String(pattern)) === undefined) {
     __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
     p = "up";
-  } else p = String(pattern);
+  } else p = __word(__ARP_ORDER_PATTERNS, String(pattern));
   if (!asc.length) return [];
   if (p === "chord") return [asc];
   if (p === "down") { seq = asc.slice().reverse(); }

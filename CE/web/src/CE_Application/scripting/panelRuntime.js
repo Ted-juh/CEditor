@@ -1170,7 +1170,13 @@ const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
 // G9 does), since these compute pitches; a sender refuses one that is not a MIDI note.
 const musicPitch = (v) => (typeof v === 'string' ? helpers.noteNumber(v)
   : typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined);
-const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
+// A name in any case (utils/wordLists.js): "Dorian" and "MAJ7" are dorian and maj7. Never one of
+// Object's own: table["toString"] was a function.
+const musicSteps = (table, name) => {
+  if (name == null) return table.major;
+  const word = listWord(Object.keys(table), String(name));
+  return word ? table[word] : undefined;
+};
 function musicPitchOf(verb, v) {
   // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
   if (v === undefined || v === null) {
@@ -2109,7 +2115,7 @@ const helpers = {
   noteSpelling: (root, scale) => {
     const steps = musicSetOf('ce.music.spelling', 'scale', scale);
     if (!steps) return undefined;
-    const name = scale == null ? 'major' : String(scale);
+    const name = scale == null ? 'major' : (listWord(SCALE_NAMES, String(scale)) ?? String(scale));
     const pitch = musicPitchOf('ce.music.spelling', root);
     if (pitch === undefined) return undefined;
     const pc = musicMod12(pitch);
