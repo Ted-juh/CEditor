@@ -785,8 +785,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 6. `glyph`: done, below.
 7. `text`: done, below.
 8. Parameter texts that are only the name: done, below.
-9. `showGhost` and `showGlass`: "Show or hide the ghost." says nothing of what the ghost is;
-   `showScanlines`' example says "if it is hidden" of a plural.
+9. `showGhost`, `showGlass`, `showScanlines`, `showGrid`: done, below.
 10. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
    `"node"` one and the Mod Matrix, none of which the LCD has; `fill`'s example passes a variable
    (`values`), and its note says "One document change". (The "already that way" in every verb's
@@ -957,6 +956,25 @@ owner made, each the recommendation, all texts and no change to behaviour:
 
 The Pixel Display's `brightness`, `contrast`, `editText` and `animFps` say only their names too;
 they are that module's review.
+
+**Item 9, the four overlays: done.** "Show or hide the ghost." said nothing of what the ghost
+is, and `showScanlines`' example said "if it is hidden" of a plural. The four are declared in the
+LCD's family now, rather than derived from the model (`derivedFlagVerbs`), for what each is. Two
+decisions the owner made, each the recommendation:
+
+- The example generator (`toggleGloss`) gives a plural name "they" and "them": "shows the
+  scanlines if they are hidden, and hides them if they are shown", "switches the zones on if they
+  are off". Thirty-one examples across the components changed, in grammar only.
+- The grid is "between the cells or pixels": a graphic display draws it between pixels.
+
+| Command | Description | Note |
+| --- | --- | --- |
+| `showGlass` | Show or hide the glass: a sheen across the screen. | Its tint is set in the inspector, under Colour ▸ Glass. Default: shown. |
+| `showGhost` | Show or hide the ghost: the faint unlit cells behind the text. | How faint is set by `contrast()`. Default: shown. |
+| `showScanlines` | Show or hide the scanlines: thin horizontal lines across the screen. | Default: hidden. |
+| `showGrid` | Show or hide the grid: faint lines between the cells or pixels. | Default: hidden. |
+
+The Pixel Display's four are still derived, and say only their names: that module's review.
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music

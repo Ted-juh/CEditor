@@ -102,9 +102,15 @@ const v = (name, field, kind, extra = {}) => ({ v: name, f: field, k: kind, ...e
 /** "scrollSpeed" -> "scroll speed": a field's name in words, for the generated texts. */
 const fieldWords = (field) => String(field ?? '').replace(/(SourceId|ControlId|Id|On)$/, '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
 /** What a boolean's example says it does: a show flag shows or hides, the rest switch on or off. */
-const toggleGloss = (field) => (/^show[A-Z]/.test(String(field ?? ''))
-  ? `shows the ${fieldWords(String(field).slice(4))} if it is hidden, and hides it if it is shown`
-  : `switches the ${fieldWords(field)} on if it is off, and off if it is on`);
+// A plural name takes "they" and "them": "shows the scanlines if they are hidden".
+const toggleGloss = (field) => {
+  const show = /^show[A-Z]/.test(String(field ?? ''));
+  const words = fieldWords(show ? String(field).slice(4) : field);
+  const [is, it] = /[^s]s$/.test(words) ? ['they are', 'them'] : ['it is', 'it'];
+  return show
+    ? `shows the ${words} if ${is} hidden, and hides ${it} if ${is} shown`
+    : `switches the ${words} on if ${is} off, and off if ${is} on`;
+};
 
 // A verb whose field the inspector draws from data takes its range from that field set instead of
 // repeating it here (models/inspectorFieldSets.js), so a script and the inspector cannot disagree.
@@ -699,6 +705,15 @@ export const COMPONENT_FAMILIES = [
         notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.'] }),
       v('layout', 'layouts', LAYOUT, { flat: 'its lines', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
         notes: ['Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.'] }),
+      // The four overlays, declared here rather than derived (derivedFlagVerbs) for what each is.
+      v('showGlass', 'showGlass', BOOL, { toggle: true, doc: 'Show or hide the glass: a sheen across the screen.',
+        notes: ['Its tint is set in the inspector, under Colour ▸ Glass. Default: shown.'] }),
+      v('showGhost', 'showGhost', BOOL, { toggle: true, doc: 'Show or hide the ghost: the faint unlit cells behind the text.',
+        notes: ['How faint is set by `contrast()`. Default: shown.'] }),
+      v('showScanlines', 'showScanlines', BOOL, { toggle: true, doc: 'Show or hide the scanlines: thin horizontal lines across the screen.',
+        notes: ['Default: hidden.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the grid: faint lines between the cells or pixels.',
+        notes: ['Default: hidden.'] }),
     ],
   },
   {
