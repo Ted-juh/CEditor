@@ -424,7 +424,7 @@ export function readNote(value, { verb, outcome, midi }) {
         meaning,
         problem: {
           severity: 'error',
-          message: `${verb}: "${value}" is not a note name, so ${outcome}. A name is a capital letter, then # or b if it `
+          message: `${verb}: "${value}" is not a note name, so ${outcome}. A name is a letter from A to G, then # or b if it `
             + 'has one, then the octave: "C4", "Eb3", "F#-1".',
         },
       };

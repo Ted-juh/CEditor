@@ -399,7 +399,7 @@ const SHARED_OPTION_FIELDS = {
   },
   bytesOrder: {
     name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
-    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").',
+    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb"). Case-insensitive.',
   },
 
   /* --- image layers (ce.image) -------------------------------------------- */
@@ -3345,7 +3345,7 @@ export const COMMANDS = [
     example: '`sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
-      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
+      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
       { name: 'velocity', type: 'number', required: true, unit: '0 to 127', summary: 'How hard the note is played, from 0 to 127. 0 means note off.' },
       { name: 'ms', type: 'number', required: false, unit: 'milliseconds', summary: 'How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.' },
     ],
@@ -3416,7 +3416,7 @@ export const COMMANDS = [
     notes: ['Every note started with sendNote without a length needs its own note off.'],
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
-      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
+      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
       { name: 'velocity', type: 'number', required: false, unit: '0 to 127', summary: 'The release velocity, from 0 to 127. It is 0 when left out.' },
     ],
     scopes: 'any',
@@ -3471,7 +3471,7 @@ export const COMMANDS = [
     id: 'sendTransport', category: 'Device / MIDI', signature: 'sendTransport(action)',
     summary: 'Start, continue or stop a connected sequencer or drum machine.',
     example: '`sendTransport("start")` starts it from the beginning.',
-    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'], summary: '"start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.' }],
+    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'], summary: '"start" (FA), "continue" (FB) or "stop" (FC). Case-insensitive. Any other action, or none, is refused with a message and nothing is sent.' }],
     scopes: 'any',
     snippet: { lua: 'sendTransport("${1:start}")$0', javascript: 'sendTransport("${1:start}")$0' },
   },
@@ -3494,7 +3494,7 @@ export const COMMANDS = [
     notes: ['The 7-bit types fit in one SysEx byte. The CRC types do not: split their result into bytes with to7bit before sending.'],
     params: [
       { name: 'type', type: 'string', required: true,
-        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.',
+        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". Case-insensitive. An unknown name, or none, returns nothing and prints the names it accepts.',
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
           'sum-8bit', 'twos-complement-8bit', 'crc8', 'crc16-ccitt', 'crc16-modbus', 'crc32'] },
       { name: 'bytes', type: 'bytes', required: true, summary: 'The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.' },
@@ -4639,7 +4639,7 @@ export const HELPERS = [
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455.' },
       { name: 'count', type: 'number', required: false, summary: 'How many bytes of 7 bits to make. Two when it is left out.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive.' },
     ],
   },
   {
@@ -4648,7 +4648,7 @@ export const HELPERS = [
     example: '`from7bit({7, 104})` gives 1000.',
     params: [
       { name: 'bytes', type: 'list of bytes', required: true, summary: 'The 7-bit bytes, as a list of numbers.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive.' },
     ],
   },
   // `to14Bit` is the spelling the WebView runtime shipped with before the contract was

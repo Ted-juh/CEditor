@@ -1228,11 +1228,13 @@ function noteName(n, flats) {
 // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is UNDEFINED, not 0 — 0 is a
 // real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
 function noteNumber(name) {
-  var m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b"));
+  // In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
+  var m = /^([A-Ga-g])([#bB]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b").trim());
   if (!m) return undefined;
-  var pc = m[2] === "b" ? __FLAT_LETTER[m[1]] : __NOTES.indexOf(m[1] + m[2]);
+  var letter = m[1].toUpperCase(), acc = m[2] === "B" ? "b" : m[2];
+  var pc = acc === "b" ? __FLAT_LETTER[letter] : __NOTES.indexOf(letter + acc);
   if (pc === undefined || pc < 0) return undefined;
-  var oct = parseInt(m[3], 10) + ((m[2] === "b" && m[1] === "C") ? 0 : 1);
+  var oct = parseInt(m[3], 10) + ((acc === "b" && letter === "C") ? 0 : 1);
   return oct * 12 + pc;
 }
 
@@ -1387,7 +1389,7 @@ function __pitchOf(verb, v) {
   if (n === undefined) {
     logError(typeof v === "string"
       ? verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
-        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+        + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
       : verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
         + 'number or a name, such as 60 or "C4".');
   }
@@ -1549,7 +1551,7 @@ function __noteList(fn, name, list, mayBeAbsent) {
     var n = __noteListItem(list[i]);
     if (n === undefined) {
       var where = __shownValue(list[i]) + " at position " + (i + 1) + " of " + name;
-      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
         : say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".');
     }
     out.push(n);
@@ -1669,8 +1671,8 @@ function arpOrder(notes, pattern) {
 // @module ce.midi
 function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
 function from14bit(msb, lsb) { return msb * 128 + lsb; }
-function to7bit(v, count, order) { count = count || 2; order = order || "msb"; v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
-function from7bit(bytes, order) { order = order || "msb"; var v = 0; var b = order === "msb" ? bytes : bytes.slice().reverse(); for (var i = 0; i < b.length; i++) v = v * 128 + b[i]; return v; }
+function to7bit(v, count, order) { count = count || 2; order = String(order || "msb").trim().toLowerCase(); v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
+function from7bit(bytes, order) { order = String(order || "msb").trim().toLowerCase(); var v = 0; var b = order === "msb" ? bytes : bytes.slice().reverse(); for (var i = 0; i < b.length; i++) v = v * 128 + b[i]; return v; }
 function toNibbles(b) { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; }
 function fromNibbles(hi, lo) { return hi * 16 + lo; }
 function nibblize(bytes) { var o = []; for (var i = 0; i < bytes.length; i++) { var n = toNibbles(bytes[i]); o.push(n.hi, n.lo); } return o; }
@@ -1790,7 +1792,7 @@ function checksum(kind, bytes, opts) {
   if (bytes === undefined || bytes === null) {
     // checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
     if (kind === undefined || kind === null
-        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase()))) {
+        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.trim().toLowerCase()))) {
       logError(verb + ": no bytes given, so there is no checksum.");
       return undefined;
     }
@@ -1799,8 +1801,8 @@ function checksum(kind, bytes, opts) {
   bytes = __scriptBytes(verb, bytes, "there is no checksum");
   if (bytes === undefined) return undefined;
   // An own key only: "constructor" or "toString" would otherwise be found on Object's prototype.
-  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase())
-    ? __CE_CKSUM_ALIAS[kind.toLowerCase()] : undefined;
+  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.trim().toLowerCase())
+    ? __CE_CKSUM_ALIAS[kind.trim().toLowerCase()] : undefined;
   if (id === undefined) {
     // The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
     var which = kind === undefined || kind === null ? ": no algorithm given" : "(" + __shownValue(kind) + "): no such algorithm";
@@ -1862,6 +1864,8 @@ function __shape(verb, opts) {
     if (opts.bits !== undefined && opts.bits !== null) bits = opts.bits;
     if (opts.order !== undefined && opts.order !== null) order = opts.order;
   }
+  // In any case, as every word from a list is read: "MSB" is "msb".
+  if (typeof order === "string") order = order.trim().toLowerCase();
   if (bits !== 7 && bits !== 8) return __refuse(verb, "bits must be 7 or 8");
   if (order !== "msb" && order !== "lsb") return __refuse(verb, 'order must be "msb" or "lsb"');
   return { bits: bits, order: order };
@@ -2313,7 +2317,7 @@ function __badNote(verb, note) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === "string") {
     why = noteNumber(note) === undefined
-      ? '"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+      ? '"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + range;
   } else if (typeof note === "number" && isFinite(note)) {
@@ -2427,7 +2431,7 @@ function sendTransport(action) {
     logError("sendTransport: no action given, so nothing was sent. " + actions);
     return;
   }
-  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.toLowerCase()] : undefined;
+  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.trim().toLowerCase()] : undefined;
   if (status === undefined) {
     logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions);
     return;

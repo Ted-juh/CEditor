@@ -1182,7 +1182,7 @@ function musicPitchOf(verb, v) {
   if (n === undefined) {
     addScriptTrace('error', '', typeof v === 'string'
       ? `${verb}: "${v}" is not a note name, so there is no answer. A name is `
-        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+        + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
       : `${verb}: ${shownValue(v)} is not a note, so there is no answer. A note is a MIDI `
         + 'number or a name, such as 60 or "C4".');
   }
@@ -2390,14 +2390,15 @@ const helpers = {
   // script packs a value identically whether it runs here or in the shipped plugin.
   to14bit: (v) => { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; },
   from14bit: (msb, lsb) => msb * 128 + lsb,
+  // The order in any case, as every word from a list is read: "MSB" is "msb".
   to7bit: (v, count = 2, order = 'msb') => {
     v = Math.floor(v);
     const out = [];
     for (let i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); }
-    return order === 'msb' ? out.reverse() : out;
+    return String(order).trim().toLowerCase() === 'msb' ? out.reverse() : out;
   },
   from7bit: (bytes, order = 'msb') => {
-    const b = order === 'msb' ? bytes : [...bytes].reverse();
+    const b = String(order).trim().toLowerCase() === 'msb' ? bytes : [...bytes].reverse();
     let v = 0;
     for (const x of b) v = v * 128 + x;
     return v;
@@ -2558,7 +2559,8 @@ const doesNotFit = (v, bits) => (v === undefined || v === null ? 'the value to w
     : v < 0 || v >= 2 ** bits ? `${v} does not fit in ${plural(bits, 'bit')}` : '');
 function bytesOpts(verb, opts) {
   const bits = opts?.bits ?? 7;
-  const order = opts?.order ?? 'msb';
+  // In any case, as every word from a list is read: "MSB" is "msb".
+  const order = typeof opts?.order === 'string' ? opts.order.trim().toLowerCase() : (opts?.order ?? 'msb');
   if (bits !== 7 && bits !== 8) return bytesRefuse(verb, 'bits must be 7 or 8');
   if (order !== 'msb' && order !== 'lsb') return bytesRefuse(verb, 'order must be "msb" or "lsb"');
   return { bits, order };
@@ -2883,7 +2885,7 @@ function refuseNote(verb, note) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === 'string') {
     why = helpers.noteNumber(note) === undefined
-      ? `"${note}" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it `
+      ? `"${note}" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it `
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : `"${note}" is outside the MIDI notes, so nothing was sent. ${range}`;
   } else if (typeof note === 'number' && Number.isFinite(note)) {
@@ -3079,7 +3081,7 @@ const midiApi = {
       addScriptTrace('error', '', `${verb}: no action given, so nothing was sent. ${actions}`);
       return;
     }
-    const a = typeof action === 'string' ? action.toLowerCase() : '';
+    const a = typeof action === 'string' ? action.trim().toLowerCase() : '';
     const status = { start: 0xFA, continue: 0xFB, stop: 0xFC }[a];
     if (status === undefined) {
       addScriptTrace('error', '', `${verb}: ${shownValue(action)} is not a transport action, so nothing was sent. ${actions}`);

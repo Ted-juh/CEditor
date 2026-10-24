@@ -1164,8 +1164,11 @@ end
 function noteNumber(name)
   local s = string.gsub(tostring(name), "♯", "#")
   s = string.gsub(s, "♭", "b")
-  local letter, acc, oct = string.match(s, "^([A-G])([#b]?)(-?%d+)$")
+  -- In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
+  local letter, acc, oct = string.match(s:match("^%s*(.-)%s*$"), "^([A-Ga-g])([#bB]?)(-?%d+)$")
   if not letter then return nil end
+  letter = letter:upper()
+  if acc == "B" then acc = "b" end
   local pc = nil
   if acc == "b" then
     pc = __FLAT_LETTER[letter]
@@ -1332,7 +1335,7 @@ local function __pitchOf(verb, v)
   if n == nil then
     if type(v) == "string" then
       logError(verb .. ': "' .. v .. '" is not a note name, so there is no answer. A name is '
-        .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        .. 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
     else
       logError(verb .. ': ' .. __shownValue(v) .. ' is not a note, so there is no answer. A note is a MIDI '
         .. 'number or a name, such as 60 or "C4".')
@@ -1427,7 +1430,7 @@ local function __noteList(fn, name, list, mayBeAbsent)
     local n = __noteListItem(list[i])
     if n == nil then
       local where = __shownValue(list[i]) .. " at position " .. i .. " of " .. name
-      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
+      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
       return say(where .. " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
     end
     out[#out + 1] = n
@@ -1675,14 +1678,14 @@ end
 function to14bit(v) v = math.floor(v) return { msb = math.floor(v / 128) % 128, lsb = v % 128 } end
 function from14bit(msb, lsb) return msb * 128 + lsb end
 function to7bit(v, count, order)
-  count = count or 2; order = order or "msb"; v = math.floor(v)
+  count = count or 2; order = tostring(order or "msb"):lower():match("^%s*(.-)%s*$"); v = math.floor(v)
   local out = {}
   for i = 1, count do out[i] = v % 128; v = math.floor(v / 128) end
   if order == "msb" then local r = {} for i = count, 1, -1 do r[#r + 1] = out[i] end return r end
   return out
 end
 function from7bit(bytes, order)
-  order = order or "msb"; local v = 0
+  order = tostring(order or "msb"):lower():match("^%s*(.-)%s*$"); local v = 0
   if order == "msb" then for i = 1, #bytes do v = v * 128 + bytes[i] end
   else for i = #bytes, 1, -1 do v = v * 128 + bytes[i] end end
   return v
@@ -1799,7 +1802,7 @@ function checksum(kind, bytes, opts)
   local verb = "ce.midi.checksum"
   if bytes == nil then
     -- checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
-    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] ~= nil) then
+    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind):match("^%s*(.-)%s*$")] ~= nil) then
       logError(verb .. ": no bytes given, so there is no checksum.")
       return nil
     end
@@ -1807,7 +1810,7 @@ function checksum(kind, bytes, opts)
   end
   bytes = __scriptBytes(verb, bytes, "there is no checksum")
   if bytes == nil then return nil end
-  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] or nil
+  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind):match("^%s*(.-)%s*$")] or nil
   if id == nil then
     -- The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
     local names = {}
@@ -1877,6 +1880,8 @@ local function __shape(verb, opts)
     if opts.bits ~= nil then bits = opts.bits end
     if opts.order ~= nil then order = opts.order end
   end
+  -- In any case, as every word from a list is read: "MSB" is "msb".
+  if type(order) == "string" then order = order:lower():match("^%s*(.-)%s*$") end
   if bits ~= 7 and bits ~= 8 then return __refuse(verb, "bits must be 7 or 8") end
   if order ~= "msb" and order ~= "lsb" then return __refuse(verb, 'order must be "msb" or "lsb"') end
   return { bits = math.floor(bits), order = order }
@@ -2338,7 +2343,7 @@ local function __badNote(verb, note)
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
   elseif type(note) == "string" then
     if noteNumber(note) == nil then
-      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         .. 'has one, then the octave: "C4", "Eb3", "F#-1".'
     else
       why = '"' .. note .. '" is outside the MIDI notes, so nothing was sent. ' .. range
@@ -2451,7 +2456,7 @@ function sendTransport(action)
   end
   local status = nil
   if type(action) == "string" then
-    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action)]
+    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action):match("^%s*(.-)%s*$")]
   end
   if status == nil then
     logError("sendTransport: " .. __shownValue(action) .. " is not a transport action, so nothing was sent. " .. actions)

@@ -648,14 +648,14 @@ test('a refusal is said in the words the runtime says it in', () => {
     ['ce.device.defineParameter("q", { nrpn = { msb = 200, lsb = 0 } })', 'ce.', (c) => optOf(optOf(argOf(c, 'spec'), 'nrpn'), 'msb'),
       (api) => api.ce.device.defineParameter('q', { nrpn: { msb: 200, lsb: 0 } })],
     ['ce.midi.sendSysex({ 0xF0, 300 })', 'ce.', (c) => argOf(c, 'bytes'), (api) => api.ce.midi.sendSysex([0xF0, 300])],
-    ['ce.midi.sendNote(1, "c4", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'c4', 100)],
+    ['ce.midi.sendNote(1, "H4", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'H4', 100)],
     ['ce.midi.sendNote(1, "C10", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'C10', 100)],
     ['ce.midi.sendCC(1, 200, 64)', 'ce.', (c) => argOf(c, 'cc'), (api) => api.ce.midi.sendCC(1, 200, 64)],
     ['ce.midi.sendCC(17, 74, 64)', 'ce.', (c) => argOf(c, 'channel'), (api) => api.ce.midi.sendCC(17, 74, 64)],
     // A note name where the channel goes: sendNote's channel comes first.
     ['ce.midi.sendNote("C4", 100, 1)', 'ce.', (c) => argOf(c, 'channel'), (api) => api.ce.midi.sendNote('C4', 100, 1)],
     ['ce.midi.sendCC(1, "Cutoff", 64)', 'ce.', (c) => argOf(c, 'cc'), (api) => api.ce.midi.sendCC(1, 'Cutoff', 64)],
-    ['ce.music.scale("c4")', 'ce.', (c) => argOf(c, 'root'), (api) => api.ce.music.scale('c4')],
+    ['ce.music.scale("H4")', 'ce.', (c) => argOf(c, 'root'), (api) => api.ce.music.scale('H4')],
     ['ce.music.scale("C3", "harmonicMinr")', 'ce.', (c) => argOf(c, 'scale'), (api) => api.ce.music.scale('C3', 'harmonicMinr')],
     ['ce.music.chord("C3", "maj8")', 'ce.', (c) => argOf(c, 'type'), (api) => api.ce.music.chord('C3', 'maj8')],
     ['ce.time.step(0, "1/6")', 'ce.', (c) => argOf(c, 'division'), (api) => api.ce.time.step(0, '1/6')],
@@ -1121,9 +1121,11 @@ test('record example 6: an easing curve, and a duration in milliseconds', () => 
 });
 
 test('record example 7: note names, what was the silent C-1', () => {
-  const src = 'ce.midi.sendNote(1, "c4", 100, 250)\nlocal triad = ce.music.chord("C4", "major")\nce.midi.sendNote(1, 48, 100)';
-  assert.equal(argOf(callOf(read(src, 'lua', 'sendNote(1, "c4"')), 'note').problem.message,
-    'sendNote: "c4" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  // "c4" was the example until a note name was read in any case: it is C4 now, and "H4" is not one.
+  const src = 'ce.midi.sendNote(1, "H4", 100, 250)\nlocal triad = ce.music.chord("C4", "major")\nce.midi.sendNote(1, 48, 100)';
+  assert.equal(argOf(callOf(read(src, 'lua', 'sendNote(1, "H4"')), 'note').problem.message,
+    'sendNote: "H4" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  assert.deepEqual(argOf(callOf(read('ce.midi.sendNote(1, "eb4", 100)', 'lua', 'sendNote(1, "eb4"')), 'note').meaning, { number: 63, name: 'D#4' });
   const c4 = argOf(callOf(read(src, 'lua', 'ce.music')), 'root');
   assert.deepEqual([c4.meaning.number, c4.meaning.hint, c4.editable], [60, 'middle C', null]);
   assert.deepEqual(argOf(callOf(read(src, 'lua', 'sendNote(1, 48')), 'note').meaning, { number: 48, name: 'C3' });

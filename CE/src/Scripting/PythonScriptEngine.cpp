@@ -2264,9 +2264,10 @@ def noteName(n, flats=None):
 # real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
 def noteNumber(name):
     import re
-    m = re.match(r"^([A-G])([#b]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b"))
+    # In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E-flat 4 and B-flat 3.
+    m = re.match(r"^([A-Ga-g])([#bB]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b").strip())
     if not m: return None
-    letter, acc = m.group(1), m.group(2)
+    letter, acc = m.group(1).upper(), ("b" if m.group(2) == "B" else m.group(2))
     if acc == "b":
         pc = __FLAT_LETTER[letter]
     else:
@@ -2427,7 +2428,7 @@ def __pitchOf(verb, v):
     if n is None:
         if isinstance(v, str):
             logError(verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
-                     + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+                     + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
             logError(verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
                      + 'number or a name, such as 60 or "C4".')
@@ -2537,7 +2538,7 @@ def __noteList(fn, name, lst, mayBeAbsent=False):
         n = __noteListItem(v)
         if n is None:
             where = __shownValue(v) + " at position " + str(i + 1) + " of " + name
-            if isinstance(v, str): return say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+            if isinstance(v, str): return say(where + " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
             return say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
         out.append(n)
     return out
@@ -2716,9 +2717,9 @@ def from14bit(msb, lsb): return msb * 128 + lsb
 def to7bit(v, count=2, order="msb"):
     import math; v = math.floor(v); out = []
     for _ in range(count): out.append(v % 128); v = math.floor(v / 128)
-    return list(reversed(out)) if order == "msb" else out
+    return list(reversed(out)) if str(order).strip().lower() == "msb" else out
 def from7bit(b, order="msb"):
-    v = 0; seq = b if order == "msb" else list(reversed(b))
+    v = 0; seq = b if str(order).strip().lower() == "msb" else list(reversed(b))
     for x in seq: v = v * 128 + x
     return v
 def toNibbles(b):
@@ -2852,13 +2853,13 @@ def checksum(kind=None, bytes=None, opts=None):
     verb = "ce.midi.checksum"
     if bytes is None:
         # checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
-        if kind is None or (isinstance(kind, str) and kind.lower() in __CE_CKSUM_ALIAS):
+        if kind is None or (isinstance(kind, str) and kind.strip().lower() in __CE_CKSUM_ALIAS):
             logError(verb + ": no bytes given, so there is no checksum.")
             return None
         bytes = kind; kind = "roland"
     bytes = __scriptBytes(verb, bytes, "there is no checksum")
     if bytes is None: return None
-    cid = __CE_CKSUM_ALIAS.get(kind.lower()) if isinstance(kind, str) else None
+    cid = __CE_CKSUM_ALIAS.get(kind.strip().lower()) if isinstance(kind, str) else None
     if cid is None:
         # The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
         which = ": no algorithm given" if kind is None else "(" + __shownValue(kind) + "): no such algorithm"
@@ -2924,6 +2925,8 @@ def __shape(verb, opts):
     if isinstance(opts, dict):
         if opts.get("bits") is not None: bits = opts.get("bits")
         if opts.get("order") is not None: order = opts.get("order")
+    # In any case, as every word from a list is read: "MSB" is "msb".
+    if isinstance(order, str): order = order.strip().lower()
     if isinstance(bits, bool) or bits not in (7, 8): return __refuse(verb, "bits must be 7 or 8")
     if order not in ("msb", "lsb"): return __refuse(verb, 'order must be "msb" or "lsb"')
     return { "bits": int(bits), "order": order }
@@ -3363,7 +3366,7 @@ def __badNote(verb, note):
         why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
     elif isinstance(note, str):
         if noteNumber(note) is None:
-            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
                    + 'has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
             why = '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + rng
@@ -3497,7 +3500,7 @@ def sendTransport(action=None):
     if action is None:
         logError("sendTransport: no action given, so nothing was sent. " + actions)
         return
-    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.lower()) if isinstance(action, str) else None
+    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.strip().lower()) if isinstance(action, str) else None
     if status is None:
         logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions)
         return

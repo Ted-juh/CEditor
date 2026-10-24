@@ -86,26 +86,34 @@ test('scale transposes rather than wrapping — the notes keep going up', () => 
   assert.deepEqual(api.scaleNotes(71), [71, 73, 75, 76, 78, 80, 82]);
 });
 
+test('a note name is read in any case, as every word from a list is', () => {
+  assert.deepEqual(api.scaleNotes('c4', 'major'), api.scaleNotes('C4', 'major'));
+  assert.deepEqual(api.chordNotes(' eb4 ', 'major'), api.chordNotes('Eb4', 'major'));
+  assert.deepEqual(api.chordNotes('BB3', 'minor'), api.chordNotes('Bb3', 'minor'), 'a B, then a flat');
+  assert.equal(api.noteNumber('f#2'), 42);
+});
+
 test('a note name the music helpers cannot read is refused, not read as C-1', () => {
-  // scaleNotes("c4") used to answer with the scale on C-1: the unreadable name became 0 so that no
+  // scaleNotes("H4") used to answer with the scale on C-1: the unreadable name became 0 so that no
   // undefined could reach the list. It answers nothing now, and says why, in every runtime's words
-  // (scriptPreludeAgreement.test.js compares them).
+  // (scriptPreludeAgreement.test.js compares them). ("c4" was the example, until a note name was
+  // read in any case: it is C4 now.)
   const errorsFrom = (call) => {
     clearScriptTrace();
     const value = call();
     return { value, errors: get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message) };
   };
-  const unreadable = (verb) => `${verb}: "c4" is not a note name, so there is no answer. A name is a `
-    + 'capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".';
+  const unreadable = (verb) => `${verb}: "H4" is not a note name, so there is no answer. A name is a `
+    + 'letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".';
   for (const [verb, call] of [
-    ['ce.music.scale', () => api.scaleNotes('c4', 'major')],
-    ['ce.music.chord', () => api.chordNotes('c4', 'major')],
-    ['ce.music.quantize', () => api.quantizeNote('c4', 60, 'major')],
-    ['ce.music.quantize', () => api.quantizeNote(61, 'c4', 'major')],
-    ['ce.music.spelling', () => api.noteSpelling('c4', 'major')],
-    ['ce.music.inScale', () => api.inScale('c4', 60, 'major')],
-    ['ce.music.degree', () => api.scaleDegree(60, 'c4', 'major')],
-    ['ce.music.degreeChord', () => api.degreeChord('c4', 'major', 1)],
+    ['ce.music.scale', () => api.scaleNotes('H4', 'major')],
+    ['ce.music.chord', () => api.chordNotes('H4', 'major')],
+    ['ce.music.quantize', () => api.quantizeNote('H4', 60, 'major')],
+    ['ce.music.quantize', () => api.quantizeNote(61, 'H4', 'major')],
+    ['ce.music.spelling', () => api.noteSpelling('H4', 'major')],
+    ['ce.music.inScale', () => api.inScale('H4', 60, 'major')],
+    ['ce.music.degree', () => api.scaleDegree(60, 'H4', 'major')],
+    ['ce.music.degreeChord', () => api.degreeChord('H4', 'major', 1)],
   ]) {
     assert.deepEqual(errorsFrom(call), { value: undefined, errors: [unreadable(verb)] }, verb);
   }
@@ -302,20 +310,22 @@ test('a flat lowers below the LETTER, so Cb is the B underneath', () => {
 });
 
 test('a name it cannot read returns nothing, not note 0', () => {
-  for (const bad of ['nonsense', 'H4', 'C', '4C', 'C##4', 'Cbb4', 'B#3', '', 'C4 ']) {
+  for (const bad of ['nonsense', 'H4', 'C', '4C', 'C##4', 'Cbb4', 'B#3', '', 'C 4']) {
     assert.equal(api.noteNumber(bad), undefined, `${JSON.stringify(bad)} must be unreadable, not C-1`);
   }
+  // Spaces around a name, and its case, are not what makes it unreadable: "C4 " and "c4" are C4.
+  assert.deepEqual([api.noteNumber('C4 '), api.noteNumber('c4')], [60, 60]);
 });
 
 test('a note name the senders cannot read is refused, not sent as note 0', () => {
   // This used to pin "90 00 64": the unreadable name became note 0 so that no undefined byte could
-  // reach a message. That kept the message well formed and played C-1 instead, so "c4" (the letter
-  // must be a capital) sounded the bottom of the keyboard with nothing to say why. Nothing goes on
-  // the wire now, undefined or otherwise, and the error names the note.
+  // reach a message. That kept the message well formed and played C-1 instead, so "c4" sounded the
+  // bottom of the keyboard with nothing to say why (it is C4 now: a name is read in any case). Nothing
+  // goes on the wire for "H4", undefined or otherwise, and the error names the note.
   for (const [verb, send] of [
-    ['sendNote', () => api.sendNote(1, 'c4', 100)],
-    ['sendNoteOff', () => api.sendNoteOff(1, 'c4')],
-    ['sendAftertouch', () => api.sendAftertouch(1, 90, 'c4')],
+    ['sendNote', () => api.sendNote(1, 'H4', 100)],
+    ['sendNoteOff', () => api.sendNoteOff(1, 'H4')],
+    ['sendAftertouch', () => api.sendAftertouch(1, 90, 'H4')],
   ]) {
     clearScriptTrace();
     send();
@@ -323,7 +333,7 @@ test('a note name the senders cannot read is refused, not sent as note 0', () =>
     assert.equal(trace.find((e) => e.kind === 'midi'), undefined, `${verb} must send nothing`);
     const error = trace.find((e) => e.kind === 'error');
     assert.ok(error, `${verb} must say why nothing was sent`);
-    assert.match(error.message, new RegExp(`^${verb}: "c4" is not a note name`));
+    assert.match(error.message, new RegExp(`^${verb}: "H4" is not a note name`));
   }
   clearScriptTrace();
   api.sendNote(1, 'C4', 100);

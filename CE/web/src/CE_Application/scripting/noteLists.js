@@ -56,7 +56,7 @@ export function noteList(memberId, name, list) {
     if (n !== undefined) { notes.push(n); continue; }
     const where = `${shown(list[i])} at position ${i + 1} of ${name}`;
     return typeof list[i] === 'string'
-      ? say(`${where} is not a note name`, ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+      ? say(`${where} is not a note name`, ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
       : say(`${where} is not a note`, ' A note is a MIDI number or a name, such as 60 or "C4".');
   }
   return { notes, refused: null };
