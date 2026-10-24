@@ -110,7 +110,7 @@ test('a hand-written family reads a field in any case, and names the fields when
 
 test('ce.panel\'s arrangement verbs refuse a word they do not take, in their own sentence', () => {
   const cases = [
-    [(api) => api.panelAlign(['K'], 'Left'), 'ce.panel.align: "Left" is not an edge. One of: left, hCenter, right, top, vCenter, bottom.'],
+    [(api) => api.panelAlign(['K'], 'lefft'), 'ce.panel.align: "lefft" is not an edge. One of: left, hCenter, right, top, vCenter, bottom.'],
     [(api) => api.panelDistribute(['K'], 'edges'), 'ce.panel.distribute: "edges" is not something to spread. One of: leftEdges, hCenters, rightEdges, topEdges, vCenters, bottomEdges, hSpacing, vSpacing.'],
     [(api) => api.panelMatch(['K'], 'size'), 'ce.panel.match: "size" is not width, height or both.'],
     [(api) => api.panelFlip(['K'], 'diagonal'), 'ce.panel.flip: "diagonal" is not horizontal or vertical.'],
@@ -121,6 +121,20 @@ test('ce.panel\'s arrangement verbs refuse a word they do not take, in their own
   for (const [id, { param, values }] of Object.entries(LAYOUT_WORDS)) {
     assert.deepEqual(MEMBER_BY_ID[id].params.find((p) => p.name === param).values, values, id);
   }
+});
+
+test('a word from a list is read in any case, by ce.panel and the hand-written families alike', () => {
+  // "Left", "Classic" and "Memory" were refused for a capital letter.
+  for (const call of [(api) => api.panelAlign(['K'], 'LEFT'), (api) => api.panelFlip(['K'], 'Vertical'),
+    (api) => api.panelOrder(['K'], ' Front '), (api) => api.splitPreset('Split', 'Classic'),
+    (api) => api.harmonyMode('Harm', 'Memory'), (api) => api.harmonyVoicing('Harm', 'CLOSE'),
+    (api) => api.phraseDirection('Phr', 'Forward')]) {
+    const { result, lines } = run(call);
+    assert.notEqual(result, false, `${call}: ${lines.join(' / ')}`);
+    assert.ok(!lines.some((l) => /refused|is not/.test(l)), `${call}: ${lines.join(' / ')}`);
+  }
+  assert.equal(rowNamed('ce.panel.align({"K"}, "HCENTER")', 'edge').problem, null);
+  assert.equal(rowNamed('harmonyMode("Harm", "MEMORY")', 'mode').problem, null);
 });
 
 test('the rows offer the words, and say the refusal in the console\'s words', () => {
@@ -141,8 +155,8 @@ test('the rows offer the words, and say the refusal in the console\'s words', ()
   said('splitRead("Split", "zonez")', 'field', (api) => api.splitRead('Split', 'zonez'));
   said('ce.panel.flip({"K"}, "diagonal")', 'axis', (api) => api.panelFlip(['K'], 'diagonal'));
   // align's row adds the near miss to the runtime's sentence.
-  assert.equal(rowNamed('ce.panel.align({"K"}, "Left")', 'edge').problem.message,
-    'ce.panel.align: "Left" is not an edge. One of: left, hCenter, right, top, vCenter, bottom. Did you mean "left"?');
+  assert.equal(rowNamed('ce.panel.align({"K"}, "lefft")', 'edge').problem.message,
+    'ce.panel.align: "lefft" is not an edge. One of: left, hCenter, right, top, vCenter, bottom. Did you mean "left"?');
 
   // The words, as a dropdown.
   const choices = (src, name) => { const row = rowNamed(src, name); return [row.editable, row.meaning.choices]; };

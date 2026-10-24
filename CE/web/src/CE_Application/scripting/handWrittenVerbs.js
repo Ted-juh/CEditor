@@ -25,6 +25,7 @@ import { HARMONY_MODES, VOICINGS, OUT_OF_KEY, VOICE_LEADING, MEMORY_PRESETS } fr
 import { setlistScenes } from '../utils/setlistLayout.js';
 import { SCALES } from '../utils/chordPadLayout.js';
 import { shownValue } from './shownValue.js';
+import { listWord } from '../utils/wordLists.js';
 
 const clampInt = (v, lo, hi, fallback) => {
   const n = Math.round(Number(v));
@@ -37,24 +38,24 @@ const quoted = (names) => names.map((n) => `"${n}"`).join(', ');
 // too), and the kind of each argument the Values tab reads: an `index` (a zone, a cell, a slot, a
 // degree, a scene) or a `word` from a closed list (words names it).
 export const HAND_WRITTEN = {
-  splitPreset: { family: 'split', section: 'SplitZone', action: 'preset', args: (preset, lowNote, highNote) => ({ preset, lowNote, highNote }), kinds: ['word'] },
+  splitPreset: { family: 'split', section: 'SplitZone', action: 'preset', args: (preset, lowNote, highNote) => ({ preset: asWord('split preset', preset), lowNote, highNote }), kinds: ['word'] },
   splitMute: { family: 'split', section: 'SplitZone', action: 'mute', args: (zone, enabled) => ({ zone, enabled: enabled !== false }), kinds: ['index'] },
   splitChannel: { family: 'split', section: 'SplitZone', action: 'channel', args: (zone, channel) => ({ zone, channel }), kinds: ['index'] },
   splitTranspose: { family: 'split', section: 'SplitZone', action: 'transpose', args: (zone, semitones) => ({ zone, transpose: semitones }), kinds: ['index'] },
   splitPoint: { family: 'split', section: 'SplitZone', action: 'splitPoint', args: (zone, note) => ({ zone, note }), kinds: ['index'] },
-  phraseSeed: { family: 'phrase', section: 'Phrase', action: 'seed', args: (seed) => ({ seed }), kinds: ['word'] },
+  phraseSeed: { family: 'phrase', section: 'Phrase', action: 'seed', args: (seed) => ({ seed: asWord('phrase seed', seed) }), kinds: ['word'] },
   phraseKey: { family: 'phrase', section: 'Phrase', action: 'key', args: (key) => ({ key }), kinds: ['word'] },
-  phraseDirection: { family: 'phrase', section: 'Phrase', action: 'direction', args: (direction) => ({ direction }), kinds: ['word'] },
+  phraseDirection: { family: 'phrase', section: 'Phrase', action: 'direction', args: (direction) => ({ direction: asWord('phrase direction', direction) }), kinds: ['word'] },
   phraseCell: { family: 'phrase', section: 'Phrase', action: 'cell', args: (step, row, on) => ({ step, row, on }), kinds: ['index', 'index'] },
-  recorderSource: { family: 'recorder', section: 'Recorder', action: 'source', args: (source) => ({ source }), kinds: ['word'] },
+  recorderSource: { family: 'recorder', section: 'Recorder', action: 'source', args: (source) => ({ source: asWord('recorder source', source) }), kinds: ['word'] },
   recorderStore: { family: 'recorder', section: 'Recorder', action: 'store', args: (slot, name) => ({ slot, name }), kinds: ['index'] },
   recorderLoad: { family: 'recorder', section: 'Recorder', action: 'load', args: (slot) => ({ slot }), kinds: ['index'] },
-  harmonyMode: { family: 'harmoniser', section: 'Harmoniser', action: 'mode', args: (mode) => ({ mode }), kinds: ['word'] },
+  harmonyMode: { family: 'harmoniser', section: 'Harmoniser', action: 'mode', args: (mode) => ({ mode: asWord('harmoniser mode', mode) }), kinds: ['word'] },
   harmonyKey: { family: 'harmoniser', section: 'Harmoniser', action: 'key', args: (key) => ({ key }), kinds: ['word'] },
-  harmonyShape: { family: 'harmoniser', section: 'Harmoniser', action: 'shape', args: (shape) => ({ shape, preset: shape }), kinds: ['word'] },
-  harmonyVoicing: { family: 'harmoniser', section: 'Harmoniser', action: 'voicing', args: (voicing) => ({ voicing }), kinds: ['word'] },
-  harmonyOutOfKey: { family: 'harmoniser', section: 'Harmoniser', action: 'outOfKey', args: (mode) => ({ outOfKey: mode }), kinds: ['word'] },
-  harmonyVoiceLeading: { family: 'harmoniser', section: 'Harmoniser', action: 'voiceLeading', args: (mode) => ({ voiceLeading: mode }), kinds: ['word'] },
+  harmonyShape: { family: 'harmoniser', section: 'Harmoniser', action: 'shape', args: (shape) => ({ shape: asWord('harmoniser shape', shape), preset: asWord('harmoniser shape', shape) }), kinds: ['word'] },
+  harmonyVoicing: { family: 'harmoniser', section: 'Harmoniser', action: 'voicing', args: (voicing) => ({ voicing: asWord('harmoniser voicing', voicing) }), kinds: ['word'] },
+  harmonyOutOfKey: { family: 'harmoniser', section: 'Harmoniser', action: 'outOfKey', args: (mode) => ({ outOfKey: asWord('harmoniser outOfKey', mode) }), kinds: ['word'] },
+  harmonyVoiceLeading: { family: 'harmoniser', section: 'Harmoniser', action: 'voiceLeading', args: (mode) => ({ voiceLeading: asWord('harmoniser voiceLeading', mode) }), kinds: ['word'] },
   harmonyDegree: { family: 'harmoniser', section: 'Harmoniser', action: 'degree', args: (degree, chord) => ({ degree, chord }), kinds: ['index', 'word'] },
   setlistGoto: { family: 'setlist', section: 'Setlist', action: 'goto', args: (scene) => ({ scene }), kinds: ['index'] },
   setlistEnable: { family: 'setlist', section: 'Setlist', action: 'enable', args: (scene, enabled) => ({ scene, enabled: enabled !== false }), kinds: ['index'] },
@@ -74,6 +75,13 @@ const WORDS = {
 };
 const WORD_ARG = { preset: 'preset', seed: 'seed', direction: 'direction', source: 'source', mode: 'mode',
   voicing: 'voicing', outOfKey: 'outOfKey', voiceLeading: 'voiceLeading', shape: 'shape' };
+
+/** A word from one of those lists in any case (utils/wordLists.js), as the list spells it, so the
+ *  reducer and the refusal see "up" for "Up"; anything else as given, for the refusal to name. A
+ *  zone's or a scene's name is the author's, and is matched as written. */
+function asWord(key, value) {
+  return typeof value === 'string' ? listWord(WORDS[key](), value) ?? value : value;
+}
 
 /** The words a hand-written verb's argument takes, or null when it takes no closed list. */
 export function handWrittenWords(memberId) {
