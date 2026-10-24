@@ -3709,8 +3709,8 @@ Good to know:
 |---|---|---|---|
 | `dash` | list of numbers | a solid line | On and off lengths in pixels, alternating.<br>A length < 0, or invalid: 0.<br>Not a list: solid line. |
 | `dashOffset` | number (pixels) | 0 | Where the dash pattern starts.<br>Advanced on a timer: the dashes move.<br>Invalid: 0. |
-| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-sensitive.<br>Invalid: default. |
-| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-sensitive.<br>Invalid: default. |
+| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-insensitive.<br>Invalid: default. |
+| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-insensitive.<br>Invalid: default. |
 
 ```lua
 -- Lua
@@ -4148,7 +4148,7 @@ Good to know:
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.<br>Invalid: default. |
+| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-insensitive.<br>Invalid: default. |
 
 #### `ce.draw.clip([x, y, w, h]) -> boolean`
 
@@ -4176,7 +4176,7 @@ Set how the shapes drawn after it mix with what is under them.
 
 Example: `drawBlend("multiply")` darkens what is under the shapes drawn after it.
 
-- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.<br>Invalid: rejected with a console error.
+- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
@@ -4235,7 +4235,7 @@ Good to know:
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `size` | number (pixels) | 12 | Text size in pixels.<br>Range: > 0.<br>≤ 0, or invalid: default. |
-| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".<br>Invalid: rejected with a console error. |
+| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case-insensitive.<br>"center", "centre" and "centred": "middle".<br>Invalid: rejected with a console error. |
 | `family` | text | — | Font family.<br>Left out: the control's font. |
 
 ```lua

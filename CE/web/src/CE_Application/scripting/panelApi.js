@@ -1503,9 +1503,9 @@ export const COMMANDS = [
         { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
           summary: 'Where the dash pattern starts.\nAdvanced on a timer: the dashes move.\nInvalid: 0.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'Line ends: "butt", "round" or "square". Case-sensitive.\nInvalid: default.' },
+          summary: 'Line ends: "butt", "round" or "square". Case-insensitive.\nInvalid: default.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
-          summary: 'Corners: "miter", "round" or "bevel". Case-sensitive.\nInvalid: default.' },
+          summary: 'Corners: "miter", "round" or "bevel". Case-insensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',
@@ -1857,7 +1857,7 @@ export const COMMANDS = [
       { name: 'h', type: 'number', required: true, kind: 'number', summary: 'Height in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: fit "fill".', fields: optionFields([
         { name: 'fit', type: 'text', default: '"fill"', values: ['fill', 'contain', 'cover'],
-          summary: 'How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.\nInvalid: default.' },
+          summary: 'How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-insensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',
@@ -1893,7 +1893,7 @@ export const COMMANDS = [
     params: [{ name: 'mode', type: 'string', required: true,
       values: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge',
         'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'],
-      summary: 'One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.\nInvalid: rejected with a console error.' }],
+      summary: 'One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive.\nInvalid: rejected with a console error.' }],
     scopes: 'any',
   },
   {
@@ -2209,7 +2209,7 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: size 12, left-aligned, the control\'s font.', fields: optionFields([
         { name: 'size', type: 'number', default: '12', unit: 'pixels', sample: '12', summary: 'Text size in pixels.\nRange: > 0.\n≤ 0, or invalid: default.' },
         { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
-          summary: 'Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".\nInvalid: rejected with a console error.' },
+          summary: 'Which part of the text sits at x: "left", "middle" or "right". Case-insensitive.\n"center", "centre" and "centred": "middle".\nInvalid: rejected with a console error.' },
         { name: 'family', type: 'text', sample: '"Inter Tight"', kind: 'font', summary: 'Font family.\nLeft out: the control\'s font.' },
       ]) },
     ],

@@ -27,6 +27,7 @@
 // redraw), adding that it is said only the first time.
 
 import { realNumber } from './scriptColours.js';
+import { listWord } from '../utils/wordLists.js';
 
 /** A value as a message shows it, as panelRuntime's shownValue shows one. */
 function shown(value) {
@@ -72,10 +73,10 @@ export function dashPattern(dash) {
   return { dasharray: lengths.length ? lengths.join(' ') : null, lengths, problem };
 }
 
-// A cap or a join is one of three words, in that spelling: the overlay hands it to SVG as
-// stroke-linecap or stroke-linejoin, which takes no other. Any other word drew the default, "butt"
-// or "miter", without a word, so `cap = "sausage"` and `join = "Round"` drew square ends and sharp
-// corners with nothing to say why. Nothing given, or `false`, is the default, and no mistake.
+// A cap or a join is one of three words, in any case (utils/wordLists.js), handed to the overlay
+// as the list spells it: SVG's stroke-linecap and stroke-linejoin take no other spelling. Any other
+// word drew the default, "butt" or "miter", without a word, so `cap = "sausage"` drew square ends
+// with nothing to say why. Nothing given, or `false`, is the default, and no mistake.
 export const STROKE_ENDS = {
   cap: { values: ['butt', 'round', 'square'], otherwise: 'butt' },
   join: { values: ['miter', 'round', 'bevel'], otherwise: 'miter' },
@@ -92,7 +93,8 @@ export const STROKE_ENDS = {
 export function strokeEnd(name, value) {
   const { values, otherwise } = STROKE_ENDS[name];
   if (value === undefined || value === null || value === false) return { value: null, problem: null };
-  if (values.includes(value)) return { value, problem: null };
+  const word = listWord(values, value);
+  if (word) return { value: word, problem: null };
   const list = values.map((v) => `"${v}"`);
   return {
     value: null,

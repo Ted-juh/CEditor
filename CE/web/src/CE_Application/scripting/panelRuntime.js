@@ -38,6 +38,7 @@ import {
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS, colourFromRgb, colourFromHsl, hslOfChannels,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
+import { listWord } from '../utils/wordLists.js';
 import { timeNumber } from './timeWords.js';
 import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
@@ -8920,16 +8921,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
             + 'ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
-      // A fit that is not one of its three words is "fill", and said once: it was "fill" in silence.
-      const fit = opts?.fit;
-      const fits = ['fill', 'contain', 'cover'];
-      if (fit !== undefined && fit !== null && !fits.includes(fit)) {
-        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
+      // A fit that is not one of its three words, in any case, is "fill", and said once: it was
+      // "fill" in silence.
+      const fit = listWord(['fill', 'contain', 'cover'], opts?.fit);
+      if (opts?.fit !== undefined && opts?.fit !== null && !fit) {
+        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(opts.fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
       }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
         x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
-        fit: fits.includes(fit) ? fit : 'fill',
+        fit: fit ?? 'fill',
       }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
@@ -8958,10 +8959,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
         addScriptTrace('error', '', 'ce.draw.blend: mode was not given, so the blend stays as it was.');
         return false;
       }
-      const wanted = String(mode);
-      if (!legal.includes(wanted)) {
+      // In any case: "Multiply" is "multiply", handed on as the list spells it.
+      const wanted = listWord(legal, String(mode));
+      if (!wanted) {
         addScriptTrace('error', '',
-          `ce.draw.blend("${wanted}"): not a blend mode. One of: ${legal.join(', ')}.`);
+          `ce.draw.blend("${String(mode)}"): not a blend mode. One of: ${legal.join(', ')}.`);
         return false;
       }
       drawState.blend = wanted === 'normal' ? null : wanted;

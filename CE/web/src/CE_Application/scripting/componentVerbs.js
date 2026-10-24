@@ -44,6 +44,7 @@ import {
 } from '../utils/drumPadLayout.js';
 import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } from '../utils/pixelElements.js';
 import { shownValue } from './shownValue.js';
+import { listWord } from '../utils/wordLists.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 // What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
@@ -51,12 +52,6 @@ const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const OFF_WORDS = new Set(['', 'false', 'off', '0']);
 const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
 const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
-/** The word of a list a script wrote, in any case and with spaces around it, as the list spells it;
- *  null when the list has no such word. */
-const wordIn = (values, value) => {
-  const want = String(value ?? '').trim().toLowerCase();
-  return values.find((x) => typeof x === 'string' && x.toLowerCase() === want) ?? null;
-};
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
 // One property of one element of a pixel display's scene, addressed by the NAME the author typed
 // beside it. Not `item`, and the two reasons are written out in utils/pixelElements.js: the list
@@ -927,7 +922,7 @@ function coerce(kind, value, spec, current) {
       // arpeggiator alone is debuggable, one that quietly sets it to "up" is not. A word in another
       // case is the word: "LEFT" is "left", stored as the list spells it.
       if (typeof value === 'number') return spec.values.some((x) => x === value) ? value : null;
-      return wordIn(spec.values, value);
+      return listWord(spec.values, value);
     }
     default: return null;
   }

@@ -602,6 +602,9 @@ function sibling(site, name) {
 }
 
 const moduleOf = (memberId) => memberModule()[memberId]?.module ?? '';
+// The modules whose calls read a word from a list in any case (utils/wordLists.js), as the component
+// verbs do: the Values tab takes "Multiply" there.
+const ANY_CASE_MODULES = new Set(['ce.ui', 'ce.draw']);
 
 /** Fill in an Arg's kind, meaning, problem, options and editable. */
 function classify(arg, node, param, site, index) {
@@ -647,7 +650,7 @@ function classify(arg, node, param, site, index) {
     case 'enum': {
       const values = param.values;
       const read = readEnum(value, values, { path: site.path, name: param.name, refusal: ENUM_REFUSALS[site.memberId],
-        anyCase: COMPONENT_VERB_BY_ID.has(site.memberId) });
+        anyCase: COMPONENT_VERB_BY_ID.has(site.memberId) || ANY_CASE_MODULES.has(moduleOf(site.memberId)) });
       return setRead(arg, 'enum', read, 'choice');
     }
     case 'number': {

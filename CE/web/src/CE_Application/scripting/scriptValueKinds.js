@@ -682,16 +682,15 @@ export const OPACITY_SCALE_WARNINGS = {
 
 /**
  * A value from a closed list. `refusal(value, list, name)` gives the runtime's own sentence where it
- * has one, and then it is said of a word in another case too: a call with a sentence of its own
- * reads only its spelling (ce.draw.blend, ce.draw.stroke's cap and join), and refuses "Multiply" in
- * the words it refuses "sausage" in, with the spelling it wanted as the "Did you mean".
+ * has one. `anyCase`: the call reads its words in any case (utils/wordLists.js), so "Multiply" is
+ * "multiply"; without it, a word in another case is said to be refused.
  */
 export function readEnum(value, values, { path, name, refusal, anyCase = false } = {}) {
   const meaning = { choices: values.map(String) };
   if (value === undefined || value === null) return { meaning, problem: null };
   if (values.some((v) => v === value)) return { meaning, problem: null };
   const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.trim().toLowerCase()) : undefined;
-  // A call that reads its words in any case (every component verb) takes "LEFT" as "left".
+  // A call that reads its words in any case takes "LEFT" as "left".
   if (exactish !== undefined && anyCase) return { meaning, problem: null };
   if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };

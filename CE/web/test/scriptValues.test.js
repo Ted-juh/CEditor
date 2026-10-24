@@ -775,10 +775,10 @@ test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in
   const cases = [
     // [the option in Lua, the option as the runtime is given it, what the overlay is handed]
     ['cap = "round"', { cap: 'round' }, 'round'], ['cap = "square"', { cap: 'square' }, 'square'],
-    ['cap = "sausage"', { cap: 'sausage' }, null], ['cap = "Round"', { cap: 'Round' }, null],
+    ['cap = "sausage"', { cap: 'sausage' }, null], ['cap = "Round"', { cap: 'Round' }, 'round'],
     ['cap = 5', { cap: 5 }, null], ['cap = true', { cap: true }, null], ['cap = false', { cap: false }, null],
     ['join = "bevel"', { join: 'bevel' }, 'bevel'], ['join = "mitre"', { join: 'mitre' }, null],
-    ['join = "ROUND"', { join: 'ROUND' }, null],
+    ['join = " ROUND "', { join: ' ROUND ' }, 'round'], ['join = "Rund"', { join: 'Rund' }, null],
   ];
   for (const [lua, opts, handed] of cases) {
     const name = Object.keys(opts)[0];
@@ -797,15 +797,18 @@ test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in
     assert.equal(runtime.said[0].kind, 'warn', src);
     assert.equal(row.problem.severity, 'warning', src);
   }
-  assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Round" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
-    'ce.draw.stroke: the join is "Round", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');
-  // ce.draw.blend reads only its spelling as well, and its row now says so in its words.
-  const blend = argOf(callOf(readStatement('ce.draw.blend("Multiply")', 'lua', 3, {})), 'mode');
+  assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Rund" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
+    'ce.draw.stroke: the join is "Rund", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');
+  // ce.draw.blend reads its word in any case too, and its row refuses only what the call refuses.
+  assert.equal(argOf(callOf(readStatement('ce.draw.blend("Multiply")', 'lua', 3, {})), 'mode').problem, null);
+  const blend = argOf(callOf(readStatement('ce.draw.blend("Multiplied")', 'lua', 3, {})), 'mode');
   resetScriptStateForTesting();
   setRuntimeHost({ panel });
   try {
     clearScriptTrace();
-    assert.equal(scriptApiForTesting('screen', 'values-probe').ce.draw.blend('Multiply'), false);
+    const api = scriptApiForTesting('screen', 'values-probe');
+    assert.equal(api.ce.draw.blend('Multiply'), true, 'a capital letter is still the word');
+    assert.equal(api.ce.draw.blend('Multiplied'), false);
     const [line] = get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
     assert.ok(blend.problem.message.startsWith(line), `read: ${blend.problem.message}\nruntime: ${line}`);
   } finally { setRuntimeHost(null); resetScriptStateForTesting(); }
