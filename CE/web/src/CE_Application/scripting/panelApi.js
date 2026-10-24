@@ -3688,6 +3688,9 @@ export const COMMANDS = [
 const PARAM_TYPE_FOR = {
   num: 'number', int: 'number', bool: 'boolean', str: 'string', enum: 'string',
   list: 'list',
+  // Where on an LCD (lcdPositions.js): a row, or a table of layout, row and col. And a layout, by
+  // its number or its name.
+  position: 'number or table', layoutRef: 'number or name',
 };
 
 /** What the value a component verb writes may be, as the spec says it: the closed list an enum
@@ -5702,6 +5705,7 @@ const TYPE_WORDS = {
   number: 'number', string: 'text', dumpKind: 'text', scriptRef: 'text', boolean: 'true or false',
   array: 'list', targetRef: 'control name', eventName: 'event name',
   'number or division': 'number or text', value: 'any value',
+  'number or table': 'number or table', 'number or name': 'number or name',
 };
 const KIND_WORDS = {
   note: 'note', noteList: 'list of notes', colour: 'colour', bytes: 'bytes',

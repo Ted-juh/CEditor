@@ -796,9 +796,9 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 12. The manual shows none of these texts: its component chapter lists the verbs' names only.
 13. Case "everywhere": done, below.
 14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
-15. `clear`: `clear("Screen", 2)` blanks every line. It takes the control only, and a second
-    argument is dropped without a word, as every verb drops one it does not take. Taken up by the
-    LCD's script model, below, which items 8 to 14 wait on.
+15. `clear`: done, by the LCD's script model, below: `clear("Screen", 2)` blanks row 2. That
+    every verb drops an argument it does not take, without a word, is wider than the LCD and is
+    not on this queue unless the owner puts it there.
 
 **Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
 
@@ -987,59 +987,76 @@ page's `timeoutMs` returning it; in design mode, the inspector's Edit/Preview la
 verbs run only with the panel window open (the preludes' webview-only stubs), so the page showing
 is always there to ask.
 
-**The model.**
+Then, from the owner's later answers: **the word is "layout"**, the inspector's own, so nothing in
+it was renamed (its Layouts are the screens and its Pages the rules that switch between them, and
+"page" in a script would have meant the one while the inspector said the other); and **a range is
+a list**, `col = {5, 10}`, because "col = 5, 10" cannot be written in a table (Lua reads the 10 as
+an entry of its own; JavaScript and Python refuse it). Open points a to e below were not answered
+one by one: the owner's go-ahead was on the summary that carried them, so their recommendations
+hold.
 
-- **A page** is a layout, by its number in the inspector (counted from 1) or its name as given in
-  the inspector (in any case and trimmed, as a control's name and a pixel element's are matched).
-  A number is a position, text a name. A display without
-  layouts has page 1, its `lines`.
-- **A page's text** is stored on the layout as `lines`, one text per row, saved with the panel as
-  the display's `lines` are. `composeLayout` starts from it instead of a blank grid, so a cell no
-  zone paints shows it. A new layout's text is empty, and the display's `lines` are not moved into
-  the first layout: a panel that has layouts carries default lines nobody sees, and would show
-  "PATCH:INIT VOICE" under its zones.
-- **The position table** takes `page`, `row` and `col`, in any case (they are words from a list
-  the app defines). Each is counted from 1, a fraction rounded; outside the page, the display's
-  rows or its columns: rejected with a console error, as `text` rejects a row now. Another key
-  (`{pg = 2}`): rejected with a console error that names the three.
-- **The commands**, on the page showing unless the table names one:
+**The model, as built** (`scripting/lcdPositions.js`):
+
+- **A layout** is addressed by its number in the inspector (counted from 1) or its name (in any
+  case and trimmed, as a control's name and a pixel element's are matched). A number is a
+  position, text a name, and text that names no layout but reads as a number is that number. A
+  display without layouts has layout 1: an LCD's lines, a Pixel Display's elements.
+- **A layout's text** is stored on the layout as `lines`, one string per row, saved as the
+  display's `lines` are. `composeLayout` starts from it, so a cell no zone paints shows it, with
+  `{value}`, `{pct}` and `{bar}` filled in. It never scrolls: a layout's rows are composed at the
+  display's width. Panels that already have layouts are not changed (they carry default lines
+  nobody sees, which would appear under their zones); "+ Enable" gives the first layout the lines,
+  so the screen does not go blank when an author turns layouts on.
+- **The position** is a row number, or a table of `layout`, `row` and `col` (the names in any
+  case). `row` and `col` are a number or a range; each counted from 1, a fraction rounded. A part
+  the display does not have is refused with why; a range past its edge stops there, said once.
+  Another key (`{pg = 2}`), an entry without a name (Lua's `{row = 2, col = 5, 10}`), a list for
+  the whole position, a range that is not two numbers or runs backwards: refused with why.
+- **The layout showing** comes from the preview, through `stores/displayLayouts.js`, which the
+  preview provides while it is mounted: the same answer it gives the renderer. With no preview,
+  the layout the design canvas shows (the inspector's Edit / Preview Layout).
 
 | Call | Does |
 | --- | --- |
-| `text(t, 2, "VOL")` | Row 2 of the page showing: replaced. As now, on a display without layouts. |
-| `text(t, {page = 2, row = 4}, "VOL")` | Row 4 of page 2: replaced. |
-| `text(t, {row = 4, col = 15}, "X")` | From column 15 of row 4: written over, the rest of the row kept, as a hardware LCD prints at its cursor. Past the last column: cut, with the one-time warning. |
-| `text(t, {page = 2}, "VOL")` | Rejected with a console error: a row is needed. |
-| `clear(t)` | The page showing's text: blanked. |
-| `clear(t, 4)`, `clear(t, {row = 4})` | Row 4 of the page showing. |
-| `clear(t, {page = 2})` | All of page 2's text. |
-| `clear(t, {page = 2, row = 4, col = 15})` | One character. |
-| `read(t, "text")`, `read(t, "text", 2)`, `read(t, "text", {page = 2, row = 4, col = 15})` | Every row, one row, one character. |
-| `page(t, 2)`, `page(t, "Edit")` | Shows that page, as a soft key that opens it does: until a soft key, an overlay or the Selector changes it, or the page's own timeout returns it. New. |
-| `read(t, "page")` | The page showing. New. |
-| `fill(t, "text", {...})`, `size(t, "text")` | The page showing's rows. |
+| `text(t, 2, "VOL")` | Row 2 of the layout showing: replaced. On a display without layouts, as before. |
+| `text(t, {layout = 2, row = 4}, "VOL")` | Row 4 of layout 2: replaced. |
+| `text(t, {row = 4, col = 15}, "X")` | From column 15 of row 4: written over, the rest of the row kept, as a hardware LCD prints at its cursor. |
+| `text(t, {row = 4, col = {5, 10}}, "VOL")` | Into columns 5 to 10: padded with blanks, or cut at 10. |
+| `text(t, {layout = 2}, "VOL")`, `text(t, {row = {1, 2}}, "VOL")` | Rejected: text writes one row. |
+| `clear(t)` | The layout showing's text: blanked. |
+| `clear(t, 4)`, `clear(t, {row = 4})` | Row 4 of the layout showing. It blanked every row, the 4 dropped. |
+| `clear(t, {layout = 2})`, `clear(t, {col = {1, 3}})` | All of layout 2's text; columns 1 to 3 of every row. |
+| `clear(t, {layout = 2, row = 4, col = 15})` | One character. |
+| `read(t, "text")`, `read(t, "text", 2)`, `read(t, "text", {row = 4, col = {5, 10}})` | Every row, one row, columns of one; one `col` is one character. |
+| `layout(t, 2)`, `layout(t, "Edit")` | Shows it as a soft key does (`lcdPressedLayout`, and the layout's timeout), until a soft key, an overlay or the Selector changes it. Not written to the panel. New, on the LCD and the Pixel Display. |
+| `read(t, "layout")` | The number of the layout showing; 1 without layouts. New. |
+| `fill(t, "text", {...})`, `size(t, "text")` | The layout showing's rows. |
 
-  `clear` takes away only what a script wrote: a zone still shows its control. On a display with
-  layouts, `text(t, 2, "VOL")` used to write `lines` nobody sees, with a warning; it writes the
-  page showing now, which is what such a script meant.
+`clear` takes away only text: a zone still shows its control. On a display with layouts,
+`text(t, 2, "VOL")` wrote `lines` nobody saw and warned so; it writes the layout showing now. The
+Joystick's `cornerLabel`, the other LINE verb, is as it was. The Values tab reads a position and a
+layout as the runtime does.
 
-**Open, for the owner** (each with the recommendation first):
+**The open points, as built:** (a) the inspector's Text rows (Row 1, Row 2, ...) edit the text of
+the layout being edited once there are layouts, and every list of layouts shows its number
+("1 · Home"); (b) `read(t, "layout")` gives a number, as names can repeat; (c) tokens filled in,
+no scrolling; (d) the cursor stays one per display and `cursorAt` is as it was; (e) the Pixel
+Display's element verbs stay by name.
 
-- a. The inspector shows a layout's text as rows, editable as the display's Lines are, so text a
-  script left in a saved panel can be seen and cleared. Or: not shown.
-- b. `read(t, "page")` gives the page's number: names can repeat, a number cannot. Or: its name.
-- c. A page's text is drawn as lines are: `{value}`, `{pct}` and `{bar}` filled in, scrolled by
-  `scroll()`. Or: plain text only.
-- d. The cursor stays one per display, drawn on whichever page shows; `cursorAt` takes
-  `{row = 2, col = 5}` as well as `(col, row)`, and a `page` in it is rejected. Or: a cursor per
-  page.
-- e. The Pixel Display gets `page()` and `read(t, "page")`. Its element verbs stay by name, which
-  already reaches every page an element is on. Or: they take `{page = …}` as well.
+| Field | Text |
+| --- | --- |
+| `text` description | Write one row of the display. |
+| `text` `at` (number or table, required) | Row, counted from 1, of the layout showing. / Or a table: {layout = 2, row = 4, col = 15}, `layout` and `col` optional. / `layout`: its number, counted from 1, or its name. Left out: the layout showing. / `col`: written from that column on, the rest of the row kept. / `col` as a range {5, 10}: written into those columns, padded with blanks or cut. / A fraction: rounded. / A range past the display: to its last column. / Not on the display: rejected with a console error. |
+| `text` `text` | The text. / Longer than the display: cut at its width, with a console warning the first time. / On a display without layouts that scrolls: scrolled in instead. / The other three lines as they were. |
+| `text` notes | On a display with layouts: written on the layout, shown where no zone paints. |
+| `clear` description | Blank the layout showing, or part of it. |
+| `clear` `at` (number or table, optional) | As `text`'s, with `row`, `col`: a number, or a range {5, 10}. Left out: every row, every column. / Left out: the whole layout showing. |
+| `clear` notes | Only text is blanked: a zone still shows its control. |
+| `layout` `layout` (number or name, required) | Its number, counted from 1, or its name. / A name: case-insensitive. / A fraction: rounded. / A display without layouts: 1, its lines (its elements). / Not a layout of the display: rejected with a console error. |
+| `layout` notes | Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it. (Pixel: until an overlay or the Selector changes it.) / `read(target, "layout")` gives the number of the layout showing. |
+| `read` `index`, the LCD's | One line more: For "text": a row or a table, as `text()` takes it. |
 
-**The steps**, one commit each, verified as the items were: (1) a page's text in the data and the
-drawing, and the inspector if (a); (2) the position table in `text`, `clear` and `read`; (3)
-`page()` and `read(t, "page")`, through a store the preview and the runtime share; (4) the Pixel
-Display's; (5) the texts, the manual, the release notes. Then items 8 to 14.
+Then items 8 to 14, one at a time.
 
 ### The branch
 

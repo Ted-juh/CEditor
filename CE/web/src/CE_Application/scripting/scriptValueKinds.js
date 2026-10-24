@@ -52,7 +52,7 @@ import {
 } from './deviceWords.js';
 import { countRolesInControls } from '../utils/deviceRoles.js';
 import { lcdLine, lcdLineWords } from './lcdLines.js';
-import { lcdPosition, lcdPositionWords, lcdReadAt, lcdRows, lcdWriteAt, lcdClearAt, isPositionTable } from './lcdPositions.js';
+import { lcdPosition, lcdPositionWords, lcdReadAt, lcdRows, lcdWriteAt, lcdClearAt, isPositionTable, lcdLayoutIndex, lcdLayoutCount } from './lcdPositions.js';
 import { findFont, findAxis, axisWords, axisClampWords, axisRefusalWords } from './textStyle.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
@@ -1328,6 +1328,17 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     // The LCD's text and clear take a position (lcdPositions.js): a row of the layout showing, or a
     // table of layout, row and col. Judged by what the position says alone, as the text after it
     // has a row of its own.
+    // A layout, by its number or its name, as layout() takes it.
+    if (verb.k === 'layout') {
+      const layouts = Array.isArray(cfg.layouts) ? cfg.layouts : [];
+      meaning.choices = layouts.map((l) => String(l?.name ?? '')).filter(Boolean);
+      Object.assign(meaning, { min: 1, max: lcdLayoutCount(cfg) });
+      const named = lcdLayoutIndex(cfg, value, verb.flat);
+      if (named.refusal) return say(named.refusal);
+      const name = layouts[named.index]?.name;
+      meaning.hint = `layout ${named.index + 1} of ${lcdLayoutCount(cfg)}${layouts.length ? (name ? ` · ${name}` : '') : ` · ${verb.flat}`}`;
+      return { meaning, problem: null };
+    }
     if (verb.k === 'line' && verb.section === 'Display') {
       const pos = lcdPosition(cfg, value);
       const refused = pos.refusal ?? (verb.clear ? lcdClearAt(cfg, value) : lcdWriteAt(cfg, value, '')).refusal;

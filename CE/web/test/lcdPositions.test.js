@@ -150,3 +150,47 @@ test('a position table works through the runtime, and a refusal says why', () =>
   const read = run(PLAIN, (lcdApi) => lcdApi.read('Lcd', 'text', { row: 3 }));
   assert.deepEqual(read.said, ['lcd.read("text", {"row":3}): There is no row 3: the rows are 1 to 2.']);
 });
+
+/* ---------------------------------------------------------------------------- layout() */
+
+test('layout() shows a layout as a soft key does, and read(t, "layout") answers the one showing', () => {
+  let showing = 'home';
+  const asked = [];
+  const withdraw = provideDisplayLayouts({ showing: () => showing, show: (id, layoutId) => { asked.push(layoutId); showing = layoutId; } });
+  try {
+    const done = run(PAGED, (lcdApi) => [
+      lcdApi.read('Lcd', 'layout'), lcdApi.layout('Lcd', 2), lcdApi.read('Lcd', 'layout'),
+      lcdApi.layout('Lcd', 'home'), lcdApi.layout('Lcd', 'Home'), lcdApi.layout('Lcd', 3), lcdApi.read('Lcd').layout,
+    ]);
+    assert.deepEqual(done.result, [1, true, 2, true, true, false, 1]);
+    assert.deepEqual(asked, ['edit', 'home', 'home'], 'shown again when showing, as a second press restarts a timeout');
+    assert.deepEqual(done.said, ['lcd Lcd: layout(3) — refused, nothing changed. There is no layout 3: the layouts are 1 to 2.']);
+    assert.equal(done.display.layouts.length, 2, 'nothing written to the panel');
+  } finally { withdraw(); }
+});
+
+test('a display without layouts has one, its lines or its elements', () => {
+  const lcdDone = run(PLAIN, (lcdApi) => [lcdApi.layout('Lcd', 1), lcdApi.read('Lcd', 'layout'), lcdApi.layout('Lcd', 2)]);
+  assert.deepEqual(lcdDone.result, [true, 1, false]);
+  assert.deepEqual(lcdDone.said, ['lcd Lcd: layout(2) — refused, nothing changed. There is no layout 2: this display has one, its lines.']);
+
+  resetScriptStateForTesting();
+  const pixel = createControl('PixelDisplay', { name: 'Px' });
+  const panel = { id: 'p', name: 'P', width: 800, height: 400, controls: [pixel], scripting: { modules: MODULES.map((m) => m.id) } };
+  setRuntimeHost({ panel, scripts: [], readValue: (c, p) => valueAtPath(c, p), writeValue: (c, p, v) => (setNestedValue(c, p, v), true) });
+  try {
+    clearScriptTrace();
+    const px = scriptApiForTesting('Px', 'pixel-probe').ce.components.pixel;
+    assert.equal(px.layout('Px', 'Main'), false);
+    assert.deepEqual(get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message),
+      ['pixel Px: layout("Main") — refused, nothing changed. There is no layout "Main": this display has no layouts, only its elements, which are layout 1.']);
+  } finally { setRuntimeHost(null); }
+});
+
+test('with no preview, layout() selects the layout the design canvas shows', async () => {
+  const { lcdDesignLayoutIds } = await import('../src/CE_Application/stores/lcdDesignLayout.js');
+  const done = run(PAGED, (lcdApi) => [lcdApi.layout('Lcd', 'Edit'), lcdApi.read('Lcd', 'layout'), lcdApi.text('Lcd', 1, 'HERE')]);
+  assert.deepEqual(done.result, [true, 2, true]);
+  assert.deepEqual(done.display.layouts[1].lines, ['HERE', '']);
+  assert.ok(Object.values(get(lcdDesignLayoutIds)).includes('edit'));
+});

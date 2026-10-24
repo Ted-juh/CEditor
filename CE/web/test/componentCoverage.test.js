@@ -51,12 +51,12 @@ const EXEMPT = {
   // Authoring surfaces: what the inspector is FOR. A script that rewrote a display's page layout
   // mid-song is not a performance, it is a different panel.
   'lcd.fields': 'a display layout is an authoring surface, not a performance one',
-  'lcd.layouts': 'ditto',
   'lcd.pages': 'ditto',
   // …and pixel.elements is NOT here any more: the scene is reachable by element name (the `elem`
-  // verb kind). The pages around it still are — which layout is showing is the selector's job.
-  'pixel.layouts': 'the pages are an authoring surface; the elements inside them are addressable by name',
-  'pixel.pages': 'ditto',
+  // verb kind). Nor are the layouts, on either display: layout() shows one, and on the LCD text()
+  // and clear() write a layout's own text (lcdPositions.js). The zones and the switching rules are
+  // still what the inspector is for.
+  'pixel.pages': 'the switching rules are an authoring surface; layout() shows a layout as a soft key does',
   'pixel.customFont': 'a font file, chosen once',
   // Text-entry plumbing: what an edit is ALLOWED to be, which the inspector decides once. The
   // buffer itself is no longer here — `editText` gained a verb (proposal 3), and the two entries

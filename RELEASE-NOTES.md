@@ -188,6 +188,21 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   blanks it.
 - Every component parameter counted from 1 (a row, a slot, a pad, a step, a position for `read`,
   `insert` or `remove`) says that a fraction is rounded, as it always was: row 1.5 is row 2.
+- An LCD Display's layouts have text of their own, shown wherever no zone paints, with `{value}`,
+  `{pct}` and `{bar}` filled in. `ce.components.lcd.text` writes it on the layout showing; on a
+  display with layouts it wrote lines that were never drawn. The inspector's Text rows edit the
+  layout being edited, "+ Enable" gives the first layout the lines so the screen does not go
+  blank, and every list of layouts shows each one's number beside its name ("1 · Home").
+- `ce.components.lcd.text`, `clear` and `read` take a position: a row, as before, or a table
+  naming the layout, the row and the column. `text("Screen", {row = 2, col = 15}, "X")` writes from
+  column 15 and keeps the rest of the row; `clear("Screen", {layout = 2, row = 4, col = {5, 10}})`
+  blanks columns 5 to 10 of row 4 of layout 2; `read("Screen", "text", {row = 1, col = 3})` gives
+  one character. A layout is its number or its name; a range is a list, `col = {5, 10}`. A part the
+  display does not have is refused with a console error that says why.
+- `ce.components.lcd.clear("Screen", 2)` blanks row 2. It blanked every row, the 2 dropped.
+- `ce.components.lcd.layout` and `ce.components.pixel.layout` show a layout by its number or its
+  name, as a soft key does, and `read(t, "layout")` gives the number of the one showing. Nothing is
+  written to the panel.
 
 ## What you get
 

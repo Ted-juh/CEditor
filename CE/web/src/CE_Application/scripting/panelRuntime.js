@@ -48,8 +48,8 @@ import {
   drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
-import { lcdReadAt, lcdWriteAt, lcdRows } from './lcdPositions.js';
-import { layoutShowing } from '../stores/displayLayouts.js';
+import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout } from './lcdPositions.js';
+import { layoutShowing, showLayout } from '../stores/displayLayouts.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
@@ -150,7 +150,7 @@ import {
 } from './midiFilters.js';
 import {
   COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, familyVerbNamed, readIndexRefusal, LIST_KINDS,
-  itemListLength, LINK_KIND, ELEM_KIND,
+  itemListLength, LINK_KIND, ELEM_KIND, LAYOUT_KIND,
 } from './componentVerbs.js';
 import {
   SOURCE_KINDS, sourceAccepts, sourceByName, sourceName,
@@ -3664,6 +3664,7 @@ function componentReadAction(verb, path, args) {
       // A link reads back as the NAME it was written by — '' when it points at nothing, which is
       // the truthful answer for both "unlinked" and "linked to a control that has been deleted".
       if (spec.k === LINK_KIND) out[verbName] = sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+      else if (spec.k === LAYOUT_KIND) out[verbName] = lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
       else if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
     }
     return out;
@@ -3676,6 +3677,8 @@ function componentReadAction(verb, path, args) {
     return undefined;
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+  // The layout showing, counted from 1 as layout() takes it: 1 on a display without layouts.
+  if (spec.k === LAYOUT_KIND) return lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
   if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
 
   // A name-addressed scene reads back BY NAME, in both shapes: the whole table, which is also how a
@@ -3957,6 +3960,29 @@ function componentLinkAction(verb, path, args) {
   return true;
 }
 
+/**
+ * layout(t, which): show one of a display's layouts, as a soft key does (stores/displayLayouts.js).
+ * Not a write to the panel: which layout shows is the preview's, and is not saved.
+ */
+function componentLayoutAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'layout');
+  if (!cfg) return false;
+  const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  const named = lcdLayoutIndex(cfg, args[0], verb.flat);
+  if (named.refusal) {
+    addScriptTrace('error', '', `${verb.family} ${path}: layout(${shown}) — refused, nothing changed. ${named.refusal}`);
+    return false;
+  }
+  const layouts = Array.isArray(cfg.layouts) ? cfg.layouts : [];
+  const already = !layouts.length || lcdShownLayout(withLayoutShowing(path, cfg)) === named.index;
+  // Shown again even when it is showing, as a second press of a soft key restarts its timeout.
+  if (layouts.length) showLayout(findControlByName(path)?._children?.Core?.id, layouts[named.index]?.id);
+  addScriptTrace('log', '', already
+    ? `${verb.family} ${path}: layout(${shown}) — already that way`
+    : `${verb.family} ${path}: layout → ${named.index + 1}`);
+  return true;
+}
+
 /** The five kinds every family gets are not writes of a field, so they dispatch elsewhere. */
 const COMPONENT_KIND_ACTION = {
   read: componentReadAction,
@@ -3965,6 +3991,7 @@ const COMPONENT_KIND_ACTION = {
   insert: componentInsertAction,
   remove: componentRemoveAction,
   [LINK_KIND]: componentLinkAction,
+  [LAYOUT_KIND]: componentLayoutAction,
 };
 
 const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [

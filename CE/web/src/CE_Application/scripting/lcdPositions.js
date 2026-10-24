@@ -103,8 +103,11 @@ function noSuch(noun, plural, value, count) {
   return `There is no ${noun} ${shownValue(value)}: the ${plural} are 1 to ${count}.`;
 }
 
-/** Which layout a `layout` part names, counted from 0, or why it names none. */
-export function lcdLayoutIndex(display, value) {
+/**
+ * Which layout a `layout` part names, counted from 0, or why it names none. `flat` is what a display
+ * without layouts shows as its one: an LCD's lines, a Pixel Display's elements (layout() on either).
+ */
+export function lcdLayoutIndex(display, value, flat = 'its lines') {
   const list = layoutsOf(display);
   const count = lcdLayoutCount(display);
   if (typeof value === 'string') {
@@ -117,13 +120,13 @@ export function lcdLayoutIndex(display, value) {
     return {
       refusal: list.length
         ? `There is no layout ${JSON.stringify(value)}. One of: ${list.map((l, i) => JSON.stringify(String(l?.name || i + 1))).join(', ')}.`
-        : `There is no layout ${JSON.stringify(value)}: this display has no layouts, only its lines, which are layout 1.`,
+        : `There is no layout ${JSON.stringify(value)}: this display has no layouts, only ${flat}, which are layout 1.`,
     };
   }
   const n = countedFrom1(value, count);
   if (n !== null) return { index: n };
   if (typeof value !== 'number') return { refusal: `${shownValue(value)} is not a layout: a number counted from 1, or a name.` };
-  return { refusal: list.length ? noSuch('layout', 'layouts', value, count) : `There is no layout ${shownValue(value)}: this display has one, its lines.` };
+  return { refusal: list.length ? noSuch('layout', 'layouts', value, count) : `There is no layout ${shownValue(value)}: this display has one, ${flat}.` };
 }
 
 /** One part, `row` or `col`: a number, or a range {first, last}, as 0-based [first, last]. */

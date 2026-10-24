@@ -12,9 +12,9 @@
 // today; the number is what the panel's scripting surface weighs, and it is the figure the Export
 // tab shows beside the (far larger) Python runtime cost.
 export const MODULE_COST = {
-  "-": { "javascript": 47168, "lua": 36262, "python": 39072, "webview": 193927 },
+  "-": { "javascript": 47216, "lua": 36308, "python": 39120, "webview": 194113 },
   "ce.anim": { "javascript": 8893, "lua": 8526, "python": 8661, "webview": 35679 },
-  "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 36753 },
+  "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 40941 },
   "ce.components.arp": { "javascript": 407, "lua": 407, "python": 407, "webview": 0 },
   "ce.components.chordpad": { "javascript": 417, "lua": 417, "python": 417, "webview": 0 },
   "ce.components.constellation": { "javascript": 294, "lua": 294, "python": 294, "webview": 0 },
@@ -25,7 +25,7 @@ export const MODULE_COST = {
   "ce.components.harmony": { "javascript": 254, "lua": 254, "python": 254, "webview": 0 },
   "ce.components.joystick": { "javascript": 323, "lua": 323, "python": 323, "webview": 0 },
   "ce.components.kinetic": { "javascript": 210, "lua": 210, "python": 210, "webview": 0 },
-  "ce.components.lcd": { "javascript": 555, "lua": 555, "python": 555, "webview": 0 },
+  "ce.components.lcd": { "javascript": 567, "lua": 567, "python": 567, "webview": 0 },
   "ce.components.looper": { "javascript": 270, "lua": 270, "python": 270, "webview": 0 },
   "ce.components.macro": { "javascript": 247, "lua": 247, "python": 247, "webview": 0 },
   "ce.components.matrix": { "javascript": 174, "lua": 174, "python": 174, "webview": 0 },
@@ -34,7 +34,7 @@ export const MODULE_COST = {
   "ce.components.orbit": { "javascript": 304, "lua": 304, "python": 304, "webview": 0 },
   "ce.components.panic": { "javascript": 181, "lua": 181, "python": 181, "webview": 0 },
   "ce.components.phrase": { "javascript": 133, "lua": 133, "python": 133, "webview": 0 },
-  "ce.components.pixel": { "javascript": 448, "lua": 447, "python": 447, "webview": 0 },
+  "ce.components.pixel": { "javascript": 462, "lua": 461, "python": 461, "webview": 0 },
   "ce.components.recorder": { "javascript": 254, "lua": 254, "python": 254, "webview": 0 },
   "ce.components.ribbon": { "javascript": 266, "lua": 266, "python": 266, "webview": 0 },
   "ce.components.router": { "javascript": 340, "lua": 340, "python": 340, "webview": 0 },

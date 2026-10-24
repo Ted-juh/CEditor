@@ -46,7 +46,7 @@ import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } fr
 import { shownValue } from './shownValue.js';
 import { listWord } from '../utils/wordLists.js';
 import { glyphBitsRefusal } from '../utils/lcdUserGlyphs.js';
-import { lcdWriteAt, lcdClearAt, lcdRows } from './lcdPositions.js';
+import { lcdWriteAt, lcdClearAt, lcdRows, lcdLayoutIndex, lcdLayoutCount } from './lcdPositions.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 // What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
@@ -77,6 +77,11 @@ const READ = 'read', SIZE = 'size', FILL = 'fill', INSERT = 'insert', REMOVE = '
 // by name and an opaque `ctl_…` is not something it could have got hold of.
 const LINK = 'link';
 export const LINK_KIND = LINK;
+// Which layout a display shows (the LCD's and the Pixel Display's). Not a field either: the layout
+// showing is the preview's, transient, as a soft key's is (stores/displayLayouts.js), so it
+// dispatches in the runtime, and read(t, "layout") answers it there.
+const LAYOUT = 'layout';
+export const LAYOUT_KIND = LAYOUT;
 export const READ_KINDS = [READ, SIZE];
 export const ARRAY_KINDS = [FILL, INSERT, REMOVE];
 /** The kinds that address an array by a verb name — what `size`, `fill`, `insert` and `remove`
@@ -597,9 +602,13 @@ export const COMPONENT_FAMILIES = [
     id: 'lcd', section: 'Display', prefix: 'lcd', label: 'LCD Display', sample: 'Screen', article: 'an',
     summary: 'Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.',
     verbs: [
-      v('text', 'lines', LINE, { valueKind: 'lcdLine', doc: 'Write one line of the display.',
-        ex: ['1, "PATCH 12"', 'writes PATCH 12 on the first row'] }),
-      v('clear', 'lines', LINE, { clear: true, doc: 'Blank every line.', ex: ['', 'blanks the display'] }),
+      // A row of a layout, or the display's lines when it has none: the owner's script model,
+      // docs/design/api-descriptions-handoff.md ("The LCD's script model"), and lcdPositions.js.
+      v('text', 'lines', LINE, { valueKind: 'lcdLine', doc: 'Write one row of the display.',
+        ex: ['1, "PATCH 12"', 'writes PATCH 12 on the first row'],
+        notes: ['On a display with layouts: written on the layout, shown where no zone paints.'] }),
+      v('clear', 'lines', LINE, { clear: true, doc: 'Blank the layout showing, or part of it.', ex: ['', 'blanks the display'],
+        notes: ['Only text is blanked: a zone still shows its control.'] }),
       v('backlight', 'backlightOn', BOOL, { toggle: true, doc: 'Switch the backlight on or off.' }),
       v('brightness', 'brightness', NUM, { min: 0, max: 100, doc: 'Set the brightness of the lit segments or pixels.', ex: ['80', 'sets the brightness to 80'] }),
       v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast, which is how visible the unlit segments are.', ex: ['55', 'sets the contrast to 55'] }),
@@ -674,6 +683,8 @@ export const COMPONENT_FAMILIES = [
       // read the patch name the user had just entered, which is the obvious thing to want.
       v('editText', 'editText', STR, { doc: 'Set the text in the display\'s editable field.', ex: ['"INIT VOICE"', 'puts INIT VOICE in the field'],
         notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.'] }),
+      v('layout', 'layouts', LAYOUT, { flat: 'its lines', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
+        notes: ['Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.'] }),
     ],
   },
   {
@@ -732,6 +743,8 @@ export const COMPONENT_FAMILIES = [
       v('transitionMs', 'transitionMs', NUM, { min: 0, max: 5000 }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
       v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
+      v('layout', 'layouts', LAYOUT, { flat: 'its elements', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
+        notes: ['Shown until an overlay or the Selector changes it.'] }),
     ],
   },
 ];
@@ -1182,6 +1195,7 @@ export function componentRequestLegal(verb, cfg, args = []) {
       if (!sites.length) return false;
       return coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]) !== null;
     }
+    case LAYOUT: return !lcdLayoutIndex(c, a, verb.flat).refusal;
     case LINE: {
       if (lcdLines(verb)) return !(verb.clear ? lcdClearAt(c, a) : lcdWriteAt(c, a, b)).refusal;
       const list = listOf(verb.f);
@@ -1233,6 +1247,7 @@ export function verbIndexArgs(verb) {
     case ELEM: return ['name'];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col'] : ['index']);
     case LINE: return lcdLines(verb) ? ['at'] : (verb.clear ? [] : ['row']);
+    case LAYOUT: return ['layout'];
     default: return [];
   }
 }
@@ -1246,6 +1261,7 @@ export function componentIndexRange(verb, cfg) {
     case CELL:
       if (verb.grid) return { rows: Array.isArray(c.rows) ? c.rows.length : 0, cols: Array.isArray(c.cols) ? c.cols.length : 0 };
       return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
+    case LAYOUT: return { count: lcdLayoutCount(c) };
     case LINE:
       if (lcdLines(verb)) return { count: lcdRows(c) };
       return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
@@ -1296,6 +1312,7 @@ export function componentRefusalReason(verb, cfg, args = []) {
       if (!range) return `It has no ${noun}s.`;
       return indexRefusal(a, range.count, noun) ?? valueOf(NUM, b);
     }
+    case LAYOUT: return lcdLayoutIndex(c, a, verb.flat).refusal ?? null;
     case LINE: {
       if (lcdLines(verb)) return (verb.clear ? lcdClearAt(c, a) : lcdWriteAt(c, a, b)).refusal ?? null;
       if (verb.clear) return null;
@@ -1443,6 +1460,7 @@ export function verbArgs(verb) {
     // The five every family gets. Their optional arguments are rendered in verbSignature, which is
     // why they read as a plain list here.
     case LINK: return ['name'];
+    case LAYOUT: return ['layout'];
     case READ: return ['name', 'index'];
     case SIZE: return ['name'];
     case FILL: return ['name', 'values'];
@@ -1468,6 +1486,7 @@ export function verbArgKinds(verb) {
     case LINE: return lcdLines(verb) ? (verb.clear ? [POSITION] : [POSITION, STR]) : (verb.clear ? [] : [INT, STR]);
     case INDEXSET: return [INT, BOOL];
     case LINK: return [STR];
+    case LAYOUT: return ['layoutRef'];
     case READ: return [STR, INT];
     case SIZE: return [STR];
     case FILL: return [STR, 'list'];
@@ -1550,6 +1569,7 @@ export function verbSummary(verb) {
     case LINE: return verb.clear ? 'Blank every line.' : 'Write one line.';
     case INDEXSET: return `Switch one ${itemNoun(verb)} on or off.`;
     case LINK: return `Name the control that drives the ${words || 'input'}.`;
+    case LAYOUT: return 'Show one of the display\'s layouts.';
     default: return `Set the ${words}.`;
   }
 }
@@ -1602,6 +1622,7 @@ export function verbExample(verb) {
     case ENUM: { const w = sampleValue(verb, ENUM); return `\`${call}(${target}, ${w})\` sets the ${words} to ${w}.`; }
     case STR: return `\`${call}(${target}, "text")\` sets the ${words} to text.`;
     case LINK: return `\`${call}(${target}, "Cutoff")\` makes the control called Cutoff drive the ${words}.`;
+    case LAYOUT: return `\`${call}(${target}, 2)\` shows layout 2.`;
     case READ: return `\`${call}(${target})\` gives every setting as a table.`;
     case SIZE: return `\`${call}(${target})\` gives the length of every list as a table.`;
     case FILL: { const [name, noun] = firstList(verb); return `\`${call}(${target}, "${name}", values)\` writes the ${noun}s from the first, one value per element.`; }
@@ -1628,6 +1649,7 @@ export function verbNotes(verb) {
   switch (verb.k) {
     case READ: case SIZE: case FILL: case INSERT: case REMOVE: return own;
     case LINK: return [...own, ...RETURNS_SET, '`read(target, "' + verb.v + '")` gives the control\'s name.'];
+    case LAYOUT: return [...own, ...RETURNS_SET, '`read(target, "layout")` gives the number of the layout showing.'];
     default: return [...own, ...RETURNS_SET];
   }
 }
@@ -1684,23 +1706,23 @@ export function verbParamSummary(verb, name, kind) {
     case LINE:
       if (name === 'row') return `Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.`;
       if (name === 'at' && verb.clear) {
-        return ['Row, counted from 1, on the layout showing.',
-          'Or a table naming the layout, the rows and the columns: {layout = 2, row = 4, col = 15}.',
+        return ['Row, counted from 1, of the layout showing.',
+          'Or a table: {layout = 2, row = 4, col = 15}, each part optional.',
           '`layout`: its number, counted from 1, or its name. Left out: the layout showing.',
-          '`row` and `col`: a number, or a range {5, 10}. Left out: every row, every column.',
+          '`row`, `col`: a number, or a range {5, 10}. Left out: every row, every column.',
           'A fraction: rounded.', 'A range past the display: to its last row or column.',
-          'Left out: every row of the layout showing.', 'Not on the display: rejected with a console error.'].join('\n');
+          'Left out: the whole layout showing.', 'Not on the display: rejected with a console error.'].join('\n');
       }
       if (name === 'at') {
-        return ['Row, counted from 1, on the layout showing.',
-          'Or a table naming the layout, the row and the column: {layout = 2, row = 4, col = 15}.',
+        return ['Row, counted from 1, of the layout showing.',
+          'Or a table: {layout = 2, row = 4, col = 15}, `layout` and `col` optional.',
           '`layout`: its number, counted from 1, or its name. Left out: the layout showing.',
           '`col`: written from that column on, the rest of the row kept.',
           '`col` as a range {5, 10}: written into those columns, padded with blanks or cut.',
           'A fraction: rounded.', 'A range past the display: to its last column.',
           'Not on the display: rejected with a console error.'].join('\n');
       }
-      return 'The line.\nLonger than the display: cut at its width unless it scrolls, with a console warning the first time.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.\nLeft out: rejected with a console error.';
+      return 'The text.\nLonger than the display: cut at its width, with a console warning the first time.\nOn a display without layouts that scrolls: scrolled in instead.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.\nLeft out: rejected with a console error.';
     case ITEM:
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
@@ -1721,10 +1743,15 @@ export function verbParamSummary(verb, name, kind) {
     case INDEXSET:
       if (name === 'index') return `${cap(noun)} number, counted from 1.\nA fraction: rounded.\nBelow 1, or invalid: rejected with a console error.`;
       return 'Left out: toggles.\n0, "", "false", "off" or "0": off. Case-insensitive.\nAny other value: on.';
+    case LAYOUT:
+      return ['Its number, counted from 1, or its name.', 'A name: case-insensitive.', 'A fraction: rounded.',
+        `A display without layouts: 1, ${verb.flat}.`, 'Not a layout of the display: rejected with a console error.'].join('\n');
     case LINK: return `The driving control's name.\nLeft out, or "": unlinked.\nNot on this panel, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}: rejected with a console error.`;
     case READ:
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
-      return 'Element number of a list verb, counted from 1.\nA fraction: rounded.\nLeft out: the whole list.\nNot one the list has: rejected with a console error.';
+      return ['Element number of a list verb, counted from 1.', 'A fraction: rounded.',
+        ...(verb.family === 'lcd' ? ['For "text": a row or a table, as `text()` takes it.'] : []),
+        'Left out: the whole list.', 'Not one the list has: rejected with a console error.'].join('\n');
     case SIZE: return 'A list verb of this component, by name.\nLeft out: every list, as a table.\nNot a list verb: rejected with a console error.';
     case FILL:
       if (name === 'name') return 'A list verb of this component, by name.\nNot a list verb: rejected with a console error.';

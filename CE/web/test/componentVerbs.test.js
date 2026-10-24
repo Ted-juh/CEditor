@@ -271,7 +271,8 @@ test('a verb that needs a list finds none and yields nothing', () => {
 // they have no patch to make and are exercised in scriptComponents.test.js instead.
 // …and `link`, which resolves a control NAME against the live panel — something the reducer is
 // deliberately blind to. Driven end to end in scriptControlSources.test.js instead.
-const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link'];
+// …and `layout`, which shows a layout the preview keeps, not the panel (lcdPositions.test.js).
+const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link', 'layout'];
 
 test('every verb either changes something or explains why it cannot', () => {
   // The catch-all. For each verb, feed it a plausible argument and assert the reducer produced a
@@ -764,7 +765,7 @@ test('a line\'s text left out is refused, as every text verb\'s is; "" still bla
   assert.deepEqual(componentScriptPatch(text, lines, [2, 42]), { lines: ['A', '42'] });
   assert.match(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'text').summary, /\nLeft out: rejected with a console error\.$/);
   const at = MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'at').summary.split('\n');
-  assert.equal(at[0], 'Row, counted from 1, on the layout showing.');
+  assert.equal(at[0], 'Row, counted from 1, of the layout showing.');
   assert.ok(at.includes('A fraction: rounded.'));
 });
 
