@@ -779,9 +779,8 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 2. `blinkRate`: done, below.
 3. `blink`: done, below.
 4. `animPreset`: done, below.
-5. `valueMin` and `valueMax`: a minimum above the maximum is stored without a message, and neither
-   text says what it means for {pct} and {bar}.
-6. `glyph`: bits that are not eight rows of five ("abc") are stored without a message.
+5. `valueMin` and `valueMax`: kept as merged, below.
+6. `glyph`: done, below.
 7. `text`: a fraction of a row (1.5) writes row 2, which the text does not say.
 8. Parameter texts that are only the name: "Brightness.", "Contrast.", "Value.", "Value min.",
    "Value max.", "Value precision.", "Value prefix.", "Value suffix.", "Edit text.", "Anim fps.".
@@ -882,6 +881,33 @@ the display drew nothing for a name `presetInto` does not know. Two decisions th
 
 Found on the way, for the queue: `animSpeed`'s range is 0 ↔ 16 in a script and 0.1 ↔ 5 on the
 inspector's preset Speed.
+
+**Item 5, `valueMin` and `valueMax`: kept as merged**, at the owner's word: the parameter lines
+proposed ("The value at 0 % and an empty bar.", the reversed range, the equal pair) and the notes
+on {value} and a value outside the range were worse than the text as it stands. Texts and
+behaviour are unchanged: a minimum above the maximum is still a reversed range, accepted without a
+word, and an equal pair still gives {pct} 0 and an empty bar.
+
+**Item 6, `glyph`: done.** Three decisions the owner made, from the probe:
+
+- A character that is not a cell ("abc", "#x###") was stored and the slot drew nothing. It is
+  refused with a console error that names it.
+- The "|" was dropped and the rest read five at a time, so a short row ran into the next: "#|#|#"
+  lit three cells of the top row. Each row between "|" is read on its own and padded to five
+  (`parseGlyph`). A flat string without "|" is read five at a time, as before; the inspector writes
+  full rows, so no saved panel draws differently.
+- More than eight rows, or a row longer than five, was cut off without a word. It is refused with a
+  console error ("It has 9 rows, and a glyph has 8.", "Row 1 has 6 cells, and a row has 5.").
+
+The three refusals are `glyphBitsRefusal` in `utils/lcdUserGlyphs.js`, which the verb names as its
+`refuseValue`; an ITEM verb with one refuses, in the reducer, the legality check and the reason
+alike, what it names.
+
+| Field | Text |
+| --- | --- |
+| `bits` (text, required) | Eight rows of five: "#" lit, "." unlit, rows separated by "\|". / Shown in a line by \x00 to \x07 for slots 1 to 8. / "1" and "0": the same as "#" and ".". / Fewer than eight rows, or fewer than five cells in a row: the rest unlit. / Empty, or nothing lit: the slot is cleared. / Other characters: rejected with a console error. / More than eight rows, or a row longer than five: rejected with a console error. |
+
+Description, example and `index` unchanged.
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music

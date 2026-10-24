@@ -309,7 +309,11 @@ test('every verb either changes something or explains why it cannot', () => {
         const current = itemCurrent(verb, cfgFor(verb.section), 0);
         if (verb.kind === 'bool') return [1, !(current === true)];
         if (verb.kind === 'enum') return [1, verb.values.find((x) => x !== current)];
-        if (verb.kind === 'str') return [1, current === 'spec-probe' ? 'spec-probe-2' : 'spec-probe'];
+        if (verb.kind === 'str') {
+          // A verb that refuses what it cannot use (glyph takes only cells) is fed something it can.
+          const [one, two] = verb.refuseValue ? ['#', '.#'] : ['spec-probe', 'spec-probe-2'];
+          return [1, current === one ? two : one];
+        }
         // A number inside the ITEM's own range rather than a fixed 0.375, which lands on the
         // default of any integer item whose range does not happen to start near it.
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
@@ -799,4 +803,25 @@ test('text left out is refused, where it was written as ""', () => {
   const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
   assert.equal(componentRequestLegal(glyph, display, [1, undefined]), false);
   assert.equal(componentRefusalReason(glyph, display, [1, undefined]), 'No text was given.');
+});
+
+test('glyph refuses what it cannot draw as written, and stores what it can', () => {
+  // "abc" was stored and the slot drew nothing; a ninth row or a sixth cell was cut off. Both are
+  // rejected with the reason. A short glyph is still drawn as far as it goes, and "" clears.
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '#####' })) };
+  for (const [bits, why] of [
+    ['abc', '"a", "b", "c" are not cells of a glyph: "#" or "1" is lit, "." or "0" unlit, and "|" ends a row.'],
+    ['#|#|#|#|#|#|#|#|#', 'It has 9 rows, and a glyph has 8.'],
+    ['######|#', 'Row 1 has 6 cells, and a row has 5.'],
+  ]) {
+    assert.deepEqual(componentScriptPatch(glyph, display, [1, bits]), {}, bits);
+    assert.equal(componentRequestLegal(glyph, display, [1, bits]), false, bits);
+    assert.equal(componentRefusalReason(glyph, display, [1, bits]), why);
+  }
+  for (const bits of ['#|#|#', '']) {
+    assert.equal(componentScriptPatch(glyph, display, [1, bits]).glyphs[0].bits, bits);
+    assert.equal(componentRequestLegal(glyph, display, [1, bits]), true);
+    assert.equal(componentRefusalReason(glyph, display, [1, bits]), null);
+  }
 });

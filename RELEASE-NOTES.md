@@ -178,6 +178,11 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.lcd.animPreset` and `ce.components.pixel.animPreset` take one of the six presets,
   "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Any other word is refused with a
   console error that lists them; it was stored, and the display drew no animation.
+- `ce.components.lcd.glyph` reads each row between "|" on its own, padding a short one with
+  unlit cells: `"#|#|#"` is a dot in each of three rows. The rows ran into each other, and it lit
+  three dots of the top row. A character that is not a cell (`"abc"`), more than eight rows or a
+  row longer than five is refused with a console error saying which; it was stored, and the slot
+  drew nothing or cut the glyph off.
 
 ## What you get
 

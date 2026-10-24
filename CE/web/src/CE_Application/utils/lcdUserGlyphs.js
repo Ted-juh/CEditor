@@ -38,8 +38,12 @@ export function glyphSlotChar(slot) {
  * The authoring form is a datasheet's: eight rows of `#` and `.`, separated by `|`. Two other
  * spellings are accepted because they cost nothing and both turn up in practice — `1`/`0` (how
  * PixelDisplay's freehand `bitmap` element stores its pixels) and no separators at all (a flat
- * forty-character string). Anything shorter than a full grid is padded with blanks rather than
- * rejected: a half-drawn glyph should render as far as it was drawn, not vanish.
+ * forty-character string, read five at a time). Anything shorter than a full grid is padded with
+ * blanks rather than rejected: a half-drawn glyph should render as far as it was drawn, not vanish.
+ *
+ * With `|`, each row is read on its own and padded to five: "#|#|#" is three rows with one dot
+ * each. The separators were dropped and the rest read five at a time, so a short row ran into the
+ * next and "#|#|#" lit three cells of the top row (the owner's decision on the LCD's glyph).
  */
 export function parseGlyph(bits) {
   const raw = String(bits ?? '');
@@ -52,13 +56,39 @@ export function parseGlyph(bits) {
   // hardware draws nothing, and treating it as a glyph would blank the character it claims.
   if (!/[#1]/.test(flat)) return null;
 
+  const split = raw.includes('|') ? raw.split('|').map((row) => row.replace(/\s/g, '')) : null;
+  const cellAt = (y, x) => (split ? split[y]?.[x] : flat[y * GLYPH_W + x]);
   const rows = [];
   for (let y = 0; y < GLYPH_H; y += 1) {
     const row = [];
-    for (let x = 0; x < GLYPH_W; x += 1) row.push(lit(flat[y * GLYPH_W + x] ?? '.'));
+    for (let x = 0; x < GLYPH_W; x += 1) row.push(lit(cellAt(y, x) ?? '.'));
     rows.push(row);
   }
   return rows;
+}
+
+/**
+ * Why a script's glyph cannot be drawn as written, or null. Empty clears the slot and is fine; a
+ * short glyph is padded (parseGlyph). What is refused is what drawing would silently change: a
+ * character that is not a cell ("abc" was stored and the slot drew nothing), and more rows or cells
+ * than the 5x8 grid has (cut off without a word).
+ */
+export function glyphBitsRefusal(bits) {
+  const raw = String(bits ?? '');
+  const odd = [...new Set(raw.replace(/[#.01|\s]/g, ''))];
+  if (odd.length) {
+    return `${odd.map((ch) => `"${ch}"`).join(', ')} ${odd.length === 1 ? 'is not a cell' : 'are not cells'} of a glyph: "#" or "1" is lit, "." or "0" unlit, and "|" ends a row.`;
+  }
+  const rows = raw.includes('|') ? raw.split('|').map((row) => row.replace(/\s/g, '')) : null;
+  if (rows) {
+    if (rows.length > GLYPH_H) return `It has ${rows.length} rows, and a glyph has ${GLYPH_H}.`;
+    const wide = rows.findIndex((row) => row.length > GLYPH_W);
+    if (wide >= 0) return `Row ${wide + 1} has ${rows[wide].length} cells, and a row has ${GLYPH_W}.`;
+    return null;
+  }
+  const cells = raw.replace(/\s/g, '').length;
+  return cells > GLYPH_W * GLYPH_H
+    ? `It has ${cells} cells, and a glyph has ${GLYPH_W * GLYPH_H}: eight rows of five.` : null;
 }
 
 /**

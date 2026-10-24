@@ -45,6 +45,7 @@ import {
 import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } from '../utils/pixelElements.js';
 import { shownValue } from './shownValue.js';
 import { listWord } from '../utils/wordLists.js';
+import { glyphBitsRefusal } from '../utils/lcdUserGlyphs.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 // What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
@@ -653,11 +654,14 @@ export const COMPONENT_FAMILIES = [
       // a script. CGRAM is eight slots on the hardware and eight here, always — an insert would
       // mint a ninth that nothing can address, since the addressing is \\x00..\\x07. Without it the
       // family picks up insert/remove for free, which scriptComponents.test.js catches.
-      v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true,
+      v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true, refuseValue: glyphBitsRefusal,
         doc: 'Define one of the eight user glyphs.',
         ex: ['1, ".#.#.|#####|#####|.###.|..#..|.....|.....|....."', 'puts a heart in slot 1, shown in a line by \\x00'],
         argDocs: { index: 'Glyph slot.\nRange: 1 ↔ 8.\nOutside the range: rejected with a console error.',
-          bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a line by \\x00 to \\x07 for slots 1 to 8.' } }),
+          bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a line by \\x00 to \\x07 for slots 1 to 8.\n'
+            + '"1" and "0": the same as "#" and ".".\nFewer than eight rows, or fewer than five cells in a row: the rest unlit.\n'
+            + 'Empty, or nothing lit: the slot is cleared.\nOther characters: rejected with a console error.\n'
+            + 'More than eight rows, or a row longer than five: rejected with a console error.' } }),
       // The on-screen editable field — the buffer a zone with show:'edit' bound to '@edit' shows,
       // and the one genuinely EDITABLE value a display owns. It was reachable by typing at the
       // screen and by a device binding on the `text` port, and by nothing else: no script could
@@ -1033,7 +1037,8 @@ export function componentScriptPatch(verb, cfg, args = []) {
       const row = list[at] && typeof list[at] === 'object' ? list[at] : {};
       const current = itemCurrent(verb, c, at);
       const next = coerce(verb.kind, b, verb, current);
-      if (next === null || next === current) return {};
+      // A value the component cannot use as written (a glyph it cannot draw) is refused, not stored.
+      if (next === null || next === current || verb.refuseValue?.(next)) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x)) };
     }
 
@@ -1151,7 +1156,8 @@ export function componentRequestLegal(verb, cfg, args = []) {
       if (length === null) return false;
       const at = indexOf(a, length);
       if (at === null) return false;
-      return coerce(verb.kind, b, verb, itemCurrent(verb, c, at)) !== null;
+      const next = coerce(verb.kind, b, verb, itemCurrent(verb, c, at));
+      return next !== null && !verb.refuseValue?.(next);
     }
     case ELEM: {
       // A name this display has nothing under is a REFUSAL, not a no-op, and that is the whole
@@ -1260,7 +1266,8 @@ export function componentRefusalReason(verb, cfg, args = []) {
     case ITEM: {
       const range = componentIndexRange(verb, c);
       if (!range) return `It has no ${noun}s.`;
-      return indexRefusal(a, range.count, noun) ?? valueOf(verb.kind, b);
+      return indexRefusal(a, range.count, noun) ?? valueOf(verb.kind, b)
+        ?? (b === undefined || b === null ? null : verb.refuseValue?.(coerce(verb.kind, b, verb)) ?? null);
     }
     case CELL: {
       if (verb.clear) return null;
