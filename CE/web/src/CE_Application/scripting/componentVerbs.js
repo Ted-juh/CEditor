@@ -602,7 +602,9 @@ export const COMPONENT_FAMILIES = [
       v('animPreset', 'animPreset', STR, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
         argDocs: { animPreset: 'The preset\'s name: "wave", "scanner", "rain", "starfield", "spinner" or "plasma".' } }),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16, doc: 'Set the speed of the preset animation, as a multiple of its normal speed.', ex: ['2', 'plays the preset animation at twice its normal speed'],
-        argDocs: { animSpeed: 'Speed factor.\nRange: 0 ↔ 16.\n1: normal; 0: still.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+        // The graphic canvas reads it as Math.max(0.05, Number(animSpeed) || 1): 0 is normal speed,
+        // not a pause, and anything below 0.05 is 0.05.
+        argDocs: { animSpeed: 'Speed factor.\nRange: 0 ↔ 16.\n1: normal; 0 is read as 1.\nBelow 0.05: 0.05.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'] }),
       v('animLoop', 'animLoop', BOOL, { toggle: true, doc: 'Switch looping of the animation on or off.',
         argDocs: { animLoop: 'Left out: toggles.\nfalse: the last frame holds.\n0 or "": false; any other value: true.' } }),
@@ -1507,8 +1509,12 @@ export function verbExample(verb) {
     case FILL: { const [name, noun] = firstList(verb); return `\`${call}(${target}, "${name}", values)\` writes the ${noun}s from the first, one value per element.`; }
     case INSERT: { const [name, noun] = firstList(verb, true); return `\`${call}(${target}, "${name}")\` adds ${article(noun)} ${noun} at the end.`; }
     case REMOVE: { const [name, noun] = firstList(verb, true); return `\`${call}(${target}, "${name}")\` removes the last ${noun}.`; }
-    case ITEM: return `\`${call}(${target}, 1, ${sampleValue(verb, verb.kind)})\` sets the ${verb.item} of ${itemNoun(verb)} 1.`;
-    case ELEM: return `\`${call}(${target}, "title", ${sampleValue(verb, verb.kind)})\` sets the ${verb.item} of the element called title.`;
+    case ITEM: return verb.kind === BOOL
+      ? `\`${call}(${target}, 1)\` switches ${verb.item} of ${itemNoun(verb)} 1 on or off.`
+      : `\`${call}(${target}, 1, ${sampleValue(verb, verb.kind)})\` sets the ${verb.item} of ${itemNoun(verb)} 1.`;
+    case ELEM: return verb.kind === BOOL
+      ? `\`${call}(${target}, "title")\` switches ${verb.item} of the element called title on or off.`
+      : `\`${call}(${target}, "title", ${sampleValue(verb, verb.kind)})\` sets the ${verb.item} of the element called title.`;
     case CELL: return verb.clear ? `\`${call}(${target})\` sets every cell to 0.`
       : verb.grid ? `\`${call}(${target}, 1, 2, 0.5)\` sets the cell at row 1, column 2 to 0.5.` : `\`${call}(${target}, 1, 0.5)\` sets ${itemNoun(verb)} 1 to 0.5.`;
     case LINE: return verb.clear ? `\`${call}(${target})\` blanks every line.` : `\`${call}(${target}, 1, "text")\` writes text on the first line.`;

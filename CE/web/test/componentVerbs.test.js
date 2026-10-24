@@ -662,6 +662,8 @@ test('every component verb has an example, notes and a text for each parameter, 
       assert.match(member.summary, /^[A-Z`][^.]*\.$/, `${verb.id}: "${member.summary}" is not one sentence`);
     }
     assert.match(member.example, /^`ce\.components\.[a-z]+\.[A-Za-z]+\("[^"]+"[^`]*\)` .+\.$/, `${verb.id}: "${member.example}" is not an example`);
+    // …and one a script could run: an argument left out leaves no comma behind it.
+    assert.doesNotMatch(member.example, /,\s*\)/, `${verb.id}: "${member.example}" has an argument missing`);
     assert.ok(Array.isArray(member.notes) && member.notes.length, `${verb.id} has no notes`);
     assert.ok(member.notes.some((n) => /Returns/.test(n)), `${verb.id}: no note says what it returns`);
     for (const param of member.params) {
