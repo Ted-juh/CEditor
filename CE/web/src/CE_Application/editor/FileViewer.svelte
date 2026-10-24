@@ -173,6 +173,10 @@
     </div>
   </div>
 
+  <!-- The scroller takes a tab stop so the file can be scrolled from the keyboard (a scrollable
+       region nobody can focus cannot be read without a mouse). Its mouseup only notes which line
+       was clicked; nothing is activated by it. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div class="fv-scroll" bind:this={scroller} onscroll={onScroll} tabindex="0" role="document"
     aria-label="The whole file, to read"
     onmouseup={(e) => {

@@ -106,7 +106,10 @@
     {/if}
   </div>
 
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <!-- A 2-D surface walked with the arrow keys and lassoed with the pointer is role="application";
+       Svelte does not count that role as interactive, so it warns about the tab stop and the
+       handlers that are the whole point of it. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div class="map" role="application" tabindex="0" data-testid="map-surface"
        aria-label="Sound map. Arrow keys walk to the nearest sound in that direction."
        onpointerdown={lassoDown} onpointermove={lassoMove} onpointerup={lassoUp}

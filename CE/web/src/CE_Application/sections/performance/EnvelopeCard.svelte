@@ -95,11 +95,13 @@
     <rect class="bend" x={g.bend.x - 4} y={g.bend.y - 4} width="8" height="8" transform={`rotate(45 ${g.bend.x} ${g.bend.y})`}
           role="slider" tabindex="0" aria-label="Bend: drag up or down" aria-valuenow={shown.curve} data-testid="envelope-bend"
           onpointerdown={(e) => drag(e, 'bend')} onkeydown={(e) => key(e, 'bend')}><title>Bend {shown.curve > 0 ? '+' : ''}{shown.curve.toFixed(2)}: drag up or down</title></rect>
-    {#each [['attack', g.attack, 'Attack', formatEnvelopeTime(shown.attackMs)],
-            ['decay', g.decay, 'Decay and sustain', `${formatEnvelopeTime(shown.decayMs)} · ${Math.round(shown.sustain * 100)}%`],
-            ['release', g.release, 'Release', formatEnvelopeTime(shown.releaseMs)]] as [handle, at, name, value] (handle)}
+    <!-- A slider needs a number for assistive tech: the handle's time in milliseconds. The
+         text (with the sustain level on the decay handle) is what is read out. -->
+    {#each [['attack', g.attack, 'Attack', formatEnvelopeTime(shown.attackMs), shown.attackMs],
+            ['decay', g.decay, 'Decay and sustain', `${formatEnvelopeTime(shown.decayMs)} · ${Math.round(shown.sustain * 100)}%`, shown.decayMs],
+            ['release', g.release, 'Release', formatEnvelopeTime(shown.releaseMs), shown.releaseMs]] as [handle, at, name, value, ms] (handle)}
       <circle class="handle" cx={at.x} cy={at.y} r="6" role="slider" tabindex="0" aria-label={`${name}: ${value}`}
-              aria-valuetext={value} data-testid={`envelope-${handle}`}
+              aria-valuenow={Math.round(ms)} aria-valuetext={value} data-testid={`envelope-${handle}`}
               onpointerdown={(e) => drag(e, handle)} onkeydown={(e) => key(e, handle)}><title>{name} {value}: drag</title></circle>
     {/each}
   </svg>

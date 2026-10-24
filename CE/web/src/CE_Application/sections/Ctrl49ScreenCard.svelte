@@ -351,8 +351,13 @@
   </div>
 
   <div class="body">
+    <!-- The screen is worked like the keyboard's: knobs dragged or scrolled, pages changed with
+         the arrow keys. That is role="application", not "img": an image role lets a screen reader
+         keep the arrow keys for itself. Svelte counts <canvas> as interactive and any role on it
+         as a step down, which is not so here. -->
+    <!-- svelte-ignore a11y_no_interactive_element_to_noninteractive_role -->
     <canvas bind:this={canvas} width="480" height="272" data-testid="ctrl49-screen-canvas"
-            tabindex="0" role="img" onkeydown={onKeydown}
+            tabindex="0" role="application" onkeydown={onKeydown}
             aria-label={`CTRL49 display, ${KIND[$ctrl49Screen.pageKind]} page ${$ctrl49Screen.pageIndex + 1} of ${$ctrl49Screen.pageCount}. Drag or scroll on a knob to turn it; arrow keys change page.`}
             onpointerdown={knobDown} onpointermove={knobMove} onpointerup={knobUp} onpointercancel={knobUp}
             onpointerleave={() => { if (!drag) hoverSlot = -1; }}

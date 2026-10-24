@@ -348,10 +348,10 @@
           <span>Type</span>
         </div>
         <div class="preset-list" data-testid="preset-list" bind:this={listElement} bind:clientHeight={listHeight}
-             onscroll={(event) => (scrollTop = event.currentTarget.scrollTop)} role="group" aria-label="Preset list">
+             onscroll={(event) => (scrollTop = event.currentTarget.scrollTop)} role="list" aria-label="Preset list">
           <div style={`height:${windowRows.before}px`} aria-hidden="true"></div>
           {#each records.slice(windowRows.start, windowRows.end) as record, offset (record.recordId)}
-            <div class="preset-row" class:sel={record.recordId === selected?.recordId} class:picked={selection.has(record.recordId)}
+            <div class="preset-row" role="listitem" class:sel={record.recordId === selected?.recordId} class:picked={selection.has(record.recordId)}
                  class:unavailable={!record.available}
                  data-testid="preset-row" data-row-index={windowRows.start + offset}
                  draggable="true" ondragstart={(e) => dragRecords(e, record)}>
@@ -383,10 +383,11 @@
         </div>
       {:else}
         <div class="grid" data-testid="browser-grid" bind:this={gridElement} bind:clientWidth={gridWidth} bind:clientHeight={gridHeight}
-             onscroll={(event) => (gridScroll = event.currentTarget.scrollTop)} style={`--columns:${gridColumns}`}>
+             onscroll={(event) => (gridScroll = event.currentTarget.scrollTop)} style={`--columns:${gridColumns}`}
+             role="list" aria-label="Preset tiles">
           <div class="grid-space" style={`height:${gridRows.before}px`} aria-hidden="true"></div>
           {#each records.slice(gridRows.start * gridColumns, gridRows.end * gridColumns) as record (record.recordId)}
-            <div class="tile" class:sel={record.recordId === selected?.recordId} class:picked={selection.has(record.recordId)}
+            <div class="tile" role="listitem" class:sel={record.recordId === selected?.recordId} class:picked={selection.has(record.recordId)}
                  class:unavailable={!record.available} draggable="true" ondragstart={(e) => dragRecords(e, record)}>
               <!-- Every tile keeps the thumbprint's space whether or not there is one yet, so the
                    grid does not reflow as the auditioner works through it. -->

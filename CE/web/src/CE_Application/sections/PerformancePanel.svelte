@@ -2217,9 +2217,6 @@
 </div>
 
 <style>
-  .setlist-entry { border:1px solid var(--host-line); border-radius:5px; }
-  .soundcheck-label { font-size:11px; color:var(--host-text-soft); margin-left:8px; }
-  .setlist-item { flex-wrap:wrap; }
   .perf-panel {
     display: flex;
     flex-direction: column;
@@ -2450,7 +2447,6 @@
 
   .lfo-body { display: flex; flex-direction: column; gap: 10px; }
   .lfo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 10px; }
-  .route-lfo { margin-left: auto; }
 
   .envelope-body { display: flex; flex-direction: column; gap: 10px; }
   .envelope-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 10px; }
@@ -2795,33 +2791,6 @@
   .snapshot-morph-status strong { color: #efad70; }
   .snapshot-morph-track { height: 4px; overflow: hidden; background: #14171a; }
   .snapshot-morph-track > span { display: block; height: 100%; background: #d7863b; }
-  .scene-clips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px 30px; }
-  .chip {
-    padding: 1px 6px;
-    font-size: 11px;
-    background: none;
-    border: 1px solid #3b4652;
-    color: #7d8894;
-  }
-  .chip.on { color: #d6dbe0; border-color: #5b9bd5; background: #24313d; }
-
-  .setlist-body { flex-direction: column; align-items:stretch; gap:8px; }
-  .setlist-item { display: flex; align-items: center; gap: 10px; min-height: 34px; font-size: 12px; }
-  .setlist-item.current { background: #24313d; border-radius: 4px; }
-  .setlist-item.loading { box-shadow: inset 3px 0 #d7863b; }
-  .setlist-go { flex: 0 0 26px; }
-  .setlist-order { display: inline-flex; flex-direction: column; gap: 2px; }
-  .setlist-order button { width: 22px; height: 15px; padding: 0; line-height: 12px; }
-  .setlist-order button:disabled { opacity: 0.28; cursor: default; }
-  .setlist-name { width: 160px; }
-  .setlist-loading { color: #98a4ae; font-size: 12px; }
-  .song-field .setlist-name { font-weight: 600; }
-  .setlist-scene { width: 160px; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .setlist-item.missing .setlist-scene { color: #d6a3a3; }
-  .setlist-notes { flex: 1 1 220px; min-width: 160px; min-height: 36px; resize: vertical; font: inherit; font-size: 12px; }
-  .preload-state { flex: 0 0 auto; font-size: 10px; color: #9aa6b0; text-transform: uppercase; }
-  .preload-state.ready { color: #82bd8d; }
-  .preload-state.degraded { color: #df9a76; }
 
 
 </style>
