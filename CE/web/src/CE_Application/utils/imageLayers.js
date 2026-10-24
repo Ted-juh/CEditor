@@ -34,6 +34,8 @@
 // Every value below was read out of the code that consumes it: fitToCSS's own switch and posMap in
 // backgroundCSS.js, and buildTextFillLayerStyle's sizeMap in canvasControlStyles.js.
 
+import { listWord } from './wordLists.js';
+
 /** Background: fitToCSS's switch. `fill` means cover here. */
 export const BACKGROUND_FITS = ['fill', 'fit', 'stretch', 'tile', 'original'];
 /** Background: fitToCSS's posMap keys. HYPHENATED, not camelCase. */
@@ -236,32 +238,32 @@ export function planImage(layer, src, opts, { tintColour = null } = {}) {
   if (source.fit !== undefined) {
     if (!layer.fits) {
       refused.push({ option: 'fit', reason: `the ${layer.label} has no fit — it always tiles` });
-    } else if (!layer.fits.includes(String(source.fit))) {
+    } else if (!listWord(layer.fits, source.fit)) {
       // The vocabularies differ per layer, so the message has to name the layer's own.
       refused.push({ option: 'fit',
         reason: `"${source.fit}" is not one of ${layer.fits.join(', ')} for the ${layer.label}` });
-    } else put('Fit', String(source.fit));
+    } else put('Fit', listWord(layer.fits, source.fit));
   }
 
   if (source.align !== undefined) {
     if (!layer.aligns) {
       refused.push({ option: 'align',
         reason: `the ${layer.label} does not read align — use offsetX / offsetY` });
-    } else if (!layer.aligns.includes(String(source.align))) {
+    } else if (!listWord(layer.aligns, source.align)) {
       refused.push({ option: 'align', reason: `"${source.align}" is not one of ${layer.aligns.join(', ')}` });
-    } else put('Align', String(source.align));
+    } else put('Align', listWord(layer.aligns, source.align));
   }
 
   if (source.blend !== undefined) {
-    if (!IMAGE_BLENDS.includes(String(source.blend))) {
+    if (!listWord(IMAGE_BLENDS, source.blend)) {
       refused.push({ option: 'blend', reason: `"${source.blend}" is not one of ${IMAGE_BLENDS.join(', ')}` });
-    } else put('Blend', String(source.blend));
+    } else put('Blend', listWord(IMAGE_BLENDS, source.blend));
   }
 
   if (source.clipMode !== undefined) {
-    if (!IMAGE_CLIP_MODES.includes(String(source.clipMode))) {
+    if (!listWord(IMAGE_CLIP_MODES, source.clipMode)) {
       refused.push({ option: 'clipMode', reason: `"${source.clipMode}" is not one of ${IMAGE_CLIP_MODES.join(', ')}` });
-    } else put('ClipMode', String(source.clipMode));
+    } else put('ClipMode', listWord(IMAGE_CLIP_MODES, source.clipMode));
   }
 
   // A tint the panel cannot read ("#000", "red") used to be stored and painted white. The runtime

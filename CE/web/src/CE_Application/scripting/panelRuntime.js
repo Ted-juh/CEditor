@@ -5798,7 +5798,10 @@ function imageIconImpl(target, idOrName, opts) {
       }
       tint = read.colour;
     }
-    const value = key === 'tint' ? tint.replace(/^#/, '') : opts[key];
+    // A fit is one of the Icon section's two words, in any case (utils/wordLists.js): the renderer
+    // reads "cover" and takes anything else as "contain", so "Cover" was drawn contained.
+    const value = key === 'tint' ? tint.replace(/^#/, '')
+      : key === 'fit' ? (listWord(['contain', 'cover'], opts.fit) ?? opts.fit) : opts[key];
     setValue(`${name}.Icon.${field}`, value);
     // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
     // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading, and

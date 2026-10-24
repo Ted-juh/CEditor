@@ -137,6 +137,17 @@ test('a background layer is enabled AND put into layerOrder', () => {
   });
 });
 
+test('the layer, fit, align, blend and clip mode are read in any case, and stored as the lists spell them', () => {
+  withControls((api) => {
+    assert.equal(api.imageSet('L', PNG, { layer: 'OVERLAY', fit: 'Tile', align: 'TOP-LEFT', blend: 'Multiply', clipMode: 'Box' }), true);
+    assert.equal(api.get('L.Background.Fill.overlayFit'), 'tile');
+    assert.equal(api.get('L.Background.Fill.overlayAlign'), 'top-left');
+    assert.equal(api.get('L.Background.Fill.overlayBlend'), 'multiply');
+    assert.equal(api.get('L.Background.Fill.overlayClipMode'), 'box');
+    assert.equal(api.imageSet('L', PNG, { fit: 'Tiled' }), false, 'a word not in the list is still refused');
+  });
+});
+
 test('a text layer sets the mode, because the renderer reads mode and not Enabled', () => {
   withControls((api) => {
     assert.equal(api.imageSet('L', PNG, { layer: 'textImage' }), true);
@@ -402,6 +413,9 @@ test('icon writes the id AND the name, so the fallback is not left deciding', ()
     assert.equal(api.get('B.Icon.source'), 'library');
     assert.equal(api.get('B.Icon.size'), 20);
     assert.equal(api.get('B.Icon.tint'), '5B9BD5', 'a leading # is stripped');
+    // The renderer reads "cover" and draws anything else contained, so "Cover" is stored "cover".
+    assert.equal(api.imageIcon('B', 'waveform', { fit: 'Cover' }), true);
+    assert.equal(api.get('B.Icon.fit'), 'cover');
   }));
 });
 
