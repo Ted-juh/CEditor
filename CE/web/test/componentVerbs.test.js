@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
+  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, componentClampWarning, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -159,6 +159,35 @@ test('an xy verb moves one axis or both, and leaves the other alone', () => {
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [0.2, 0.8]), { x: 0.2, y: 0.8 });
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [0.2]), { x: 0.2 });
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [undefined, 0.8]), { y: 0.8 });
+});
+
+test('an xy verb given an axis that is not a number refuses the call, and moves neither', () => {
+  // timbre.move(t, "x", 0.8) moved y and dropped the "x" without a word, and returned true.
+  const verb = byId('timbreMove');
+  const cfg = cfgFor('Timbre');
+  assert.deepEqual(componentScriptPatch(verb, cfg, ['x', 0.8]), {});
+  assert.equal(componentRequestLegal(verb, cfg, ['x', 0.8]), false);
+  assert.equal(componentRefusalReason(verb, cfg, ['x', 0.8]), '"x" is not a number.');
+  assert.equal(componentRefusalReason(verb, cfg, []), 'No number was given.');
+  assert.equal(componentRequestLegal(verb, cfg, [undefined, 0.8]), true, 'one left out is still a move');
+  assert.deepEqual(verbArgOptional(verb), [true, true]);
+  assert.equal(MEMBER_BY_ID.timbreMove.signature, 'timbreMove(target [, x] [, y]) -> boolean');
+});
+
+test('the LCD cursor is held to the display, counted from 1, and whole', () => {
+  // cursorAt(t, 40, 9) on a 2 x 16 display was stored as it was and drawn nowhere; 2.6 was stored
+  // as 2.6, read back as 2.6 and drawn at 3.
+  const verb = byId('lcdCursorAt');
+  const display = { ...cfgFor('Display'), rows: 2, cols: 16, cursorCol: 0, cursorRow: 0 };
+  assert.deepEqual(componentScriptPatch(verb, display, [40, 9]), { cursorCol: 15, cursorRow: 1 });
+  assert.deepEqual(componentScriptPatch(verb, { ...display, cols: 20, rows: 4 }, [40, 9]), { cursorCol: 19, cursorRow: 3 });
+  assert.deepEqual(componentScriptPatch(verb, display, [2.6, 2]), { cursorCol: 2, cursorRow: 1 });
+  assert.deepEqual(componentScriptPatch(verb, display, [0, 1]), {}, '0 is column 1, where it is');
+  assert.equal(componentClampWarning(verb, 'Screen', [40, 9], display),
+    'lcd Screen: cursorAt(40, 9) — the col 40 is outside 1 to 16, so 16 was used.');
+  assert.equal(componentClampWarning(verb, 'Screen', [40, 'x'], display), null, 'a refused call used nothing');
+  assert.deepEqual(componentScriptPatch(verb, display, [5, 'x']), {});
+  assert.equal(componentRequestLegal(verb, display, [5, 'x']), false);
 });
 
 test('a nested xy verb merges into the object rather than replacing it', () => {
@@ -683,7 +712,10 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-sensitive.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0 or "": false; any other value: true.');
   assert.equal(text('lcdBacklight', 'target'), 'The LCD Display\'s control, by name.\nNot an LCD Display: rejected with a console error.');
-  assert.equal(text('lcdCursorAt', 'col').split('\n')[0], 'Column, counted from 1.');
+  assert.equal(text('lcdCursorAt', 'col'), 'Column, counted from 1.\nRange: 1 ↔ the display\'s columns.\nA fraction: rounded.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.');
+  assert.equal(text('lcdCursorAt', 'row').split('\n')[1], 'Range: 1 ↔ the display\'s rows.');
+  assert.equal(MEMBER_BY_ID.lcdCursorAt.params.find((p) => p.name === 'col').required, false);
+  assert.equal(MEMBER_BY_ID.lcdCursorAt.notes[0], 'The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".');
   assert.equal(MEMBER_BY_ID.lcdBacklight.example, '`ce.components.lcd.backlight("Screen")` switches the backlight on if it is off, and off if it is on.');
   assert.equal(MEMBER_BY_ID.lcdShowGlass.example, '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
   assert.equal(MEMBER_BY_ID.lcdValueSource.example, '`ce.components.lcd.valueSource("Screen", "Cutoff")` makes the control called Cutoff drive the value.');

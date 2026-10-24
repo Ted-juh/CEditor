@@ -595,8 +595,12 @@ export const COMPONENT_FAMILIES = [
         argDocs: { scrollSpeed: 'Characters per second.\nRange: 0 ↔ 60.\n0: no scrolling.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('blink', 'blink', BOOL, { toggle: true, doc: 'Switch blinking of the whole display on or off.' }),
       v('cursor', 'cursor', ENUM, { doc: 'Set the cursor\'s shape, or hide it.', ex: ['"block"', 'shows a block cursor'] }),
+      // `fit`: a cell of the display, so 1 to its columns and rows, not to 256. Column 40 of a
+      // 16-column display was stored without a word and the cursor was drawn nowhere.
       v('cursorAt', '', XY, { fx: 'cursorCol', fy: 'cursorRow', min: 1, max: 256, flat: true, oneBased: true,
-        args: ['col', 'row'], doc: 'Put the cursor on a cell.', ex: ['5, 2', 'puts the cursor on column 5 of row 2'] }),
+        fit: { cursorCol: 'cols', cursorRow: 'rows' },
+        args: ['col', 'row'], doc: 'Put the cursor on a cell.', ex: ['5, 2', 'puts the cursor on column 5 of row 2'],
+        notes: ['The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".'] }),
       v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'] }),
       v('anim', 'animMode', ENUM, { doc: 'Set the animation behind the text of a graphic display: off, a file, or a preset.', ex: ['"preset"', 'plays the chosen preset animation'] }),
       v('animPreset', 'animPreset', STR, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
@@ -859,6 +863,25 @@ function clampInt(value, spec) {
   return n === null ? null : Math.round(n);
 }
 
+/**
+ * The range one axis of an XY verb takes: the spec's own, or, for an axis that addresses a cell of
+ * the control (`fit`: the LCD's cursor), 1 to the size the control has, read as the renderer reads
+ * it. Without the control's settings, the spec's own.
+ */
+function axisRange(verb, field, c) {
+  const sizeField = verb.fit?.[field];
+  if (!sizeField || !c || typeof c !== 'object') return verb;
+  const own = Number(c[sizeField]);
+  const size = Number.isFinite(own) ? own : Number(SECTION_DEFAULTS[verb.section]?.[sizeField]);
+  return Number.isFinite(size) ? { ...verb, max: Math.max(1, Math.round(size)) } : verb;
+}
+
+// An XY call's two numbers: either may be left out, but not both, and one that is given has to be
+// a number. `cursorAt(t, "x", 2)` moved the row and dropped the "x" without a word.
+const xyGiven = (x) => x !== undefined && x !== null;
+const xyNumber = (x) => Number.isFinite(Number(x));
+const xyLegal = (a, b) => (xyGiven(a) || xyGiven(b)) && [a, b].every((x) => !xyGiven(x) || xyNumber(x));
+
 /** Coerce one argument to the kind a verb (or an array item) declares. null means "no-op". */
 function coerce(kind, value, spec, current) {
   switch (kind) {
@@ -947,13 +970,17 @@ export function componentScriptPatch(verb, cfg, args = []) {
 
     case XY: {
       // Two numbers at once. Either may be omitted to move only the other axis — a script sweeping
-      // the x of a puck should not have to know where the y currently is.
+      // the x of a puck should not have to know where the y currently is. One given that is not a
+      // number refuses the whole call (xyLegal), rather than moving the other axis alone.
+      if (!xyLegal(a, b)) return {};
       const patch = {};
       const put = (field, value) => {
         if (value === undefined || value === null) return;
-        const n = clampNum(value, verb);
+        const n = clampNum(value, axisRange(verb, field, c));
         if (n === null) return;
-        const stored = verb.oneBased ? n - 1 : n;
+        // A one-based axis addresses a cell, which is whole: 2.6 was stored, read back as 2.6 and
+        // drawn at 3.
+        const stored = verb.oneBased ? Math.round(n) - 1 : n;
         if (verb.flat) { if (stored !== c[field]) patch[field] = stored; return; }
         patch.__nested = { ...(patch.__nested ?? {}), [field]: stored };
       };
@@ -1089,11 +1116,9 @@ export function componentRequestLegal(verb, cfg, args = []) {
       return a === undefined || a === null ? false : Number.isFinite(Number(a));
     case ENUM:
       return coerce(ENUM, a, verb, c[verb.f]) !== null;
-    case XY: {
-      // At least one axis has to be a usable number — moving neither is not a move.
-      const usable = (x) => x !== undefined && x !== null && Number.isFinite(Number(x));
-      return usable(a) || usable(b);
-    }
+    case XY:
+      // At least one axis, and no axis given that is not a number — moving neither is not a move.
+      return xyLegal(a, b);
     case INDEXSET:
       return Number.isFinite(Number(a)) && Math.round(Number(a)) - 1 >= 0;
     case ITEM: {
@@ -1231,6 +1256,10 @@ export function componentRefusalReason(verb, cfg, args = []) {
       const n = Number(a);
       return Number.isFinite(n) && Math.round(n) >= 1 ? null : `${shownValue(a)} is not a ${noun}: the ${noun}s count from 1.`;
     }
+    case XY: {
+      const bad = [a, b].find((x) => xyGiven(x) && !xyNumber(x));
+      return bad !== undefined ? `${shownValue(bad)} is not a number.` : xyGiven(a) || xyGiven(b) ? null : 'No number was given.';
+    }
     case ELEM: {
       if (elementSites(c, a).length) return null;
       const { names } = componentIndexRange(verb, c);
@@ -1246,23 +1275,26 @@ export function componentRefusalReason(verb, cfg, args = []) {
  * stored as 127 without a word, and the row said "the note is from 0 to 127, and 200 is not", as
  * though the call had been refused.
  */
-export function componentClampWarning(verb, path, args = []) {
+export function componentClampWarning(verb, path, args = [], cfg = null) {
   const names = verbArgs(verb);
   const given = [];
+  // A refused call used nothing, so it has no nearest end to say.
+  if (verb.k === XY && !xyLegal(args[0], args[1])) return null;
   if (verb.k === NUM || verb.k === INT) given.push([names[0], args[0]]);
   else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
   else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
-  else if (verb.k === XY) given.push([names[0], args[0]], [names[1], args[1]]);
-  for (const [name, value] of given) {
+  else if (verb.k === XY) given.push([names[0], args[0], verb.fx], [names[1], args[1], verb.fy]);
+  for (const [name, value, field] of given) {
     if (value === undefined || value === null || typeof value === 'boolean') continue;
     const n = Number(value);
     if (!isFinite_(n)) continue;
-    const lo = isFinite_(verb.min) ? verb.min : -Infinity;
-    const hi = isFinite_(verb.max) ? verb.max : Infinity;
+    const spec = field ? axisRange(verb, field, cfg) : verb;
+    const lo = isFinite_(spec.min) ? spec.min : -Infinity;
+    const hi = isFinite_(spec.max) ? spec.max : Infinity;
     if (n >= lo && n <= hi) continue;
     const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
-    const span = isFinite_(verb.min) && isFinite_(verb.max) ? `outside ${verb.min} to ${verb.max}`
-      : n < lo ? `below ${verb.min}` : `above ${verb.max}`;
+    const span = isFinite_(spec.min) && isFinite_(spec.max) ? `outside ${spec.min} to ${spec.max}`
+      : n < lo ? `below ${spec.min}` : `above ${spec.max}`;
     return `${verb.family} ${path}: ${verb.v}(${shown}) — the ${name} ${shownValue(n)} is ${span}, so ${n < lo ? lo : hi} was used.`;
   }
   return null;
@@ -1398,6 +1430,7 @@ export function verbArgOptional(verb) {
     case INDEXSET: return [false, true];
     case ITEM: case ELEM: return [false, boolValue];
     case BOOL: return [Boolean(verb.toggle)];
+    case XY: return [true, true];                     // either axis alone; both left out is refused
     default: return verbArgs(verb).map(() => false);
   }
 }
@@ -1551,6 +1584,8 @@ const RANGE_LINES = (verb, kind) => {
 };
 const cap = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 const AXIS_WORDS = { col: 'column', row: 'row', x: 'x', y: 'y' };
+/** The size an axis with `fit` is held to, in words. */
+const FIT_WORDS = { cols: 'the display\'s columns', rows: 'the display\'s rows' };
 /** `"off", "left" or "right"`: an enum's words as a list. */
 const oneOfWords = (values) => {
   const quoted = (values ?? []).map((x) => `"${x}"`);
@@ -1574,7 +1609,13 @@ export function verbParamSummary(verb, name, kind) {
     case BOOL: return verb.toggle ? 'Left out: toggles.\n0 or "": false; any other value: true.' : '0 or "": false; any other value: true.';
     case ENUM: return `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`;
     case STR: return `${words}.\nA number: written as text.\nLeft out: rejected with a console error.`;
-    case XY: return [`${cap(AXIS_WORDS[name] ?? name)}${verb.oneBased ? ', counted from 1' : ''}.`, ...RANGE_LINES(verb, NUM).filter((l) => !l.startsWith('Invalid')), 'Left out, or invalid: unchanged.', 'Both left out or invalid: rejected with a console error.'].join('\n');
+    case XY: {
+      const size = verb.fit?.[name === verbArgs(verb)[0] ? verb.fx : verb.fy];
+      const range = size ? [`Range: ${verb.min} ↔ ${FIT_WORDS[size]}.`, ...(verb.oneBased ? ['A fraction: rounded.'] : []), 'Outside the range: the nearest end.']
+        : RANGE_LINES(verb, NUM).filter((l) => !l.startsWith('Invalid'));
+      return [`${cap(AXIS_WORDS[name] ?? name)}${verb.oneBased ? ', counted from 1' : ''}.`, ...range,
+        'Left out: unchanged.', 'Invalid: rejected with a console error.', 'Both left out: rejected with a console error.'].join('\n');
+    }
     case LINE:
       if (name === 'row') return `Row, counted from 1.\nNot a row the display has: rejected with a console error.`;
       return 'The line.\nLonger than the display: cut at its width unless it scrolls, with a console warning the first time.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.';

@@ -145,6 +145,16 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   parameter with its range and what is rejected, in the Insert picker, the hover card and the API
   explorer. The LCD Display's verbs say what each setting is: the scrolling speed in characters
   per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show.
+- `ce.components.lcd.cursorAt` keeps the cursor on the display: a column or row past the
+  display's own size is its last column or row, with a console warning the first time. It took
+  anything up to 256, and column 40 of a 16-column display put the cursor nowhere. A fraction is
+  rounded, so `read` gives back the cell the cursor is drawn on.
+- A verb that takes two numbers (`cursorAt`, `joystick.move`, `timbre.move`, `kinetic.launch`,
+  `kinetic.velocity`, `constellation.probe`) given one that is not a number is refused with a
+  console error and moves nothing. It moved the other one and dropped this one without a word.
+  Either number may still be left out to move only the other.
+- The LCD Display's inspector counts the cursor's row and column from 1, as scripts do. It counted
+  from 0, so its column 0 was a script's column 1.
 
 ## What you get
 

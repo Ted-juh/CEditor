@@ -14,7 +14,7 @@
 export const MODULE_COST = {
   "-": { "javascript": 47168, "lua": 36262, "python": 39072, "webview": 193555 },
   "ce.anim": { "javascript": 8893, "lua": 8526, "python": 8661, "webview": 35532 },
-  "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 36818 },
+  "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 36823 },
   "ce.components.arp": { "javascript": 407, "lua": 407, "python": 407, "webview": 0 },
   "ce.components.chordpad": { "javascript": 417, "lua": 417, "python": 417, "webview": 0 },
   "ce.components.constellation": { "javascript": 294, "lua": 294, "python": 294, "webview": 0 },

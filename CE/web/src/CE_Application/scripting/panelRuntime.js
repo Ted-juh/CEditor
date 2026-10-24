@@ -3487,7 +3487,7 @@ function componentVerbAction(verb, target, args) {
   const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
   // A number past the verb's range is used as the nearest end, and said once per verb.
-  const clamped = componentClampWarning(verb, path, args);
+  const clamped = componentClampWarning(verb, path, args, cfg);
   if (clamped && !componentClampWarned.has(verb.id)) {
     componentClampWarned.add(verb.id);
     addScriptTrace('warn', '', `${clamped} This is said only the first time.`);

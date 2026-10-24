@@ -1034,11 +1034,13 @@
     <PropertyCell label="Cursor Blink" span={1} hint="Blink the cursor.">
       <PropertyToggle value={display.cursorBlink !== false} onchange={() => toggle('cursorBlink', true)} />
     </PropertyCell>
-    <PropertyCell label="Cursor Row" span={1} compact hint="Cursor row (0-based).">
-      <NumberCell label="Row" value={display.cursorRow ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorRow', Math.round(value))} />
+    <!-- Counted from 1, as ce.components.lcd.cursorAt counts them; stored from 0, as the renderer
+         reads them. They said 0-based here, so the inspector's column 0 was a script's column 1. -->
+    <PropertyCell label="Cursor Row" span={1} compact hint="Cursor row, counted from 1.">
+      <NumberCell label="Row" value={(display.cursorRow ?? 0) + 1} defaultValue={1} step={1} min={1} max={display.rows ?? 2} onchange={(value) => set('cursorRow', Math.round(value) - 1)} />
     </PropertyCell>
-    <PropertyCell label="Cursor Col" span={1} compact hint="Cursor column (0-based).">
-      <NumberCell label="Col" value={display.cursorCol ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
+    <PropertyCell label="Cursor Col" span={1} compact hint="Cursor column, counted from 1.">
+      <NumberCell label="Col" value={(display.cursorCol ?? 0) + 1} defaultValue={1} step={1} min={1} max={display.cols ?? 16} onchange={(value) => set('cursorCol', Math.round(value) - 1)} />
     </PropertyCell>
   </PropertySection>
   </div>

@@ -106,7 +106,8 @@ sidebar's `readDrawShape`-style readers do not apply. Then `ce.panel`, `ce.devic
 `ce.core`, `ce.storage`, `ce.image`, `ce.text`, `ce.ui` and the lifecycle hooks. After the
 commands: the module descriptions (41, the picker's group headings) and the event descriptions
 (38), with the same rules. Next by the table: `ce.components.arp` (30 descriptions, 15 that need
-the most work).
+the most work), once the owner's review of `ce.components.lcd` is finished: it was merged without
+the owner seeing each item, and [its queue](#the-owners-review-one-item-at-a-time) says what is left.
 
 ---
 
@@ -758,6 +759,66 @@ control name; probe its reducer edges (they share `componentScriptPatch`, so mos
 widen the one-sentence check in `componentVerbs.test.js` to that family. Next by the table:
 `ce.components.arp` (30 descriptions, 15 that need the most work).
 
+### The owner's review, one item at a time
+
+`ce.components.lcd` was merged (#69) without the owner seeing its items; the owner's "Ok, next
+module?" was taken as the "continue without abruption" of `ce.draw`. On 2026-10-24 the owner asked
+for it to be gone through one item at a time, as a new module is. The queue, from a read of every
+LCD text against the rules above and a probe of each verb's edges in the runtime:
+
+1. `cursorAt`: done, below.
+2. `blinkRate`: the text says "Period in milliseconds" and the example "250 blinks four times a
+   second"; the renderer reads it as half the period (`Math.floor(frameTime / rate) % 2`), so 250
+   blinks twice a second, and it holds the rate at 60 or more where the range says 50.
+3. `animPreset`: any word is stored without a message ("bogus", "RAIN", 5), and the text has no
+   `Invalid:` line.
+4. `valueMin` and `valueMax`: a minimum above the maximum is stored without a message, and neither
+   text says what it means for {pct} and {bar}.
+5. `glyph`: bits that are not eight rows of five ("abc") are stored without a message.
+6. `text`: a fraction of a row (1.5) writes row 2, which the text does not say.
+7. Parameter texts that are only the name: "Brightness.", "Contrast.", "Value.", "Value min.",
+   "Value max.", "Value precision.", "Value prefix.", "Value suffix.", "Edit text.", "Anim fps.".
+8. `showGhost` and `showGlass`: "Show or hide the ghost." says nothing of what the ghost is;
+   `showScanlines`' example says "if it is hidden" of a plural.
+9. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
+   `"node"` one and the Mod Matrix, none of which the LCD has; `fill`'s example passes a variable
+   (`values`), and its note says "One document change"; "already that way" in every verb's note.
+10. `backlightSource`: "Not on this panel, or not a control on this panel".
+11. The manual shows none of these texts: its component chapter lists the verbs' names only.
+
+**Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
+
+- A column or row past the display (`cursorAt("Screen", 40, 9)` on 2 x 16) was stored and the
+  cursor drawn nowhere; the range was 1 to 256 whatever the display. It is the display's last
+  column or row now, with the one-time warning, rather than refused as `text` refuses a row the
+  display does not have: a script stepping the cursor right stops at the last column. The spec
+  says so with `fit: { cursorCol: 'cols', cursorRow: 'rows' }`, which `axisRange` reads in the
+  reducer, in `componentClampWarning` (which the runtime now hands the control's settings) and in
+  the parameter's text ("Range: 1 ↔ the display's columns.").
+- One number given that is not a number (`cursorAt("Screen", "x", 2)`) moved the row, dropped the
+  "x" without a word and returned true. The call is refused with a console error ("\"x\" is not
+  a number.") and moves nothing. This is the XY kind's rule, so `joystick.move`, `timbre.move`,
+  `kinetic.launch`, `kinetic.velocity` and `constellation.probe` follow it too. Either number may
+  still be left out, so both are optional in the data (`verbArgOptional`): the type line said
+  "number, required" beside "Left out: unchanged."
+- A fraction (2.6) was stored as 2.6, read back as 2.6 and drawn at 3. A one-based axis is rounded
+  when written.
+
+The inspector's Cursor Row and Cursor Col counted from 0 ("0-based") where the script counts from
+1; at the owner's word they count from 1 now and stop at the display's size (`DisplayEditor.svelte`).
+
+The owner asked why the text as merged was better than the one proposed. It was better in two
+ways, both kept: every rule about a parameter sat in its own row, where the sidebar hint shows it
+on the parameter's name (the proposal had moved "Both left out" into the notes, which the hint does
+not show), and its range line had no bracket ("16 by default" went). It was wrong in four, after
+the decisions: "required", "1 ↔ 256", "invalid: unchanged", and no word on a fraction. As written:
+
+| Field | Text |
+| --- | --- |
+| `col` (number, optional) | Column, counted from 1. / Range: 1 ↔ the display's columns. / A fraction: rounded. / Outside the range: the nearest end. / Left out: unchanged. / Invalid: rejected with a console error. / Both left out: rejected with a console error. |
+| `row` (number, optional) | The same, with "Row" and "the display's rows". |
+| notes | The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off". Then the two every verb has. |
+
 ### The branch
 
 Everything above is on `main`, merged through three pull requests the owner asked for and merged
@@ -837,7 +898,9 @@ not open a pull request unless asked.
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
 on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
-ce.anim, ce.draw, ce.time and ce.components.lcd are done; continue with ce.components.arp, in
+ce.anim, ce.draw, ce.time and ce.components.lcd are done, but ce.components.lcd is still being
+reviewed by the owner one item at a time: take the next item in its queue ("The owner's review, one
+item at a time") first. Then continue with ce.components.arp, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check
