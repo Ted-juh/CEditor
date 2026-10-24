@@ -17108,6 +17108,18 @@ inline JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                         /* Note: if 'p' is a prototype, it can be
                            freed in the called function */
                         obj1 = JS_DupValue(ctx, JS_MKPTR(JS_TAG_OBJECT, p));
+                        /* CEditor patch 7 (JUCE/VENDORED.md): a read of a global variable asks
+                           an exotic object in the global's prototype chain whether it has the
+                           name before getting it, as the spec's HasBinding does, so that a name
+                           it does not have stays undefined: a ReferenceError for a read, while
+                           typeof (throw_ref_error false) still gets undefined. */
+                        if (throw_ref_error && em->has_property) {
+                            int found = em->has_property(ctx, obj1, prop);
+                            if (found <= 0) {
+                                JS_FreeValue(ctx, obj1);
+                                return found < 0 ? JS_EXCEPTION : JS_ThrowReferenceErrorNotDefined(ctx, prop);
+                            }
+                        }
                         retval = em->get_property(ctx, obj1, prop, this_obj);
                         JS_FreeValue(ctx, obj1);
                         return retval;

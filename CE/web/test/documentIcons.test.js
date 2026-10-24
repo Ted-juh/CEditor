@@ -172,7 +172,7 @@ test('an exported panel carries its icons to the player', async () => {
   const { preparePanelForExport } = await import('../src/CE_Application/stores/panelExportPreparation.js');
   const before = get(appSettings).icons;
   appSettings.update((current) => ({ ...current, icons: library }));
-  const source = JSON.stringify({ panelGuid: 'icons-export', name: 'Icons', controls: [
+  const source = JSON.stringify({ panelGuid: 'icons-export', name: 'Icons', documentForm: 'complete', controls: [
     button({ assetId: 'gicon_play', name: 'play_arrow' }),
     button({ assetId: 'deleted_long_ago', name: 'gone' }),
   ] });

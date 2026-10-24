@@ -23,6 +23,7 @@ import {
 import { addPanel, activePanel } from './panels.js';
 import { cerror, cinfo, cwarn } from './console.js';
 import { deserializePanel, panelOpenReport, serializePanel } from './panelModel.js';
+import { resolveDrawings } from './documentDrawings.js';
 import { openSharedPanel, packagePanelForSharing, panelPackageFile } from './panelSharing.js';
 import { notify } from './scriptUi.js';
 
@@ -49,9 +50,13 @@ const pendingReads = new Map();
  *                 machine, and deserializePanel takes the path from the caller anyway.
  *   deviceSession which MIDI ports were bound, by name. Machine state, not panel content: on the
  *                 recipient's computer it names hardware that is not there.
+ *
+ * And the drawings Save writes once are put back into the controls that use them
+ * (documentDrawings.js): packaging finds the images and fonts a panel needs by walking its
+ * controls, and would miss the ones a shared drawing uses.
  */
 function documentToShare(panel) {
-  const doc = JSON.parse(serializePanel(panel));
+  const { doc } = resolveDrawings(JSON.parse(serializePanel(panel)));
   delete doc.filePath;
   delete doc.deviceSession;
   return doc;

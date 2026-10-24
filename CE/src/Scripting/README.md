@@ -21,8 +21,10 @@ panel API (mirrors `CE/web/src/CE_Application/scripting/panelApi.js`).
 |------|------|
 | `ScriptRuntime.h/.cpp` | Interfaces + routing: lifecycle hooks, event dispatch, origin/transmit tracking, error logging. Pure C++. |
 | `LuaScriptEngine.cpp` | Lua 5.4 via Sol3. Per-script `sol::environment` isolation, native API bindings, pure-Lua helper prelude. |
-| `JsScriptEngine.cpp` | JS via `juce::JavascriptEngine`. One engine per script, native `__api` object + JS prelude. |
-| `BridgeScriptHost.h` | `ScriptHostApi` impl forwarding to app-supplied callbacks; computes transmit-by-default. |
+| `JsScriptEngine.cpp` | JS via `juce::JavascriptEngine`. One engine per panel, each script a function scope with its own per-script context (listeners, timers, `state`, `self`, and any new name it assigns without declaring or puts on `globalThis`, kept behind the global by a proxy that relies on patch 7 in `JUCE/VENDORED.md`); native `__api` object + JS prelude. |
+| `PythonScriptEngine.cpp` | Embedded CPython 3.12+ (behind `CEDITOR_PYTHON`). An interpreter per instance, so two instances share no module, builtin or host; its own `ceditor` bridge module, whose state names the instance; each script its own namespace dict; no threads. |
+| `BridgeScriptHost.h` | `ScriptHostApi` impl forwarding to app-supplied callbacks; computes transmit-by-default. Reads every set()'s colours by the editor's rule (`colourWrites`) before writing. |
+| `ScriptColours.h` | The editor's colour-property rule (`scriptColours.js`) in C++, in its words: what is stored, written out or refused, and which fields are colours. Its tables are `ScriptColours.generated.h`, written by `tools/scripts/gen-colour-fields.mjs`; `CE/web/test/fixtures/colourPropertyCases.json` holds both sides to the same answers. |
 
 ## Build
 ```
@@ -483,11 +485,17 @@ Backstops so a bad script can't freeze the DAW or spam MIDI. All invisible in no
 |-------|-------|-------|---------|
 | Lua instruction budget | `LuaScriptEngine` (`lua_sethook`, `LUA_MASKCOUNT`) | 20M instructions per outermost entry | Lua error → reported to the error sink, handler aborted |
 | JS execution time | `JsScriptEngine` (`JavascriptEngine::maximumExecutionTime`) | 2 s per call | QuickJS interrupt → error reported, handler aborted |
-| Python execution time | `PythonScriptEngine` (watchdog thread → `PyErr_SetInterrupt`) | 2 s per outermost entry | `KeyboardInterrupt` in the handler → error reported, handler aborted; a late interrupt that races past the call is absorbed so the next dispatch runs clean |
+| Python execution time | `PythonScriptEngine` (a watchdog thread per instance raises `ceditor.TimeLimit` in that instance's interpreter) | 2 s per outermost entry | error reported, handler aborted; `TimeLimit` is a `BaseException`, so `except Exception:` does not catch it; one raised as the call returns is cleared so the next dispatch runs clean |
 | Dispatch depth | `ScriptRuntime::dispatchEvent` | 16 nested dispatches | event dropped + reported (emit→dispatch feedback loop) |
 | Action depth | `ScriptRuntime::runAction` | shares the same 16 | `run()` dropped + reported — a run→handler→run loop recurses through C++ frames, so it needs the same backstop as `emit` |
 | MIDI send rate | `BridgeScriptHost` | 1000 sends / rolling second (CC+NRPN+sysex+transmitting `set`) | excess sends dropped, local value writes still apply, one log notice per burst |
 | Emit depth (WebView) | `panelRuntime.js` `deliverEmit` | 16 nested emits | event dropped + reported — the same limit as the C++ side, so a feedback loop behaves the same window-open and window-closed |
 
-Caveat: a Python handler that swallows `KeyboardInterrupt` (`except: pass` in the loop) can still
-run away — the watchdog fires once per entry. The MIDI rate guard still bounds what it can send.
+Caveat: a Python handler that swallows `TimeLimit` (a bare `except: pass` in the loop) can still
+run away — the watchdog raises it again every quarter second while the entry runs, but a loop that
+catches every one never ends. Nor can it stop one C call that holds the GIL (a regex that
+backtracks for ever). The MIDI rate guard still bounds what it can send.
+
+Until October 2026 this guard was `PyErr_SetInterrupt`, which is ignored when Python has no SIGINT
+handler of its own — and the isolated config the engine starts Python with installs none — so it
+never stopped a loop. CI does not build the Python engine, which is how its test hanging went unseen.

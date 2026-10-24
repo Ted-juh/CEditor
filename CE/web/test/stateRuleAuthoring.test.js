@@ -56,3 +56,14 @@ test('the starter templates that depend on a rule still carry one', () => {
   assert.match(s, /rule: 'active >= 1'/, 'the Status LED starter');
   assert.match(s, /rule: `tab == '\$\{value\}'`/, 'the Tabbed Pages container starter');
 });
+
+test('the rule builder offers the control\'s value, which every control has', async () => {
+  // A rule reads the control's own value by the names `when` reads it by (interactionRuntime's
+  // stateRuleValues), so a plain knob's builder has something to offer before any channel exists.
+  const s = src('CE_Application/sections/StatesEditor.svelte');
+  assert.match(s, /import \{ STATE_RULE_VALUE_NAMES \} from '\.\.\/utils\/interactionRuntime\.js'/);
+  assert.match(s, /channels=\{ruleNames\}/, 'the builder is given the channels and the value names');
+  assert.match(s, /let ruleNames = \$derived\(\[\.\.\.channelNames, \.\.\.STATE_RULE_VALUE_NAMES/, 'channels first, as before');
+  const { STATE_RULE_VALUE_NAMES } = await import('../src/CE_Application/utils/interactionRuntime.js');
+  assert.deepEqual(STATE_RULE_VALUE_NAMES, ['value', 'valueNormalized', 'valueEnum']);
+});

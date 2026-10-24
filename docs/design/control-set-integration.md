@@ -78,6 +78,11 @@ built as editable parts and verified in the editor before being advertised.
 
 Regenerate definitions with `node scripts/export-control-sets.mjs` from `CE/web`. Regenerate
 starters with `node --import ./test/support/register-svelte.mjs scripts/export-control-set-starters.mjs`.
+Both take `--check`, and the node suite holds the committed files to them byte for byte
+(`controlSetPilot.test.js`, `controlSetStarter.test.js`): a change to a set or to the starter that
+leaves its files behind fails `npm test`. A starter file is exactly what the gallery opens for that
+set, with a fixed panel identity and control numbering so that it changes only when what it shows
+does.
 Run `npm run test:all`, `npm run test:browser`, and `node browser-checks/controlSetStarters.mjs`
 (with `CHROMIUM_PATH` set). Build Windows with `tools/scripts/build-native.ps1 -Configuration Release`.
 Use CMake's `CEditor` install component to update the installed executable and web bundle together.

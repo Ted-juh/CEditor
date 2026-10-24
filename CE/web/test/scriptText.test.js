@@ -21,6 +21,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { appSettings, availableFonts } from '../src/CE_Application/stores/appSettings.js';
 import { get as storeGet } from 'svelte/store';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { buildBlockTextLayout } from '../src/CE_Application/editor/canvasControlTextLayout.js';
 import { lineCanvasFont } from '../src/CE_Application/editor/canvasControlStyles.js';
 import {
@@ -106,6 +107,19 @@ test('weightDisagrees catches the desync a bare set() leaves behind, in both dir
   assert.equal(weightDisagrees({ weightValue: 700, weight: 'Regular' }), true);
   assert.equal(weightDisagrees({ weightValue: 400, weight: 'Bold' }), true);
   assert.equal(weightDisagrees({ weightValue: 700, weight: 'Bold' }), false);
+});
+
+test('style() with an option it does not take refuses the whole call', () => {
+  // It used to refuse the unknown option alone and apply the rest, where every other member now
+  // refuses the call; the words are the shared ones.
+  withText((api) => {
+    clearScriptTrace();
+    assert.equal(api.textStyle('L', { bold: true, bolld: true, colour: 'red' }), false);
+    const errors = storeGet(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /^ce\.text\.style: "bolld" and "colour" are not among its options, so nothing was done\. Its options are: /);
+    assert.notEqual(api.textRead('L').font.weight, 'Bold', 'bold was not applied either');
+  });
 });
 
 test('style() writes both halves of the weight pair', () => {

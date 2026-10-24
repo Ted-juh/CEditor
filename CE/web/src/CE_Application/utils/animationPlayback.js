@@ -19,7 +19,7 @@
  * it. A condition the session cannot hold at all is reported (`exact: false`) and played as near as
  * it can be, because a near miss shown honestly beats a Play button that does nothing.
  */
-import { readTrigger } from './interactionRuntime.js';
+import { readTrigger, STATE_RULE_VALUE_NAMES } from './interactionRuntime.js';
 import { getCustomValueChannels, customChannelDefaultValue, customConditionMatches } from './customComponentInteraction.js';
 import { controlStateNames, ANY_STATE, DEFAULT_STATE } from './animationModel.js';
 import { isSliderBehavior, getSliderMin, getSliderMax } from './sliderBehavior.js';
@@ -80,11 +80,45 @@ const escapeName = (name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * Only the channels the rule names are tried, and at most 256 combinations.
  */
 export function ruleValues(control, rule, flags = {}) {
+  const found = ruleSearch(control, rule, flags);
+  return found && Object.keys(found.customValues).length ? found.customValues : null;
+}
+
+/** The values worth trying for the control's own value in a rule: its ends and its middle, and each
+ *  number the rule compares `value` or `valueNormalized` with, and a hundredth of the range either
+ *  side of it, so `value > 64` is met at 64 and a little. Raw values, inside the range. */
+function valueCandidates(range, rule) {
+  const low = Math.min(range.min, range.max);
+  const high = Math.max(range.min, range.max);
+  const span = high - low;
+  const raws = [high, low, low + span / 2];
+  const compared = /(^|[^\w.$])(value|valueNormalized)\s*(?:===?|!==?|>=|<=|>|<)\s*['"]?(-?\d+(?:\.\d+)?)/g;
+  for (const match of rule.matchAll(compared)) {
+    const n = Number(match[3]);
+    const at = match[2] === 'valueNormalized' ? low + span * n : n;
+    raws.push(at, at + span / 100, at - span / 100);
+  }
+  return [...new Set(raws)].filter((raw) => Number.isFinite(raw) && raw >= low && raw <= high);
+}
+
+/**
+ * What makes a rule true: `{ customValues, value }`, the channels' settings and, when the rule
+ * compares the control's own value (`value`, `valueNormalized`, a channel of that name aside), the
+ * raw value to set; null when the rule names nothing the stage can set, or nothing tried meets it.
+ * `fixed` is a value the state's `when` already sets, the only one tried then. The names are read
+ * in the runtime's order (interactionRuntime's stateRuleValues): the value, channels over it, flags.
+ */
+function ruleSearch(control, rule, flags = {}, fixed = undefined) {
   const text = String(rule ?? '').trim();
   if (!text) return null;
   const channels = getCustomValueChannels(control) ?? {};
-  const named = Object.keys(channels).filter((name) => new RegExp(`(^|[^\\w.])${escapeName(name)}(?![\\w])`).test(text));
-  if (!named.length) return null;
+  const names = (list) => list.filter((name) => new RegExp(`(^|[^\\w.])${escapeName(name)}(?![\\w])`).test(text));
+  const named = names(Object.keys(channels));
+  const ownNamed = names(STATE_RULE_VALUE_NAMES).filter((name) => !(name in channels));
+  if (!named.length && !ownNamed.length) return null;
+  // valueEnum is a list's choice, which the stage does not set; a rule on it is beyond a preview.
+  const range = ownNamed.length ? valueRange(control) : null;
+  if (ownNamed.length && (!range || ownNamed.includes('valueEnum'))) return null;
   const base = Object.fromEntries(Object.entries(channels).map(([name, channel]) => [name, customChannelDefaultValue(channel)]));
   const flagValues = Object.fromEntries(FLAGS.map((flag) => [flag, flags?.[flag] === true]));
   let combos = [{}];
@@ -94,8 +128,17 @@ export function ruleValues(control, rule, flags = {}) {
     combos = combos.flatMap((combo) => candidates.map((value) => ({ ...combo, [name]: value })));
     if (combos.length > 256) return null;
   }
-  return combos.find((combo) => customConditionMatches(text, { ...base, ...flagValues, ...combo })) ?? null;
+  const raws = !range ? [undefined] : fixed !== undefined ? [fixed] : valueCandidates(range, text);
+  for (const combo of combos) {
+    for (const raw of raws) {
+      const own = raw === undefined ? {} : { value: raw, valueNormalized: normalizedIn(range, raw) };
+      if (customConditionMatches(text, { ...own, ...base, ...flagValues, ...combo })) return { customValues: combo, value: raw };
+    }
+  }
+  return null;
 }
+
+const normalizedIn = (range, raw) => (range.max === range.min ? 0 : (raw - range.min) / (range.max - range.min));
 
 /** The channels' own values, for the channels a set of custom values names: where the stage starts. */
 function channelDefaults(control, values) {
@@ -120,13 +163,19 @@ export function statePatch(control, stateName) {
     const value = Array.isArray(expected) ? expected[0] : expected;
     if (FLAGS.includes(key) && typeof value === 'boolean') patch[key] = value;
     else if (key === 'activeHandle' && typeof value === 'string') patch[key] = value;
+    // The control's own value, where the stage can set it, as the Value tool does (valuePatch).
+    else if (key === 'value' && typeof value === 'number' && valueRange(control)) Object.assign(patch, { valueOverrideEnabled: true, valueOverride: value });
+    else if (key === 'valueNormalized' && typeof value === 'number' && valueRange(control)) Object.assign(patch, valuePatch(control, value));
     else exact = false;
   }
   const rule = String(state?.rule ?? '').trim();
   if (rule) {
-    const values = ruleValues(control, rule, patch);
-    if (values) patch.customValues = values;
-    else exact = false;
+    const found = ruleSearch(control, rule, patch, patch.valueOverrideEnabled ? patch.valueOverride : undefined);
+    if (!found) exact = false;
+    else {
+      if (Object.keys(found.customValues).length) patch.customValues = found.customValues;
+      if (found.value !== undefined) Object.assign(patch, { valueOverrideEnabled: true, valueOverride: found.value });
+    }
   }
   return { patch, exact, name };
 }
@@ -153,18 +202,17 @@ const firstNamed = (list, known) => (list ?? []).find((name) => name !== ANY_STA
  * the stage cannot set directly.
  */
 export function valuePatch(control, t) {
-  const behavior = control?._children?.Behavior ?? null;
+  const range = valueRange(control);
+  if (!range) return null;
   const x = Math.min(1, Math.max(0, Number(t) || 0));
-  if (isSliderBehavior(behavior)) {
-    const min = getSliderMin(behavior);
-    const max = getSliderMax(behavior);
-    return { valueOverrideEnabled: true, valueOverride: min + (max - min) * x };
-  }
-  if (isRangeBehavior(behavior)) {
-    const min = getRangeMin(behavior);
-    const max = getRangeMax(behavior);
-    return { valueOverrideEnabled: true, valueOverride: min + (max - min) * x };
-  }
+  return { valueOverrideEnabled: true, valueOverride: range.min + (range.max - range.min) * x };
+}
+
+/** `{ min, max }` of a control whose value the stage can set directly, else null. */
+function valueRange(control) {
+  const behavior = control?._children?.Behavior ?? null;
+  if (isSliderBehavior(behavior)) return { min: getSliderMin(behavior), max: getSliderMax(behavior) };
+  if (isRangeBehavior(behavior)) return { min: getRangeMin(behavior), max: getRangeMax(behavior) };
   return null;
 }
 

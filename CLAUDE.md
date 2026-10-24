@@ -40,17 +40,18 @@ metered.
 ### The rules that survive, and what actually justifies them
 
 Most of the old rules were right for the wrong reason. A CI run costs no money and still costs
-twenty minutes of somebody's attention and a main branch that may be broken while they wait.
+twelve minutes of somebody's attention (three jobs side by side; `ci.yml`'s header has the timings)
+and a main branch that may be broken while they wait.
 
 1. **Verify locally, then push.** Unchanged, and it was never really about minutes: a red run is
-   twenty minutes of *your* wall clock before you learn anything, and everything except the
+   twelve minutes of *your* wall clock before you learn anything, and everything except the
    Windows-only targets runs on this machine — see [Local verification](#local-verification).
 2. **Batch your commits.** Commit locally as often as you like. Push when the change is *finished
    and locally green*. One push per completed change keeps the run history a record of changes
    rather than of keystrokes.
 3. **Do not iterate against the runner.** `concurrency: cancel-in-progress` is set, so a second
    push kills the first run mid-flight. Pushing three speculative fixes does not get you three
-   answers — it gets you one, twenty minutes later, and you will not know which fix produced it.
+   answers — it gets you one, twelve minutes later, and you will not know which fix produced it.
 4. **Use `[skip ci]` for changes that cannot affect the build.** Markdown and docs, comments,
    `.gitignore`, `LICENSE`, review notes. Not a saving any more — a signal-to-noise one. A run
    history where every entry means something is a history somebody reads.
@@ -67,7 +68,7 @@ twenty minutes of somebody's attention and a main branch that may be broken whil
 5. **When CI is red, reproduce it locally before pushing a fix.** Read the job log, make the
    failure happen here, fix everything you can see, then push once. You may now push a second time
    without it costing anything, which is exactly why the discipline has to come from somewhere
-   else: a fix you have not reproduced is a guess, and guessing at twenty minutes a turn is slow
+   else: a fix you have not reproduced is a guess, and guessing at twelve minutes a turn is slow
    however free it is.
 6. **Do not widen CI without asking.** Kept, with a different justification — not cost, but that
    the shape of the project's automation is the owner's call, and every job added is time on
@@ -77,6 +78,14 @@ twenty minutes of somebody's attention and a main branch that may be broken whil
 Dropped outright: the old rules 3 and 4 (never push WIP to a branch with an open PR; open the PR
 last). Both existed only to avoid paying for runs. Push work in progress and open a draft PR
 whenever it is useful — a draft still runs CI in full, and that is now a feature.
+
+**Release checks are run by hand.** `.github/workflows/release-checks.yml` holds the two checks too
+slow for every PR: a plug-in with C++, C# and Java handlers exported the way an installed CEditor
+exports one (its provisioned MinGW clang, JDK and .NET), loaded by pluginval and checked for every
+handler having run; and the installer packaged end to end, uploaded as an artifact. It has no push or
+PR trigger and must not get one (rule 6); start it from the Actions tab before a release, or after a
+change to the exporter, the native-handler loader or the packaging. The handler half runs locally
+too: `tools/scripts/nativeHandlers/probe-panel.mjs` says how.
 
 **Do check the premise if something feels off.** `visibility` on the repo API and
 `billable.*.total_ms` on a run's timing endpoint are the two facts this section rests on. They take
@@ -106,7 +115,7 @@ of work here as an excuse not to check anything at all off it.
 
 So a change to `CE/src/**` that never gets compiled locally is a choice, not a limitation. Compile
 it first; the run then confirms the two things above rather than telling you something a local
-build would have told you twenty minutes sooner.
+build would have told you twelve minutes sooner.
 
 ---
 
@@ -115,21 +124,25 @@ build would have told you twenty minutes sooner.
 Run these instead of pushing. Nothing here needs Windows — every command below was run on a plain
 Linux container, and the notes about what breaks there are from that run, not from guesswork.
 
-### Web (mirrors CI's first three steps exactly)
+### Web (what CI's `web-tests` job runs, and the build its other two start from)
 
 ```bash
 cd CE/web
 npm ci
 npm run test:all     # node --test suite + script-export validation
-npm run build        # the bundle CMakeLists globs into PlayerWebData
+npm run build        # the bundle, and with it dist-embed/: what the player and host pages reach,
+                     # gzipped, which CMakeLists embeds as PlayerWebData
 ```
 
 The node suite takes about three and a half minutes here. `validate-script-exports` reports
 `SKIP` for any language whose toolchain is absent (commonly Lua and C#) — a skip is not a
 failure, but do not read a run full of skips as coverage.
 
-`npm run test:browser` additionally drives Playwright over the built bundle. It is not in CI; run it
-locally when you touch rendering, the player inbound path or the learn chips.
+`npm run test:browser` additionally drives Playwright over the built bundle and the editor's dev
+server: 38 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
+first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows, in a job of
+their own beside the web tests and the C++ build; run them locally when you touch rendering, the
+docks, the player inbound path or the learn chips.
 
 ### C++ *on* Windows: use a Developer shell, or you will get MinGW
 
@@ -301,11 +314,14 @@ node tools/scripts/validate-plugins.mjs build/app/CEditorPlayerVST_artefacts/Rel
 ```
 
 **Never point `CE_VST_PANEL_PATH` at a saved `.cepanel`.** A saved file stores each control as a
-difference from its type's defaults. The plug-in cannot rebuild the defaults, so every
-default-valued property is missing from it. The first validation runs did exactly that, and the
-player log filled with 14,000 refused script writes that were an artefact of the setup, not of the
-panel. `prepare-export-panel.mjs` writes the complete form the app would export. The exporters do
-this themselves.
+difference from its type's defaults, and each entry of its lists (bindings, grab areas, channels,
+choices) as a difference from a baseline, and carries neither, so the plug-in has nothing to
+rebuild them from and every default-valued property is missing. The first validation runs did
+exactly that, and the player log filled with 14,000 refused script writes that were an artefact of
+the setup, not of the panel. `prepare-export-panel.mjs` writes the export payload the app would:
+the same two differences, baked, carrying what they are against (`controlDefaults`: the type
+defaults, and the baselines under `entries`), from which the plug-in rebuilds each control. The
+exporters do this themselves.
 
 Do this when you touch `CE/src/Player/`, the CLAP wrapper or the plug-in's CMake. Its first run
 found five defects that no other test here could see. Linux is also where the host-thread
@@ -343,6 +359,11 @@ Lua and sol2.
 node tools/scripts/nativeHandlers/verify-all.mjs
 node tools/toolchains/languages.mjs status
 ```
+
+`verify-all.mjs` builds and runs real C++, Java and C# handler modules where it finds a compiler,
+a JDK with `jlink` and `dotnet`, and skips each check it cannot run. CI runs it on Windows with
+`--require`, where a skip fails; pass the same flag locally when you touch
+`tools/scripts/nativeHandlers/` or the loader, so a missing toolchain does not read as a pass.
 
 `docs/verify-end-to-end.md` is the full gated checklist for the export toolchain, most of which is
 Windows-only. Gates 0 and 1 run anywhere and are the cheapest way to catch a broken script/export

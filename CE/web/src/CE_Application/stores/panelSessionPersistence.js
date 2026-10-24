@@ -19,7 +19,7 @@
 // unchanged.
 import { readStoredJson, removeStoredValue, writeStoredJson } from '../utils/localStorageState.js';
 import { browserDatabase, readRecord, removeRecord, writeRecord } from '../utils/browserDatabase.js';
-import { expandControl, shrinkControl } from './documentShape.js';
+import { expandControls, shrinkControl } from './documentShape.js';
 
 const UNSAVED_PANELS_KEY = 'ce.unsavedPanels';
 const UNSAVED_ACTIVE_TAB_KEY = 'ce.unsavedActiveEditorTab';
@@ -107,7 +107,7 @@ function expandSnapshot(snapshot) {
   return snapshot.map((panel) => {
     if (!panel?._sessionControlsSparse) return panel; // Older expanded snapshots.
     const { _sessionControlsSparse, ...restored } = panel;
-    return { ...restored, controls: (restored.controls ?? []).map(expandControl) };
+    return { ...restored, controls: expandControls(restored.controls ?? []) };
   });
 }
 

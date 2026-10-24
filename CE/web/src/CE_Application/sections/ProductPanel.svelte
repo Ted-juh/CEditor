@@ -96,7 +96,7 @@
         {#each product.daw.exposedMacros as macro (macro.index)}
           <span class="macro-slot" class:bound={macro.bound} title={macro.name}>
             <span class="macro-index">{macro.index + 1}</span>
-            <span class="macro-name">{macro.bound ? macro.name.replace(/^Macro \d+ — /, '') : '—'}</span>
+            <span class="macro-name">{macro.bound ? macro.name.replace(/^Macro \d+ \u2014 /, '') : '—'}</span>
           </span>
         {/each}
       </div>

@@ -8,6 +8,10 @@ import './assets/fonts/panelFonts.css';
 import App from './App.svelte';
 import { wireFontOutlineSources } from './CE_Application/stores/fontOutlineSources.js';
 import { wireDocumentIcons } from './CE_Application/stores/documentIconSources.js';
+import { installSharedWriteDiagnostics } from './CE_Application/utils/sharedWriteDiagnostics.js';
+
+// A write into a section a loaded panel shares between controls throws; this says why.
+installSharedWriteDiagnostics();
 
 // Imported fonts for text turned into outlines, and the fonts open panels carry.
 wireFontOutlineSources();

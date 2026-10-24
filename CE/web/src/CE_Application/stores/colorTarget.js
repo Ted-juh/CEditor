@@ -15,6 +15,9 @@ import { stateEditScope } from './stateEditScope.js';
  *   { type: 'panel', prop: 'bgColour' }
  *   { type: 'panel', prop: 'gridColour' }
  *   { type: 'control', controlId: 'ctrl_1', path: 'Background.Fill.colour' }
+ *   { type: 'callback', apply(hex), label?, cancel? }  — anything else; `cancel`, when given, is
+ *       what the dock's Cancel calls instead of applying the colour it began with (the script
+ *       editor's Values sidebar puts a script's original characters back that way)
  *   null  (no active target — default panel bgColour behavior)
  *
  * WHY A GLOBAL DOCK AND NOT AN ANCHORED POPOVER — a decision, recorded here because the review

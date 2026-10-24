@@ -12,8 +12,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
 
 import { scriptApiForTesting, setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
   MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_WEBVIEW,
@@ -204,6 +206,22 @@ test('match gives everything the reference\'s size, and the reference keeps its 
       assert.equal(r.width, want['Transform.width']);
       assert.equal(r.height, want['Transform.height']);
     }
+  });
+});
+
+test('align and match refuse a `to` that is not one of the names, and move nothing', () => {
+  // match used to take the first name instead, silently, and size every control to the wrong one;
+  // align said so and lined them up on the whole group anyway. Both are layouts nobody asked for.
+  withPanel([btn('a', 10, 10, 40, 20), btn('b', 100, 50, 60, 30), btn('c', 200, 90, 20, 50)], (api) => {
+    const before = rects(api, ['a', 'b', 'c']);
+    clearScriptTrace();
+    assert.equal(api.panelMatch(['a', 'b'], 'both', { to: 'c' }), 0);
+    assert.equal(api.panelAlign(['a', 'b'], 'left', { to: 'cc' }), 0);
+    assert.deepEqual(get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message), [
+      'ce.panel.match: "c" is not one of the names given, so nothing was resized.',
+      'ce.panel.align: "cc" is not one of the names given, so nothing was moved.',
+    ]);
+    assert.deepEqual(rects(api, ['a', 'b', 'c']), before, 'nothing moved and nothing was resized');
   });
 });
 

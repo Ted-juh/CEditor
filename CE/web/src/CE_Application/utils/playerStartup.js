@@ -15,6 +15,7 @@
  */
 
 import { countRolesInControls } from './deviceRoles.js';
+import { flatControls } from './containment.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /** The profile a panel ships with when it names none: the original slim GAIA demo profile. */
@@ -81,4 +82,29 @@ export function createHostSeedTracker() {
     },
     reset() { seeded.clear(); },
   };
+}
+
+/**
+ * The Player is a runtime: a bound control SENDS rather than dry-running. The engine still only
+ * transmits when the role's output is a real hardware port, so this is safe anywhere.
+ *
+ * By replacing each control's bindings, not writing into them: a loaded control's binding can be
+ * one object several controls share, frozen (expandControls in stores/documentShape.js), and
+ * writing `dryRun` into it threw, which stopped the panel loading in the player at all. Only the
+ * control and its `_children` are the control's own to change.
+ */
+export function sendFromBoundControls(controls) {
+  for (const control of flatControls(controls ?? [])) {
+    const sections = control?._children;
+    const deviceBindings = sections?.DeviceBindings;
+    const bindings = deviceBindings?.bindings;
+    if (!Array.isArray(bindings)) continue;
+    const dry = (binding) => binding && typeof binding === 'object' && binding.dryRun !== false;
+    if (!bindings.some(dry)) continue;
+    control._children = {
+      ...sections,
+      DeviceBindings: { ...deviceBindings, bindings: bindings.map((binding) => (dry(binding) ? { ...binding, dryRun: false } : binding)) },
+    };
+  }
+  return controls;
 }

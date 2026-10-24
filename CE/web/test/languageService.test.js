@@ -104,6 +104,39 @@ test('getHover describes panel API functions', () => {
   assert.match(h.doc, /CC/);
 });
 
+test('getHover lists the parameters with their type and whether each is required', () => {
+  const h = getHover('scale(64, 0, 127, 0, 100)', 'lua', 2);
+  assert.deepEqual(h.params[0], { name: 'v', type: 'number, required', summary: 'The value to move.' });
+  assert.equal(h.params.length, 5);
+});
+
+test('getHover finds a command written by its place in the API, not only by its short name', () => {
+  // In ce.anim.to the word under the pointer is "to", which names nothing; 677 of the 774 commands
+  // had no card in the form scripts write them in.
+  const src = 'ce.anim.to("cutoff", 127, { duration = 500 })';
+  const h = getHover(src, 'lua', src.indexOf('to(') + 1);
+  assert.equal(h.title, 'ce.anim.to(path, target [, opts])');
+  assert.equal(h.doc, 'Move a value smoothly to a new number over time.');
+  assert.match(h.example, /^`animateTo\(/);
+  assert.equal(h.notes.length, 2);
+  assert.deepEqual(h.params.map((p) => p.name), ['path', 'target', 'opts']);
+  const lcd = 'ce.components.lcd.text("Screen", 1, "Hi")';
+  assert.match(getHover(lcd, 'javascript', lcd.indexOf('text') + 1).title, /^ce\.components\.lcd\.text\(/);
+  const err = 'ce.core.error("bad")';
+  assert.match(getHover(err, 'lua', err.indexOf('error') + 1).title, /^ce\.core\.error\(/, 'a path whose short name differs: logError');
+});
+
+test('getHover names the module for the middle of a path, and nothing for a table of the script\'s own', () => {
+  const src = 'ce.anim.to("cutoff", 127)';
+  const h = getHover(src, 'lua', src.indexOf('anim') + 1);
+  assert.equal(h.title, 'ce.anim');
+  assert.ok(h.doc.length > 0);
+  assert.equal(getHover('local t = {}\nt.to(1)', 'lua', 'local t = {}\nt.to'.length - 1), null);
+  // …while a value form after a dot is still the value form.
+  const v = 'local x = cutoff.midiValue';
+  assert.equal(getHover(v, 'lua', v.length - 2).title, '.midiValue');
+});
+
 test('getHover describes a local declaration', () => {
   const src = 'function add(a, b)\n  return a + b\nend';
   const h = getHover(src, 'lua', 10); // inside "add"
@@ -147,6 +180,16 @@ test('getSignatureHelp works for helpers (params parsed from signature)', () => 
   assert.equal(s.name, 'scale');
   assert.deepEqual(s.params, ['v', 'inLo', 'inHi', 'outLo', 'outHi']);
   assert.equal(s.activeParam, 1);
+});
+
+test('getSignatureHelp finds a command written by its path, named as it is written', () => {
+  const src = 'ce.anim.to("cutoff", ';
+  const sig = getSignatureHelp(src, 'lua', src.length);
+  assert.equal(sig.name, 'ce.anim.to');
+  assert.equal(sig.id, 'animateTo', 'the id picks the parameters\' colours');
+  assert.deepEqual(sig.params, ['path', 'target', 'opts']);
+  assert.equal(sig.activeParam, 1);
+  assert.equal(getSignatureHelp('obj.to(', 'lua', 7), null, 'a table of the script\'s own is not ce.anim');
 });
 
 test('getSignatureHelp resolves a document function', () => {
@@ -205,4 +248,19 @@ test('a document symbol is never narrowed away, whatever the control is', () => 
   const src = 'local arpRateOfMine = 3\narpR';
   const { options } = getCompletions(src, 'lua', src.length, { controlType: 'Slider' });
   assert.ok(options.some((o) => o.label === 'arpRateOfMine'), "the user's own name always completes");
+});
+
+/* --------------------------------------------------------------------- JSON */
+
+test('JSON (the panel file view): the first mistake with its line, folds, and nothing to complete', async () => {
+  const { getFoldRegions } = await import('../src/CE_Application/scripting/languageService.js');
+  assert.deepEqual(analyze('{\n  "a": 1\n}', 'json').diagnostics, []);
+  const [d] = analyze('{\n  "a": 1,\n  "b": [1,]\n}', 'json').diagnostics;
+  assert.equal(d.severity, 'error');
+  assert.equal(d.line, 3);
+  assert.match(d.message, /comma before "]"/);
+  assert.deepEqual(getFoldRegions('{\n  "a": {\n    "b": 1\n  }\n}', 'json'), [{ startLine: 1, endLine: 5 }, { startLine: 2, endLine: 4 }]);
+  assert.deepEqual(getCompletions('{ "va', 'json', 5).options, [], 'the script API is nothing to type in a data file');
+  assert.equal(getHover('{ "value": 1 }', 'json', 4), null);
+  assert.equal(getSignatureHelp('{ "a": [1, ', 'json', 11), null);
 });

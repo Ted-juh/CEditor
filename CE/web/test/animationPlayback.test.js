@@ -13,6 +13,7 @@ import { readAnimations } from '../src/CE_Application/utils/animationModel.js';
 import { resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
 import { createTransitionTracker } from '../src/CE_Application/utils/transitionSelection.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { getSliderMin, getSliderMax } from '../src/CE_Application/utils/sliderBehavior.js';
 
 const row = (control, name) => readAnimations(control).find((entry) => entry.name === name);
 
@@ -206,4 +207,71 @@ test('the status lamp\'s glow plays on the stage: lit for the change, back to it
   assert.ok(states[1].includes('lampon'), JSON.stringify(states));
   assert.ok(!states[0].includes('lampon') && !states[2].includes('lampon'));
   assert.deepEqual(fired(lamp, plan), [[], ['lampGlow'], ['lampGlow']]);
+});
+
+/* A state's rule on the control's own value. The rule language could compare (`level > 0.5`), but
+ * a rule saw the control's channels and flags alone, so on a plain knob `value > 64` compared
+ * nothing and was never true; `when` could only ask for the value to be equal. */
+
+function withState(control, name, spec) {
+  control._children.States._children[name] = { _type: 'State', name, enabled: true, when: {}, patches: { component: {}, parts: {} }, ...spec };
+  return control;
+}
+/** A knob over a MIDI range, 0 to 127. */
+function midiKnob() {
+  const knob = createControl('Knob');
+  Object.assign(knob._children.Behavior, { min: 0, max: 127 });
+  return knob;
+}
+const activeOn = (control, session) => resolveInteractiveControl(control, { ...REST_SESSION, ...session }).runtime.activeStates.map((name) => name.toLowerCase());
+
+test('a state\'s rule compares the control\'s value, raw or 0 to 1', () => {
+  const knob = withState(midiKnob(), 'Hot', { rule: 'value > 64' });
+  const { min, max } = { min: getSliderMin(knob._children.Behavior), max: getSliderMax(knob._children.Behavior) };
+  const at = (raw) => activeOn(knob, { valueOverrideEnabled: true, valueOverride: raw });
+  assert.ok(max > 64 && min < 64, `the knob's range ${min}..${max} holds 64`);
+  assert.ok(at(max).includes('hot'), 'above 64');
+  assert.ok(!at(64).includes('hot'), 'not at 64');
+  assert.ok(!at(min).includes('hot'), 'not at the bottom');
+  const half = withState(midiKnob(), 'Top', { rule: 'valueNormalized >= 0.5 && hover == true' });
+  const top = (t, hover) => activeOn(half, { hover, ...valuePatch(half, t) });
+  assert.ok(top(0.75, true).includes('top'));
+  assert.ok(!top(0.75, false).includes('top'), 'the rest of the rule still holds');
+  assert.ok(!top(0.25, true).includes('top'));
+});
+
+test('a channel named value is still that channel in a rule', () => {
+  const lamp = starter('starter.statusLamp');
+  lamp._children.ValueChannels._children.value = { ...lamp._children.ValueChannels._children.active, name: 'value', type: 'float', min: 0, max: 10, defaultValue: 0, currentValue: 0 };
+  withState(lamp, 'Bright', { rule: 'value >= 5' });
+  assert.ok(!activeOn(lamp, { customValues: { value: 0 } }).includes('bright'));
+  assert.ok(activeOn(lamp, { customValues: { value: 7 } }).includes('bright'));
+  assert.deepEqual(statePatch(lamp, 'bright').patch.customValues, { value: 10 }, 'the preview sets the channel, not a value override');
+});
+
+test('the preview sets the value a state asks for', () => {
+  const knob = withState(midiKnob(), 'Hot', { rule: 'value > 64' });
+  const hot = statePatch(knob, 'hot');
+  assert.equal(hot.exact, true);
+  assert.equal(hot.patch.valueOverrideEnabled, true);
+  assert.ok(activeOn(knob, hot.patch).includes('hot'), 'the patch found makes the state true');
+  // Its bounds as written: 64 itself where a rule asks for it, either side of it otherwise.
+  for (const rule of ['value == 64', 'value < 64', 'value >= 64 && value <= 65', 'valueNormalized < 0.1', 'value != 0']) {
+    withState(knob, 'Probe', { rule });
+    const probe = statePatch(knob, 'probe');
+    assert.equal(probe.exact, true, rule);
+    assert.ok(activeOn(knob, probe.patch).includes('probe'), `${rule}: ${JSON.stringify(probe.patch)}`);
+  }
+  // `when` on the value is set too, and a rule beside it is tried at that value only.
+  withState(knob, 'At', { when: { value: 100 }, rule: 'value > 64' });
+  assert.deepEqual(statePatch(knob, 'at'), { patch: { valueOverrideEnabled: true, valueOverride: 100 }, exact: true, name: 'at' });
+  withState(knob, 'Never', { when: { value: 10 }, rule: 'value > 64' });
+  assert.equal(statePatch(knob, 'never').exact, false, 'a when and a rule that cannot both hold');
+  withState(knob, 'Mid', { when: { valueNormalized: 0.5 } });
+  assert.ok(activeOn(knob, statePatch(knob, 'mid').patch).includes('mid'));
+  // What the stage cannot set stays inexact: a list's choice, a value no range holds.
+  withState(knob, 'Choice', { rule: "valueEnum == 'Saw'" });
+  assert.equal(statePatch(knob, 'choice').exact, false);
+  withState(knob, 'Out', { rule: 'value > 100000' });
+  assert.equal(statePatch(knob, 'out').exact, false);
 });

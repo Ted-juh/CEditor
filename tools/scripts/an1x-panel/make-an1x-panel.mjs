@@ -18,7 +18,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
-import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sectionDefaults.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { DEFAULT_CONTROL_SET_ID } from '../../../CE/web/src/CE_Application/models/controlSets.js';
@@ -269,78 +268,6 @@ const KINDS = {
     return { controls: [control], caption: null };
   },
 };
-
-/**
- * Drop the default-valued fields a custom part carries.
- *
- * The component factory clones SECTION_DEFAULTS wholesale into every part, so one 42px knob
- * serializes sixteen rectangles each spelling out ~4.7 KB of stock Fill/Border/Corners fields it
- * never changed — which is how the GAIA panel came to cost 107 KB per control and 43 MB per file.
- * The panel serializer already elides CONTROLS against their type defaults; parts had no such pass.
- *
- * Keeping only what differs cuts a part to a few hundred bytes. Verified by rendering the slim and
- * fat panels and comparing the screenshots pixel for pixel before this became the default.
- */
-/**
- * A key may only be dropped when its absence READS the same as its value. Nothing re-expands a
- * part on load (documentShape's NEVER_ELIDE says why), so every reader sees the raw document and
- * treats a missing key as undefined — falsy. Deleting `linked: true` from a Corners section
- * because true is the default therefore turned every knob and LED square: the renderer read
- * absent-linked as unlinked and fell back to the per-corner radii of 0. Found by rendering the
- * slim and fat panels and comparing pixels, which is also how this rule is enforced.
- */
-const falsyish = (v) => v === false || v === 0 || v === '' || v === null;
-
-function elideAgainst(node, defaults) {
-  if (!node || typeof node !== 'object' || !defaults || typeof defaults !== 'object') return;
-  for (const key of Object.keys(node)) {
-    if (key === '_type') continue;
-    const ours = node[key];
-    const theirs = defaults[key];
-    if (ours && typeof ours === 'object' && theirs && typeof theirs === 'object' && !Array.isArray(ours)) {
-      elideAgainst(ours, theirs);
-      if (Object.keys(ours).every((k) => k === '_type')) delete node[key];
-    } else if (falsyish(ours) && JSON.stringify(ours) === JSON.stringify(theirs)) {
-      delete node[key];
-    }
-  }
-}
-
-// A stock part, to elide the boilerplate every part is born with — the factory's own defaults for
-// the node fields and the Layout section. Built once, from the same factory the parts came from,
-// so the reference cannot drift from the code that stamps them.
-import { createPartNode } from '../../../CE/web/src/CE_Application/utils/customComponentFactory.js';
-const REFERENCE_PART = createPartNode('__reference', { role: 'custom' });
-
-const SLIM_LEVEL = Number(process.env.AN1X_SLIM_LEVEL ?? 3);
-
-function slimCustomParts(control) {
-  const parts = control._children?.Parts?._children;
-  if (!parts) return control;
-  for (const part of Object.values(parts)) {
-    const sections = part?._children;
-    if (!sections) continue;
-    if (SLIM_LEVEL >= 2) {
-      for (const key of Object.keys(part)) {
-        if (key === '_type' || key === 'name' || key === '_children') continue;
-        if (falsyish(part[key]) && JSON.stringify(part[key]) === JSON.stringify(REFERENCE_PART[key])) delete part[key];
-      }
-      if (sections.Layout) elideAgainst(sections.Layout, REFERENCE_PART._children.Layout);
-    }
-    if (sections.Background) {
-      elideAgainst(sections.Background, SECTION_DEFAULTS.Background);
-      // With linked corners the four per-corner sub-objects are dead weight — the renderer takes
-      // the linked radius. They are ~2 KB of every part; the pixel comparison below is what
-      // licenses dropping them.
-      const corners = sections.Background._children?.Corners;
-      if (corners && corners.linked === true) {
-        delete corners.topLeft; delete corners.topRight; delete corners.bottomLeft; delete corners.bottomRight;
-      }
-    }
-    if (SLIM_LEVEL >= 3 && sections.Text) elideAgainst(sections.Text, SECTION_DEFAULTS.Text);
-  }
-  return control;
-}
 
 /**
  * One Free EG track: the recorded curve, drawn and editable, over the sequence length.
@@ -686,7 +613,7 @@ Named lists read as names
   the effect types are the manual's own lists now, so they are choosers rather than knobs. A knob
   can show a number; only a list can show "BassLineD".`;
 
-export function buildAn1xPanel({ slim = true } = {}) {
+export function buildAn1xPanel() {
   const profile = JSON.parse(readFileSync(PROFILE, 'utf8'));
   const byId = new Map(profile.parameters.map((p) => [p.id, p]));
   seq = 0;
@@ -778,7 +705,15 @@ export function buildAn1xPanel({ slim = true } = {}) {
 
   plate._children.Transform.height = y - PLATE_INSET + 4;
 
-  panel.controls = slim ? controls.map(slimCustomParts) : controls;
+  // The parts go out exactly as the factory made them, and that is not an oversight. serializePanel
+  // diffs every part against its section defaults (stores/documentShape.js), so a default-valued
+  // field already costs nothing on disk. This used to run its own slimming pass first, written
+  // before that diff existed, and the two compounded rather than cancelled: the diff read every key
+  // the pass had deleted as a key the author deleted, and wrote it into a `_removed` list for the
+  // loader to delete again. 374,074 key names, 63% of a 26.9 MB file — and saving the panel from
+  // the editor wrote them all back, because loading had deleted the keys. Without the pass the file
+  // is 8.9 MB and renders pixel for pixel the same.
+  panel.controls = controls;
   panel.width = PANEL_WIDTH;
   panel.height = brandY + 46;
   panel.bgColour = SKIN.panelBg;
@@ -814,16 +749,15 @@ export function buildAn1xPanel({ slim = true } = {}) {
   return migrateDottedControlNames(panel);
 }
 
-export function serializeAn1xPanel({ slim = true } = {}) {
-  return `${serializePanel(buildAn1xPanel({ slim }))}\n`;
+export function serializeAn1xPanel() {
+  return `${serializePanel(buildAn1xPanel())}\n`;
 }
 
 function main() {
   const args = process.argv.slice(2);
   const check = args.includes('--check');
-  const slim = !args.includes('--fat');
   const out = path.resolve(REPO, args.find((a) => !a.startsWith('--')) ?? DEFAULT_OUT);
-  const json = serializeAn1xPanel({ slim });
+  const json = serializeAn1xPanel();
 
   if (check) {
     let current = null;

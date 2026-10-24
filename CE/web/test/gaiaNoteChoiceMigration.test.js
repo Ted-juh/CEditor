@@ -2,13 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
-import { expandControl } from '../src/CE_Application/stores/documentShape.js';
+import { expandControl, expandControls, shrinkControl } from '../src/CE_Application/stores/documentShape.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
 import { repairGaiaNoteChoices } from '../src/CE_Application/utils/gaiaNoteChoiceMigration.js';
+import { readPanelDocument } from '../src/CE_Application/utils/panelFormat.js';
 
 test('opening a legacy GAIA panel repairs all six note tables and preserves the rest of every control', () => {
   const source = readFileSync(new URL('../../panels/Roland GAIA SH-01.cepanel', import.meta.url), 'utf8');
-  const before = flatControls(JSON.parse(source).controls.map(expandControl));
+  // Read as opening reads it (the drawings the file writes once and the defaults its list entries
+  // leave out go back in first), but without the repair deserializePanel makes after.
+  const before = flatControls(readPanelDocument(source).doc.controls.map(expandControl));
   const panel = deserializePanel(source, 'gaia.cepanel', 'gaia');
   const after = flatControls(panel.controls);
   assert.equal(after.length, before.length);
@@ -50,5 +54,27 @@ test('repair leaves other devices, custom labels and custom IDs alone', () => {
     const before = structuredClone(control);
     repairGaiaNoteChoices([control]);
     assert.deepEqual(control, before);
+  }
+});
+
+test('repair copies the tables it changes: two controls with one legacy table share it, frozen', () => {
+  // The GAIA panel in the tree is already repaired, so this is the case the repair exists for: an
+  // old file, where the six note tables are equal and so one frozen array once loaded.
+  const legacy = (name, parameterId) => {
+    const control = createControl('Combobox');
+    control._children.Core.name = name;
+    control._children.DeviceBindings.bindings = [{ deviceRole: 'Roland GAIA SH-01', parameterId }];
+    control._children.Value.rows = [
+      { id: '12', internalValue: '12', displayText: '1/2', sendValue: 8 },
+      { id: '16', internalValue: '16', displayText: '1/6', sendValue: 13 },
+    ];
+    return shrinkControl(control);
+  };
+  const controls = expandControls([legacy('a', 'tone1.lfo.tempoSyncNote'), legacy('b', 'tone2.lfo.tempoSyncNote')]);
+  assert.equal(controls[0]._children.Value.rows, controls[1]._children.Value.rows);
+  assert.ok(Object.isFrozen(controls[0]._children.Value.rows[0]));
+  repairGaiaNoteChoices(controls);
+  for (const control of controls) {
+    assert.deepEqual(control._children.Value.rows.map(row => row.internalValue), ['12_8', '16_13']);
   }
 });

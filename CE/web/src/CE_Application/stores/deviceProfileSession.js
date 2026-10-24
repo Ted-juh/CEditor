@@ -3,6 +3,7 @@
 // via appSettings/projectDeviceSession, and owns role-mapping + profile/source refresh calls.
 import { get } from 'svelte/store';
 import { clearDeviceParameterValues } from './deviceParameterValues.js';
+import { isParameterTablePage, acceptParameterTablePage, forgetParameterTable, setParameterTableBridge } from './deviceParameterTable.js';
 import { syncFeedbackRoutes, invalidateDeviceFeedback, noteDeviceFeedbackReceived, noteDeviceFeedbackResult, noteDeviceFeedbackRead, noteDeviceFeedbackIdentity } from './deviceSyncFeedback.js';
 import {
   getDeviceProfileSource,
@@ -131,6 +132,7 @@ import { DEFAULT_DEVICE_ROLE, DEFAULT_ECHO_WINDOW_MS } from './deviceConstants.j
 // this file as the inbound seam in its own header; the outbound half in bridge.js imports its
 // counterpart correctly. Dependency-free by design, so there is no cycle to avoid here.
 import { filterInboundMidi } from '../scripting/midiFilters.js';
+import { mergeMonitorEvents } from '../utils/midiMonitor.js';
 
 // Echo window per role: role mapping timingOverrides.echoWindowMs wins, then the profile
 // source's timing.echoWindowMs, then the conservative default. The parsed value is cached per
@@ -379,6 +381,9 @@ function initDeviceSessionPersistence() {
   });
 }
 
+// The whole-table loader's pages come back through the listener registered below.
+setParameterTableBridge(() => initDeviceProfileBridge());
+
 export function initDeviceProfileBridge() {
   initDeviceSessionPersistence();
   if (initialized) return;
@@ -395,6 +400,8 @@ export function initDeviceProfileBridge() {
 
   onDeviceProfileImported((payload) => {
     latestProfileImport.set(payload);
+    // An import over a profile of the same id replaces its parameters.
+    if (payload?.ok === true) forgetParameterTable(payload?.profileId ?? payload?.profile?.id);
   });
 
   onMidiCiDiscovered((payload) => {
@@ -478,6 +485,8 @@ export function initDeviceProfileBridge() {
   onDeviceProfileSourceSaved((payload) => {
     latestProfileSourceSave.set(payload);
     if (payload?.ok !== true) return;
+    // A saved source can add, rename or remove parameters: the whole table is loaded again.
+    forgetParameterTable(payload?.profileId);
 
     if (payload?.profileId && payload?.source !== undefined) {
       profileSources.update((sources) => ({
@@ -644,6 +653,9 @@ export function initDeviceProfileBridge() {
   });
 
   onProfileParametersListed((payload) => {
+    // A page of the whole table (deviceParameterTable.js) is that table's, and never the
+    // Designer's page, which shows what its own search asked for.
+    if (isParameterTablePage(payload)) { acceptParameterTablePage(payload); return; }
     if (payload?.ok !== true || !payload?.profileId) return;
     const parameters = Array.isArray(payload.parameters) ? payload.parameters : [];
     const offset = Number(payload.offset ?? 0);
@@ -694,6 +706,7 @@ export function initDeviceProfileBridge() {
   onProfileParameterDetailSaved((payload) => {
     latestProfileSourceSave.set(payload);
     if (payload?.ok !== true || !payload?.profileId || !payload?.parameterId) return;
+    forgetParameterTable(payload.profileId);
 
     const key = `${payload.profileId}:${payload.parameterId}`;
     profileParameterDetails.update((details) => ({
@@ -802,7 +815,7 @@ export function initDeviceProfileBridge() {
   });
 
   onMidiMonitorEvents((payload) => {
-    midiMonitorEvents.set(Array.isArray(payload) ? payload : []);
+    midiMonitorEvents.update((current) => mergeMonitorEvents(current, payload));
   });
 
   onDeviceDiagnostics((payload) => {

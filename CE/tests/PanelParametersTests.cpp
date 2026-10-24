@@ -28,6 +28,30 @@ void check (bool cond, const juce::String& label)
     if (! cond) ++failures;
 }
 
+// A layout can only be consumed by an APVTS, so a throwaway processor holds it.
+struct Dummy : juce::AudioProcessor
+{
+    explicit Dummy (juce::AudioProcessorValueTreeState::ParameterLayout&& l)
+        : state (*this, nullptr, "T", std::move (l)) {}
+    juce::AudioProcessorValueTreeState state;
+    const juce::String getName() const override { return "T"; }
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+};
+
 /**
  * What juce::AudioParameter* class each entry in a built layout actually is.
  *
@@ -37,29 +61,7 @@ void check (bool cond, const juce::String& label)
 juce::StringArray layoutParameterKinds (juce::AudioProcessorValueTreeState::ParameterLayout&& layout)
 {
     juce::StringArray kinds;
-    // A layout can only be consumed by an APVTS, so stand up a throwaway processor to hold it.
-    struct Dummy : juce::AudioProcessor
-    {
-        explicit Dummy (juce::AudioProcessorValueTreeState::ParameterLayout&& l)
-            : state (*this, nullptr, "T", std::move (l)) {}
-        juce::AudioProcessorValueTreeState state;
-        const juce::String getName() const override { return "T"; }
-        void prepareToPlay (double, int) override {}
-        void releaseResources() override {}
-        void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
-        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
-        bool hasEditor() const override { return false; }
-        double getTailLengthSeconds() const override { return 0.0; }
-        bool acceptsMidi() const override { return false; }
-        bool producesMidi() const override { return false; }
-        int getNumPrograms() override { return 1; }
-        int getCurrentProgram() override { return 0; }
-        void setCurrentProgram (int) override {}
-        const juce::String getProgramName (int) override { return {}; }
-        void changeProgramName (int, const juce::String&) override {}
-        void getStateInformation (juce::MemoryBlock&) override {}
-        void setStateInformation (const void*, int) override {}
-    };
+    // A layout can only be consumed by an APVTS: Dummy holds it.
 
     Dummy dummy (std::move (layout));
     for (auto* p : dummy.getParameters())
@@ -251,6 +253,47 @@ int main()
         })JSON");
         check (params.size() == 1 && params[0].valueKind == "float",
                "an unrecognised valueKind falls back to float");
+    }
+
+    // Two entries with one id: the first wins. Two host parameters with one id is a broken plug-in
+    // (clap-validator's state tests failed on QA-08's two controls named Cutoff).
+    {
+        const auto params = roundTrip (R"JSON(
+          { "id": "Cutoff.value", "path": "Cutoff.value", "min": 20, "max": 20000, "defaultValue": 440, "unit": "Hz" },
+          { "id": "Cutoff.value", "path": "Cutoff.value", "min": 20, "max": 20000, "defaultValue": 440, "unit": "" },
+          { "id": "Res.value", "path": "Res.value", "min": 0, "max": 1 }
+        )JSON");
+        check (params.size() == 2 && params[0].unit == "Hz" && params[1].id == "Res.value",
+               "a second entry with an id already taken is dropped, the first kept");
+    }
+
+    // A value read back from its own text prints the same text (clap-validator's param-conversions:
+    // with JUCE's seven decimals, QA-08's Kinetic Gravity, -1 to 1, printed a different last digit).
+    {
+        const auto params = roundTrip (R"JSON(
+          { "id": "g.value", "path": "g.value", "min": -1, "max": 1 },
+          { "id": "f.value", "path": "f.value", "min": 20, "max": 20000, "unit": "Hz" },
+          { "id": "u.value", "path": "u.value", "min": 0, "max": 1 },
+          { "id": "m.value", "path": "m.value", "min": 0, "max": 127 },
+          { "id": "s.value", "path": "s.value", "min": 0, "max": 0.01 }
+        )JSON");
+        Dummy dummy (ce::buildParameterLayout (params));
+        juce::Random random (42);
+        juce::String firstMismatch;
+        for (auto* parameter : dummy.getParameters())
+            for (int i = 0; i < 2000 && firstMismatch.isEmpty(); ++i)
+            {
+                const auto value = random.nextFloat();
+                const auto text = parameter->getText (value, 0);
+                const auto again = parameter->getText (parameter->getValueForText (text), 0);
+                if (text != again)
+                    firstMismatch = parameter->getName (64) + ": " + text + " -> " + again;
+            }
+        check (firstMismatch.isEmpty(), "every float parameter's text survives being read back"
+                                        + (firstMismatch.isEmpty() ? juce::String() : " (" + firstMismatch + ")"));
+        check (dummy.getParameters()[0]->getText (0.75f, 0) == "0.5000"
+                   && dummy.getParameters()[1]->getText (0.0210210f, 0) == "440",
+               "and it is as fine as the range calls for: 0.5000 on -1..1, 440 on 20..20000 Hz");
     }
 
     if (failures == 0)

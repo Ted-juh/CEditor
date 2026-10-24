@@ -244,9 +244,13 @@ test('an unknown layer or option is reported', () => {
     clearScriptTrace();
     assert.equal(api.imageSet('L', PNG, { layer: 'nope' }), false);
     assert.match(traced(), /no such layer/);
+    // An option it does not take refuses the whole call, in the words every member uses; it used to
+    // drop that option alone and apply the rest.
     clearScriptTrace();
-    assert.equal(api.imageSet('L', PNG, { nonsense: 1 }), false);
-    assert.match(traced(), /not an image option/);
+    const before = api.get('L.Background.Fill.imageOpacity');
+    assert.equal(api.imageSet('L', PNG, { nonsense: 1, opacity: 40 }), false);
+    assert.match(traced(), /^ce\.image\.set: "nonsense" is not one of its options, so nothing was done\. Its options are: /);
+    assert.equal(api.get('L.Background.Fill.imageOpacity'), before, 'nothing from the refused call landed');
   });
 });
 
@@ -257,6 +261,40 @@ test('opacity is clamped to the panel\'s own 0..100 range', () => {
     api.imageSet('L', PNG, { opacity: -20 });
     assert.equal(api.get('L.Background.Fill.imageOpacity'), 0);
   });
+});
+
+test('the two opacity scales say how a value was read when it looks meant for the other one', () => {
+  // ce.image.set reads opacity out of 100, ce.image.icon out of 1, one call apart. The value is
+  // applied as written either way, because the scale is the panel's, and a warning gives the
+  // reading and the number that would mean what was probably meant.
+  const warns = () => storeGet(scriptTrace).filter((e) => e.kind === 'warn').map((e) => e.message);
+  withIcons([
+    { id: 'i1', name: 'waveform', enabled: true, dataUrl: PNG },
+  ], () => withControls((api) => {
+    clearScriptTrace();
+    api.imageSet('L', PNG, { opacity: 0.5 });
+    assert.equal(api.get('L.Background.Fill.imageOpacity'), 0.5, 'applied as written');
+    assert.deepEqual(warns(), ['ce.image.set("L"): opacity runs from 0 to 100 here, so 0.5 is almost '
+      + 'invisible. If you meant 0.5 out of 1, write 50.']);
+    for (const quiet of [50, 100, 0]) {
+      clearScriptTrace();
+      api.imageSet('L', PNG, { opacity: quiet });
+      assert.deepEqual(warns(), [], `opacity ${quiet} on the 0 to 100 scale is not a mistake`);
+    }
+
+    const button = createControl('Button', { name: 'B' });
+    panels.update((all) => [{ ...all[0], controls: [...all[0].controls, button] }]);
+    clearScriptTrace();
+    api.imageIcon('B', 'waveform', { opacity: 50 });
+    assert.equal(api.get('B.Icon.opacity'), 50, 'applied as written');
+    assert.deepEqual(warns(), ['ce.image.icon("B"): opacity runs from 0 to 1 here, so 50 is fully solid. '
+      + 'If you meant 50 out of 100, write 0.5.']);
+    for (const quiet of [0.5, 1, 0]) {
+      clearScriptTrace();
+      api.imageIcon('B', 'waveform', { opacity: quiet });
+      assert.deepEqual(warns(), [], `opacity ${quiet} on the 0 to 1 scale is not a mistake`);
+    }
+  }));
 });
 
 test('a control without the section reports rather than throwing', () => {

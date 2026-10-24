@@ -1,8 +1,49 @@
+<script module>
+  import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
+  import { hasCompoundPath, pathIsClosed, pathVectorPoints } from '../utils/penPath.js';
+  import { isBooleanGroup } from '../utils/booleanGroups.js';
+
+  function drawnAs(part, ...names) {
+    return names.includes(String(part?.kind ?? '').toLowerCase())
+      || names.includes(String(part?.meta?.renderer ?? '').toLowerCase());
+  }
+
+  function partShape(part) {
+    const kind = String(part?.kind ?? '').trim().toLowerCase();
+    const rendersArcTrack = drawnAs(part, 'arctrack', 'ringarc');
+    // Flat vector polygons (triangle, star, hexagon, …) render as a single SVG
+    // <polygon> using the part's fill + border, instead of the CSS background.
+    // A `path` part (the designer's Pen) carries its own points; see utils/penPath.js.
+    const polygonVerts = polygonPoints(part?.kind) ?? pathVectorPoints(part);
+    const rendersLine = kind === 'line';
+    // A combined or smoothed shape (utils/partBooleans.js): SVG path data in 0..1 of the box, with curves,
+    // holes and islands, so it cannot be a point list.
+    const compoundPathData = hasCompoundPath(part) ? part.meta.pathData : '';
+    // A combined shape (utils/booleanGroups.js) and a closed compound path paint through the outline
+    // pipeline — every fill layer, border style and effect, on their true shape. An OPEN compound path
+    // (a smoothed open Pen path) has no inside and is still a stroke, drawn by the vector branch.
+    const rendersBooleanGroup = isBooleanGroup(part);
+    const rendersOutline = rendersBooleanGroup || (!!compoundPathData && part?.meta?.closed !== false);
+    return {
+      rendersValueArc: drawnAs(part, 'valuearc'),
+      rendersArcTrack,
+      rendersEnvelopePath: drawnAs(part, 'envelopepath'),
+      rendersWaveformIcon: drawnAs(part, 'waveformicon'),
+      usesSimpleBackground: !!part?._children?.Background && !rendersArcTrack && ['circle', 'ring', 'capsule'].includes(kind),
+      polygonVerts,
+      rendersOpenPath: !!polygonVerts && String(part?.kind ?? '') === 'path' && !pathIsClosed(part),
+      rendersLine,
+      compoundPathData,
+      rendersBooleanGroup,
+      rendersOutline,
+      rendersVectorShape: !!polygonVerts || rendersLine || (!!compoundPathData && !rendersOutline),
+    };
+  }
+</script>
+
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
-  import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
-  import { hasCompoundPath, pathIsClosed, pathVectorPoints } from '../utils/penPath.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
@@ -10,7 +51,7 @@
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { isSliderControlPart, sliderControlSession } from '../utils/sliderControlPart.js';
-  import { booleanShapeFor, booleanShapeRevision, compoundShapeFor, isBooleanGroup } from '../utils/booleanGroups.js';
+  import { booleanShapeFor, booleanShapeRevision, compoundShapeFor } from '../utils/booleanGroups.js';
   import { outlineInsetDepths } from '../utils/outlineBorder.js';
   import { outlineShadows } from '../utils/outlineShadows.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
@@ -83,69 +124,25 @@
 
   let layout = $derived(part?._children?.Layout ?? null);
   let background = $derived(part?._children?.Background ?? null);
-  let backgroundFill = $derived(background?._children?.Fill ?? null);
-  let backgroundBorder = $derived(background?._children?.Border ?? null);
-  let simpleBackgroundKind = $derived(String(part?.kind ?? '').trim().toLowerCase());
   let effects = $derived(part?._children?.Effects ?? null);
   let text = $derived(part?._children?.Text ?? null);
   let image = $derived(part?._children?.Image ?? null);
-  let textFill = $derived(text?._children?.Fill ?? null);
-  let textFont = $derived(text?._children?.Font ?? null);
-  let textPosition = $derived(text?._children?.Position ?? null);
-  let valueArc = $derived(part?.meta?.valueArc ?? null);
-  let arcTrack = $derived(part?.meta?.arcTrack ?? part?.meta?.ringArc ?? null);
-  let envelopePath = $derived(part?.meta?.envelopePath ?? null);
-  let waveformIcon = $derived(part?.meta?.waveformIcon ?? null);
-  let rendersValueArc = $derived(
-    String(part?.kind ?? '').toLowerCase() === 'valuearc'
-    || String(part?.meta?.renderer ?? '').toLowerCase() === 'valuearc'
-  );
-  let rendersArcTrack = $derived(
-    ['arctrack', 'ringarc'].includes(String(part?.kind ?? '').toLowerCase())
-    || ['arctrack', 'ringarc'].includes(String(part?.meta?.renderer ?? '').toLowerCase())
-  );
-  let rendersEnvelopePath = $derived(
-    String(part?.kind ?? '').toLowerCase() === 'envelopepath'
-    || String(part?.meta?.renderer ?? '').toLowerCase() === 'envelopepath'
-  );
-  let rendersWaveformIcon = $derived(
-    String(part?.kind ?? '').toLowerCase() === 'waveformicon'
-    || String(part?.meta?.renderer ?? '').toLowerCase() === 'waveformicon'
-  );
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
   // pipeline, fed the session the panel would hold for it, so it draws and animates the same way.
   let sliderControl = $derived(isSliderControlPart(part) ? part?.meta?.sliderControl ?? null : null);
   let sliderResolved = $derived(sliderControl?.control
     ? resolveInteractiveControl(sliderControl.control, sliderControlSession(sliderControl))
     : null);
-  let usesSimpleBackground = $derived(
-    background
-    && !rendersArcTrack
-    && ['circle', 'ring', 'capsule'].includes(simpleBackgroundKind)
-  );
+  // What the part draws, worked out once per part. These were fourteen deriveds of their own, each
+  // a node in the reactive graph with its dependency and reader lists, for every part of every
+  // control on a panel; GAIA's custom components carry five or six parts each. See partShape.
+  let shape = $derived(partShape(part));
 
-  // Flat vector polygons (triangle, star, hexagon, …) render as a single SVG
-  // <polygon> using the part's fill + border, instead of the CSS background.
-  // A `path` part (the designer's Pen) carries its own points; see utils/penPath.js.
-  let polygonVerts = $derived(polygonPoints(part?.kind) ?? pathVectorPoints(part));
-  let rendersPolygon = $derived(!!polygonVerts);
-  let rendersOpenPath = $derived(rendersPolygon && String(part?.kind ?? '') === 'path' && !pathIsClosed(part));
-  let rendersLine = $derived(simpleBackgroundKind === 'line');
-  // A combined or smoothed shape (utils/partBooleans.js): SVG path data in 0..1 of the box, with curves,
-  // holes and islands, so it cannot be a point list.
-  let compoundPathData = $derived(hasCompoundPath(part) ? part.meta.pathData : '');
-  // A combined shape (utils/booleanGroups.js) and a closed compound path paint through the outline
-  // pipeline — every fill layer, border style and effect, on their true shape. An OPEN compound path
-  // (a smoothed open Pen path) has no inside and is still a stroke, drawn by the vector branch.
-  let rendersBooleanGroup = $derived(isBooleanGroup(part));
-  let rendersOutline = $derived(rendersBooleanGroup || (!!compoundPathData && part?.meta?.closed !== false));
-  let rendersVectorShape = $derived(rendersPolygon || rendersLine || (!!compoundPathData && !rendersOutline));
-
-  let outlineDepths = $derived(rendersOutline ? outlineInsetDepths(background) : []);
+  let outlineDepths = $derived(shape.rendersOutline ? outlineInsetDepths(background) : []);
   // The group's outline: computed from its operands as they are now, synchronously when that is
   // already known, otherwise the previous outline until Paper.js has the new one.
   let groupShape = $derived.by(() => {
-    if (!rendersBooleanGroup) return null;
+    if (!shape.rendersBooleanGroup) return null;
     $booleanShapeRevision;
     return booleanShapeFor(part, parentWidth, parentHeight, { insetDepths: outlineDepths, identity: partUid });
   });
@@ -187,35 +184,35 @@
   // A group sits where its outline is; its Layout box only records that for the designer.
   let frame = $derived.by(() => {
     const bounds = groupShape?.shape?.bounds;
-    if (rendersBooleanGroup && bounds) return { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height };
+    if (shape.rendersBooleanGroup && bounds) return { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height };
     return layoutFrame;
   });
 
   let outlineState = $derived.by(() => {
-    if (!rendersOutline) return null;
-    if (rendersBooleanGroup) return groupShape;
+    if (!shape.rendersOutline) return null;
+    if (shape.rendersBooleanGroup) return groupShape;
     $booleanShapeRevision;
     return compoundShapeFor(part, frame.width, frame.height, { insetDepths: outlineDepths, identity: partUid });
   });
 
   let outline = $derived.by(() => {
-    const shape = outlineState?.shape;
-    if (!shape || shape.empty || !shape.pathData) return null;
-    return { d: shape.pathData, fillRule: 'evenodd', insets: shape.insets ?? {} };
+    const traced = outlineState?.shape;
+    if (!traced || traced.empty || !traced.pathData) return null;
+    return { d: traced.pathData, fillRule: 'evenodd', insets: traced.insets ?? {} };
   });
 
-  let shadowLayers = $derived(rendersOutline ? outlineShadows(effects) : null);
+  let shadowLayers = $derived(shape.rendersOutline ? outlineShadows(effects) : null);
 
   let partScale = $derived(Math.max(0.01, numberOr(layout?.scale, 1)));
   let partRotation = $derived(numberOr(layout?.rotation, 0));
   // On an outline the shadows are drawn from the outline (utils/outlineShadows.js), not the box.
-  let shadowCSS = $derived(rendersOutline ? '' : buildShadowCSS(effects));
+  let shadowCSS = $derived(shape.rendersOutline ? '' : buildShadowCSS(effects));
   let blendCSS = $derived(buildBlendCSS(effects));
   // A lit material (utils/materialFilter.js) is an SVG filter this part owns; it goes first in the
   // filter list so the CSS blur / brightness that follow act on the lit surface.
   let material = $derived(effects?._children?.Material ?? null);
   let materialLit = $derived(materialActive(material));
-  let materialId = $derived(`part-material-${partUid}`);
+  const materialId = `part-material-${partUid}`;
   let filterCSS = $derived.by(() => {
     const css = buildFilterCSS(effects);
     if (!materialLit) return css;
@@ -258,7 +255,7 @@
   // 2,821 of the GAIA panel's parts are static art already folded into one image per component,
   // and the 474 that are left over still wanted a div each just to hold a colour.
   let absorbedFillCSS = $derived(
-    background && !usesSimpleBackground && !rendersVectorShape && !rendersOutline
+    background && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -278,6 +275,9 @@
 
   let textStyle = $derived.by(() => {
     if (!text) return '';
+    const textFill = text._children?.Fill ?? null;
+    const textFont = text._children?.Font ?? null;
+    const textPosition = text._children?.Position ?? null;
     const multiline = Number(text._children?.Multiline?.maxLines) > 1;
 
     return [
@@ -318,6 +318,9 @@
 
   let inputStyle = $derived.by(() => {
     if (!editableInput) return '';
+    const textFill = text?._children?.Fill ?? null;
+    const textFont = text?._children?.Font ?? null;
+    const textPosition = text?._children?.Position ?? null;
 
     return [
       'position:absolute',
@@ -374,7 +377,8 @@
   });
 
   let valueArcStyle = $derived.by(() => {
-    if (!rendersValueArc) return '';
+    if (!shape.rendersValueArc) return '';
+    const valueArc = part?.meta?.valueArc ?? null;
 
     const size = Math.max(1, Math.min(frame.width, frame.height));
     const thickness = clampNumber(valueArc?.thickness, 1, size / 2);
@@ -396,7 +400,10 @@
   });
 
   let arcSvgData = $derived.by(() => {
-    if (!rendersArcTrack) return null;
+    if (!shape.rendersArcTrack) return null;
+    const arcTrack = part?.meta?.arcTrack ?? part?.meta?.ringArc ?? null;
+    const backgroundFill = background?._children?.Fill ?? null;
+    const backgroundBorder = background?._children?.Border ?? null;
     const size = Math.max(1, Math.min(frame.width, frame.height));
     const thickness = clampNumber(arcTrack?.thickness ?? backgroundBorder?.thickness, 1, size / 2);
     const r = Math.max(0.5, size / 2 - thickness / 2);
@@ -414,7 +421,9 @@
   });
 
   let simpleBackgroundStyle = $derived.by(() => {
-    if (!usesSimpleBackground) return '';
+    if (!shape.usesSimpleBackground) return '';
+    const backgroundFill = background?._children?.Fill ?? null;
+    const backgroundBorder = background?._children?.Border ?? null;
 
     const fillEnabled = backgroundFill?.solidEnabled !== false;
     const borderEnabled = backgroundBorder?.enabled === true && numberOr(backgroundBorder?.thickness, 0) > 0;
@@ -433,7 +442,9 @@
   });
 
   let vectorShapeSvg = $derived.by(() => {
-    if (!rendersVectorShape) return null;
+    if (!shape.rendersVectorShape) return null;
+    const backgroundFill = background?._children?.Fill ?? null;
+    const backgroundBorder = background?._children?.Border ?? null;
     const width = Math.max(1, frame.width);
     const height = Math.max(1, frame.height);
     const fillEnabled = backgroundFill?.solidEnabled !== false;
@@ -442,7 +453,7 @@
     const fill = fillEnabled ? cssColour(backgroundFill?.colour ?? '00000000', 'transparent') : 'none';
     const stroke = borderEnabled ? cssColour(backgroundBorder?.colour ?? 'FFFFFFFF', '#FFFFFF') : 'none';
 
-    if (rendersLine) {
+    if (shape.rendersLine) {
       // A line/divider has no area: paint the border as a centered stroke,
       // falling back to the fill colour or white when no border is set.
       const lineStroke = stroke !== 'none'
@@ -455,7 +466,7 @@
       };
     }
 
-    if (compoundPathData) {
+    if (shape.compoundPathData) {
       // Scaled into the box the way a polygon's points are, inset by half the stroke so the stroke
       // stays inside the box; the stroke itself does not scale.
       const open = part?.meta?.closed === false;
@@ -469,12 +480,12 @@
         fill: open ? 'none' : fill,
         stroke: pathStroke,
         strokeWidth: pathStrokeWidth,
-        d: compoundPathData,
+        d: shape.compoundPathData,
         transform: `translate(${inset} ${inset}) scale(${Math.max(0.001, width - 2 * inset)} ${Math.max(0.001, height - 2 * inset)})`,
       };
     }
 
-    if (rendersOpenPath) {
+    if (shape.rendersOpenPath) {
       // An open path has no inside: stroke it like a line, falling back the same way.
       const openStroke = stroke !== 'none'
         ? stroke
@@ -482,7 +493,7 @@
       const openWidth = strokeWidth > 0 ? strokeWidth : 2;
       return {
         width, height, fill: 'none', stroke: openStroke, strokeWidth: openWidth, open: true,
-        points: polygonToSvgPoints(polygonVerts, width, height, openWidth / 2),
+        points: polygonToSvgPoints(shape.polygonVerts, width, height, openWidth / 2),
         line: null,
       };
     }
@@ -490,13 +501,14 @@
     const inset = strokeWidth / 2;
     return {
       width, height, fill, stroke, strokeWidth,
-      points: polygonToSvgPoints(polygonVerts, width, height, inset),
+      points: polygonToSvgPoints(shape.polygonVerts, width, height, inset),
       line: null,
     };
   });
 
   let envelopeSvg = $derived.by(() => {
-    if (!rendersEnvelopePath) return { d: '', fillD: '', stroke: '#65E6A0', fill: 'transparent', strokeWidth: 3 };
+    if (!shape.rendersEnvelopePath) return { d: '', fillD: '', stroke: '#65E6A0', fill: 'transparent', strokeWidth: 3 };
+    const envelopePath = part?.meta?.envelopePath ?? null;
     const width = Math.max(1, frame.width);
     const height = Math.max(1, frame.height);
     const padX = clampNumber(envelopePath?.padX, 0, width / 3);
@@ -571,7 +583,8 @@
   }
 
   let waveformSvg = $derived.by(() => {
-    if (!rendersWaveformIcon) return { d: '', tileD: '', tiles: [], stroke: '#EAF0F6', strokeWidth: 3, animate: false, animationMode: 'scroll', durationMs: 900 };
+    if (!shape.rendersWaveformIcon) return { d: '', tileD: '', tiles: [], stroke: '#EAF0F6', strokeWidth: 3, animate: false, animationMode: 'scroll', durationMs: 900 };
+    const waveformIcon = part?.meta?.waveformIcon ?? null;
     const width = Math.max(1, frame.width);
     const height = Math.max(1, frame.height);
     const pad = Math.max(2, Math.min(width, height) * 0.16);
@@ -604,7 +617,7 @@
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />
     {/if}
-    {#if rendersOutline}
+    {#if shape.rendersOutline}
       {#if outline}
         {#if shadowLayers?.outer.length}
           <svg class="interactive-outline-shadow" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
@@ -658,13 +671,13 @@
           </svg>
         {/if}
       {/if}
-    {:else if background && usesSimpleBackground && !rendersVectorShape}
+    {:else if background && shape.usesSimpleBackground && !shape.rendersVectorShape}
       <div class="interactive-simple-background ce-colour-anim" style={simpleBackgroundStyle}></div>
-    {:else if background && !rendersVectorShape}
+    {:else if background && !shape.rendersVectorShape}
       <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
     {/if}
 
-    {#if rendersVectorShape && vectorShapeSvg}
+    {#if shape.rendersVectorShape && vectorShapeSvg}
       <svg class="interactive-vector-shape ce-colour-anim" viewBox={`0 0 ${vectorShapeSvg.width} ${vectorShapeSvg.height}`} preserveAspectRatio="none" aria-hidden="true">
         {#if vectorShapeSvg.line}
           <line
@@ -720,7 +733,7 @@
       />
     {/if}
 
-    {#if rendersValueArc}
+    {#if shape.rendersValueArc}
       <div class="interactive-value-arc" style={valueArcStyle}></div>
     {/if}
 
@@ -740,14 +753,14 @@
       </svg>
     {/if}
 
-    {#if rendersEnvelopePath}
+    {#if shape.rendersEnvelopePath}
       <svg class="interactive-envelope-path" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
         <path d={envelopeSvg.fillD} fill={envelopeSvg.fill}></path>
         <path d={envelopeSvg.d} fill="none" stroke={envelopeSvg.stroke} stroke-width={envelopeSvg.strokeWidth} stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
     {/if}
 
-    {#if rendersWaveformIcon}
+    {#if shape.rendersWaveformIcon}
       <svg class="interactive-waveform-icon" class:dash-scrolling={waveformSvg.animate && waveformSvg.animationMode === 'dash'} class:real-scrolling={waveformSvg.animate && waveformSvg.animationMode !== 'dash'} viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
         {#if waveformSvg.animate && waveformSvg.animationMode !== 'dash'}
           <g class="waveform-strip">

@@ -34,6 +34,9 @@ export function outlineBorderSettings(border) {
 
 const round3 = (value) => Math.round(value * 1000) / 1000;
 
+/** The key an outline's `insets` holds the outline pulled inward by `depth` under (booleanGroups.js). */
+export const outlineInsetKey = (depth) => String(round3(depth));
+
 /**
  * The bands to paint for a border along an outline:
  *   [{ from, to, colour, dasharray, linecap, facing: 'upLeft' | 'downRight' | null, dots: { radius, gap } | null }]

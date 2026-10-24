@@ -6,12 +6,40 @@
   // highlight, smart Tab/auto-indent, bracket & quote auto-closing, comment toggle,
   // find & replace, and font zoom. Native textarea undo/redo and copy/paste are kept
   // intact by routing every programmatic edit through document.execCommand('insertText').
+  //
+  // A long JSON text (the panel file view's "every field" reference: up to 11,000 lines for one of
+  // GAIA's controls) is drawn only where it is on screen. The textarea still holds all of it, so
+  // selecting, copying, the caret and find are the browser's own over the whole text; the highlight
+  // layer and the gutter draw the visible lines and a margin, and move with the scroll. JSON can be
+  // drawn a window at a time because each of its tokens ends on the line it began on; a script's
+  // block comment or template string does not, so scripts are drawn whole, as before. Positions are
+  // found through an index of where each line starts (utils/lineIndex.js), not by counting newlines.
+  //
+  // MARKS: the Values sidebar's highlights (`marks`, editor/codeMarks.js) are boxes placed by line and
+  // column behind the textarea, as the occurrence marks are, so no character moves: a faint band over
+  // the statement it lists, a light box around the value under the pointer in it, and an outlined box
+  // around the value an edit is open on. replaceRange() is how the sidebar writes a value back: one
+  // replacement through applyEdit, so it is one native undo step and reaches the parent as typing does.
+  //
+  // VALUE COMPLETION: with the caret inside a string that is a value the editor knows the choices for
+  // (a curve, a division, an event, a control's name…), completion lists those choices instead of
+  // words, and the one accepted replaces the whole value between the quotes, as one edit. What the
+  // choices are comes from the Values core, which is a chunk of its own and is handed in, once it has
+  // loaded, as `valueCompletions` (scripting/valueCompletions.js); until then, and outside such a
+  // value, completion is word completion as it always was.
   import { onDestroy, tick } from 'svelte';
-  import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
+  import { highlight, lineCommentToken, matchingBracket, identifierOccurrences, languageKey } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
   import { projectFolds, pruneFolds } from './foldModel.js';
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
   import { floating } from '../utils/floatingUi.js';
+  import { carryPopupTheme } from './popupTheme.js';
+  import { placeSignatureHint } from './signatureHint.js';
+  import { visualColumn, indexAtColumn } from './textColumns.js';
+  import { codeParts } from './explainViews.js';
+  import { paramColours } from '../scripting/paramColours.js';
+  import { lineAt, lineStartsOf } from '../utils/lineIndex.js';
+  import { markBoxes } from './codeMarks.js';
 
   let {
     value = '',
@@ -27,6 +55,16 @@
     // The component type this script is attached to, if it is attached to one. Completion uses it
     // to leave out the verbs the control has no section for.
     controlType = '',
+    // Shown to read, not to edit: the panel file view's "every field" reference.
+    readOnly = false,
+    // The Values sidebar's highlights: [{ start, end, kind: 'statement' | 'hover' | 'edit' }], offsets
+    // into `value`. None are drawn while the view is folded.
+    marks = [],
+    // Told whether the view is folded, each time that changes: folding ends an open value edit.
+    onfold = null,
+    // (source, language, caret, { force }) → { from, to, current, options, selected } | null: the
+    // choices for the value the caret is in (scripting/valueCompletions.js), or null to complete words.
+    valueCompletions = null,
   } = $props();
 
   let bpSet = $derived(new Set(breakpoints)); // 1-based line numbers
@@ -37,6 +75,7 @@
   }
 
   let taEl = $state(null);       // the editable textarea (the source of truth for editing)
+  let rootEl = null;             // the editor's own box, whose colours the portaled popups take
   let measureEl = $state(null);  // hidden element for measuring monospace character width
   let scrollTop = $state(0);
   let scrollLeft = $state(0);
@@ -102,6 +141,7 @@
     if (pruned.size !== folded.size) folded = pruned;
   });
   let isFolded = $derived(folded.size > 0);
+  $effect(() => { onfold?.(isFolded); });
   let projection = $derived(isFolded ? projectFolds(value, folded, foldRegions) : null);
   let displayText = $derived(projection ? projection.text : value);
   function fullLineOf(displayIdx) { return projection ? (projection.displayToFull[displayIdx] ?? displayIdx + 1) : displayIdx + 1; }
@@ -116,10 +156,14 @@
   // Each diagnostic, resolved to the on-screen token it underlines.
   // Squiggle overlay positions are in full-source space; suppress while folded
   // (the gutter error tint still shows via errorLines, keyed by full line number).
+  // Columns as drawn (textColumns.js): the diagnostic's own column and its word's length count
+  // characters, and a tab before it put the underline under the wrong text.
   let diagSpans = $derived(isFolded ? [] : diagnostics.map((d) => {
     const w = wordAt(analyzedSource, d.index) || wordAt(analyzedSource, d.index - 1);
     const len = w ? w.word.length : 1;
-    return { line: d.line, col: d.col, len, message: d.message };
+    const text = analyzedSource.split('\n')[d.line - 1] ?? '';
+    const col = visualColumn(text, d.col);
+    return { line: d.line, col, len: visualColumn(text, d.col + len) - col, message: d.message };
   }));
   $effect(() => { ondiagnostics?.(diagnostics); });
 
@@ -127,16 +171,40 @@
   let lineHeight = $derived(Math.round(fontSize * 1.6));
   let lines = $derived(displayText.split('\n'));
   let lineCount = $derived(lines.length);
+  // Where each line starts, as character offsets: of the full source, and of what is displayed.
+  let valueStarts = $derived(lineStartsOf(value));
+  let displayStarts = $derived(projection ? lineStartsOf(displayText) : valueStarts);
   // Gutter shows full-source line numbers, so size it to the full line count (not the
   // possibly-fewer displayed rows when folded).
-  let gutterDigits = $derived(String(value.split('\n').length).length);
+  let gutterDigits = $derived(String(valueStarts.length).length);
+
+  // ----- drawing only what is on screen (long JSON) -----
+  const VIRTUAL_MIN_LINES = 1000;
+  const WINDOW_STEP = 40;    // the drawn window moves in steps of this many lines…
+  const WINDOW_MARGIN = 60;  // …and reaches this far past the screen on each side
+  let virtual = $derived(languageKey(language) === 'json' && lineCount > VIRTUAL_MIN_LINES);
+  let firstRow = $derived.by(() => {
+    if (!virtual) return 0;
+    const top = Math.max(0, Math.floor((scrollTop - PAD_TOP) / lineHeight));
+    return Math.max(0, Math.floor(top / WINDOW_STEP) * WINDOW_STEP - WINDOW_MARGIN);
+  });
+  let lastRow = $derived(virtual
+    ? Math.min(lineCount, firstRow + Math.ceil((taClientH || 800) / lineHeight) + WINDOW_STEP + 2 * WINDOW_MARGIN)
+    : lineCount);
+  let windowStart = $derived(virtual ? displayStarts[firstRow] : 0);
+  let windowText = $derived(virtual
+    ? displayText.slice(windowStart, lastRow < lineCount ? displayStarts[lastRow] - 1 : displayText.length)
+    : displayText);
+  let gutterRows = $derived(Array.from({ length: lastRow - firstRow }, (_, i) => firstRow + i));
+
   // Highlight a matched bracket pair only when there's no active text selection (and not folded).
+  // Offsets are into the drawn text, which a long text starts at windowStart.
   let matchMarks = $derived.by(() => {
     if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return undefined;
     const pair = matchingBracket(displayText, caretPos);
-    return pair ? new Set(pair) : undefined;
+    return pair ? new Set(pair.map((at) => at - windowStart)) : undefined;
   });
-  let highlighted = $derived(highlight(displayText, language, matchMarks));
+  let highlighted = $derived(highlight(windowText, language, matchMarks));
 
   // Highlight every occurrence of the identifier under the caret (or the selected word).
   const IDENT_RE = /^[A-Za-z_$][\w$]*$/;
@@ -150,11 +218,15 @@
   });
   let occurrences = $derived.by(() => {
     if (isFolded || !targetWord) return [];
-    const occ = identifierOccurrences(displayText, language, targetWord);
-    return occ.length >= 2 ? occ.slice(0, 200) : [];
+    // A long text marks the occurrences in what is drawn, which is all that would show.
+    const occ = identifierOccurrences(windowText, language, targetWord);
+    const found = occ.length >= 2 ? occ.slice(0, 200) : [];
+    return windowStart ? found.map((o) => ({ start: o.start + windowStart, end: o.end + windowStart })) : found;
   });
+  // The Values sidebar's highlights, placed in the lines drawn (a long text draws a window of them).
+  let markList = $derived(markBoxes(marks, value, valueStarts, { first: firstRow, last: lastRow, folded: isFolded }));
   // A trailing newline collapses in <pre>; pad so the highlight layer matches the textarea height.
-  let highlightedSafe = $derived(highlighted + (displayText.endsWith('\n') ? '\n' : ''));
+  let highlightedSafe = $derived(highlighted + (windowText.endsWith('\n') ? '\n' : ''));
 
   const CLOSERS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' };
   const OPENERS = new Set(Object.keys(CLOSERS));
@@ -187,15 +259,19 @@
     ctx.clearRect(0, 0, W, H);
     const n = lines.length;
     const cellH = Math.max(1, Math.min(4, H / Math.max(n, 1)));
+    // A text taller than the map is sampled, one line per row, so the map is the whole text and the
+    // viewport box (a share of the whole) sits over the part it says.
+    const stride = Math.max(1, (n * cellH) / H);
     const cellW = Math.max(0.8, Math.min(1.6, (W - 6) / 90));
     const fg = theme === 'light' ? 'rgba(31,36,48,0.5)' : 'rgba(207,227,216,0.45)';
     const com = theme === 'light' ? 'rgba(138,148,140,0.6)' : 'rgba(91,107,95,0.75)';
     const tok = lineCommentToken(language);
-    for (let i = 0; i < n; i++) {
-      const y = i * cellH;
-      if (y > H) break;
+    for (let row = 0; ; row++) {
+      const y = row * cellH;
+      const i = Math.floor(row * stride);
+      if (y > H || i >= n) break;
       const line = lines[i];
-      ctx.fillStyle = line.trimStart().startsWith(tok) ? com : fg;
+      ctx.fillStyle = tok && line.trimStart().startsWith(tok) ? com : fg;
       let run = -1;
       for (let c = 0; c <= line.length; c++) {
         const ch = line[c];
@@ -243,10 +319,21 @@
     if (!taEl) return;
     const pos = taEl.selectionStart;
     caretPos = pos;
-    const before = taEl.value.slice(0, pos);
-    caretLine = countLines(before);
-    caretCol = pos - (before.lastIndexOf('\n') + 1);
-    oncaret?.(fullLineOf(caretLine), caretCol + 1);
+    // The index is of what is displayed; between a keystroke and the parent passing the new text
+    // back, the textarea is ahead of it, and is indexed itself.
+    const text = taEl.value;
+    const starts = text === displayText ? displayStarts : lineStartsOf(text);
+    caretLine = lineAt(starts, pos);
+    caretCol = pos - starts[caretLine];
+    // A value's list is about the characters between its quotes: the caret leaving them (an arrow
+    // key, typing over the closing quote) closes it, so that Enter out there is a new line again and
+    // not a rewrite of the value left behind.
+    if (acOpen && acValue && (pos < acFrom || pos > acTo || taEl.selectionEnd !== pos)) acOpen = false;
+    // The third argument is the caret's offset into the full source; folded, the start of its line
+    // in the full source plus its column, since the textarea then holds the folded text.
+    const fullLine = fullLineOf(caretLine);
+    const offset = projection ? (valueStarts[fullLine - 1] ?? 0) + caretCol : pos;
+    oncaret?.(fullLine, caretCol + 1, offset);
   }
 
   function countLines(s) { let n = 0; for (let i = 0; i < s.length; i++) if (s[i] === '\n') n++; return n; }
@@ -258,12 +345,31 @@
     if (measureEl) charWidth = measureEl.getBoundingClientRect().width / 10 || charWidth;
     if (taEl) taClientH = taEl.clientHeight;
   });
+  // …and whenever the measured text changes width without the size changing. The face is a web font
+  // (JetBrains Mono), loaded the first time text needs it, so the first measure is the fallback's:
+  // on Windows that is Cascadia Code or Consolas, 7.0 px a character to JetBrains Mono's 7.8, and
+  // every box placed by column (occurrences, squiggles, the Values marks, the completion list) ended
+  // further from its text the further along the line it was.
+  $effect(() => {
+    const el = measureEl;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => { charWidth = el.getBoundingClientRect().width / 10 || charWidth; });
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
 
-  // line/column (0-based) of a character offset.
+  // The text of line `line` (from 0).
+  function lineTextOf(line) {
+    const start = valueStarts[line] ?? 0;
+    return value.slice(start, line + 1 < valueStarts.length ? valueStarts[line + 1] - 1 : value.length);
+  }
+  // line/column (0-based) of a character offset, the column as the editor draws it, a tab to its next
+  // stop (textColumns.js). Counted in characters, every box placed by it (the completion list, the
+  // rename box, the occurrence marks) sat left of its text on a line with tabs.
   function posOf(index) {
-    const before = value.slice(0, index);
-    const nl = before.lastIndexOf('\n');
-    return { line: countLines(before), col: index - (nl + 1) };
+    const at = Math.min(index, value.length);
+    const line = lineAt(valueStarts, at);
+    return { line, col: visualColumn(lineTextOf(line), at - valueStarts[line]) };
   }
   // Content-space pixel (pre-scroll) for a line/col.
   function xyOf(line, col) {
@@ -277,11 +383,8 @@
     const ly = clientY - r.top + taEl.scrollTop - PAD_TOP;
     const line = Math.max(0, Math.floor(ly / lineHeight));
     const col = Math.max(0, Math.round(lx / charWidth));
-    const lines = value.split('\n');
-    if (line >= lines.length) return value.length;
-    let base = 0;
-    for (let i = 0; i < line; i++) base += lines[i].length + 1;
-    return base + Math.min(col, lines[line].length);
+    if (line >= valueStarts.length) return value.length;
+    return valueStarts[line] + indexAtColumn(lineTextOf(line), col);
   }
 
   // ----- autocomplete -----
@@ -290,6 +393,10 @@
   let acIndex = $state(0);
   let acFrom = $state(0);
   let acTo = $state(0);
+  // The list is a value's choices, not words: accepting one replaces all of [acFrom, acTo), the text
+  // between the value's quotes, rather than the word before the caret.
+  let acValue = $state(false);
+  let acEl = $state(null);
   let acAnchor = $derived(acOpen ? posOf(acFrom) : { line: 0, col: 0 });
   // Viewport coords of the completion anchor (fixed-positioned so it escapes the editor's clip).
   let acScreen = $derived.by(() => {
@@ -307,19 +414,49 @@
     if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
     return getSignatureHelp(value, language, caretPos);
   });
-  let sigScreen = $derived.by(() => {
-    if (!signature || !taEl) return { x: 0, y: 0 };
+  // Each parameter's colour, the one it has under its argument and in the Values sidebar.
+  let sigColours = $derived(signature ? paramColours(signature.id, signature.params) : []);
+  // At the right edge of the caret's line when it clears the code, else a box above it or below
+  // (signatureHint.js).
+  let sigPlace = $derived.by(() => {
+    if (!signature || !taEl) return null;
     const r = taEl.getBoundingClientRect();
-    return {
-      x: r.left + PAD_L + caretCol * charWidth - taEl.scrollLeft,
-      y: r.top + PAD_TOP + caretLine * lineHeight - taEl.scrollTop,
-    };
+    const text = taEl.value;
+    const starts = text === displayText ? displayStarts : lineStartsOf(text);
+    const start = starts[caretLine] ?? 0;
+    const end = caretLine + 1 < starts.length ? starts[caretLine + 1] - 1 : text.length;
+    const line = text.slice(start, end);
+    // In columns as drawn: a tab is drawn to its next stop, not one character wide.
+    const endCol = visualColumn(line, Math.max(line.trimEnd().length, caretCol));
+    const x0 = r.left + PAD_L - scrollLeft;
+    return placeSignatureHint({
+      name: signature.name, params: signature.params, active: signature.activeParam,
+      lineEndX: x0 + endCol * charWidth, caretX: x0 + visualColumn(line, caretCol) * charWidth,
+      lineTop: r.top + PAD_TOP + caretLine * lineHeight - scrollTop, lineHeight, charWidth,
+      box: { left: r.left, right: r.left + taEl.clientWidth, top: r.top, bottom: r.top + taEl.clientHeight },
+    });
   });
 
   function refreshCompletion(force) {
     if (!taEl) return;
     const caret = taEl.selectionStart;
     if (caret !== taEl.selectionEnd) { acOpen = false; return; }
+    // In a value the editor knows the choices for, those are the list, and words are not asked for
+    // even when none of the choices fits what is typed: a function's name is no curve. The textarea's
+    // text, not `value`, since the range found is the one an accept replaces.
+    const choice = valueCompletions?.(taEl.value, language, caret, { force }) ?? null;
+    if (choice) {
+      // The same rule as for words: typing opens the list once there is something typed in the value,
+      // or, in a path, once a dot is (`openEmpty`), as member completion opens after one.
+      if ((!force && caret === choice.from && !choice.openEmpty) || choice.options.length === 0) { acOpen = false; return; }
+      acOptions = choice.options;
+      acFrom = choice.from;
+      acTo = choice.to;
+      acIndex = Math.max(0, Math.min(choice.options.length - 1, choice.selected ?? 0));
+      acValue = true;
+      acOpen = true;
+      return;
+    }
     const { from, to, options } = getCompletions(value, language, caret, { controlType });
     const prefixLen = to - from;
     // Auto-open only once there's a prefix; Ctrl+Space (force) opens regardless.
@@ -329,17 +466,50 @@
     acFrom = from;
     acTo = to;
     acIndex = 0;
+    acValue = false;
     acOpen = true;
   }
 
   function acceptCompletion() {
     const opt = acOptions[acIndex];
     if (!opt) { acOpen = false; return; }
-    applyEdit(acFrom, taEl.selectionStart, opt.label, acFrom + opt.label.length);
+    if (acValue) {
+      // A value's choice replaces the whole value between its quotes, as one edit, and leaves the caret
+      // after it, inside them. The value as it is already written is no edit at all.
+      const text = opt.insert ?? opt.label;
+      if (taEl.value.slice(acFrom, acTo) === text) { taEl.setSelectionRange(acTo, acTo); syncCaret(); }
+      else applyEdit(acFrom, acTo, text, acFrom + text.length);
+    } else {
+      applyEdit(acFrom, taEl.selectionStart, opt.label, acFrom + opt.label.length);
+    }
     acOpen = false;
   }
 
-  const KIND_ICON = { function: 'ƒ', variable: 'x', parameter: 'p', property: '.', builtin: 'b', keyword: 'k' };
+  // A list can run past its height (a value's choices, which open on the one written; the words;
+  // Go to symbol's symbols), and the arrow keys move through all of it, wrapping from the first row
+  // to the last: the selected row is kept in view, by the list's own scroll, so nothing else on the
+  // page moves. Measured on screen, since a symbol row's offset counts from the box above its list.
+  function keepSelectedInView(list, selector) {
+    const row = list?.querySelector(selector);
+    if (!row) return;
+    const box = list.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    const top = box.top + list.clientTop;
+    const bottom = top + list.clientHeight;
+    if (at.top < top) list.scrollTop -= top - at.top;
+    else if (at.bottom > bottom) list.scrollTop += at.bottom - bottom;
+  }
+  $effect(() => {
+    void acIndex; void acOptions;
+    if (acOpen) keepSelectedInView(acEl, '.ce-ac-row.sel');
+  });
+  // The pointer selects the row it moves onto, and only when it moves: a list the keys scroll
+  // passes its rows under a resting pointer, and the browser tells each it was entered, so a row
+  // that took the selection on mouseenter took it back from the keys. A move has a distance; what
+  // the browser says of a scroll has none. A browser that gives no distance moves it as before.
+  const pointerMoved = (e) => e.movementX === undefined || e.movementX !== 0 || e.movementY !== 0;
+
+  const KIND_ICON = { function: 'ƒ', variable: 'x', parameter: 'p', property: '.', builtin: 'b', keyword: 'k', value: '"' };
   function kindIcon(kind) { return KIND_ICON[kind] ?? '•'; }
 
   // ----- hover -----
@@ -381,6 +551,7 @@
   let soOpen = $state(false);
   let soQuery = $state('');
   let soIndex = $state(0);
+  let soListEl = $state(null);
   let soInputEl = $state(null);
   let soAll = $derived(
     analysis.symbols.filter((s) => s.kind === 'function' || s.kind === 'variable')
@@ -412,6 +583,10 @@
     else if (e.key === 'Enter') { e.preventDefault(); acceptSymbol(); }
     else if (e.key === 'Escape') { e.preventDefault(); soOpen = false; taEl?.focus(); }
   }
+  $effect(() => {
+    void soIndex; void soItems;
+    if (soOpen) keepSelectedInView(soListEl, '.ce-so-row.sel');
+  });
   async function onEditorClick(e) {
     // Click in the folded view → unfold and drop the caret on the clicked line of the full source.
     if (isFolded) {
@@ -519,6 +694,10 @@
   // reselect [selStart,selEnd]. Fires the textarea input path so the parent stays in sync.
   function applyEdit(start, end, text, selStart, selEnd) {
     if (isFolded) return; // never edit the projected (folded) text — the full source is the truth
+    // readonly stops typing, not this: a read-only textarea refuses insertText, and the fallback
+    // below would write it anyway, past an oninput that ignores it. Every edit of the editor's own
+    // (indent, Enter, closing brackets, column typing, replace, rename, insert) comes through here.
+    if (readOnly) return;
     const ta = taEl;
     ta.focus();
     ta.setSelectionRange(start, end);
@@ -691,6 +870,7 @@
   function toggleComment() {
     const ta = taEl, v = ta.value;
     const token = lineCommentToken(language);
+    if (!token) return; // a language without comments (JSON)
     const selStart = ta.selectionStart, selEnd = ta.selectionEnd;
     const from = lineStartOf(v, selStart);
     // Operate on whole lines: extend to the end of the line containing the selection end.
@@ -722,7 +902,7 @@
     { keys: 'Ctrl/⌘ + F', desc: 'Find' },
     { keys: 'Ctrl/⌘ + H', desc: 'Find & replace' },
     { keys: 'Ctrl/⌘ + /', desc: 'Toggle line comment' },
-    { keys: 'Ctrl/⌘ + Space', desc: 'Trigger autocomplete' },
+    { keys: 'Ctrl/⌘ + Space', desc: 'Trigger autocomplete; in a value, its choices' },
     { keys: 'F12 / Ctrl/⌘+Click', desc: 'Go to definition' },
     { keys: 'Shift + F12', desc: 'Next occurrence (references)' },
     { keys: 'Ctrl/⌘ + Shift + O', desc: 'Go to symbol' },
@@ -789,8 +969,7 @@
     taEl.focus();
     taEl.setSelectionRange(m[0], m[1]);
     // Scroll the match's line into view.
-    const ln = countLines(taEl.value.slice(0, m[0]));
-    const top = ln * lineHeight;
+    const top = posOf(m[0]).line * lineHeight;
     if (top < taEl.scrollTop || top > taEl.scrollTop + taEl.clientHeight - lineHeight * 2) {
       taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 2);
     }
@@ -827,6 +1006,63 @@
   }
   export function focus() { taEl?.focus(); }
 
+  /**
+   * Replace [start, end) of the source with `text`, for the Values sidebar: through applyEdit, so it
+   * is one step of the textarea's own undo and fires the input path a keystroke does. The caret and
+   * selection keep their place, moved by the edit, and focus goes back to where it was (a field or
+   * the display panel), since the textarea has to hold it for the edit. Returns the whole text after
+   * the edit, or null when the view cannot be edited (folded, or read-only).
+   */
+  export function replaceRange(start, end, text) {
+    if (!taEl || isFolded || readOnly) return null;
+    const length = taEl.value.length;
+    const s = Math.max(0, Math.min(length, Math.floor(start)));
+    const e = Math.max(s, Math.min(length, Math.floor(end)));
+    const insert = String(text ?? '');
+    const back = typeof document !== 'undefined' ? document.activeElement : null;
+    const moved = (p) => (p <= s ? p : p >= e ? p + insert.length - (e - s) : s + insert.length);
+    applyEdit(s, e, insert, moved(taEl.selectionStart), moved(taEl.selectionEnd));
+    if (back && back !== taEl && back.isConnected && typeof back.focus === 'function') back.focus({ preventScroll: true });
+    return taEl.value;
+  }
+
+  /** Scroll [start, end) into view and put the caret at its start: a Values row was clicked. */
+  export async function reveal(start, end = start, { focus: take = true } = {}) {
+    if (!taEl) return;
+    if (isFolded) { unfoldAll(); await tick(); }
+    const at = Math.max(0, Math.min(value.length, Math.floor(start) || 0));
+    if (take) taEl.focus({ preventScroll: true });
+    taEl.setSelectionRange(at, at);
+    const p = posOf(at);
+    const last = posOf(Math.max(at, Math.min(value.length, Math.floor(end) || at)));
+    const top = p.line * lineHeight;
+    const bottom = (last.line + 1) * lineHeight;
+    if (top < taEl.scrollTop || bottom > taEl.scrollTop + taEl.clientHeight - lineHeight) {
+      taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 3);
+    }
+    const x = p.col * charWidth;
+    if (x < taEl.scrollLeft || x > taEl.scrollLeft + taEl.clientWidth - charWidth * 8) {
+      taEl.scrollLeft = Math.max(0, x - taEl.clientWidth / 3);
+    }
+    onScroll();
+    syncCaret();
+  }
+  // Put the caret at a line and column (both from 1) and scroll it into the middle of the view: the
+  // panel file view takes a reader to the mistake it reported.
+  export async function revealLine(line, col = 1) {
+    if (!taEl) return;
+    if (isFolded) { unfoldAll(); await tick(); }
+    const at = Math.max(1, Math.min(valueStarts.length, Math.floor(line) || 1));
+    const start = valueStarts[at - 1];
+    const end = at < valueStarts.length ? valueStarts[at] - 1 : value.length;
+    const offset = start + Math.max(0, Math.min(end - start, (Math.floor(col) || 1) - 1));
+    taEl.focus();
+    taEl.setSelectionRange(offset, offset);
+    taEl.scrollTop = Math.max(0, (at - 1) * lineHeight - taEl.clientHeight / 2);
+    onScroll();
+    syncCaret();
+  }
+
   onDestroy(() => {
     cancelMinimapDrag?.();
     clearTimeout(analyzeTimer);
@@ -834,17 +1070,19 @@
   });
 
   // Move a node to <body> so fixed-positioned popups aren't clipped by an ancestor's
-  // overflow or transformed containing block.
+  // overflow or transformed containing block. Its colours go with it: they are set where the
+  // editor is, and do not reach <body> (popupTheme.js).
   function portal(node) {
+    carryPopupTheme(node, rootEl);
     document.body.appendChild(node);
     return { destroy() { node.remove(); } };
   }
 </script>
 
-<div class={['ce', theme === 'light' && 'light']} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
+<div class={['ce', theme === 'light' && 'light']} bind:this={rootEl} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
   <div class="ce-gutter">
-    <div class="ce-gutter-inner" style="transform:translateY({-scrollTop}px)">
-      {#each lines as _, i (i)}
+    <div class="ce-gutter-inner" style="transform:translateY({firstRow * lineHeight - scrollTop}px)">
+      {#each gutterRows as i (i)}
         {@const fl = fullLineOf(i)}
         <div class={['ce-gln', i === caretLine && 'active', errorLines.has(fl) && 'err', bpSet.has(fl) && 'bp']}
           role="button" tabindex="-1" title="Toggle breakpoint"
@@ -864,29 +1102,39 @@
   </div>
 
   <div class="ce-area">
+    {#each markList as b (b.key)}
+      {#if b.band}
+        <div class="ce-mark ce-mark-statement" data-mark="statement" data-line={b.line + 1}
+          style="top:{PAD_TOP + b.line * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+      {:else}
+        <div class={['ce-mark', `ce-mark-${b.kind}`, b.colour && `c-${b.colour}`]} data-mark={b.kind} data-line={b.line + 1}
+          style="left:{PAD_L + b.col * charWidth - scrollLeft - 1}px; top:{PAD_TOP + b.line * lineHeight - scrollTop}px; width:{b.width * charWidth + 2}px; height:{lineHeight}px"></div>
+      {/if}
+    {/each}
+    <!-- After the marks: its bar is drawn over a statement band's, so the caret's line in it shows. -->
     <div class="ce-activeline" style="top:{PAD_TOP + caretLine * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {#each occurrences as o (o.start)}
       {@const p = posOf(o.start)}
       <div class="ce-occ"
-        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(o.end - o.start) * charWidth}px; height:{lineHeight}px"></div>
+        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(posOf(o.end).col - p.col) * charWidth}px; height:{lineHeight}px"></div>
     {/each}
     {#each columnCaretLines as ln (ln)}
       <div class="ce-mcaret"
-        style="left:{PAD_L + column.col * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+        style="left:{PAD_L + visualColumn(lineTextOf(ln), column.col) * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
     {/each}
-    <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {-scrollTop}px)">{@html highlightedSafe}</pre>
+    <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {firstRow * lineHeight - scrollTop}px)">{@html highlightedSafe}</pre>
     <textarea
       class="ce-ta"
       bind:this={taEl}
       value={displayText}
-      readonly={isFolded}
+      readonly={isFolded || readOnly}
       {placeholder}
       spellcheck="false"
       autocomplete="off"
       autocapitalize="off"
       autocorrect="off"
       wrap="off"
-      oninput={() => { if (isFolded) return; emit(); syncCaret(); if (!column) refreshCompletion(false); }}
+      oninput={() => { if (isFolded || readOnly) return; emit(); syncCaret(); if (!column) refreshCompletion(false); }}
       onscroll={onScroll}
       onkeydown={onKeydown}
       onkeyup={syncCaret}
@@ -973,28 +1221,40 @@
       onblur={commitRename} />
   {/if}
 
+  {#snippet coded(text)}{#each codeParts(text) as part, k (k)}{#if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}{/snippet}
+
   {#if hover}
     <div class="ce-hover" use:portal use:floating={{ anchor: { x: hover.cx, y: hover.cy }, placement: 'bottom-start', offset: { mainAxis: 16, crossAxis: 6 }, fallbackPlacements: ['top-start'], track: false }}>
       <div class="ce-hover-title">{hover.title}</div>
-      {#if hover.doc}<div class="ce-hover-doc">{hover.doc}</div>{/if}
+      <!-- The description and its example mark code with backticks: drawn as code, not shown as backticks. -->
+      {#if hover.doc}<div class="ce-hover-doc">{@render coded(hover.doc)}</div>{/if}
+      {#if hover.example}<div class="ce-hover-doc ce-hover-example">Example: {@render coded(hover.example)}</div>{/if}
+      {#if hover.params?.length}<ul class="ce-hover-params">{#each hover.params as p (p.name)}<li><code>{p.name}</code> <span class="ce-hover-type">({p.type})</span> {@render coded(p.summary)}</li>{/each}</ul>{/if}
+      {#if hover.notes?.length}<ul class="ce-hover-notes">{#each hover.notes as note, k (k)}<li>{@render coded(note)}</li>{/each}</ul>{/if}
     </div>
   {/if}
 
-  {#if signature && !acOpen}
-    <div class="ce-sig" use:portal use:floating={{ anchor: { x: sigScreen.x, y: sigScreen.y, width: 0, height: lineHeight }, placement: 'top-start', offset: 5, fallbackPlacements: ['bottom-start'], track: false }}>
+  {#if signature && sigPlace && !acOpen}
+    <!-- A line tall, in the code's own size: inline on the caret's line, or a box over the line
+         before or after it, cut at the editor's width. -->
+    <div class={['ce-sig', sigPlace.mode]} data-mode={sigPlace.mode} use:portal
+      style:left="{sigPlace.x}px" style:top="{sigPlace.y}px"
+      style:height="{lineHeight}px" style:line-height="{sigPlace.mode === 'inline' ? lineHeight : lineHeight - 2}px"
+      style:font-size="{fontSize}px"
+      style:max-width={sigPlace.mode === 'inline' ? null : `${sigPlace.width}px`}>
       <span class="ce-sig-name">{signature.name}</span>(<!--
-        -->{#each signature.params as p, i (i)}<span class={['ce-sig-param', i === signature.activeParam && 'active']}>{p}</span>{#if i < signature.params.length - 1}, {/if}{/each}<!--
+        -->{#each sigPlace.parts as p, i (i)}<span class={['ce-sig-param', p.active && 'active', sigColours[p.index] && `c-${sigColours[p.index]}`]}>{p.text}</span>{#if i < sigPlace.parts.length - 1}{', '}{/if}{/each}<!--
       -->)
     </div>
   {/if}
 
   {#if acOpen}
-    <div class="ce-ac" use:portal use:floating={{ anchor: { x: acScreen.x, y: acScreen.y - lineHeight, width: 0, height: lineHeight }, placement: 'bottom-start', offset: -2, fallbackPlacements: ['top-start'], track: false }}>
+    <div class="ce-ac" bind:this={acEl} data-list={acValue ? 'value' : 'words'} use:portal use:floating={{ anchor: { x: acScreen.x, y: acScreen.y - lineHeight, width: 0, height: lineHeight }, placement: 'bottom-start', offset: -2, fallbackPlacements: ['top-start'], track: false }}>
       {#each acOptions as o, i (o.kind + o.label)}
         <div class={['ce-ac-row', i === acIndex && 'sel']}
           role="option" aria-selected={i === acIndex} tabindex="-1"
           onmousedown={(e) => { e.preventDefault(); acIndex = i; acceptCompletion(); }}
-          onmouseenter={() => acIndex = i}>
+          onmousemove={(e) => { if (acIndex !== i && pointerMoved(e)) acIndex = i; }}>
           <span class={['ce-ac-kind', o.kind]}>{kindIcon(o.kind)}</span>
           <span class="ce-ac-label">{o.label}</span>
           <span class="ce-ac-detail">{o.detail}</span>
@@ -1009,7 +1269,7 @@
       role="dialog" aria-label="Go to symbol" tabindex="-1" onmousedown={(e) => e.stopPropagation()}>
       <input class="ce-so-input" bind:this={soInputEl} bind:value={soQuery} placeholder="Go to symbol…"
         oninput={() => soIndex = 0} onkeydown={onSymbolKey} />
-      <div class="ce-so-list">
+      <div class="ce-so-list" bind:this={soListEl}>
         {#if soItems.length === 0}
           <div class="ce-so-empty">No symbols</div>
         {:else}
@@ -1017,7 +1277,7 @@
             <div class={['ce-so-row', i === soIndex && 'sel']}
               role="option" aria-selected={i === soIndex} tabindex="-1"
               onmousedown={(e) => { e.preventDefault(); soIndex = i; acceptSymbol(); }}
-              onmouseenter={() => soIndex = i}>
+              onmousemove={(e) => { if (soIndex !== i && pointerMoved(e)) soIndex = i; }}>
               <span class={['ce-ac-kind', s.kind]}>{kindIcon(s.kind)}</span>
               <span class="ce-so-name">{s.name}</span>
               <span class="ce-so-detail">{s.detail}</span>
@@ -1047,6 +1307,14 @@
     --ce-bic: #4dd6a0;
     --ce-match-bg: rgba(90, 155, 240, 0.28);
     --ce-match-ring: rgba(90, 155, 240, 0.55);
+    /* the Values sidebar's highlights: the statement it lists, the value under the pointer in it, and
+       the value an edit is open on — each its own, so all three read apart from --ce-occ and --ce-sel */
+    --ce-stmt: rgba(90, 155, 240, 0.055);
+    --ce-stmt-bar: rgba(90, 155, 240, 0.75);
+    --ce-hov: rgba(255, 255, 255, 0.075);
+    --ce-hov-ring: rgba(255, 255, 255, 0.24);
+    --ce-edit: rgba(90, 155, 240, 0.12);
+    --ce-edit-ring: #6aa8ff;
     position: relative;
     display: flex;
     width: 100%;
@@ -1074,6 +1342,12 @@
     --ce-bic: #1a8f6a;
     --ce-match-bg: rgba(42, 93, 176, 0.2);
     --ce-match-ring: rgba(42, 93, 176, 0.5);
+    --ce-stmt: rgba(42, 93, 176, 0.05);
+    --ce-stmt-bar: rgba(42, 93, 176, 0.6);
+    --ce-hov: rgba(0, 0, 0, 0.05);
+    --ce-hov-ring: rgba(0, 0, 0, 0.24);
+    --ce-edit: rgba(42, 93, 176, 0.09);
+    --ce-edit-ring: #2a5db0;
   }
 
   .ce-gutter {
@@ -1113,10 +1387,13 @@
 
   .ce-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
 
+  /* The caret's line: a faint band, and a bar at its left edge as the Values tab's statement band
+     has, in the accent colour, so the line the caret is on reads at a glance. */
   .ce-activeline {
     position: absolute;
     left: 0; right: 0;
     background: var(--ce-active);
+    box-shadow: inset 2px 0 0 var(--accent);
     pointer-events: none;
     z-index: 0;
   }
@@ -1127,6 +1404,20 @@
     pointer-events: none;
     z-index: 0;
   }
+  .ce-mark {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    box-sizing: border-box;
+  }
+  .ce-mark-statement { left: 0; right: 0; background: var(--ce-stmt); box-shadow: inset 2px 0 0 var(--ce-stmt-bar); }
+  /* An argument's parameter colour, as a line under it: the colour it has in the hint and the sidebar. */
+  .ce-mark-param { box-shadow: inset 0 -2px 0 var(--ce-param, var(--txt-faint)); border-radius: 0; }
+  .ce-mark-param.c-blue { --ce-param: var(--blue); }
+  .ce-mark-param.c-amber { --ce-param: var(--amber); }
+  .ce-mark-param.c-green { --ce-param: var(--accent); }
+  .ce-mark-hover { background: var(--ce-hov); box-shadow: 0 0 0 1px var(--ce-hov-ring); border-radius: 3px; }
+  .ce-mark-edit { background: var(--ce-edit); box-shadow: 0 0 0 1.5px var(--ce-edit-ring); border-radius: 3px; }
   .ce-mcaret {
     position: absolute;
     width: 2px;
@@ -1181,6 +1472,7 @@
   .ce-hl :global(.tok-kw)  { color: var(--ce-kw); }
   .ce-hl :global(.tok-lit) { color: var(--ce-litc); }
   .ce-hl :global(.tok-bi)  { color: var(--ce-bic); }
+  .ce-hl :global(.tok-key) { color: var(--ce-kw); }
   .ce-hl :global(.tok-match) {
     background: var(--ce-match-bg);
     border-radius: 2px;
@@ -1388,25 +1680,50 @@
   }
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
+  .ce-hover-doc code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
+  /* pre-line: a parameter's rules are one per line (Range, Default, Invalid…). */
+  .ce-hover-params { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--txt-dim); line-height: 1.4; white-space: pre-line; }
+  .ce-hover-params li + li { margin-top: 3px; }
+  .ce-hover-params code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
+  .ce-hover-type { color: var(--txt-faint, var(--txt-dim)); font-style: italic; }
+  .ce-hover-example { margin-top: 5px; }
+  .ce-hover-notes { margin: 6px 0 0; padding: 6px 0 0 14px; border-top: 1px solid var(--line-2); font-size: 12px; color: var(--txt-dim); line-height: 1.4; }
+  .ce-hover-notes li + li { margin-top: 3px; }
+  .ce-hover-notes code { font-family: var(--mono); font-size: 0.95em; color: var(--txt); }
 
-  /* signature help */
+  /* signature help: inline after the end of the caret's line, or a box over the line before or after
+     it; a line tall either way, its size set where it is placed (signatureHint.js, whose HINT holds
+     the padding and border) */
   .ce-sig {
     position: fixed;
     z-index: 59;
+    box-sizing: border-box;
     background: var(--panel-2);
     border: 1px solid var(--line-2);
-    border-radius: 6px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-    padding: 5px 9px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    padding: 0 6px;
     font-family: var(--mono);
-    font-size: 12px;
     color: var(--txt-dim);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     pointer-events: none;
   }
-  .ce-sig-name { color: var(--blue); }
+  .ce-sig.inline {
+    border: none;
+    box-shadow: none;
+  }
+  /* The name in the text's own colour, so blue is free for a parameter; each parameter in the colour
+     it has under its argument and in the Values sidebar (scripting/paramColours.js), grey when it
+     has none; the one being typed underlined. */
+  .ce-sig-name { color: var(--txt); }
   .ce-sig-param { color: var(--txt-faint); }
-  .ce-sig-param.active { color: var(--accent); font-weight: 700; text-decoration: underline; }
+  .ce-sig-param.c-blue { color: var(--blue); }
+  .ce-sig-param.c-amber { color: var(--amber); }
+  .ce-sig-param.c-green { color: var(--accent); }
+  .ce-sig-param.active { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .ce-sig-param.active:not([class*='c-']) { color: var(--txt); }
 
   /* autocomplete popup */
   .ce-ac {
@@ -1438,6 +1755,9 @@
   .ce-ac-kind.variable, .ce-ac-kind.parameter { color: var(--accent); }
   .ce-ac-kind.keyword { color: #c98be0; }
   .ce-ac-kind.property { color: var(--amber); }
+  /* a value's choice is a string, in the colour the editor's dark theme gives strings (the list is
+     outside .ce, so its --ce-str is not there to read) */
+  .ce-ac-kind.value { color: #9ed4a8; }
   .ce-ac-label { font-family: var(--mono); font-size: 12px; color: var(--txt); flex-shrink: 0; }
   .ce-ac-detail {
     font-size: 11px; color: var(--txt-faint); margin-left: auto;

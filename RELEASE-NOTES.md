@@ -36,6 +36,106 @@ or follow the control's value like a scrubbed film. A track can be a part's tran
 colour, one of the control's value channels, or a filmstrip part's frame, so a filmstrip knob
 turns on the sequence too.
 
+**Scripts written for an earlier build: zones and phrase cells now count from 1.** The Zone
+Splitter's verbs (`ce.components.split.mute`, `channel`, `transpose` and `point`) and
+`ce.components.phrase.cell` count from 1, as the panel labels them and as every other component verb
+counts, so zone 1 is the one labelled "Zone 1". They counted from 0, so a script that names a zone, a
+step or a row by number now reaches the one before the one it meant: add 1 to each. Zone 0 and step
+0 are refused, and the console says the range. A zone named by its label works as it did.
+
+**Scripts written for an earlier build: some `ce.math` answers have changed.**
+
+- `randomFloat(5)` gives a number from 0 up to 5. It was between 1 and 5.
+- `random` gives only whole numbers inside its range: `random(1.5, 3.5)` gives 2 or 3, where it
+  could give 1. A range with no whole number in it, such as 1.2 to 1.8, is refused.
+- `hslToHex` with a negative hue gave the wrong colour in the editor and in JavaScript scripts; -120
+  is blue now, as it was in Lua and Python. A saturation or lightness below 0 is held at 0.
+- `angleOf` of the same point twice is 0. It was 180 in the editor and in JavaScript scripts.
+- A number written as text, such as "128", is read as one in every language (Python read it as 0).
+  A value that is not a number is refused in `rgbToHex`, `hslToHex`, `mixColour`, `snap` and `lerp`,
+  where it was read as 0 or gave NaN, and the console says which one.
+
+**Scripts written for an earlier build: `ce.anim` rejects a control the panel does not have.**
+
+- `ce.anim.to`, `ce.anim.spring` and `ce.anim.envelope` given a control name the panel does not
+  have, such as a misspelt `"cutof"`, return false and write one error to the console. The move
+  used to start: it returned true, wrote an error on every step, and called `done` with true at
+  the end. A list with such a name in it is rejected whole, as a list with a colour property is.
+- An empty path, or none, writes an error to the console. It returned false without a word.
+- A `damping` below 0 is replaced by the default, 6, with a console warning. It made the spring
+  grow without limit instead of settling.
+- A `curve` that cannot be used (an unknown name, control points out of range, or a value that is
+  neither a name nor four numbers) is warned about once per command, as every other option is, and
+  the move is linear. It was logged on every call, and the last case was linear in silence.
+- A `from` that is not a number ("abc", true) starts from the current value, with a console
+  warning. It started from 0 or 1 in silence.
+- A `stagger` below 0 is replaced by 0, with a warning. It gave each path a delay below 0, and the
+  warning named `delay`.
+- A `repeat` that is not a number runs the move once, with a warning. It was silent.
+- A `done` that is not a function is reported with a warning. It was dropped in silence.
+- `ce.anim.envelope` with a `from` or `to` that is not a number uses the default (0 and 1), with a
+  warning. "abc" was read as 0 and true as 1 in silence, so `to = "abc"` held the whole move at 0;
+  in Python, "abc" raised an error.
+- `ce.anim.envelope` with fewer than two points writes an error to the console, as every other
+  rejection does. It wrote a plain line.
+
+**Scripts written for an earlier build: `ce.draw` says more.**
+
+- `ce.draw.clear` with a control name the panel does not have, or from a script attached to no
+  control and given no name, writes an error to the console. It returned false in silence.
+- `ce.draw.stroke` with a `dash` that is not a list, or a `cap` or `join` that is not one of its
+  words, draws the default as before, but reports it as a warning, not an error: an error now
+  always means the call did nothing.
+- `ce.draw.stroke` with a `width` that is not a number above 0, or a `dashOffset` that is not a
+  number, draws the default (1, and no offset) with a warning. Both were silent.
+- A shape command with a required coordinate, size or text left out (`drawRect(0, 0)`,
+  `drawText(0, 10)`) writes an error to the console and draws nothing. It drew at 0, or wrote no
+  text, in silence. A size or radius below 0 is 0, with a warning; it drew nothing in silence.
+- `ce.draw.gradient` with `stops` left out, not a list, or fewer than two colours writes an error
+  and returns nothing. It returned nothing in silence, and read text in place of the list as its
+  letters, so `"red"` was three stops, the first of which "is not a colour". An `angle` that is
+  not a number is 180, with a warning.
+- `ce.draw.path` with fewer than two points, or `points` that is not a list, writes an error and
+  draws nothing; it drew nothing in silence. A pair that is not two numbers, and a trailing value
+  with no partner, are left out with a warning. `ce.draw.lines` leaves out an item that is not a
+  segment with a warning. Each was silent.
+- `ce.draw.grid`: `columns` or `rows` given with a spacing wins over it, with a warning; a
+  fraction of a column or row is rounded, with a warning; a count or spacing that cannot be used
+  is ignored, with a warning; `x`, `y`, `width` and `height` are read as every shape's numbers are.
+  Each was silent, and a fraction of a column drew a grid with no closing line.
+- `ce.draw.polygon` with `sides` below 3, a fraction or not a number draws three sides, or the
+  rounded number, with a warning, and a `rotation` that is not a number is 0 with a warning. Both
+  were silent.
+- `ce.draw.transform` with an option that is not a number uses its default, with a warning; `cx`
+  without `cy`, or the reverse, rotates about the top-left corner with a warning. Both were silent.
+- `ce.draw.text` and `ce.draw.measure` with a `size` that is not a number above 0 use 12, with a
+  warning; `ce.draw.measure` with `text` left out writes an error and returns nothing (it measured
+  ""), and a pixel `scale` it cannot use is 1 with a warning. `ce.draw.image` with a `fit` that is
+  not "fill", "contain" or "cover" draws "fill", with a warning. Each was silent.
+- `ce.draw.clip` with some of its four numbers left out writes an error and leaves the clip as it
+  was; it took the missing ones as 0, which hid everything drawn after it. `ce.draw.blend` with no
+  mode writes an error and leaves the blend as it was; it was "normal". `ce.draw.batch` with
+  something that is not a function writes an error; it returned false in silence.
+  `ce.draw.redraw` with a control name the panel does not have names it; it said "no control to
+  redraw", which reads as the script's attachment being wrong when its spelling is.
+
+**Scripts written for an earlier build: `ce.time` says more, in every language.**
+
+- A musical helper with a number it cannot do without left out (`ce.time.position()`,
+  `ce.time.beatsToMs()`, `ce.time.swing(1)`) writes an error to the console and returns nothing.
+  It used the default without a word: bar 1, 0 ms, no swing. `beatsPerBar`, `max` and `bpm` keep
+  their defaults, and say nothing.
+- `ce.time.startTimer` and `ce.time.syncTimer` with no id, or "", write an error and start nothing;
+  `syncTimer` started a timer called "". `ce.time.stopTimer` with no id writes an error; an id that
+  is not running is still not a mistake.
+- `ce.time.after` and `ce.time.afterBeats` with something that is not a function write an error
+  that names the call; it was a plain line in `after`'s words for both. With no tempo to work from,
+  `syncTimer` and `afterBeats` write an error, where it was a plain line: the call did nothing.
+- `ce.time.tap` and `ce.time.clockTempo` with a list that is not one write an error; they returned
+  nothing as if the taps were too few. An item that is not a number above 0 is left out with a
+  warning, and a `resetMs` that is not a number above 0 is 2000 with a warning; both were silent,
+  and a `resetMs` of 0 or below made every gap "after a pause".
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

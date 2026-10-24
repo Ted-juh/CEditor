@@ -3,6 +3,8 @@
   import { parameterGroup, parameterAccent, parameterFeedback, parameterEntries, parameterBindingFor, splitParameterItemId } from '../utils/parameterStatus.js';
   import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
+  import { sharedAnimationFrame } from '../utils/sharedAnimationFrame.js';
+  import { hostWindowShown } from '../stores/hostWindow.js';
   import { onDestroy, setContext, untrack, tick } from 'svelte';
   import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
@@ -668,7 +670,10 @@
     // already applied to the document's control is a state the set can no longer change. Tokens
     // are resolved later, in CanvasControl, as they are for every control.
     const control = applyDeviceSyncStatus(applySectionValues(resolveControlFamily(rawControl, controlSetForPanel(panel)), previewOverrides?.sectionValues));
-    const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides));
+    // shareUnchanged: what the resolution leaves as it was stays the control's own shared, frozen
+    // objects (interactionRuntime.js, reshareUnchanged), not a copy each for as long as it is drawn;
+    // the value sources below copy what they change.
+    const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides, { shareUnchanged: true }));
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }
 
@@ -770,7 +775,7 @@
     if (!src) return null;
     if (src._children?.Designer?.deviceSyncFeedback?.kind === 'gaiaArpeggio') {
       const resolved = applyDeviceSyncStatus(src);
-      return { present: true, text: resolved._children.Parts._children.feedback._children.Text.content.replace(/^● /, '') };
+      return { present: true, text: resolved._children.Parts._children.feedback._children.Text.content.replace(/^\u25CF /, '') };
     }
     const custom = customLcdInfo(src, customSessionValues(src));
     if (custom) return custom;
@@ -1677,7 +1682,7 @@
       const anyPeak = flatControls(orderedControls ?? []).some((c) =>
         isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
-      meterClock = Date.now();
+      if (hostShown) meterClock = Date.now();   // the peak decays by the time, seen or not
       meterAnimationFrame = requestAnimationFrame(loop);
     };
     meterAnimationFrame = requestAnimationFrame(loop);
@@ -2339,6 +2344,46 @@
   const ORBIT_EMIT_MS = 25;
   const ORBIT_EMIT_EPS = 0.004;
   let orbitClock = $state(0);
+  // Every free-running control's ticker steps in one shared frame, and the clock moves once after
+  // all of them; one loop each moved it once per ticker (utils/sharedAnimationFrame.js says why).
+  //
+  // While the host's window is minimised or hides ours (stores/hostWindow.js), the clock and the
+  // steps shown stand still: they are what redraws the running controls, and nobody can see them.
+  // So do the meter's and the step sequencer's clocks, and the displays' own (LcdDisplayRenderer,
+  // PixelDisplayRenderer). The tickers do not: what they send (values to bound targets, MIDI,
+  // notes, script events) is sent from the ticker loops themselves, every frame as before. Shown
+  // again, one move redraws every running control where it now is.
+  let hostShown = true;
+  const orbitFrame = sharedAnimationFrame(() => { if (hostShown) { orbitClock = Date.now(); noteShownSteps(); } });
+  const stopWatchingHostWindow = hostWindowShown.subscribe((shown) => {
+    const wasShown = hostShown;
+    hostShown = shown !== false;
+    if (hostShown && !wasShown) { orbitClock = Date.now(); noteShownSteps(); }
+  });
+  onDestroy(stopWatchingHostWindow);
+  // WHAT A STEP SEQUENCE DRAWS MOVES WITH ITS STEP, NOT ITS CLOCK. Turing, Arp and Phrase are drawn
+  // from the step they are on (their renderers' `head` and `playStep`), so they read their entry
+  // here instead of orbitClock: it is worked out every frame, after the tickers, from what their
+  // value sources inject, and changes, and resolves them again, only when what they draw does.
+  // Reading the clock, each was resolved sixty times a second to draw the same step.
+  let shownSteps = $state({});   // { [id]: what the sequence shows }
+  function noteShownSteps() {
+    for (const c of turingControls()) if (turingConfig(c).running !== false) showStep(c, turingShownStep(withLiveSections(c), c));
+    for (const c of arpControls()) if (arpConfig(c).running !== false) showStep(c, arpShownStep(withLiveSections(c), c));
+    for (const c of phraseControls()) {
+      if (phraseConfig(c).running === false) continue;
+      showStep(c, phraseShownStep(c, withLiveSections(c)._children?.Phrase ?? {}));
+    }
+  }
+  function showStep(control, shown) {
+    const id = getControlId(control);
+    if (shownSteps[id] !== shown) shownSteps[id] = shown;
+  }
+  /** The control with the host's automation of its own section, as its value source is handed it. */
+  function withLiveSections(control) {
+    const session = sessionFor(control);
+    return applySectionValues(control, session?.enabled === false ? undefined : session?.sectionValues);
+  }
   // The sequencer's own frame stamp, so `applyStepSequencerValueSource` re-runs as the playhead
   // walks. Separate from `orbitClock` because the two tickers self-stop independently.
   let seqClock = $state(0);
@@ -2385,10 +2430,9 @@
         }
         emitClockFanout(orbitControlWith(c, orbitPhaseState[id]), now, 'orbit');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Rate-capped, change-filtered fan-out for a free-running clock (Orbit,
   // Looper): send a bound port's value only when it moved ≥ epsilon AND that
@@ -2540,11 +2584,9 @@
         // Don't fight a recording in progress on this control's lane.
         if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');
       }
-      // touch a reactive dep so the resolve path re-runs
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   function looperGeomFor(control) {
     const t = control?._children?.Transform ?? {};
@@ -2825,6 +2867,11 @@
     const sess = sessionFor(control)?.turingSteps;
     return Array.isArray(sess) ? sess : turingSteps(control);
   }
+  /** The step the renderer highlights: its `head`, from the phase this injects. `raw` is the
+      document's control, which the phase is kept under. */
+  function turingShownStep(control, raw = control) {
+    return turingStepIndex(turingControlWith(control, turingPhaseFor(raw)));
+  }
   function turingControlWith(control, phase, steps) {
     const turing = { ...control._children?.Turing, __phase: phase };
     if (Array.isArray(steps)) turing.__steps = steps;
@@ -2891,17 +2938,16 @@
         }
         emitClockFanout(turingControlWith(c, phase, turingLiveSteps(c)), now, 'turing');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   function applyTuringValueSource(control, resolved) {
     if (!isTuringControl(control)) return resolved;
     const base = resolved?.control ?? control;
     const turing = base?._children?.Turing;
     if (!turing) return resolved;
-    if (turing.running !== false) { ensureTuringTicker(); void orbitClock; }
+    if (turing.running !== false) { ensureTuringTicker(); void shownSteps[getControlId(control)]; }
     const next = { ...turing, __phase: turingPhaseFor(control) };
     const sess = sessionFor(control)?.turingSteps;
     if (Array.isArray(sess)) next.__steps = sess;
@@ -3012,10 +3058,9 @@
         }
         emitClockFanout(kineticControlWith(c, next, null, { __bounce: next.bounced }), now, 'kinetic');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   function applyKineticValueSource(control, resolved) {
     if (!isKineticControl(control)) return resolved;
@@ -3117,10 +3162,9 @@
         constPhaseState[id] = phase;
         emitClockFanout(constControlWith(c, wanderPos(phase)), now, 'constellation');
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Inject the live probe (drag > wander > committed) + any star drag + marker.
   function applyConstellationValueSource(control, resolved) {
@@ -3519,6 +3563,13 @@
     if (notes) arp.__sourceNotes = notes;
     return { ...control, _children: { ...control._children, Arp: arp } };
   }
+  /** What the renderer draws that moves: its `head` into the sequence, and the notes the sequence is
+      built from, which a linked Chord Pad holds in a map nothing reacts to. */
+  function arpShownStep(control, raw = control) {
+    const live = arpControlWith(control, arpPhaseFor(raw));
+    const seq = arpSequence(live, arpBaseNotes(live));
+    return `${seq.length ? stepIndexAt(arpPhase(live), seq.length) : -1}:${seq.map(String).join(' ')}`;
+  }
   function arpPhaseFor(control) {
     const id = getControlId(control);
     return arpPhaseState[id] !== undefined ? arpPhaseState[id] : arpPhase(control);
@@ -3648,10 +3699,9 @@
           }
         }
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Inject the live phase + linked notes so the renderer draws the real walk.
   function applyArpValueSource(control, resolved) {
@@ -3659,7 +3709,7 @@
     const base = resolved?.control ?? control;
     const arp = base?._children?.Arp;
     if (!arp) return resolved;
-    if (arp.running !== false) { ensureArpTicker(); void orbitClock; }
+    if (arp.running !== false) { ensureArpTicker(); void shownSteps[getControlId(control)]; }
     const notes = arpSourceNotes(control);
     const next = { ...arp, __phase: arpPhaseFor(control) };
     if (notes) next.__sourceNotes = notes;
@@ -3809,7 +3859,7 @@
         }
         if (guard >= 16) seqAccMs[id] = 0;   // gave up catching up; resume from now
       }
-      seqClock = now;
+      if (hostShown) seqClock = now;   // the playhead drawn; the steps above fire regardless
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -4861,10 +4911,9 @@
         playRecorderWindow(c, prev, next, loopSecs);
         recorderPrevPhase[id] = next;
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Song mode for the recorder: the same chain engine, pointed at take slots
   // instead of patterns. A chain never runs while recording — swapping the take
@@ -5113,10 +5162,9 @@
         const index = Math.floor(next);
         if (index !== phraseIndexState[id]) phraseFireIndex(c, index, null);
       }
-      orbitClock = now;
-      requestAnimationFrame(loop);
+      orbitFrame(loop);
     };
-    requestAnimationFrame(loop);
+    orbitFrame(loop);
   }
   // Song mode. A lap is one complete pass of the pattern, so the chain advances
   // on the pattern's own length rather than on a separate counter — a chain
@@ -5139,13 +5187,17 @@
     const cells = loadPattern(phraseConfig(control).patterns, slot);
     patchControlSession(id, { phrasePattern: cells });
   }
+  /** The column the renderer lights (`__step`), -1 for none. */
+  function phraseShownStep(control, cfg) {
+    const index = cfg.running === false ? undefined : phraseIndexState[getControlId(control)];
+    return index === undefined ? -1 : phraseStepAt(index, phraseSteps(control), phraseDirection(control), cfg.seed ?? 0);
+  }
   function applyPhraseValueSource(control, resolved) {
     if (!isPhraseControl(control)) return resolved;
     const base = resolved?.control ?? control;
     const cfg = base?._children?.Phrase;
     if (!cfg) return resolved;
-    if (cfg.running !== false) { ensurePhraseTicker(); void orbitClock; }
-    const id = getControlId(control);
+    if (cfg.running !== false) { ensurePhraseTicker(); void shownSteps[getControlId(control)]; }
     // A STOPPED SEQUENCE DRAWS NO COLUMN, decided here rather than left to the ticker to clear.
     // The ticker does clear `phraseIndexState` when it notices the sequence has stopped — but it is
     // a plain module map, not reactive, and the render that follows `running: false` happens BEFORE
@@ -5153,11 +5205,7 @@
     // so the playing column stayed lit on a stopped sequencer, parked on whatever step it had
     // reached, until something unrelated re-rendered the control. Reading `running` here makes the
     // document the authority, which is what the renderer's own "-1 means draw nothing" expects.
-    const index = cfg.running === false ? undefined : phraseIndexState[id];
-    const next = {
-      ...cfg,
-      __step: index === undefined ? -1 : phraseStepAt(index, phraseSteps(control), phraseDirection(control), cfg.seed ?? 0),
-    };
+    const next = { ...cfg, __step: phraseShownStep(control, cfg) };
     const sess = sessionFor(control);
     if (sess?.phrasePattern) next.pattern = sess.phrasePattern;
     return { ...resolved, control: { ...base, _children: { ...base._children, Phrase: next } } };
@@ -8917,6 +8965,7 @@
       } : null,
       previewEditableFields: { ...spinnerEditableFields(control), ...numericEditableFields(control) },
       previewKeyboardFocus: keyboardFocusControlId === getControlId(control),
+      previewEditing: lcdEdit.active && lcdEdit.id === getControlId(control),
       previewHighlighted: $showPreviewSelectionRing && $previewInspectedControlId === getControlId(control),
       onpreviewpointerenter: () => handlePointerEnter(control),
       onpreviewpointerleave: () => handlePointerLeave(control),

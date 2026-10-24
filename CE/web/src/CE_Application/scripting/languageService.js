@@ -20,9 +20,11 @@ import { analyzeTs, foldTs } from './tsService.js';
 import { analyzeCsharp, foldCsharp } from './csharpPreview.js';
 import { analyzeJava, foldJava } from './javaPreview.js';
 import {
-  COMMANDS, HELPERS, PANEL_COMMANDS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
+  COMMANDS, HELPERS, PANEL_COMMANDS, VALUE_ACCESSORS, SELF, ALL_EVENTS, paramTypeLine, memberPath,
+  moduleById,
 } from './panelApi.js';
 import { memberAppliesToType } from './componentSchema.js';
+import { jsonFoldRegions, jsonSyntaxError } from '../utils/jsonText.js';
 
 /* ----------------------------------------------------------- static API data */
 
@@ -31,13 +33,28 @@ import { memberAppliesToType } from './componentSchema.js';
 // completion, no hover and no signature help at all. componentSchema answers that now.
 const ALL_API = [...COMMANDS, ...PANEL_COMMANDS, ...HELPERS];
 
+// The hover card's text: the description, then the example and the "Good to know" notes, which
+// hold what the description no longer says (docs/design/api-descriptions-handoff.md, "The fields").
+const hoverDoc = (m) => [m.summary, m.example, ...(m.notes ?? []).map((n) => (typeof n === 'string' ? n : n?.text))]
+  .filter(Boolean).join(' ');
 const API_FUNCTIONS = ALL_API.map((m) => ({
   label: m.id,
   kind: 'function',
   detail: m.signature || `${m.id}(…)`,
-  doc: m.summary || '',
+  doc: hoverDoc(m),
 }));
 const API_BY_NAME = Object.fromEntries(API_FUNCTIONS.map((f) => [f.label, f]));
+// …and under it each described parameter: its name, its type and whether it is required ("number,
+// required", from the contract), and its own text.
+// A command is written by its short name (animateTo) or by its place in the API (ce.anim.to), and
+// scripts mostly write the second. Hover and signature help looked up the word under the pointer
+// alone, so in ce.anim.to they looked up "to" and found nothing: 677 of the 774 commands, all 499
+// component commands among them, had no card and no hint in the form scripts use. Only those whose
+// last part is their short name (ce.math.scale) had either. So the dotted name is read as well.
+const API_BY_PATH = Object.fromEntries(ALL_API.map((m) => [memberPath(m.id), m.id]));
+const API_MEMBER_BY_ID = Object.fromEntries(ALL_API.map((m) => [m.id, m]));
+const HOVER_PARAMS = Object.fromEntries(ALL_API.map((m) => [m.id, (m.params ?? []).filter((p) => p.summary)
+  .map((p) => ({ name: p.name, type: paramTypeLine(p, m), summary: p.summary }))]));
 
 // Parameter names per API function, for signature help. Prefer the structured
 // params array (commands); fall back to parsing the signature string (helpers).
@@ -177,10 +194,25 @@ function collectLuaSymbols(ast) {
 // source is mid-edit and doesn't parse.
 const lastGoodSymbols = { javascript: [], lua: [] };
 
+// JSON (the panel file view): the first mistake, where it is. JSON.parse first, because it is fast
+// and almost always right; the scanner only for the location, which JavaScriptCore's message lacks.
+function analyzeJson(src) {
+  try {
+    JSON.parse(src);
+    return { diagnostics: [], symbols: [] };
+  } catch {
+    const err = jsonSyntaxError(src);
+    if (!err) return { diagnostics: [], symbols: [] };
+    // Columns from 0, as acorn gives them for JavaScript.
+    return { diagnostics: [{ severity: 'error', message: err.message, line: err.line, col: err.col - 1, index: err.index }], symbols: [] };
+  }
+}
+
 /** Parse + analyze: returns { diagnostics, symbols }. Never throws. */
 export function analyze(source, languageId) {
   const src = String(source ?? '');
   if (!src.trim()) return { diagnostics: [], symbols: [] };
+  if (languageId === 'json') return analyzeJson(src);
   // C++ has its own interpreter front-end (cppPreview); Python uses a lightweight scanner.
   if (languageId === 'cpp' || languageId === 'c++') return analyzeCpp(src);
   if (languageId === 'python') return analyzePython(src);
@@ -278,6 +310,8 @@ export function getCompletions(source, languageId, caretIndex, options = {}) {
   const src = String(source ?? '');
   const controlType = String(options?.controlType ?? '');
   const { prefix, start } = prefixBefore(src, caretIndex);
+  // A panel file is data: the script API's functions and keywords are nothing to type there.
+  if (languageId === 'json') return { from: start, to: caretIndex, options: [] };
 
   // Member access: the char before the word is a dot.
   if (src[start - 1] === '.') {
@@ -328,27 +362,76 @@ function filterRank(items, prefix) {
   return scored.map(([, it]) => it).slice(0, 40);
 }
 
+/** The dotted name that ends with the word `w`: "ce.anim.to" for the "to" in it, "ce.anim" for the
+ *  "anim". Just the word when no dot comes before it. */
+function dottedAt(source, w) {
+  const src = String(source ?? '');
+  let start = w.start;
+  while (start > 1 && src[start - 1] === '.' && IDENT.test(src[start - 2])) {
+    let s = start - 1;
+    while (s > 0 && IDENT.test(src[s - 1])) s -= 1;
+    start = s;
+  }
+  return src.slice(start, w.end);
+}
+
+/** The API command the word `w` names, as { id, written }: by its path when it is the last part of
+ *  one (ce.anim.to), or by its short name standing alone (animateTo). Null for anything else, a
+ *  method of the script's own table (obj.scale) included. */
+function apiCommandAt(source, w) {
+  const dotted = dottedAt(source, w);
+  if (API_BY_PATH[dotted]) return { id: API_BY_PATH[dotted], written: dotted };
+  if (dotted === w.word && API_BY_NAME[w.word]) return { id: w.word, written: w.word };
+  return null;
+}
+
 /* --------------------------------------------------------------------- hover */
 
-/** Hover info for the identifier at `index` → { title, doc } or null. */
+/**
+ * Hover info for the identifier at `index` → { title, doc } or null. A command's card also has
+ * `example`, `notes` and `params`, each shown on its own: run together into the description, as
+ * they were, the example and the notes read as one long paragraph.
+ */
 export function getHover(source, languageId, index) {
+  if (languageId === 'json') return null;
   const w = wordAt(source, index);
   if (!w) return null;
   const name = w.word;
+
+  // A command by its path, before the script's own names: the "to" of ce.anim.to is not a local.
+  const command = apiCommandAt(source, w);
+  if (command && command.written !== command.id) return commandHover(command);
+  // A module, by the part of a path that names it: the "anim" of ce.anim.to.
+  const dotted = dottedAt(source, w);
+  const module = dotted.includes('.') ? moduleById(dotted) : null;
+  if (module) return { title: dotted, doc: module.summary ?? '' };
 
   // A declaration in this document.
   const { symbols } = analyze(source, languageId);
   const decl = symbols.find((s) => s.name === name);
   if (decl) return { title: decl.detail, doc: decl.kind === 'parameter' ? 'parameter' : '' };
 
-  // Panel API function.
-  if (API_BY_NAME[name]) return { title: API_BY_NAME[name].detail, doc: API_BY_NAME[name].doc };
+  // Panel API function, by its short name.
+  if (command) return commandHover(command);
   // Event handler name.
   if (EVENT_BY_FN[name]) return { title: `${name}(${EVENT_BY_FN[name].payload ?? ''})`, doc: EVENT_BY_FN[name].summary };
   // Value accessor / self.
   if (ACCESSOR_BY_ID[name]) return { title: `.${name}`, doc: ACCESSOR_BY_ID[name].summary };
   if (name === SELF.id) return { title: 'self', doc: SELF.summary };
   return null;
+}
+
+/** A command's card, its signature as written: ce.anim.to(path, target [, opts]) for ce.anim.to. */
+function commandHover({ id, written }) {
+  const m = API_MEMBER_BY_ID[id];
+  const sig = m.signature || `${id}(…)`;
+  return {
+    title: written !== id && sig.startsWith(id) ? written + sig.slice(id.length) : sig,
+    doc: m.summary ?? '',
+    example: m.example ?? '',
+    notes: (m.notes ?? []).map((n) => (typeof n === 'string' ? n : n?.text)).filter(Boolean),
+    params: HOVER_PARAMS[id] ?? [],
+  };
 }
 
 /* ---------------------------------------------------------------- definition */
@@ -360,6 +443,7 @@ export function getHover(source, languageId, index) {
  * document's own functions. (Heuristic: doesn't skip commas inside strings.)
  */
 export function getSignatureHelp(source, languageId, caret) {
+  if (languageId === 'json') return null;
   const src = String(source ?? '');
   const pre = src.slice(0, caret);
   let depth = 0, commas = 0, i = pre.length - 1;
@@ -378,7 +462,8 @@ export function getSignatureHelp(source, languageId, caret) {
   const w = wordAt(src, j);
   if (!w) return null;
 
-  let info = API_PARAMS[w.word];
+  const command = apiCommandAt(src, w);
+  let info = command ? { ...API_PARAMS[command.id], name: command.written } : null;
   if (!info) {
     // Parse the source up to the current (likely incomplete) line so the call being
     // typed doesn't break the parse and hide the function's declaration.
@@ -388,7 +473,10 @@ export function getSignatureHelp(source, languageId, caret) {
     if (fn) info = { name: w.word, params: paramsFromSignature(fn.detail), signature: fn.detail };
   }
   if (!info || info.params.length === 0) return null;
-  return { name: info.name, params: info.params, activeParam: Math.min(commas, info.params.length - 1), signature: info.signature };
+  // `id`: the API command's, which picks the parameters' colours (paramColours.js); null for a
+  // function the script declares.
+  return { name: info.name, params: info.params, activeParam: Math.min(commas, info.params.length - 1), signature: info.signature,
+    id: command?.id ?? null };
 }
 
 /** Source offset where the identifier at `index` is declared → { index, line, col } or null. */
@@ -417,6 +505,7 @@ const LUA_FOLD = new Set(['FunctionDeclaration', 'IfStatement', 'ForNumericState
  */
 export function getFoldRegions(source, languageId) {
   const src = String(source ?? '');
+  if (languageId === 'json') return jsonFoldRegions(src);
   if (languageId === 'cpp' || languageId === 'c++') return foldCpp(src);
   if (languageId === 'python') return foldPython(src);
   if (languageId === 'typescript' || languageId === 'ts') return foldTs(src);

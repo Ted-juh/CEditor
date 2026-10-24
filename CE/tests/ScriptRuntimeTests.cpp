@@ -245,9 +245,9 @@ public:
 
     // ce.anim routes to the runtime, the way BridgeScriptHost does — the animation list has to
     // live in ONE place, so a host forwards rather than keeping its own.
-    void startAnimation (const juce::String& kind, const juce::var& path,
+    bool startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts) override
-    { if (runtime != nullptr) runtime->startAnimation (kind, path, target, opts); }
+    { return runtime != nullptr && runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime != nullptr) runtime->stopAnimation (path); }
     bool animationRunning (const juce::String& path) override
@@ -634,6 +634,183 @@ int main()
     check (host.rawSends[0] == "90 3C 64", "ce.midi.sendNote assembles the same bytes in JS");
     check (host.rawSends[1] == "E0 00 00", "ce.midi.sendPitchBend agrees across engines");
     check (errors.isEmpty(), "no errors from the message verbs");
+
+    // A note name the senders cannot read is refused, not sent as note 0. "c4" (the letter must be
+    // a capital) used to become 0 and play C-1 with nothing to say why; the WebView runtime refuses
+    // it in the same words (scriptMusic.test.js).
+    juce::Array<juce::var> badNoteScripts;
+    badNoteScripts.add (makeScript ("badnotes", "lua", "panel", "onBadNotes", "*",
+        "function onBadNotes()\n"
+        "  sendNote(1, \"c4\", 100)\n"
+        "  sendNoteOff(1, \"c4\")\n"
+        "  sendAftertouch(1, 90, \"c4\")\n"
+        "  sendNote(1, \"C-1\", 100)\n"       // note 0 by NAME is still a real note
+        "end\n"));
+    badNoteScripts.add (makeScript ("badnotesjs", "javascript", "panel", "onBadNotesJs", "*",
+        "function onBadNotesJs() { ce.midi.sendNote(1, 'c4', 100); ce.midi.sendNoteOff(1, 'c4');"
+        " ce.midi.sendAftertouch(1, 90, 'c4'); }"));
+    runtime.loadScripts (juce::var (badNoteScripts));
+    for (const auto* event : { "onBadNotes", "onBadNotesJs" })
+    {
+        const bool lua = juce::String (event) == "onBadNotes";
+        host.rawSends.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent (event, "panel", juce::var());
+        const juce::String engine = lua ? " (Lua)" : " (JS)";
+        check (host.rawSends.size() == (lua ? 1 : 0),
+               "an unreadable note name sends nothing" + engine + " (got " + host.rawSends.joinIntoString (" | ") + ")");
+        if (lua) check (host.rawSends[0] == "90 00 64", "C-1 by name is note 0 and still plays");
+        check (host.levelled.size() == 3, "each refusal is an error line" + engine);
+        for (const auto* verb : { "sendNote", "sendNoteOff", "sendAftertouch" })
+            check (host.levelled.contains (juce::String ("error:") + verb + ": \"c4\" is not a note name, so nothing was sent. "
+                                           "A name is a capital letter, then # or b if it has one, then the octave: "
+                                           "\"C4\", \"Eb3\", \"F#-1\"."),
+                   juce::String (verb) + " names the note it refused" + engine);
+    }
+
+    // 12b) ce.midi byte lists, through the real engines and their namespaced names. The helpers'
+    // arithmetic and messages are compared across engines in scriptPreludeAgreement.test.js; this
+    // proves the generated ce.midi table reaches them in the Lua and JS engines that ship.
+    {
+        juce::Array<juce::var> byteScripts;
+        byteScripts.add (makeScript ("byteslua", "lua", "panel", "onBytesLua", "*",
+            "function onBytesLua()\n"
+            "  local msg = ce.midi.write({ 0xF0, 0, 0, 0xF7 }, 1, 2, 200)\n"
+            "  log('lua ' .. ce.midi.toHex(msg) .. ' ' .. ce.midi.read(msg, 1, 2) .. ' ' .. ce.midi.getBits(0xB4, 4, 3)\n"
+            "      .. ' ' .. ce.midi.find('F0 41 10 42', '10 42') .. ' ' .. ce.midi.toBase64(ce.midi.fromHex('F0 41 10 42')))\n"
+            "  ce.midi.slice({ 1, 2 }, 1, 2)\n"
+            "end\n"));
+        byteScripts.add (makeScript ("bytesjs", "javascript", "panel", "onBytesJs", "*",
+            "function onBytesJs() {\n"
+            "  var msg = ce.midi.put([0xF0, 0xF7], 1, ce.midi.fromBase64('QRA='));\n"
+            "  log('js ' + ce.midi.toHex(msg) + ' ' + ce.midi.setBits(0xB4, 4, 3, 5) + ' ' + ce.midi.slice(msg, 1, 2).length);\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (byteScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onBytesLua", "panel", juce::var());
+        runtime.dispatchEvent ("onBytesJs", "panel", juce::var());
+        check (host.logs.contains ("lua F0 01 48 F7 200 3 2 8EEQQg=="), "ce.midi byte helpers answer in the Lua engine (got "
+                   + host.logs.joinIntoString (" | ") + ")");
+        // put overwrites, it does not insert: 41 10 written at offset 1 of F0 F7 replaces the F7.
+        check (host.logs.contains ("js F0 41 10 212 2"), "ce.midi byte helpers answer in the JS engine");
+        check (host.levelled.size() == 1 && host.levelled[0] == "error:ce.midi.slice: bytes 1 to 2 run past the end of 2 bytes, so there is no answer.",
+               "and refuse in the WebView runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
+    // 12c) ce.math's colours and 0..1 amounts, and ce.anim's target, through the real engines. The
+    // words are compared across engines in scriptPreludeAgreement.test.js; this proves the engines
+    // that ship refuse rather than answer. Lightening by 40 was white, an alpha of 128 was solid,
+    // "x5B9BD5" was read from its last six characters, and ce.anim.to("full") swept the value to 0.
+    {
+        juce::Array<juce::var> visualScripts;
+        visualScripts.add (makeScript ("visuallua", "lua", "panel", "onVisualLua", "*",
+            "function onVisualLua()\n"
+            "  log('lua ' .. tostring(ce.math.lighten('#5B9BD5', 40)) .. ' ' .. ce.math.alpha('80336699', 0.5)\n"
+            "      .. ' ' .. tostring(ce.math.rgb('x5B9BD5')))\n"
+            "  ce.anim.to('cutoff', 'full', { duration = 10 })\n"
+            "  log('lua running ' .. tostring(ce.anim.running('cutoff')))\n"
+            "end\n"));
+        visualScripts.add (makeScript ("visualjs", "javascript", "panel", "onVisualJs", "*",
+            "function onVisualJs() {\n"
+            "  log('js ' + ce.math.alpha('5B9BD5', 128) + ' ' + ce.math.darken('FFFFFF', '0.5'));\n"
+            "  ce.anim.spring('cutoff', '100px');\n"
+            "  log('js running ' + ce.anim.running('cutoff'));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (visualScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onVisualLua", "panel", juce::var());
+        runtime.dispatchEvent ("onVisualJs", "panel", juce::var());
+        const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
+        check (host.logs.contains ("lua nil 80336699 nil"), "ce.math refuses in the Lua engine, and reads AARRGGBB" + got);
+        check (host.logs.contains ("lua running false"), "ce.anim.to starts nothing for a target that is not a number (Lua)");
+        check (host.logs.contains ("js undefined #808080"), "ce.math refuses in the JS engine, and reads text that is a number" + got);
+        check (host.logs.contains ("js running false"), "ce.anim.spring starts nothing for a target that is not a number (JS)");
+        for (const auto* line : {
+                 "error:ce.math.lighten: the amount is a number from 0 to 1, and 40 is not, so there is no answer. "
+                 "If you meant 40 out of 100, write 0.4.",
+                 "error:ce.math.rgb: \"x5B9BD5\" is not a colour, so there is no answer. A colour is 6 hex digits "
+                 "(RRGGBB) or 8 (AARRGGBB), with or without \"#\", or \"#RGB\", a CSS colour name, rgb() or hsl().",
+                 "error:ce.anim.to: \"full\" is not a number, so nothing was started.",
+                 "error:ce.math.alpha: the alpha is a number from 0 to 1, and 128 is not, so there is no answer.",
+                 "error:ce.anim.spring: \"100px\" is not a number, so nothing was started." })
+            check (host.levelled.contains (line), juce::String ("refused in the WebView runtime's words: ") + line);
+        check (host.levelled.size() == 5, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
+    // 12c, continued) a done that is not a function, through the real Lua and QuickJS engines: the
+    // prelude passes it to the runtime as __badDone, the runtime says so once, and the move goes
+    // ahead. It was dropped without a word.
+    {
+        juce::Array<juce::var> doneScripts;
+        doneScripts.add (makeScript ("badDoneLua", "lua", "panel", "onBadDoneLua", "*",
+            "function onBadDoneLua()\n"
+            "  log('lua started ' .. tostring(ce.anim.to('cutoff', 50, { duration = 10, done = 'later' })))\n"
+            "  log('lua shape ' .. tostring(ce.anim.envelope('cutoff', { {0, 0}, {1, 1} }, { duration = 10, from = 'abc' })))\n"
+            "end\n"));
+        doneScripts.add (makeScript ("badDoneJs", "javascript", "panel", "onBadDoneJs", "*",
+            "function onBadDoneJs() {\n"
+            "  log('js started ' + ce.anim.spring('cutoff', 50, { duration: 10, done: 5 }));\n"
+            "  log('js shape ' + ce.anim.envelope('cutoff', [[0, 0], [1, 1]], { duration: 10, to: true }));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (doneScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onBadDoneLua", "panel", juce::var());
+        runtime.dispatchEvent ("onBadDoneJs", "panel", juce::var());
+        check (host.logs.contains ("lua started true") && host.logs.contains ("js started true")
+                   && host.logs.contains ("lua shape true") && host.logs.contains ("js shape true"),
+               "a done that is not a function, or an envelope's from or to, does not stop the move (got " + host.logs.joinIntoString (" | ") + ")");
+        check (host.levelled.joinIntoString (" | ") == "warn:ce.anim.to: \"later\" is not a function, so nothing is called when the move ends. This is said only the first time. | "
+                                                       "warn:ce.anim.envelope: \"abc\" is not a number, so y = 0 of the shape means 0, as it does when no from is given. This is said only the first time. | "
+                                                       "warn:ce.anim.spring: 5 is not a function, so nothing is called when the move ends. This is said only the first time. | "
+                                                       "warn:ce.anim.envelope: true is not a number, so y = 1 of the shape means 1, as it does when no to is given. This is said only the first time.",
+               "...and each is said once per command, in the runtime's words (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
+
+    // 12d) ce.math reads CSS's short forms as a colour property stores them, through the real Lua
+    // and QuickJS engines: each prelude's own port of the WebView's reading, and the generated names
+    // table. "red" was refused here while set() took it. The rounding is JavaScript's (30% of 255 is
+    // 76.5, which is 77), the Kelvin sign is read as "k" as toLowerCase reads it, and what a property
+    // refuses is refused, with the property's hint.
+    {
+        juce::Array<juce::var> cssScripts;
+        cssScripts.add (makeScript ("csslua", "lua", "panel", "onCssLua", "*",
+            "function onCssLua()\n"
+            "  local rgb = ce.math.rgb('rgba(255, 0, 0, 0.5)')\n"
+            "  log('lua ' .. ce.math.lighten('Red', 0.2) .. ' ' .. ce.math.alpha('#abc', 0.5) .. ' '\n"
+            "      .. rgb.r .. ',' .. rgb.g .. ',' .. rgb.b .. ' ' .. ce.math.mix('hsl(0, 0%, 30%)', 'transparent', 0)\n"
+            "      .. ' ' .. ce.math.darken('rgb(2.5 300 -4)', 1) .. ' ' .. tostring(ce.math.rgb(' red '))\n"
+            "      .. ' ' .. tostring(ce.math.rgb('constructor')))\n"
+            "end\n"));
+        cssScripts.add (makeScript ("cssjs", "javascript", "panel", "onCssJs", "*",
+            "function onCssJs() {\n"
+            "  var rgb = ce.math.rgb('RGB(91 155 213 / 50%)');\n"
+            "  var hsl = ce.math.hsl('hsl(-0.25turn, 100%, 50%)');\n"
+            "  log('js ' + ce.math.lighten('SteelBlue', 0) + ' ' + ce.math.alpha('hsla(120, 100%, 50%, 0.25)', 1) + ' '\n"
+            "      + rgb.r + ',' + rgb.g + ',' + rgb.b + ' ' + Math.round(hsl.h) + ' ' + ce.math.darken('rgb(30%, 30%, 30%)', 1)\n"
+            "      + ' ' + ce.math.rgb('#abcd') + ' ' + ce.math.lighten('\\u212Ahaki', 0));\n"
+            "}\n"));
+        runtime.loadScripts (juce::var (cssScripts));
+        host.logs.clear();
+        host.levelled.clear();
+        runtime.dispatchEvent ("onCssLua", "panel", juce::var());
+        runtime.dispatchEvent ("onCssJs", "panel", juce::var());
+        const auto got = " (got " + host.logs.joinIntoString (" | ") + ")";
+        check (host.logs.contains ("lua #FF3333 80AABBCC 255,0,0 #4D4D4D #03FF00 nil nil"),
+               "ce.math reads CSS's short forms in the Lua engine" + got);
+        check (host.logs.contains ("js #4682B4 FF00FF00 91,155,213 270 #4D4D4D undefined #F0E68C"),
+               "ce.math reads CSS's short forms in the JS engine" + got);
+        const juce::String forms ("A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without \"#\", "
+                                  "or \"#RGB\", a CSS colour name, rgb() or hsl().");
+        for (const auto& line : {
+                 "error:ce.math.rgb: \" red \" is not a colour, so there is no answer. " + forms + " Write \"#FF0000\".",
+                 "error:ce.math.rgb: \"constructor\" is not a colour, so there is no answer. " + forms,
+                 "error:ce.math.rgb: \"#abcd\" is not a colour, so there is no answer. " + forms + " Write \"DDAABBCC\"." })
+            check (host.levelled.contains (line), "refused in the WebView runtime's words: " + line);
+        check (host.levelled.size() == 3, "and nothing else was refused (got " + host.levelled.joinIntoString (" | ") + ")");
+    }
 
     // 13) ce.storage ------------------------------------------------------------------------------
     juce::Array<juce::var> storeScripts;
@@ -1217,6 +1394,81 @@ int main()
                "stop() leaves the value where it got to");
         check (! runtime.animationRunning(), "…and nothing is running afterwards");
 
+        // An envelope through the Lua and JavaScript preludes: the shape is sampled there, with
+        // mapCurve(), and moved here. The samplers called map(), which no prelude defines, so both
+        // stopped with an error and the move never started (Python's case is in its own tests).
+        for (const auto& [language, source] : std::vector<std::pair<const char*, juce::String>> {
+                 { "lua", "function onEnvelope()\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff',\n"
+                          "    { { x = 0, y = 0 }, { x = 0.5, y = 1 }, { x = 1, y = 0 } },\n"
+                          "    { duration = 1000, from = 0, to = 100 })))\n"
+                          "end\n" },
+                 { "javascript", "function onEnvelope() {\n"
+                          "  log('started ' + ce.anim.envelope('cutoff',\n"
+                          "    [{ x: 0, y: 0 }, { x: 0.5, y: 1 }, { x: 1, y: 0 }],\n"
+                          "    { duration: 1000, from: 0, to: 100 }));\n"
+                          "}\n" } })
+        {
+            juce::Array<juce::var> envelopeScripts;
+            envelopeScripts.add (makeScript ("envelope", language, "panel", "onEnvelope", "*", source));
+            runtime.loadScripts (juce::var (envelopeScripts));
+            host.logs.clear();
+            host.values["cutoff"] = juce::var (0.0);
+            runtime.tickAnimations (10000.0);
+            runtime.runAction ("onEnvelope", juce::var());
+            check (host.logs.contains ("started true"),
+                   juce::String (language) + ": ce.anim.envelope starts a move (got " + host.logs.joinIntoString (" | ") + ")");
+            runtime.tickAnimations (10250.0);
+            check (std::abs ((double) host.values["cutoff"] - 50.0) < 0.5,
+                   juce::String (language) + ": the prelude samples the shape, so the value climbs: 50 a quarter of the way in");
+            runtime.tickAnimations (10500.0);
+            check (std::abs ((double) host.values["cutoff"] - 100.0) < 0.5, juce::String (language) + ": …peaks halfway");
+            runtime.tickAnimations (11000.0);
+            check (std::abs ((double) host.values["cutoff"]) < 0.5, juce::String (language) + ": …and comes back down to 0");
+            runtime.stopAnimation();
+        }
+
+        // A point the sampler cannot place starts nothing, in the WebView runtime's words: one whose x
+        // is written out of 100 was never reached, so the shape played was a sliver of the one
+        // written, and one that is not a number was dropped. Both went without a word. The words are
+        // held to the WebView's in scriptPreludeAgreement.test.js; these are the real engines.
+        for (const auto& [language, source] : std::vector<std::pair<const char*, juce::String>> {
+                 { "lua", "function onEnvelope()\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff', { { x = 0, y = 0 }, { x = 50, y = 1 } })))\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff', { { 0, 0 }, { 1, 'high' } })))\n"
+                          "  log('started ' .. tostring(ce.anim.envelope('cutoff', { { x = 0, y = 0 } })))\n"
+                          "end\n" },
+                 { "javascript", "function onEnvelope() {\n"
+                          "  log('started ' + ce.anim.envelope('cutoff', [{ x: 0, y: 0 }, { x: 50, y: 1 }]));\n"
+                          "  log('started ' + ce.anim.envelope('cutoff', [[0, 0], [1, 'high']]));\n"
+                          "  log('started ' + ce.anim.envelope('cutoff', [{ x: 0, y: 0 }]));\n"
+                          "}\n" } })
+        {
+            juce::Array<juce::var> envelopeScripts;
+            envelopeScripts.add (makeScript ("envelope", language, "panel", "onEnvelope", "*", source));
+            runtime.loadScripts (juce::var (envelopeScripts));
+            host.logs.clear();
+            host.levelled.clear();
+            runtime.runAction ("onEnvelope", juce::var());
+            check (host.levelled.joinIntoString (" | ")
+                       == "error:ce.anim.envelope: the x of point 2 of 2 is a number from 0 to 1, and 50 is not, so nothing was "
+                          "started. If you meant 50 out of 100, write 0.5. | "
+                          "error:ce.anim.envelope: the y of point 2 of 2 is a number, and \"high\" is not, so nothing was started."
+                          // Too few points is an error too, as every rejection is (it was a plain line); the dash
+                          // needs CharPointer_UTF8, as a plain literal is read as ASCII.
+                          + juce::String (juce::CharPointer_UTF8 (" | error:ce.anim.envelope(path, points): needs at least two points, "
+                                                                  "each { x, y } in 0..1 — nothing was started.")),
+                   juce::String (language) + ": a point the sampler cannot place is refused in the WebView's words (got "
+                       + host.levelled.joinIntoString (" | ") + ")");
+            check (host.logs.contains ("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started."),
+                   juce::String (language) + ": too few points is a note, in the same words (got " + host.logs.joinIntoString (" | ") + ")");
+            int answeredFalse = 0;
+            for (const auto& line : host.logs) answeredFalse += line == "started false" ? 1 : 0;
+            check (answeredFalse == 3 && ! host.logs.contains ("started true") && ! runtime.animationRunning ("cutoff"),
+                   juce::String (language) + ": …and nothing was started, each call answering false (got "
+                       + host.logs.joinIntoString (" | ") + ")");
+        }
+
         // ce.ui is webview-only: window-closed the verbs must explain themselves.
         juce::Array<juce::var> uiScripts;
         uiScripts.add (makeScript ("ui", "lua", "panel", "onSay", "*",
@@ -1702,7 +1954,8 @@ int main()
         runtime.runAction ("onArmBad", juce::var());
         check (host.timerStarts.isEmpty(), "after() with no function schedules nothing");
         check (host.logs.contains ("bad nil"), "…and returns nil");
-        check (host.logs.joinIntoString ("\n").contains ("needs a function"), "…having explained why");
+        check (host.levelled.contains ("error:ce.time.after: fn is nothing, not a function, so nothing was scheduled."),
+               "…having explained why, as an error in the call's own name");
 
         // The JavaScript engine has no setTimeout either — same construction, same behaviour.
         juce::Array<juce::var> afterJs;
@@ -2140,6 +2393,29 @@ int main()
                    && (int) (*sy.getArray())[11] == 0xF7,
                "$checksumStart makes the Roland checksum right rather than nearly right");
 
+        // Without the marker the definition stands, the checksum covers the header (27 where 4C is
+        // right, for this message at 64), and a warning says so in deviceDefinitions.js's words.
+        const juce::String rolandWarning = "warn:defineParameter(\"lvl\"): this is a Roland template (41 after F0) "
+            "with $checksum and no $checksumStart, so the checksum includes the header, and a Roland synth ignores "
+            "the message. Put $checksumStart where the address begins.";
+        host.levelled.clear();
+        check (runtime.defineDeviceParameter ("mainSynth", "lvl", spec (
+                   R"({ "sysex": ["F0","41","10","42","12","40","01","33","$value","$checksum","F7"], "min": 0, "max": 127 })")),
+               "a Roland template without $checksumStart is still defined");
+        check (host.levelled.size() == 1 && host.levelled[0] == rolandWarning,
+               "…with a warning that names the missing marker (got " + host.levelled.joinIntoString (" | ") + ")");
+        const auto lvl = runtime.encodeDeviceParameter ("mainSynth", "lvl", 64);
+        check (lvl.getArray() != nullptr && lvl.getArray()->size() == 11 && (int) (*lvl.getArray())[9] == 0x27,
+               "…and the warning is about something real: the header is in the sum");
+        host.levelled.clear();
+        check (runtime.defineDeviceParameter ("mainSynth", "lvl", spec (
+                   R"({ "sysex": ["F0","41","10","42","12","$checksumStart","40","01","33","$value","$checksum","F7"], "min": 0, "max": 127 })"))
+                   && host.levelled.isEmpty(),
+               "with the marker there is nothing to warn about");
+        check (runtime.defineDeviceParameter ("mainSynth", "yam", spec (R"({ "sysex": ["F0","43","10","$value","$checksum","F7"] })"))
+                   && host.levelled.isEmpty(),
+               "a template that is not Roland's gets no Roland warning");
+
         check (! runtime.encodeDeviceParameter ("mainSynth", "notMine", 1).isArray(),
                "encoding an undeclared parameter is void, so the caller falls through to the profile");
 
@@ -2186,6 +2462,126 @@ int main()
                                 ? namedDecoded.getDynamicObject()->getProperty ("values").getDynamicObject() : nullptr;
         check (namedValues != nullptr && namedValues->getProperty ("patchName").toString() == "Pad",
                "…while a clean one decodes, trimmed");
+
+        // -- the cases deviceDefinitions.test.js runs through the editor's codec, from the same file
+        // (CE/web/test/fixtures/deviceCodecCases.json). Every refusal must be the editor's sentence
+        // word for word, every write the editor's bytes, every dump the editor's values. Each case
+        // gets a role of its own, so none can see another's declarations.
+        {
+            const auto fixture = juce::File (__FILE__).getParentDirectory()   // CE/tests
+                                     .getParentDirectory()                     // CE
+                                     .getChildFile ("web/test/fixtures/deviceCodecCases.json");
+            const auto cases = juce::JSON::parse (fixture.loadFileAsString());
+            check (cases.isObject(), "the shared device codec cases are where deviceDefinitions.test.js reads them ("
+                                         + fixture.getFullPathName() + ")");
+
+            auto hexOf = [] (const juce::var& bytes)
+            {
+                juce::StringArray hex;
+                if (auto* arr = bytes.getArray())
+                    for (const auto& b : *arr) hex.add (juce::String::toHexString ((int) b).paddedLeft ('0', 2).toUpperCase());
+                return hex.joinIntoString (" ");
+            };
+            auto bytesOf = [] (const juce::String& hex)
+            {
+                juce::Array<juce::var> out;
+                for (const auto& token : juce::StringArray::fromTokens (hex, " ", "")) out.add (token.getHexValue32());
+                return juce::var (out);
+            };
+            auto lastError = [&errors] { return errors.isEmpty() ? juce::String() : errors[errors.size() - 1]; };
+            auto warnings = [&host]
+            {
+                juce::StringArray out;
+                for (const auto& line : host.levelled) if (line.startsWith ("warn:")) out.add (line.substring (5));
+                return out;
+            };
+
+            int index = 0;
+            if (auto* parameters = cases["parameters"].getArray())
+                for (const auto& c : *parameters)
+                {
+                    const auto role = "codecCase" + juce::String (++index);
+                    const auto name = "parameter case agrees with the editor: " + c["case"].toString();
+                    errors.clear();
+                    host.levelled.clear();
+                    const bool defined = runtime.defineDeviceParameter (role, "p", c["spec"]);
+                    if (c.hasProperty ("error"))
+                    {
+                        check (! defined && lastError() == "[script runtime] " + c["error"].toString()
+                                   && ! runtime.hasDeviceParameter (role, "p"),
+                               name + " (got " + lastError() + ")");
+                        continue;
+                    }
+                    check (defined, name + " — it is defined (got " + lastError() + ")");
+                    const auto warned = warnings();
+                    check (c.hasProperty ("warning") ? (warned.size() == 1 && warned[0] == c["warning"].toString()) : warned.isEmpty(),
+                           name + " — the warning (got " + warned.joinIntoString (" | ") + ")");
+                    if (c.hasProperty ("max"))
+                        check ((double) runtime.declaredDeviceParameter (role, "p")["max"] == (double) c["max"],
+                               name + " — the range it reports");
+                    if (auto* writes = c["writes"].getArray())
+                        for (const auto& w : *writes)
+                        {
+                            host.levelled.clear();
+                            const auto bytes = runtime.encodeDeviceParameter (role, "p", w["value"]);
+                            const auto what = name + " — writing " + juce::JSON::toString (w["value"], true);
+                            if (w.hasProperty ("error"))
+                                check (bytes.isVoid() && host.levelled.size() == 1
+                                           && host.levelled[0] == "error:" + w["error"].toString(),
+                                       what + " is refused alike (got " + host.levelled.joinIntoString (" | ") + ")");
+                            else
+                                check (hexOf (bytes) == w["bytes"].toString() && host.levelled.isEmpty(),
+                                       what + " sends " + w["bytes"].toString() + " (got " + hexOf (bytes) + ")");
+                        }
+                }
+
+            if (auto* dumps = cases["dumps"].getArray())
+                for (const auto& c : *dumps)
+                {
+                    const auto role = "codecCase" + juce::String (++index);
+                    const auto name = "dump case agrees with the editor: " + c["case"].toString();
+                    if (auto* own = c["parameters"].getDynamicObject())
+                        for (const auto& entry : own->getProperties())
+                            runtime.defineDeviceParameter (role, entry.name.toString(), entry.value);
+                    else
+                        runtime.defineDeviceParameter (role, "cutoff", spec (R"({ "cc": 74 })"));
+                    errors.clear();
+                    const bool defined = runtime.defineDeviceDump (role, "d", c["spec"]);
+                    if (c.hasProperty ("error"))
+                    {
+                        check (! defined && lastError() == "[script runtime] " + c["error"].toString()
+                                   && ! runtime.hasDeviceDump (role, "d"),
+                               name + " (got " + lastError() + ")");
+                        continue;
+                    }
+                    check (defined, name + " — it is defined (got " + lastError() + ")");
+                    if (c.hasProperty ("request"))
+                        check (hexOf (runtime.deviceDumpRequest (role, "d")) == c["request"].toString(),
+                               name + " — the request (got " + hexOf (runtime.deviceDumpRequest (role, "d")) + ")");
+                    if (auto* decodes = c["decodes"].getArray())
+                        for (const auto& d : *decodes)
+                        {
+                            const auto decoded = runtime.matchDeviceDump (role, bytesOf (d["hex"].toString()));
+                            const auto what = name + " — " + d["hex"].toString();
+                            auto* expected = d["values"].getDynamicObject();
+                            if (expected == nullptr)
+                            {
+                                check (decoded.isVoid(), what + " matches nothing (got " + juce::JSON::toString (decoded, true) + ")");
+                                continue;
+                            }
+                            auto* values = decoded["values"].getDynamicObject();
+                            bool same = values != nullptr && values->getProperties().size() == expected->getProperties().size();
+                            for (const auto& entry : expected->getProperties())
+                            {
+                                const auto got = values != nullptr ? values->getProperty (entry.name) : juce::var();
+                                same = same && (entry.value.isString() ? got.isString() && got.toString() == entry.value.toString()
+                                                                       : ! got.isString() && (double) got == (double) entry.value);
+                            }
+                            check (same, what + " decodes to " + juce::JSON::toString (d["values"], true)
+                                             + " (got " + juce::JSON::toString (decoded, true) + ")");
+                        }
+                }
+        }
 
         // -- the same, driven from a script, in both always-on engines.
         for (const char* lang : { "lua", "javascript" })
@@ -2272,6 +2668,56 @@ int main()
             host.logs.clear();
             runtime.dispatchEvent ("onDumpReceived", "", dumpPayload);
             check (host.logs.isEmpty(), juce::String (lang) + ": …and is not armed for the next one");
+        }
+
+        // -- what the shared cases cannot carry: numbers as each engine hands them over (a template's
+        // 0x41 was read back as hex 65), a Lua table with a hole, and a refused write from a script.
+        for (const char* lang : { "lua", "javascript" })
+        {
+            const bool isLua = juce::String (lang) == "lua";
+            juce::Array<juce::var> scripts;
+            scripts.add (makeScript ("codec", lang, "panel", "onDefs", "*", isLua
+                ? "function onDefs()\n"
+                  "  ce.device.defineParameter(\"num\", { sysex = { 0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x01, 0x33, \"$value\", \"$checksum\", 0xF7 } })\n"
+                  "  ce.device.defineParameter(\"hole\", { sysex = { 0xF0, nil, 0x41 } })\n"
+                  "  ce.device.defineParameter(\"sw\", { type = \"boolean\", cc = 65, trueValue = 127 })\n"
+                  "end\n"
+                  "function onNum() ce.device.write(\"num\", 64) end\n"
+                  "function onSw() ce.device.write(\"sw\", \"enabled\") end\n"
+                : "function onDefs() {\n"
+                  "  ce.device.defineParameter(\"num\", { sysex: [0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x01, 0x33, \"$value\", \"$checksum\", 0xF7] });\n"
+                  "  ce.device.defineParameter(\"hole\", { sysex: [0xF0, null, 0x41] });\n"
+                  "  ce.device.defineParameter(\"sw\", { type: \"boolean\", cc: 65, trueValue: 127 });\n"
+                  "}\n"
+                  "function onNum() { ce.device.write(\"num\", 64); }\n"
+                  "function onSw() { ce.device.write(\"sw\", \"enabled\"); }\n"));
+            runtime.loadScripts (juce::var (scripts));
+            errors.clear();
+            host.levelled.clear();
+            runtime.runAction ("onDefs", juce::var());
+            const auto engine = juce::String (" (") + lang + ")";
+            check (host.levelled.size() == 1 && host.levelled[0].startsWith ("warn:defineParameter(\"num\"): this is a Roland template"),
+                   "a Roland template written as numbers gets the Roland warning" + engine
+                       + " (got " + host.levelled.joinIntoString (" | ") + ")");
+            check (errors.contains ("[script runtime] defineParameter(\"hole\"): in the sysex template, nothing at position 1 "
+                                    "is not a byte, so the parameter was not defined."),
+                   "a hole in a template is nothing, at the position the editor names" + engine
+                       + " (got " + errors.joinIntoString (" | ") + ")");
+
+            host.rawSends.clear();
+            runtime.runAction ("onNum", juce::var());
+            check (host.rawSends.size() == 1 && host.rawSends[0] == "F0 41 10 42 12 40 01 33 40 27 F7",
+                   "numbers in a template are the bytes they say" + engine
+                       + " (got " + host.rawSends.joinIntoString (" | ") + ")");
+
+            host.rawSends.clear();
+            host.levelled.clear();
+            runtime.runAction ("onSw", juce::var());
+            check (host.rawSends.isEmpty() && host.levelled.contains (
+                       "error:deviceWrite(\"sw\"): \"enabled\" is not on or off, so nothing was sent. Write true or false, a "
+                       "number (0 is off, any other number is on), or \"on\", \"off\", \"true\" or \"false\"."),
+                   "a switch written as a word it does not know sends nothing, and says so" + engine
+                       + " (got " + host.levelled.joinIntoString (" | ") + ")");
         }
 
         // Reloading the script set drops the declarations with it: a parameter declared by the
@@ -2812,6 +3258,116 @@ int main()
     }
 
     {
+        // A move's timing is read as the WebView's animTiming and animBeats read it: a number, or
+        // text that is one. What cannot be read is said once per command, in the WebView's words
+        // (scriptValues.test.js holds the editor's), and the move goes ahead as it always did.
+        // A duration of "1/4" was read here by String::getDoubleValue as 1, a 1 ms jump, where the
+        // WebView moved it in its default 300.
+        TestHost timingHost;
+        ScriptRuntime timing (timingHost);
+        timing.tickAnimations (0.0);
+        auto opts = [] (std::initializer_list<std::pair<const char*, juce::var>> pairs)
+        {
+            auto* o = new juce::DynamicObject();
+            for (const auto& p : pairs) o->setProperty (p.first, p.second);
+            return juce::var (o);
+        };
+        auto said = [&timingHost]
+        {
+            const auto out = timingHost.levelled.joinIntoString ("\n");
+            timingHost.levelled.clear();
+            return out;
+        };
+        const juce::String once = " This is said only the first time.";
+
+        timing.startAnimation ("to", juce::var ("a"), 100.0, opts ({ { "duration", "1/4" }, { "from", 0.0 } }));
+        check (said() == "warn:ce.anim.to: \"1/4\" is not a number of milliseconds, so the move takes 300 ms, as it does "
+                         "when no duration is given. For a length in beats, give beats, a number." + once,
+               "a duration that is not a number is said, with the beats it may have meant");
+        timing.tickAnimations (150.0);
+        const double halfway = (double) timingHost.values["a"];
+        check (halfway > 0.0 && halfway < 100.0, "…and the move takes its default 300 ms, not the 1 ms \"1/4\" read as");
+        timing.startAnimation ("to", juce::var ("b"), 100.0, opts ({ { "duration", -5.0 } }));
+        check (said().isEmpty(), "a second duration that cannot be used is not said again by the same command");
+        timing.startAnimation ("spring", juce::var ("c"), 100.0, opts ({ { "duration", -5.0 } }));
+        check (said() == "warn:ce.anim.spring: a duration of -5 is less than 0, so the move takes 1 ms: it jumps." + once,
+               "a duration below 0 is a jump, and said by spring for itself");
+        timing.startAnimation ("to", juce::var ("d"), 100.0, opts ({ { "delay", "soon" } }));
+        check (said() == "warn:ce.anim.to: \"soon\" is not a number of milliseconds, so the move starts at once, as it does "
+                         "when no delay is given." + once, "a delay that is not a number starts at once, and says so");
+        timing.startAnimation ("spring", juce::var ("e"), 100.0, opts ({ { "delay", -100.0 } }));
+        check (said() == "warn:ce.anim.spring: a delay of -100 is less than 0, so the move starts at once." + once,
+               "a delay below 0 starts at once, and says so");
+        timing.startAnimation ("to", juce::var ("f"), 100.0, opts ({ { "beats", "1/4" } }));
+        check (said() == "warn:ce.anim.to: \"1/4\" is not a number of beats, so the move's length is its duration." + once,
+               "beats that are not a number leave the length to the duration, and say so");
+        timing.startAnimation ("spring", juce::var ("g"), 100.0, opts ({ { "beats", 0.0 } }));
+        check (said() == "warn:ce.anim.spring: 0 beats is not more than 0, so the move's length is its duration." + once,
+               "beats of 0 or less do too");
+        timing.startAnimation ("to", juce::var ("h"), 100.0, opts ({ { "duration", "250" }, { "delay", "0" }, { "beats", "0.5" } }));
+        check (said().isEmpty(), "text that is a number is read as one, and nothing is said");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "i", "j" }), 100.0, opts ({ { "delay", true } }));
+        check (said().isEmpty(), "a list's delay is the same option: said already by this command, so quiet");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "l", "m" }), 100.0, opts ({ { "stagger", "lots" } }));
+        check (said() == "warn:ce.anim.to: \"lots\" is not a number of milliseconds, so the moves start together, as they do "
+                         "when no stagger is given." + once, "a list's stagger that is not a number starts them together, and says so");
+        timing.startAnimation ("spring", juce::var ("n"), 100.0, opts ({ { "damping", "soft" }, { "frequency", true } }));
+        check (said() == "warn:ce.anim.spring: \"soft\" is not a number, so the spring's damping is 6, as it is when none is given." + once
+                       + "\nwarn:ce.anim.spring: true is not a number, so the spring's frequency is 12, as it is when none is given." + once,
+               "a spring's damping and frequency that are not numbers are their defaults, and say so");
+        // "to", because spring's damping was said already, by "n" above.
+        timing.startAnimation ("to", juce::var ("o"), 100.0, opts ({ { "curve", "spring" }, { "damping", -2.0 }, { "frequency", "8" } }));
+        {
+            const auto got = said();
+            check (got == "warn:ce.anim.to: a damping of -2 is less than 0, so the spring would grow instead of settling: "
+                          "its damping is 6, as it is when none is given." + once,
+                   "a damping below 0 would grow instead of settling, so it is the default, and said; text that is a number is used (got " + got + ")");
+        }
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("k"), 100.0, opts ({ { "duration", -1.0 } }));
+        check (said() == "warn:ce.anim.to: a duration of -1 is less than 0, so the move takes 1 ms: it jumps." + once,
+               "a script set loaded afresh is told again");
+        // A curve that cannot be used is said once per command too. It was a line on every call,
+        // and a curve that was neither a name nor numbers was linear without a word.
+        timing.startAnimation ("to", juce::var ("p"), 100.0, opts ({ { "curve", "outBak" } }));
+        {
+            const auto got = said();
+            // CharPointer_UTF8: a plain literal is read as ASCII, and the dash is not.
+            check (got == juce::String (juce::CharPointer_UTF8 ("warn:ce.anim.to: \"outBak\" is not a curve this build knows — animating linear.")) + once,
+                   "an unknown curve is said once, as every other option is (got " + got + ")");
+        }
+        timing.startAnimation ("to", juce::var ("q"), 100.0,
+                               opts ({ { "curve", juce::var (juce::Array<juce::var> { 1.5, 0.0, 0.0, 1.0 }) } }));
+        timing.startAnimation ("to", juce::var ("r"), 100.0, opts ({ { "curve", 5.0 } }));
+        check (said().isEmpty(), "…and not again by the same command, whatever the curve was");
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("s"), 100.0, opts ({ { "curve", true } }));
+        {
+            const auto got = said();
+            check (got == juce::String (juce::CharPointer_UTF8 ("warn:ce.anim.to: true is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.")) + once,
+                   "a curve that is neither a name nor numbers is said, where it was linear in silence (got " + got + ")");
+        }
+        // from, stagger, repeat and a done that is not a function (passed on by a prelude as
+        // __badDone): each was silent, and each is said once, as the WebView says it.
+        timing.loadScripts (juce::var (juce::Array<juce::var>()));
+        said();
+        timing.startAnimation ("to", juce::var ("t"), 100.0, opts ({ { "from", "abc" } }));
+        check (said() == "warn:ce.anim.to: \"abc\" is not a number, so the move starts from the value as it is now, as it does when no from is given." + once,
+               "a from that is not a number is where the value is now, and said");
+        timing.startAnimation ("to", juce::var (juce::Array<juce::var> { "u", "v" }), 100.0, opts ({ { "from", 0.0 }, { "stagger", -100.0 } }));
+        check (said() == "warn:ce.anim.to: a stagger of -100 is less than 0, so the moves start together, as they do when no stagger is given." + once,
+               "a stagger below 0 starts the moves together, and is said as a stagger, not as the delay each path got");
+        timing.startAnimation ("to", juce::var ("w"), 100.0, opts ({ { "repeat", "x" } }));
+        check (said() == "warn:ce.anim.to: \"x\" is not a number of runs, so the move runs once, as it does when no repeat is given." + once,
+               "a repeat that is not a number runs once, and is said");
+        timing.startAnimation ("to", juce::var ("x"), 100.0, opts ({ { "__badDone", "x" } }));
+        check (said() == "warn:ce.anim.to: \"x\" is not a function, so nothing is called when the move ends." + once,
+               "a done that is not a function is said, and the move goes ahead");
+    }
+
+    {
         TestHost animHost;
         ScriptRuntime anim (animHost);
         anim.tickAnimations (0.0);
@@ -2881,7 +3437,7 @@ int main()
         check (anim.animationRunning ("z"), "…and the last has not begun");
 
         // An envelope goes UP before it comes down — the thing `to` cannot express at all. The
-        // shape arrives pre-sampled, because map()'s per-point curves live in the preludes.
+        // shape arrives pre-sampled, because mapCurve()'s per-point curves live in the preludes.
         anim.stopAnimation();
         anim.tickAnimations (0.0);
         juce::Array<juce::var> samples;
@@ -2900,6 +3456,216 @@ int main()
         anim.stopAnimation();
     }
 
+    // 39b) ce.anim's `repeat` is the runs in all, and done(completed) gets one boolean --------------
+    // What the contract always said, and what no runtime did: repeat = 1 ran twice, repeat = 0 once,
+    // and done was handed a table ({ path, completed } or { paths, completed }), which is always
+    // true, so `if completed then` read a cancelled move as a finished one. The same fixtures as
+    // CE/web/test/apiContractRuntimes.test.js.
+    {
+        // How many 100 ms runs a move makes before it ends; -1 when it is still going after 12.
+        auto runsOf = [] (std::function<void (juce::DynamicObject&)> setRepeat)
+        {
+            TestHost countHost;
+            ScriptRuntime count (countHost);
+            count.tickAnimations (0.0);
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("duration", 100.0);
+            o->setProperty ("from", 0.0);
+            setRepeat (*o);
+            count.startAnimation ("to", juce::var ("count"), 100.0, juce::var (o));
+            for (int i = 1; i <= 12; ++i)
+            {
+                count.tickAnimations (i * 100.0);
+                if (! count.animationRunning ("count")) return i;
+            }
+            count.stopAnimation ("count");
+            return count.animationRunning ("count") ? -2 : -1;   // until stopped, and stop() stops it
+        };
+        auto repeatOf = [] (juce::var v) { return [v] (juce::DynamicObject& o) { o.setProperty ("repeat", v); }; };
+
+        check (runsOf ([] (juce::DynamicObject&) {}) == 1, "repeat left out: once");
+        check (runsOf (repeatOf (1)) == 1, "repeat = 1: once, not twice");
+        check (runsOf (repeatOf (3)) == 3, "repeat = 3: three times, not four");
+        check (runsOf (repeatOf (0)) == -1, "repeat = 0: until stopped, not once");
+        check (runsOf (repeatOf (-1)) == -1, "a negative number: until stopped");
+        check (runsOf (repeatOf (2.6)) == 3 && runsOf (repeatOf (2.5)) == 3, "a fraction is rounded, a half up");
+        check (runsOf (repeatOf (0.4)) == -1, "…so 0.4 is 0, which is until stopped");
+        check (runsOf (repeatOf ("3")) == 3 && runsOf (repeatOf (" -1 ")) == -1, "text that is a number is read as one");
+        check (runsOf (repeatOf ("three")) == 1 && runsOf (repeatOf ("")) == 1 && runsOf (repeatOf ("0x3")) == 1
+                   && runsOf (repeatOf (juce::var())) == 1 && runsOf (repeatOf (false)) == 1
+                   && runsOf (repeatOf (true)) == 1,
+               "anything else runs once, as before: a plain cast would read most of it as 0, which is now until stopped");
+
+        // pingpong under the same count: repeat = 2 is there and back, and no more.
+        TestHost ppHost;
+        ScriptRuntime pp (ppHost);
+        pp.tickAnimations (0.0);
+        pp.startAnimation ("to", juce::var ("pp"), 10.0,
+                           juce::JSON::parse (R"JSON({"duration":100,"from":0,"repeat":2,"pingpong":true})JSON"));
+        pp.tickAnimations (100.0);
+        check (std::abs ((double) ppHost.values["pp"] - 10.0) < 1e-9, "pingpong, repeat = 2: the first run arrives…");
+        pp.tickAnimations (150.0);
+        check (std::abs ((double) ppHost.values["pp"] - 5.0) < 1e-9, "…the second comes back…");
+        pp.tickAnimations (200.0);
+        check (! pp.animationRunning ("pp") && std::abs ((double) ppHost.values["pp"]) < 1e-9, "…and that is all");
+
+        // done, through the Lua and JavaScript preludes: one argument, exactly true or false, for a
+        // single path and for a list, with stagger and repeat counted the same way. The same moves in
+        // each language, each in a runtime of its own; what is logged at each step must be the same.
+        auto doneSteps = [] (const char* language, const juce::String& source)
+        {
+            TestHost h;
+            ScriptRuntime r (h);
+            h.runtime = &r;
+            juce::StringArray errors;
+            r.setErrorLogger ([&errors] (const juce::String& line)
+                { errors.add (line); std::cout << "  [error] " << line << "\n"; });
+            juce::Array<juce::var> list;
+            list.add (makeScript ("done", language, "panel", "onDone", "*", source));
+            r.loadScripts (juce::var (list));
+            juce::StringArray steps;
+            auto step = [&] { steps.add (h.logs.joinIntoString (" | ")); h.logs.clear(); };
+            r.tickAnimations (0.0);
+            r.runAction ("onDone", juce::var());
+            step();                                                      // 0: at the start
+            r.tickAnimations (100.0); step();                            // 1
+            r.tickAnimations (150.0); r.tickAnimations (200.0);
+            steps.add (juce::String (r.animationRunning ("d") ? "d running" : "d over") + ", "
+                       + (r.animationRunning ("e") ? "e running" : "e over") + ", "
+                       + (r.animationRunning ("h") ? "h running" : "h over"));
+            step();                                                      // 2, 3
+            r.tickAnimations (250.0); r.tickAnimations (300.0); step();  // 4
+            r.tickAnimations (1300.0);
+            steps.add (r.animationRunning ("i") ? "i running" : "i over");
+            r.stopAnimation(); step();                                   // 5, 6
+            steps.add (errors.isEmpty() ? "no errors" : errors.joinIntoString (" / "));
+            return steps;
+        };
+        const auto lua = doneSteps ("lua",
+            "local function say(name) return function(...)\n"
+            "  local c = ...\n"
+            "  log(name .. ' ' .. select('#', ...) .. ' ' .. type(c) .. ' ' .. tostring(c))\n"
+            "end end\n"
+            "function onDone()\n"
+            "  ce.anim.to('a', 1, { duration = 100, from = 0, done = say('a') })\n"
+            "  ce.anim.to('b', 1, { duration = 100, from = 0, done = say('b') })\n"
+            "  ce.anim.to('c', 1, { duration = 100, from = 0, done = say('c') })\n"
+            "  ce.anim.to({ 'd', 'e' }, 1, { duration = 100, from = 0, stagger = 50, ['repeat'] = 2, done = say('d,e') })\n"
+            "  ce.anim.to({ 'f', 'g' }, 1, { duration = 100, from = 0, done = say('f,g') })\n"
+            "  ce.anim.to('h', 1, { duration = 100, from = 0, ['repeat'] = 3, done = say('h') })\n"
+            "  ce.anim.to('i', 1, { duration = 100, from = 0, ['repeat'] = 0, done = say('i') })\n"
+            "  ce.anim.to('j', 1, { duration = 100, from = 0, done = say('j') })\n"
+            "  ce.anim.stop('b')\n"
+            "  ce.anim.finish('c')\n"
+            "  ce.anim.stop('f')\n"
+            "  ce.anim.to('j', 5, { duration = 100 })\n"
+            "end\n");
+        const auto js = doneSteps ("javascript",
+            "function say(name) { return function (c) {\n"
+            "  log(name + ' ' + arguments.length + ' ' + typeof c + ' ' + c);\n"
+            "}; }\n"
+            "function onDone() {\n"
+            "  ce.anim.to('a', 1, { duration: 100, from: 0, done: say('a') });\n"
+            "  ce.anim.to('b', 1, { duration: 100, from: 0, done: say('b') });\n"
+            "  ce.anim.to('c', 1, { duration: 100, from: 0, done: say('c') });\n"
+            "  ce.anim.to(['d', 'e'], 1, { duration: 100, from: 0, stagger: 50, repeat: 2, done: say('d,e') });\n"
+            "  ce.anim.to(['f', 'g'], 1, { duration: 100, from: 0, done: say('f,g') });\n"
+            "  ce.anim.to('h', 1, { duration: 100, from: 0, repeat: 3, done: say('h') });\n"
+            "  ce.anim.to('i', 1, { duration: 100, from: 0, repeat: 0, done: say('i') });\n"
+            "  ce.anim.to('j', 1, { duration: 100, from: 0, done: say('j') });\n"
+            "  ce.anim.stop('b');\n"
+            "  ce.anim.finish('c');\n"
+            "  ce.anim.stop('f');\n"
+            "  ce.anim.to('j', 5, { duration: 100 });\n"
+            "}\n");
+        const juce::StringArray expected {
+            "b 1 boolean false | c 1 boolean true | j 1 boolean false",   // stopped, finished, replaced
+            "a 1 boolean true | f,g 1 boolean false",                      // arrived; a list with one stopped
+            "d over, e running, h running",                                // at 200, d's two runs are over, e's
+            "",                                                            // (staggered by 50) are not: no done yet
+            "d,e 1 boolean true | h 1 boolean true",                       // the list, once at 250; repeat = 3 at 300
+            "i running",                                                   // repeat = 0: until stopped
+            "i 1 boolean false",
+            "no errors",
+        };
+        for (const auto& [name, got] : { std::pair { "Lua", lua }, std::pair { "JavaScript", js } })
+            for (int i = 0; i < expected.size(); ++i)
+                check (i < got.size() && got[i] == expected[i],
+                       juce::String (name) + " step " + juce::String (i) + ": done(completed) is one boolean, repeat the runs in all (want \""
+                           + expected[i] + "\", got \"" + (i < got.size() ? got[i] : juce::String ("nothing")) + "\")");
+    }
+
+    // 39c) Each move's done reaches its own function, whoever started it -----------------------------
+    // The preludes stored a done under its path, or for a list under a number they counted while
+    // the host counted its own. So a path replaced by a move with a done of its own called the NEW
+    // function for the old move, and the old one never ran; two scripts, or a Lua and a JavaScript
+    // one, that each started a list got each other's done, or none; and a reload, which starts every
+    // prelude counting again, left the host's numbers pointing at nothing. Each move with a done now
+    // has a token of its own, and a move that outlives the set that started it calls nothing.
+    {
+        TestHost mixHost;
+        ScriptRuntime mix (mixHost);
+        mixHost.runtime = &mix;
+        juce::StringArray mixErrors;
+        mix.setErrorLogger ([&mixErrors] (const juce::String& line)
+            { mixErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+        juce::Array<juce::var> set1;
+        set1.add (makeScript ("mixLua", "lua", "panel", "onGo", "*",
+            "function onGo()\n"
+            "  ce.anim.to({ 'p', 'q' }, 1, { duration = 100, from = 0, done = function(c) log('lua list ' .. tostring(c)) end })\n"
+            "  ce.anim.to('x', 1, { duration = 100, from = 0, done = function(c) log('lua x ' .. tostring(c)) end })\n"
+            "  ce.anim.to('z', 1, { duration = 1000, from = 0, done = function(c) log('lua z ' .. tostring(c)) end })\n"
+            "end\n"));
+        set1.add (makeScript ("mixJsA", "javascript", "panel", "onGo", "*",
+            "function onGo() {\n"
+            "  ce.anim.to(['r', 's'], 1, { duration: 100, from: 0, done: function (c) { log('jsA list ' + c); } });\n"
+            "  ce.anim.to('x', 2, { duration: 100, from: 0, done: function (c) { log('jsA x ' + c); } });\n"
+            "}\n"));
+        set1.add (makeScript ("mixJsB", "javascript", "panel", "onGo", "*",
+            "function onGo() {\n"
+            "  ce.anim.to(['t', 'u'], 1, { duration: 200, from: 0, done: function (c) { log('jsB list ' + c); } });\n"
+            "  ce.anim.to('y', 1, { duration: 100, from: 0, done: function (c) { log('jsB y1 ' + c); } });\n"
+            "  ce.anim.to('y', 2, { duration: 100, from: 0, done: function (c) { log('jsB y2 ' + c); } });\n"
+            "}\n"));
+        mix.loadScripts (juce::var (set1));
+        mix.tickAnimations (0.0);
+        mix.dispatchEvent ("onGo", "panel", juce::var());
+        const auto mixed = [&mixHost] { const auto line = mixHost.logs.joinIntoString (" | "); mixHost.logs.clear(); return line; };
+        const auto atStart = mixed();
+        check (atStart == "lua x false | jsB y1 false",
+               "a replaced move's own done gets false, from another script or the same one (got " + atStart + ")");
+        mix.tickAnimations (100.0);
+        const auto at100 = mixed();
+        check (at100 == "lua list true | jsA list true | jsA x true | jsB y2 true",
+               "each list's done, and each replacing move's, is its own (got " + at100 + ")");
+        mix.tickAnimations (200.0);
+        const auto at200 = mixed();
+        check (at200 == "jsB list true", "…and a second script's list is not ended by the first's (got " + at200 + ")");
+
+        // Reload while 'z' is still going. The new set's prelude counts from 1 again, so its third
+        // token, 'w''s, is the one 'z' carries; and the host's list count does not start again.
+        juce::Array<juce::var> set2;
+        set2.add (makeScript ("mixLua2", "lua", "panel", "onGo", "*",
+            "function onGo()\n"
+            "  ce.anim.to('a', 1, { duration = 100, from = 0, done = function(c) log('new a ' .. tostring(c)) end })\n"
+            "  ce.anim.to('b', 1, { duration = 100, from = 0, done = function(c) log('new b ' .. tostring(c)) end })\n"
+            "  ce.anim.to('w', 1, { duration = 2000, from = 0, done = function(c) log('new w ' .. tostring(c)) end })\n"
+            "  ce.anim.to({ 'c', 'd' }, 1, { duration = 100, from = 0, done = function(c) log('new list ' .. tostring(c)) end })\n"
+            "end\n"));
+        mix.loadScripts (juce::var (set2));
+        mix.dispatchEvent ("onGo", "panel", juce::var());
+        mix.tickAnimations (300.0);
+        mix.tickAnimations (1000.0);
+        const auto afterReload = mixed();
+        check (afterReload == "new a true | new b true | new list true",
+               "a move that outlives its script set calls nothing in the next one (got " + afterReload + ")");
+        check (! mix.animationRunning ("z") && mix.animationRunning ("w"), "…though it still ran to its end");
+        mix.tickAnimations (2200.0);
+        const auto atEnd = mixed();
+        check (atEnd == "new w true", "…and the new set's move gets its own done when it ends (got " + atEnd + ")");
+        check (mixErrors.isEmpty(), "and no script raised doing any of it");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");
@@ -2907,6 +3673,331 @@ int main()
                "extensionsFromPanel reads scripting.extensions");
         check (! ScriptRuntime::extensionsFromPanel (juce::JSON::parse (R"({ "scripting": {} })")).isArray(),
                "a panel carrying no modules reads as none");
+    }
+
+    // 40) One JavaScript engine for the whole panel --------------------------------------------------
+    // Every JavaScript script used to get an engine of its own, and that was what kept their handlers,
+    // globals, `state` and `self` apart. It also cost 650 KB a script. The engine is shared now
+    // (JsScriptEngine.cpp, the top of the prelude), so each check here is something the separate
+    // engines guaranteed, asked of the shared one.
+    {
+        TestHost shareHost;
+        ScriptRuntime share (shareHost);
+        shareHost.runtime = &share;
+        juce::StringArray shareErrors;
+        share.setErrorLogger ([&shareErrors] (const juce::String& line)
+            { shareErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+
+        juce::Array<juce::var> iso;
+        iso.add (makeScript ("isoA", "javascript", "panel", "onPing", "*",
+            "var count = 0;\n"
+            "self.tag = 'A';\n"
+            "function onPing() { count++; state.mine = 'A'; log('A ' + count + ' ' + state.mine); }\n"
+            "function onSeeA() { log('A sees ' + state.mine + ' ' + (ce.storage.state === state)); }\n"
+            "on('*', 'onShout', function () { log('A heard'); });\n"
+            "defineAction('fromA', function (n) { count += 10; return 'A' + count + ':' + state.mine; });"));
+        iso.add (makeScript ("isoB", "javascript", "panel", "onPing", "*",
+            "var count = 100;\n"
+            "function onPing() { count++; log('B ' + count + ' ' + state.mine); }\n"
+            "function onCallA() { log('B got ' + run('fromA', 1) + ' then ' + count + ' ' + state.mine); }\n"
+            "function onProbe() { log('B sees ' + typeof onSeeA + ' ' + self.tag); }\n"
+            "const onConst = function () { log('B const'); };\n"
+            "off('*', 'onShout');"));
+        // A component script: its `self` is its own control, not the panel the others are on.
+        iso.add (makeScript ("isoC", "javascript", "component", "onSelfJs", "knob",
+            "function onSelfJs() { self.set('value', 7); }"));
+        iso.add (makeScript ("isoBad", "javascript", "panel", "onPing", "*",
+            "function onPing() { log('BAD ran'); }\nthrow new Error('top level fails');"));
+        // after() in two scripts: each needs its own copy of the listener the prelude registers.
+        iso.add (makeScript ("isoT1", "javascript", "panel", "onArmT", "*",
+            "function onArmT() { after(10, function () { log('T1 fired'); }); }"));
+        iso.add (makeScript ("isoT2", "javascript", "panel", "onArmT", "*",
+            "function onArmT() { after(10, function () { log('T2 fired'); }); }"));
+        share.loadScripts (juce::var (iso));
+
+        share.dispatchEvent ("onPing", "panel", juce::var());
+        share.dispatchEvent ("onPing", "panel", juce::var());
+        check (shareHost.logs.contains ("A 2 A"), "two scripts both define onPing, and each runs its own");
+        check (shareHost.logs.contains ("B 102 undefined"),
+               "…with its own top-level `count`, and a `state` the other script's writes do not reach");
+        check (! shareHost.logs.contains ("BAD ran"), "a script whose top level throws is not loaded");
+        check (shareErrors.joinIntoString ("\n").contains ("isoBad")
+                   && shareErrors.joinIntoString ("\n").contains ("load error"),
+               "…and says so, under its own id");
+
+        shareHost.logs.clear();
+        share.runAction ("onSeeA", juce::var());
+        check (shareHost.logs.contains ("A sees A true"), "ce.storage.state is the running script's `state`");
+        share.runAction ("onProbe", juce::var());
+        check (shareHost.logs.contains ("B sees undefined undefined"),
+               "one script cannot see another's functions, nor what it put on its `self`");
+        share.runAction ("onConst", juce::var());
+        check (shareHost.logs.contains ("B const"), "a handler held in a top-level const is found by name");
+
+        // run() from one script into another re-enters the shared engine. The action has to run as
+        // the script that defined it, and the caller has to be itself again afterwards.
+        share.runAction ("onCallA", juce::var());
+        check (shareHost.logs.contains ("B got A12:A then 102 undefined"),
+               "run() across scripts runs the action in its own script, and hands the caller back intact");
+
+        shareHost.logs.clear();
+        share.dispatchEvent ("onShout", "panel", juce::var());
+        check (shareHost.logs.size() == 1 && shareHost.logs[0] == "A heard",
+               "off() in one script leaves another script's listener alone");
+
+        share.runAction ("onSelfJs", juce::var());
+        check (shareHost.values.count ("knob.value") == 1 && (int) shareHost.values["knob.value"] == 7,
+               "a component script's `self` is its own control");
+
+        shareHost.logs.clear(); shareHost.timerStarts.clear();
+        share.dispatchEvent ("onArmT", "panel", juce::var());
+        check (shareHost.timerStarts.size() == 2, "after() in two scripts arms two timers");
+        juce::StringArray ids (shareHost.timerStarts);
+        ids.removeDuplicates (false);
+        for (const auto& id : ids)
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", id);
+            share.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (shareHost.logs.contains ("T1 fired") && shareHost.logs.contains ("T2 fired"),
+               "…and both fire: each script starts with its own copy of the prelude's listeners");
+    }
+
+    // 40b) A name a script assigns without declaring it is the script's own --------------------------
+    // In an engine of its own it became a global only that script could see, and in the WebView,
+    // where each script has a context of its own, it still does. In the shared engine it used to land
+    // on the one global every script sees. The prelude now keeps it in the script's context.
+    {
+        TestHost impHost;
+        ScriptRuntime imp (impHost);
+        impHost.runtime = &imp;
+        juce::StringArray impErrors;
+        imp.setErrorLogger ([&impErrors] (const juce::String& line)
+            { impErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("impA", "javascript", "panel", "onImp", "*",
+            "tally = 5;\n"
+            "function onImp() { tally++; log('A tally ' + tally); }\n"
+            "function onArmLater() { after(10, function () { tally += 100; log('A later ' + tally); }); }"));
+        scripts.add (makeScript ("impB", "javascript", "panel", "onImp", "*",
+            "function onImp() { log('B sees ' + typeof tally); }\n"
+            "function onReadTally() { log('B read ' + tally); }\n"
+            "function onTakeOwn() { tally = 1; log('B own ' + tally); }"));
+        // A new name put on the global object by name is the script's own as well: in the WebView each
+        // script's global is its own, so a write there was never one another script could read.
+        scripts.add (makeScript ("impD", "javascript", "panel", "onImp", "*",
+            "globalThis.viaGlobal = 'D1'; this.viaThis = 'D2';\n"
+            "function onImp() { log('D has ' + viaGlobal + ' ' + globalThis.viaThis); }\n"
+            "function onProbeGlobal() { log('D sees ' + typeof viaGlobal); }"));
+        scripts.add (makeScript ("impE", "javascript", "panel", "onImp", "*",
+            "function onImp() { log('E sees ' + typeof viaGlobal + ' ' + typeof viaThis + ' ' + typeof globalThis.viaGlobal); }"));
+        // The way such names are usually used: made the first time through, by asking typeof.
+        scripts.add (makeScript ("impC", "javascript", "panel", "onImp", "*",
+            "if (typeof seen === 'undefined') seen = 0;\n"
+            "function onImp() { seen++; log('C seen ' + seen); }"));
+        imp.loadScripts (juce::var (scripts));
+
+        imp.dispatchEvent ("onImp", "panel", juce::var());
+        check (impHost.logs.contains ("A tally 6"), "a script's undeclared name works for that script");
+        check (impHost.logs.contains ("B sees undefined"), "…and another script's typeof says it is not there");
+        check (impHost.logs.contains ("D has D1 D2"), "a script reads back what it put on globalThis or this");
+        check (impHost.logs.contains ("E sees undefined undefined undefined"),
+               "…and another script finds neither, as in the WebView where each global is a script's own");
+
+        impHost.logs.clear(); impErrors.clear();
+        imp.runAction ("onReadTally", juce::var());
+        check (! impHost.logs.contains ("B read 6") && impErrors.joinIntoString ("\n").contains ("tally"),
+               "reading another script's undeclared name fails as a name that is not defined, not with its value");
+
+        impHost.logs.clear();
+        imp.runAction ("onTakeOwn", juce::var());
+        imp.dispatchEvent ("onImp", "panel", juce::var());
+        check (impHost.logs.contains ("B own 1") && impHost.logs.contains ("A tally 7")
+                   && impHost.logs.contains ("B sees number"),
+               "two scripts assigning the same undeclared name each keep their own");
+        check (impHost.logs.contains ("C seen 2"), "typeof on a name not yet made says 'undefined', so it can be made once");
+
+        // A callback runs later, from a timer, and has to find its own script's name then too.
+        impHost.logs.clear(); impHost.timerStarts.clear();
+        imp.runAction ("onArmLater", juce::var());
+        for (const auto& id : impHost.timerStarts)
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", id);
+            imp.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (impHost.logs.contains ("A later 107"), "…including in a callback that runs later, from a timer");
+    }
+
+    // ---- Intervals and storage option keys a script got wrong, in the real engines --------------
+    // startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) reached the host as 0 ms (its
+    // 5 ms floor, a flood), after("1s", fn) ran at once, and saveSetting(k, v, { scop = "script" })
+    // saved into the shared panel store. Each is refused now, in the words the WebView runtime and
+    // the three preludes share (scriptPreludeAgreement.test.js), and nothing reaches the host. What
+    // is right still does: a 250 ms timer, after(0, fn), and a division as a sync timer's length.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        TestHost host;
+        ScriptRuntime runtime (host);
+        host.runtime = &runtime;
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("bad", lang, "panel", "onBad", "*", isLua
+            ? "function onBad()\n"
+              "  startTimer(\"t\", \"fast\")\n  startTimer(\"u\", -100)\n  startTimer(\"v\")\n"
+              "  after(\"1s\", function() end)\n  syncTimer(\"s\", 0)\n"
+              "  saveSetting(\"k\", 1, { scop = \"script\" })\n"
+              "  startTimer(\"ok\", 250)\n  after(0, function() end)\n"
+              "end\n"
+            : "function onBad() {\n"
+              "  startTimer(\"t\", \"fast\"); startTimer(\"u\", -100); startTimer(\"v\");\n"
+              "  after(\"1s\", function () {}); syncTimer(\"s\", 0);\n"
+              "  saveSetting(\"k\", 1, { scop: \"script\" });\n"
+              "  startTimer(\"ok\", 250); after(0, function () {});\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.timerOps.clear();
+        host.timerStarts.clear();
+        host.levelled.clear();
+        runtime.runAction ("onBad", juce::var());
+        const juce::String tag (lang);
+        check (host.timerStarts.size() == 2 && host.timerStarts[0] == "ok" && host.timerStarts[1].startsWith ("__after:"),
+               tag + ": only the 250 ms timer and the after(0) reach the host (got " + host.timerOps.joinIntoString (", ") + ")");
+        check (host.settings.empty(), tag + ": a misspelled scope key saves nothing, in no store");
+        for (const char* line : {
+                 "error:ce.time.startTimer(\"t\"): \"fast\" is not a number of milliseconds, so no timer was started.",
+                 "error:ce.time.startTimer(\"u\"): -100 is not more than 0 milliseconds, so no timer was started.",
+                 "error:ce.time.startTimer(\"v\"): no interval was given, so no timer was started.",
+                 "error:ce.time.after: \"1s\" is not a number of milliseconds, so nothing was scheduled.",
+                 "error:ce.time.syncTimer(\"s\"): 0 is not more than 0 beats, so no timer was started.",
+                 "error:ce.storage.saveSetting: \"scop\" is not one of its options, so nothing was done. Its only option is scope." })
+            check (host.levelled.contains (line), tag + ": " + juce::String (line).fromFirstOccurrenceOf (":", false, false));
+    }
+
+    // ---- An option key a call does not take refuses it, in the real engines ----------------------
+    // ce.anim.to("K.value", 100, { easing = "outBack" }) moved in a straight line, a parameter
+    // declared with a misspelled key was defined without it, and set() with a key it does not take
+    // wrote anyway. Each is refused now, before the host or the runtime sees it, by the check
+    // gen-script-modules.mjs writes into each prelude from panelApi.js, in the WebView runtime's
+    // words (scriptPreludeAgreement.test.js): nothing is done, and the call answers what the member
+    // answers for any other refusal. The runtime's own animation and definition code is never
+    // reached, which is what this pins; the same calls with the keys spelled right still work.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        TestHost host;
+        ScriptRuntime runtime (host);
+        host.runtime = &runtime;
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("opts", lang, "panel", "onOpts", "*", isLua
+            ? "function onOpts()\n"
+              "  log(\"to \" .. tostring(animateTo(\"K.value\", 100, { easing = \"outBack\" })))\n"
+              "  log(\"spring \" .. tostring(ce.anim.spring(\"K.value\", 100, { curve = \"outBack\" })))\n"
+              "  log(\"running \" .. tostring(animateRunning(\"K.value\")))\n"
+              "  log(\"define \" .. tostring(ce.device.defineParameter(\"cut\", { cc = 74, nmae = \"Cutoff\", nrpn = { mbs = 1 } })))\n"
+              "  log(\"dump \" .. tostring(ce.device.defineDump(\"patch\", { header = \"F0\", match = { prefix = \"F0 7D\" }, fields = {} })))\n"
+              "  set(\"K.refused\", 5, { transmit = false, quiet = true })\n"
+              "  log(\"recall \" .. tostring(recallPreset(0, { rol = \"mainSynth\" }).ok))\n"
+              "  log(\"params \" .. #ce.device.parameters({ grp = \"Filter\" }))\n"
+              "  syncTimer(\"s\", 1, { folow = false })\n"
+              "  log(\"read \" .. tostring(ce.midi.read({ 1, 2 }, 0, 2, { ordr = \"lsb\" })))\n"
+              "  set(\"K.good\", 7, { transmit = false })\n"
+              "  log(\"good \" .. tostring(ce.device.defineParameter(\"res\", { cc = 71, name = \"Resonance\", nrpn = nil })))\n"
+              "  log(\"goodRead \" .. tostring(ce.midi.read({ 1, 2 }, 0, 2, { order = \"lsb\" })))\n"
+              "  log(\"write \" .. tostring(ce.midi.write({ 1, 2 }, 0, 2, 300, { bit = 8 })))\n"
+              "  log(\"goodWrite \" .. table.concat(ce.midi.write({ 0, 0 }, 0, 2, 300, { bits = 8 }), \" \"))\n"
+              "  animateTo(\"K.value\", 50, { duration = 500 })\n"
+              "end\n"
+            : "function onOpts() {\n"
+              "  log(\"to \" + animateTo(\"K.value\", 100, { easing: \"outBack\" }));\n"
+              "  log(\"spring \" + ce.anim.spring(\"K.value\", 100, { curve: \"outBack\" }));\n"
+              "  log(\"running \" + animateRunning(\"K.value\"));\n"
+              "  log(\"define \" + ce.device.defineParameter(\"cut\", { cc: 74, nmae: \"Cutoff\", nrpn: { mbs: 1 } }));\n"
+              "  log(\"dump \" + ce.device.defineDump(\"patch\", { header: \"F0\", match: { prefix: \"F0 7D\" }, fields: [] }));\n"
+              "  set(\"K.refused\", 5, { transmit: false, quiet: true });\n"
+              "  log(\"recall \" + recallPreset(0, { rol: \"mainSynth\" }).ok);\n"
+              "  log(\"params \" + ce.device.parameters({ grp: \"Filter\" }).length);\n"
+              "  syncTimer(\"s\", 1, { folow: false });\n"
+              "  log(\"read \" + (ce.midi.read([1, 2], 0, 2, { ordr: \"lsb\" }) === undefined ? \"nil\" : \"a number\"));\n"
+              "  set(\"K.good\", 7, { transmit: false });\n"
+              "  log(\"good \" + ce.device.defineParameter(\"res\", { cc: 71, name: \"Resonance\" }));\n"
+              "  log(\"goodRead \" + ce.midi.read([1, 2], 0, 2, { order: \"lsb\" }));\n"
+              "  log(\"write \" + (ce.midi.write([1, 2], 0, 2, 300, { bit: 8 }) === undefined ? \"nil\" : \"a list\"));\n"
+              "  log(\"goodWrite \" + ce.midi.write([0, 0], 0, 2, 300, { bits: 8 }).join(\" \"));\n"
+              "  animateTo(\"K.value\", 50, { duration: 500 });\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.logs.clear();
+        host.levelled.clear();
+        host.timerStarts.clear();
+        host.deviceQueries.clear();
+        runtime.runAction ("onOpts", juce::var());
+        const juce::String tag (lang);
+        const auto logged = host.logs.joinIntoString (" | ");
+        for (const char* line : { "to false", "spring false", "running false", "define false", "dump false",
+                                  "recall false", "params 0", "read nil", "good true", "goodRead 257",
+                                  "write nil", "goodWrite 1 44" })
+            check (host.logs.contains (line), tag + ": logs " + line + " (got " + logged + ")");
+        check (host.values.find ("K.refused") == host.values.end() && (int) host.values["K.good"] == 7,
+               tag + ": the refused set() writes nothing, and the right one writes");
+        check (! runtime.hasDeviceParameter ("mainSynth", "cut") && runtime.hasDeviceParameter ("mainSynth", "res"),
+               tag + ": the refused definition defines nothing, and the right one defines");
+        check (! runtime.hasDeviceDump ("mainSynth", "patch"), tag + ": the refused dump layout is not declared");
+        check (! host.timerStarts.contains ("s"), tag + ": the refused sync timer is not started");
+        check (host.deviceQueries.isEmpty(), tag + ": neither refused device read reaches the host (got "
+                   + host.deviceQueries.joinIntoString (", ") + ")");
+        check (runtime.animationRunning ("K.value"), tag + ": the move with the right options runs");
+        for (const char* line : {
+                 "error:ce.anim.to: \"easing\" is not one of its options, so nothing was done. Its options are: duration, "
+                     "beats, sync, curve, damping, frequency, from, delay, stagger, repeat, pingpong, done.",
+                 "error:ce.anim.spring: \"curve\" is not one of its options, so nothing was done. Its options are: duration, "
+                     "damping, frequency, from, beats, sync, delay, stagger, repeat, pingpong, done.",
+                 "error:ce.device.defineParameter: \"nmae\" is not one of its options, so nothing was done. Its options are: "
+                     "name, group, type, min, max, access, choices, trueValue, falseValue, cc, nrpn, sysex, channel, encoding, "
+                     "nibbles, checksum, variables, length, pad.",
+                 "error:ce.device.defineParameter: \"nrpn.mbs\" is not one of its options, so nothing was done. The options "
+                     "of nrpn are: msb, lsb.",
+                 "error:ce.device.defineDump: \"header\" is not one of its options, so nothing was done. Its options are: "
+                     "name, request, match, prefix, suffix, offset, size, checksum, fields.",
+                 "error:set: \"quiet\" is not one of its options, so nothing was done. Its only option is transmit.",
+                 "error:ce.device.recallPreset: \"rol\" is not one of its options, so nothing was done. Its only option is role.",
+                 "error:ce.device.parameters: \"grp\" is not one of its options, so nothing was done. Its options are: "
+                     "role, query, group, type, access, limit.",
+                 "error:ce.time.syncTimer: \"folow\" is not one of its options, so nothing was done. Its only option is follow.",
+                 "error:ce.midi.read: \"ordr\" is not one of its options, so nothing was done. Its options are: bits, order.",
+                 "error:ce.midi.write: \"bit\" is not one of its options, so nothing was done. Its options are: bits, order." })
+            check (host.levelled.contains (line), tag + ": " + juce::String (line).fromFirstOccurrenceOf (":", false, false));
+        check (host.levelled.size() == 11, tag + ": one line per refusal and nothing else (got "
+                   + host.levelled.joinIntoString (" | ") + ")");
+        runtime.stopAnimation ({});
+    }
+
+    // ---- Two instances in one process ------------------------------------------------------------
+    // Each ScriptRuntime is one plug-in instance (one standalone window). Two copies of one panel,
+    // in one DAW, must keep their own variables in Lua and in JavaScript — a global JavaScript
+    // assigns without declaring included — and each copy's scripts must reach its own host.
+    {
+        TestHost hostA, hostB;
+        ScriptRuntime a (hostA), b (hostB);
+        hostA.runtime = &a; hostB.runtime = &b;
+        juce::Array<juce::var> panel;
+        panel.add (makeScript ("luaCount", "lua", "panel", "onTick", "*",
+            "count = 0\nfunction onTick(v)\n  count = count + 1\n  set(\"lua.count\", count)\nend\n"));
+        panel.add (makeScript ("jsCount", "javascript", "panel", "onTick", "*",
+            "var count = 0; total = 0;\n"
+            "function onTick(v) { count += 1; total += 1; set(\"js.count\", count); set(\"js.total\", total); }"));
+        a.loadScripts (juce::var (panel));
+        b.loadScripts (juce::var (panel));
+        a.dispatchEvent ("onTick", "panel", juce::var());
+        a.dispatchEvent ("onTick", "panel", juce::var());
+        b.dispatchEvent ("onTick", "panel", juce::var());
+        check ((int) hostA.values["lua.count"] == 2 && (int) hostB.values["lua.count"] == 1,
+               "Two copies of one panel: Lua globals count apart (A 2, B 1)");
+        check ((int) hostA.values["js.count"] == 2 && (int) hostB.values["js.count"] == 1
+                   && (int) hostA.values["js.total"] == 2 && (int) hostB.values["js.total"] == 1,
+               "Two copies of one panel: JavaScript variables count apart, declared or not");
     }
 
     std::cout << "------------------------\n"

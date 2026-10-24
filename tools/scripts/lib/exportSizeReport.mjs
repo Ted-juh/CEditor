@@ -15,8 +15,8 @@
 //   - the carried fonts, which are already cut to the panel's characters by the time they are here.
 //
 // Pure and dependency-free (node built-ins only), so the installed exporter — which ships these
-// scripts and no node_modules — can run it too. Fed the COMPLETE document, after
-// completeExportDocument: a sparse one would report the defaults it does not carry as savings.
+// scripts and no node_modules — can run it too. Fed the export payload, after exportFormFor: what it
+// reports is what the plug-in carries, the defaults table included (`controlDefaults`).
 
 import { createHash } from 'node:crypto';
 
@@ -65,6 +65,14 @@ export function exportSizeReport(doc, { fileBytes = null, top = 5 } = {}) {
   const partSections = new Map();
   let controls = 0;
   let parts = 0;
+  const countParts = (section) => {
+    for (const part of Object.values(section?._children ?? {})) {
+      parts += 1;
+      for (const [name, value] of Object.entries(part?._children ?? {})) {
+        partSections.set(name, (partSections.get(name) ?? 0) + compactBytes(value));
+      }
+    }
+  };
   const visitControl = (control) => {
     controls += 1;
     const type = String(control?._children?.Core?.controlType ?? 'unknown');
@@ -75,15 +83,13 @@ export function exportSizeReport(doc, { fileBytes = null, top = 5 } = {}) {
     const { Children: _members, ...own } = control._children;
     entry.bytes += compactBytes({ ...control, _children: own });
     byType.set(type, entry);
-    for (const part of Object.values(control?._children?.Parts?._children ?? {})) {
-      parts += 1;
-      for (const [section, value] of Object.entries(part?._children ?? {})) {
-        partSections.set(section, (partSections.get(section) ?? 0) + compactBytes(value));
-      }
-    }
+    countParts(control?._children?.Parts);
     for (const child of childControls(control)) visitControl(child);
   };
   for (const control of doc?.controls ?? []) if (control?._children?.Core) visitControl(control);
+  // A drawing several controls share is carried once (stores/documentDrawings.js), and counted once:
+  // the parts here are the ones the payload carries, not the ones the panel draws.
+  for (const drawing of Object.values(doc?.drawings ?? {})) countParts(drawing);
 
   // Embedded media: every data URL, wherever it is, with repeats by content. The carried fonts are
   // data URLs too and are reported on their own line below, so they are not walked here.
@@ -159,7 +165,7 @@ export function formatExportSizeReport(report) {
     lines.push(`  ${count} controls${parts ? `, ${parts} parts` : ''}: ${types}`);
     const heaviest = report.partSections[0];
     if (heaviest && parts && heaviest.bytes >= total * 0.1) {
-      lines.push(`  parts' ${heaviest.section} sections: ${kb(heaviest.bytes)} (${pct(heaviest.bytes, total)}), ${kb(Math.round(heaviest.bytes / parts))} per part — the complete form carries every default`);
+      lines.push(`  parts' ${heaviest.section} sections: ${kb(heaviest.bytes)} (${pct(heaviest.bytes, total)}), ${kb(Math.round(heaviest.bytes / parts))} per part`);
     }
   }
 

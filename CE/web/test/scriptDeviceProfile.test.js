@@ -114,12 +114,13 @@ test('setVariable writes the override, not the profile', () => {
 test('a variable that is not a number, or has no name, is refused and says why', () => {
   withDevice(withVars, (d) => {
     assert.equal(d.setVariable('deviceId', 'seventeen'), false);
-    assert.match(said(), /needs a number/);
+    assert.match(said(), /"seventeen" is not a number, so nothing was changed\./);
     assert.equal(d.setVariable('', 3), false);
-    assert.match(said(), /a name is required/);
-    // …and clamped to a data byte. Individual uses narrow further — a channel is 1..16.
+    assert.match(said(), /a name is required, so nothing was changed\./);
+    // …and clamped to a data byte, which is said. Individual uses narrow further — a channel is 1..16.
     assert.equal(d.setVariable('deviceId', 999), true);
     assert.equal(d.variables().deviceId, 127);
+    assert.match(said(), /999 is outside 0 to 127, so 127 was used\./);
   });
 });
 
@@ -201,7 +202,7 @@ test('nothing back when no profile is mapped, rather than an empty object', () =
     // an empty list rather than nil, so a caller can iterate without a guard either way.
     assert.deepEqual(d.recipes(), []);
     assert.equal(d.setVariable('deviceId', 1), false);
-    assert.match(said(), /no device profile is mapped/);
+    assert.match(said(), /no device profile is chosen for mainSynth, so nothing was changed\./);
   } finally { panels.set([]); deviceRoleMappings.set({}); }
 });
 

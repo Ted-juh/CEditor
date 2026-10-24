@@ -257,7 +257,11 @@ function Stage-HostTemplate([string]$RepoRoot, [string]$StageDir, [string]$Confi
     Reset-Directory $hostDir
 
     $standaloneSrc = Join-Path $buildDir "CEHostStandalone_artefacts\$Configuration"
-    $programs = @(Get-ChildItem -LiteralPath $standaloneSrc -Filter "*.exe" -File)
+    # CMakeLists.txt copies the live plug-in worker beside every host target after it links, this
+    # one included, so the folder holds CEditorPluginWorker.exe as well. It is CEditor's (above), not
+    # the template's, and counting it made the first release-checks run stop here.
+    $programs = @(Get-ChildItem -LiteralPath $standaloneSrc -Filter "*.exe" -File |
+        Where-Object { $_.Name -ne "CEditorPluginWorker.exe" })
     if ($programs.Count -ne 1) {
         throw "Expected one HoSTage standalone in $standaloneSrc; found $($programs.Count)."
     }

@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly six patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly nine patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -172,3 +172,93 @@ This complements `CE/src/TrustedWebBrowser.h`, which blocks navigation away from
 Both protections must survive a JUCE update; reapply the source check before `handleNativeEvent`
 in the Windows `WebMessageReceived` callback. Other platforms retain the navigation protection;
 this message-source patch specifically covers WebView2 on Windows.
+
+### 7. QuickJS: a global read asks a proxy in the global's prototype chain before getting
+
+**File:** `include/JUCE-8.0.7/modules/juce_javascript/choc/javascript/choc_javascript_QuickJS.h`,
+`JS_GetPropertyInternal`, the exotic-object branch (where QuickJS's own comment reads
+`XXX: should pass throw_ref_error`).
+
+**Guard:** none. It is a fix toward the spec, and inert in any engine that does not put an exotic
+object in its global's prototype chain, which nothing does but CEditor's JavaScript prelude.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What was wrong.** Reading a global variable, QuickJS walks the global object's prototype chain,
+and when it reaches a Proxy it returns whatever the proxy's `get` trap returns, without asking its
+`has` trap first. The spec asks first (a global binding exists only if HasProperty says so), and
+that is the only way a proxy can say "not here": without it a read of an undefined name through
+the proxy is `undefined` instead of a ReferenceError. `typeof` cannot be told apart from a read
+inside a trap, so the trap cannot make up for it.
+
+**Why it matters here.** `CE/src/Scripting/JsScriptEngine.cpp` runs every JavaScript script on a
+panel in one engine, and keeps a name a script assigns without declaring it in that script's own
+context, from behind the global object: a proxy in the global's prototype chain. Without the
+patch, every typo in every script would read as `undefined` in the plug-in, where the editor's
+WebView (a context per script) throws "not defined".
+
+**What the patch does.** When the lookup is a global read (`throw_ref_error`, set by `OP_get_var`
+only; `typeof` uses `OP_get_var_undef`, which does not set it), it calls the exotic object's
+`has_property` first and throws "not defined" when that says no. Every other caller of
+`JS_GetPropertyInternal` passes `FALSE` and is unaffected.
+
+**If you upgrade JUCE:** check whether upstream QuickJS (or choc's copy) has started passing
+`throw_ref_error` to exotic objects; if not, re-apply the five lines after the `XXX` comment. The
+pin test fails while they are missing, and `ScriptRuntimeTests` section 40b fails without them.
+
+### 8. Linux webview: a closing window could spin the host forever
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp`,
+`Platform::killChild`, and the `childHasGone` helper beside it.
+
+**Guard:** none. The file is compiled on Linux only, and it is a fix: the child is still asked to
+quit and given the same second and a half before anything harsher happens.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What was wrong.** On Linux a webview runs in a child process (inside a plug-in, a fork of the host
+that never execs). Closing the window tells the child to quit and waits 1.5 s; a child still there
+after that was handled by `for (;;) { kill (child, SIGTERM); waitpid (child, &status, 0); if
+(WIFEXITED (status)) break; }`. A child the SIGTERM kills reports `WIFSIGNALED`, never `WIFEXITED`,
+so the loop went round again: `waitpid` on a child already reaped fails at once with `ECHILD`, the
+status is never touched, and the host's message thread spun at full CPU inside the window's
+destructor for good, re-sending SIGTERM each time to a pid the system was free to hand to another
+process. Any child slower than 1.5 s to go (a large panel, a busy machine) was enough.
+
+Found by `CEditorWebViewEngineProbe` (tests/WebViewEngineProbe.cpp) on Linux, 2026-10-16: three
+copies of GAIA in one process, every window closed and reopened at once. The second time round, the
+host stopped in `~Platform` → `killChild` → `wait4` on a pid that no longer existed, at 97% CPU. In a
+DAW that is the whole application hung when a plug-in window closes.
+
+**What the patch does.** Waits for the child with `WNOHANG` for the 1.5 s upstream allowed, then
+sends SIGTERM and waits up to a second more, then SIGKILL and a blocking wait, and stops the moment
+`waitpid` reports the child, however it ended, or fails with anything but `EINTR`. SIGTERM is never
+sent to a child already reaped.
+
+**Upstream status (checked 2026-10-16).** Not compared against `develop` from here; check on an
+upgrade. **If you upgrade JUCE:** if `killChild` still waits for `WIFEXITED`, re-apply
+`childHasGone` and the three-step shutdown. The pin test fails while the loop is back.
+
+### 9. Windows WebView2: no autofill in a panel
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp`,
+`WebView2::setWebViewPreferences`.
+
+**Guard:** none. It asks the WebView2 runtime for `ICoreWebView2Settings4` and does nothing when the
+runtime is older than that; the SDK in `CE/thirdparty/webview2` declares it.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What it does.** Turns off general autofill and password saving. A panel's text fields are not a
+web form: there is nothing to fill them from, and no password for the browser to keep.
+
+**What it no longer does.** It also asked a hidden webview for WebView2's low memory target
+(`ICoreWebView2_19::put_MemoryUsageTargetLevel`, from `setControlVisible`, which JUCE calls with
+`Component::isShowing` and so with false while the window is minimised). `CEditorWebViewEngineProbe`
+measured it with three windows minimised (docs/webview2-profiles.md): no difference in 10 s, and with
+it in, the pages kept growing for all 30 s they were minimised. It came out. What grows is the
+pages' own garbage, and the low target does not touch that.
+
+**If you upgrade JUCE:** if `setWebViewPreferences` is still there, re-apply the hunk; if JUCE grows
+options for these, use them instead.
+

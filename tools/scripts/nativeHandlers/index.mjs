@@ -1,7 +1,8 @@
 // nativeHandlers/index.mjs — orchestrate compile-at-export of a panel's C++/C#/Java handlers into
 // native modules (ce_handlers_<lang>.<ext>) bundled next to the plugin binary, loaded at runtime by
-// NativeHandlerEngine. See native-handlers-design.md. BUILD-UNVERIFIED: requires the per-language
-// toolchains (CMake+C++, .NET AOT, GraalVM) on the export machine; per-OS (no cross-OS build).
+// NativeHandlerEngine. See native-handlers-design.md. Needs the per-language toolchains on the export
+// machine (a C++ compiler, the .NET SDK, a JDK with jlink); per-OS, no cross-OS build. Run end to end
+// on Linux into a VST3 that a host loaded, all three languages (the design record says how).
 //
 // Wiring: export-panel-vst3.mjs calls compileNativeHandlers() after the plugin binary is built, only
 // when Export settings opt in (compileNativeHandlers === 'on'); it also passes -DCEDITOR_NATIVE_HANDLERS=ON
@@ -11,6 +12,7 @@ import { existsSync, mkdirSync, cpSync, statSync, readdirSync, rmSync } from 'no
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cppCompiler, dotnetExe, jdkTools } from '../../toolchains/resolveToolchain.mjs';
+import { cppModuleCommand } from './cpp/moduleCommand.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ABI_DIR = path.resolve(HERE, '../../../CE/src/Scripting'); // holds NativeHandlerAbi.h
@@ -65,18 +67,17 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
 
   try {
     if (lang === 'cpp') {
-      // Build the handler module with the BUNDLED LLVM-MinGW Clang (no Visual Studio / Windows SDK).
-      // Direct clang invocation — no CMake, no system toolchain. -static links the mingw runtime in so
-      // the .dll is self-contained; the flat C ABI means it loads into the MSVC-built host regardless.
+      // Built with the bundled LLVM-MinGW clang where it is provisioned (no Visual Studio / Windows
+      // SDK), else the system compiler; one direct invocation, no CMake. The flat C ABI means the
+      // module loads into the MSVC-built host whichever compiler made it.
       const { generateCppModule } = await import('./cpp/genCpp.mjs');
       generateCppModule({ scripts, outDir, abiHeaderDir: ABI_DIR, runtimeHeaderDir: path.join(HERE, 'cpp') });
       const tc = cppCompiler();
       if (!tc) return { ok: false, lang, error: 'no C++ compiler — run: node tools/toolchains/provision.mjs llvm-mingw' };
       const out = path.join(outDir, `${moduleName}${ext}`);
-      // -ffp-contract=off: ce_runtime.h's helpers match the preview to the bit, and a fused
-      // multiply-add (lerp's a + (b - a) * t) rounds once where JS rounds twice. Clang contracts
-      // within an expression by default and does so wherever the target has FMA (every ARM64).
-      execSync(`"${tc.cxx}" -std=c++20 -shared -static -O2 -ffp-contract=off -fvisibility=hidden -I "${ABI_DIR}" -I "${path.join(HERE, 'cpp')}" "${path.join(outDir, 'glue.cpp')}" -o "${out}"`, { stdio: 'inherit' });
+      // The command the C++ verifiers build with too (cpp/moduleCommand.mjs), flags explained there.
+      execSync(cppModuleCommand({ cxx: tc.cxx, targetsWindows: tc.targetsWindows, glue: path.join(outDir, 'glue.cpp'), out,
+        includeDirs: [ABI_DIR, path.join(HERE, 'cpp')] }), { stdio: 'inherit' });
       if (!existsSync(out)) return { ok: false, lang, error: 'C++ module build produced no output' };
       cpSync(out, dest);
     } else if (lang === 'csharp') {

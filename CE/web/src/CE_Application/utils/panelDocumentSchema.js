@@ -72,6 +72,11 @@ const control = {
           type: 'object',
           properties: { scripts: { type: 'array', items: script } },
         },
+        // A drawing written once in the document's `drawings` (stores/documentDrawings.js).
+        Parts: {
+          type: 'object',
+          properties: { _drawing: { type: 'string', pattern: '\\S' } },
+        },
       },
     },
   },
@@ -173,6 +178,8 @@ export const PANEL_DOCUMENT_SCHEMA = {
     deviceSession: nullable(object),
     captureSession: nullable(object),
     controls: { type: 'array', items: control },
+    // Each drawing more than one control uses, by name: a Parts section (stores/documentDrawings.js).
+    drawings: { type: 'object', additionalProperties: section },
     layers: { type: 'array', items: layer },
     scripts: { type: 'array', items: script },
     exportParameters: { type: 'array', items: exportParameter },

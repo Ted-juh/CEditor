@@ -8,6 +8,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
+  import { STATE_RULE_VALUE_NAMES } from '../utils/interactionRuntime.js';
   import Layers from 'lucide-svelte/icons/layers';
   import Target from 'lucide-svelte/icons/target';
   import SquareCheck from 'lucide-svelte/icons/square-check';
@@ -34,6 +35,11 @@
   // ValueChannels section and the builder degrades to its free-text form, which is right:
   // flags like `hover` are still legal operands there.
   let channelNames = $derived(Object.keys(getSection(control, 'ValueChannels')?._children ?? {}));
+  // And the control's own value, which a rule reads by name (`value > 64`) on every control; a
+  // channel of the same name is that channel, so it is listed once. The channels come first: on a
+  // custom control, a new condition starts on its first channel, as it always did. valueEnum, a
+  // list's choice, is read too, and is left to be typed.
+  let ruleNames = $derived([...channelNames, ...STATE_RULE_VALUE_NAMES.filter((name) => name !== 'valueEnum' && !channelNames.includes(name))]);
   let multiEdit = $derived($selectedComponentIds.size > 1);
   let stateTargetOptions = $derived(buildStateTargetOptions(states));
   let selectedStateName = $state('');
@@ -262,17 +268,17 @@
     <PropertySection title="When" icon={GitBranch}>
       <!--
         The rule half of `evaluateState()` (utils/interactionRuntime.js): an optional compound
-        condition over channels and flags, ANDed with the toggles below. The runtime has honoured
+        condition over the control's value, its channels and flags, ANDed with the toggles below. The runtime has honoured
         it for as long as it has existed and the starter templates write one — the Tabbed Pages
         container drives its page states with `tab == 'a'`, the Status LED with `active >= 1` —
         but there was no field here, so a rule could be seen on the filmstrip badge and never
         edited, and no user could write a new one. Same builder Links and Hit Zones use, on the
         same condition language, so a rule learned in one place reads in all three.
       -->
-      <PropertyCell label="Rule" span={4} hint="Compound condition over channels and flags. ANDed with the toggles below; leave empty to depend on the toggles alone.">
+      <PropertyCell label="Rule" span={4} hint="Compound condition over the control's value (value, valueNormalized), its channels and flags, such as value > 64. ANDed with the toggles below; leave empty to depend on the toggles alone.">
         <ConditionBuilder
           value={selectedState.rule ?? ''}
-          channels={channelNames}
+          channels={ruleNames}
           onChange={(next) => setStateProp('rule', next)}
           placeholder="no rule — flags only"
         />

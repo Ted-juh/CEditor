@@ -116,6 +116,23 @@ const panelDocument = {
   ],
 };
 
+// The same panel with a screen whose field is edited on the screen itself (playerHostKeys.mjs):
+// a click puts the caret in it, and the keys type into it without any text box on the page.
+const panelWithScreen = {
+  ...panelDocument,
+  controls: [
+    ...panelDocument.controls,
+    createControl('LcdDisplay', {
+      Core: { id: 'screen', name: 'screen' },
+      Transform: { x: 120, y: 250, width: 256, height: 40 },
+      Display: {
+        cols: 16, rows: 1, editText: 'AB', editCharset: 'upper', editMaxLength: 12, cursorMode: 'off',
+        layouts: [{ id: 'home', zones: [{ id: 'edit', show: 'edit', sourceId: '@edit', prefix: '[', suffix: ']', row: 1, colStart: 1, colEnd: 16 }] }],
+      },
+    }),
+  ],
+};
+
 // What the Player would fetch over the bridge, under the profile id it defaults to.
 profileSources.set({
   'roland-gaia': { profileId: 'roland-gaia', source: JSON.stringify(gaiaProfile), native: true },
@@ -124,7 +141,7 @@ profileSources.set({
 mount(Player, { target: document.getElementById('host') });
 
 window.__player = {
-  load: () => fire('loadPanel', { panel: panelDocument }),
+  load: (variant) => fire('loadPanel', { panel: variant === 'screen' ? panelWithScreen : panelDocument }),
   cc: (hex) => fire('midiInputMessage', { messageType: 'cc', hex }),
   // As the bridge labels anything that is not 0xB0: "midi", not "cc".
   channelMidi: (hex) => fire('midiInputMessage', { messageType: 'midi', hex }),
@@ -133,6 +150,10 @@ window.__player = {
   bound: () => Object.keys(get(panelPreviewSessions) ?? {}).length,
   // Every RQ1 the read-back sent, as parameterId -> the byte count the request asks for. The size
   // is the last of the four size bytes, at offset 14 of the message.
+  // What the page sent the host under one event name, and a clean slate (playerHostKeys.mjs).
+  events: (name) => sent.filter((e) => e.name === name).map((e) => e.payload),
+  forget: () => { sent.length = 0; },
+  pressed: (controlId) => get(panelPreviewSessions)?.[controlId]?.pressed === true,
   requests: () => Object.fromEntries(sent
     .filter((e) => e.name === 'triggerRawMidiAction' && String(e.payload?.actionId ?? '').startsWith('rq1_'))
     .map((e) => [String(e.payload.actionId).slice(4), parseInt(String(e.payload.message).trim().split(/\s+/)[14], 16)])),

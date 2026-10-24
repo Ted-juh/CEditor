@@ -5,9 +5,6 @@
 // For DPD-backed profiles the resolved slice carries `wires` (the self-contained MIDI
 // config). We resolve via mergeParamForId, which strips the instance prefix
 // (tone1.filter.cutoff -> filter.cutoff), so a panel's flat parameterId still matches.
-import gaiaRuntime from '../generated/roland.gaia.runtime.json';
-import an1xRuntime from '../generated/yamaha.an1x.runtime.json';
-import genericCcRuntime from '../generated/generic.cc.runtime.json';
 import dpdProfileMap from '../generated/dpdProfileMap.json';
 import { mergeParamForId, dpdBackingFor } from './dpdMergeOnDrop.js';
 
@@ -15,11 +12,21 @@ import { mergeParamForId, dpdBackingFor } from './dpdMergeOnDrop.js';
 // not ALSO in this table the app takes the DPD path and then finds nothing, which reads to the user
 // as "unresolved profile" rather than as a missing build artefact. dpdLibraryGuards.test.js keeps
 // the two in step.
+//
+// Each is loaded the first time an address is asked of it, not with the editor. Imported statically
+// they were parsed at every start, in the eager entry chunk, for this one line of the Device
+// insight strip: the AN1x's runtime alone is 1.4 MB of JSON, and it took `main` past
+// vite.config.js's chunkSizeWarningLimit.
 const RUNTIMES = {
-  'roland.gaia': gaiaRuntime,
-  'yamaha.an1x': an1xRuntime,
-  'generic.cc': genericCcRuntime,
+  'roland.gaia': () => import('../generated/roland.gaia.runtime.json'),
+  'yamaha.an1x': () => import('../generated/yamaha.an1x.runtime.json'),
+  'generic.cc': () => import('../generated/generic.cc.runtime.json'),
 };
+const loaded = new Map();
+function runtimeFor(source) {
+  if (!loaded.has(source)) loaded.set(source, RUNTIMES[source]().then((m) => m.default ?? m));
+  return loaded.get(source);
+}
 
 function formatWire(wire) {
   if (!wire) return '';
@@ -31,20 +38,21 @@ function formatWire(wire) {
 }
 
 /**
- * @returns {string|null} formatted address (e.g. "DT1 10 00 01 0C" or "CC 74"), or null if unresolved.
+ * @returns {Promise<string|null>} formatted address (e.g. "DT1 10 00 01 0C" or "CC 74"), or null if unresolved.
  */
-export function resolveDeviceAddress(profile, parameterId) {
+export async function resolveDeviceAddress(profile, parameterId) {
   if (!parameterId) return null;
 
   // Prefer an explicit profileId -> dpdSource -> runtime mapping.
   let runtime = null;
   const backing = profile ? dpdBackingFor(profile, dpdProfileMap) : null;
-  if (backing?.dpdSource && RUNTIMES[backing.dpdSource]) runtime = RUNTIMES[backing.dpdSource];
+  if (backing?.dpdSource && RUNTIMES[backing.dpdSource]) runtime = await runtimeFor(backing.dpdSource);
 
   // Fallback: the profileId may not be in the map (id naming drift) — use whichever
   // runtime actually resolves this parameter.
   if (!runtime) {
-    for (const candidate of Object.values(RUNTIMES)) {
+    for (const source of Object.keys(RUNTIMES)) {
+      const candidate = await runtimeFor(source);
       if (mergeParamForId(candidate, parameterId)) { runtime = candidate; break; }
     }
   }

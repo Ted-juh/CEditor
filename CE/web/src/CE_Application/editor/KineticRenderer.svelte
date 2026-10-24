@@ -28,6 +28,9 @@
   let params = $derived(kineticParams(control));
   let speed = $derived(kineticSpeed(st, params.maxSpeed));
   let dragging = $derived(cfg.__drag === true);
+  // Moving: the preview's ticker is driving it (it injects __state; the editor's canvas does not),
+  // or a fling is being dragged. A compositing layer of its own meanwhile, as OrbitRenderer.
+  let moving = $derived((cfg.running !== false && cfg.__state !== undefined) || dragging);
 
   let fieldCss = $derived(css(cfg.fieldColour, 'rgba(13,13,18,1)'));
   let ballCss = $derived(css(cfg.ballColour, 'rgba(57,217,138,1)'));
@@ -45,7 +48,7 @@
   let showGrav = $derived(params.gravity > 0.01);
 </script>
 
-<svg class="kinetic" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
+<svg class="kinetic" class:moving width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="6" fill={fieldCss} stroke={tone('rgba(36,36,48,1)')} />
   {#if cfg.showWalls !== false}
     <rect x={geom.x0 + 1} y={geom.y0 + 1} width={geom.w - 2} height={geom.h - 2} rx="5" fill="none" stroke={wallCss} stroke-width="2" />
@@ -53,23 +56,24 @@
 
   <!-- gravity hint -->
   {#if showGrav}
-    <line x1={geom.x0 + geom.w - 12} y1={geom.y0 + 8} x2={geom.x0 + geom.w - 12} y2={geom.y0 + 8 + Math.min(18, params.gravity * 8)} stroke={labelCss} stroke-width="1.5" opacity="0.4" />
-    <path d={`M ${geom.x0 + geom.w - 15} ${geom.y0 + 4 + Math.min(18, params.gravity * 8)} L ${geom.x0 + geom.w - 12} ${geom.y0 + 8 + Math.min(18, params.gravity * 8)} L ${geom.x0 + geom.w - 9} ${geom.y0 + 4 + Math.min(18, params.gravity * 8)}`} fill="none" stroke={labelCss} stroke-width="1.5" opacity="0.4" />
+    <line x1={geom.x0 + geom.w - 12} y1={geom.y0 + 8} x2={geom.x0 + geom.w - 12} y2={geom.y0 + 8 + Math.min(18, params.gravity * 8)} stroke={labelCss} stroke-width="1.5" stroke-opacity="0.4" />
+    <path d={`M ${geom.x0 + geom.w - 15} ${geom.y0 + 4 + Math.min(18, params.gravity * 8)} L ${geom.x0 + geom.w - 12} ${geom.y0 + 8 + Math.min(18, params.gravity * 8)} L ${geom.x0 + geom.w - 9} ${geom.y0 + 4 + Math.min(18, params.gravity * 8)}`} fill="none" stroke={labelCss} stroke-width="1.5" stroke-opacity="0.4" />
   {/if}
 
   <!-- comet trail -->
   {#if cfg.showTrail !== false && trail.length > 1}
     {#each trail as p, i (i)}
-      <circle cx={p.px} cy={p.py} r={Math.max(1, ballR * (0.3 + 0.5 * (i / trail.length)))} fill={trailCss} opacity={(i / trail.length) * 0.6} />
+      <circle cx={p.px} cy={p.py} r={Math.max(1, ballR * (0.3 + 0.5 * (i / trail.length)))} fill={trailCss} fill-opacity={(i / trail.length) * 0.6} />
     {/each}
   {/if}
 
   <!-- ball: glow halo + body + specular -->
-  <circle cx={ball.px} cy={ball.py} r={ballR + 6} fill={ballCss} opacity={0.14 + speed * 0.2} />
+  <circle cx={ball.px} cy={ball.py} r={ballR + 6} fill={ballCss} fill-opacity={0.14 + speed * 0.2} />
   <circle cx={ball.px} cy={ball.py} r={ballR} fill={ballCss} stroke={dragging ? 'rgba(255,255,255,1)' : 'rgba(0,0,0,0.5)'} stroke-width={dragging ? 2 : 1} />
   <circle cx={ball.px - ballR * 0.3} cy={ball.py - ballR * 0.3} r={Math.max(1, ballR * 0.3)} fill="rgba(255,255,255,0.85)" />
 </svg>
 
 <style>
   .kinetic { position: absolute; inset: 0; display: block; pointer-events: none; overflow: visible; }
+  .kinetic.moving { will-change: transform; }
 </style>

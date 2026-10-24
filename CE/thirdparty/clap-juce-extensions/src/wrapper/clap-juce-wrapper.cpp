@@ -61,6 +61,9 @@ JUCE_END_IGNORE_WARNINGS_MSVC
 JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
 #include <clap-juce-extensions/clap-juce-extensions.h>
+#if __has_include("Player/StateLoadReport.h")
+#include "Player/StateLoadReport.h" // CEditor patch (VENDORED.md), stateLoad
+#endif
 
 #if JUCE_LINUX
 #if JUCE_VERSION >= 0x070006
@@ -2450,6 +2453,12 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
         // So we just have to assume it works.
         processor->setStateInformation(chunkMemory.getData(), (int)chunkMemory.getSize());
         chunkMemory.reset();
+#if __has_include("Player/StateLoadReport.h")
+        // CEditor patch (VENDORED.md): ask the processor whether it recognised the state, so a
+        // load it ignored (random bytes, another plug-in's chunk) is reported as the failure it is.
+        if (auto *report = dynamic_cast<ceditor::ReportsStateLoad *>(processor.get()))
+            return report->lastStateLoadAccepted();
+#endif
         return true;
     }
 

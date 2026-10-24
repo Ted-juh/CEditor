@@ -22,8 +22,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 using System.Text;
 
 namespace Ce
@@ -481,7 +484,8 @@ namespace Ce
         public void sendNRPN(int channel, int msb, int lsb, double v) => sendNRPN(channel, msb, lsb, new Var(v));
 
         /// <summary>sendSysex(bytes) or sendSysex("F0 41 10 …"). The list or the string goes to the host
-        /// as it is — the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS.</summary>
+        /// as it is — the host reads it as it does for Lua and JS (each byte 0 to 255, each hex token one
+        /// byte, anything else refused with a message) and adds F0/F7.</summary>
         public void sendSysex(IEnumerable<int> bytes)
         {
             var list = new List<int>(bytes ?? Array.Empty<int>());
@@ -677,13 +681,50 @@ namespace Ce
             => Map.TryGetValue((scriptId, eventId), out fn);
     }
 
-    // The generated registration partial calls into this so all entries are registered exactly once,
-    // lazily, on first init.
+    // The generated registration partial calls into this so all entries are registered exactly once
+    // per instance, at that instance's init.
     internal static partial class GeneratedRegistration
     {
         // Implemented by the generated *.Registration.cs partial. If no handlers were generated, the
         // generator still emits an empty body so this compiles.
         public static partial void RegisterAll();
+    }
+
+    // ----------------------------------------------------------------- one instance's handlers
+    //
+    // Each plug-in instance runs its handlers in a load context of its own: Exports.Init loads another
+    // copy of this assembly into a new AssemblyLoadContext and calls into that copy through here. So the
+    // registry, every handler object and every static field a handler keeps are that instance's alone,
+    // and two copies of a panel in one DAW count apart. Exports.Shutdown unloads it.
+    //
+    // Until October 2026 every instance used the registry and handlers of the one copy hostfxr loaded,
+    // so two copies of a panel shared every field and static a handler kept.
+    //
+    // Only types every load context shares cross between the copies — string, IntPtr — since this
+    // copy's CeValue is not the other copy's.
+    public static unsafe class InstanceEntry
+    {
+        public static void Register() => GeneratedRegistration.RegisterAll();
+
+        public static int Has(string scriptId, string eventId) => HandlerRegistry.Has(scriptId, eventId) ? 1 : 0;
+
+        public static int Dispatch(string scriptId, string eventId, IntPtr payload, IntPtr host)
+        {
+            try
+            {
+                if (!HandlerRegistry.TryGet(scriptId, eventId, out var fn) || fn == null)
+                    return 0; // no such handler is NOT an error (parity with the C++ glue)
+
+                // Value-returning handlers (e.g. onDawSaveState) are a TODO — see design §4. We leave
+                // out_result as the host initialized it (CE_NULL) so the host reads back null.
+                fn(new CeContext((CeHostVtable*)host), new CeEvent((CeValue*)payload));
+                return 0;
+            }
+            catch
+            {
+                return -3; // the host logs + disables; nothing is rethrown across the frame
+            }
+        }
     }
 
     // ----------------------------------------------------------------- exported entry points
@@ -693,45 +734,60 @@ namespace Ce
     // they MUST NOT let a managed exception escape (a throw across the extern "C" frame crashes the host).
     internal static unsafe class Exports
     {
-        // Cached vtable pointer, set in ce_handler_init. The host keeps the CeHostVtable alive for the
-        // module's lifetime (it lives in the host's `modules` map), so caching the pointer is safe.
-        private static CeHostVtable* s_host = null;
-        private static bool s_registered = false;
+        // One plug-in instance: its load context, with the copy of this assembly its handlers run in,
+        // and its host. The ABI `state` handle is a GCHandle to it.
+        private sealed class Instance
+        {
+            public AssemblyLoadContext Context = null!;
+            public Func<string, string, int> Has = null!;
+            public Func<string, string, IntPtr, IntPtr, int> Dispatch = null!;
+            public IntPtr Host;
+        }
+
+        private static Instance? Of(void* state)
+            => state == null ? null : GCHandle.FromIntPtr((IntPtr)state).Target as Instance;
 
         // uint32_t ce_handler_abi_version(void) — gate FIRST; host refuses a mismatch.
         [UnmanagedCallersOnly(EntryPoint = "ce_handler_abi_version", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         public static uint AbiVersion() => Abi.Version;
 
         // int ce_handler_init(const CeHostVtable* host, void** out_state)
-        // Called once on the message thread at plugin load. Cache the vtable, and register the handlers,
-        // so their types load here rather than on the first dispatch.
+        // Called once per plug-in instance, on the message thread. Makes the instance's load context and
+        // registers its handlers there, so their types load here rather than on the first dispatch.
         [UnmanagedCallersOnly(EntryPoint = "ce_handler_init", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+        [UnconditionalSuppressMessage("Trimming", "IL2075",
+            Justification = "InstanceEntry is found by name in a copy of this assembly, which roots.xml preserves whole.")]
+        [UnconditionalSuppressMessage("Trimming", "IL2026",
+            Justification = "Assembly.GetType names a type of this assembly's own copy, which roots.xml preserves whole.")]
         public static int Init(CeHostVtable* host, void** outState)
         {
+            AssemblyLoadContext? context = null;
             try
             {
                 if (host == null || host->abi_version != Abi.Version)
                     return -1;
 
-                s_host = host; // marks "initialized"; NOT used by dispatch (see below)
-
-                // Populate the dispatch registry once, at init rather than on the first dispatch.
-                if (!s_registered)
+                context = new AssemblyLoadContext("ce-handlers-instance", isCollectible: true);
+                Assembly copy = context.LoadFromAssemblyPath(typeof(Exports).Assembly.Location);
+                Type entry = copy.GetType("Ce.InstanceEntry", throwOnError: true)!;
+                entry.GetMethod(nameof(InstanceEntry.Register))!.Invoke(null, null);
+                var instance = new Instance
                 {
-                    GeneratedRegistration.RegisterAll();
-                    s_registered = true;
-                }
+                    Context = context,
+                    Has = entry.GetMethod(nameof(InstanceEntry.Has))!.CreateDelegate<Func<string, string, int>>(),
+                    Dispatch = entry.GetMethod(nameof(InstanceEntry.Dispatch))!.CreateDelegate<Func<string, string, IntPtr, IntPtr, int>>(),
+                    Host = (IntPtr)host,
+                };
 
-                // out_state IS this instance's host vtable — the host passes it back to dispatch so two
-                // plugin instances sharing this (process-global) module each call into their OWN host.
-                // (A single cached static would route the 2nd instance's callbacks to the 1st's host.)
+                // out_state is this instance, which dispatch is handed back: two plugin instances
+                // sharing this (process-global) module each call into their OWN handlers and host.
                 if (outState != null)
-                    *outState = host;
-
+                    *outState = (void*)GCHandle.ToIntPtr(GCHandle.Alloc(instance));
                 return 0;
             }
             catch
             {
+                context?.Unload();
                 return -2; // never let an exception cross the ABI frame
             }
         }
@@ -742,9 +798,8 @@ namespace Ce
         {
             try
             {
-                string sid = Utf8.Decode(scriptId);
-                string ev = Utf8.Decode(eventId);
-                return HandlerRegistry.Has(sid, ev) ? 1 : 0;
+                var instance = Of(state);
+                return instance == null ? 0 : instance.Has(Utf8.Decode(scriptId), Utf8.Decode(eventId));
             }
             catch
             {
@@ -759,25 +814,10 @@ namespace Ce
         {
             try
             {
-                // The `state` handle is THIS instance's CeHostVtable* (set in Init via *out_state), so
-                // callbacks reach the right plugin instance — not a shared global.
-                var host = (CeHostVtable*)state;
-                if (host == null)
+                var instance = Of(state);
+                if (instance == null)
                     return -1;
-
-                string sid = Utf8.Decode(scriptId);
-                string ev = Utf8.Decode(eventId);
-
-                if (!HandlerRegistry.TryGet(sid, ev, out var fn) || fn == null)
-                    return 0; // no such handler is NOT an error (parity with the C++ glue)
-
-                var ctx = new CeContext(host);
-                var evt = new CeEvent(payload);
-
-                // Value-returning handlers (e.g. onDawSaveState) are a TODO — see design §4. We leave
-                // out_result as the host initialized it (CE_NULL) so the host reads back null.
-                fn(ctx, evt);
-                return 0;
+                return instance.Dispatch(Utf8.Decode(scriptId), Utf8.Decode(eventId), (IntPtr)payload, instance.Host);
             }
             catch
             {
@@ -787,17 +827,19 @@ namespace Ce
         }
 
         // void ce_handler_shutdown(void* state)
-        // The CoreCLR cannot be unloaded and started again, so the shim pins itself for the process
-        // lifetime (CeHost.c, ce_pin_self). This just flushes handler state.
+        // This instance only: its load context is unloaded with its handlers. The CoreCLR cannot be
+        // unloaded and started again, so the shim pins itself for the process lifetime (CeHost.c,
+        // ce_pin_self) and the runtime stays.
         [UnmanagedCallersOnly(EntryPoint = "ce_handler_shutdown", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         public static void Shutdown(void* state)
         {
             try
             {
-                s_host = null;
-                // We intentionally keep the registry populated: a re-init reuses it (s_registered stays
-                // true only within a process; the static is reset only if the host reloads us, which the
-                // pinned shim never lets happen).
+                if (state == null) return;
+                var handle = GCHandle.FromIntPtr((IntPtr)state);
+                var instance = handle.Target as Instance;
+                handle.Free();
+                instance?.Context.Unload();
             }
             catch
             {

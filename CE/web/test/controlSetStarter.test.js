@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
+import { assertSameText, readText } from './support/readText.mjs';
+import { SHIPPED_STARTER_IDS, STARTERS_DIR, starterFile } from '../scripts/export-control-set-starters.mjs';
 import { STARTER_CONTROL_SETS } from '../src/CE_Application/models/controlSetCoverage.js';
 import { PHYSICAL_DIRECTIONS } from '../src/CE_Application/models/physicalControlSets.js';
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
-import { getControlSet } from '../src/CE_Application/models/controlSets.js';
+import { getControlSet, resolveToken } from '../src/CE_Application/models/controlSets.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 import { resolveControlForSet, readControlPath } from '../src/CE_Application/models/controlSetFamilies.js';
 import { shrinkControl, expandControl } from '../src/CE_Application/stores/documentShape.js';
 import { serializePanel, deserializePanel } from '../src/CE_Application/stores/panelModel.js';
@@ -26,6 +30,59 @@ test('sixty editable starters round-trip with portable design pins and finite bo
   }
 });
 
+test('the shipped starters are what the generator writes, byte for byte', () => {
+  // They were written once and then left while the sets' designs moved on, which nothing could
+  // catch: every export renamed every control, so a fresh one never matched the committed one.
+  // starterFile numbers them from a fixed point, and this holds the files to it. Run after the test
+  // above has opened all sixty, so a starter whose bytes depend on what the process did first —
+  // the panel counter, the control counter — fails here rather than in CI.
+  assert.deepEqual(readdirSync(STARTERS_DIR).filter((f) => f.endsWith('.cepanel')).sort(),
+    SHIPPED_STARTER_IDS.map((id) => `${id}.cepanel`).sort(),
+    'every file in the folder is a starter the code still makes, and every starter has its file');
+  const owner = new Map();
+  for (const id of SHIPPED_STARTER_IDS) {
+    const { path, text } = starterFile(id);
+    assertSameText(readText(path), text,
+      `${id}.cepanel is stale — run scripts/export-control-set-starters.mjs from CE/web`,
+      { actual: 'committed', expected: 'the generator' });
+    // Distinct across starters, so controls copied from two of them into one panel do not collide.
+    for (const control of JSON.parse(text).controls) {
+      const cid = control._children.Core.id;
+      assert.ok(!owner.has(cid), `${cid} is in both ${owner.get(cid)} and ${id}`);
+      owner.set(cid, id);
+    }
+  }
+});
+
+test('every starter caption can be read against what is behind it', () => {
+  // The lettering against its plate where the label has one, the panel where it does not. The plate
+  // sets' captions once kept their dark plate lettering with the plate taken away by the starter:
+  // 1.0 to 1, which is invisible, and nothing failed. 4.5 to 1 is WCAG's floor for body text.
+  const luminance = (argb) => {
+    const [r, g, b] = [2, 4, 6].map((i) => parseInt(argb.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  let captions = 0;
+  for (const { id } of STARTER_CONTROL_SETS) {
+    const panelColour = resolveToken('panel.surface', getControlSet(id));
+    for (const c of createControlSetStarter(id).controls) {
+      if (c._children.Core.controlType !== 'Label') continue;
+      const ink = c._children.Text._children.Fill.colour;
+      const plate = c._children.Background._children.Fill.colour;
+      const behind = plate.startsWith('00') ? panelColour : plate;
+      const ratio = contrast(ink, behind);
+      assert.ok(ratio >= 4.5, `${id}: "${c._children.Text.content}" is ${ink} on ${behind}, ${ratio.toFixed(2)} to 1`);
+      captions++;
+    }
+  }
+  assert.ok(captions > 500, `every starter has its captions checked, saw ${captions}`);
+});
+
 test('the third synth collection has twelve distinct sculpted mechanisms, not palette aliases', () => {
   const sculpted = PHYSICAL_DIRECTIONS.filter((entry) => entry.series === 3);
   assert.equal(sculpted.length, 12);
@@ -42,7 +99,9 @@ test('the third synth collection has twelve distinct sculpted mechanisms, not pa
 test('mixed controls retain shapes after copy/save, and edits override the pinned design', () => {
   for (const [id, shape] of [['console', 'console'], ['machined', 'block'], ['blueprint', 'ring']]) {
     const source = createControl('Slider', { Core: { controlSetId: id } });
-    const copied = expandControl(shrinkControl(source));
+    // A copy to write into, as the editor's drafts are: a loaded control shares its untouched
+    // defaults with every other control of its type, frozen (stores/documentShape.js).
+    const copied = deepClone(expandControl(shrinkControl(source)));
     const drawn = resolveControlForSet(copied, getControlSet('pop'));
     assert.equal(drawn._children.Parts._children.pointerCurrent.kind, shape);
     copied._children.Parts._children.pointerCurrent._children.Layout.width = 61;

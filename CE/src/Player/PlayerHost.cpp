@@ -1,11 +1,23 @@
 #include "PlayerHost.h"
+#include "WebViewProfileFolders.h"
 #include "TrustedWebBrowser.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
-#include "BinaryData.h" // PlayerWebData — the embedded web bundle (player.html + assets)
+#include "EmbeddedWebBundle.h" // PlayerWebData — the embedded web bundle (player.html + assets)
+#include "HostKeyForwarding.h"
 
 #include <atomic>
 #include <cstring>
 #include <optional>
+
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
 
 namespace
 {
@@ -78,15 +90,8 @@ std::optional<juce::WebBrowserComponent::Resource> providePlayerResource (const 
 
     // Primary: the embedded web bundle. Vite emits unique asset basenames, so a basename
     // lookup is unambiguous. This is host-path-independent — it paints inside any DAW.
-    for (int i = 0; i < PlayerWebData::namedResourceListSize; ++i)
-    {
-        if (juce::String (PlayerWebData::originalFilenames[i]) == basename)
-        {
-            int size = 0;
-            if (auto* data = PlayerWebData::getNamedResource (PlayerWebData::namedResourceList[i], size))
-                return makeResource (data, (size_t) size, mimeFor (mimeFile));
-        }
-    }
+    if (auto bytes = ceditor::embeddedWebFile (basename))
+        return juce::WebBrowserComponent::Resource { std::move (*bytes), mimeFor (mimeFile) };
 
     // Fallback: filesystem dist (dev / build tree) if the bundle wasn't embedded.
     auto file = getDistFolder().getChildFile (basename);
@@ -133,14 +138,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         });
     });
 
-    // Unique WebView2 user-data folder PER INSTANCE. WebView2 cannot share a folder across
-    // processes/instances, so a fixed folder makes a second user (e.g. a plugin loaded while a
-    // standalone runs, or two plugin instances) fail to create its WebView -> blank panel.
-    static std::atomic<int> instanceCounter { 0 };
-    auto userDataFolder = juce::File::getSpecialLocation (juce::File::tempDirectory)
-        .getChildFile ("CEditorPlayer_WebView2")
-        .getChildFile (juce::String::toHexString (juce::Time::getHighResolutionTicks())
-                       + "_" + juce::String (++instanceCounter));
+    // Never a fixed WebView2 user-data folder: one a second process also used (a plug-in loaded
+    // while a standalone ran) failed to create its WebView -> blank panel. The folder is this
+    // process's and this binary's, shared by its copies so they share one engine, or one per
+    // window with CEDITOR_WEBVIEW2_SHARED=0; the folders processes that have gone left behind are
+    // swept (WebViewProfileFolders.h).
+    auto userDataFolder = ceditor::webview::profileFolderForNewWebView ("CEditorPlayer_WebView2");
 
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
         .withBackgroundColour (juce::Colour (0xFF1E1E1E))
@@ -169,7 +172,11 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     // SafePointer the device events above use, so a late post finds nothing to load into.
     options = options.withEventListener ("playerReady", [safe = juce::Component::SafePointer<PlayerHost> (this)] (const juce::var&)
     {
-        juce::MessageManager::callAsync ([safe]() { if (safe != nullptr) safe->loadPanelIntoWebView(); });
+        juce::MessageManager::callAsync ([safe]()
+        {
+            if (safe != nullptr && safe->onWebViewStage != nullptr) safe->onWebViewStage ("page ready");
+            if (safe != nullptr) safe->loadPanelIntoWebView();
+        });
     });
 
     // Host-parameter sync (M2): the user moved a control -> set the matching host parameter so the
@@ -185,7 +192,15 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     // (so the on-screen controls reflect a restored/automated state on open).
     options = options.withEventListener ("requestParamSync", [this] (const juce::var&)
     {
+        if (onWebViewStage != nullptr) onWebViewStage ("panel shown");
         if (onResyncRequest != nullptr) onResyncRequest();
+        if (! hostWindowShown) sendHostWindow();   // a page loaded behind a minimised host
+    });
+
+    // A ce.storage write the page made (scriptStores, in PlayerHost.h).
+    options = options.withEventListener ("scriptSetting", [this] (const juce::var& payload)
+    {
+        if (onScriptSetting != nullptr) onScriptSetting (payload);
     });
 
     // The answer to the restore question: "always", "never", or "load" (take the synth's patch
@@ -195,6 +210,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     {
         if (onRestoreAnswer != nullptr)
             onRestoreAnswer (payload.getProperty ("answer", "").toString());
+    });
+
+    // A key the page did not use, for the DAW (utils/hostKeys.js, HostKeyForwarding.h).
+    options = options.withEventListener ("hostKey", [this] (const juce::var& payload)
+    {
+        forwardKeyToHost (payload);
     });
 
    #if CEDITOR_DEV_MODE
@@ -212,6 +233,7 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         return;
     }
 
+    webViewProfileName = userDataFolder.getFileName();
     auto browser = std::make_unique<PlayerWebBrowserComponent> (options);
     browser->onNetworkError = [this] (const juce::String& errorInfo)
     {
@@ -226,7 +248,68 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
    #endif
 
+   #if JUCE_WINDOWS
+    startTimerHz (4);   // whether the host's window is showing ours (timerCallback)
+   #endif
+
     setSize (800, 480);
+}
+
+void PlayerHost::timerCallback()
+{
+   #if JUCE_WINDOWS
+    // In a plug-in this window is a child of the host's, and Windows tells a child nothing when the
+    // top-level window is minimised, nor when a host hides its plug-in window, so the page goes on
+    // drawing for nobody (release checks #17: sixty frames a second through 30 s minimised). The
+    // page is TOLD, and nothing is hidden: a hidden webview drops every event sent to it, and a
+    // hidden page gets no frames and runs its timers once a second, while with the window open it
+    // is what drives free-running modulators, scripts' timers and automation out to the hardware.
+    // Told, the page stops redrawing what cannot be seen and carries on with the rest
+    // (stores/hostWindow.js).
+    auto* peer = webView != nullptr ? getPeer() : nullptr;
+    if (peer == nullptr)
+        return;
+    const auto window = static_cast<HWND> (peer->getNativeHandle());
+    const auto top = GetAncestor (window, GA_ROOT);
+    const bool shown = IsWindowVisible (window) && ! (top != nullptr && IsIconic (top));
+    if (shown != hostWindowShown)
+    {
+        hostWindowShown = shown;
+        sendHostWindow();
+    }
+   #endif
+}
+
+bool PlayerHost::keysGoToHost() const
+{
+   #if JUCE_WINDOWS
+    return forwardKeysToHost;
+   #else
+    // A host off Windows already gets the keys an embedded view leaves (X11), or has a responder
+    // chain of its own (macOS): docs/known-issues.md. The page keeps its keys there.
+    return false;
+   #endif
+}
+
+void PlayerHost::forwardKeyToHost (const juce::var& payload)
+{
+   #if JUCE_WINDOWS
+    if (! keysGoToHost())
+        return;
+    const auto key = ceditor::player::hostkeys::keyEventFromPage (payload);
+    auto* peer = key ? getPeer() : nullptr;
+    if (peer != nullptr)
+        ceditor::player::hostkeys::postToParentWindow (static_cast<HWND> (peer->getNativeHandle()), *key);
+   #else
+    juce::ignoreUnused (payload);
+   #endif
+}
+
+void PlayerHost::sendHostWindow()
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("shown", hostWindowShown);
+    emitToWebView ("hostWindow", juce::var (obj));
 }
 
 PlayerHost::~PlayerHost()
@@ -249,6 +332,14 @@ void PlayerHost::notifySessionRestored()
 
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)
 {
+    // The player shows no MIDI monitor, so it is sent none of it. When every MIDI message pushed the
+    // whole log, up to 500 events and about 120 KB of JSON at up to 20 a second, a panel whose
+    // controls send MIDI as they move (QA-08's free-running ones send 17 messages a second) had each
+    // window compile and parse 2 MB a second of a log nothing on the page reads: release checks #17
+    // watched it from inside the page, and it was most of what grew. The service now sends only
+    // what is new, but nothing here reads that either.
+    if (eventName == "midiMonitorEvents")
+        return;
     if (webView != nullptr)
         webView->emitEventIfBrowserIsVisible (eventName, payload);
 }
@@ -290,9 +381,13 @@ void PlayerHost::loadPanelIntoWebView()
     // The panel JSON is itself a valid JS object literal, so it can be passed directly.
     // Before the panel, so the Player knows at connect time whether this is a reopened project,
     // whose saved sound must not be read over, or a new instance, which reads the synth.
+    // The instance's ce.storage stores go with it, when there is an instance to have them.
+    // And whether the keys it does not use go to the host (utils/hostKeys.js).
     const bool restored = isSessionRestored != nullptr && isSessionRestored();
+    const auto stores = scriptStores != nullptr ? juce::JSON::toString (scriptStores(), true) : juce::String ("null");
     webView->evaluateJavascript (juce::String ("window.__CE_PLAYER_SESSION__ = { restored: ")
-                                 + (restored ? "true" : "false") + " };"
+                                 + (restored ? "true" : "false") + ", storage: " + stores
+                                 + ", hostKeys: " + (keysGoToHost() ? "true" : "false") + " };"
                                  + "if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
 }
 

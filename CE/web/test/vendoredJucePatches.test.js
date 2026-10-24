@@ -184,3 +184,68 @@ test('JUCE/VENDORED.md records the MIDI-CI patch', () => {
   assert.ok(text.includes('juce_CIDevice.cpp') && text.includes('stack-use-after-return'),
     'VENDORED.md must name the MIDI-CI file and the defect');
 });
+
+test('the Linux webview child is shut down without a loop that waits for an exit a signal never reports', () => {
+  // Patch 8: a child killed by the SIGTERM is WIFSIGNALED, not WIFEXITED, so upstream's loop spun on
+  // ECHILD at full CPU inside the closing window's destructor, re-sending SIGTERM to a reused pid.
+  const source = readFileSync(LINUX_BRIDGE, 'utf8');
+  const kill = source.slice(source.indexOf('void killChild()'));
+  const body = kill.slice(0, kill.indexOf('void launchChild()'));
+  assert.ok(!/WIFEXITED\s*\(/.test(body), `killChild waits for WIFEXITED again. ${REAPPLY}`);
+  assert.ok(!/for \(;;\)\s*\{\s*kill \(childProcess, SIGTERM\)/.test(body), `the kill-and-wait loop is back. ${REAPPLY}`);
+  for (const piece of ['CEditor patch (JUCE/VENDORED.md, 8)', 'childHasGone (1500)', 'kill (childProcess, SIGTERM)',
+    'kill (childProcess, SIGKILL)', 'childHasGone (-1)', "result == childProcess || (result < 0 && errno != EINTR)"])
+    assert.ok(body.includes(piece), `Missing ${piece} in killChild. ${REAPPLY}`);
+  assert.match(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8'), /### 8\. Linux webview: a closing window could spin the host forever/);
+});
+
+test('QuickJS still asks a proxy in the global prototype chain before reading a global through it', () => {
+  // Without it, a read of an undefined name in a plug-in script is undefined instead of an error:
+  // the per-script scope for undeclared names (JsScriptEngine.cpp) sits behind the global as a proxy.
+  const source = readFileSync(join(repoRoot,
+    'JUCE/include/JUCE-8.0.7/modules/juce_javascript/choc/javascript/choc_javascript_QuickJS.h'), 'utf8');
+  const branch = source.slice(source.indexOf('/* XXX: should pass throw_ref_error */'));
+  const get = branch.indexOf('em->get_property(ctx, obj1, prop, this_obj)');
+  assert.ok(get > 0, 'the exotic get branch of JS_GetPropertyInternal moved');
+  const before = branch.slice(0, get);
+  for (const piece of ['CEditor patch 7', 'throw_ref_error && em->has_property', 'JS_ThrowReferenceErrorNotDefined(ctx, prop)'])
+    assert.ok(before.includes(piece), `Missing ${piece} before the proxy's get. ${REAPPLY}`);
+});
+
+
+test('the vendored CLAP wrapper reports a state the player did not recognise as a failed load', () => {
+  // JUCE's setStateInformation is void, so the wrapper returned true for any bytes at all and
+  // clap-validator's state-invalid-random warned. The wrapper now asks (Player/StateLoadReport.h).
+  const wrapper = readFileSync(join(repoRoot, 'CE/thirdparty/clap-juce-extensions/src/wrapper/clap-juce-wrapper.cpp'), 'utf8');
+  const load = wrapper.slice(wrapper.indexOf('bool stateLoad(const clap_istream *stream)'));
+  const body = load.slice(0, load.indexOf('\n    }\n'));
+  const ask = body.indexOf('report->lastStateLoadAccepted()');
+  assert.ok(ask > body.indexOf('processor->setStateInformation('), 'asked after the state is handed over. Re-apply the patch — CE/thirdparty/clap-juce-extensions/VENDORED.md.');
+  assert.match(body, /dynamic_cast<ceditor::ReportsStateLoad \*>\(processor\.get\(\)\)/);
+  assert.match(wrapper, /#include "Player\/StateLoadReport\.h"/);
+  assert.match(readFileSync(join(repoRoot, 'CE/thirdparty/clap-juce-extensions/VENDORED.md'), 'utf8'), /`stateLoad`: returns whether the processor recognised the/);
+
+  const processor = readFileSync(join(repoRoot, 'CE/src/Player/PluginProcessor.h'), 'utf8');
+  assert.match(processor, /class PlayerAudioProcessor : public juce::AudioProcessor\s+, public ceditor::ReportsStateLoad/);
+  const setState = processor.slice(processor.indexOf('void setStateInformation (const void* data, int sizeInBytes) override'));
+  const setBody = setState.slice(0, setState.indexOf('\n    }\n'));
+  assert.ok(setBody.indexOf('stateLoadAccepted.store (false);') < setBody.indexOf('getXmlFromBinary'), 'cleared before anything can return early');
+  assert.ok(setBody.indexOf('stateLoadAccepted.store (true);') > setBody.indexOf('backward-compat: APVTS-only state'), 'set only once a known form was read');
+});
+
+test('a panel in a Windows webview has no autofill, and a hidden one is left to WebView2', () => {
+  // Patch 9: JUCE 8.0.7 leaves autofill and password saving on. It also asked a hidden webview for
+  // the low memory target, which the engine probe found did nothing for a page that keeps running;
+  // setControlVisible is JUCE's own again.
+  const source = readFileSync(join(repoRoot,
+    'JUCE/include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp'), 'utf8');
+  const preferences = source.slice(source.indexOf('void setWebViewPreferences()'));
+  const preferencesBody = preferences.slice(0, preferences.indexOf('void createWebView()'));
+  for (const piece of ['ComSmartPtr<ICoreWebView2Settings4>', 'put_IsGeneralAutofillEnabled (FALSE)', 'put_IsPasswordAutosaveEnabled (FALSE)'])
+    assert.ok(preferencesBody.includes(piece), `Missing ${piece} in setWebViewPreferences. ${REAPPLY}`);
+  const visible = source.slice(source.indexOf('void setControlVisible (bool shouldBeVisible) const'));
+  const visibleBody = visible.slice(0, visible.indexOf('\n    }\n'));
+  assert.ok(visibleBody.includes('put_IsVisible (shouldBeVisible)'));
+  assert.ok(!visibleBody.includes('MemoryUsageTargetLevel'), 'the low memory target came out (VENDORED.md, patch 9)');
+  assert.match(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8'), /### 9\. Windows WebView2: no autofill in a panel/);
+});

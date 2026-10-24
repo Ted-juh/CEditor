@@ -435,7 +435,13 @@ DeviceRequestResult DeviceProfileEngine::compileDeviceRequest (const juce::Strin
     if (resolvedRequestId.isEmpty())
         return { false, "Profile has no startup request" };
 
+    // A dump the profile defines is asked for by the request that answers with it: requestDump
+    // takes the dump's id ("system"), which is also the id its answer arrives under, so a script's
+    // callback for it can be matched. Only a request id was taken, and a dump id was refused here.
     auto* request = findDeviceRequest (resolvedRequestId);
+    if (request == nullptr)
+        if ((request = findRequestForDump (resolvedRequestId)) != nullptr)
+            resolvedRequestId = propString (*request, "id");
     if (request == nullptr)
         return { false, "Unknown device request: " + resolvedRequestId };
 
@@ -1228,11 +1234,24 @@ DumpBuildResult DeviceProfileEngine::buildDumpMessage (const juce::String& dumpI
         }
         consumed.insert (parameterId);
 
+        // A mapping's codec, when it gives one, is how this dump keeps the value, as the parser reads
+        // it (decodeDumpParameterValue's codecOverride). Built with the parameter's own encoding
+        // instead, a field the dump keeps LSB-first went out MSB-first, or was refused.
+        auto codecOverride = mapping->getProperty ("codec");
+        if (codecOverride.isVoid())
+            codecOverride = mapping->getProperty ("nameCodec");
+        std::unique_ptr<juce::DynamicObject> withCodec;
+        if (asObject (codecOverride) != nullptr)
+        {
+            withCodec = parameter->clone();
+            withCodec->setProperty ("encoding", codecOverride);
+        }
+
         juce::var semanticValue;
         juce::Array<int> encodedBytes;
         double normalizedValue = 0.0;
         juce::String displayedValue;
-        auto encoded = validateAndEncodeValue (*parameter, given->getProperty (parameterId),
+        auto encoded = validateAndEncodeValue (withCodec != nullptr ? *withCodec : *parameter, given->getProperty (parameterId),
                                                semanticValue, encodedBytes, normalizedValue, displayedValue);
         if (encoded.failed())
             return fail ("Cannot encode " + parameterId + ": " + encoded.getErrorMessage());
@@ -1672,6 +1691,28 @@ const juce::DynamicObject* DeviceProfileEngine::findDeviceRequest (const juce::S
                 return request;
 
     return nullptr;
+}
+
+const juce::DynamicObject* DeviceProfileEngine::findRequestForDump (const juce::String& dumpId) const
+{
+    auto* dump = findDumpDefinition (dumpId);
+    if (dump == nullptr)
+        return nullptr;
+
+    // The request that says it answers with this dump, else the one the dump names as its own.
+    auto* root = profileObject();
+    if (auto* requests = root != nullptr ? asArray (root->getProperty ("requests")) : nullptr)
+        for (const auto& requestValue : *requests)
+            if (auto* request = asObject (requestValue))
+            {
+                auto* response = asObject (request->getProperty ("response"));
+                const auto expected = response != nullptr ? propString (*response, "dump") : propString (*request, "expectedDump");
+                if (expected == dumpId)
+                    return request;
+            }
+
+    const auto recipe = propString (*dump, "requestRecipe");
+    return recipe.isNotEmpty() ? findDeviceRequest (recipe) : nullptr;
 }
 
 juce::StringArray DeviceProfileEngine::dumpDefinitionIds() const
@@ -2262,13 +2303,17 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             return juce::Result::ok();
         }
 
-        if (encodingType == "u14-msb-lsb")
+        if (encodingType == "u14-msb-lsb" || encodingType == "u14" || encodingType == "u14-lsb-msb")
         {
+            // "u14" is the decoder's other name for MSB first; u14-lsb-msb keeps the same 14 bits
+            // least significant byte first. Both were read here and only one of the three written.
             auto value = (int) std::round (numeric);
             if (value < 0 || value > 16383)
                 return juce::Result::fail ("Encoded u14 value outside 0-16383 for " + propString (parameter, "id"));
-            encodedBytes.add ((value >> 7) & 0x7f);
-            encodedBytes.add (value & 0x7f);
+            const auto msb = (value >> 7) & 0x7f;
+            const auto lsb = value & 0x7f;
+            encodedBytes.add (encodingType == "u14-lsb-msb" ? lsb : msb);
+            encodedBytes.add (encodingType == "u14-lsb-msb" ? msb : lsb);
             return juce::Result::ok();
         }
 
@@ -2290,6 +2335,19 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             for (auto shift = (nibbles - 1) * 4; shift >= 0; shift -= 4)
                 encodedBytes.add ((value >> shift) & 0x0f);
 
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s7")
+        {
+            // signed 7-bit: the value plus its bias (default 64), the reverse of the dump decoder's
+            // s7 branch and of codecs.mjs encodeValue('s7'). Without it a profile could read a
+            // bipolar parameter (pan, tune, env depth) but every write of one was refused here.
+            auto signedOffset = encoding != nullptr ? propInt (*encoding, "signedOffset", 64) : 64;
+            auto byte = (int) std::round (numeric) + signedOffset;
+            if (! isMidiDataByte (byte))
+                return juce::Result::fail ("Encoded s7 value outside MIDI data byte range for " + propString (parameter, "id"));
+            encodedBytes.add (byte);
             return juce::Result::ok();
         }
 
@@ -2520,8 +2578,12 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
         if (encodedBytes.size() < 2)
             return { false, label + " 14-bit recipe requires two encoded bytes", {} };
 
-        addCc (transaction.messages, 6, encodedBytes[0]);
-        addCc (transaction.messages, 38, encodedBytes[1]);
+        // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
+        // two bytes in elsewhere.
+        auto* encoding = asObject (parameter.getProperty ("encoding"));
+        const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+        addCc (transaction.messages, 6, encodedBytes[lsbFirst ? 1 : 0]);
+        addCc (transaction.messages, 38, encodedBytes[lsbFirst ? 0 : 1]);
     }
     else
     {

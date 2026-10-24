@@ -37,7 +37,8 @@ import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
-const MAX_ALIAS_DEPTH = 8;
+// Exported for gen-colour-fields.mjs: the plug-in's C++ follows a script's reference just as far.
+export const MAX_ALIAS_DEPTH = 8;
 
 /**
  * The roles a set has to name. Every built-in set defines every one of these (the test insists),
@@ -567,8 +568,9 @@ export function resolveColourLiteral(value, set = BASE_CONTROL_SET, fallback = '
 
 // A key names a colour when it is `colour`, ends in `Colour` (`underlineColour`, `accentColour`)
 // or is a dotted property path ending in `.colour` (the keys of a State's patch map). Nothing
-// else is looked at — see the note on text content at the top of the file.
-function isColourKey(key) {
+// else is looked at — see the note on text content at the top of the file. Exported for the script
+// runtime, which accepts a reference in a script's colour write only where this resolves one.
+export function isColourKey(key) {
   return key === 'colour' || key.endsWith('Colour') || key.endsWith('.colour') || key === 'cellBg' || key.endsWith('.cellBg');
 }
 

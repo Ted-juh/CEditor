@@ -1,7 +1,7 @@
 /** Full-editor checks for the Align and Viewer dock tabs. */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -22,7 +22,7 @@ const readPanel = () => page.evaluate(async () => {
 });
 
 try {
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { waitUntil: 'networkidle', timeout: DEV_SERVER_FIRST_LOAD_MS });
   await page.locator('.app').waitFor();
   const ids = await page.evaluate(async () => {
     const { createControl } = await import('/src/CE_Application/models/componentTypes.js');

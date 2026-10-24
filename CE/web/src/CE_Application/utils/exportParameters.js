@@ -488,8 +488,13 @@ export function collectExportParameters(panel) {
   const explicit = Array.isArray(panel?.exportParameters) ? panel.exportParameters : [];
   if (!explicit.length) return deriveExportParameters(panel);
 
+  // The first of two entries with one id wins: two host parameters with one id is a broken plug-in
+  // (the host keys automation and saved state by it, and restored one of QA-08's two Cutoffs and
+  // left the other at its default). The derived list already never makes one.
   const excluded = unexportableControlNames(panel);
+  const ids = new Set();
   return explicit
     .map(normalizeExportParameter)
-    .filter((parameter) => parameter && !excluded.has(parameter.controlName));
+    .filter((parameter) => parameter && !excluded.has(parameter.controlName))
+    .filter((parameter) => !ids.has(parameter.id) && ids.add(parameter.id));
 }

@@ -224,7 +224,7 @@ juce::var DeviceProfileService::pushRuntimeStateToDevice (const juce::String& co
     response->setProperty ("transactions", juce::var (transactions));
     response->setProperty ("runtimeState", getRuntimeState());
     response->setProperty ("sessionState", getSessionState());
-    emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+    publishMonitorEvents();
     emitDeviceEvent ("deviceSessionState", getSessionState());
     return juce::var (response);
 }
@@ -232,6 +232,7 @@ juce::var DeviceProfileService::pushRuntimeStateToDevice (const juce::String& co
 void DeviceProfileService::addPendingDeviceRequest (const PendingDeviceRequest& request)
 {
     pendingDeviceRequests[request.correlationId] = request;
+    publishPendingRequests();
     startTimerHz (60);
 }
 
@@ -438,7 +439,7 @@ void DeviceProfileService::processPendingRequestTimeouts()
             updatePresetScanForTimeout (request);
         updateRoleSessionState (request.deviceRole, "linked", "Sync request timed out: " + request.requestId);
         it = pendingDeviceRequests.erase (it);
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
         emitDeviceEvent ("deviceSessionState", getSessionState());
     }
 }

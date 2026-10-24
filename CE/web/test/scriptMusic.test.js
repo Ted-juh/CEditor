@@ -86,6 +86,68 @@ test('scale transposes rather than wrapping — the notes keep going up', () => 
   assert.deepEqual(api.scaleNotes(71), [71, 73, 75, 76, 78, 80, 82]);
 });
 
+test('a note name the music helpers cannot read is refused, not read as C-1', () => {
+  // scaleNotes("c4") used to answer with the scale on C-1: the unreadable name became 0 so that no
+  // undefined could reach the list. It answers nothing now, and says why, in every runtime's words
+  // (scriptPreludeAgreement.test.js compares them).
+  const errorsFrom = (call) => {
+    clearScriptTrace();
+    const value = call();
+    return { value, errors: get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message) };
+  };
+  const unreadable = (verb) => `${verb}: "c4" is not a note name, so there is no answer. A name is a `
+    + 'capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".';
+  for (const [verb, call] of [
+    ['ce.music.scale', () => api.scaleNotes('c4', 'major')],
+    ['ce.music.chord', () => api.chordNotes('c4', 'major')],
+    ['ce.music.quantize', () => api.quantizeNote('c4', 60, 'major')],
+    ['ce.music.quantize', () => api.quantizeNote(61, 'c4', 'major')],
+    ['ce.music.spelling', () => api.noteSpelling('c4', 'major')],
+    ['ce.music.inScale', () => api.inScale('c4', 60, 'major')],
+    ['ce.music.degree', () => api.scaleDegree(60, 'c4', 'major')],
+    ['ce.music.degreeChord', () => api.degreeChord('c4', 'major', 1)],
+  ]) {
+    assert.deepEqual(errorsFrom(call), { value: undefined, errors: [unreadable(verb)] }, verb);
+  }
+  // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
+  const missing = (verb) => `${verb}: no note was given, so there is no answer. A note is a MIDI `
+    + 'number or a name, such as 60 or "C4".';
+  for (const [verb, call] of [
+    ['ce.music.scale', () => api.scaleNotes(undefined, 'major')],
+    ['ce.music.chord', () => api.chordNotes(null, 'major')],
+    ['ce.music.quantize', () => api.quantizeNote(61, undefined, 'major')],
+    ['ce.music.degreeChord', () => api.degreeChord(undefined, 'major', 1)],
+  ]) {
+    assert.deepEqual(errorsFrom(call), { value: undefined, errors: [missing(verb)] }, `${verb}, nothing given`);
+  }
+  // A right name, and note 0 spelled as a name, are still answers, and say nothing.
+  assert.deepEqual(errorsFrom(() => api.scaleNotes('C-1', 'major')).errors, []);
+  assert.deepEqual(errorsFrom(() => api.scaleNotes('C-1', 'major')).value, api.scaleNotes(0, 'major'));
+});
+
+test('an unknown scale or chord says so, and lists the ones there are', () => {
+  const clear = () => clearScriptTrace();
+  const errors = () => get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message);
+  clear();
+  assert.equal(api.scaleNotes(60, 'lokrian'), undefined);
+  assert.deepEqual(errors(), [`ce.music.scale: "lokrian" is not a scale, so there is no answer. `
+    + `The scales are ${SCALE_NAMES.join(', ')}.`]);
+  clear();
+  assert.equal(api.chordNotes(60, 'maj'), undefined);
+  assert.deepEqual(errors(), [`ce.music.chord: "maj" is not a chord, so there is no answer. `
+    + `The chords are ${CHORD_NAMES.join(', ')}.`]);
+  // The scale is checked before the notes, and only the first problem is reported.
+  clear();
+  assert.equal(api.quantizeNote('c4', 'd4', 'lokrian'), undefined);
+  assert.equal(errors().length, 1);
+  assert.match(errors()[0], /^ce\.music\.quantize: "lokrian" is not a scale/);
+  // Leaving the scale out is the documented default, not a mistake.
+  clear();
+  api.scaleNotes(60);
+  api.degreeChord(60, undefined, 5);
+  assert.deepEqual(errors(), []);
+});
+
 test('an unknown scale returns nothing rather than quietly meaning major', () => {
   assert.equal(api.scaleNotes(60, 'lokrian'), undefined, 'a typo must be findable');
   assert.equal(api.scaleNotes(60, ''), undefined);
@@ -245,14 +307,45 @@ test('a name it cannot read returns nothing, not note 0', () => {
   }
 });
 
-test('sendNote still puts a byte on the wire when the name is unreadable', () => {
-  // noteNumber is honest; the MIDI path cannot be — a message needs a NUMBER. This pins that the
-  // honesty did not leak out as an undefined byte in a MIDI message.
+test('a note name the senders cannot read is refused, not sent as note 0', () => {
+  // This used to pin "90 00 64": the unreadable name became note 0 so that no undefined byte could
+  // reach a message. That kept the message well formed and played C-1 instead, so "c4" (the letter
+  // must be a capital) sounded the bottom of the keyboard with nothing to say why. Nothing goes on
+  // the wire now, undefined or otherwise, and the error names the note.
+  for (const [verb, send] of [
+    ['sendNote', () => api.sendNote(1, 'c4', 100)],
+    ['sendNoteOff', () => api.sendNoteOff(1, 'c4')],
+    ['sendAftertouch', () => api.sendAftertouch(1, 90, 'c4')],
+  ]) {
+    clearScriptTrace();
+    send();
+    const trace = get(scriptTrace);
+    assert.equal(trace.find((e) => e.kind === 'midi'), undefined, `${verb} must send nothing`);
+    const error = trace.find((e) => e.kind === 'error');
+    assert.ok(error, `${verb} must say why nothing was sent`);
+    assert.match(error.message, new RegExp(`^${verb}: "c4" is not a note name`));
+  }
   clearScriptTrace();
-  api.sendNote(1, 'nonsense', 100);
-  const line = get(scriptTrace).find((e) => e.kind === 'midi');
-  assert.ok(line, 'sendNote should have traced a message');
-  assert.match(line.message, /90 00 64/, 'an unreadable name sends note 0, not an undefined byte');
+  api.sendNote(1, 'C4', 100);
+  assert.match(get(scriptTrace).find((e) => e.kind === 'midi')?.message ?? '', /90 3C 64/,
+    'a readable name still plays');
+
+  // A note left out altogether is refused too: the numeric path made it 0, which played C-1.
+  for (const [verb, send] of [
+    ['sendNote', () => api.sendNote(1, undefined, 100)],
+    ['sendNoteOff', () => api.sendNoteOff(1)],
+  ]) {
+    clearScriptTrace();
+    send();
+    assert.equal(get(scriptTrace).find((e) => e.kind === 'midi'), undefined, `${verb} with no note sends nothing`);
+    assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message),
+      [`${verb}: no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".`]);
+  }
+  // …except aftertouch, where no note is how channel pressure is asked for.
+  clearScriptTrace();
+  api.sendAftertouch(1, 90);
+  assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
+  assert.match(get(scriptTrace).find((e) => e.kind === 'midi')?.message ?? '', /D0 5A/);
 });
 
 /* -------------------------------------------------------------------------- noteSpelling */

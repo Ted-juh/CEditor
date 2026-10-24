@@ -479,7 +479,7 @@ void DeviceProfileService::timerCallback()
 
     auto now = nowMs();
     if (monitorEmitPending && now - lastMonitorEmitMs >= 50.0)
-        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        publishMonitorEvents();
     // Remove every due item before sending any of them. sendTransactionNow may queue the
     // remainder of a multi-message transaction; pushing onto a deque invalidates the iterator
     // used by the old single loop.
@@ -513,7 +513,13 @@ void DeviceProfileService::timerCallback()
                             sent ? status + " from queue" : "Not sent from queue: " + error);
     }
 
-    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive)
+    // What this service waits for and was just answered with, for the other processes on the same
+    // input (publishPendingRequests). Before the timer can stop, and it does not stop while there is
+    // any of either or the file is still there, so the file goes when they do.
+    publishPendingRequests();
+
+    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive
+        && answeredReplies.empty() && publishedRequests.isEmpty())
         stopTimer();
 }
 

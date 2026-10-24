@@ -360,7 +360,7 @@ export function planSvgPanelImport(text) {
   let root;
   let source;
   try {
-    source = String(text ?? '').replace(/^﻿/, '');
+    source = String(text ?? '').replace(/^\uFEFF/, '');
     root = parseXml(source, { offsets: true, doctypeSubset: 'skip' });
   } catch (error) {
     return { ok: false, error: `This is not a readable SVG file: ${error.message}` };

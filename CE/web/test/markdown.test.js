@@ -33,6 +33,14 @@ test('a document cannot introduce a tag', () => {
   assert.match(html, /&lt;script&gt;/);
 });
 
+test('a <br> is the one tag let through, because the scripting manual writes a line break as one', () => {
+  // A parameter's rules are one per line inside a table cell or a list item, which markdown has no
+  // other way to write (generate-scripting-manual.mjs). Only that exact tag, and not in a code span.
+  assert.ok(renderMarkdown('| a | b |\n|---|---|\n| x | Range: ≥ 0.<br>Invalid: default. |').includes('<td>Range: ≥ 0.<br>Invalid: default.</td>'));
+  assert.ok(renderMarkdown('- `x`: one<br />two').includes('one<br>two'));
+  assert.ok(renderMarkdown('`<br>` and <b>no</b>').includes('<code>&lt;br&gt;</code> and &lt;b&gt;no&lt;/b&gt;'));
+});
+
 test('a document cannot introduce an event handler', () => {
   // The attribute text survives as TEXT, which is the point — it is escaped, so there is no tag
   // for it to be an attribute of. What must not appear is an opening angle bracket in front of it.

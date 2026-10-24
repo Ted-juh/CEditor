@@ -9,7 +9,8 @@
 #include "PngResourceValidation.h"
 #include "HostageManifest.h"
 #include "InstrumentHostService.h"
-#include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
+#include "EmbeddedWebBundle.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
+#include "../WebViewProfileFolders.h"
 
 // HostRuntimeShared — the glue both generated Hostage targets share.
 //
@@ -109,15 +110,8 @@ provideHostRuntimeResource (const juce::String& rawPath)
         return juce::WebBrowserComponent::Resource { std::move (bytes), std::move (mime) };
     };
 
-    for (int i = 0; i < PlayerWebData::namedResourceListSize; ++i)
-    {
-        if (juce::String (PlayerWebData::originalFilenames[i]) == basename)
-        {
-            int size = 0;
-            if (auto* data = PlayerWebData::getNamedResource (PlayerWebData::namedResourceList[i], size))
-                return makeResource (data, (size_t) size, hostRuntimeMimeFor (mimeName));
-        }
-    }
+    if (auto bytes = ceditor::embeddedWebFile (basename))
+        return juce::WebBrowserComponent::Resource { std::move (*bytes), hostRuntimeMimeFor (mimeName) };
 
     // Fallback: filesystem dist (dev / build tree) if the bundle wasn't embedded.
     auto file = hostRuntimeDistFolder().getChildFile (basename);
@@ -139,12 +133,9 @@ inline juce::WebBrowserComponent::Options
 makeHostWebViewOptions (const juce::String& userDataFolderName,
                         std::function<void (const juce::var& payload)> onCommand)
 {
-    static std::atomic<int> instanceCounter { 0 };
-
-    const auto userDataFolder = juce::File::getSpecialLocation (juce::File::tempDirectory)
-        .getChildFile (userDataFolderName)
-        .getChildFile (juce::String::toHexString (juce::Time::getHighResolutionTicks())
-                       + "_" + juce::String (++instanceCounter));
+    // As the player's: this process's and this binary's, shared by its webviews (one per webview with
+    // CEDITOR_WEBVIEW2_SHARED=0); the folders gone processes left are swept (WebViewProfileFolders.h).
+    const auto userDataFolder = ceditor::webview::profileFolderForNewWebView (userDataFolderName);
 
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
         .withBackgroundColour (juce::Colour (0xFF1E1E1E))

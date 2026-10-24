@@ -29,10 +29,27 @@ import {
 import { presetSlotInfo } from '../stores/deviceProfileLocalEngine.js';
 import { recallPreset as recallPresetAction } from '../stores/presetLibrarian.js';
 import { noteScriptTouchedControl, noteScriptTouchedControls } from '../stores/scriptTouchedControls.js';
-import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
+import { valueAtPath, probeNestedWrite, getDefaultChildTemplate } from '../stores/controlTreeUtils.js';
 import { deepClone } from '../utils/deepClone.js';
-import { controlSetForPanel, isTokenReference, resolveColourValue } from '../models/controlSets.js';
+import { controlSetForPanel, isTokenReference, resolveColourValue, resolveToken } from '../models/controlSets.js';
+import {
+  COLOUR_FORMS, DRAW_COLOUR_FORMS, MADE_CHILDREN, colourFieldAt, colourHint, drawColour, mapColourWrites,
+  mapPanelColourWrites, panelColour, panelColourFieldAt, percentHint, percentTextHint, realNumber,
+  shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS, colourFromRgb, colourFromHsl, hslOfChannels,
+} from './scriptColours.js';
+import { dashPattern, strokeEnd } from './drawDash.js';
+import { timeNumber } from './timeWords.js';
+import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
+import { layoutWord } from './layoutWords.js';
+import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
+import {
+  drawNumber, commandBounds, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords, drawMissing,
+  drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
+} from './drawShapes.js';
+import { lcdLineWords } from './lcdLines.js';
+import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
+import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
 import { documentIcons } from '../utils/documentIcons.js';
 import { layoutModeForIcon } from '../utils/iconLayout.js';
@@ -49,7 +66,7 @@ import { checksumNames, computeChecksum } from '../utils/checksums.js';
 // ce.text measures through the renderer's own layout rather than a second implementation of it.
 import { buildBlockTextLayout } from '../editor/canvasControlTextLayout.js';
 import {
-  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight,
+  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight, axisClampWords, axisRefusalWords,
 } from './textStyle.js';
 import {
   isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed,
@@ -58,10 +75,15 @@ import {
 import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
-  deviceProfiles, deviceRoleMappings, profileParameters, refreshProfileParameters,
+  deviceProfiles, deviceRoleMappings,
   midiInputs, midiDestinations,
 } from '../stores/deviceProfiles.js';
 import { profileSources } from '../stores/deviceProfileStores.js';
+import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
+import {
+  deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, DEVICE_OVERRIDES, deviceOverrideValue,
+  deviceSetNoNameWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
+} from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
@@ -75,8 +97,17 @@ import {
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
-  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
+  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID, optionChecks, memberPath,
+  andList, unknownOptionsMessage,
 } from './panelApi.js';
+// Each section type's template: what get() checks a path against, and create's `<section>` keys.
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+// The entries the app makes for a control's lists: what ce.panel.define holds a spec against.
+import { ENTRY_BASELINES } from '../stores/documentEntries.js';
+import {
+  createPartNode, createValueChannel, createArrayChannel, createBehaviorModule, createHitZone,
+  createGenerator, createLink, createVariant,
+} from '../utils/customComponentFactory.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession, syncPanelPreviewSessions, setPreviewStopBarrier } from '../stores/interactionPreview.js';
 import {
@@ -106,9 +137,8 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 // The arrangement maths — pure, and the SAME functions the canvas context menu runs. Two
 // implementations of "distribute six things evenly" would drift the first time one was touched.
-import {
-  boundsOf, alignPatch, distributePatches, matchPatch, gridPatches, circlePatches, flipPatches,
-} from '../stores/alignment.js';
+// arrangementPlan is each verb's decision on top of them, which the Values tab draws too.
+import { boundsOf, arrangementPlan } from '../utils/arrangement.js';
 import { pushSnapshot } from '../stores/history.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
@@ -116,7 +146,7 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, readIndexRefusal, LIST_KINDS,
   itemListLength, LINK_KIND, ELEM_KIND,
 } from './componentVerbs.js';
 import {
@@ -128,12 +158,12 @@ import {
 import { patchOf, isUnchanged } from '../utils/scriptPatchOutcome.js';
 import { typeOfControl, familiesForType } from './componentSchema.js';
 import {
-  SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
-  QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
+  SCALES, CHORDS, SCALE_NAMES, CHORD_NAMES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
+  QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES, noteNameOf, noteNumberOf,
 } from './musicTheory.js';
-import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
+import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN, divisionIdOf } from './timeTables.js';
 import { FONT_ADVANCE as PIXEL_ADVANCE, FONT_H as PIXEL_FONT_H } from '../utils/pixelFont.js';
-import { EASING_BEZIERS, ANIM_CURVE_NAMES } from './easingTables.js';
+import { EASING_BEZIERS, ANIM_CURVE_NAMES, bezierOf } from './easingTables.js';
 import { cubicBezierEase, springEase } from '../utils/easing.js';
 // ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
 // beat falls and the Transport drawing that beat have to agree, and one implementation is the only
@@ -298,38 +328,64 @@ function activePanel() {
 }
 
 // Editor document writes replace the controls array. Reuse name/id lookups
-// across the many watch() reads in a settle pass; host adapters can own mutable
-// documents, so retain their uncached lookup semantics.
+// across the many watch() reads in a settle pass.
 const editorNameIndexes = new WeakMap();
+
+// The player's document is its host's and is written in place (playerScriptHost.js), so its controls
+// array stays the same object when a name changes and cannot key an index on its own. It used to be
+// scanned whole on every lookup instead, and with the window open that was most of what GAIA's
+// preset-name script cost: 1,070 lookups across 818 controls in one call, 160 to 220 ms of the
+// 250 ms a call could take then. Its index is kept honest as it is used: a hit is checked against the
+// control's current name and id, a miss looks again in a fresh index (a control a script created),
+// and a script's write to a name or an id drops it (noteHostWrite).
+const hostNameIndexes = new WeakMap();
+let hostNamesVersion = 0;
+
+/** Name and id (lower-cased) to the first control that answers to it, in the order a scan meets them. */
+function nameIndexFor(controls) {
+  const index = new Map();
+  // flatControls, NOT the top level: a control inside a Group or Container was unreachable by
+  // name — get("Osc1Cutoff.value") returned nothing for a knob that was plainly there, in both
+  // runtimes, and most real panels group their controls. ce.panel.snapshot found it, because a
+  // snapshot that stopped at the top level would have silently missed most of a panel.
+  for (const control of flatControls(controls)) {
+    const core = control?._children?.Core;
+    for (const key of [String(core?.name ?? '').toLowerCase(), String(core?.id ?? '').toLowerCase()]) {
+      if (!index.has(key)) index.set(key, control);
+    }
+  }
+  return index;
+}
+
+function answersTo(control, target) {
+  const core = control?._children?.Core;
+  return String(core?.name ?? '').toLowerCase() === target || String(core?.id ?? '').toLowerCase() === target;
+}
+
+/** A host write that renames a control, or changes its id, leaves the player's name index stale. */
+function noteHostWrite(modelPath) {
+  if (modelPath === 'Core.name' || modelPath === 'Core.id') hostNamesVersion += 1;
+}
 
 /** Find a control in the active panel by its friendly name (case-insensitive), id fallback. */
 function findControlByName(name) {
   const panel = activePanel();
   if (!panel) return null;
   const target = String(name ?? '').toLowerCase();
-  if (!host && Array.isArray(panel.controls)) {
-    let index = editorNameIndexes.get(panel.controls);
-    if (!index) {
-      index = new Map();
-      for (const control of flatControls(panel.controls)) {
-        const core = control?._children?.Core;
-        for (const key of [String(core?.name ?? '').toLowerCase(), String(core?.id ?? '').toLowerCase()]) {
-          if (!index.has(key)) index.set(key, control);
-        }
-      }
-      editorNameIndexes.set(panel.controls, index);
-    }
+  const controls = Array.isArray(panel.controls) ? panel.controls : [];
+  if (!host) {
+    let index = editorNameIndexes.get(controls);
+    if (!index) editorNameIndexes.set(controls, (index = nameIndexFor(controls)));
     return index.get(target) ?? null;
   }
-  // flatControls, NOT panel.controls: a control inside a Group or Container was unreachable by
-  // name — get("Osc1Cutoff.value") returned nothing for a knob that was plainly there, in both
-  // runtimes, and most real panels group their controls. ce.panel.snapshot found it, because a
-  // snapshot that stopped at the top level would have silently missed most of a panel.
-  // A name that resolved before still resolves; this only adds the ones that never could.
-  return flatControls(panel.controls ?? []).find((c) => {
-    const core = c?._children?.Core;
-    return String(core?.name ?? '').toLowerCase() === target || String(core?.id ?? '').toLowerCase() === target;
-  }) ?? null;
+  let entry = hostNameIndexes.get(controls);
+  if (entry?.version === hostNamesVersion) {
+    const found = entry.index.get(target);
+    if (found && answersTo(found, target)) return found;
+  }
+  entry = { version: hostNamesVersion, index: nameIndexFor(controls) };
+  hostNameIndexes.set(controls, entry);
+  return entry.index.get(target) ?? null;
 }
 
 // Common shorthands → their canonical section path (visible lives under Core, x under Transform, …).
@@ -472,7 +528,7 @@ function getPanelValue(segs) {
   return panelValueAt(panel, segs);
 }
 
-function setPanelValue(segs, value) {
+function setPanelValue(segs, value, path) {
   const panel = activePanel();
   if (!panel) return;
   warnIfControlNamedPanel();
@@ -486,22 +542,34 @@ function setPanelValue(segs, value) {
     return;
   }
 
+  // The panel's own colours are read as a control's are: "red" is stored as "#FF0000", what the
+  // panel cannot read is refused in set()'s words and nothing is written, and a gradient written
+  // whole has each of its stops read. They took anything, so "red" was stored as "red" and the
+  // background painted nothing. The plug-in's model asks the same question with its window shut.
+  const colours = panelColourWrites(`set("${path}")`, 'nothing was set', segs.join('.'), value);
+  if (!colours) return;
+  value = colours.value;
+
   // Walk to the leaf's parent, then assign with the document's real-case key.
   let node = panel;
+  let top = null;
   for (let i = 0; i < segs.length - 1; i++) {
     if (node == null || typeof node !== 'object') return;
     const key = Object.keys(node).find((k) => k.toLowerCase() === String(segs[i]).toLowerCase());
     if (key == null) { addScriptTrace('error', '', `set("panel.${segs.join('.')}", …): no such property`); return; }
+    top ??= key;
     node = node[key];
   }
   if (node == null || typeof node !== 'object') return;
   const last = Object.keys(node).find((k) => k.toLowerCase() === String(segs[segs.length - 1]).toLowerCase())
     ?? segs[segs.length - 1];
   node[last] = value;
+  top ??= last;
 
   // The editor holds panels in a store; the player holds one object. Poke the store so the canvas
-  // repaints, exactly as a control write does.
-  if (!host) panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, [last]: node === panel ? value : p[last] } : p)));
+  // repaints, exactly as a control write does. By the panel's own key: a write below one
+  // (bgGradient.stops.0.color) poked the leaf's name, and left `color: undefined` on the panel.
+  if (!host) panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, [top]: panel[top] } : p)));
 }
 
 /* ---------------------------------------------------------------- value representations (Q8) */
@@ -515,6 +583,29 @@ function setPanelValue(segs, value) {
 // — the representation is arithmetic applied on the way past.
 
 const DERIVED_ACCESSORS = new Set(VALUE_ACCESSOR_IDS.filter((id) => id !== 'value'));
+
+// An explicit form that is not one of the three used to be dropped here without a word, so
+// get("cutoff", "normalisedValue"), British spelling and all, answered the raw 64 rather than 0.5,
+// and set("cutoff", 0.5, "normalisedValue") wrote 0.5 into a 0..127 control. A string that is not a
+// form now refuses the call: get answers nothing, set writes nothing, and the console names the
+// forms, and the one meant when the text is a form written another way (other capitals, the label's
+// leading dot, or "normalised"/"normalise" for "normalized"). The player says the same in the same
+// words (BridgeScriptHost::formRefusal). Anything but a string is not a form at all and is left as
+// it was: set's options table, and whatever else reaches get's second argument.
+
+/** The form `text` is another way of writing, or ''. */
+function formMeant(text) {
+  const canonical = String(text).trim().toLowerCase().replace(/^\./, '').replace(/normali[sz]e?d?/, 'normalized');
+  return VALUE_ACCESSOR_IDS.find((id) => id.toLowerCase() === canonical) ?? '';
+}
+
+/** The console's line refusing `form`, given explicitly to `call`, or '' when it is a form or none. */
+function formRefusal(call, outcome, form) {
+  if (typeof form !== 'string' || form === '' || VALUE_ACCESSOR_IDS.includes(form)) return '';
+  const meant = formMeant(form);
+  return `${call}: "${form}" is not a value form, so ${outcome}. The forms are ${andList(VALUE_ACCESSOR_IDS)}.`
+    + (meant ? ` Write ${meant}.` : '');
+}
 
 function splitAccessor(path, explicitForm) {
   const text = String(path ?? '');
@@ -577,15 +668,68 @@ function valueBindingFor(control) {
     && String(b.port ?? 'value') === 'value') ?? null;
 }
 
+/**
+ * What a write stores in the colour properties it reaches: `{ value }`, the value to write, with
+ * each colour in it as scriptColours.panelColour stores it ("red" as "#FF0000", "#000" as
+ * "#000000"); or null when one of them is something the panel cannot read, and then each such
+ * property has been reported, once, and nothing is to be written.
+ *
+ * Which properties hold colours comes from the section templates (scriptColours.colourFieldAt), so
+ * Icon.tint is one and Pixel.imageColour, a switch, is not. `root` is the control, or for a state's
+ * part patch the part, and `path` is relative to it: set()'s model path, or a patch map's key. A
+ * whole section or list written at once is looked into, field by field. `place(at, path)` says
+ * where in the write a refused colour is, for the message: below `path` by default, as set() says
+ * it ("at colour"); `wholePath` for a call whose own arguments do not already say which property it
+ * was; componentPlace for a component verb, which counts list positions from 1.
+ */
+function colourWrites(call, outcome, root, path, value, place = belowPath) {
+  return readColours(call, outcome, path, place,
+    (colour) => mapColourWrites(root, path, value, colour));
+}
+
+/** The same for a write to the panel document itself, `path` below the panel: the panel's own
+ *  colours (bgColour, the tints, the grid's, the gradient's stops) are read by the same rule
+ *  (scriptColours.panelColourFieldAt), in the same words. */
+function panelColourWrites(call, outcome, path, value) {
+  return readColours(call, outcome, path, belowPath,
+    (colour) => mapPanelColourWrites(path, value, colour));
+}
+
+function readColours(call, outcome, path, place, map) {
+  // Asked only of a control-set reference, so an ordinary write does not look the set up.
+  const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
+  let refused = false;
+  const stored = map((at, written, field) => {
+    const read = panelColour(written, field, resolves);
+    if (!read.why) return read.colour;
+    refused = true;
+    addScriptTrace('error', '', `${call}: ${place(at, path)}${read.why}, so ${outcome}. ${read.advice}`);
+    return written;
+  });
+  return refused ? null : { value: stored };
+}
+
+/** Where a refused colour is, below the path the call wrote: "at colour, ", or '' at the path. */
+function belowPath(at, path) {
+  return at === path ? '' : `at ${at.slice(path.length + 1)}, `;
+}
+
+/** …or by its whole path, for the calls that write several: 'at "Background.Fill.colour", '. */
+function wholePath(at) {
+  return `at "${at}", `;
+}
+
 // The third argument carries two different things, as the contract's own signature does:
 // set(path, value, opts) with { transmit }, and the second-argument spelling of the value form.
 // A string is a form, an object is opts.
 function setValue(path, value, formOrOpts = '') {
   const form = typeof formOrOpts === 'string' ? formOrOpts : '';
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
+  const notAForm = formRefusal(`set("${path}")`, 'nothing was set', form);
+  if (notAForm) { addScriptTrace('error', '', notAForm); return; }
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
-  if (isPanelTarget(name)) { setPanelValue(segs, value); return; }
+  if (isPanelTarget(name)) { setPanelValue(segs, value, path); return; }
   const control = findControlByName(name);
   if (!control) { addScriptTrace('error', '', `set: control "${name}" not found on the active panel`); return; }
 
@@ -623,6 +767,16 @@ function setValue(path, value, formOrOpts = '') {
     if (decided === REJECTED) return;
     value = decided;
   }
+
+  // A colour the panel cannot read used to be stored as written and painted white ("#000", "red",
+  // a number). Read here, after the filters have had their say (so what a filter returns is read
+  // too) and before anything is written: CSS's short forms are written out, so "red" is stored as
+  // "#FF0000", and what has no one reading is refused with the form to write instead.
+  // ce.panel.patch asks the same question of its entries, ce.panel.create and clone of their props'
+  // sections (sectionOverrides), and the component verbs of what they write (writeComponentFields).
+  const colours = colourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value);
+  if (!colours) return;
+  value = colours.value;
 
   // A write that goes nowhere used to VANISH. The contract's own headline (Q1) is that coverage is
   // total and you can never pick wrong, so a path that resolves to nothing has to say so — without
@@ -669,6 +823,7 @@ function setValue(path, value, formOrOpts = '') {
   let wrote = true;
   if (host) {
     wrote = host.writeValue(control, modelPath, value) !== false;
+    noteHostWrite(modelPath);
   } else if (live && liveId) {
     updatePanelPreviewSession(liveId, channelName
       ? customChannelPatch(control, channelName, value, get(panelPreviewSessions))
@@ -737,12 +892,61 @@ function setValue(path, value, formOrOpts = '') {
   });
 }
 
-function getValue(path, form = '') {
+/* What get() says when it has no answer because the script asked for something that is not there.
+ *
+ * set() always reported a control it could not find and a path that led nowhere. get() returned
+ * nothing for both, so get("cutof.value") and get("cutoff.vlaue") read exactly like a control whose
+ * value is unset, and the mistake surfaced wherever the nothing was used. It says so now, in set()'s
+ * words, and still returns nothing.
+ *
+ * Only for a script's own get(): the runtime asks getValue whether a section exists all the time
+ * (ce.image, ce.text, snapshot), and the debugger's watch panel reads whatever is typed into it.
+ *
+ * "Not there" is decided without false alarms: a value the session holds (a knob's live value, a
+ * custom component's channel) is never reported, nor a key absent from a free-form map (a state's
+ * `when`), nor a property the section's own type has, written or not. What is reported is a path no
+ * reading of which resolves (not a shorthand, a section or a property of any section), and an
+ * explicit section path that stops short or names a property its section's type does not have.
+ * The exported plug-in's PanelValueModel::whyNoAnswer gives the first two cases in the same words. */
+function getFoundNothing(path, what, control) {
+  addScriptTrace('error', '', `get("${path}"): "${what}" does not lead anywhere on "${control}", so there is no answer.`);
+}
+
+/** No reading of `segs` resolves on `control`: resolveModelPath fell through every branch. */
+function pathReadsNothing(control, segs) {
+  if (!segs.length) return false;
+  const first = String(segs[0]).toLowerCase();
+  if (SHORTHANDS[first]) return false;
+  const sections = Object.keys(control?._children ?? {});
+  if (sections.some((k) => k.toLowerCase() === first)) return false;
+  return !sections.some((key) => walkCaseInsensitive(control._children[key], segs));
+}
+
+/** An explicit section path that stops short, or names what its section's type does not have. */
+function sectionPathMisses(control, modelPath) {
+  if (!probeNestedWrite(control, modelPath, undefined).writes) return true;
+  const parts = String(modelPath).split('.');
+  if (parts.length < 2) return false;
+  const parent = valueAtPath(control, parts.slice(0, -1).join('.'));
+  // A parent that is only a template (an effect nobody has edited) cannot be asked.
+  if (!parent || typeof parent !== 'object' || typeof parent._type !== 'string') return false;
+  const key = parts[parts.length - 1];
+  if (parent[key] !== undefined || parent._children?.[key] !== undefined) return false;
+  const template = SECTION_DEFAULTS[parent._type];
+  return !(template && (key in template || template._children?.[key] !== undefined));
+}
+
+function getValue(path, form = '', report = false) {
+  const notAForm = formRefusal(`get("${path}")`, 'there is no answer', form);
+  if (notAForm) { addScriptTrace('error', '', notAForm); return undefined; }
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
   if (isPanelTarget(name)) return getPanelValue(segs);
   const control = findControlByName(name);
-  if (!control) return undefined;
+  if (!control) {
+    if (report) addScriptTrace('error', '', `get: control "${name}" not found on the active panel, so there is no answer.`);
+    return undefined;
+  }
 
   if (addressed.form === 'midiValue') { reportNeedsDeviceHost('get(.midiValue)', addressed.path); return undefined; }
 
@@ -761,6 +965,18 @@ function getValue(path, form = '') {
   // reads as the literal the panel's set gives it — the answer the exported plugin gives too,
   // whose payload was baked at export. A script should never see the reference.
   if (typeof raw === 'string' && isTokenReference(raw)) raw = resolveColourValue(raw, controlSetForPanel(activePanel()));
+  if (report && raw === undefined && !readsLiveValue(control, modelPath) && customChannelOfPath(control, modelPath) == null) {
+    const explicitSection = segs.length > 1
+      && Object.keys(control._children ?? {}).some((k) => k.toLowerCase() === String(segs[0]).toLowerCase());
+    if (pathReadsNothing(control, segs)) {
+      getFoundNothing(addressed.path, segs.join('.'), name);
+      return undefined;
+    }
+    if (explicitSection && sectionPathMisses(control, modelPath)) {
+      getFoundNothing(addressed.path, modelPath, name);
+      return undefined;
+    }
+  }
   if (addressed.form !== 'normalizedValue') return raw;
 
   const range = rangeOf(control);
@@ -789,121 +1005,220 @@ export function readWatch(path) {
 // One accepted input, three forms out, and the difference matters. The app STORES colours as
 // AARRGGBB (JUCE's order — '66FFFFFF' is a 40%-opaque white in every panel document). CSS and SVG
 // want #RRGGBB or #RRGGBBAA — the SAME four bytes in a DIFFERENT order, which is the trap this
-// pair of formats sets. So: everything takes "RRGGBB", "AARRGGBB" or "#RRGGBB" (the app's own
-// parser, which reads the last six characters), everything returns "#RRGGBB" which both CSS and a
-// panel property accept, and ONE verb — alpha() — returns the panel's AARRGGBB, because that is
-// the only form a stored colour can carry an alpha in. Making a DRAWING translucent is
-// ce.draw.opacity(), which is a different question with a different answer.
+// pair of formats sets. So: everything takes what a colour property takes, everything returns
+// "#RRGGBB" which both CSS and a panel property accept, and ONE verb — alpha() — returns the
+// panel's AARRGGBB, because that is the only form a stored colour can carry an alpha in. Making a
+// DRAWING translucent is ce.draw.opacity(), which is a different question with a different answer.
+//
+// READING. A colour is read as if what a property would store for it had been given
+// (scriptColours.storedColour): 6 hex digits are RRGGBB, 8 are AARRGGBB with the alpha set aside,
+// one leading "#" either way, and CSS's short forms are written out first as set() writes them out
+// ("#000" is "#000000", "red" is "#FF0000", rgba(255, 0, 0, 0.5) is "80FF0000"). This used to take
+// the last six characters of whatever it was given, so text that is no colour at all ("x5B9BD5",
+// "#12#34#56", the number 0xFF0000) read as one and nothing said so. Anything else is refused, in
+// the words of each prelude's __cchan, which reads the short forms with its own port of
+// scriptColours' CSS reading and the generated names table. Eight digits are still AARRGGBB, so
+// CSS's "#5B9BD580" reads as 9BD580, which is the colour a property would paint for it.
+//
+// AMOUNTS. lighten, darken and alpha take a number from 0 to 1. One outside it used to be used as
+// it was (lightening by 40 gave white) or clamped (an alpha of 128 gave solid). It is refused, with
+// the number out of 100 when that is what it looks like, in the words of each prelude's __cunit.
 
-const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
 
-/** "RRGGBB" | "AARRGGBB" | "#RRGGBB" -> [r, g, b]. The app's parseHexRGB: the last six characters
- *  are the colour, whatever came before them. Nothing readable gives black rather than NaN. */
-function colourChannels(hex) {
-  const h = String(hex ?? '').replace(/#/g, '').slice(-6);
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+/** A colour a property could store -> [r, g, b], or null after saying why it cannot be read. */
+function colourChannels(verb, hex) {
+  const stored = storedColour(hex);
+  if (stored) {
+    const h = stored.slice(-6);
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  let why;
+  if (hex === undefined || hex === null) why = 'no colour was given';
+  else if (typeof hex === 'string') why = `"${hex}" is not a colour`;
+  else if (typeof hex === 'number' && Number.isFinite(hex)) why = `${shownNumber(hex)} is not a colour`;
+  else why = 'the colour given is not text';
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer. ${COLOUR_FORMS}.${colourHint(hex)}`);
+  return null;
 }
 
-function colourFromRgb(r, g, b) {
-  const c = (v) => colourClampByte(Number(v) || 0).toString(16).padStart(2, '0');
-  return `#${c(r)}${c(g)}${c(b)}`.toUpperCase();
+/** A 0..1 amount, or its default when one was left out, or undefined after saying why not. */
+function colourUnit(verb, what, value, fallback) {
+  if ((value === undefined || value === null) && fallback !== undefined) return fallback;
+  const problem = unitProblem(what, value);
+  if (!problem) return realNumber(value);
+  addScriptTrace('error', '', `${verb}: ${problem.why}, so there is no answer.${problem.hint}`);
+  return undefined;
+}
+
+/** A number a ce.math command was given, or undefined after an error in the console. Left out, it
+ *  is `fallback` when there is one; text that is a number is read as one. Anything else used to be
+ *  read as 0, or as NaN, in silence, and differently in each runtime: Python read "128" as 0 where
+ *  the others read 128. The preludes' __mnum is its twin, word for word. */
+function mathNumber(verb, what, value, fallback) {
+  if ((value === undefined || value === null) && fallback !== undefined) return fallback;
+  const n = realNumber(value);
+  if (n !== undefined) return n;
+  addScriptTrace('error', '', value === undefined || value === null
+    ? `${verb}: ${what} is a number, and none was given, so there is no answer.`
+    : `${verb}: ${what} is a number, and ${shownValue(value)} is not, so there is no answer.`);
+  return undefined;
+}
+
+/** ce.math.hex: each part left out is 0, and one that is not a number is refused. */
+function colourFromParts(r, g, b) {
+  const parts = [];
+  for (const [v, what] of [[r, 'the red part'], [g, 'the green part'], [b, 'the blue part']]) {
+    const n = mathNumber('ce.math.hex', what, v, 0);
+    if (n === undefined) return undefined;
+    parts.push(n);
+  }
+  return colourFromRgb(...parts);
+}
+
+/** ce.math.fromHsl: the same, for hue, saturation and lightness. */
+function colourFromHslParts(h, s, l) {
+  const parts = [];
+  for (const [v, what] of [[h, 'the hue'], [s, 'the saturation'], [l, 'the lightness']]) {
+    const n = mathNumber('ce.math.fromHsl', what, v, 0);
+    if (n === undefined) return undefined;
+    parts.push(n);
+  }
+  return colourFromHsl(...parts);
 }
 
 function colourToRgb(hex) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.rgb', hex);
   return rgb ? { r: rgb[0], g: rgb[1], b: rgb[2] } : undefined;
 }
 
 /** Scale each channel toward 255. The border renderer's `lighten`, default and all. */
 function colourLighten(hex, amount) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.lighten', hex);
   if (!rgb) return undefined;
-  const f = Number.isFinite(Number(amount)) ? Number(amount) : 0.4;
+  const f = colourUnit('ce.math.lighten', 'the amount', amount, 0.4);
+  if (f === undefined) return undefined;
   return colourFromRgb(rgb[0] + (255 - rgb[0]) * f, rgb[1] + (255 - rgb[1]) * f, rgb[2] + (255 - rgb[2]) * f);
 }
 
 /** Scale each channel toward 0. The border renderer's `darken`, whose 0.55 default is the groove
  *  shading — so a script drawing a bevel matches the one the panel draws. */
 function colourDarken(hex, amount) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.darken', hex);
   if (!rgb) return undefined;
-  const f = Number.isFinite(Number(amount)) ? Number(amount) : 0.55;
+  const f = colourUnit('ce.math.darken', 'the amount', amount, 0.55);
+  if (f === undefined) return undefined;
   return colourFromRgb(rgb[0] * f, rgb[1] * f, rgb[2] * f);
 }
 
 /** Blend two colours. NOT an app algorithm and said so: it is lerp() per channel, in plain RGB,
  *  which is the blend a meter fading from green to red actually wants. */
 function colourMix(a, b, t) {
-  const x = colourChannels(a);
-  const y = colourChannels(b);
-  if (!x || !y) return undefined;
-  const f = Math.min(1, Math.max(0, Number(t) || 0));
+  const x = colourChannels('ce.math.mix', a);
+  if (!x) return undefined;
+  const y = colourChannels('ce.math.mix', b);
+  if (!y) return undefined;
+  const n = mathNumber('ce.math.mix', 't', t, 0);
+  if (n === undefined) return undefined;
+  const f = Math.min(1, Math.max(0, n));
   return colourFromRgb(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
 }
 
 /** The PANEL's form: AARRGGBB, which is what a stored colour property holds. See the note above —
  *  CSS's #RRGGBBAA is the same bytes the other way round, and mixing them up is silent. */
 function colourWithAlpha(hex, a) {
-  const rgb = colourChannels(hex);
+  const rgb = colourChannels('ce.math.alpha', hex);
   if (!rgb) return undefined;
-  const f = Math.min(1, Math.max(0, Number.isFinite(Number(a)) ? Number(a) : 1));
+  const f = colourUnit('ce.math.alpha', 'the alpha', a);
+  if (f === undefined) return undefined;
   const aa = Math.round(f * 255).toString(16).padStart(2, '0');
   return (aa + colourFromRgb(rgb[0], rgb[1], rgb[2]).slice(1)).toUpperCase();
 }
 
-/** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
-function colourToHsl(hex) {
-  const rgb = colourChannels(hex);
-  if (!rgb) return undefined;
-  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, sat = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-    else if (max === g) h = ((b - r) / d + 2) * 60;
-    else h = ((r - g) / d + 4) * 60;
-  }
-  return { h, s: sat * 100, l: l * 100 };
+/** A colour written with its alpha first (fromARGB) or last (fromRGBA), in the form every reader
+ *  reads one way: "#RRGGBB" when solid, AARRGGBB when not. In each prelude's __corder words. */
+function colourFromOrder(verb, order, value) {
+  const colour = orderedColour(value, order);
+  if (colour) return colour;
+  let why;
+  if (value === undefined || value === null) why = 'no colour was given';
+  else if (typeof value === 'string') why = `"${value}" is not a colour written ${order === 'argb' ? 'AARRGGBB' : 'RRGGBBAA'}`;
+  else if (typeof value === 'number' && Number.isFinite(value)) why = `${shownNumber(value)} is a number, not text`;
+  else why = 'the colour given is not text';
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer. ${ORDERED_FORMS[order]}`);
+  return undefined;
 }
 
-function colourFromHsl(hue, sat, light) {
-  const h = Number(hue) || 0;
-  const s = (Number(sat) || 0) / 100;
-  const l = (Number(light) || 0) / 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  return colourFromRgb(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
+/** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
+function colourToHsl(hex) {
+  const rgb = colourChannels('ce.math.hsl', hex);
+  return rgb ? hslOfChannels(rgb) : undefined;
 }
 
 // @module ce.music
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
-// The panel writes accidentals as ♯ and ♭; a script types # and b. Both are the same note, so both
-// spellings are folded to the ASCII pair before anything tries to read a name.
-const musicAscii = (s) => String(s).replace(/♯/g, '#').replace(/♭/g, 'b');
-const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 
 // A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is. An unreadable
-// name is 0 HERE — musicPitch feeds scaleNotes and friends, and a nil root would turn one bad
-// string into an unexplained nil list. noteNumber itself is honest about it.
-const musicPitch = (v) => (typeof v === 'string'
-  ? (helpers.noteNumber(v) ?? 0)
-  : Math.floor(Number(v) || 0));
+// name used to be 0 here, because a nil root would have turned one bad string into an unexplained
+// nil list: so ce.music.scale("c4") answered with the scale on C-1, and nothing said why. It is
+// undefined now, and the helper that asked refuses through musicPitchOf, which does the explaining.
+// An unknown scale or chord name already answered nothing, just as silently; musicSetOf says so.
+// Both are in the words of each prelude's __pitchOf and __setOf. Each helper checks its scale or
+// chord first, then its notes in argument order, and stops at the first that cannot be read.
+// A number has to be a finite one: NaN, true or a table went through Number(v) || 0 and rooted the
+// answer at C-1 or C#-1 just as an unreadable name had. The answer itself may pass 127 (a chord on
+// G9 does), since these compute pitches; a sender refuses one that is not a MIDI note.
+const musicPitch = (v) => (typeof v === 'string' ? helpers.noteNumber(v)
+  : typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined);
 const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
-const musicNotes = (table, root, name) => {
-  const steps = musicSteps(table, name);
+function musicPitchOf(verb, v) {
+  // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
+  if (v === undefined || v === null) {
+    addScriptTrace('error', '', `${verb}: no note was given, so there is no answer. A note is a MIDI `
+      + 'number or a name, such as 60 or "C4".');
+    return undefined;
+  }
+  const n = musicPitch(v);
+  if (n === undefined) {
+    addScriptTrace('error', '', typeof v === 'string'
+      ? `${verb}: "${v}" is not a note name, so there is no answer. A name is `
+        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+      : `${verb}: ${shownValue(v)} is not a note, so there is no answer. A note is a MIDI `
+        + 'number or a name, such as 60 or "C4".');
+  }
+  return n;
+}
+function musicSetOf(verb, kind, name) {
+  const steps = musicSteps(kind === 'chord' ? CHORDS : SCALES, name);
+  if (!steps) {
+    addScriptTrace('error', '', `${verb}: "${name}" is not a ${kind}, so there is no answer. The ${kind}s `
+      + `are ${(kind === 'chord' ? CHORD_NAMES : SCALE_NAMES).join(', ')}.`);
+  }
+  return steps;
+}
+const musicNotes = (verb, kind, root, name) => {
+  const steps = musicSetOf(verb, kind, name);
   if (!steps) return undefined;
-  const base = musicPitch(root);
+  const base = musicPitchOf(verb, root);
+  if (base === undefined) return undefined;
   return steps.map((x) => base + x);
 };
 // Sorted ascending, which is what every voicing rule below assumes.
-const musicSorted = (list) => (Array.isArray(list) ? list.slice() : []).map(Number)
-  .filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+// ce.music's lists of notes, read as noteLists.js reads them: a number, a note name or text that
+// is a number, and one that is neither refuses the call where it is. They were read as numbers, so
+// a chord written by name was an empty one, without a word. null for a list refused.
+function musicNoteList(memberId, name, list) {
+  const { notes, refused } = noteList(memberId, name, list);
+  if (refused) { addScriptTrace('error', '', refused); return null; }
+  return notes;
+}
+const musicSorted = (notes) => notes.slice().sort((a, b) => a - b);
+// A word or a count used as its default, said once (noteLists.js); resetScriptState clears it.
+const musicWarned = new Set();
+function musicSaid(said) {
+  if (!said || musicWarned.has(said)) return;
+  musicWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
 // A count argument that is not a finite number falls back to its default. Written out rather than
 // leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree
 // or a size differing by one between runtimes is a chord differing by a third.
@@ -968,8 +1283,20 @@ const nowMsRead = () => (NOW_EPOCH === null ? performance.now() : Date.now() - N
 
 // A division is the panel's own vocabulary — "1/16", "1/8T", "1/4D" — and every sequencer property
 // speaks it. An unknown name returns nothing rather than the component's 1/16 fallback: a component
-// must keep running, a script that mistyped one should find out.
-const timeDivision = (name) => DIVISIONS[String(name)];
+// must keep running, a script that mistyped one should find out. It found out only by getting
+// nothing, so this says so as well, in the same words as each prelude's __division. Any case is
+// read: "1/8t" is "1/8T", because the names differ only by D and T and nothing is ambiguous. The
+// table's own id comes back, because the transport's functions look the name up again.
+function divisionId(verb, name) {
+  const id = divisionIdOf(name);
+  if (id === undefined) {
+    // A division left out is named as such: "undefined", "nil" and "None" were the same mistake
+    // printed three ways.
+    addScriptTrace('error', '', `${verb}: ${name === undefined || name === null ? 'no division given'
+      : `${shownValue(name)} is not a division`}, so there is no answer. The divisions are ${DIVISION_NAMES.join(', ')}.`);
+  }
+  return id;
+}
 
 // @module ce.math
 // A seeded xorshift32, written the same way in every prelude and masked to 32 bits at every step.
@@ -1043,10 +1370,17 @@ function resetRandomStreams() { randomStates.clear(); streamOverride = null; }
 function randomImpl(scriptId, lo, hi) {
   const r = randomNext(scriptId);
   if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
-  const a = Math.floor(Number(lo)), b = Math.floor(Number(hi));
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return r;
-  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
-  const low = Math.min(a, b), high = Math.max(a, b);
+  const a = mathNumber('ce.math.random', 'lo', lo);
+  if (a === undefined) return undefined;
+  const b = mathNumber('ce.math.random', 'hi', hi);
+  if (b === undefined) return undefined;
+  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step — and
+  // only those inside the range: the ends were floored, so random(1.5, 3.5) could give 1.
+  const low = Math.ceil(Math.min(a, b)), high = Math.floor(Math.max(a, b));
+  if (high < low) {
+    addScriptTrace('error', '', `ce.math.random: there is no whole number from ${shownValue(a)} to ${shownValue(b)}, so there is no answer.`);
+    return undefined;
+  }
   return low + Math.floor(r * (high - low + 1));
 }
 
@@ -1074,20 +1408,14 @@ function toBreakpoints(points) {
     : [];
   const out = [];
   for (const p of raw) {
-    let x, y;
-    if (Array.isArray(p)) { [x, y] = p; }
-    else if (p && typeof p === 'object') {
-      // A wasmoon array-of-pairs arrives as an object of objects, so try {x,y} then 1/2 then 0/1.
-      x = p.x ?? p[1] ?? p[0];
-      y = p.y ?? p[2] ?? p[1];
-    }
-    const nx = Number(x), ny = Number(y);
-    // A point may also carry the CURVE of the segment ending at it, the way an Envelope point and
-    // a Router breakpoint do. Straight lines are still the default, so a plain pair list is
-    // unchanged.
-    const shape = Array.isArray(p) ? p[2] : p?.curve;
-    const tension = Array.isArray(p) ? p[3] : p?.tension;
-    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, shape, tension]);
+    // A pair, or a table by its names or its numbered entries (animEnvelope.js says how they are
+    // counted). A point may also carry the CURVE of the segment ending at it, the way an Envelope
+    // point and a Router breakpoint do; straight lines are still the default, so a plain pair list
+    // is unchanged.
+    const parts = envelopePointParts(p);
+    if (!parts) continue;
+    const nx = Number(parts.x), ny = Number(parts.y);
+    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, parts.curve, parts.tension]);
   }
   return out.sort((p, q) => p[0] - q[0]);
 }
@@ -1355,7 +1683,10 @@ function blendImpl(a, b, t) {
 
 /** The seeded float in a range — random(lo, hi) returns whole numbers, so this did not exist. */
 function randomFloatImpl(scriptId, lo, hi) {
-  const a = num(lo), b = num(hi, 1);
+  // One number alone is the top of a range from 0. It used to be the bottom of a range up to 1, so
+  // randomFloat(5) was between 1 and 5.
+  const alone = hi === undefined || hi === null;
+  const a = alone ? 0 : num(lo), b = alone ? num(lo, 1) : num(hi);
   return a + randomNext(scriptId) * (b - a);
 }
 
@@ -1413,6 +1744,8 @@ function distanceImpl(x1, y1, x2, y2) {
 function angleOfImpl(x1, y1, x2, y2) {
   const dx = num(x2) - num(x1);
   const dy = num(y2) - num(y1);
+  // The same point twice has no direction. atan2 answered 180 for it here and 0 in Lua.
+  if (dx === 0 && dy === 0) return 0;
   const a = degImpl(Math.atan2(dx, -dy));
   return a < 0 ? a + 360 : a;
 }
@@ -1660,8 +1993,23 @@ const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
   scale: (v, inLo, inHi, outLo, outHi) => (inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)),
-  snap: (v, step) => (step === 0 ? v : Math.round(v / step) * step),
-  lerp: (a, b, t) => a + (b - a) * t,
+  // A step or t left out gave NaN in silence here and a Lua error in the other runtime.
+  snap: (v, step) => {
+    const n = mathNumber('ce.math.snap', 'the value', v);
+    if (n === undefined) return undefined;
+    const s = mathNumber('ce.math.snap', 'the step', step);
+    if (s === undefined) return undefined;
+    return s === 0 ? n : Math.round(n / s) * s;
+  },
+  lerp: (a, b, t) => {
+    const x = mathNumber('ce.math.lerp', 'a', a);
+    if (x === undefined) return undefined;
+    const y = mathNumber('ce.math.lerp', 'b', b);
+    if (y === undefined) return undefined;
+    const f = mathNumber('ce.math.lerp', 't', t);
+    if (f === undefined) return undefined;
+    return x + (y - x) * f;
+  },
   // A shape the list does not have used to return v in silence, which reads as a curve that does
   // nothing rather than as a name that was never applied.
   curve: (v, shape) => {
@@ -1701,9 +2049,11 @@ const helpers = {
   mixColour: (a, b, t) => colourMix(a, b, t),
   colourAlpha: (hex, a) => colourWithAlpha(hex, a),
   hexToRgb: (hex) => colourToRgb(hex),
-  rgbToHex: (r, g, b) => colourFromRgb(r, g, b),
+  rgbToHex: (r, g, b) => colourFromParts(r, g, b),
   hexToHsl: (hex) => colourToHsl(hex),
-  hslToHex: (h, sat, l) => colourFromHsl(h, sat, l),
+  hslToHex: (h, sat, l) => colourFromHslParts(h, sat, l),
+  colourFromArgb: (colour) => colourFromOrder('ce.math.fromARGB', 'argb', colour),
+  colourFromRgba: (colour) => colourFromOrder('ce.math.fromRGBA', 'rgba', colour),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   // range and normalisation
   norm: (v, lo, hi) => normImpl(v, lo, hi),
@@ -1744,47 +2094,46 @@ const helpers = {
   // what noteNumber has always round-tripped. Given, you get the PANEL's names (C♯4 / E♭4): the
   // same table the Chord Pad, the Harmoniser and the Arpeggiator print from, so a script can label
   // a control with the spelling the component beside it is using.
-  noteName: (n, flats) => {
-    n = Math.floor(n);
-    const table = flats === undefined || flats === null ? NOTE_NAMES : (flats ? NOTE_FLAT : NOTE_SHARP);
-    return table[musicMod12(n)] + (Math.floor(n / 12) - 1);
-  },
+  // The rule is musicTheory's, which the script editor's Values sidebar reads a note by too.
+  noteName: (n, flats) => noteNameOf(n, flats),
   // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a
   // perfectly good MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in
   // silence rather than showing up.
-  noteNumber: (name) => {
-    const m = /^([A-G])([#b]?)(-?\d+)$/.exec(musicAscii(name));
-    if (!m) return undefined;
-    const pc = m[2] === 'b' ? FLAT_LETTER[m[1]] : NOTE_NAMES.indexOf(m[1] + m[2]);
-    if (pc < 0) return undefined;
-    // A flat lowers below the letter, so Cb3 is the B under C3 — one octave down, not up.
-    const oct = parseInt(m[3], 10) + (m[2] === 'b' && m[1] === 'C' ? 0 : 1);
-    return oct * 12 + pc;
-  },
+  noteNumber: (name) => noteNumberOf(name),
   // Does this key write its accidentals as flats? The Chord Pad's rule, exactly: judged by the
   // RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the answer straight to
   // noteName and a script's labels match the panel's without deciding anything itself.
   noteSpelling: (root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.spelling', 'scale', scale);
     if (!steps) return undefined;
     const name = scale == null ? 'major' : String(scale);
-    const pc = musicMod12(musicPitch(root));
+    const pitch = musicPitchOf('ce.music.spelling', root);
+    if (pitch === undefined) return undefined;
+    const pc = musicMod12(pitch);
     return FLAT_KEY_PCS.includes(MINOR_SCALE_NAMES.includes(name) ? musicMod12(pc + 3) : pc);
   },
   inScale: (note, root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.inScale', 'scale', scale);
     if (!steps) return undefined;
-    const base = musicMod12(musicPitch(root));
-    return steps.some((x) => musicMod12(base + x) === musicMod12(musicPitch(note)));
+    const n = musicPitchOf('ce.music.inScale', note);
+    if (n === undefined) return undefined;
+    const r = musicPitchOf('ce.music.inScale', root);
+    if (r === undefined) return undefined;
+    const base = musicMod12(r);
+    return steps.some((x) => musicMod12(base + x) === musicMod12(n));
   },
   // Which degree of the key a note is — 1 for the tonic, 5 for the dominant. A note OUTSIDE the key
   // has NO degree and gets nil rather than the nearest one: rounding here is what turns a wrong
   // note into a plausible chord, and quantizeNote is the verb that rounds on purpose.
   scaleDegree: (note, root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.degree', 'scale', scale);
     if (!steps) return undefined;
-    const base = musicMod12(musicPitch(root));
-    const pc = musicMod12(musicPitch(note));
+    const n = musicPitchOf('ce.music.degree', note);
+    if (n === undefined) return undefined;
+    const r = musicPitchOf('ce.music.degree', root);
+    if (r === undefined) return undefined;
+    const base = musicMod12(r);
+    const pc = musicMod12(n);
     const i = steps.findIndex((x) => musicMod12(base + x) === pc);
     return i < 0 ? undefined : i + 1;
   },
@@ -1792,12 +2141,13 @@ const helpers = {
   // are 1-based, like scaleDegree's, so degreeChord(60, 'major', 5) is the V. `size` is how many
   // thirds to stack: 3 a triad, 4 a seventh. Past the top of the scale it keeps going an octave up.
   degreeChord: (root, scale, degree, size) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.degreeChord', 'scale', scale);
     if (!steps || !steps.length) return undefined;
     const name = scale == null ? 'major' : String(scale);
+    const base = musicPitchOf('ce.music.degreeChord', root);
+    if (base === undefined) return undefined;
     const d = musicCount(degree, 1) - 1;
     const offsets = musicStack(steps, d, size);
-    const base = musicPitch(root);
     const quality = helpers.chordQuality(offsets);
     const flats = helpers.noteSpelling(root, name);
     const spell = (n) => (flats ? NOTE_FLAT : NOTE_SHARP)[musicMod12(n)];
@@ -1817,7 +2167,9 @@ const helpers = {
   // built by hand. The vocabulary is the panel's, so a chord this names and a chord the Chord Pad
   // labels agree.
   chordQuality: (notes) => {
-    const list = musicSorted(notes);
+    const read = musicNoteList('chordQuality', 'notes', notes);
+    if (!read) return undefined;
+    const list = musicSorted(read);
     if (!list.length) return undefined;
     const iv = list.map((x) => musicMod12(x - list[0]));
     const has = (a) => iv.includes(a);
@@ -1838,9 +2190,13 @@ const helpers = {
   // lets the inner voices jump; 'off' returns the chord in root position. With no previous chord
   // there is nothing to lead from, so the chord comes back untouched.
   voiceLead: (notes, previous, mode) => {
-    const chord = musicSorted(notes);
-    const prev = musicSorted(previous);
-    const how = mode == null ? 'closest' : String(mode);
+    const read = musicNoteList('voiceLead', 'notes', notes);
+    const before = read && musicNoteList('voiceLead', 'previous', previous);
+    if (!read || !before) return [];
+    const chord = musicSorted(read);
+    const prev = musicSorted(before);
+    const { how, said } = voiceLeadMode(mode);
+    musicSaid(said);
     if (!chord.length || !prev.length || how === 'off') return chord;
     let best = chord;
     let bestScore = Infinity;
@@ -1859,8 +2215,11 @@ const helpers = {
   // ascending and clamped into MIDI range; anything that would land above 127 is DROPPED rather
   // than clamped, because clamping stacks strays on one pitch and that sounds like a stuck key.
   expandOctaves: (notes, octaves) => {
-    const base = musicSorted(notes).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
-    const oc = Math.min(4, Math.max(1, musicCount(octaves, 1)));
+    const read = musicNoteList('expandOctaves', 'notes', notes);
+    if (!read) return [];
+    const base = musicSorted(read).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
+    const { n: oc, said } = octaveCount(octaves);
+    musicSaid(said);
     const out = [];
     for (let o = 0; o < oc; o += 1) for (const n of base) { const v = n + o * 12; if (v <= 127) out.push(v); }
     return out;
@@ -1874,9 +2233,12 @@ const helpers = {
   // step at play time rather than shuffling the walk. A script that wants a shuffled WALK has
   // ce.math.shuffle, which is seeded and therefore repeatable.
   arpOrder: (notes, pattern) => {
-    const asc = (Array.isArray(notes) ? notes : []).slice();
+    const asc = musicNoteList('arpOrder', 'notes', notes);
+    if (!asc) return [];
+    const { which, said } = arpOrderPattern(pattern);
+    musicSaid(said);
     if (!asc.length) return [];
-    switch (String(pattern)) {
+    switch (which) {
       case 'down': return asc.slice().reverse().map((n) => [n]);
       case 'updown': return [...asc, ...asc.slice(1, -1).reverse()].map((n) => [n]);
       case 'downup': {
@@ -1891,12 +2253,15 @@ const helpers = {
   // that quantises to dorian gets the same note whether the window is open or shut. An unknown
   // name returns undefined rather than guessing "major" — asking for something this build does not
   // know should be findable, not silently corrected.
-  scaleNotes: (root, scale) => musicNotes(SCALES, root, scale),
-  chordNotes: (root, type) => musicNotes(CHORDS, root, type),
+  scaleNotes: (root, scale) => musicNotes('ce.music.scale', 'scale', root, scale),
+  chordNotes: (root, type) => musicNotes('ce.music.chord', 'chord', root, type),
   quantizeNote: (note, root, scale) => {
-    const steps = musicSteps(SCALES, scale);
+    const steps = musicSetOf('ce.music.quantize', 'scale', scale);
     if (!steps) return undefined;
-    const n = musicPitch(note), base = musicPitch(root);
+    const n = musicPitchOf('ce.music.quantize', note);
+    if (n === undefined) return undefined;
+    const base = musicPitchOf('ce.music.quantize', root);
+    if (base === undefined) return undefined;
     const inKey = new Set(steps.map((x) => (((base + x) % 12) + 12) % 12));
     // Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested
     // before the -d one, so a note exactly between two scale tones lands on the same one in every
@@ -1913,62 +2278,108 @@ const helpers = {
   nowMs: () => nowMsRead(),
   // The panel's division vocabulary, in both directions. Every sequencer property in the app is
   // one of these strings, and a script could set one and never convert it.
-  beatsPerDivision: (name) => timeDivision(name),
+  beatsPerDivision: (name) => {
+    const id = divisionId('ce.time.division', name);
+    return id === undefined ? undefined : DIVISIONS[id];
+  },
   divisionNames: () => DIVISION_NAMES.map((id) => ({ id, label: DIVISION_LABELS[id], beats: DIVISIONS[id] })),
   // Where a beat position falls, musically — for ANY position, not only the one the transport is
   // at. `text` is the Transport's own readout ("3.2.00"), so a script's label and the component's
   // agree character for character. Ticks are 24 PPQN, the MIDI clock resolution.
+  //
+  // Their numbers are read as the transport reads them, and one not used as written is said once
+  // (timeArg): a position before the start is the start, and text that is not a number is the
+  // argument's default.
   barBeatAt: (beats, beatsPerBar) => {
-    const signature = { beats: beatsPerBar == null ? 4 : beatsPerBar, unit: 4 };
-    return { ...panelBarBeat(beats, signature), text: panelFormatBarBeat(beats, signature) };
+    const b = timeArg('barBeatAt', 'beats', beats);
+    if (b === undefined) return undefined;
+    const signature = { beats: timeArg('barBeatAt', 'beatsPerBar', beatsPerBar), unit: 4 };
+    return { ...panelBarBeat(b, signature), text: panelFormatBarBeat(b, signature) };
   },
   // Which step of the grid a position is on, counting from 0 at the transport origin.
-  stepAt: (beats, division) => (timeDivision(division) === undefined
-    ? undefined
-    : panelStepAtBeat(beats, division)),
+  stepAt: (beats, division) => {
+    const id = divisionId('ce.time.step', division);
+    if (id === undefined) return undefined;
+    const b = timeArg('stepAt', 'beats', beats);
+    return b === undefined ? undefined : panelStepAtBeat(b, id);
+  },
   // The step boundaries crossed between two readings — the never-lose-an-event rule every synced
   // follower in the panel runs on. A stalled frame must FIRE the steps it slept through rather than
   // drop them: that is the difference between a stutter and a hole in the bar. `max` caps the
   // catch-up (default 16) and what was dropped is REPORTED rather than swallowed, so a script can
   // say it happened. On an overrun the most RECENT steps are kept — catching up to now matters
   // more than replaying where you were.
-  stepsBetween: (fromBeats, toBeats, division, max) => (timeDivision(division) === undefined
-    ? undefined
-    : panelCrossedSteps(fromBeats, toBeats, division, max == null ? 16 : max)),
+  stepsBetween: (fromBeats, toBeats, division, max) => {
+    const id = divisionId('ce.time.steps', division);
+    if (id === undefined) return undefined;
+    const from = timeArg('stepsBetween', 'from', fromBeats);
+    if (from === undefined) return undefined;
+    const to = timeArg('stepsBetween', 'to', toBeats);
+    if (to === undefined) return undefined;
+    return panelCrossedSteps(from, to, id, timeArg('stepsBetween', 'max', max));
+  },
   // The panel's shuffle: every odd step pushed later by up to half a step. In BEATS, to add to a
   // step's position. Two sequencers at "the same" swing really are the same swing only if they
   // compute it the same way, which is why this is the transport's function and not a second one.
-  swingOffset: (step, amount, division) => (timeDivision(division) === undefined
-    ? undefined
-    : panelSwungBeatOffset(step, amount, division)),
+  swingOffset: (step, amount, division) => {
+    const id = divisionId('ce.time.swing', division);
+    if (id === undefined) return undefined;
+    const s = timeArg('swingOffset', 'step', step);
+    if (s === undefined) return undefined;
+    const a = timeArg('swingOffset', 'amount', amount);
+    if (a === undefined) return undefined;
+    return panelSwungBeatOffset(s, a, id);
+  },
   // For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep.
   // Derived from the position, never accumulated, so a cycle running for an hour is still exactly
   // on the bar line. `length` is the cycle in beats; `count` is how many have completed.
   cycleAt: (beats, bars, beatsPerBar) => {
-    const perBar = beatsPerBar == null ? 4 : beatsPerBar;
+    const b = timeArg('cycleAt', 'beats', beats);
+    if (b === undefined) return undefined;
+    const n = timeArg('cycleAt', 'bars', bars);
+    if (n === undefined) return undefined;
+    const perBar = timeArg('cycleAt', 'beatsPerBar', beatsPerBar);
     return {
-      phase: panelCyclePhaseAt(beats, bars, perBar),
-      count: panelCycleCountAt(beats, bars, perBar),
-      length: panelCycleBeats(bars, perBar),
+      phase: panelCyclePhaseAt(b, n, perBar),
+      count: panelCycleCountAt(b, n, perBar),
+      length: panelCycleBeats(n, perBar),
     };
   },
   // Fold a timeline position into a loop. Before the loop start the position is untouched — you can
   // run IN to a loop from earlier in the song, which is what every DAW does and what a count-in
   // needs. `pass` is which time round you are, and -1 before the loop has been reached; a script
   // watching it for CHANGES knows a wrap happened without a wrap handler that can miss one.
-  loopedBeats: (beats, startBeats, lengthBeats) => ({
-    beats: panelLoopedBeats(beats, startBeats, lengthBeats),
-    pass: panelLoopCycleIndex(beats, startBeats, lengthBeats),
-  }),
+  loopedBeats: (beats, startBeats, lengthBeats) => {
+    const b = timeArg('loopedBeats', 'beats', beats);
+    if (b === undefined) return undefined;
+    const start = timeArg('loopedBeats', 'startBeats', startBeats);
+    if (start === undefined) return undefined;
+    const length = timeArg('loopedBeats', 'lengthBeats', lengthBeats);
+    if (length === undefined) return undefined;
+    return { beats: panelLoopedBeats(b, start, length), pass: panelLoopCycleIndex(b, start, length) };
+  },
   // Tempo from tap times, in the milliseconds nowMs() reports. Taps more than `resetMs` apart start
   // a NEW measurement rather than averaging across the pause — otherwise the first tap after a
   // break poisons it, which is what every hand-rolled tap tempo gets wrong. Nothing comes back from
   // fewer than two usable taps.
-  tapTempo: (times, resetMs) => panelTapTempo(times, resetMs == null ? 2000 : resetMs) ?? undefined,
+  tapTempo: (times, resetMs) => {
+    const list = timeList('ce.time.tap', 'times', 'a tap time in milliseconds', times);
+    if (list === undefined) return undefined;
+    // A pause that is not a number above 0 gave nothing (every gap was "after a pause") or 2000, in
+    // silence; it is 2000, said once.
+    const reset = realNumber(resetMs);
+    if (resetMs !== undefined && resetMs !== null && !(reset > 0)) {
+      timeSaid('tapTempo resetMs', `ce.time.tap: resetMs is ${shownValue(resetMs)}, which is ${reset === undefined ? 'not a number' : 'not above 0'}, so 2000 was used.`);
+    }
+    return panelTapTempo(list, reset > 0 ? reset : 2000) ?? undefined;
+  },
   // Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not
   // the mean: one late pulse from a USB hiccup drags an average around, and a wobbling BPM readout
   // is worse than a slightly stale one.
-  clockTempo: (intervalsMs) => panelClockTempo(intervalsMs) ?? undefined,
+  clockTempo: (intervalsMs) => {
+    const list = timeList('ce.time.clockTempo', 'intervalsMs', 'a gap in milliseconds', intervalsMs);
+    return list === undefined ? undefined : (panelClockTempo(list) ?? undefined);
+  },
 
 // @module ce.midi
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
@@ -2011,6 +2422,18 @@ const helpers = {
   fromOffset: (b, center) => b - center,
   toSigned: (v, bits) => { const m = 2 ** bits; return v < 0 ? v + m : v; },
   fromSigned: (b, bits) => { const m = 2 ** bits; return b >= m / 2 ? b - m : b; },
+  // Byte lists — see "byte lists" below, and docs/design/script-bytes.md for why lists.
+  getBits: (value, start, count) => bytesGetBits(value, start, count),
+  setBits: (value, start, count, bits) => bytesSetBits(value, start, count, bits),
+  bytesRead: (bytes, offset, count, opts) => bytesRead(bytes, offset, count, opts),
+  bytesWrite: (bytes, offset, count, value, opts) => bytesWrite(bytes, offset, count, value, opts),
+  bytesSlice: (bytes, offset, count) => bytesSlice(bytes, offset, count),
+  bytesPut: (bytes, offset, values) => bytesPut(bytes, offset, values),
+  bytesFind: (bytes, pattern, from) => bytesFind(bytes, pattern, from),
+  bytesToHex: (bytes) => bytesToHex(bytes),
+  bytesFromHex: (text) => bytesFromHex(text),
+  bytesToBase64: (bytes) => bytesToBase64(bytes),
+  bytesFromBase64: (text) => bytesFromBase64(text),
 };
 // The spelling this runtime shipped with before the contract was enforced. panelApi.js declares
 // it as an alias of to14bit, so panels written against it keep working.
@@ -2026,14 +2449,298 @@ helpers.to14Bit = helpers.to14bit;
 const DEFAULT_ROLE = DEFAULT_DEVICE_ROLE;
 
 function midiInt(v, lo, hi) { v = Math.round(Number(v) || 0); return v < lo ? lo : v > hi ? hi : v; }
-function toByteArray(input) {
-  if (Array.isArray(input)) return input;
-  if (input && typeof input === 'object') return Object.values(input); // wasmoon Lua table → object
-  if (typeof input === 'string') return input.trim().split(/[\s,]+/).filter(Boolean).map((h) => parseInt(h, 16));
-  return [];
+// How a refusal shows a value the script passed, in the same words in every runtime whatever the
+// language would print: "nothing" for nil, undefined or None, NaN and Infinity as JavaScript writes
+// them, a whole number without Lua's or Python's ".0", text in quotes, and "a list" for any list or
+// table. The preludes' __shownValue and BridgeScriptHost's shownScriptValue are its twins.
+function shownValue(v) {
+  if (v === undefined || v === null) return 'nothing';
+  if (typeof v === 'boolean') return String(v);
+  if (typeof v === 'number') {
+    if (Number.isNaN(v)) return 'NaN';
+    return Number.isFinite(v) ? String(v) : v > 0 ? 'Infinity' : '-Infinity';
+  }
+  if (typeof v === 'string') return `"${v}"`;
+  return typeof v === 'function' ? 'a function' : 'a list';
+}
+
+// Hex text is read a token at a time, and a token is one byte: one or two hex digits, with or
+// without 0x. A longer token was read as ONE number and clamped, so "F0411000" went out as F0 FF F7
+// here and as F0 00 F7 from the player (which kept the low byte), and neither said anything. A
+// token that is not one byte is now refused, the message naming it, in the same words as the
+// player's BridgeScriptHost. The separators are the same in every runtime: space, tab, the line
+// breaks, form and vertical tab, and the comma. JavaScript's \s would also split on a no-break
+// space, which Lua and the player do not, so the same text was a message here and a refusal there.
+const HEX_BYTE = /^(0x)?[0-9a-f]{1,2}$/i;
+const hexTokens = (text) => text.split(/[ \t\r\n\f\v,]+/).filter(Boolean);
+function notOneByte(input) {
+  if (typeof input !== 'string') return null;
+  return hexTokens(input).find((token) => !HEX_BYTE.test(token)) ?? null;
+}
+// One item of a list of bytes: a whole number from 0 to 255, or text that is one byte by the rule
+// above, so ["F0", "41"] is F0 41. A list item used to be clamped (300 went out as FF, System Reset,
+// inside a SysEx), and a text item read as decimal ("41" went out as 29).
+const byteItem = (v) => (typeof v === 'number' ? (Number.isInteger(v) && v >= 0 && v <= 255 ? v : undefined)
+  : typeof v === 'string' && HEX_BYTE.test(v) ? parseInt(v, 16) : undefined);
+/** The bytes a script passed, as numbers from 0 to 255: hex text, a list, a wasmoon Lua table (which
+ *  arrives as an object) or a typed array. Nothing given is an empty list, for the caller to judge.
+ *  Anything else is null, after saying what was wrong; `outcome` finishes "so …": what did not
+ *  happen because of it. */
+function scriptBytes(verb, input, outcome = 'nothing was sent') {
+  if (input === undefined || input === null) return [];
+  if (typeof input === 'string') {
+    const token = notOneByte(input);
+    if (token === null) return hexTokens(input).map((t) => parseInt(t, 16));
+    const spaced = /^[0-9a-f]+$/i.test(token) && token.length % 2 === 0 ? token.match(/../g).join(' ') : '';
+    addScriptTrace('error', '', `${verb}: "${token}" is not one byte, so ${outcome}. `
+      + (spaced ? `Put a space between the bytes: "${spaced}".`
+        : 'Each byte is one or two hex digits, with spaces between the bytes: "F0 41 10 F7".'));
+    return null;
+  }
+  if (typeof input !== 'object') {
+    addScriptTrace('error', '', `${verb}: ${shownValue(input)} is not a list of bytes, so ${outcome}.`);
+    return null;
+  }
+  const items = Array.isArray(input) ? input : Object.values(input);
+  const bytes = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const b = byteItem(items[i]);
+    if (b === undefined) {
+      addScriptTrace('error', '', `${verb}: ${shownValue(items[i])} at position ${i} is not a byte, so ${outcome}. `
+        + 'A byte is a whole number from 0 to 255, or one or two hex digits such as "F7".');
+      return null;
+    }
+    bytes.push(b);
+  }
+  return bytes;
 }
 function toHexMessage(bytes) {
   return bytes.map((v) => (midiInt(v, 0, 255) & 0xff).toString(16).padStart(2, '0').toUpperCase()).join(' ');
+}
+
+/* ------------------------------------------------------------------- byte lists */
+// What JUCE's MemoryBlock does, over the plain lists scripts already pass bytes in
+// (docs/design/script-bytes.md): bit fields and multi-byte values read and written at an offset, a
+// pattern found, a run cut out or written in, and a list turned into hex or base64 text and back.
+// Lists rather than a block object, because only plain data crosses between scripts and languages
+// (panel-api-spec Q3). The rules, the same in every prelude and pinned word for word by
+// scriptPreludeAgreement.test.js:
+//   - offsets and bit positions count from 0, in every language, as dump layouts do (Lua too);
+//   - a list may also be hex text, and its items are bytes, both by scriptBytes' rule: a number
+//     from 0 to 255 or one hex byte. Anything else is refused, as a send refuses it;
+//   - nothing is answered for a mistake, and the error says what it was. Nothing is clamped,
+//     wrapped or padded into a plausible answer, except that a write may run past the end of a
+//     list and grow it, since that is how a message is built;
+//   - every list that comes back is new. The one passed in is never changed.
+const isWholeNumber = (n) => typeof n === 'number' && Number.isInteger(n);
+function bytesRefuse(verb, why, tail = '') {
+  addScriptTrace('error', '', `${verb}: ${why}, so there is no answer.${tail ? ` ${tail}` : ''}`);
+  return undefined;
+}
+// No bytes at all is refused here, where a send says "no bytes given": an empty list is a list, but
+// toHex(nil) answering "" made a variable left unset look like a message with nothing in it.
+function bytesIn(verb, input) {
+  if (input === undefined || input === null) return bytesRefuse(verb, 'no bytes given');
+  return scriptBytes(verb, input, 'there is no answer') ?? undefined;
+}
+const BIT_RANGE = 'start must be a whole number from 0, and count one from 1 to 32';
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// A single position IS past the end; a range RUNS past it, since its first part may be inside.
+const span = (word, a, b) => (a === b ? `${word} ${a} is past` : `${word}s ${a} to ${b} run past`);
+const WRITE_START = 'Writing can run past the end, but not start beyond it.';
+// Why a value to write cannot be written in `bits` bits, or '' when it can. A value left out is
+// named as such rather than printed, since each language would print it as a different word.
+const doesNotFit = (v, bits) => (v === undefined || v === null ? 'the value to write is missing'
+  : !isWholeNumber(v) ? `${shownValue(v)} is not a whole number`
+    : v < 0 || v >= 2 ** bits ? `${v} does not fit in ${plural(bits, 'bit')}` : '');
+function bytesOpts(verb, opts) {
+  const bits = opts?.bits ?? 7;
+  const order = opts?.order ?? 'msb';
+  if (bits !== 7 && bits !== 8) return bytesRefuse(verb, 'bits must be 7 or 8');
+  if (order !== 'msb' && order !== 'lsb') return bytesRefuse(verb, 'order must be "msb" or "lsb"');
+  return { bits, order };
+}
+function bytesGetBits(value, start, count) {
+  const verb = 'ce.midi.getBits';
+  if (!isWholeNumber(start) || start < 0 || !isWholeNumber(count) || count < 1 || count > 32) {
+    return bytesRefuse(verb, BIT_RANGE);
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return bytesRefuse(verb, `${shownValue(value)} is not a finite number`);
+    if (start + count > 32) return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the 32 bits a number holds here`);
+    const m = 2 ** count;
+    return ((Math.floor(Math.floor(value) / 2 ** start) % m) + m) % m;
+  }
+  const bytes = bytesIn(verb, value);
+  if (!bytes) return undefined;
+  if (start + count > bytes.length * 8) {
+    return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the end of ${plural(bytes.length, 'byte')}`);
+  }
+  let out = 0;
+  for (let k = 0; k < count; k += 1) {
+    const at = start + k;
+    out += (Math.floor(bytes[Math.floor(at / 8)] / 2 ** (at % 8)) % 2) * 2 ** k;
+  }
+  return out;
+}
+function bytesSetBits(value, start, count, bits) {
+  const verb = 'ce.midi.setBits';
+  if (!isWholeNumber(start) || start < 0 || !isWholeNumber(count) || count < 1 || count > 32) {
+    return bytesRefuse(verb, BIT_RANGE);
+  }
+  const unfit = doesNotFit(bits, count);
+  if (unfit) return bytesRefuse(verb, unfit);
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return bytesRefuse(verb, `${shownValue(value)} is not a finite number`);
+    if (start + count > 32) return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the 32 bits a number holds here`);
+    const v = Math.floor(value);
+    const m = 2 ** count;
+    const old = ((Math.floor(v / 2 ** start) % m) + m) % m;
+    return v - old * 2 ** start + bits * 2 ** start;
+  }
+  const bytes = bytesIn(verb, value);
+  if (!bytes) return undefined;
+  if (start + count > bytes.length * 8) {
+    return bytesRefuse(verb, `${span('bit', start, start + count - 1)} the end of ${plural(bytes.length, 'byte')}`);
+  }
+  const out = bytes.slice();
+  for (let k = 0; k < count; k += 1) {
+    const at = start + k;
+    const i = Math.floor(at / 8);
+    const mask = 2 ** (at % 8);
+    const now = Math.floor(out[i] / mask) % 2;
+    const want = Math.floor(bits / 2 ** k) % 2;
+    out[i] += (want - now) * mask;
+  }
+  return out;
+}
+function bytesRead(bytes, offset, count, opts) {
+  const verb = 'ce.midi.read';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  if (!isWholeNumber(count) || count < 1 || count > 4) return bytesRefuse(verb, 'count must be a whole number from 1 to 4');
+  const shape = bytesOpts(verb, opts);
+  if (!shape) return undefined;
+  if (offset + count > list.length) {
+    return bytesRefuse(verb, `${span('byte', offset, offset + count - 1)} the end of ${plural(list.length, 'byte')}`);
+  }
+  const part = list.slice(offset, offset + count);
+  if (shape.order === 'lsb') part.reverse();
+  let v = 0;
+  for (const b of part) v = v * 2 ** shape.bits + (b % 2 ** shape.bits);
+  return v;
+}
+function bytesWrite(bytes, offset, count, value, opts) {
+  const verb = 'ce.midi.write';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  if (!isWholeNumber(count) || count < 1 || count > 4) return bytesRefuse(verb, 'count must be a whole number from 1 to 4');
+  const shape = bytesOpts(verb, opts);
+  if (!shape) return undefined;
+  const unfit = doesNotFit(value, count * shape.bits);
+  if (unfit) return bytesRefuse(verb, unfit);
+  if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`, WRITE_START);
+  const digits = [];
+  let v = value;
+  for (let i = 0; i < count; i += 1) { digits.push(v % 2 ** shape.bits); v = Math.floor(v / 2 ** shape.bits); }
+  if (shape.order === 'msb') digits.reverse();
+  const out = list.slice();
+  digits.forEach((d, i) => { out[offset + i] = d; });
+  return out;
+}
+function bytesSlice(bytes, offset, count) {
+  const verb = 'ce.midi.slice';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  if (count === undefined || count === null) {
+    if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`);
+    return list.slice(offset);
+  }
+  if (!isWholeNumber(count) || count < 0) return bytesRefuse(verb, 'count must be a whole number from 0');
+  if (offset + count > list.length) {
+    return bytesRefuse(verb, count === 0 ? `offset ${offset} is past the end of ${plural(list.length, 'byte')}`
+      : `${span('byte', offset, offset + count - 1)} the end of ${plural(list.length, 'byte')}`);
+  }
+  return list.slice(offset, offset + count);
+}
+function bytesPut(bytes, offset, values) {
+  const verb = 'ce.midi.put';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  if (!isWholeNumber(offset) || offset < 0) return bytesRefuse(verb, 'offset must be a whole number from 0');
+  const part = bytesIn(verb, values);
+  if (!part) return undefined;
+  if (offset > list.length) return bytesRefuse(verb, `offset ${offset} is past the end of ${plural(list.length, 'byte')}`, WRITE_START);
+  const out = list.slice();
+  part.forEach((b, i) => { out[offset + i] = b; });
+  return out;
+}
+function bytesFind(bytes, pattern, from) {
+  const verb = 'ce.midi.find';
+  const list = bytesIn(verb, bytes);
+  if (!list) return undefined;
+  const wanted = bytesIn(verb, pattern);
+  if (!wanted) return undefined;
+  if (!wanted.length) return bytesRefuse(verb, 'the pattern is empty');
+  const first = from === undefined || from === null ? 0 : from;
+  if (!isWholeNumber(first) || first < 0) return bytesRefuse(verb, 'from must be a whole number from 0');
+  // Not found is an answer, not a mistake: nothing comes back and nothing is said.
+  for (let i = first; i + wanted.length <= list.length; i += 1) {
+    let j = 0;
+    while (j < wanted.length && list[i + j] === wanted[j]) j += 1;
+    if (j === wanted.length) return i;
+  }
+  return undefined;
+}
+// Hex text out, the form the console prints messages in and every send reads back: two uppercase
+// digits a byte, one space between. Reading it back is scriptBytes' rule, so text that is not a
+// byte at a time is refused here as it is in a send.
+function bytesToHex(bytes) {
+  const list = bytesIn('ce.midi.toHex', bytes);
+  return list ? list.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ') : undefined;
+}
+function bytesFromHex(text) {
+  const verb = 'ce.midi.fromHex';
+  if (text === undefined || text === null) return bytesRefuse(verb, 'no hex text given');
+  if (typeof text !== 'string') return bytesRefuse(verb, `${shownValue(text)} is not hex text`);
+  return bytesIn(verb, text);
+}
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function bytesToBase64(bytes) {
+  const list = bytesIn('ce.midi.toBase64', bytes);
+  if (!list) return undefined;
+  let out = '';
+  for (let i = 0; i < list.length; i += 3) {
+    const a = list[i], b = list[i + 1], c = list[i + 2];
+    const n = a * 65536 + (b ?? 0) * 256 + (c ?? 0);
+    out += BASE64[Math.floor(n / 262144) % 64] + BASE64[Math.floor(n / 4096) % 64]
+      + (b === undefined ? '=' : BASE64[Math.floor(n / 64) % 64])
+      + (c === undefined ? '=' : BASE64[n % 64]);
+  }
+  return out;
+}
+function bytesFromBase64(text) {
+  const verb = 'ce.midi.fromBase64';
+  if (text === undefined || text === null) return bytesRefuse(verb, 'no base64 text given');
+  const clean = typeof text === 'string' ? text.replace(/[ \t\r\n]/g, '') : null;
+  if (clean === null || clean.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) {
+    return bytesRefuse(verb, 'that is not base64', 'Base64 is groups of four characters from A-Z, a-z, '
+      + '0-9, + and /, with = only as padding at the end.');
+  }
+  const out = [];
+  for (let i = 0; i < clean.length; i += 4) {
+    const group = clean.slice(i, i + 4);
+    const pad = (group.match(/=/g) ?? []).length;
+    let n = 0;
+    for (let j = 0; j < 4; j += 1) n = n * 64 + (group[j] === '=' ? 0 : BASE64.indexOf(group[j]));
+    out.push(Math.floor(n / 65536) % 256);
+    if (pad < 2) out.push(Math.floor(n / 256) % 256);
+    if (pad < 1) out.push(n % 256);
+  }
+  return out;
 }
 // checksum(kind, bytes). "roland"/"yamaha" are the same two's-complement 7-bit sum — Roland
 // documents it as (128 - sum) & 0x7F and Yamaha as (0 - sum) & 0x7F, which are the same number —
@@ -2054,13 +2761,13 @@ function toHexMessage(bytes) {
  * under different names. Two implementations of the same arithmetic is how they drifted apart.
  */
 function checksumOf(kind, bytes, opts) {
-  // Sanitised before the table sees them, so an out-of-range value clamps the way every other
-  // byte-taking verb in ce.midi clamps rather than wrapping.
-  const clean = bytes.map((v) => midiInt(v, 0, 255) & 0xff);
-  const value = computeChecksum(kind, clean, opts);
+  // The bytes have been through scriptBytes, so each one is already 0 to 255.
+  const value = typeof kind === 'string' ? computeChecksum(kind, bytes, opts) : undefined;
   if (value === undefined) {
-    addScriptTrace('error', '',
-      `ce.midi.checksum("${kind}"): no such algorithm. One of: ${checksumNames().join(', ')}.`);
+    // The algorithm left out is named as such, rather than printed as undefined, nil or None.
+    const which = kind === undefined || kind === null ? ': no algorithm given'
+      : `(${typeof kind === 'string' ? `"${kind}"` : shownValue(kind)}): no such algorithm`;
+    addScriptTrace('error', '', `ce.midi.checksum${which}. One of: ${checksumNames().join(', ')}.`);
     return undefined;
   }
   return value;
@@ -2107,10 +2814,92 @@ function releaseTrackedScriptNotes(role, channel, note) {
 // MIDI channel messages — arithmetic over one raw-byte send, the way panic() is over sendCC, which
 // is what makes them identical in every runtime and every exported language. `note` accepts a MIDI
 // number or a name ("C3"), because a script that reads musically should be allowed to say so.
-const midiCh = (c) => midiInt(c, 1, 16) - 1;
-// noteNumber returns nil for a name it cannot read; sendNote still has to put a BYTE on the wire,
-// so an unreadable name becomes 0 here rather than an undefined slipping into a MIDI message.
-const midiNote = (n) => (typeof n === 'string' ? (helpers.noteNumber(n) ?? 0) : midiInt(n, 0, 127));
+// The numbers a channel message carries, checked before anything is sent. They were clamped, and a
+// clamp is not harmless here: CC 200 went out as CC 127 (Poly Mode On), "cutoff" as CC 0 (Bank
+// Select), channel 0 or 17 as 1 or 16, a missing velocity as 0 (a note off). So an ADDRESS (channel,
+// controller, program, bank, parameter number) outside its range is refused, since clamping it picks
+// a different message; so is anything that is not a number, or is missing where there is no default.
+// Text that is a number ("64", from a label say) is read as one, as it always was, by realNumber's
+// rule. A VALUE past the end of its range (a CC value of 128) is sent as the nearest end, which is
+// the same message one step along, and the first time for each command a warning says so: such a
+// value comes from the script's own arithmetic (0..1 times 128, an offset added, a curve that
+// overshoots), and the warning points at it without filling the console sixty times a second. A
+// number with a fraction is rounded half up, the same in every runtime (the player floored it). The
+// preludes' __midiArg is the twin of this, word for word.
+const MIDI_ARGS = {
+  channel: ['channel', 'a channel', 1, 16, true, 'A channel is a whole number from 1 to 16.'],
+  controller: ['controller number', 'a controller number', 0, 127, true, 'A controller number is a whole number from 0 to 127.'],
+  program: ['program', 'a program', 0, 127, true, 'A program is a whole number from 0 to 127.'],
+  bank: ['bank number', 'a bank number', 0, 127, true, 'A bank number is a whole number from 0 to 127.'],
+  msb: ['MSB', 'an MSB', 0, 127, true, 'An MSB is a whole number from 0 to 127.'],
+  lsb: ['LSB', 'an LSB', 0, 127, true, 'An LSB is a whole number from 0 to 127.'],
+  value: ['value', 'a value', 0, 127, false, 'A value is a number from 0 to 127.'],
+  velocity: ['velocity', 'a velocity', 0, 127, false, 'A velocity is a number from 0 to 127.'],
+  pressure: ['pressure', 'a pressure', 0, 127, false, 'A pressure is a number from 0 to 127.'],
+  value14: ['value', 'a value', 0, 16383, false, 'A value is a number from 0 to 16383.'],
+  bend: ['bend', 'a bend', 0, 16383, false, 'A bend is a number from 0 to 16383, and 8192 is the centre.'],
+  position: ['song position', 'a song position', 0, 16383, false, 'A song position is a number of MIDI beats from 0 to 16383.'],
+};
+const edgeWarned = new Set();   // the commands that have said a value was past its end; resetScriptState clears it
+/** The number to send for `kind`, or undefined after saying why nothing was sent. */
+function midiArg(verb, kind, v) {
+  const [noun, aNoun, lo, hi, address, hint] = MIDI_ARGS[kind];
+  if (v === undefined || v === null) {
+    addScriptTrace('error', '', `${verb}: no ${noun} given, so nothing was sent.`);
+    return undefined;
+  }
+  const r = realNumber(v);
+  const n = r === undefined ? undefined : Math.floor(r + 0.5);
+  if (n === undefined || (address && (n < lo || n > hi))) {
+    addScriptTrace('error', '', `${verb}: ${shownValue(v)} is not ${aNoun}, so nothing was sent. ${hint}`);
+    return undefined;
+  }
+  if (n >= lo && n <= hi) return n;
+  const sent = n < lo ? lo : hi;
+  if (!edgeWarned.has(verb)) {
+    edgeWarned.add(verb);
+    addScriptTrace('warn', '', `${verb}: the ${noun} ${shownValue(v)} is outside ${lo} to ${hi}, so ${sent} was sent. `
+      + 'This is said only the first time.');
+  }
+  return sent;
+}
+// A note: a MIDI number from 0 to 127, rounded, or a name such as "C4" whose number is in that range.
+// An unreadable name used to become note 0, so "c4" (the letter must be a capital) played C-1, the
+// bottom of the keyboard, with nothing to say why; and a name past the top, "C10", put 132 in the
+// data byte, which a synth reads as a status byte. Anything else, NaN or a table included, played
+// C-1 by the numeric path. Each is refused by refuseNote, in the preludes' __badNote words.
+const midiNote = (n) => {
+  const v = typeof n === 'string' ? helpers.noteNumber(n)
+    : typeof n === 'number' && Number.isFinite(n) ? Math.floor(n + 0.5) : undefined;
+  return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
+};
+function refuseNote(verb, note) {
+  const range = 'MIDI notes run from 0 to 127, which is C-1 to G9.';
+  let why;
+  if (note === undefined || note === null) {
+    why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
+  } else if (typeof note === 'string') {
+    why = helpers.noteNumber(note) === undefined
+      ? `"${note}" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it `
+        + 'has one, then the octave: "C4", "Eb3", "F#-1".'
+      : `"${note}" is outside the MIDI notes, so nothing was sent. ${range}`;
+  } else if (typeof note === 'number' && Number.isFinite(note)) {
+    why = `${note} is outside the MIDI notes, so nothing was sent. ${range}`;
+  } else {
+    why = `${shownValue(note)} is not a note, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".`;
+  }
+  addScriptTrace('error', '', `${verb}: ${why}`);
+}
+// sendNote's `ms`: left out, the script sends the note off itself; given, it must be a length.
+// "500ms", NaN or -5 sent the note on and never the note off, a hung voice.
+function noteLength(verb, ms) {
+  if (ms === undefined || ms === null) return null;
+  const length = realNumber(ms);   // "500" is what sendNote has always read
+  if (length !== undefined && length > 0) return length;
+  addScriptTrace('error', '', `${verb}: ${shownValue(ms)} is not a length in milliseconds, so nothing was sent. `
+    + 'Give a number above 0, or leave it out to send the note off yourself.');
+  return undefined;
+}
 
 /* --- the wire filters: interceptIn / interceptOut / feed --------------------------------------
  * ce.core.intercept filters a MODEL PATH. These filter the WIRE, and they are a different thing:
@@ -2149,7 +2938,12 @@ function runMidiChain(list, payload, label) {
       return null;
     }
     if (out === undefined || out === null) continue;    // no opinion — pass it on unchanged
-    const next = toByteArray(out).map((v) => midiInt(v, 0, 255) & 0xff);
+    // What a filter returns is read as a send reads bytes. "903C7F" used to become FF, and an
+    // unreadable token 00, and that went out in place of the message; now the message goes nowhere
+    // and the filter's mistake is named.
+    const next = scriptBytes(label === 'out' ? 'interceptMidiOut' : 'interceptMidiIn', out,
+      label === 'out' ? 'the message was not sent' : 'the message was dropped');
+    if (!next) return null;
     if (!next.length) continue;                          // an empty array is not a decision
     bytes = next;
   }
@@ -2162,17 +2956,36 @@ function installMidiFilters() {
   setOutboundMidiFilter(midiOut.length ? (p) => runMidiChain(midiOut, p, 'out') : null);
 }
 
+/** An NRPN or RPN: the parameter number in two CCs, then the 14-bit value in data entry 6 and 38. */
+function sendParameterNumber(verb, label, msbCc, lsbCc, ch, msb, lsb, v) {
+  const c = midiArg(verb, 'channel', ch);
+  const m = c === undefined ? undefined : midiArg(verb, 'msb', msb);
+  const l = m === undefined ? undefined : midiArg(verb, 'lsb', lsb);
+  const val = l === undefined ? undefined : midiArg(verb, 'value14', v);
+  if (val === undefined) return;
+  const s = 0xB0 | (c - 1);
+  sendRawMidi([s, msbCc, m, s, lsbCc, l, s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `${label}_${m}_${l}`);
+}
+
 const midiApi = {
   sendMidi: (bytes) => {
-    const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    const b = scriptBytes('sendMidi', bytes);
+    if (!b) return;
     if (!b.length) { addScriptTrace('error', '', 'sendMidi: no bytes given'); return; }
     sendRawMidi(b, 'raw');
   },
   sendNote: (ch, note, velocity, ms) => {
+    const c = midiArg('sendNote', 'channel', ch);
+    if (c === undefined) return;
     const n = midiNote(note);
-    const channel = midiCh(ch);
+    if (n === undefined) { refuseNote('sendNote', note); return; }
+    const vel = midiArg('sendNote', 'velocity', velocity);
+    if (vel === undefined) return;
+    const length = noteLength('sendNote', ms);
+    if (length === undefined) return;
+    const channel = c - 1;
     const role = routedRole ?? DEFAULT_ROLE;
-    sendRawMidi([0x90 | channel, n, midiInt(velocity, 0, 127)], `note_${n}`);
+    sendRawMidi([0x90 | channel, n, vel], `note_${n}`);
     const token = ++activeScriptNoteSeq;
     const active = { role, channel, note: n, timerId: '' };
     activeScriptNotes.set(token, active);
@@ -2180,42 +2993,69 @@ const midiApi = {
     // hand-roll a timer, and getting it wrong meant a hung voice — the one MIDI mistake you hear
     // rather than read. The role is captured now, so a note started inside routeMidi() ends where
     // it began even though the block has long since closed.
-    if (ms === undefined || ms === null) return;
-    const delay = Number(ms);
-    if (!Number.isFinite(delay) || delay <= 0) return;
-    active.timerId = scheduleOneShot(delay, () => {
+    if (length === null) return;
+    active.timerId = scheduleOneShot(length, () => {
       if (!activeScriptNotes.delete(token)) return;
       sendRawMidiForRole([0x80 | channel, n, 0], `noteoff_${n}`, role);
     });
   },
   sendNoteOff: (ch, note, velocity) => {
-    const channel = midiCh(ch);
+    const c = midiArg('sendNoteOff', 'channel', ch);
+    if (c === undefined) return;
     const n = midiNote(note);
+    if (n === undefined) { refuseNote('sendNoteOff', note); return; }
+    const vel = midiArg('sendNoteOff', 'velocity', velocity ?? 0);   // release velocity: 0 unless given
+    if (vel === undefined) return;
+    const channel = c - 1;
     const role = routedRole ?? DEFAULT_ROLE;
     releaseTrackedScriptNotes(role, channel, n);
-    sendRawMidi([0x80 | channel, n, midiInt(velocity ?? 0, 0, 127)], `noteoff_${n}`);
+    sendRawMidi([0x80 | channel, n, vel], `noteoff_${n}`);
   },
   sendProgramChange: (ch, program, bankMsb, bankLsb) => {
+    const verb = 'sendProgramChange';
+    const c = midiArg(verb, 'channel', ch);
+    if (c === undefined) return;
+    const p = midiArg(verb, 'program', program);
+    if (p === undefined) return;
+    const msb = bankMsb === undefined || bankMsb === null ? null : midiArg(verb, 'bank', bankMsb);
+    if (msb === undefined) return;
+    const lsb = bankLsb === undefined || bankLsb === null ? null : midiArg(verb, 'bank', bankLsb);
+    if (lsb === undefined) return;
     // Bank select first: a device applies the bank that was in force when the program change lands.
-    const s = 0xB0 | midiCh(ch);
-    if (bankMsb !== undefined && bankMsb !== null) sendRawMidi([s, 0, midiInt(bankMsb, 0, 127)], 'cc_0');
-    if (bankLsb !== undefined && bankLsb !== null) sendRawMidi([s, 32, midiInt(bankLsb, 0, 127)], 'cc_32');
-    sendRawMidi([0xC0 | midiCh(ch), midiInt(program, 0, 127)], `pc_${midiInt(program, 0, 127)}`);
+    const s = 0xB0 | (c - 1);
+    if (msb !== null) sendRawMidi([s, 0, msb], 'cc_0');
+    if (lsb !== null) sendRawMidi([s, 32, lsb], 'cc_32');
+    sendRawMidi([0xC0 | (c - 1), p], `pc_${p}`);
   },
   sendPitchBend: (ch, value) => {
-    const v = midiInt(value ?? 8192, 0, 16383);
-    sendRawMidi([0xE0 | midiCh(ch), v % 128, Math.floor(v / 128) % 128], 'bend');
+    const c = midiArg('sendPitchBend', 'channel', ch);
+    if (c === undefined) return;
+    const v = midiArg('sendPitchBend', 'bend', value ?? 8192);   // left out, the bend centres
+    if (v === undefined) return;
+    sendRawMidi([0xE0 | (c - 1), v % 128, Math.floor(v / 128) % 128], 'bend');
   },
-  sendAftertouch: (ch, pressure, note) => (note === undefined || note === null
-    ? sendRawMidi([0xD0 | midiCh(ch), midiInt(pressure, 0, 127)], 'aftertouch')
-    : sendRawMidi([0xA0 | midiCh(ch), midiNote(note), midiInt(pressure, 0, 127)], 'polyaftertouch')),
+  sendAftertouch: (ch, pressure, note) => {
+    const c = midiArg('sendAftertouch', 'channel', ch);
+    if (c === undefined) return;
+    if (note === undefined || note === null) {
+      const p = midiArg('sendAftertouch', 'pressure', pressure);
+      if (p !== undefined) sendRawMidi([0xD0 | (c - 1), p], 'aftertouch');
+      return;
+    }
+    const n = midiNote(note);
+    if (n === undefined) { refuseNote('sendAftertouch', note); return; }
+    const p = midiArg('sendAftertouch', 'pressure', pressure);
+    if (p === undefined) return;
+    sendRawMidi([0xA0 | (c - 1), n, p], 'polyaftertouch');
+  },
   // feed(bytes) — inject as if the hardware had sent it, so the panel's OWN bindings, note input
   // and transport all act on it. set() moves a control directly and bypasses every binding, which
   // is a different thing: this is how a script-built arpeggiator drives the panel rather than
   // fighting it. Inbound filters run on it, so a fed message obeys the same rules as a real one —
   // a velocity curve that applies to the keyboard has to apply to the sequencer too.
   feedMidi: (bytes) => {
-    const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    const b = scriptBytes('feedMidi', bytes, 'nothing was fed');
+    if (!b) return;
     if (!b.length) { addScriptTrace('error', '', 'feedMidi: no bytes given'); return; }
     const status = b[0] ?? 0;
     const kind = (status & 0xf0) === 0xb0 ? 'cc' : (status & 0xf0) === 0x90 || (status & 0xf0) === 0x80 ? 'note' : 'raw';
@@ -2228,34 +3068,41 @@ const midiApi = {
   interceptMidiOut: null,
   routeMidi: null,
   sendClock: () => sendRawMidi([0xF8], 'clock'),
+  // Any action but stop and continue used to send Start, so "pause" started the sequencer.
   sendTransport: (action) => {
-    const a = String(action ?? 'start').toLowerCase();
-    sendRawMidi([a === 'stop' ? 0xFC : a === 'continue' ? 0xFB : 0xFA], `transport_${a}`);
+    const verb = 'sendTransport';
+    const actions = 'The actions are "start", "continue" and "stop".';
+    if (action === undefined || action === null) {
+      addScriptTrace('error', '', `${verb}: no action given, so nothing was sent. ${actions}`);
+      return;
+    }
+    const a = typeof action === 'string' ? action.toLowerCase() : '';
+    const status = { start: 0xFA, continue: 0xFB, stop: 0xFC }[a];
+    if (status === undefined) {
+      addScriptTrace('error', '', `${verb}: ${shownValue(action)} is not a transport action, so nothing was sent. ${actions}`);
+      return;
+    }
+    sendRawMidi([status], `transport_${a}`);
   },
 
-  sendCC: (ch, cc, v) =>
-    sendRawMidi([0xB0 | (midiInt(ch, 1, 16) - 1), midiInt(cc, 0, 127), midiInt(v, 0, 127)], `cc_${midiInt(cc, 0, 127)}`),
+  sendCC: (ch, cc, v) => {
+    const c = midiArg('sendCC', 'channel', ch);
+    const n = c === undefined ? undefined : midiArg('sendCC', 'controller', cc);
+    const value = n === undefined ? undefined : midiArg('sendCC', 'value', v);
+    if (value !== undefined) sendRawMidi([0xB0 | (c - 1), n, value], `cc_${n}`);
+  },
   // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range,
   // fine tuning and coarse tuning, which is what a panel sets once at load.
-  sendRPN: (ch, msb, lsb, v) => {
-    const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
-    const val = midiInt(v, 0, 16383);
-    sendRawMidi([s, 0x65, midiInt(msb, 0, 127), s, 0x64, midiInt(lsb, 0, 127),
-      s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `rpn_${midiInt(msb, 0, 127)}_${midiInt(lsb, 0, 127)}`);
-  },
+  sendRPN: (ch, msb, lsb, v) => sendParameterNumber('sendRPN', 'rpn', 0x65, 0x64, ch, msb, lsb, v),
   // Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
   sendSongPosition: (beats) => {
-    const b = midiInt(beats, 0, 16383);
-    sendRawMidi([0xF2, b & 0x7f, (b >> 7) & 0x7f], 'songPosition');
+    const b = midiArg('sendSongPosition', 'position', beats);
+    if (b !== undefined) sendRawMidi([0xF2, b & 0x7f, (b >> 7) & 0x7f], 'songPosition');
   },
-  sendNRPN: (ch, msb, lsb, v) => {
-    const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
-    const val = midiInt(v, 0, 16383);
-    sendRawMidi([s, 0x63, midiInt(msb, 0, 127), s, 0x62, midiInt(lsb, 0, 127),
-      s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `nrpn_${midiInt(msb, 0, 127)}_${midiInt(lsb, 0, 127)}`);
-  },
+  sendNRPN: (ch, msb, lsb, v) => sendParameterNumber('sendNRPN', 'nrpn', 0x63, 0x62, ch, msb, lsb, v),
   sendSysex: (bytes) => {
-    let b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    let b = scriptBytes('sendSysex', bytes);
+    if (!b) return;
     if (b.length === 0) { addScriptTrace('error', '', 'sendSysex: no bytes given'); return; }
     if (b[0] !== 0xF0) b = [0xF0, ...b];
     if (b[b.length - 1] !== 0xF7) b = [...b, 0xF7];
@@ -2265,10 +3112,23 @@ const midiApi = {
   // The parameter is `kind`, the name the contract and every other runtime use for it.
   // requestDump is bound in buildApi, not here: its optional callback belongs to a script, and a
   // throw inside it has to be reported against that script. Same reason the wire filters are.
-  checksum: (type, bytes, opts) =>
-    (bytes === undefined || bytes === null
-      ? checksumOf('roland', toByteArray(type))     // one-arg form: checksum(bytes)
-      : checksumOf(type, toByteArray(bytes), opts)),
+  checksum: (type, bytes, opts) => {
+    const verb = 'ce.midi.checksum';
+    const oneArg = bytes === undefined || bytes === null;   // one-arg form: checksum(bytes)
+    // checksum("roland") with the bytes left out read the NAME as hex text and said "roland" is not
+    // one byte. A name the table knows is a name, and what is missing is the bytes.
+    if (oneArg && typeof type === 'string' && checksumNames().includes(type.toLowerCase())) {
+      addScriptTrace('error', '', `${verb}: no bytes given, so there is no checksum.`);
+      return undefined;
+    }
+    const raw = scriptBytes(verb, oneArg ? type : bytes, 'there is no checksum');
+    if (!raw) return undefined;
+    if (oneArg && (type === undefined || type === null)) {
+      addScriptTrace('error', '', `${verb}: no bytes given, so there is no checksum.`);
+      return undefined;
+    }
+    return oneArg ? checksumOf('roland', raw) : checksumOf(type, raw, opts);
+  },
 
   // panic([opts]) — All Sound Off (120) FIRST, then All Notes Off (123), then Reset All
   // Controllers (121). The order matters: 120 cuts a note that is already ringing, 123 only stops
@@ -2277,9 +3137,14 @@ const midiApi = {
   panic: (opts) => {
     const o = opts ?? {};
     const reset = o.resetControllers !== false;
-    const channels = o.channel === undefined || o.channel === null
-      ? Array.from({ length: 16 }, (_, i) => i + 1)
-      : [midiInt(o.channel, 1, 16)];
+    // A channel that is not one ("all", 17) silenced channel 1 or 16 here and nothing at all from
+    // the player's JavaScript; leaving it out is how every channel is named.
+    let channels = Array.from({ length: 16 }, (_, i) => i + 1);
+    if (o.channel !== undefined && o.channel !== null) {
+      const c = midiArg('panic', 'channel', o.channel);
+      if (c === undefined) return;
+      channels = [c];
+    }
     for (const ch of channels) {
       const s = 0xB0 | (ch - 1);
       sendRawMidi([s, 120, 0], 'cc_120');
@@ -2306,7 +3171,9 @@ const midiApi = {
       return n;
     }
     if (isJuceAvailable()) {
-      parseDumpMessage({ deviceRole: role, message: toHexMessage(toByteArray(data)) });
+      const raw = scriptBytes('applyDump', data, 'nothing was decoded');
+      if (!raw) return 0;
+      parseDumpMessage({ deviceRole: role, message: toHexMessage(raw) });
       addScriptTrace('midi', '', 'applyDump: decoding bulk dump via the device host…');
     } else {
       addScriptTrace('midi', '', 'applyDump(bytes): decoding raw dumps needs the device host — pass a decoded { parameter: value } map to fill now');
@@ -2316,6 +3183,11 @@ const midiApi = {
   // sendDump builds the dump from the device profile and sends it (host-side bulk send).
   sendDump: (kind) => {
     const role = DEFAULT_ROLE;
+    const refused = dumpKindRefusal('sendDump', kind);
+    if (refused) {
+      addScriptTrace('error', '', refused);
+      return;
+    }
     if (isJuceAvailable()) {
       startBulkDumpSend({ deviceRole: role, expectedDumpId: String(kind ?? ''), dryRun: false });
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) → bulk send requested`);
@@ -2334,6 +3206,11 @@ const midiApi = {
   // The error is at ERROR level, not 'midi': it used to be the latter, which reads as ordinary
   // chatter, so a script got a quiet null and no indication anything was wrong.
   buildDump: (kind, values) => {
+    const refused = dumpKindRefusal('buildDump', kind, { outcome: 'nothing was built' });
+    if (refused) {
+      addScriptTrace('error', '', refused);
+      return null;
+    }
     const built = buildRuntimeDump(DEFAULT_ROLE, String(kind ?? ''), values ?? {});
     if (built === null) {
       addScriptTrace('error', '',
@@ -2402,17 +3279,27 @@ function splitAction(path, action, args) {
     addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
     return;
   }
-  const next = applySplitScriptAction(current, action, args ?? {});
+  // A zone that is not one, or a preset there is none of, is refused, and says which there are
+  // (handWrittenVerbs.js). The zone was logged as though it had been set, and nothing changed; the
+  // preset replaced every zone with one whole-keyboard zone.
+  const refused = handWrittenRefusal('split', action, { zones: current }, args ?? {});
+  if (refused) {
+    addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, refused.reason));
+    return false;
+  }
+  // A script counts zones from 1, as the panel labels them; the reducer indexes them from 0.
+  const next = applySplitScriptAction(current, action, reducerArgs('split', action, { zones: current }, args));
   setValue(zonesPath, next);
   addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
+  return true;
 }
 const splitApi = {
-  splitPreset: (target, preset, lowNote, highNote) =>
-    splitAction(target, 'preset', { preset, lowNote, highNote }),
-  splitMute: (target, zone, enabled) => splitAction(target, 'mute', { zone, enabled: enabled !== false }),
-  splitChannel: (target, zone, channel) => splitAction(target, 'channel', { zone, channel }),
-  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', { zone, transpose: semitones }),
-  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
+  // Their arguments are built where the Values tab builds them (handWrittenVerbs.js).
+  splitPreset: (target, preset, lowNote, highNote) => splitAction(target, 'preset', HAND_WRITTEN.splitPreset.args(preset, lowNote, highNote)),
+  splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN.splitMute.args(zone, enabled)),
+  splitChannel: (target, zone, channel) => splitAction(target, 'channel', HAND_WRITTEN.splitChannel.args(zone, channel)),
+  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN.splitTranspose.args(zone, semitones)),
+  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN.splitPoint.args(zone, note)),
   splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
 };
 
@@ -2428,7 +3315,15 @@ function phraseAction(path, action, args) {
     addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
     return;
   }
-  const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
+  // A cell off the grid, a seed or a direction there is none of, and a key that is not a pitch
+  // class are refused, and say what there is (handWrittenVerbs.js). They said "nothing to change".
+  const refused = handWrittenRefusal('phrase', action, cfg, args ?? {});
+  if (refused) {
+    addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, refused.reason));
+    return false;
+  }
+  // A script counts steps and rows from 1; the reducer indexes them from 0.
+  const patch = phraseScriptPatch(cfg, action, reducerArgs('phrase', action, cfg, args), () => Math.random());
   const keys = Object.keys(patch);
   if (keys.length === 0) {
     // Not an error — an unknown seed or an out-of-grid cell is a no-op by
@@ -2440,14 +3335,14 @@ function phraseAction(path, action, args) {
   addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
 }
 const phraseApi = {
-  phraseSeed: (target, seed) => phraseAction(target, 'seed', { seed }),
+  phraseSeed: (target, seed) => phraseAction(target, 'seed', HAND_WRITTEN.phraseSeed.args(seed)),
   phraseClear: (target) => phraseAction(target, 'clear', {}),
-  phraseKey: (target, key) => phraseAction(target, 'key', { key }),
+  phraseKey: (target, key) => phraseAction(target, 'key', HAND_WRITTEN.phraseKey.args(key)),
   phraseScale: (target, scale) => phraseAction(target, 'scale', { scale }),
   phraseTranspose: (target, semitones) => phraseAction(target, 'transpose', { transpose: semitones }),
-  phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
+  phraseDirection: (target, direction) => phraseAction(target, 'direction', HAND_WRITTEN.phraseDirection.args(direction)),
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
-  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN.phraseCell.args(step, row, on)),
   phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
 };
 
@@ -2483,8 +3378,9 @@ function sectionAction(path, section, reducer, action, args) {
     }
     // Refused, and said so at error level: it reads exactly like a dead footswitch otherwise, and
     // a scene name that does not exist is a typo somebody needs to see.
-    addScriptTrace('error', '',
-      `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — refused, nothing changed`);
+    // With why (handWrittenVerbs.js): the words there are, a slot that holds no take, the scenes.
+    const family = section.toLowerCase();
+    addScriptTrace('error', '', sectionRefusalLine(family, target, action, args, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
     return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
@@ -2502,31 +3398,31 @@ const recorderApi = {
     recAction(target, 'quantize', { grid, strength, scale, key }),
   recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
   recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
-  recorderSource: (target, source) => recAction(target, 'source', { source }),
+  recorderSource: (target, source) => recAction(target, 'source', HAND_WRITTEN.recorderSource.args(source)),
   recorderNudge: (target, by) => recAction(target, 'nudge', { by }),
   recorderShift: (target, semitones) => recAction(target, 'shift', { semitones }),
-  recorderStore: (target, slot, name) => recAction(target, 'store', { slot, name }),
-  recorderLoad: (target, slot) => recAction(target, 'load', { slot }),
+  recorderStore: (target, slot, name) => recAction(target, 'store', HAND_WRITTEN.recorderStore.args(slot, name)),
+  recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN.recorderLoad.args(slot)),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
   recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
 };
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
 const harmoniserApi = {
-  harmonyMode: (target, mode) => harmAction(target, 'mode', { mode }),
-  harmonyKey: (target, key) => harmAction(target, 'key', { key }),
+  harmonyMode: (target, mode) => harmAction(target, 'mode', HAND_WRITTEN.harmonyMode.args(mode)),
+  harmonyKey: (target, key) => harmAction(target, 'key', HAND_WRITTEN.harmonyKey.args(key)),
   harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
   harmonySize: (target, size) => harmAction(target, 'size', { size }),
-  harmonyShape: (target, shape) => harmAction(target, 'shape', { shape, preset: shape }),
-  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', { voicing }),
+  harmonyShape: (target, shape) => harmAction(target, 'shape', HAND_WRITTEN.harmonyShape.args(shape)),
+  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', HAND_WRITTEN.harmonyVoicing.args(voicing)),
   harmonyInversion: (target, inversion) => harmAction(target, 'inversion', { inversion }),
   harmonyOctave: (target, octave) => harmAction(target, 'octave', { octave }),
-  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', { outOfKey: mode }),
+  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', HAND_WRITTEN.harmonyOutOfKey.args(mode)),
   harmonyKeepPlayed: (target, keep) => harmAction(target, 'keepPlayed', keep === undefined ? {} : { keepPlayed: keep !== false }),
   harmonyChannel: (target, channel) => harmAction(target, 'channel', { channel }),
-  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', { voiceLeading: mode }),
+  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', HAND_WRITTEN.harmonyVoiceLeading.args(mode)),
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
-  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
+  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', HAND_WRITTEN.harmonyDegree.args(degree, chord)),
   harmonyRead: (target, field) => sectionRead(target, 'Harmoniser', 'harmony', field),
 };
 
@@ -2536,6 +3432,50 @@ const harmoniserApi = {
 // be reused verbatim because these verbs take POSITIONAL arguments rather than a named action, so
 // this is its sibling: identical error text, identical no-op reporting, one extra hop to the spec.
 // @module ce.components
+
+/**
+ * Where a refused colour is in what a component verb writes, in the verbs' own terms: a list
+ * position counted from 1, as every verb here counts them ("in pad 3, "), the property below it if
+ * that is not the item's own colour, and nothing when the field written is the colour itself.
+ */
+function componentPlace(at, path) {
+  if (at === path) return '';
+  const below = at.slice(path.length + 1).split('.');
+  if (!/^\d+$/.test(below[0])) return `at ${below.join('.')}, `;
+  const item = path.slice(path.lastIndexOf('.') + 1).replace(/s$/, '');
+  const rest = below.slice(1).join('.');
+  return `in ${item} ${Number(below[0]) + 1}, ${rest && rest.toLowerCase() !== 'colour' ? `at ${rest}, ` : ''}`;
+}
+
+/**
+ * Write the fields a component verb changes in its section, every one or none. `patch` maps each
+ * field to its new value, a whole list for a verb that addresses one element of it.
+ *
+ * Every colour in it is read first, as set() reads one: a short form is written out ("red" is
+ * stored as "#FF0000"), and one the panel cannot read refuses the call before any field is written,
+ * in set()'s sentence with the verb's own name first. Which fields are colours comes from the
+ * section templates (colourFieldAt), not from the verb, so a verb added later that reaches a colour
+ * field is read the same way. Every verb built from componentVerbs.js writes through here.
+ *
+ * Returns whether it wrote; false is the verb's answer for a refusal, as for any other.
+ */
+function writeComponentFields(verb, path, patch) {
+  const control = findControlByName(path);
+  const call = `${memberPath(verb.id)}("${path}")`;
+  const written = [];
+  let refused = false;
+  for (const [field, value] of Object.entries(patch)) {
+    const at = `${verb.section}.${field}`;
+    const colours = colourWrites(call, 'nothing was set', control, at, value, componentPlace);
+    if (colours) written.push([field, colours.value]);
+    else refused = true;
+  }
+  if (refused) return false;
+  for (const [field, value] of written) setValue(`${path}.${verb.section}.${field}`, value);
+  return true;
+}
+
+const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
   const cfg = getValue(`${path}.${verb.section}`);
@@ -2546,6 +3486,12 @@ function componentVerbAction(verb, target, args) {
   const patch = componentScriptPatch(verb, cfg, args);
   const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  // A number past the verb's range is used as the nearest end, and said once per verb.
+  const clamped = componentClampWarning(verb, path, args);
+  if (clamped && !componentClampWarned.has(verb.id)) {
+    componentClampWarned.add(verb.id);
+    addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
+  }
   if (keys.length === 0) {
     // An empty patch is two different things here, and this reducer DOES compare against the
     // current value — so ask the spec whether the request was one the component could have
@@ -2553,16 +3499,31 @@ function componentVerbAction(verb, target, args) {
     // of the list is not, and used to be indistinguishable from both success and silence.
     if (componentRequestLegal(verb, cfg, args)) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
+      lcdLineSaid(verb, path, cfg, args, shown);
       return true;
     }
-    addScriptTrace('error', '',
-      `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed`
-      + (verb.values ? `. One of: ${verb.values.join(', ')}.` : ''));
+    // Said with why (componentVerbs.componentRefusalLine): the index that addresses nothing and
+    // the ones there are, or the value that is not one, which the Values tab's rows say too.
+    addScriptTrace('error', '', componentRefusalLine(verb, path, args, cfg));
     return false;
   }
-  for (const key of keys) setValue(`${path}.${verb.section}.${key}`, patch[key]);
+  if (!writeComponentFields(verb, path, patch)) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
+  lcdLineSaid(verb, path, cfg, args, shown);
   return true;
+}
+
+// A line the LCD cannot show all of (cut at its width, a character it has no shape for, a display
+// showing its layouts instead) is said once per line and reason (lcdLines.js).
+const lcdLineWarned = new Set();   // resetScriptState clears it
+function lcdLineSaid(verb, path, display, args, shown) {
+  if (verb.family !== 'lcd' || verb.v !== 'text') return;
+  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, args[1])) {
+    const key = `${path}\u0000${args[0]}\u0000${reason}`;
+    if (lcdLineWarned.has(key)) continue;
+    lcdLineWarned.add(key);
+    addScriptTrace('warn', '', `${message} This is said only the first time.`);
+  }
 }
 
 
@@ -2674,10 +3635,9 @@ function componentReadAction(verb, path, args) {
   }
 
   const spec = specs[String(name)];
-  if (!spec) {
-    addScriptTrace('error', '',
-      `${verb.family}.read: "${name}" is not a verb of this component. One of: `
-      + `${Object.keys(specs).filter((k) => k !== 'read').sort().join(', ')}.`);
+  const refusedName = familyVerbRefusal(verb.family, 'read', name);
+  if (refusedName) {
+    addScriptTrace('error', '', refusedName);
     return undefined;
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
@@ -2704,6 +3664,11 @@ function componentReadAction(verb, path, args) {
   if (index === undefined || index === null) return list;
 
   // 1-based, as everywhere else in this module — and for a grid the second index is the column.
+  const refusedIndex = readIndexRefusal(spec, cfg, index, index2);
+  if (refusedIndex) {
+    addScriptTrace('error', '', refusedIndex);
+    return undefined;
+  }
   const at = Math.round(Number(index)) - 1;
   if (!Number.isFinite(at) || at < 0 || at >= list.length) return undefined;
   const row = list[at];
@@ -2738,9 +3703,7 @@ function componentSizeAction(verb, path, args) {
   }
   const spec = specs[String(name)];
   if (!spec || !LIST_KINDS.includes(spec.k)) {
-    addScriptTrace('error', '',
-      `${verb.family}.size: "${name}" does not address a list. One of: `
-      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    addScriptTrace('error', '', familyVerbRefusal(verb.family, 'size', name));
     return undefined;
   }
   return sizeOf(spec);
@@ -2753,11 +3716,8 @@ function componentFillAction(verb, path, args) {
   const [name, values] = args;
   const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
   const spec = specs[String(name ?? '')];
-  const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
   if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
-    addScriptTrace('error', '',
-      `${verb.family}.fill: "${name}" does not address a list. One of: `
-      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    addScriptTrace('error', '', familyVerbRefusal(verb.family, 'fill', name));
     return false;
   }
   if (!Array.isArray(values)) {
@@ -2809,7 +3769,7 @@ function componentFillAction(verb, path, args) {
     addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") — already that way`);
     return true;
   }
-  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${calls.length} value(s)`);
   return true;
 }
@@ -2828,7 +3788,7 @@ function componentInsertAction(verb, path, args) {
       `${verb.family}.insert("${spec.v}"): this component's ${spec.f} cannot be grown from a script.`);
     return false;
   }
-  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: insert("${spec.v}") → ${next.length}`);
   return true;
 }
@@ -2851,7 +3811,7 @@ function componentRemoveAction(verb, path, args) {
       + 'element, or this component needs it.');
     return false;
   }
-  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: remove("${spec.v}") → ${next.length}`);
   return true;
 }
@@ -2859,12 +3819,9 @@ function componentRemoveAction(verb, path, args) {
 /** The list-addressing verb a name refers to, having complained if it is not one. */
 function componentListSpec(verb, forWhat, name) {
   const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const lists = Object.entries(specs).filter(([, x]) => LIST_KINDS.includes(x.k) && !x.clear);
   const spec = specs[String(name ?? '')];
   if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
-  addScriptTrace('error', '',
-    `${verb.family}.${forWhat}: "${name}" does not address a list. One of: `
-    + `${lists.map(([k]) => k).sort().join(', ')}.`);
+  addScriptTrace('error', '', familyVerbRefusal(verb.family, forWhat, name));
   return null;
 }
 
@@ -2899,7 +3856,7 @@ function componentLinkAction(verb, path, args) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}() — already unlinked`);
       return true;
     }
-    setValue(`${path}.${verb.section}.${verb.f}`, '');
+    if (!writeComponentFields(verb, path, { [verb.f]: '' })) return false;
     addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}() → unlinked`);
     return true;
   }
@@ -2923,7 +3880,7 @@ function componentLinkAction(verb, path, args) {
     addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}("${wanted}") — already that way`);
     return true;
   }
-  setValue(`${path}.${verb.section}.${verb.f}`, id);
+  if (!writeComponentFields(verb, path, { [verb.f]: id })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → "${wanted}"`);
   return true;
 }
@@ -2971,15 +3928,12 @@ function sectionRead(path, section, label, field) {
     // surface is in a sequence this frame, not something a script set or can set.
     return Object.fromEntries(Object.entries(cfg).filter(([k]) => !k.startsWith('_')));
   }
-  const name = String(field);
-  const key = Object.keys(cfg).find((k) => k.toLowerCase() === name.toLowerCase());
-  if (key === undefined || key.startsWith('_')) {
-    addScriptTrace('error', '',
-      `${label}.read: "${field}" is not a field of this component. One of: `
-      + `${Object.keys(cfg).filter((k) => !k.startsWith('_')).sort().join(', ')}.`);
+  const refused = sectionFieldRefusal(label, cfg, field);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return undefined;
   }
-  return cfg[key];
+  return cfg[Object.keys(cfg).find((k) => k.toLowerCase() === String(field).toLowerCase())];
 }
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
@@ -2988,8 +3942,8 @@ const setlistApi = {
   // scripted step and a footswitch step are the same event downstream.
   setlistNext: (target) => setAction(target, 'next', {}),
   setlistPrev: (target) => setAction(target, 'prev', {}),
-  setlistGoto: (target, scene) => setAction(target, 'goto', { scene }),
-  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
+  setlistGoto: (target, scene) => setAction(target, 'goto', HAND_WRITTEN.setlistGoto.args(scene)),
+  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', HAND_WRITTEN.setlistEnable.args(scene, enabled)),
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
   setlistRead: (target, field) => sectionRead(target, 'Setlist', 'setlist', field),
@@ -3382,12 +4336,7 @@ const SPRING_DEFAULT_FREQUENCY = 12;
  */
 export function drawnCurve(values) {
   const named = values && typeof values === 'object' && !Array.isArray(values) && 'x1' in values;
-  const list = named ? [values.x1, values.y1, values.x2, values.y2] : toList(values);
-  if (list.length !== 4 || !list.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
-  const [x1, y1, x2, y2] = list;
-  if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) return null;
-  if (y1 < -2 || y1 > 3 || y2 < -2 || y2 > 3) return null;
-  return [x1, y1, x2, y2];
+  return bezierOf(named ? [values.x1, values.y1, values.x2, values.y2] : toList(values));
 }
 
 /** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
@@ -3430,8 +4379,10 @@ function runScriptCallback(scriptId, label, fn) {
 export const ANIM_SAMPLES = 1024;
 
 /** Sample a { x, y, curve } point list into a flat table of y values, using ce.math.map — which IS
- *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. */
-function sampleEnvelope(points) {
+ *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. The
+ *  script editor's Values tab draws an envelope's shape under its row from it, so what it shows is
+ *  what moves. */
+export function sampleEnvelope(points) {
   const out = [];
   for (let i = 0; i <= ANIM_SAMPLES; i += 1) {
     const y = Number(mapCurveImpl(i / ANIM_SAMPLES, points));
@@ -3449,10 +4400,6 @@ function sampleAt(samples, t) {
   return samples[i] + (samples[i + 1] - samples[i]) * (x - i);
 }
 
-const animNumber = (opts, name, fallback) => {
-  const v = Number(opts?.[name]);
-  return Number.isFinite(v) ? v : fallback;
-};
 
 /** The transport position an animation with `sync` measures against. */
 function animationBeats() {
@@ -3489,8 +4436,12 @@ function animationValueOf(a, progress) {
   return a.from + (a.to - a.from) * (Number.isFinite(eased) ? eased : progress);
 }
 
-/** Run (and forget) the completion callback for one animation. `completed` says whether it got
- *  there: a stopped animation reports false, so "then do X" can tell finishing from cancelling. */
+/** Run (and forget) the completion callback for one animation, as done(completed): one argument,
+ *  true or false, for a single path and for a list alike. A stopped animation reports false, so
+ *  "then do X" can tell finishing from cancelling. It used to be handed a table, { path, completed }
+ *  or { paths, completed }, where the contract says done(completed), and a table is always true:
+ *  `if completed then` read a cancelled move as a finished one. Every engine passes the boolean now
+ *  (ScriptRuntime::fireAnimationDone and the preludes' __animDone listeners). */
 function fireAnimationDone(a, completed) {
   if (a.groupId != null) {
     const group = animationGroups.get(a.groupId);
@@ -3500,13 +4451,13 @@ function fireAnimationDone(a, completed) {
     if (group.remaining > 0) return;
     animationGroups.delete(a.groupId);
     if (typeof group.done !== 'function') return;
-    runScriptCallback(group.scriptId, 'done', () => group.done({ paths: group.paths, completed: group.completed }));
+    runScriptCallback(group.scriptId, 'done', () => group.done(group.completed === true));
     return;
   }
   if (typeof a.done !== 'function') return;
   const fn = a.done;
   a.done = null;                          // once, whatever happens next
-  runScriptCallback(a.scriptId, 'done', () => fn({ path: a.path, completed }));
+  runScriptCallback(a.scriptId, 'done', () => fn(completed === true));
 }
 
 /** Drop an animation without firing anything — panel teardown, and the internal half of stop(). */
@@ -3518,33 +4469,177 @@ function dropAnimation(key) {
   }
 }
 
+/**
+ * The number ce.anim.to or ce.anim.spring moves to, or undefined after saying why there is none.
+ * A target that is not a number ("full", "100px", "#FF0000") used to be read as 0, so the control
+ * swept to its bottom; text that is a number ("100") is read as one, as it always was. In the words
+ * of each prelude's __animTarget.
+ */
+function animationTarget(verb, target) {
+  const n = realNumber(target);
+  if (n !== undefined) return n;
+  let why;
+  if (target === undefined || target === null) why = 'no number to move to was given';
+  else if (typeof target === 'string') why = `"${target}" is not a number`;
+  else why = 'the target given is not a number';
+  addScriptTrace('error', '', `${verb}: ${why}, so nothing was started.`);
+  return undefined;
+}
+
+/** True, after saying so, when `path` is a colour property, a control's or the panel's own
+ *  (panel.bgColour): ce.anim moves numbers, and every tick would write one into the colour (set()
+ *  refuses each, sixty times a second). */
+function animatesColour(verb, path) {
+  const { name, segs } = splitScriptPath(String(path));
+  if (!segs.length) return false;
+  let colour;
+  if (isPanelTarget(name)) colour = panelColourFieldAt(segs.join('.'));
+  else {
+    const control = findControlByName(name);
+    colour = control ? colourFieldAt(control, resolveModelPath(control, segs)) : null;
+  }
+  if (!colour) return false;
+  addScriptTrace('error', '', `${verb}: "${path}" is a colour, and ce.anim moves numbers, so nothing was started.`);
+  return true;
+}
+
+/** True, after saying so, when `path` names a control the panel does not have. The move used to
+ *  start anyway: the call answered true, every tick wrote `set: control "…" not found` to the
+ *  console, sixty times a second, and done was called with true at the end. With no panel to ask
+ *  nothing is refused, as the plug-in's ScriptRuntime refuses nothing with no panel document. */
+function animatesNoControl(verb, path) {
+  const { name } = splitScriptPath(String(path));
+  if (isPanelTarget(name) || !activePanel() || findControlByName(name)) return false;
+  addScriptTrace('error', '', `${verb}: control "${name}" not found on the active panel, so nothing was started.`);
+  return true;
+}
+
+// A move's timing: a number, or text that is one (realNumber). A duration or a delay that cannot be
+// read, or is below 0, and beats that are not a number above 0, are said once per command, and the
+// move goes ahead as it always did: a duration in its default time, or 1 ms below 0; a delay of
+// none; the length its duration gives. They were all taken without a word, and Number() read
+// "1/4" as no duration here while the plug-in's ScriptRuntime read it as 1 ms; both read it as
+// this now, in these words. resetScriptState clears what has been said.
+const animTimingWarned = new Set();
+function warnAnimTiming(verb, name, said) {
+  const key = `${verb} ${name}`;
+  if (animTimingWarned.has(key)) return;
+  animTimingWarned.add(key);
+  addScriptTrace('warn', '', `${verb}: ${said} This is said only the first time.`);
+}
+function animTiming(verb, opts, name, fallback) {
+  const v = opts?.[name];
+  if (v === undefined || v === null) return fallback;
+  const duration = name === 'duration';
+  const n = realNumber(v);
+  if (n === undefined) {
+    const beatsLike = duration && typeof v === 'string' && v.includes('/');
+    warnAnimTiming(verb, name, `${shownValue(v)} is not a number of milliseconds, so the move `
+      + (duration ? `takes ${Math.round(fallback)} ms, as it does when no duration is given.` : 'starts at once, as it does when no delay is given.')
+      + (beatsLike ? ' For a length in beats, give beats, a number.' : ''));
+    return fallback;
+  }
+  if (n < 0) {
+    warnAnimTiming(verb, name, `a ${name} of ${shownValue(n)} is less than 0, so the move ${duration ? 'takes 1 ms: it jumps.' : 'starts at once.'}`);
+    return duration ? 1 : 0;
+  }
+  return n;
+}
+/** `stagger`, `damping` and `frequency`: a number, or text that is one, or after saying why not, the
+ *  default. A frequency's sign makes no difference, so it is used as given. A damping below 0 makes
+ *  the spring grow instead of settling (a move from 0 to 100 at -2 is at -161 halfway), and a
+ *  stagger below 0 gave each path a delay below 0, held at 0 and said as a delay; both are the
+ *  default, and said as what they are. */
+const ANIM_OPTION_FALLBACK_WORDS = {
+  stagger: () => 'not a number of milliseconds, so the moves start together, as they do when no stagger is given.',
+  damping: (d) => `not a number, so the spring's damping is ${d}, as it is when none is given.`,
+  frequency: (d) => `not a number, so the spring's frequency is ${d}, as it is when none is given.`,
+};
+function animOption(verb, opts, name, fallback) {
+  const v = opts?.[name];
+  if (v === undefined || v === null) return fallback;
+  const n = realNumber(v);
+  if (n !== undefined) {
+    if (name === 'damping' && n < 0) {
+      warnAnimTiming(verb, name, `a damping of ${shownValue(n)} is less than 0, so the spring would grow instead of settling: its damping is ${fallback}, as it is when none is given.`);
+      return fallback;
+    }
+    if (name === 'stagger' && n < 0) {
+      warnAnimTiming(verb, name, `a stagger of ${shownValue(n)} is less than 0, so the moves start together, as they do when no stagger is given.`);
+      return fallback;
+    }
+    return n;
+  }
+  warnAnimTiming(verb, name, `${shownValue(v)} is ${ANIM_OPTION_FALLBACK_WORDS[name](fallback)}`);
+  return fallback;
+}
+
+/** `done` as the function it is, or null: none given, or after saying why not. A done that was not
+ *  a function ("x", 5) was dropped without a word. The preludes pass theirs on as __badDone, and
+ *  ScriptRuntime::startAnimation says the same of it. */
+function animDone(verb, opts) {
+  const fn = opts?.done;
+  if (typeof fn === 'function') return fn;
+  if (fn !== undefined && fn !== null) warnAnimTiming(verb, 'done', `${shownValue(fn)} is not a function, so nothing is called when the move ends.`);
+  return null;
+}
+
+/** `beats` as a number above 0, or null: none given, or said why not. */
+function animBeats(verb, opts) {
+  const v = opts?.beats;
+  if (v === undefined || v === null) return null;
+  const n = realNumber(v);
+  if (n === undefined) warnAnimTiming(verb, 'beats', `${shownValue(v)} is not a number of beats, so the move's length is its duration.`);
+  else if (n <= 0) warnAnimTiming(verb, 'beats', `${shownValue(n)} beats is not more than 0, so the move's length is its duration.`);
+  else return n;
+  return null;
+}
+
 function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = null) {
+  // to and spring move to a number, and only a number. An envelope's ends come from its own opts.
+  if (kind !== 'envelope' && animationTarget(`ce.anim.${kind}`, target) === undefined) return false;
   // A LIST of paths is one call, one shape, one completion. Six paths with six hand-computed
   // delays was the alternative, and `stagger` is why the list is worth having at all.
   if (Array.isArray(path)) {
     const paths = path.map((p) => String(p ?? '')).filter(Boolean);
-    if (!paths.length) return false;
-    const stagger = animNumber(opts, 'stagger', 0);
-    const done = typeof opts?.done === 'function' ? opts.done : null;
+    if (!paths.length) {
+      addScriptTrace('error', '', `ce.anim.${kind}: the list has no paths, so nothing was started.`);
+      return false;
+    }
+    // A colour among them, or a control the panel does not have, refuses the whole call, each one
+    // named in the words a single path is refused in, and nothing starts. The colour alone was
+    // refused and the rest moved, and the list's done waited for a path that never started, so it
+    // was never called. The plug-in's ScriptRuntime::startAnimation checks a list the same way
+    // before it starts any of it.
+    const refused = paths.filter((p) => animatesNoControl(`ce.anim.${kind}`, p) || animatesColour(`ce.anim.${kind}`, p));
+    if (refused.length) return false;
+    const stagger = animOption(`ce.anim.${kind}`, opts, 'stagger', 0);
+    const baseDelay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
+    const done = animDone(`ce.anim.${kind}`, opts);
     let groupId = null;
     if (done) {
       animationGroupSeq += 1;
       groupId = animationGroupSeq;
       animationGroups.set(groupId, {
-        remaining: paths.length, done, completed: true, paths,
+        remaining: paths.length, done, completed: true,
         scriptId: scriptId,
       });
     }
     let ok = true;
     paths.forEach((p, i) => {
-      const each = { ...opts, delay: animNumber(opts, 'delay', 0) + stagger * i, done: undefined };
+      const each = { ...opts, delay: baseDelay + stagger * i, done: undefined };
       if (!startAnimationImpl(scriptId, kind, p, target, each, groupId)) ok = false;
     });
     return ok;
   }
 
   const key = String(path ?? '');
-  if (!key) return false;
+  if (!key) {
+    // An empty path used to answer false without a word.
+    addScriptTrace('error', '', `ce.anim.${kind}: no path was given, so nothing was started.`);
+    return false;
+  }
+  if (animatesNoControl(`ce.anim.${kind}`, key) || animatesColour(`ce.anim.${kind}`, key)) return false;
 
   const groupId = group;
   const spring = kind === 'spring';
@@ -3553,27 +4648,44 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
   // Properties panel offers three feet away, and it was linear here in every runtime. A curve can
   // also be drawn — four numbers, see drawnCurve — which is how a script moves along the same
-  // custom curve an animation in the Animation tab uses.
+  // custom curve an animation in the Animation tab uses. Said once per command, as every other
+  // option is (warnAnimTiming): it was a line on every call, and a curve that was neither a name
+  // nor numbers (curve = 5) was linear without a word. ScriptRuntime::startAnimation says the same.
+  const curveVerb = `ce.anim.${kind}`;
   let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
   let bezier = null;
   if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
     bezier = drawnCurve(opts.curve);
     curve = bezier ? 'custom' : 'linear';
     if (!bezier) {
-      addScriptTrace('log', scriptId,
-        'ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
+      warnAnimTiming(curveVerb, 'curve',
+        'a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
     }
-  } else if (!spring && !envelope && animationEase(0.5, curve) === undefined) {
-    addScriptTrace('log', scriptId,
-      `ce.anim: "${curve}" is not a curve this build knows — animating linear. `
+  } else if (!spring && !envelope && typeof opts?.curve === 'string' && animationEase(0.5, curve) === undefined) {
+    warnAnimTiming(curveVerb, 'curve',
+      `"${curve}" is not a curve this build knows — animating linear. `
       + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.`);
     curve = 'linear';
+  } else if (!spring && !envelope && opts?.curve !== undefined && opts?.curve !== null && typeof opts.curve !== 'string') {
+    warnAnimTiming(curveVerb, 'curve',
+      `${shownValue(opts.curve)} is not a curve: a name, or four numbers, x1, y1, x2, y2 — animating linear.`);
   }
 
   // `from` defaults to where the value IS, so an animation starts from the truth rather than from
-  // wherever the previous one happened to stop.
-  const fromRaw = opts?.from != null ? Number(opts.from) : Number(getValue(key, 'value'));
-  const from = Number.isFinite(fromRaw) ? fromRaw : 0;
+  // wherever the previous one happened to stop. A number, or text that is one (realNumber), or
+  // after saying why not, the default: Number() read "abc" and "" as 0 and true as 1, in silence.
+  let from;
+  if (opts?.from !== undefined && opts?.from !== null) {
+    from = realNumber(opts.from);
+    if (from === undefined) {
+      warnAnimTiming(curveVerb, 'from',
+        `${shownValue(opts.from)} is not a number, so the move starts from the value as it is now, as it does when no from is given.`);
+    }
+  }
+  if (from === undefined) {
+    const now = Number(getValue(key, 'value'));
+    from = Number.isFinite(now) ? now : 0;
+  }
 
   // Nothing has ticked yet on a fresh panel, so seed the origin from the clock the interval below
   // will use — otherwise the first animation measures against zero and finishes instantly.
@@ -3584,11 +4696,11 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // stretches when the tempo drops — which is what every synced component in the panel does and no
   // script could ask for.
   const sync = opts?.sync === true;
-  const beatsOpt = opts?.beats != null ? Number(opts.beats) : null;
+  const beatsOpt = animBeats(`ce.anim.${kind}`, opts);
   const defaultMs = spring ? 600 : 300;
-  let duration = Math.max(1, animNumber(opts, 'duration', defaultMs));
+  let duration = Math.max(1, animTiming(`ce.anim.${kind}`, opts, 'duration', defaultMs));
   let syncBeats = 0;
-  if (Number.isFinite(beatsOpt) && beatsOpt > 0) {
+  if (beatsOpt !== null) {
     syncBeats = beatsOpt;
     const ms = beatsToMsRead(beatsOpt);
     if (ms != null) duration = Math.max(1, ms);
@@ -3600,11 +4712,21 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     syncBeats = msToBeatsRead(duration) ?? 1;
   }
 
-  const delay = Math.max(0, animNumber(opts, 'delay', 0));
-  // repeat: 0 runs once, n runs n more times, -1 runs until stopped. Anything a script can start
-  // forever it must be able to stop, which is what list()/value() and panel teardown are for.
-  const repeatRaw = Math.round(animNumber(opts, 'repeat', 0));
-  const repeat = repeatRaw < 0 ? -1 : repeatRaw;
+  const delay = Math.max(0, animTiming(`ce.anim.${kind}`, opts, 'delay', 0));
+  // `repeat` is how many times the move runs IN ALL: 1 (the default) once, 3 three times, and 0 or
+  // less until it is stopped, as the contract always said. Every runtime used to read it as runs
+  // AFTER the first, so repeat = 1 ran twice and repeat = 0 once. Rounded to a whole number. Text
+  // that is a number is read as one (realNumber); anything else runs it once, as all of it but true
+  // did before. That is why this is not Number(): Number() reads null, false and "" as 0, which
+  // would now mean forever. Held below as the runs LEFT after this one, -1 for until stopped.
+  // Anything a script can start forever it must be able to stop, which is what list()/value() and
+  // panel teardown are for. ScriptRuntime::startAnimation reads it the same way.
+  const runsGiven = realNumber(opts?.repeat);
+  if (runsGiven === undefined && opts?.repeat !== undefined && opts?.repeat !== null) {
+    warnAnimTiming(curveVerb, 'repeat', `${shownValue(opts.repeat)} is not a number of runs, so the move runs once, as it does when no repeat is given.`);
+  }
+  const runs = runsGiven === undefined ? 1 : Math.round(runsGiven);
+  const repeat = runs <= 0 ? -1 : runs - 1;
 
   const previous = animations.get(key);
   if (previous) fireAnimationDone(previous, false);   // replaced is not finished
@@ -3613,7 +4735,7 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     kind: envelope ? 'envelope' : (spring ? 'spring' : 'to'),   // a value has one destination
     path: key,
     from,
-    to: Number(target) || 0,
+    to: envelope ? (Number(target) || 0) : realNumber(target),
     samples: envelope ? opts.samples : null,
     startMs: animationNowMs + delay,
     startBeats: animationBeats() + (sync ? (msToBeatsRead(delay) ?? 0) : 0),
@@ -3623,14 +4745,14 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     syncBeats,
     curve,
     bezier,
-    damping: animNumber(opts, 'damping', SPRING_DEFAULT_DAMPING),
-    frequency: animNumber(opts, 'frequency', SPRING_DEFAULT_FREQUENCY),
+    damping: animOption(`ce.anim.${kind}`, opts, 'damping', SPRING_DEFAULT_DAMPING),
+    frequency: animOption(`ce.anim.${kind}`, opts, 'frequency', SPRING_DEFAULT_FREQUENCY),
     repeat,
     cycle: 0,
     pingpong: opts?.pingpong === true,
     paused: false,
     heldProgress: 0,
-    done: typeof opts?.done === 'function' ? opts.done : null,
+    done: animDone(curveVerb, opts),
     scriptId: scriptId,
     groupId,
   });
@@ -3648,19 +4770,31 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
  *  and the lookup is ce.math.map, which IS envValueAt, so a script's sweep and the Envelope drawn
  *  beside it trace the same line. */
 function startEnvelopeImpl(scriptId, path, points, opts = {}) {
-  const list = Array.isArray(points) ? points : null;
-  if (!list || list.length < 2) {
-    addScriptTrace('log', scriptId,
-      'ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.');
+  // Fewer than two points, a point that is not one, or one whose x is not from 0 to 1, is refused
+  // with an error (animEnvelope.js says why each used to pass without a word; too few was a plain
+  // line until the owner asked for the error every other rejection is). The preludes'
+  // animateEnvelope check the same, in the same words.
+  const refused = envelopeRefusal(points);
+  if (refused) {
+    addScriptTrace('error', scriptId, refused.message);
     return false;
   }
-  const lo = opts?.from != null ? Number(opts.from) : 0;
-  const hi = opts?.to != null ? Number(opts.to) : 1;
-  return startAnimationImpl(scriptId, 'envelope', path, hi, {
-    ...opts,
-    samples: sampleEnvelope(list),
-    from: Number.isFinite(lo) ? lo : 0,
-  });
+  // `from` and `to`: a number, or text that is one (realNumber), or after saying why not, the
+  // default. Number() read "abc" as 0 and true as 1 in silence, so to = "abc" held the whole move
+  // at 0. The preludes read theirs the same way and pass what they could not read on as
+  // __badFrom / __badTo, which ScriptRuntime::startAnimation says in these words.
+  const end = (name, fallback) => {
+    const v = opts?.[name];
+    if (v === undefined || v === null) return fallback;
+    const n = realNumber(v);
+    if (n !== undefined) return n;
+    warnAnimTiming('ce.anim.envelope', name,
+      `${shownValue(v)} is not a number, so y = ${fallback} of the shape means ${fallback}, as it does when no ${name} is given.`);
+    return fallback;
+  };
+  const from = end('from', 0);   // from before to: the order the plug-in's runtime says them in
+  const to = end('to', 1);
+  return startAnimationImpl(scriptId, 'envelope', path, to, { ...opts, samples: sampleEnvelope(points), from });
 }
 
 function stopAnimationImpl(path) {
@@ -3705,7 +4839,7 @@ function animationValueImpl(path) {
 }
 
 /** Every animation running, in path order. The read `ce.time.timers()` and `ce.panel.entries()`
- *  both got, and the one that makes `repeat = -1` safe to offer: a script can always find what it
+ *  both got, and the one that makes `repeat = 0` safe to offer: a script can always find what it
  *  started and stop it. */
 function animationListImpl() {
   return [...animations.keys()].sort().map((k) => animationValueImpl(k));
@@ -3778,18 +4912,23 @@ function animationFinishImpl(path) {
  * animations the control does have, so a typo is one message away from fixed.
  */
 function animatePlayImpl(controlName, animationName) {
+  // A name left out was looked up as the text "undefined", and said so.
+  const given = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  if (!given(controlName)) { addScriptTrace('error', '', 'ce.anim.play: no control name was given.'); return false; }
   const control = controlNamed(controlName);
   if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
   const all = control?._children?.Animations?._children ?? {};
-  const wanted = String(animationName ?? '').toLowerCase();
+  const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+  const have = playable.length
+    ? `Its keyframe animations: ${playable.join(', ')}.`
+    : 'It has no keyframe animations — make one in the Animation tab.';
+  if (!given(animationName)) { addScriptTrace('error', '', `ce.anim.play: no animation name was given. ${have}`); return false; }
+  const wanted = String(animationName).toLowerCase();
   const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);
   const node = key == null ? null : all[key];
   if (!node || String(node.kind ?? '') !== 'keyframes') {
-    const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
     const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${animationName}"`;
-    addScriptTrace('error', '', `ce.anim.play: ${why}. ${playable.length
-      ? `Its keyframe animations: ${playable.join(', ')}.`
-      : 'It has no keyframe animations — make one in the Animation tab.'}`);
+    addScriptTrace('error', '', `ce.anim.play: ${why}. ${have}`);
     return false;
   }
   return requestAnimationPlay(control._children?.Core?.id, String(node.name ?? key));
@@ -3957,6 +5096,98 @@ const DRAW_STYLE_KEYS = [
   'opacity', 'transform', 'clip', 'blend',
 ];
 
+/**
+ * A fill or stroke as the overlay paints it, or undefined after saying why it cannot be painted.
+ *
+ * The overlay hands a string to SVG as it is, so "FF5B9BD5" (the panel's own AARRGGBB, what get()
+ * returns for a colour property and what ce.math.alpha() makes) and a bare "5B9BD5" painted nothing,
+ * and a number painted nothing either. scriptColours.drawColour turns the panel's forms into CSS
+ * and keeps what CSS reads as written; anything else is refused here and `what` stays as it was.
+ */
+function drawPaint(call, what, colour) {
+  const read = drawColour(colour);
+  if ('css' in read) return read.css;
+  addScriptTrace('error', '', `${call}: ${read.why}, so ${what} stays as it was. ${DRAW_COLOUR_FORMS}${read.hint}`);
+  return undefined;
+}
+
+// ce.time's number arguments as the transport reads them (timeWords.js), with one not used as
+// written said once per call and argument: these run on every frame, and a line per frame would
+// bury the console. resetScriptState clears what has been said. A required one left out is
+// rejected, and said every time: it was the default without a word.
+const timeNumberWarned = new Set();
+function timeArg(memberId, name, value) {
+  const { n, said, rejected } = timeNumber(memberId, name, value);
+  if (rejected) {
+    addScriptTrace('error', '', said);
+    return undefined;
+  }
+  const key = `${memberId} ${name}`;
+  if (said && !timeNumberWarned.has(key)) {
+    timeNumberWarned.add(key);
+    addScriptTrace('warn', '', `${said} This is said only the first time.`);
+  }
+  return n;
+}
+
+/** A line said once per key, as timeArg says its numbers. */
+function timeSaid(key, said) {
+  if (timeNumberWarned.has(key)) return;
+  timeNumberWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+
+/** ce.time.tap's times and ce.time.clockTempo's intervals: the numbers above 0 in `value`, or
+ *  undefined after saying that it is no list, or was left out. An item that is not a number above
+ *  0 is left out, and said once: every one of these was done in silence, and a list that was not
+ *  one gave no result as if the taps were too few. */
+function timeList(verb, name, what, value) {
+  if (value === undefined || value === null) {
+    addScriptTrace('error', '', `${verb}: ${name} was not given, so there is no answer.`);
+    return undefined;
+  }
+  if (typeof value !== 'object') {
+    addScriptTrace('error', '', `${verb}: ${name} is ${shownValue(value)}, not a list, so there is no answer.`);
+    return undefined;
+  }
+  const items = Array.isArray(value) ? value : Object.values(value);
+  const out = [];
+  items.forEach((item, i) => {
+    const n = realNumber(item);
+    if (n > 0) { out.push(n); return; }
+    timeSaid(`${verb} ${name}`, `${verb}: ${shownValue(item)} at position ${i + 1} of ${name} is not ${what} above 0, so it was left out.`);
+  });
+  return out;
+}
+
+// What ce.draw.stroke made of a dash, a cap or a join it could not draw as written (drawDash.js),
+// said once per message: a stroke is set on every redraw, and a message per frame would bury the
+// console. resetScriptState clears what has been said.
+const drawStrokeWarned = new Set();
+function warnDrawStroke(problem) {
+  if (drawStrokeWarned.has(problem.message)) return;
+  drawStrokeWarned.add(problem.message);
+  addScriptTrace(problem.severity === 'error' ? 'error' : 'warn', '', `${problem.message} This is said only the first time.`);
+}
+
+// ce.draw.text's alignments, read without regard to case. The app spells centre three ways (ce.text.style
+// says "centred", an image's alignment "center", this call "middle"), and "center" written here used
+// to draw left-aligned without a word. All of them are the middle here.
+const DRAW_TEXT_ALIGNS = {
+  left: 'left', right: 'right', middle: 'middle', center: 'middle', centre: 'middle', centred: 'middle',
+};
+
+/** The alignment a text command carries, or undefined after saying the word is not one. */
+function drawTextAlign(align) {
+  if (align === undefined || align === null || align === '') return 'left';
+  const read = typeof align === 'string' ? DRAW_TEXT_ALIGNS[align.toLowerCase()] : undefined;
+  if (read) return read;
+  const shown = typeof align === 'string' ? `"${align}"` : (typeof align === 'number' ? shownNumber(align) : 'the value given');
+  addScriptTrace('error', '', `ce.draw.text: ${shown} is not an alignment, so nothing was drawn. `
+    + 'The alignments are "left", "middle" (or "center", "centre" or "centred") and "right".');
+  return undefined;
+}
+
 // Gradients get an id because SVG paints them by reference: the overlay defines each one once in
 // <defs> and every shape using it points at that. Per panel rather than per draw pass, so a
 // gradient reused across a redraw does not churn the defs list.
@@ -3970,28 +5201,65 @@ let gradientSeq = 0;
  *  gradient set in the Properties panel run in the same direction, which two conventions would not.
  */
 function drawGradientImpl(stops, angle) {
-  const raw = Array.isArray(stops) ? stops : Object.values(stops ?? {});
+  // Stops left out, not a list, or fewer than two: no gradient, and said. Fewer than two said
+  // nothing (a gradient between one colour and nothing is a colour, and a colour is what the
+  // script got: nothing), and text in place of the list was read letter by letter, so "red" was
+  // three stops, the first of which "is not a colour".
+  const refuseAll = (why) => {
+    addScriptTrace('error', '', `ce.draw.gradient: ${why}, so there is no gradient.`);
+    return undefined;
+  };
+  if (stops === undefined || stops === null) return refuseAll('stops was not given');
+  if (typeof stops !== 'object') return refuseAll(`stops is ${shownValue(stops)}, not a list of colours`);
+  const raw = Array.isArray(stops) ? stops : Object.values(stops);
+  if (raw.length < 2) return refuseAll(`stops has ${raw.length === 0 ? 'no colours' : 'one colour'}, and a gradient needs at least two`);
+  // An angle that is not a number is the default, 180, and said once: it was 180 in silence.
+  const { n: degrees, said: angleSaid } = drawOption('drawGradient', 'angle', angle, 180);
+  drawSaid('drawGradient\u0000angle', angleSaid);
   const list = [];
-  for (const stop of raw) {
+  for (const [i, stop] of raw.entries()) {
     // Two spellings, because two shapes are natural: { at, colour } for a positioned stop, and a
     // bare colour string for "space these evenly", which is what a two-colour fade actually is.
-    const colour = typeof stop === 'string' ? stop : String(stop?.colour ?? stop?.color ?? '');
-    if (!colour) continue;
-    const at = typeof stop === 'string' ? null : Number(stop?.at);
-    list.push({
-      colour,
-      at: Number.isFinite(at) ? Math.min(1, Math.max(0, at)) : null,
-      opacity: Number.isFinite(Number(stop?.opacity)) ? Math.min(1, Math.max(0, Number(stop.opacity))) : 1,
-    });
+    //
+    // A stop that cannot be read refuses the whole gradient, where it used to be dropped or bent:
+    // a colour SVG cannot paint stayed in and painted black, `at = 50` was clamped to 1 (so the
+    // middle stop went to the end), and `opacity = 50` to fully solid. The panel's own colour forms
+    // are turned into CSS, as fill() turns them.
+    const which = `stop ${i + 1} of ${raw.length}`;
+    const refuse = (why, hint = '') => {
+      addScriptTrace('error', '', `ce.draw.gradient: ${why}, so there is no gradient.${hint}`);
+      return undefined;
+    };
+    const object = stop && typeof stop === 'object' ? stop : null;
+    const given = object ? (object.colour ?? object.color) : stop;
+    if (given === undefined || given === null || given === '') {
+      return refuse(`${which} has no colour`, ' A stop is a colour, or { at, colour, opacity }.');
+    }
+    const read = typeof given === 'object' ? { why: 'the colour given is not a colour' } : drawColour(given);
+    if (typeof read.css !== 'string') {
+      return refuse(`in ${which}, ${read.why ?? `"${given}" is not a colour`}`, ` ${DRAW_COLOUR_FORMS}${read.hint ?? ''}`);
+    }
+    let at = null;
+    if (object?.at !== undefined && object?.at !== null) {
+      const problem = unitProblem(`the position (at) of ${which}`, object.at);
+      if (problem) return refuse(problem.why, `${problem.hint}${percentTextHint(object.at)}`);
+      at = realNumber(object.at);
+    }
+    let opacity = 1;
+    if (object?.opacity !== undefined && object?.opacity !== null) {
+      const problem = unitProblem(`the opacity of ${which}`, object.opacity);
+      if (problem) return refuse(problem.why, `${problem.hint}${percentTextHint(object.opacity)}`);
+      opacity = realNumber(object.opacity);
+    }
+    list.push({ colour: read.css, at, opacity });
   }
-  if (list.length < 2) return undefined;   // a gradient between one colour and nothing is a colour
   // Unpositioned stops spread evenly across whatever room the positioned ones left them.
   list.forEach((st, i) => { if (st.at == null) st.at = list.length === 1 ? 0 : i / (list.length - 1); });
   gradientSeq += 1;
   return {
     gradient: true,
     id: `ce-draw-grad-${gradientSeq}`,
-    angle: Number.isFinite(Number(angle)) ? Number(angle) : 180,
+    angle: degrees,
     stops: list,
   };
 }
@@ -4012,8 +5280,34 @@ function drawTarget(explicit, ownerName) {
   return controlNamed(name);
 }
 
-/** Append a command for `target`, with the style in force at this moment baked into it. */
-function pushCommand(explicit, ownerName, command) {
+// A coordinate that is not a number, and a shape that lies wholly outside its control, said once
+// per call (and per argument, or per control), since drawing runs every frame (drawShapes.js).
+// resetScriptState clears it.
+const drawWarned = new Set();
+function drawSaid(key, said) {
+  if (!said || drawWarned.has(key)) return;
+  drawWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+/** A shape's coordinate, read as drawShapes.js reads it, and said when it is not a number. */
+function drawNum(memberId, name, value) {
+  const { n, said } = drawNumber(memberId, name, value);
+  drawSaid(`${memberId}\u0000${name}`, said);
+  return n;
+}
+
+/** True, after saying so, when a shape's required argument is left out (drawShapes' drawMissing):
+ *  it was drawn at 0, or with no text, in silence. */
+function drawRejected(memberId, given) {
+  const said = drawMissing(memberId, given);
+  if (!said) return false;
+  addScriptTrace('error', '', said);
+  return true;
+}
+
+/** Append a command for `target`, with the style in force at this moment baked into it. `memberId`
+ *  names the call, for saying when its shape lies wholly outside the control. */
+function pushCommand(explicit, ownerName, command, memberId = null) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
     addScriptTrace('error', '',
@@ -4021,6 +5315,13 @@ function pushCommand(explicit, ownerName, command) {
     return false;
   }
   const id = control._children.Core.id;
+  // Clipped at the control's box, a shape wholly outside it shows nothing; under a transform, where
+  // it lands is not known here, so nothing is said.
+  if (memberId && !drawState.transform) {
+    const t = control._children.Transform ?? {};
+    const outside = outsideWords(memberId, commandBounds(command), { w: Number(t.width), h: Number(t.height) }, drawState.strokeWidth);
+    drawSaid(`${id}\u0000${memberId}`, outside);
+  }
   const list = drawCommands.get(id) ?? [];
   list.push({
     ...command,
@@ -4050,7 +5351,11 @@ let drawBatchDepth = 0;
 const drawBatchDirty = new Set();
 
 function runDrawBatch(fn) {
-  if (typeof fn !== 'function') return false;
+  if (typeof fn !== 'function') {
+    // Returned false in silence, and the drawing the script meant to batch was never done.
+    addScriptTrace('error', '', `ce.draw.batch: fn is ${shownValue(fn)}, not a function, so nothing ran.`);
+    return false;
+  }
   drawBatchDepth += 1;
   try {
     fn();
@@ -4078,22 +5383,6 @@ function runDrawBatch(fn) {
  * just the special case that computes a lattice, so both share one op and one renderer branch.
  */
 
-/** A flat list of [x1, y1, x2, y2] segments from whatever shape the script passed. */
-function toSegmentList(value) {
-  const out = [];
-  if (!value) return out;
-  const list = Array.isArray(value) ? value : Object.values(value);
-  for (const item of list) {
-    const seg = Array.isArray(item) ? item : (item && typeof item === 'object'
-      ? [item.x1 ?? item[0], item.y1 ?? item[1], item.x2 ?? item[2], item.y2 ?? item[3]]
-      : null);
-    if (!seg) continue;
-    const [a, b, c, d] = seg.map((n) => Number(n));
-    if ([a, b, c, d].every((n) => Number.isFinite(n))) out.push([a, b, c, d]);
-  }
-  return out;
-}
-
 function drawGridImpl(explicit, ownerName, opts) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
@@ -4102,17 +5391,31 @@ function drawGridImpl(explicit, ownerName, opts) {
   }
   const transform = control._children?.Transform ?? {};
   const o = opts && typeof opts === 'object' ? opts : {};
-  const x = Number(o.x ?? 0);
-  const y = Number(o.y ?? 0);
-  const w = Number(o.width ?? (Number(transform.width) || 0) - x);
-  const h = Number(o.height ?? (Number(transform.height) || 0) - y);
+  // The box is read as every shape's numbers are (drawShapes.js): one that is not a number is 0,
+  // a width or height below 0 is 0, each said once. Both drew nothing, in silence.
+  const x = drawNum('drawGrid', 'x', o.x);
+  const y = drawNum('drawGrid', 'y', o.y);
+  const w = o.width === undefined || o.width === null ? (Number(transform.width) || 0) - x : drawNum('drawGrid', 'width', o.width);
+  const h = o.height === undefined || o.height === null ? (Number(transform.height) || 0) - y : drawNum('drawGrid', 'height', o.height);
 
   // Spacing OR counts, because both are the natural way to ask depending on what you know: a step
-  // sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels.
-  const cols = Number(o.columns ?? 0);
-  const rows = Number(o.rows ?? 0);
-  const stepX = cols > 0 ? w / cols : Number(o.stepX ?? o.step ?? 0);
-  const stepY = rows > 0 ? h / rows : Number(o.stepY ?? o.step ?? 0);
+  // sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. A count wins
+  // over a spacing given with it, and says so; a count or a spacing that cannot be used is ignored,
+  // and said (a fraction of a column drew a grid with no closing line, a count of "x" nothing).
+  const count = (name) => { const r = gridCount(name, o[name]); drawSaid(`drawGrid\u0000${name}`, r.said); return r.n; };
+  const step = (name) => { const r = gridStep(name, o[name]); drawSaid(`drawGrid\u0000${name}`, r.said); return r.n; };
+  const cols = count('columns');
+  const rows = count('rows');
+  const stepAcross = o.stepX !== undefined && o.stepX !== null ? 'stepX' : 'step';
+  const stepDown = o.stepY !== undefined && o.stepY !== null ? 'stepY' : 'step';
+  if (cols && o[stepAcross] !== undefined && o[stepAcross] !== null) {
+    drawSaid(`drawGrid\u0000columns+${stepAcross}`, `ce.draw.grid: columns was given, so ${stepAcross} was ignored across.`);
+  }
+  if (rows && o[stepDown] !== undefined && o[stepDown] !== null) {
+    drawSaid(`drawGrid\u0000rows+${stepDown}`, `ce.draw.grid: rows was given, so ${stepDown} was ignored down.`);
+  }
+  const stepX = cols ? w / cols : (step(stepAcross) ?? 0);
+  const stepY = rows ? h / rows : (step(stepDown) ?? 0);
 
   if (!(stepX > 0) && !(stepY > 0)) {
     addScriptTrace('error', '',
@@ -4129,7 +5432,10 @@ function drawGridImpl(explicit, ownerName, opts) {
 }
 
 function drawLinesImpl(explicit, ownerName, value) {
-  const segments = toSegmentList(value);
+  // An item that is not a segment is left out and said once (drawShapes.js): it was left out in
+  // silence.
+  const { segments, said } = segmentList(value);
+  drawSaid('drawLines\u0000segments', said);
   if (!segments.length) {
     addScriptTrace('error', '',
       'ce.draw.lines: no segments. Pass a list of [x1, y1, x2, y2] — one command for all of them, '
@@ -4139,59 +5445,59 @@ function drawLinesImpl(explicit, ownerName, value) {
   return pushCommand(explicit, ownerName, { op: 'segments', segments });
 }
 
+// An item that is not a point is left out, a radius not above 0 is 1.5 and a tension outside 0 to
+// 1 its nearest end, each said once (drawShapes.js): they were done without a word, and a tension
+// that is not a number was NaN, which drew no curve.
 function drawPointsImpl(explicit, ownerName, value, radius) {
-  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
-  const points = [];
-  for (const item of list) {
-    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
-    if (!pair) continue;
-    const [px, py] = pair.map((n) => Number(n));
-    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
-  }
+  const { points, said } = pointList('drawPoints', value);
+  drawSaid('drawPoints\u0000points', said);
   if (!points.length) {
     addScriptTrace('error', '', 'ce.draw.points: no points. Pass a list of [x, y].');
     return false;
   }
-  const r = Number(radius) > 0 ? Number(radius) : 1.5;
-  return pushCommand(explicit, ownerName, { op: 'dots', points, r });
+  const { r, said: radiusSaid } = pointRadius(radius);
+  drawSaid('drawPoints\u0000radius', radiusSaid);
+  return pushCommand(explicit, ownerName, { op: 'dots', points, r }, 'drawPoints');
 }
 
 function drawCurveImpl(explicit, ownerName, value, opts) {
-  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
-  const points = [];
-  for (const item of list) {
-    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
-    if (!pair) continue;
-    const [px, py] = pair.map((n) => Number(n));
-    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
-  }
+  const { points, said } = pointList('drawCurve', value);
+  drawSaid('drawCurve\u0000points', said);
   if (points.length < 2) {
     addScriptTrace('error', '', 'ce.draw.curve: needs at least two points.');
     return false;
   }
   // A curve was inexpressible before: you approximated it with straight segments, which meant a
   // loop, which was the expensive thing. `tension` 0 is a polyline and 1 is fully round.
-  const tension = Math.max(0, Math.min(1, Number(opts?.tension ?? 0.5)));
+  const { t: tension, said: tensionSaid } = curveTension(opts?.tension);
+  drawSaid('drawCurve\u0000tension', tensionSaid);
   return pushCommand(explicit, ownerName, {
     op: 'curve', points, tension, closed: opts?.closed === true,
-  });
+  }, 'drawCurve');
 }
 
 function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
-  const n = Math.max(3, Math.round(Number(sides) || 3));
-  const radius = Number(r) || 0;
-  const x = Number(cx) || 0;
-  const y = Number(cy) || 0;
+  if (drawRejected('drawPolygon', { cx, cy, radius: r, sides })) return false;
+  // Fewer than three sides, a fraction or no number is three, or rounded, and said once
+  // (drawShapes.js): each drew a triangle, or rounded, in silence. So is a rotation that is not a
+  // number, which is 0.
+  const { sides: n, said: sidesSaid } = polygonSides(sides);
+  drawSaid('drawPolygon\u0000sides', sidesSaid);
+  const radius = drawNum('drawPolygon', 'radius', r);
+  const x = drawNum('drawPolygon', 'cx', cx);
+  const y = drawNum('drawPolygon', 'cy', cy);
   // Rotation in the panel's drawing convention: degrees, 0 at twelve o'clock, clockwise — the same
   // one drawArc uses, so a polygon and an arc drawn at the same angle line up.
-  const from = ((Number(opts?.rotation) || 0) - 90) * (Math.PI / 180);
+  const { n: rotation, said: rotationSaid } = drawOption('drawPolygon', 'rotation', opts?.rotation, 0);
+  drawSaid('drawPolygon\u0000rotation', rotationSaid);
+  const from = (rotation - 90) * (Math.PI / 180);
   const points = [];
   for (let i = 0; i < n; i += 1) {
     const a = from + (i * 2 * Math.PI) / n;
     points.push([x + Math.cos(a) * radius, y + Math.sin(a) * radius]);
   }
   // Emitted as an ordinary closed path — no new renderer branch needed for a shape that IS one.
-  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true });
+  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true }, 'drawPolygon');
 }
 
 /**
@@ -4204,10 +5510,19 @@ function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
  * to an estimate rather than pretending. Panel view only either way, like everything in ce.draw.
  */
 function drawMeasureImpl(text, opts) {
-  const str = String(text ?? '');
-  const size = Number(opts?.size) > 0 ? Number(opts.size) : 12;
+  // Text left out measured as "" without a word, and a size or a scale that could not be used was
+  // the default in silence; each is said (drawShapes.js: textSize and pixelScale, as text and
+  // pixelText say them).
+  if (text === undefined || text === null) {
+    addScriptTrace('error', '', 'ce.draw.measure: text was not given, so there is no result.');
+    return undefined;
+  }
+  const str = String(text);
+  const { size, said: sizeSaid } = textSize('drawMeasure', opts?.size);
+  drawSaid('drawMeasure\u0000size', sizeSaid);
   if (opts?.pixel === true) {
-    const scale = Math.max(1, Math.round(Number(opts?.scale) || 1));
+    const { scale, said: scaleSaid } = pixelScale(opts?.scale, 'ce.draw.measure');
+    drawSaid('drawMeasure\u0000scale', scaleSaid);
     // FONT_ADVANCE per character, minus the trailing gap: a string ends at its last lit column.
     return { width: str.length ? str.length * PIXEL_ADVANCE * scale - scale : 0,
              height: PIXEL_FONT_H * scale, exact: true };
@@ -4333,17 +5648,34 @@ function ensureLayerOrder(name, layer) {
   setValue(path, [...order, layer.prefix]);
 }
 
+/** ce.text.style and ce.image.set read their own option keys (image.set in any case, which the
+ *  shared check does not), but an unknown one refuses the whole call as it does everywhere else:
+ *  they used to drop the unknown key alone and apply the rest. True after saying so. */
+function refusedForUnknownOptions(path, memberId, refused, unknownReason) {
+  const keys = refused.filter((p) => p.reason === unknownReason).map((p) => p.option).sort();
+  if (!keys.length) return false;
+  const names = (MEMBER_BY_ID[memberId].params ?? []).find((p) => Array.isArray(p.fields))?.fields.map((f) => f.name) ?? [];
+  addScriptTrace('error', '', unknownOptionsMessage(path, { parent: '', keys, shape: { names, sections: false } }));
+  return true;
+}
+
 function imageSetImpl(target, src, opts) {
   const name = String(target ?? '');
   const layer = resolveImageLayer('set', name, opts?.layer);
   if (!layer) return false;
   if (!imageNode(name, layer)) return imageNeedsNode('set', name, layer) ?? false;
 
-  const { writes, refused } = planImage(layer, src, opts);
+  const { writes, refused, warnings } = planImage(layer, src, opts, { tintColour: (tint) => {
+    const read = panelColour(tint);
+    // The refusal line adds its own full stop.
+    return read.why ? { reason: `${read.why}. ${read.advice.replace(/\.$/, '')}` } : { colour: read.colour };
+  } });
+  if (refusedForUnknownOptions('ce.image.set', 'imageSet', refused, 'not an image option')) return false;
   for (const problem of refused) {
     addScriptTrace('error', '',
       `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
   }
+  for (const warning of warnings) addScriptTrace('warn', '', `ce.image.set("${name}"): ${warning}`);
   if (!writes.length) return false;
 
   let all = true;
@@ -4449,11 +5781,34 @@ function imageIconImpl(target, idOrName, opts) {
     setValue(`${name}.Icon.${field}`, value);
     if (getValue(`${name}.Icon.${field}`) !== value) all = false;
   }
+  let refused = false;
   for (const [key, field] of [['size', 'size'], ['fit', 'fit'], ['tint', 'tint'],
     ['opacity', 'opacity'], ['rotation', 'rotation']]) {
     if (opts?.[key] === undefined) continue;
-    const value = key === 'tint' ? String(opts[key]).replace(/^#/, '') : opts[key];
+    // A tint the panel cannot read used to be stored with its "#" taken off, so "#000" became "000",
+    // which the renderer reads as no tint at all. Read as ce.image.set reads one: a short form is
+    // written out ("#000" is stored as "000000"), and anything else is refused; the other options
+    // are still applied, and the call answers false.
+    let tint;
+    if (key === 'tint') {
+      const read = panelColour(opts.tint);
+      if (read.why) {
+        addScriptTrace('error', '', `ce.image.icon("${name}"): tint refused — ${read.why}. ${read.advice}`);
+        refused = true;
+        continue;
+      }
+      tint = read.colour;
+    }
+    const value = key === 'tint' ? tint.replace(/^#/, '') : opts[key];
     setValue(`${name}.Icon.${field}`, value);
+    // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
+    // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading, and
+    // the number out of 100 only when that lands on this scale (150 out of 100 is still above 1).
+    const amount = Number(value);
+    if (key === 'opacity' && amount > 1) {
+      addScriptTrace('warn', '', `ce.image.icon("${name}"): opacity runs from 0 to 1 here, so ${amount} is `
+        + `fully solid.${percentHint(amount)}`);
+    }
   }
   // A control showing text only draws no icon; the same rule as the editor's icon pickers
   // (utils/iconLayout.js), so the icon this call asked for is seen.
@@ -4462,7 +5817,7 @@ function imageIconImpl(target, idOrName, opts) {
     Text: { content: getValue(`${name}.Text.content`) },
   } });
   if (mode) setValue(`${name}.ContentLayout.mode`, mode);
-  return all;
+  return all && !refused;
 }
 
 function textStyleImpl(target, opts) {
@@ -4474,6 +5829,7 @@ function textStyleImpl(target, opts) {
   const { writes, refused } = planStyle(opts, {
     descriptor: findFont(catalogue, font.family), catalogue,
   });
+  if (refusedForUnknownOptions('ce.text.style', 'textStyle', refused, 'not a style option')) return false;
 
   for (const problem of refused) {
     addScriptTrace('error', '',
@@ -4488,19 +5844,23 @@ function textStyleImpl(target, opts) {
   return all && refused.length === 0;
 }
 
+const textAxisWarned = new Set();   // the controls and axes that have said a number was kept within the axis; resetScriptState clears it
 function textAxisImpl(target, tag, value) {
   const name = String(target ?? '');
   const font = textFontNode(name);
   if (!font) return textNeedsTextSection('axis', name) ?? false;
 
   const descriptor = findFont(textCatalogue(), font.family);
-  const { writes, refused } = planAxis(descriptor, tag, value);
-  for (const problem of refused) {
-    addScriptTrace('error', '',
-      `ce.text.axis("${name}", "${problem.option}"): refused — ${problem.reason}. `
-      + `ce.text.font("${font.family}") reports the axes it has.`);
-  }
+  const { writes, refused, axis, given, used } = planAxis(descriptor, tag, value);
+  for (const problem of refused) addScriptTrace('error', '', axisRefusalWords(name, font.family, problem.option, problem.reason));
   if (!writes.length) return false;
+  // A number the axis does not reach is kept within it, and said once per control and axis: it was
+  // kept within it without a word (textStyle.js).
+  const key = `${name}\u0000${axis.tag}`;
+  if (given !== used && !textAxisWarned.has(key)) {
+    textAxisWarned.add(key);
+    addScriptTrace('warn', '', `${axisClampWords(name, descriptor.family, axis, given, used)} This is said only the first time.`);
+  }
   let all = true;
   for (const write of writes) if (!textApplyWrite(name, write)) all = false;
   return all;
@@ -4662,25 +6022,19 @@ function textFitImpl(target, opts) {
 
 function drawClearImpl(explicit, ownerName) {
   const control = drawTarget(explicit, ownerName);
-  if (!control) return false;
+  if (!control) {
+    // Said, as every shape says it: a name the panel does not have, and no control at all,
+    // returned false in silence.
+    const wanted = explicit != null && String(explicit) !== '' ? String(explicit) : '';
+    addScriptTrace('error', '', wanted
+      ? `ce.draw.clear: no control named "${wanted}".`
+      : 'ce.draw.clear: no control to draw on. Attach the script to a control, or pass a target name.');
+    return false;
+  }
   const id = control._children.Core.id;
   drawCommands.delete(id);
   clearDrawing(id);
   return true;
-}
-
-function toPointList(points) {
-  // A flat { x1, y1, x2, y2, ... } list — the one shape every language expresses the same way: a
-  // Lua table, a JS array, a Python list. An odd trailing value is dropped rather than silently
-  // pairing with a zero.
-  const flat = Array.isArray(points) ? points : Object.values(points ?? {});
-  const out = [];
-  for (let i = 0; i + 1 < flat.length; i += 2) {
-    const x = Number(flat[i]);
-    const y = Number(flat[i + 1]);
-    if (Number.isFinite(x) && Number.isFinite(y)) out.push([x, y]);
-  }
-  return out;
 }
 
 /**
@@ -4723,8 +6077,12 @@ function runDrawPass(control) {
 function drawRedrawImpl(explicit, ownerName) {
   const control = drawTarget(explicit, ownerName);
   if (!control) {
-    addScriptTrace('error', '',
-      'ce.draw.redraw(): no control to redraw. Attach the script to a control, or pass a target name.');
+    // A name the panel does not have was "no control to redraw", which reads as the script's
+    // attachment being wrong when its spelling is.
+    const wanted = explicit != null && String(explicit) !== '' ? String(explicit) : '';
+    addScriptTrace('error', '', wanted
+      ? `ce.draw.redraw: no control named "${wanted}".`
+      : 'ce.draw.redraw(): no control to redraw. Attach the script to a control, or pass a target name.');
     return false;
   }
   return runDrawPass(control);
@@ -4823,8 +6181,45 @@ function uniqueControlName(base) {
   return `${root}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Apply the flat convenience props (name/x/y/width/height) plus any section overrides. */
-function applyControlProps(control, props = {}, scriptId = '') {
+/**
+ * The section overrides in `props` that `control` has a section for, [[section, values]], with
+ * every colour in them read as set() reads a section written whole: a short form written out ("red"
+ * is stored as "#FF0000"), and the script's own table left as it wrote it. Null when one of them is
+ * a colour the panel cannot read, or names a section `control` does not have, or is not a table:
+ * each has been reported, after `call`, and nothing is to be made. A colour used to be stored as
+ * written and painted white, and the other two were passed over without a word.
+ */
+function sectionOverrides(control, props, call, outcome) {
+  const sections = [];
+  let refused = false;
+  for (const [section, values] of Object.entries(props ?? {})) {
+    // A section name the option check let through, as a section of some control, that this control
+    // does not have, or one given as anything but a table of its settings: it used to be passed over
+    // without a word, so the control was made without what the script asked of it. set() refuses a
+    // section a control lacks; create and clone refuse the call, as for an option they do not take.
+    if (SECTION_NAMES.has(section) && !control._children[section]) {
+      addScriptTrace('error', '', `${call}: "${section}" is not a section this control has, so ${outcome}. `
+        + 'ce.panel.info() lists the sections a control has.');
+      refused = true;
+      continue;
+    }
+    if (!control._children[section]) continue;
+    if (typeof values !== 'object' || values == null) {
+      addScriptTrace('error', '', `${call}: "${section}" takes a table of its settings, not ${shownValue(values)}, `
+        + `so ${outcome}.`);
+      refused = true;
+      continue;
+    }
+    const colours = colourWrites(call, outcome, control, section, values, wholePath);
+    if (colours) sections.push([section, colours.value]);
+    else refused = true;
+  }
+  return refused ? null : sections;
+}
+
+/** Apply the flat convenience props (name/x/y/width/height) plus the section overrides. `call`
+ *  begins the warning for a key no section of that shape has (mergeSettings). */
+function applyControlProps(control, props, sections, scriptId, call) {
   const core = control._children.Core;
   const transform = control._children.Transform;
   if (props.name != null) core.name = String(props.name);
@@ -4833,13 +6228,79 @@ function applyControlProps(control, props = {}, scriptId = '') {
   }
   // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
   // script setting one field does not wipe the rest of the section.
-  for (const [section, values] of Object.entries(props)) {
-    if (!control._children[section] || typeof values !== 'object' || values == null) continue;
-    control._children[section] = { ...control._children[section], ...values };
+  for (const [section, values] of sections) {
+    control._children[section] = mergeSettings(control._children[section], values, (path) => addScriptTrace('warn', '',
+      `${call}: "${section}${path}" is a new property on a section with a fixed shape. `
+      + 'It was written, but nothing reads it — check the spelling.'));
   }
   core[GENERATED_KEY] = scriptId || 'script';
   return control;
 }
+
+/**
+ * `values` merged into `node`, a section or one of its children, as a new node: each key is a field
+ * written over the one there, except a key that names a child of `node` with a table as its value,
+ * which is merged into that child the same way, at every depth, keeping the child's other fields.
+ * { Background = { Fill = { colour = "red" } } } changes Background's Fill and nothing else of it.
+ *
+ * A child is one in `node`'s `_children`, or one set() would make there from a template on the way
+ * down a path (the section's template's children, and the optional effect targets: controlTreeUtils
+ * getDefaultChildTemplate), made from that template first. A Fill given beside Background's
+ * `_children` was a field nothing reads, so its colour, read since create began reading colours, had
+ * no effect. `_children` given whole is merged entry by entry for the same reason, rather than
+ * replacing every child with the few it names.
+ *
+ * Children and fields are matched without regard to case, as a set() path is and as the colour
+ * check before this reads them, and written under the document's own spelling: `fill` is Fill and
+ * `Colour` is colour. Matched exactly, a `fill` had its colour read and was then stored as a field
+ * beside Fill that nothing reads. A key that is neither a child nor a field `node` has is written,
+ * as set() writes one, and on a typed node (one with a `_type`, as every section and child the app
+ * makes is) `fresh(path)` is told, for set()'s warning by set()'s own test: nothing reads it. `at` is
+ * where `node` is below the section, for that path.
+ */
+function mergeSettings(node, values, fresh = () => {}, at = '') {
+  const merged = { ...node };
+  const intoChild = (key, value) => {
+    const child = isPlainTable(value) ? childToMerge(merged, key) : undefined;
+    if (!child) return false;
+    merged._children = { ...merged._children, [child.name]: mergeSettings(child.node, value, fresh, `${at}.${child.name}`) };
+    return true;
+  };
+  for (const [key, value] of Object.entries(values)) {
+    if (key === '_children' && isPlainTable(value)) {
+      for (const [name, child] of Object.entries(value)) {
+        if (!intoChild(name, child)) merged._children = { ...merged._children, [name]: child };
+      }
+    } else if (!intoChild(key, value)) {
+      const field = key === '_type' ? key : sameKey(merged, key, (k) => k !== '_children' && k !== '_type');
+      if (field === undefined && typeof merged._type === 'string') fresh(`${at}.${key}`);
+      merged[field ?? key] = value;
+    }
+  }
+  return merged;
+}
+
+/** `object`'s own key spelled like `name` in any case, among those `keep` accepts, or undefined. */
+function sameKey(object, name, keep = () => true) {
+  if (!isPlainTable(object)) return undefined;
+  const lower = String(name).toLowerCase();
+  return Object.keys(object).find((k) => keep(k) && k.toLowerCase() === lower);
+}
+
+/** The child of `node` called `name` in any case, as `{ name, node }` under its own spelling: the
+ *  one there, or a copy of the template set() would make it from (a Fill's effect targets are made
+ *  with the `_children` they go in); or undefined. */
+function childToMerge(node, name) {
+  const children = node?._children;
+  const own = sameKey(children, name);
+  if (own !== undefined) return isPlainTable(children[own]) ? { name: own, node: children[own] } : undefined;
+  const type = node?._type;
+  const made = sameKey(SECTION_DEFAULTS[type]?._children, name) ?? MADE_CHILDREN[type]?.[String(name).toLowerCase()];
+  const template = made !== undefined ? getDefaultChildTemplate(type, made) : undefined;
+  return isPlainTable(template) ? { name: made, node: deepClone(template) } : undefined;
+}
+
+const isPlainTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 function panelCreateImpl(type, props, scriptId) {
   const typeName = String(type ?? '');
@@ -4852,7 +6313,11 @@ function panelCreateImpl(type, props, scriptId) {
   try { control = createControl(typeName); }
   catch (e) { addScriptTrace('error', '', `ce.panel.create("${typeName}"): ${e?.message ?? e}`); return null; }
 
-  applyControlProps(control, props ?? {}, scriptId);
+  // The new control's own sections type its props, so a colour in them is read before anything is
+  // made: one the panel cannot read means no control, and the panel is as it was.
+  const sections = sectionOverrides(control, props, `ce.panel.create("${typeName}")`, 'nothing was created');
+  if (!sections) return null;
+  applyControlProps(control, props ?? {}, sections, scriptId, `ce.panel.create("${typeName}")`);
   control._children.Core.name = uniqueControlName(control._children.Core.name);
 
   const parentName = props?.parent ? String(props.parent) : null;
@@ -4876,7 +6341,10 @@ function panelCloneImpl(name, props, scriptId) {
   if (!source) { addScriptTrace('error', '', `ce.panel.clone: no control named "${name}".`); return null; }
 
   const copy = remintControlIds(source);
-  applyControlProps(copy, props ?? {}, scriptId);
+  // Only what the script passes is read: the source's own colours are stored already.
+  const sections = sectionOverrides(copy, props, `ce.panel.clone("${name}")`, 'nothing was copied');
+  if (!sections) return null;
+  applyControlProps(copy, props ?? {}, sections, scriptId, `ce.panel.clone("${name}")`);
   if (props?.name == null) copy._children.Core.name = `${source._children.Core.name}_copy`;
   copy._children.Core.name = uniqueControlName(copy._children.Core.name);
   // A clone lands beside its source by default: in the same container, not at the top level.
@@ -4947,8 +6415,52 @@ function controlSummary(control, controls) {
   };
 }
 
+// What ce.panel.find filters on, and what each takes. A key it did not know used to filter nothing,
+// so { Type = "Knob" }, { kind = "Knob" } and { generated = "true" } all answered with every control
+// on the panel, which a script then went on to change.
+const FIND_FILTERS = { name: 'string', type: 'string', generated: 'boolean', parent: 'string' };
+const FIND_TAKES = { string: 'text', boolean: 'true or false' };
+
+/** How a find query's value reads in its refusal. A panel verb, so it runs in this runtime only,
+ *  and can tell a table from a list where shownValue, held to the preludes' words, cannot. */
+function shownQueryValue(v) {
+  if (typeof v === 'string') return `"${v}"`;
+  if (v === undefined || v === null) return 'nothing';
+  if (typeof v === 'object') return Array.isArray(v) ? 'a list' : 'a table';
+  return String(v);
+}
+
+/** Why a find query cannot be answered, or null. */
+function findQueryProblem(query) {
+  const filters = `Its filters are: ${Object.keys(FIND_FILTERS).join(', ')}.`;
+  if (query == null || typeof query === 'string') return null;
+  // A Lua list, { "Knob" }, arrives as { 1: "Knob" }: it is a list, not a filter called "1".
+  const queryKeys = isOptionsTable(query) ? Object.keys(query) : [];
+  const listQuery = queryKeys.length > 0 && queryKeys.every((key) => LIST_KEY.test(key));
+  if (!isOptionsTable(query) || listQuery) {
+    return `the query is ${listQuery ? 'a list' : shownQueryValue(query)}, not part of a name or a table of filters, so nothing was found. ${filters}`;
+  }
+  const unknown = Object.keys(query).filter((key) => !(key in FIND_FILTERS));
+  if (unknown.length) {
+    const quoted = andList(unknown.map((key) => `"${key}"`));
+    return `${quoted} ${unknown.length === 1 ? 'is not one of its filters' : 'are not among its filters'}, `
+      + `so nothing was found. ${filters}`;
+  }
+  for (const [key, type] of Object.entries(FIND_FILTERS)) {
+    const v = query[key];
+    if (v === undefined || v === null || typeof v === type) continue;
+    return `${key} takes ${FIND_TAKES[type]}, not ${shownQueryValue(v)}, so nothing was found.`;
+  }
+  return null;
+}
+
 function panelFindImpl(query) {
   const controls = activePanel()?.controls ?? [];
+  const problem = findQueryProblem(query);
+  if (problem) {
+    addScriptTrace('error', '', `ce.panel.find: ${problem}`);
+    return [];
+  }
   const q = typeof query === 'string' ? { name: query } : (query ?? {});
   return flatControls(controls)
     .map((c) => ({ control: c, info: controlSummary(c, controls) }))
@@ -5065,95 +6577,60 @@ function panelApplyPatches(transforms, patches) {
   return updateControls((controls) => apply(controls)) ? resolved.size : 0;
 }
 
-const ALIGN_EDGES = ['left', 'hCenter', 'right', 'top', 'vCenter', 'bottom'];
-
-function panelAlignImpl(names, edge, opts) {
-  const which = String(edge ?? '');
-  if (!ALIGN_EDGES.includes(which)) {
-    addScriptTrace('error', '',
-      `ce.panel.align: "${edge}" is not an edge. One of: ${ALIGN_EDGES.join(', ')}.`);
+// The words each arrangement verb takes, and its sentence for one it does not, are layoutWords.js's,
+// which the Values tab reads too; what each verb then moves, and what of its options it refuses, is
+// arrangementPlan's (utils/arrangement.js), which the Values tab draws.
+function panelArrange(memberId, transforms, which, opts) {
+  const plan = arrangementPlan(memberId, transforms, which, opts);
+  if (plan.refused) {
+    addScriptTrace('error', '', plan.refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'align');
-  if (!transforms.length) return 0;
-  // The reference is the group's own bounds, or one named control — "align these to that one",
-  // which is what the canvas calls a key object.
-  const keyName = opts?.to != null ? String(opts.to) : null;
-  const key = keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null;
-  if (keyName && !key) addScriptTrace('error', '', `ce.panel.align: "${keyName}" is not one of the names given.`);
-  const ref = key ? { x: key.x, y: key.y, width: key.width, height: key.height } : boundsOf(transforms);
-  const patches = new Map();
-  for (const t of transforms) {
-    const patch = alignPatch(t, which, ref);
-    if (patch) patches.set(t.id, patch);
-  }
-  return panelApplyPatches(transforms, patches);
+  return panelApplyPatches(transforms, plan.patches);
 }
 
-const DISTRIBUTE_WHAT = ['leftEdges', 'hCenters', 'rightEdges', 'topEdges', 'vCenters',
-                         'bottomEdges', 'hSpacing', 'vSpacing'];
-
-function panelDistributeImpl(names, what, opts) {
-  const which = String(what ?? '');
-  if (!DISTRIBUTE_WHAT.includes(which)) {
-    addScriptTrace('error', '',
-      `ce.panel.distribute: "${what}" is not something to spread. One of: ${DISTRIBUTE_WHAT.join(', ')}.`);
+function panelAlignImpl(names, edge, opts) {
+  const { which, refused } = layoutWord('panelAlign', edge);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'distribute');
-  if (transforms.length < 2) return 0;
-  const gap = Number(opts?.gap);
-  return panelApplyPatches(transforms, distributePatches(
-    transforms, which, Number.isFinite(gap) ? gap : null, opts?.align === true));
+  return panelArrange('panelAlign', panelTransforms(names, 'align'), which, opts);
+}
+
+function panelDistributeImpl(names, what, opts) {
+  const { which, refused } = layoutWord('panelDistribute', what);
+  if (refused) {
+    addScriptTrace('error', '', refused);
+    return 0;
+  }
+  return panelArrange('panelDistribute', panelTransforms(names, 'distribute'), which, opts);
 }
 
 function panelMatchImpl(names, what, opts) {
-  const which = String(what ?? 'both');
-  if (!['width', 'height', 'both'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.match: "${what}" is not width, height or both.`);
+  const { which, refused } = layoutWord('panelMatch', what);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'match');
-  if (transforms.length < 2) return 0;
-  // The first name is the reference unless one is named, which is the canvas's rule too.
-  const keyName = opts?.to != null ? String(opts.to) : null;
-  const key = (keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null) ?? transforms[0];
-  const patches = new Map();
-  for (const t of transforms) {
-    if (t.id === key.id) continue;                       // the reference does not resize itself
-    patches.set(t.id, matchPatch(key, which));
-  }
-  return panelApplyPatches(transforms, patches);
+  return panelArrange('panelMatch', panelTransforms(names, 'match'), which, opts);
 }
 
 function panelGridImpl(names, opts) {
-  const transforms = panelTransforms(names, 'grid');
-  if (transforms.length < 2) return 0;
-  return panelApplyPatches(transforms, gridPatches(
-    transforms,
-    Number.isFinite(Number(opts?.columns)) ? Number(opts.columns) : 3,
-    Number.isFinite(Number(opts?.gapX)) ? Number(opts.gapX) : 10,
-    Number.isFinite(Number(opts?.gapY)) ? Number(opts.gapY) : 10));
+  return panelArrange('panelGrid', panelTransforms(names, 'grid'), null, opts);
 }
 
 function panelCircleImpl(names, opts) {
-  const transforms = panelTransforms(names, 'circle');
-  if (transforms.length < 2) return 0;
-  return panelApplyPatches(transforms, circlePatches(
-    transforms,
-    Number.isFinite(Number(opts?.radius)) ? Number(opts.radius) : 100,
-    Number.isFinite(Number(opts?.startAngle)) ? Number(opts.startAngle) : 0));
+  return panelArrange('panelCircle', panelTransforms(names, 'circle'), null, opts);
 }
 
 function panelFlipImpl(names, axis) {
-  const which = String(axis ?? 'horizontal');
-  if (!['horizontal', 'vertical'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.flip: "${axis}" is not horizontal or vertical.`);
+  const { which, refused } = layoutWord('panelFlip', axis);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
-  const transforms = panelTransforms(names, 'flip');
-  if (transforms.length < 2) return 0;
-  return panelApplyPatches(transforms, flipPatches(transforms, which));
+  return panelArrange('panelFlip', panelTransforms(names, 'flip'), which, undefined);
 }
 
 /**
@@ -5182,9 +6659,9 @@ function panelRectImpl(names) {
  * moving something to the front of a container it is not in is not a thing.
  */
 function panelOrderImpl(names, where) {
-  const which = String(where ?? '');
-  if (!['front', 'forward', 'backward', 'back'].includes(which)) {
-    addScriptTrace('error', '', `ce.panel.order: "${where}" is not front, forward, backward or back.`);
+  const { which, refused } = layoutWord('panelOrder', where);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return 0;
   }
   const wanted = new Set(panelTransforms(names, 'order').map((t) => t.id));
@@ -5359,6 +6836,136 @@ const COLLECTION_TEMPLATES = {
     }),
 };
 
+/* What define takes in a spec, section by section.
+ *
+ * A spec key no entry of the section has was stored as written and read by nothing:
+ * define("k", "States", "Warn", { wen = { hover = true } }) made a state with no condition, which is
+ * a state that always applies, and { durration = 400 } made a 120 ms animation. So a key the section
+ * does not take refuses the whole call, as an unknown option refuses any other (applyOptionChecks):
+ * nothing is defined, define answers false, and the console names every such key, sorted, and lists
+ * what the section takes, in the same words.
+ *
+ * What a section takes is read off the entry the app makes for it, so a field added there is a
+ * field define accepts: the templates above for a state and an animation (both kinds), the entry
+ * baselines the saved format holds bindings, grab areas, value channels and behaviours against
+ * (stores/documentEntries.js) together with the functions that make a new one, and the editors'
+ * own Add for a part, a generator, a link and a variant (utils/customComponentFactory.js). An
+ * entry's `_type` is always taken and never listed: it is how an entry says what it is.
+ *
+ * `extra` is what the readers read beyond those, each because a new entry has no reason to carry
+ * it: an option that only one mode or kind uses, an older spelling still read, or something only
+ * the app's own generated entries carry. Each is named with the reader that reads it.
+ *
+ * `nested` names the fields whose own keys are checked too, one level down, from the template's
+ * value: a state's patches holds two maps, by name. Every other value is a script's to fill (a
+ * state's `when`, a binding's enumMap, a part's sections), as an option's value is elsewhere.
+ *
+ * A key is matched exactly, capitals included, where the section and the entry name are matched as
+ * paths are: the key is stored as written and read by its exact name, so { When = … } would sit
+ * beside an empty `when`. */
+const DEFINE_SPECS = {
+  States: {
+    templates: [COLLECTION_TEMPLATES.States('')],
+    // The compound condition evaluateState reads beside `when` (utils/interactionRuntime.js).
+    extra: ['rule'],
+    nested: ['patches'],
+  },
+  Animations: {
+    templates: [COLLECTION_TEMPLATES.Animations('', {}), COLLECTION_TEMPLATES.Animations('', { kind: 'keyframes' })],
+    // A keyframe animation's playing (utils/keyframeAnimation.js readKeyframes, keyframePlayer.js),
+    // and the curve of the "custom" easing and the feel of "spring" (utils/easing.js readEasing).
+    // The Animation tab writes all six.
+    extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring'],
+  },
+  Bindings: {
+    templates: [ENTRY_BASELINES.Bindings],
+    // mapMode "format" and "template" (utils/interactionRuntime.js resolveBindingValue); the app's
+    // own readouts are format bindings (utils/customComponentFactory.js).
+    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template'],
+  },
+  Parts: {
+    templates: [createPartNode('')],
+    // What the slider family's renderer reads off a part, and the control-set designs write
+    // (editor/SliderFamilyRenderer.svelte), and the marks of a generated part and of one detached
+    // from its generator (utils/customComponentMaterializer.js, the designer surface).
+    extra: ['shadow', 'glow', 'sheen', 'slot', 'inset', 'grooveColour', 'plateColour',
+      'generated', 'detachedFromGenerator', 'locked'],
+  },
+  ValueChannels: {
+    // An array channel's size, items and itemFields come from its own maker.
+    templates: [ENTRY_BASELINES.ValueChannels, createValueChannel(''), createArrayChannel('', { itemFields: {} })],
+    // An enum channel's choices, and `constraint`, the older spelling of constraints, still read
+    // in its place (utils/customComponentInteraction.js).
+    extra: ['values', 'options', 'constraint'],
+  },
+  Behaviors: {
+    templates: [ENTRY_BASELINES.Behaviors, createBehaviorModule('')],
+    // How an XY or rotary drag feels and where its centre is, set in the Behaviors editor; the
+    // second channel of an XY behaviour, in both its spellings; and the slider part a behaviour
+    // drives (utils/customComponentInteraction.js).
+    extra: ['combine', 'invertX', 'invertY', 'weightX', 'weightY', 'increaseAngle', 'dragSensitivity',
+      'centerX', 'centerY', 'targetValueChannelY', 'targetYValueChannel', 'part'],
+  },
+  HitZones: {
+    templates: [ENTRY_BASELINES.HitZones, createHitZone('', { payload: {} })],
+    // The older spellings of the X and Y channels, still read in their place; the probe position a
+    // zone without a payload is tried at (utils/customComponentInteraction.js); and the marks of a
+    // generated zone and of one detached from its generator (utils/customComponentMaterializer.js).
+    extra: ['targetXValueChannel', 'targetYValueChannel', 'probeNormalized', 'probeYNormalized',
+      'generated', 'detachedFromGenerator'],
+  },
+  Generators: {
+    templates: [createGenerator('')],
+    // A new generator draws ticks; each other type reads its own (utils/customComponentMaterializer.js),
+    // and the app's starters write them (utils/customComponentFactory.js). `rect` is bounds' older
+    // spelling, `scrollChannel` valueSource's and `size` ledSize's, each still read in its place.
+    extra: ['zIndex', 'bounds', 'rect', 'targetValueChannel', 'targetValueChannelY', 'targetYValueChannel',
+      'valueSource', 'scrollChannel', 'activationMode', 'labels', 'values', 'min', 'max', 'precision',
+      'suffix', 'baseNote', 'startAngle', 'endAngle', 'radius', 'gap', 'fontSize', 'ledSize', 'size',
+      'minBarHeight', 'colour', 'activeColour', 'inactiveColour', 'activeBorderColour',
+      'inactiveBorderColour', 'inactiveOpacity', 'assetName'],
+  },
+  Links: {
+    templates: [createLink('')],
+    // A new link is a map; each other type reads its own, `map`, `offset`, `whenTrue` and `whenFalse`
+    // being older spellings of cases, amount, trueValue and falseValue still read in their place
+    // (utils/customComponentInteraction.js applyCustomLinks). A route to another control's port
+    // names it, in either spelling, and carries what it was made from
+    // (utils/panelCustomComponentLinks.js createPanelCustomRouteLink).
+    extra: ['value', 'amount', 'offset', 'cases', 'map', 'inputMin', 'inputMax', 'outputMin', 'outputMax',
+      'min', 'max', 'clamp', 'round', 'invert', 'trueValue', 'falseValue', 'whenTrue', 'whenFalse',
+      'targetControlId', 'targetComponentId', 'targetPort', 'targetInput', 'routeMeta'],
+  },
+  Variants: {
+    templates: [createVariant('')],
+    extra: [],
+  },
+};
+
+/** Each section's spec as the check of option keys reads it (unknownOptionKeys): the names in the
+ *  templates' order, then the extras, and the nested ones from the template's own value. */
+const DEFINE_SPEC_SHAPES = Object.fromEntries(Object.entries(DEFINE_SPECS).map(([section, spec]) => {
+  const names = [...new Set([...spec.templates.flatMap((t) => Object.keys(t)), ...spec.extra])]
+    .filter((key) => key !== '_type');
+  const nested = {};
+  for (const field of spec.nested ?? []) {
+    const inner = spec.templates.find((t) => isOptionsTable(t[field]))?.[field];
+    nested[field] = { names: Object.keys(inner ?? {}), nested: {}, sections: false };
+  }
+  return [section, { names, nested, sections: false }];
+}));
+
+/** The console's lines for a spec holding keys its section does not take, or none. */
+function defineSpecProblems(call, section, spec) {
+  const keys = Object.fromEntries(Object.entries(spec).filter(([key]) => key !== '_type'));
+  return unknownOptionKeys(keys, DEFINE_SPEC_SHAPES[section]).map((group) => unknownOptionsMessage(call, group));
+}
+
+/** For the tests: what define takes in a spec, by section, in the order a refusal lists it. */
+export function defineSpecFieldsForTesting() {
+  return Object.fromEntries(Object.entries(DEFINE_SPEC_SHAPES).map(([section, shape]) => [section, [...shape.names]]));
+}
+
 /** Resolve (control, section) with the section name matched case-insensitively, as paths are. */
 function collectionNode(controlName, section, verb) {
   const control = controlNamed(controlName);
@@ -5395,7 +7002,7 @@ function panelEntryImpl(controlName, section, name) {
  * define(control, section, name, spec) — create an entry, or replace one that is there.
  *
  * The spec is MERGED over the section's template rather than used as-is, so
- * `define("k", "States", "Warn", { when = { valueGreaterThan = 0.9 } })` produces a state that
+ * `define("k", "States", "Held", { when = { pressed = true } })` produces a state that
  * actually works. Hand-writing `_type`, `patches.component` and `patches.parts` every time is how
  * a verb like this ends up unused.
  */
@@ -5410,6 +7017,11 @@ function panelDefineImpl(controlName, section, name, spec) {
   }
 
   const given = spec && typeof spec === 'object' && !Array.isArray(spec) ? spec : {};
+  const problems = defineSpecProblems(`ce.panel.define("${controlName}", "${found.key}", "${key}")`, found.key, given);
+  if (problems.length) {
+    for (const line of problems) addScriptTrace('error', '', line);
+    return false;
+  }
   const template = COLLECTION_TEMPLATES[found.key]?.(key, given) ?? { _type: found.key.replace(/s$/, '') };
   const entry = { ...template, ...given, name: given.name ?? key };
   // One level of merge for the nested shapes a template carries, so a spec that names only
@@ -5472,30 +7084,99 @@ function panelPatchImpl(controlName, stateName, patch, part) {
   const entries = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : null;
   if (!entries) { addScriptTrace('error', '', 'ce.panel.patch(control, state, patch): patch must be a table of path -> value'); return 0; }
 
+  // A colour is read as set() reads it: a short form is written out ("red" is stored as "#FF0000"),
+  // and one the panel cannot read is refused, and the whole patch with it. Asked before the loop
+  // below writes into the state, so a refused patch leaves the state as it was. Each key is a path
+  // on the control, or on the part the patch is for.
+  const patchRoot = part == null || part === ''
+    ? found.control : found.control?._children?.Parts?._children?.[String(part)];
+  let refusedColour = false;
+  const written = [];
+  for (const [path, value] of Object.entries(entries)) {
+    const colours = colourWrites(`ce.panel.patch("${controlName}", "${stateName}")`, 'nothing was patched',
+      patchRoot, String(path), value, wholePath);
+    if (colours) written.push([path, colours.value]);
+    else refusedColour = true;
+  }
+  if (refusedColour) return 0;
+
   const state = kids[key];
   const target = String(part ?? '');
+  // The keys are paths into the control, or into the part a part patch names. A part the control
+  // does not have was stored anyway, and the renderer skips a part it cannot find.
+  const partNames = Object.keys(found.control._children?.Parts?._children ?? {});
+  const partKey = target ? partNames.find((p) => p.toLowerCase() === target.toLowerCase()) : null;
+  if (target && partKey == null) {
+    addScriptTrace('error', '',
+      `ce.panel.patch: "${controlName}" has no part called "${target}", so nothing was applied. `
+      + (partNames.length ? `Its parts are ${partNames.join(', ')}.` : 'It has no parts.'));
+    return 0;
+  }
+  const node = partKey != null ? found.control._children.Parts._children[partKey] : found.control;
+  const owner = partKey != null ? `part "${partKey}"` : `"${controlName}"`;
+
+  // Each key is checked before anything is written, and only what lands is counted. A misspelled
+  // key or a nested table used to be stored as written and counted, so the call answered 1 for a
+  // change the panel never showed.
+  const applied = [];
+  const entriesList = written;
+  for (const [path, value] of entriesList) {
+    const where = patchKeyPath(node, String(path), value, owner);
+    if (where.why) {
+      addScriptTrace('error', '', `ce.panel.patch("${controlName}", "${key}"): ${where.why}, so it was not applied.`);
+      continue;
+    }
+    applied.push([where.path, value]);
+  }
+  if (!applied.length) return 0;
+
   const base = state.patches ?? (state.patches = { component: {}, parts: {} });
   let map;
-  if (target) {
+  if (partKey != null) {
     base.parts ??= {};
-    base.parts[target] ??= {};
-    map = base.parts[target];
+    base.parts[partKey] ??= {};
+    map = base.parts[partKey];
   } else {
     base.component ??= {};
     map = base.component;
   }
-
-  let n = 0;
-  for (const [path, value] of Object.entries(entries)) {
-    map[String(path)] = value;
-    n += 1;
-  }
+  for (const [path, value] of applied) map[path] = value;
   // Written back through the same door every structure write uses, so the editor store and the
   // player host both see it — mutating the node in place would move the object and not the panel.
   writeControlProperty(found.control, `States.${key}.patches`, base);
+  const n = applied.length;
   addScriptTrace('log', '',
-    `ce.panel.patch ${controlName}.${key}${target ? `.parts.${target}` : ''}: ${n} key(s)`);
+    `ce.panel.patch ${controlName}.${key}${partKey != null ? `.parts.${partKey}` : ''}: `
+    + (n === entriesList.length ? plural(n, 'key') : `${n} of ${plural(entriesList.length, 'key')} applied`));
   return n;
+}
+
+/**
+ * Where one patch key leads on `node` (the control, or one of its parts): `{ path }`, the key with
+ * the node's own capitals, which is how the renderer looks it up (setTreeValueAtPath walks exact
+ * keys); or `{ why }` it leads nowhere. Matched without regard to capitals, as every path is.
+ *
+ * Refused: a path that reaches nothing, a section rather than one setting in it (which is what a
+ * nested table is: `{ Background = { Fill = … } }` is one key, "Background", and would have replaced
+ * the whole section in that state), and a property its section's type does not have. A path through
+ * a section nobody has edited yet (an effect's) is checked against its template.
+ */
+function patchKeyPath(node, path, value, owner) {
+  const segs = path.split('.');
+  const real = walkCaseInsensitive(node, segs);
+  if (real != null) {
+    const at = valueAtPath(node, real);
+    if (at && typeof at === 'object' && !Array.isArray(at) && (at._type !== undefined || at._children !== undefined)) {
+      return { why: `"${path}" is a section, not one setting in it. Name each setting by its whole path, such as "Background.Fill.colour"` };
+    }
+    return { path: real };
+  }
+  if (segs.length > 1) {
+    const probe = probeNestedWrite(node, path, value);
+    if (probe.writes && !(probe.fresh && probe.typed)) return { path };
+    if (probe.writes) return { why: `"${path}" is not a property of its section on ${owner}` };
+  }
+  return { why: `"${path}" does not lead anywhere on ${owner}` };
 }
 
 /**
@@ -5587,9 +7268,61 @@ function clearTimerHandle(key) {
   timers.delete(key);
 }
 
+/* An interval or a delay a script got wrong is refused, in the words every prelude uses.
+ *
+ * startTimer(id, "fast"), startTimer(id) and startTimer(id, -100) all became `Number(ms) || 0`, a
+ * timer firing every millisecond here and every 5 in the player, which is a script flooding the
+ * panel because of a typo. after("1s", fn) ran at once. A repeating interval has to be a number
+ * above 0; a one-shot's delay a number from 0, where 0 is "as soon as the handler has returned",
+ * the way setTimeout(fn, 0) is read. A number is a number: "250" is text, and is refused like any
+ * text, because two of the four runtimes could not read it and the other two read "" as 0.
+ *
+ * `call` names the call, `unit` is "milliseconds" or "beats", and `outcome` is what did not happen.
+ * Returns true when it refused. */
+function timeRefused(call, value, { unit, what, positive, outcome }) {
+  let why = null;
+  if (value === undefined || value === null) why = `no ${what} was given`;
+  else if (typeof value === 'string') why = `"${value}" is not a number of ${unit}`;
+  else if (typeof value !== 'number') why = `the ${what} is not a number of ${unit}`;
+  else if (!Number.isFinite(value)) why = `the ${what} is not a finite number of ${unit}`;
+  else if (positive && value <= 0) why = `${value} is not more than 0 ${unit}`;
+  else if (!positive && value < 0) why = `${value} is less than 0 ${unit}`;
+  if (why === null) return false;
+  addScriptTrace('error', '', `${call}: ${why}, so ${outcome}.`);
+  return true;
+}
+
+/* A number of beats, or a division's name, which is the other way a musical length is written
+ * ("1/16" is a quarter of a beat): syncTimer("step", "1/16") was 1 ms and afterBeats("1/4", fn) ran
+ * at once, and the name has one meaning, so it is read. Any case, as divisionId reads it. Anything
+ * else is refused by timeRefused. */
+function beatsOf(call, value, { positive, outcome }) {
+  if (typeof value === 'string') {
+    const id = DIVISION_NAMES.find((d) => d.toLowerCase() === value.toLowerCase());
+    if (id !== undefined) return DIVISIONS[id];
+    addScriptTrace('error', '', `${call}: "${value}" is neither a number of beats nor a division, `
+      + `so ${outcome}. The divisions are ${DIVISION_NAMES.join(', ')}.`);
+    return undefined;
+  }
+  return timeRefused(call, value, { unit: 'beats', what: 'number of beats', positive, outcome })
+    ? undefined : value;
+}
+
+/** startTimer as a script calls it: the interval checked, then armed. */
 function startTimer(id, ms) {
   const key = String(id ?? '');
-  if (!key) return;
+  if (!key) {
+    // Started nothing, in silence.
+    addScriptTrace('error', '', 'ce.time.startTimer: no id was given, so no timer was started.');
+    return;
+  }
+  if (timeRefused(`ce.time.startTimer("${key}")`, ms,
+    { unit: 'milliseconds', what: 'interval', positive: true, outcome: 'no timer was started' })) return;
+  armTimer(key, ms);
+}
+
+/** Start or re-time a timer whose interval the caller has already checked or worked out. */
+function armTimer(key, ms) {
   const period = Math.max(1, Math.round(Number(ms) || 0));
   clearTimerHandle(key);
   // An explicit millisecond interval REPLACES a musical one — startTimer over a sync timer is a
@@ -5605,6 +7338,11 @@ function startTimer(id, ms) {
 
 function stopTimer(id) {
   const key = String(id ?? '');
+  if (!key) {
+    // Stopped nothing, in silence; an id that is not running is not a mistake, no id is.
+    addScriptTrace('error', '', 'ce.time.stopTimer: no id was given, so nothing was stopped.');
+    return;
+  }
   syncFollowers.delete(key);
   clearTimerHandle(key);
 }
@@ -5623,9 +7361,9 @@ function stopTimer(id) {
 let afterSeq = 0;
 const afterCallbacks = new Map();   // timer id -> the function to run once
 
-function afterFor(scriptId, ms, fn) {
+function afterFor(scriptId, ms, fn, verb = 'ce.time.after') {
   if (typeof fn !== 'function') {
-    addScriptTrace('error', scriptId ?? '', 'after(ms, fn) needs a function to run — nothing was scheduled');
+    addScriptTrace('error', scriptId ?? '', `${verb}: fn is ${shownValue(fn)}, not a function, so nothing was scheduled.`);
     return undefined;
   }
   afterSeq += 1;
@@ -5633,8 +7371,17 @@ function afterFor(scriptId, ms, fn) {
   // The owner is stored with the callback so a throw inside it is reported against the script that
   // scheduled it. By the time it fires there is no dispatch in progress to infer that from.
   afterCallbacks.set(id, { fn, scriptId: scriptId ?? '' });
-  startTimer(id, ms);
+  armTimer(id, ms);
   return id;
+}
+
+/** after as a script calls it. afterFor itself stays unchecked: sendNote's duration and
+    requestDump's timeout work out their own delays. */
+function afterRead(scriptId, ms, fn) {
+  if (typeof fn !== 'function') return afterFor(scriptId, ms, fn);   // its own message
+  if (timeRefused('ce.time.after', ms,
+    { unit: 'milliseconds', what: 'delay', positive: false, outcome: 'nothing was scheduled' })) return undefined;
+  return afterFor(scriptId, ms, fn);
 }
 
 /** Schedule a one-shot the runtime owns, rather than one a script asked for. Used by sendNote's
@@ -5701,16 +7448,21 @@ function transportInfoRead() {
 const tempoRead = () => transportSnapshot().bpm;
 const isPlayingRead = () => transportSnapshot().playing;
 
+// A bpm that is not above 0, or not a number, is the transport's tempo, and says so (timeArg).
 function beatsToMsRead(beats, bpm) {
-  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  const b = timeArg('beatsToMs', 'beats', beats);
+  if (b === undefined) return undefined;
+  const rate = timeArg('beatsToMs', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
-  return (Number(beats) || 0) * 60000 / rate;
+  return b * 60000 / rate;
 }
 
 function msToBeatsRead(ms, bpm) {
-  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  const m = timeArg('msToBeats', 'ms', ms);
+  if (m === undefined) return undefined;
+  const rate = timeArg('msToBeats', 'bpm', bpm) ?? tempoRead();
   if (!rate || rate <= 0) return null;
-  return (Number(ms) || 0) * rate / 60000;
+  return m * rate / 60000;
 }
 
 /**
@@ -5727,17 +7479,25 @@ function msToBeatsRead(ms, bpm) {
  */
 function syncTimerRead(id, beats, opts) {
   const key = String(id ?? '');
-  const ms = beatsToMsRead(beats);
+  if (!key) {
+    // Started a timer called "", in silence.
+    addScriptTrace('error', '', 'ce.time.syncTimer: no id was given, so no timer was started.');
+    return;
+  }
+  const length = beatsOf(`ce.time.syncTimer("${key}")`, beats, { positive: true, outcome: 'no timer was started' });
+  if (length === undefined) return;
+  const ms = beatsToMsRead(length);
   if (ms == null) {
-    addScriptTrace('log', '',
-      `syncTimer("${id}"): no tempo is being reported, so there is no interval to compute. `
+    // An error, as every rejection is: it was a plain line, and the call did nothing.
+    addScriptTrace('error', '',
+      `ce.time.syncTimer("${key}"): no tempo is being reported, so no timer was started. `
       + 'Use startTimer with a millisecond interval, or wait for onTransport.');
     return;
   }
-  startTimer(key, Math.round(ms));            // clears any previous follow…
+  armTimer(key, Math.round(ms));              // clears any previous follow…
   const follow = !(opts && opts.follow === false);
   if (!follow) return;
-  syncFollowers.set(key, Number(beats) || 0);  // …and this puts it back on purpose
+  syncFollowers.set(key, length);             // …and this puts it back on purpose
   watchTempoForSyncTimers();
 }
 
@@ -5756,7 +7516,7 @@ function reArmSyncTimers() {
   for (const [key, beats] of [...syncFollowers]) {
     const ms = beatsToMsRead(beats);
     if (ms == null) continue;                 // no tempo any more: leave it running at the last one
-    startTimer(key, Math.round(ms));
+    armTimer(key, Math.round(ms));
     syncFollowers.set(key, beats);
   }
 }
@@ -5782,10 +7542,14 @@ function watchTempoForSyncTimers() {
  * says so rather than firing immediately.
  */
 function afterBeatsFor(scriptId, beats, fn) {
-  const ms = beatsToMsRead(beats);
+  // fn first, in this call's name: it was said as after's, after the delay was read.
+  if (typeof fn !== 'function') return afterFor(scriptId, 0, fn, 'ce.time.afterBeats');
+  const length = beatsOf('ce.time.afterBeats', beats, { positive: false, outcome: 'nothing was scheduled' });
+  if (length === undefined) return undefined;
+  const ms = beatsToMsRead(length);
   if (ms == null) {
-    addScriptTrace('log', scriptId ?? '',
-      'afterBeats(): no tempo is being reported, so there is no delay to compute. '
+    addScriptTrace('error', scriptId ?? '',
+      'ce.time.afterBeats: no tempo is being reported, so nothing was scheduled. '
       + 'Use after() with milliseconds, or wait for onTransport.');
     return undefined;
   }
@@ -5816,12 +7580,22 @@ function runningTimersRead() {
 // call is complete — which is the best a synchronous verb can do over an asynchronous source, and
 // far better than returning an empty list that looks like "this synth has no parameters".
 
-const parameterRequests = new Set();   // profileIds we have already asked for, to not spam the bridge
 const deviceSourceCache = new Map();
 
 function roleMapping(role) {
   const mappings = get(deviceRoleMappings) ?? {};
   return mappings[role] ?? mappings[DEFAULT_ROLE] ?? null;
+}
+
+/**
+ * The mapping a role has of its OWN, or null. profile, variables, timing, coverage, recipes and
+ * requests answer from it, as the plug-in answers them, from the role's own session record. They
+ * answered from roleMapping, which falls back to the main synth, so a role nothing is mapped to read
+ * as the main synth window-open and as nothing window-closed. parameter() and parameters() still
+ * fall back, in both: the plug-in's engine does (DeviceProfileService::engineForRole).
+ */
+function ownRoleMapping(role) {
+  return (get(deviceRoleMappings) ?? {})[role] ?? null;
 }
 
 /**
@@ -5832,8 +7606,8 @@ function roleMapping(role) {
  * document: what variables the recipes interpolate, what the profile claims it can do, what
  * messages it can build.
  */
-function deviceProfileSource(role = DEFAULT_ROLE) {
-  const profileId = roleMapping(role)?.profileId;
+function deviceProfileSource(role = DEFAULT_ROLE, { own = false } = {}) {
+  const profileId = (own ? ownRoleMapping(role) : roleMapping(role))?.profileId;
   if (!profileId) return null;
   const text = (get(profileSources) ?? {})[profileId]?.source ?? '';
   if (!text) return null;
@@ -5855,8 +7629,8 @@ function deviceProfileSource(role = DEFAULT_ROLE) {
  * of the same synth must be able to sit on different device ids without editing it.
  */
 function deviceVariablesRead(role = DEFAULT_ROLE) {
-  const profile = deviceProfileSource(role);
-  const mapping = roleMapping(role);
+  const profile = deviceProfileSource(role, { own: true });
+  const mapping = ownRoleMapping(role);
   if (!profile && !mapping) return null;
   return {
     ...(profile?.variables && typeof profile.variables === 'object' ? profile.variables : {}),
@@ -5865,8 +7639,8 @@ function deviceVariablesRead(role = DEFAULT_ROLE) {
 }
 
 function deviceTimingRead(role = DEFAULT_ROLE) {
-  const profile = deviceProfileSource(role);
-  const mapping = roleMapping(role);
+  const profile = deviceProfileSource(role, { own: true });
+  const mapping = ownRoleMapping(role);
   if (!profile && !mapping) return null;
   return {
     ...(profile?.timing && typeof profile.timing === 'object' ? profile.timing : {}),
@@ -5874,24 +7648,38 @@ function deviceTimingRead(role = DEFAULT_ROLE) {
   };
 }
 
-/** One override written onto the role mapping, through the app's own writer so it persists. */
-function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
+/**
+ * One override written onto the role mapping, through the app's own writer so it persists.
+ *
+ * The role's OWN mapping, not roleMapping's: a read of a role nothing is mapped to takes the main
+ * synth's profile, and this took it too, and wrote it back as a new mapping for that role, so a
+ * misspelt role became a second device on the main synth's profile. It is refused, as the plug-in
+ * refuses it, and both say so in deviceWords.js's words, as they say a value used as the nearest
+ * whole number in range, once per name.
+ */
+const deviceOverrideWarned = new Set();   // label, role and name of each override that has said so; resetScriptState clears it
+function deviceOverrideWrite(kind, name, value, role) {
+  const { label, min, max } = DEVICE_OVERRIDES[kind];
   const key = String(name ?? '').trim();
   if (!key) {
-    addScriptTrace('error', '', `ce.device.${label}: a name is required.`);
+    addScriptTrace('error', '', deviceSetNoNameWords(label));
     return false;
   }
-  const mapping = roleMapping(role);
+  const mapping = (get(deviceRoleMappings) ?? {})[role];
   if (!mapping?.profileId) {
-    addScriptTrace('error', '', `ce.device.${label}: no device profile is mapped to "${role}".`);
+    addScriptTrace('error', '', deviceSetNoProfileWords(label, role));
     return false;
   }
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    addScriptTrace('error', '', `ce.device.${label}("${key}"): needs a number.`);
+  const { n: next, refused, said } = deviceOverrideValue(label, key, value, min, max);
+  if (refused) {
+    addScriptTrace('error', '', refused);
     return false;
   }
-  const next = Math.min(max, Math.max(min, Math.round(n)));
+  const warnedAs = `${label}\u0000${role}\u0000${key}`;
+  if (said && !deviceOverrideWarned.has(warnedAs)) {
+    deviceOverrideWarned.add(warnedAs);
+    addScriptTrace('warn', '', `${said} This is said only the first time.`);
+  }
   const current = (mapping[kind] && typeof mapping[kind] === 'object' ? mapping[kind] : {});
   if (current[key] === next) {
     addScriptTrace('log', '', `ce.device.${label}("${key}", ${next}) — already that way`);
@@ -5912,7 +7700,7 @@ function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
  * about; the ones that mean "no" are spelled that way.
  */
 function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
-  const coverage = deviceProfileSource(role)?.coverage;
+  const coverage = deviceProfileSource(role, { own: true })?.coverage;
   if (!coverage || typeof coverage !== 'object') return feature ? undefined : null;
   if (feature === undefined || feature === null || feature === '') return { ...coverage };
   const wanted = String(feature);
@@ -5922,18 +7710,18 @@ function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
 
 /** The ids of the messages a profile can build, and of the requests it can send. */
 function deviceListRead(role, field) {
-  const list = deviceProfileSource(role)?.[field];
+  const list = deviceProfileSource(role, { own: true })?.[field];
   if (!Array.isArray(list)) return [];
   return list.map((entry) => String(entry?.id ?? '')).filter(Boolean);
 }
 
 function deviceProfileRead(role = DEFAULT_ROLE) {
-  const mapping = roleMapping(role);
+  const mapping = ownRoleMapping(role);
   const profileId = mapping?.profileId;
   if (!profileId) return null;
   const listed = (get(deviceProfiles) ?? []).find((p) => String(p?.id) === String(profileId)) ?? null;
   const session = (get(deviceSessionState) ?? {})[role] ?? null;
-  const source = deviceProfileSource(role);
+  const source = deviceProfileSource(role, { own: true });
   return {
     id: profileId,
     name: listed?.name ?? profileId,
@@ -5994,6 +7782,26 @@ function deviceValueWrite(id, value, role) {
     sendRawMidi(encoded.bytes, `param_${key}`);
     return true;
   }
+  // A parameter the profile does not have is refused, once the profile's whole table is in: nothing
+  // is sent, the answer is false, and the console says so in the words the plug-in says it in
+  // (deviceWords.js). It was logged as written and answered true, and the host's "Not sent" went to
+  // the MIDI preview, which no script reads; the plug-in answered false without a word. While the
+  // table is on its way, the write goes to the host as it did, which drops what it cannot encode.
+  // With no profile chosen there is nothing to encode it, and that is said the same way. The role's
+  // OWN mapping: a send takes no other (deviceMidiOps resolveParameterSend, and the plug-in's
+  // service), so a role nothing is mapped to has no profile here, where a read takes the main
+  // synth's (roleMapping).
+  const profileId = get(deviceRoleMappings)?.[role]?.profileId;
+  if (!profileId) {
+    addScriptTrace('error', '', deviceWriteNoProfileWords(key, role));
+    return false;
+  }
+  const table = parameterTable(profileId);
+  if (!table) requestParameterTable(profileId, role);
+  else if (!table.some((p) => String(p?.id ?? '') === key)) {
+    addScriptTrace('error', '', deviceWriteUnknownWords(key, role));
+    return false;
+  }
   if (!isJuceAvailable()) {
     addScriptTrace('error', '',
       `deviceWrite(${JSON.stringify(key)}) needs the device host — encoding a parameter is the device `
@@ -6020,17 +7828,18 @@ function deviceParametersRead(opts = {}) {
 
   let fromProfile = [];
   if (profileId) {
-    const cached = (get(profileParameters) ?? {})[profileId];
-    if (Array.isArray(cached) && cached.length) {
-      fromProfile = cached;
+    // The profile's whole table (stores/deviceParameterTable.js). This read used the Device
+    // Profile Designer's page, which is 160 parameters by default and what the Designer's search
+    // matched, and asked for it with one object where the request takes the id and the role, so a
+    // profile the Designer had not listed was never loaded at all.
+    const table = parameterTable(profileId);
+    if (table) {
+      fromProfile = table;
     } else {
-      // Cold cache. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
+      // Cold. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
       // different thing from "this synth has no parameters", and a script that cannot tell them
       // apart will draw the wrong conclusion silently.
-      if (!parameterRequests.has(profileId)) {
-        parameterRequests.add(profileId);
-        try { refreshProfileParameters({ profileId, deviceRole: role }); } catch { /* no bridge */ }
-      }
+      requestParameterTable(profileId, role);
       addScriptTrace('log', '',
         `deviceParameters(): the parameter table for "${profileId}" has not been loaded yet — `
         + 'requesting it now. Call again from a later handler (onTimer is the usual place). '
@@ -6073,9 +7882,6 @@ function deviceParameterRead(id, role = DEFAULT_ROLE) {
   return all.find((p) => String(p?.id) === wanted) ?? null;
 }
 
-/** Forget which profiles we have asked for — used when the device session is torn down. */
-export function resetDeviceReadCache() { parameterRequests.clear(); }
-
 /* ------------------------------------------------- ce.device: declaring what the app does not know */
 // Everything above READS a device profile the app was shipped with. That is a hard ceiling: a panel
 // can only address a synth somebody already wrote a profile for, which excludes most of what is
@@ -6091,6 +7897,7 @@ function deviceDefineParameterImpl(id, spec, role) {
   if (!result.ok) { addScriptTrace('error', '', result.error); return false; }
   const p = result.parameter;
   addScriptTrace('log', '', `defineParameter ${p.id} — ${p.name} (${p.type}, ${p.min}..${p.max})`);
+  if (result.warning) addScriptTrace('warn', '', result.warning);
   return true;
 }
 
@@ -6120,7 +7927,7 @@ function deviceDefineDumpImpl(kind, spec, role) {
  * plugin runs this runtime in its OPEN window, so a panel-view-only verb still has a host.
  */
 function writeControlProperty(control, path, value) {
-  if (host) { host.writeValue(control, path, value); return; }
+  if (host) { host.writeValue(control, path, value); noteHostWrite(path); return; }
   noteEditorScriptTouchedControl(control?._children?.Core?.id);
   writeEditorControlProperty(control, path, value);
 }
@@ -6143,13 +7950,18 @@ function deviceBindImpl(controlName, parameterId, opts = {}) {
   // The profile is only consulted when there IS one. Asking otherwise would emit "no profile is
   // mapped" from the read — true, and completely beside the point when the panel is deliberately
   // driving a synth that has none.
-  const known = hasDefinedParameter(role, key)
-    || (roleMapping(role)?.profileId ? deviceParameterRead(key, role) != null : false);
-  if (!known) {
-    addScriptTrace('log', '',
-      `bind("${name}", "${key}"): neither the profile nor this panel's declarations know "${key}" yet. `
-      + 'The binding is made anyway — it works if the parameter arrives — but check the id if the control stays dead.');
-  }
+  //
+  // The profile's knowledge is its whole table (stores/deviceParameterTable.js), asked for here when
+  // it is not in. Asked of the Designer's page instead, this named parameters the profile has; before
+  // the table arrives nothing knows the id yet, which is what the notice says.
+  // The role's OWN profile, as for a write: the binding's every move is sent to its role and no
+  // other (deviceMidiOps resolveParameterSend), so a role nothing is mapped to knows no id but a
+  // declared one, though a read of it takes the main synth's profile.
+  const profileId = get(deviceRoleMappings)?.[role]?.profileId;
+  const table = profileId ? parameterTable(profileId) : null;
+  if (profileId && !table) requestParameterTable(profileId, role);
+  const known = hasDefinedParameter(role, key) || Boolean(table?.some((p) => String(p?.id ?? '') === key));
+  if (!known) addScriptTrace('log', '', deviceBindUnknownWords(name, key));
 
   const port = String(opts?.port ?? 'value');
   const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)
@@ -6339,6 +8151,8 @@ function recallPresetImpl(slot, opts = {}) {
 
   const profile = deviceProfileSource(role);
   if (!profile) {
+    // It answered with this and said nothing; the plug-in says the same (presetWords.js).
+    addScriptTrace('error', '', recallNoProfileWords(number, role));
     return { ok: false, error: `No device profile for role "${role}".`, slot: number };
   }
 
@@ -6367,13 +8181,17 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
 
   if (typeof fn === 'function') {
     const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
-    const waiter = { kind: key, fn, scriptId, timerId: null, done: false };
+    // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
+    // so that is what the callback waits for, in every runtime; waiting for the request's own id,
+    // it heard only the timeout.
+    const waitFor = requestAnswer(role, key) ?? key;
+    const waiter = { kind: waitFor, fn, scriptId, timerId: null, done: false };
     dumpWaiters.push(waiter);
     // A one-shot the RUNTIME owns rather than one the script asked for, so a script cannot cancel
     // somebody else's timeout by id, and stopAllTimers on panel close takes it with the panel.
     waiter.timerId = scheduleOneShot(ms, () => {
       if (waiter.done) return;
-      resolveDumpWaiters(key, role, undefined, `no dump arrived within ${ms}ms`);
+      resolveDumpWaiters(waitFor, role, undefined, `no dump arrived within ${ms}ms`);
     });
   }
 
@@ -6391,6 +8209,11 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
     return true;
   }
 
+  const refused = dumpKindRefusal('requestDump', key, { requests: true });
+  if (refused) {
+    addScriptTrace('error', '', refused);
+    return false;
+  }
   if (isJuceAvailable()) {
     startDeviceSync({ deviceRole: role, request: key });
     addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) → device sync requested`);
@@ -6398,6 +8221,29 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   }
   addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) — no device host`);
   return false;
+}
+
+/** The dump a request of the role's profile answers with, or null (the plug-in's "answers" query). */
+function requestAnswer(role, kind) {
+  const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
+  const dump = String(request?.response?.dump ?? request?.expectedDump ?? '');
+  return dump || null;
+}
+
+/**
+ * What requestDump, sendDump and buildDump say of a kind the main synth's profile has no dump by
+ * (deviceWords.js), or null: for no kind, a dump the script declared, one the profile defines (or,
+ * for requestDump, a request it can send), and while the profile's document has not arrived, when
+ * the host is the one to know.
+ */
+function dumpKindRefusal(verb, kind, { requests = false, outcome } = {}) {
+  const key = String(kind ?? '');
+  if (!key || hasDefinedDump(DEFAULT_ROLE, key)) return null;
+  const profile = deviceProfileSource(DEFAULT_ROLE);
+  if (!profile) return null;
+  const known = profileDumpKinds(profile);
+  if (known.dumps.includes(key) || (requests && known.requests.includes(key))) return null;
+  return dumpKindUnknownWords(verb, key, DEFAULT_ROLE, known.dumps, outcome);
 }
 
 /** Drop every runtime declaration. Called wherever generated controls are cleared, for the same
@@ -6420,8 +8266,9 @@ export function clearDeviceRuntimeDefinitions() {
 // C++ engines that falls out of the per-script environment for free, and here it falls out of the
 // handler cache, so both behave the same. Settings outlive the session: they go into the panel
 // document under scripting.settings, which is what makes them travel with the panel and survive an
-// export. In the player the document is in memory, so they last the session and ride along in the
-// DAW state the plugin already saves.
+// export. In the player they are the plug-in instance's, which saves them with the DAW project (see
+// the scopes below). This said they rode along in the DAW state from the document in memory; nothing
+// carried them there, and a setting saved with the window open was gone when the project reopened.
 
 const scriptState = new Map();   // scriptId -> the script's own scratch table
 
@@ -6445,6 +8292,11 @@ function stateFor(scriptId) {
  *
  * script scope is a key prefix rather than a second store on purpose: a private setting should
  * persist and travel exactly like a shared one, and only its visibility differs.
+ *
+ * In the exported plug-in both stores are the instance's own, and two copies of a panel keep theirs
+ * apart: the instance saves them with the DAW project ("local" under this machine's id, applied on
+ * no other) and the page reads and writes them through the host (playerScriptHost.js,
+ * createInstanceStorage), so the window open and the window closed see one store.
  */
 const STORAGE_SCOPES = ['panel', 'script', 'local'];
 const LOCAL_STORAGE_PREFIX = 'ce.storage:';
@@ -6454,14 +8306,33 @@ const LOCAL_STORAGE_PREFIX = 'ce.storage:';
  *  Refusing rather than falling back to "panel": storing a value in a scope the caller did not ask
  *  for is how a private setting quietly becomes a shared one, and a typo in a scope name would be
  *  the way it happened. Every verb below bails on nothing.
+ *
+ *  A typo in the KEY is the same leak by another door, and it used to walk straight through:
+ *  `saveSetting(k, v, { scop = "script" })` has no `scope`, so it was "panel", and another script
+ *  read the value. So an options table with any key but `scope` is refused too, in the words every
+ *  other member's unknown key is refused in (applyOptionChecks), which leaves these to say it
+ *  here. The keys are sorted, so the four runtimes, whose tables keep different orders, say the
+ *  same words. A key that is a number is a list entry, as everywhere else, and is left alone.
+ *
+ *  `verb` is the call's namespaced path, ce.storage.saveSetting and so on.
  */
-function storageScopeOf(opts, scriptId) {
+function storageScopeOf(opts, scriptId, verb) {
+  if (isOptionsTable(opts)) {
+    const unknown = Object.keys(opts).filter((key) => key !== 'scope' && !LIST_KEY.test(key)).sort();
+    if (unknown.length) {
+      const quoted = andList(unknown.map((key) => `"${key}"`));
+      addScriptTrace('error', scriptId ?? '', unknown.length === 1
+        ? `${verb}: ${quoted} is not one of its options, so nothing was done. Its only option is scope.`
+        : `${verb}: ${quoted} are not among its options, so nothing was done. Its only option is scope.`);
+      return undefined;
+    }
+  }
   const raw = typeof opts === 'string' ? opts : opts?.scope;
   if (raw == null || raw === '') return 'panel';
   const scope = String(raw);
   if (STORAGE_SCOPES.includes(scope)) return scope;
   addScriptTrace('error', scriptId ?? '',
-    `ce.storage: "${scope}" is not a scope. One of: ${STORAGE_SCOPES.join(', ')}.`);
+    `${verb}: "${scope}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
   return undefined;
 }
 
@@ -6488,6 +8359,8 @@ function storageKeyFrom(scope, stored, scriptId) {
 }
 
 function settingsStore() {
+  // The plug-in instance's own store, window open in the player (playerScriptHost.js).
+  if (host?.storage) return host.storage.read('panel');
   const panel = activePanel();
   if (!panel) return null;
   panel.scripting ??= {};
@@ -6504,6 +8377,7 @@ function localStore() {
 }
 
 function localRead() {
+  if (host?.storage) return host.storage.read('local');
   const store = localStore();
   if (!store) return null;
   const panel = activePanel();
@@ -6520,9 +8394,11 @@ function localWrite(map) {
 }
 
 function saveSetting(key, value, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.saveSetting');
   if (!scope) return false;
   const stored = storageKeyFor(scope, key, scriptId);
+  // In the player, both scopes are the instance's, and every write goes back to it.
+  if (host?.storage) return host.storage.write(scope === 'local' ? 'local' : 'panel', stored, value);
   if (scope === 'local') {
     const map = localRead();
     if (!map) {
@@ -6546,7 +8422,7 @@ function saveSetting(key, value, opts, scriptId) {
 }
 
 function loadSetting(key, fallback, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.loadSetting');
   if (!scope) return fallback;
   const stored = storageKeyFor(scope, key, scriptId);
   const source = scope === 'local' ? localRead() : settingsStore();
@@ -6557,7 +8433,7 @@ function loadSetting(key, fallback, opts, scriptId) {
 /** Every key this panel has saved IN THIS SCOPE. Empty means nothing written — not "settings
  *  unavailable", which is what info() is for. */
 function listSettings(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.settings');
   if (!scope) return [];
   const source = (scope === 'local' ? localRead() : settingsStore()) ?? {};
   return Object.keys(source)
@@ -6568,7 +8444,7 @@ function listSettings(opts, scriptId) {
 /** Every setting as a table — the read every other module got, instead of listing keys and looping
  *  to fetch each one. */
 function allSettings(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.all');
   if (!scope) return {};
   const source = (scope === 'local' ? localRead() : settingsStore()) ?? {};
   const out = {};
@@ -6582,9 +8458,10 @@ function allSettings(opts, scriptId) {
 /** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing
  *  there" — the distinction the whole module keeps. */
 function forgetSetting(key, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.forget');
   if (!scope) return false;
   const stored = storageKeyFor(scope, key, scriptId);
+  if (host?.storage) return host.storage.forget(scope === 'local' ? 'local' : 'panel', stored);
   if (scope === 'local') {
     const map = localRead();
     if (!map || !(stored in map)) return false;
@@ -6600,7 +8477,7 @@ function forgetSetting(key, opts, scriptId) {
 /** Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
  *  keys alone: "clear my settings" must not mean "clear everybody's". */
 function clearSettings(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.clear');
   if (!scope) return 0;
   const keys = listSettings(opts, scriptId);
   let gone = 0;
@@ -6617,7 +8494,7 @@ function clearSettings(opts, scriptId) {
  * scope will not stick, which is a thing to say once rather than discover per key.
  */
 function storageInfo(opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId);
+  const scope = storageScopeOf(opts, scriptId, 'ce.storage.info');
   if (!scope) return undefined;
   const source = scope === 'local' ? localRead() : settingsStore();
   const contents = allSettings(opts, scriptId);
@@ -6696,18 +8573,140 @@ function decodeJson(text) {
   } catch { return undefined; }
 }
 
+/* --------------------------------------------------------- reading what a script passed */
+
+/** An options table, rather than a list, a typed array, text or nothing. */
+function isOptionsTable(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && !ArrayBuffer.isView(value);
+}
+
+// A key that is a number is a list entry: wasmoon hands a Lua list over as an object with keys
+// "1", "2", …, and a list is not a table of options or filters, whatever argument it arrived in.
+const LIST_KEY = /^\d+$/;
+
+/* ------------------------------------------------------- option keys a call does not take
+ * An options table is the one argument where a mistake cannot show. `{ easing = "outBack" }` on
+ * ce.anim.to moved in a straight line, `{ time = 800 }` took 300 ms, `{ onDone = fn }` never ran,
+ * ce.draw.transform({ rotation = 45 }) turned nothing because the option is `rotate`, and a NRPN
+ * declared with `{ mbs = 1 }` sent MSB 0. Every one of those calls succeeded.
+ *
+ * So every call is checked against the fields panelApi.js lists for that member's options
+ * (optionChecks), here where the functions are handed to scripts rather than inside each one: one
+ * check, driven by the contract, so a field the contract gains is a field the check accepts. A key
+ * that is not listed REFUSES the call: nothing is done, the console says which keys and lists the
+ * options the member has, and the call answers what the member answers for any other refusal
+ * (refusalOf). The owner decided that over the warning this used to be: a call that runs without
+ * an option it was given has not done what it was asked.
+ *
+ * The C++ engines' preludes carry the same check, generated from the same lists by
+ * tools/scripts/gen-script-modules.mjs, in the same words, so a panel cannot work in the exported
+ * plug-in and refuse here, or the other way round; scriptPreludeAgreement.test.js holds them to it.
+ * The keys are named sorted, because a Lua table and a Python dict keep no order a message could
+ * follow, and the groups come own options first, then each option's own, in the contract's order.
+ *
+ * What is not a mistake, and is not checked:
+ *  · a key that is a number. wasmoon hands a Lua list over as an object with keys "1", "2", …, and
+ *    a list is not an options table, whatever argument it arrived in.
+ *  · anything inside an option's value, unless the contract lists that option's own fields (a
+ *    NRPN's msb and lsb): a curve's four numbers, a SysEx template, a state's `when`.
+ *  · a section name where `<section>` is listed: ce.panel.create's and clone's props.
+ *  · a member whose options list no fields. The contract does not say what it takes, so nothing
+ *    here can say what it does not.
+ *  · the members that check their own keys, in words of their own (MEMBERS_CHECKING_OWN_OPTIONS).
+ */
+
+/** The section names a control can carry: what a `<section>` field accepts. */
+const SECTION_NAMES = new Set(Object.keys(SECTION_DEFAULTS));
+
+/** Member id -> { path, refusal, callback, params: [{ index, shape }] }, from the contract. */
+const OPTION_CHECKS = new Map(optionChecks().map((check) => [check.id, {
+  ...check,
+  // Where 'unanswered' finds the callback it calls with nothing: dialog's onChoice, and so on.
+  callback: (MEMBER_BY_ID[check.id].params ?? []).findIndex((p) => p.type === 'function'),
+}]));
+
+/** The keys `opts` holds that `shape` does not list, as groups: its own first, then those inside
+ *  each option that lists fields of its own, in the contract's order. Each group's keys sorted. */
+function unknownOptionKeys(opts, shape, parent = '', out = []) {
+  const unknown = Object.keys(opts).filter((key) => !LIST_KEY.test(key) && !shape.names.includes(key)
+    && !(shape.sections && SECTION_NAMES.has(key))).sort();
+  if (unknown.length) out.push({ parent, keys: unknown, shape });
+  for (const name of shape.names) {
+    const inner = shape.nested[name];
+    if (inner && Object.hasOwn(opts, name) && isOptionsTable(opts[name])) {
+      unknownOptionKeys(opts[name], inner, parent ? `${parent}.${name}` : name, out);
+    }
+  }
+  return out;
+}
+
+/** What a refused call answers, by the kinds panelApi.js's REFUSAL_ANSWERS names. */
+function refusedAnswer({ refusal, callback }, lines, args) {
+  switch (refusal) {
+    case 'false': return false;
+    case 'zero': return 0;
+    case 'empty list': return [];
+    case 'result': return { ok: false, error: lines.join(' ') };
+    case 'unanswered': {
+      // False from dialog, prompt and choose means the callback has already run with no answer, so
+      // a script waiting on it never has to wonder whether it still might. It runs inside the
+      // script's own call, so a throw from it is the calling handler's, reported as that is.
+      const fn = args[callback];
+      if (typeof fn === 'function') fn(undefined);
+      return false;
+    }
+    default: return undefined;
+  }
+}
+
+// One wrapper per function, so a function every script shares (checksum, panic, encodeJson) stays
+// one function, as the approval guard needs it to be.
+const optionCheckers = new WeakMap();
+
+function withOptionCheck(fn, check) {
+  let checked = optionCheckers.get(fn);
+  if (!checked) {
+    checked = function checkedOptions(...args) {
+      const lines = [];
+      for (const { index, shape } of check.params) {
+        if (!isOptionsTable(args[index])) continue;
+        for (const group of unknownOptionKeys(args[index], shape)) lines.push(unknownOptionsMessage(check.path, group));
+      }
+      if (!lines.length) return fn.apply(this, args);
+      for (const line of lines) addScriptTrace('error', '', line);
+      return refusedAnswer(check, lines, args);
+    };
+    optionCheckers.set(fn, checked);
+  }
+  return checked;
+}
+
+/** Put the check in front of every member whose options the contract lists. */
+function applyOptionChecks(flat) {
+  for (const [memberId, check] of OPTION_CHECKS) {
+    if (typeof flat[memberId] === 'function') flat[memberId] = withOptionCheck(flat[memberId], check);
+  }
+}
+
+/** For the tests: the members whose option keys are checked, by namespaced path. */
+export function optionCheckedMembersForTesting() {
+  return [...OPTION_CHECKS.values()].map((c) => c.path).sort();
+}
+
 // @module -
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const self = {
-    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
-    get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form),
+    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
+      typeof form === 'string' || isOptionsTable(form) ? form : ''),
+    get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form, true),
   };
   const api = {
-    // The third argument is the value form for the second-argument spelling. `set` also takes an
-    // opts object in that position in the contract; only a string is read as a form, so
-    // set(path, v, { transmit: false }) is unaffected.
-    set: (path, value, form) => setValue(path, value, typeof form === 'string' ? form : ''),
-    get: (path, form) => getValue(path, form),
+    // The third argument is the value form for the second-argument spelling, or the contract's opts
+    // object: setValue reads a string as a form and an object as opts. This passed '' for an
+    // object, so set(path, v, { transmit = false }) was accepted and its `transmit` never reached
+    // the write, in the editor only: the player's host has always read it.
+    set: (path, value, form) => setValue(path, value, typeof form === 'string' || isOptionsTable(form) ? form : ''),
+    get: (path, form) => getValue(path, form, true),
     log: (msg, val) => scriptPrint('log', scriptId, msg, val),
     // Levels the console already renders differently — the runtime uses the distinction constantly
     // and a script could not, so a real failure read exactly like a debug print.
@@ -6755,7 +8754,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     defineAction: (name, fn) => defineActionImpl(scriptId, name, fn),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
-    after: (ms, fn) => afterFor(scriptId, ms, fn),
+    after: (ms, fn) => afterRead(scriptId, ms, fn),
     // ce.anim — values that move over time
     animateTo: (path, target, opts) => startAnimationImpl(scriptId, 'to', path, target, opts ?? {}),
     animateSpring: (path, target, opts) => startAnimationImpl(scriptId, 'spring', path, target, opts ?? {}),
@@ -6776,72 +8775,123 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     uiStatus: (message, opts) => uiStatusImpl(message, opts),
     uiState: () => uiStateImpl(),
     uiCopy: (text) => uiCopyImpl(scriptId, text),
-    uiDialog: (opts, onChoice) => uiDialogImpl(scriptId, opts, onChoice),
     // prompt and choose are dialog() with a different SHAPE of question — one modal at a time,
-    // one callback contract, one teardown, whatever is being asked.
+    // one callback contract, one teardown, whatever is being asked. Each names its own shape after
+    // the script's options, dialog included: `ask` is how these three tell the store apart, not an
+    // option of any of them, so a script's `ask` is refused as an unknown key, never obeyed.
+    uiDialog: (opts, onChoice) => uiDialogImpl(scriptId,
+      isOptionsTable(opts) ? { ...opts, ask: 'choice' } : opts, onChoice),
     uiPrompt: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'text' }, onAnswer),
     uiChoose: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'list' }, onAnswer),
     // ce.draw — immediate-mode drawing on top of a control
     drawClear: (target) => drawClearImpl(target, ownerName),
     // A gradient is an OBJECT, so fill/stroke pass it through rather than stringifying it — the
-    // overlay turns it into the url(#…) reference SVG needs.
+    // overlay turns it into the url(#…) reference SVG needs. A colour is read by drawPaint: the
+    // panel's own forms become CSS, and what SVG could not paint is refused with the style unchanged.
     drawFill: (colour) => {
-      drawState.fill = colour == null ? null : (typeof colour === 'object' ? colour : String(colour));
+      const paint = drawPaint('ce.draw.fill', 'the fill', colour);
+      if (paint !== undefined) drawState.fill = paint;
     },
     drawStroke: (colour, width, opts) => {
-      drawState.stroke = colour == null ? null : (typeof colour === 'object' ? colour : String(colour));
-      drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
+      const paint = drawPaint('ce.draw.stroke', 'the stroke', colour);
+      if (paint === undefined) return;
+      drawState.stroke = paint;
+      // A width that is not a number above 0 is 1, and said once: it was 1 in silence. Text that
+      // is a number is read as one, as every drawing number is (realNumber).
+      const w = realNumber(width);
+      if (width !== undefined && width !== null && !(w > 0)) {
+        warnDrawStroke({ severity: 'warning', message: `ce.draw.stroke: the width is ${shownValue(width)}, not a number above 0, so 1 is drawn.` });
+      }
+      drawState.strokeWidth = w > 0 ? w : 1;
       // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
       // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
-      // probe link) are "3 3" and "2 3".
-      const dash = opts?.dash;
-      const dashList = Array.isArray(dash) ? dash : (dash == null ? null : Object.values(dash));
-      drawState.dash = dashList && dashList.length
-        ? dashList.map((n) => Math.max(0, Number(n) || 0)).join(' ')
-        : (typeof dash === 'string' && dash ? dash : null);
-      drawState.cap = ['butt', 'round', 'square'].includes(opts?.cap) ? opts.cap : null;
-      drawState.join = ['miter', 'round', 'bevel'].includes(opts?.join) ? opts.join : null;
+      // probe link) are "3 3" and "2 3". drawDash.js reads it, for this and for the script editor's
+      // Values tab: a length below 0 or not a number is drawn as 0, and a dash that is not a list
+      // is none, each said once in the words the Values tab says it in. So is a cap or a join that
+      // is not one of its three words, which draws the default.
+      const dash = dashPattern(opts?.dash);
+      if (dash.problem) warnDrawStroke(dash.problem);
+      drawState.dash = dash.dasharray;
+      const cap = strokeEnd('cap', opts?.cap);
+      const join = strokeEnd('join', opts?.join);
+      for (const said of [cap.problem, join.problem]) if (said) warnDrawStroke(said);
+      drawState.cap = cap.value;
+      drawState.join = join.value;
       // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
       // which is how a panel shows "this is recording" without redrawing the shape (§49).
-      drawState.dashOffset = Number.isFinite(Number(opts?.dashOffset)) ? Number(opts.dashOffset) : null;
+      // …and one that is not a number was none in silence; it is said once.
+      const offset = opts?.dashOffset;
+      const off = realNumber(offset);
+      if (offset !== undefined && offset !== null && off === undefined) {
+        warnDrawStroke({ severity: 'warning', message: `ce.draw.stroke: the dashOffset is ${shownValue(offset)}, not a number of pixels, so 0 is used.` });
+      }
+      drawState.dashOffset = off ?? null;
     },
     drawGradient: (stops, angle) => drawGradientImpl(stops, angle),
     // Applies to everything drawn after it, like fill and stroke — not to one shape, because the
     // whole style model here is "what is in force when the command is issued".
+    // Nothing given switches it off. A number outside 0..1, or something that is not a number, used
+    // to be clamped (50 was fully solid) or to switch it off ("50%"); it is refused, and what is in
+    // force stays.
     drawOpacity: (a) => {
-      const v = Number(a);
-      drawState.opacity = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : null;
+      if (a === undefined || a === null) { drawState.opacity = null; return; }
+      const problem = unitProblem('the opacity', a);
+      if (problem) {
+        addScriptTrace('error', '', `ce.draw.opacity: ${problem.why}, so the opacity stays as it was.`
+          + `${problem.hint}${percentTextHint(a)}`);
+        return;
+      }
+      drawState.opacity = realNumber(a);
     },
     // rotate/move/scale for what follows. Without it a knob pointer means computing every corner
     // with sin and cos by hand — and getting the centre of rotation wrong is the classic way a
     // pointer ends up orbiting the wrong point.
     drawTransform: (opts) => {
       if (opts == null) { drawState.transform = null; return; }
+      // Each option that is not a number is its default, and said once (drawShapes.js): a rotate of
+      // "x" was no rotation, a scale of "x" no scaling, in silence. A centre half given (cx without
+      // cy) rotated about the top-left corner in silence, which makes a pointer orbit that corner.
+      const read = (name, fallback) => {
+        const { n, said } = drawOption('drawTransform', name, opts[name], fallback);
+        drawSaid(`drawTransform\u0000${name}`, said);
+        return n;
+      };
       const parts = [];
-      const x = Number(opts.x) || 0;
-      const y = Number(opts.y) || 0;
+      const x = read('x', 0);
+      const y = read('y', 0);
       if (x || y) parts.push(`translate(${x} ${y})`);
-      const rotate = Number(opts.rotate);
-      if (Number.isFinite(rotate) && rotate !== 0) {
+      const rotate = read('rotate', 0);
+      const given = (name) => opts[name] !== undefined && opts[name] !== null;
+      if (given('cx') !== given('cy')) {
+        const [has, lacks] = given('cx') ? ['cx', 'cy'] : ['cy', 'cx'];
+        drawSaid('drawTransform\u0000centre', `ce.draw.transform: ${has} was given without ${lacks}, so the rotation is about the top-left corner.`);
+      }
+      if (rotate !== 0) {
         // Around a named centre, or the origin. A rotation with no centre is almost never what a
         // pointer wants, so the centre is the argument people reach for first.
-        const cx = Number(opts.cx);
-        const cy = Number(opts.cy);
-        parts.push(Number.isFinite(cx) && Number.isFinite(cy)
-          ? `rotate(${rotate} ${cx} ${cy})` : `rotate(${rotate})`);
+        parts.push(given('cx') && given('cy')
+          ? `rotate(${rotate} ${read('cx', 0)} ${read('cy', 0)})` : `rotate(${rotate})`);
       }
-      const scale = Number(opts.scale);
-      if (Number.isFinite(scale) && scale !== 1) parts.push(`scale(${scale})`);
+      const scale = read('scale', 1);
+      if (scale !== 1) parts.push(`scale(${scale})`);
       drawState.transform = parts.length ? parts.join(' ') : null;
     },
-    drawEllipse: (cx, cy, rx, ry) => pushCommand(null, ownerName,
-      { op: 'ellipse', cx: Number(cx) || 0, cy: Number(cy) || 0,
-        rx: Number(rx) || 0, ry: Number(ry) || 0 }),
+    drawEllipse: (cx, cy, rx, ry) => drawRejected('drawEllipse', { cx, cy, rx, ry }) ? false : pushCommand(null, ownerName,
+      { op: 'ellipse', cx: drawNum('drawEllipse', 'cx', cx), cy: drawNum('drawEllipse', 'cy', cy),
+        rx: drawNum('drawEllipse', 'rx', rx), ry: drawNum('drawEllipse', 'ry', ry) }, 'drawEllipse'),
     // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
     // LCD component prints are then the same letters, which a second font would not be.
-    drawPixelText: (text, x, y, scale) => pushCommand(null, ownerName,
-      { op: 'pixelText', text: String(text ?? ''), x: Number(x) || 0, y: Number(y) || 0,
-        scale: Math.max(1, Math.round(Number(scale) || 1)) }),
+    // Its numbers are read as every shape's are, and a character it has no glyph for is said
+    // (drawShapes.js): each left a gap, without a word.
+    drawPixelText: (text, x, y, scale) => {
+      if (drawRejected('drawPixelText', { text, x, y })) return false;
+      const written = String(text ?? '');
+      const { scale: s, said } = pixelScale(scale);
+      drawSaid('drawPixelText\u0000scale', said);
+      drawSaid(`drawPixelText\u0000gaps\u0000${written}`, pixelGapWords(written));
+      return pushCommand(null, ownerName,
+        { op: 'pixelText', text: written, x: drawNum('drawPixelText', 'x', x), y: drawNum('drawPixelText', 'y', y), scale: s }, 'drawPixelText');
+    },
     drawMeasure: (text, opts) => drawMeasureImpl(text, opts),
 
     /* ce.draw, phase §49 — the bulk primitives, a style stack, clipping and images. */
@@ -6852,7 +8902,9 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     drawCurve: (points, opts) => drawCurveImpl(null, ownerName, points, opts),
     drawPolygon: (cx, cy, r, sides, opts) => drawPolygonImpl(null, ownerName, cx, cy, r, sides, opts),
     // An image needs a source the renderer can actually load: a data URL, or an icon from the
-    // library resolved through ce.image. A bare name would be a string that silently draws nothing.
+    // library resolved through ce.image. A bare name would be a string that silently draws nothing,
+    // and until this refused it, it did: the command was pushed, and the overlay drew an image
+    // that never loaded. An icon's name gets the exact call to use instead.
     drawImage: (src, x, y, w, h, opts) => {
       const source = String(src ?? '');
       if (!source) {
@@ -6860,26 +8912,55 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
           'ce.draw.image: no source. Pass a data URL, or ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
+      if (drawRejected('drawImage', { x, y, w, h })) return false;
+      if (!/^data:/i.test(source)) {
+        const shown = source.length > 60 ? `${source.slice(0, 57)}…` : source;
+        addScriptTrace('error', '', findAsset(imageCatalogue(), source)
+          ? `ce.draw.image: "${shown}" is an icon's name, not its image, so nothing was drawn. `
+            + `Pass ce.image.asset("${shown}").dataUrl.`
+          : `ce.draw.image: "${shown}" is not image data, so nothing was drawn. Pass a data URL, or `
+            + 'ce.image.asset(name).dataUrl for a library icon.');
+        return false;
+      }
+      // A fit that is not one of its three words is "fill", and said once: it was "fill" in silence.
+      const fit = opts?.fit;
+      const fits = ['fill', 'contain', 'cover'];
+      if (fit !== undefined && fit !== null && !fits.includes(fit)) {
+        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
+      }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
-        x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
-        fit: ['fill', 'contain', 'cover'].includes(opts?.fit) ? opts.fit : 'fill',
-      });
+        x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
+        fit: fits.includes(fit) ? fit : 'fill',
+      }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
     // fill and stroke do, and save()/restore() put them back.
+    // A clip that leaves the control nothing to draw in hid everything after it without a word; it
+    // is said, once (drawShapes.js), and its numbers are read as every shape's are.
     drawClip: (x, y, w, h) => {
-      if (x === undefined || x === null) { drawState.clip = null; return true; }
+      if ([x, y, w, h].every((v) => v === undefined || v === null)) { drawState.clip = null; return true; }
+      // Some of the four given and not the rest: rejected, and said. A missing width or height was
+      // 0, which hid everything drawn after it.
+      const missing = drawMissing('drawClip', { x, y, w, h }, 'so the clip stays as it was.');
+      if (missing) { addScriptTrace('error', '', missing); return false; }
       drawState.clip = {
-        x: Number(x) || 0, y: Number(y) || 0,
-        w: Math.max(0, Number(w) || 0), h: Math.max(0, Number(h) || 0),
+        x: drawNum('drawClip', 'x', x), y: drawNum('drawClip', 'y', y),
+        w: Math.max(0, drawNum('drawClip', 'w', w)), h: Math.max(0, drawNum('drawClip', 'h', h)),
       };
+      const t = drawState.transform ? null : drawTarget(null, ownerName)?._children?.Transform;
+      drawSaid('drawClip', clipWords(drawState.clip, t ? { w: Number(t.width), h: Number(t.height) } : null));
       return true;
     },
     drawBlend: (mode) => {
       const legal = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
         'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'];
-      const wanted = String(mode ?? 'normal');
+      if (mode === undefined || mode === null) {
+        // It was "normal" in silence, which is what ce.draw.blend("normal") is for.
+        addScriptTrace('error', '', 'ce.draw.blend: mode was not given, so the blend stays as it was.');
+        return false;
+      }
+      const wanted = String(mode);
       if (!legal.includes(wanted)) {
         addScriptTrace('error', '',
           `ce.draw.blend("${wanted}"): not a blend mode. One of: ${legal.join(', ')}.`);
@@ -6937,25 +9018,49 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textRead: (target, field) => textReadImpl(target, field),
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
-    drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
-      { op: 'rect', x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
-        radius: Number(radius) > 0 ? Number(radius) : 0 }),
-    drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
-      { op: 'circle', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0 }),
+    // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
+    drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
+      { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
+        h: drawNum('drawRect', 'h', h), radius: Math.max(0, drawNum('drawRect', 'radius', radius)) }, 'drawRect'),
+    drawCircle: (cx, cy, r) => drawRejected('drawCircle', { cx, cy, r }) ? false : pushCommand(null, ownerName,
+      { op: 'circle', cx: drawNum('drawCircle', 'cx', cx), cy: drawNum('drawCircle', 'cy', cy), r: drawNum('drawCircle', 'r', r) }, 'drawCircle'),
     // Angles in DEGREES, 0 at twelve o'clock, clockwise — the way a knob's arc is described, and
     // the convention the Meter's arcStart/arcSweep already use. The renderer converts.
-    drawArc: (cx, cy, r, from, to) => pushCommand(null, ownerName,
-      { op: 'arc', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0,
-        from: Number(from) || 0, to: Number(to) || 0 }),
-    drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
-      { op: 'line', x1: Number(x1) || 0, y1: Number(y1) || 0, x2: Number(x2) || 0, y2: Number(y2) || 0 }),
-    drawPath: (points, closed) => pushCommand(null, ownerName,
-      { op: 'path', points: toPointList(points), closed: closed === true }),
-    drawText: (x, y, text, opts) => pushCommand(null, ownerName,
-      { op: 'text', x: Number(x) || 0, y: Number(y) || 0, text: String(text ?? ''),
-        size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
-        align: ['left', 'middle', 'right'].includes(opts?.align) ? opts.align : 'left',
-        family: opts?.family ? String(opts.family) : null }),
+    drawArc: (cx, cy, r, from, to) => drawRejected('drawArc', { x: cx, y: cy, radius: r, from, to }) ? false : pushCommand(null, ownerName,
+      { op: 'arc', cx: drawNum('drawArc', 'x', cx), cy: drawNum('drawArc', 'y', cy), r: drawNum('drawArc', 'radius', r),
+        from: drawNum('drawArc', 'from', from), to: drawNum('drawArc', 'to', to) }, 'drawArc'),
+    drawLine: (x1, y1, x2, y2) => drawRejected('drawLine', { x1, y1, x2, y2 }) ? false : pushCommand(null, ownerName,
+      { op: 'line', x1: drawNum('drawLine', 'x1', x1), y1: drawNum('drawLine', 'y1', y1),
+        x2: drawNum('drawLine', 'x2', x2), y2: drawNum('drawLine', 'y2', y2) }, 'drawLine'),
+    // A flat { x1, y1, x2, y2, ... } list — the one shape every language expresses the same way: a
+    // Lua table, a JS array, a Python list. One point or none drew nothing, and a pair that is not
+    // two numbers or a trailing value with no partner was left out, all in silence; each is said
+    // (drawShapes.js), the first two as a rejection.
+    drawPath: (points, closed) => {
+      if (drawRejected('drawPath', { points })) return false;
+      const { points: list, said, odd, notList } = flatPointList(points);
+      if (notList) { addScriptTrace('error', '', notList); return false; }
+      drawSaid('drawPath\u0000points', said);
+      drawSaid('drawPath\u0000odd', odd);
+      if (list.length < 2) {
+        addScriptTrace('error', '', `ce.draw.path: points has ${list.length === 0 ? 'no points' : 'one point'}, and a path needs at least two, so nothing was drawn.`);
+        return false;
+      }
+      return pushCommand(null, ownerName, { op: 'path', points: list, closed: closed === true }, 'drawPath');
+    },
+    drawText: (x, y, text, opts) => {
+      if (drawRejected('drawText', { x, y, text })) return false;
+      const align = drawTextAlign(opts?.align);
+      if (align === undefined) return false;
+      // A size that is not a number above 0 is 12, and said once (drawShapes.js): it was 12 in silence.
+      const { size, said: sizeSaid } = textSize('drawText', opts?.size);
+      drawSaid('drawText\u0000size', sizeSaid);
+      return pushCommand(null, ownerName,
+        { op: 'text', x: drawNum('drawText', 'x', x), y: drawNum('drawText', 'y', y), text: String(text ?? ''),
+          size,
+          align,
+          family: opts?.family ? String(opts.family) : null });
+    },
     drawRedraw: (target) => drawRedrawImpl(target, ownerName),
     // ce.panel — structure
     panelCreate: (type, props) => panelCreateImpl(type, props, scriptId),
@@ -7012,13 +9117,9 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
     devicePorts: (opts) => devicePortsRead(opts ?? {}),
     deviceVariables: (role) => deviceVariablesRead(role || DEFAULT_ROLE),
-    deviceSetVariable: (name, value, role) => deviceOverrideWrite(
-      'variables', name, value, role || DEFAULT_ROLE,
-      { min: 0, max: 127, label: 'setVariable' }),
+    deviceSetVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
     deviceTiming: (role) => deviceTimingRead(role || DEFAULT_ROLE),
-    deviceSetTiming: (name, ms, role) => deviceOverrideWrite(
-      'timingOverrides', name, ms, role || DEFAULT_ROLE,
-      { min: 0, max: 60000, label: 'setTiming' }),
+    deviceSetTiming: (name, ms, role) => deviceOverrideWrite('timingOverrides', name, ms, role || DEFAULT_ROLE),
     deviceCoverage: (feature, role) => deviceCoverageRead(role || DEFAULT_ROLE, feature),
     deviceRecipes: (role) => deviceListRead(role || DEFAULT_ROLE, 'messageRecipes'),
     deviceRequests: (role) => deviceListRead(role || DEFAULT_ROLE, 'requests'),
@@ -7066,15 +9167,17 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     ...helpers,
   };
 
+  // An unknown option key refuses the call, for every member the contract lists options for, before
+  // the guard and the namespace see the functions, so every spelling of a member carries the check.
+  applyOptionChecks(api);
+
   // Installed third-party modules (ce.ext.*) contribute their members to the SAME flat surface a
   // built-in module does, before anything is gated — so they are gated, namespaced and discovered
   // by exactly the same code, with no separate path to keep in step.
   const epoch = executionEpoch;
   const wrapFunctions = (object) => Object.fromEntries(Object.entries(object).map(([key, value]) => [key,
-    typeof value === 'function' ? (...args) => {
-      if (epoch !== executionEpoch) throw new Error('Script approval expired; enable the current code before running it.');
-      return value(...args);
-    } : value && typeof value === 'object' && key !== 'state' ? wrapFunctions(value) : value]));
+    typeof value === 'function' ? approvalGuard(value, epoch)
+      : value && typeof value === 'object' && key !== 'state' ? wrapFunctions(value) : value]));
   // Also guard capabilities handed to extension code, before evaluating it.
   if (guardExecution) Object.assign(api, wrapFunctions(api));
   installExtensionMembers(api, scriptId);
@@ -7090,6 +9193,38 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
   // embedded as a string literal cannot import anything.
   api.ce = buildModuleNamespace(api, enabled);
   return guardExecution ? wrapFunctions(api) : api;
+}
+
+// What a guarded script API calls through: a call made after the approval the API was built under
+// has expired throws instead of running. One wrapper per function per approval, shared by every
+// script and every spelling of it — the flat sendCC and ce.midi.sendCC are one function, and the
+// helpers every script is handed are the same functions in all of them — and a wrapper is never
+// wrapped again.
+//
+// It used to be one per spelling, per script, and the flat names were wrapped a second time on the
+// way out: a script is handed 761 functions, and GAIA's 232 scripts built 509,220 wrappers for them.
+// Built once, with the shared gate stubs below, the player page's JS heap went from 153 MB to
+// 116 MB. The wrappers are held weakly, so a script's own functions go with the script.
+let guardEpoch = -1;
+let guards = new WeakMap();
+const isGuard = new WeakSet();
+
+function approvalGuard(fn, epoch) {
+  if (isGuard.has(fn)) return fn;
+  if (guardEpoch !== epoch) {
+    guardEpoch = epoch;
+    guards = new WeakMap();
+  }
+  let guard = guards.get(fn);
+  if (!guard) {
+    guard = (...args) => {
+      if (epoch !== executionEpoch) throw new Error('Script approval expired; enable the current code before running it.');
+      return fn(...args);
+    };
+    guards.set(fn, guard);
+    isGuard.add(guard);
+  }
+  return guard;
 }
 
 /**
@@ -7133,8 +9268,7 @@ function applyModuleGates(flat, enabled) {
     if (module.global || enabled.has(module.id)) continue;
     for (const memberId of Object.values(memberMapFor(module.id))) {
       if (isValueMember(MEMBER_BY_ID[memberId])) continue;
-      const message = moduleGateMessage(memberId, module.id);
-      flat[memberId] = () => addScriptTrace('log', '', message);
+      flat[memberId] = gateStub(memberId, module.id);
     }
   }
   // Declared aliases follow their member: to14Bit is to14bit, gated or not.
@@ -7143,6 +9277,20 @@ function applyModuleGates(flat, enabled) {
       if (flat[member.id] !== undefined) flat[alias] = flat[member.id];
     }
   }
+}
+
+// A stub says the same thing in every script, so every script is handed the same one: GAIA's
+// scripts built 16,560 of them, one per gated member per script.
+const gateStubs = new Map();   // member id -> stub
+
+function gateStub(memberId, moduleId) {
+  let stub = gateStubs.get(memberId);
+  if (!stub) {
+    const message = moduleGateMessage(memberId, moduleId);
+    stub = () => addScriptTrace('log', '', message);
+    gateStubs.set(memberId, stub);
+  }
+  return stub;
 }
 
 /**
@@ -7266,9 +9414,11 @@ const HANDLER_NAMES = handlerNamesForRuntime(RUNTIME_WEBVIEW);
  * panelApi.js in both directions: nothing declared and unimplemented, nothing bound and
  * undeclared. Reading the real object rather than scanning the source is the point — a surface
  * that drifts from what scripts actually receive is the bug being guarded against.
+ *
+ * `guarded` builds it the way a script about to run receives it, behind the approval guard.
  */
-export function scriptApiForTesting(owner = '', scriptId = 'parity-probe') {
-  return buildApi(owner, scriptId);
+export function scriptApiForTesting(owner = '', scriptId = 'parity-probe', guarded = false) {
+  return buildApi(owner, scriptId, guarded);
 }
 
 /** Just the names — what the parity check compares against panelApi.js. */
@@ -7939,6 +10089,16 @@ function destroyLoadedScriptHandlers() {
 /** Drop all cached handlers, listeners and timers — the script set or the panel changed. */
 function resetScriptState() {
   executionEpoch += 1;
+  edgeWarned.clear();
+  animTimingWarned.clear();
+  drawStrokeWarned.clear();
+  timeNumberWarned.clear();
+  componentClampWarned.clear();
+  lcdLineWarned.clear();
+  textAxisWarned.clear();
+  deviceOverrideWarned.clear();
+  musicWarned.clear();
+  drawWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

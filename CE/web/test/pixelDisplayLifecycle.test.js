@@ -44,7 +44,7 @@ test('drag and resize listeners share blur, destroy, and SSR-safe cleanup paths'
 test('discrete display changes do not redraw the dot canvas at refresh rate', () => {
   assert.match(source, /let continuousMotion = \$derived\(animActive \|\| widgetMotion\)/);
   assert.match(source, /const runDiscrete = clockActive \|\| \(!reduced && discreteMotion\)/);
-  assert.match(source, /const timer = setInterval\(\(\) => \{ frameTime = Date\.now\(\) - origin; \}, 100\)/);
+  assert.match(source, /const timer = setInterval\(\(\) => \{ if \(hostShown\) frameTime = Date\.now\(\) - origin; \}, 100\)/);
   assert.match(source, /return \(\) => clearInterval\(timer\)/);
 });
 

@@ -3,8 +3,12 @@ import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runti
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
-import { expandControl, shrinkControl } from './documentShape.js';
-import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
+import { expandAuthoredParts, expandControls, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
+import { panelDocumentText } from './documentLayout.js';
+import { shareDrawings } from './documentDrawings.js';
+import { ENTRY_BASELINES, shrinkEntries } from './documentEntries.js';
+import { normalizePanelLayers } from '../utils/panelLayers.js';
+import { panelDefaults } from '../models/panelDefaults.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
 import { newPanelControlSet, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
@@ -36,195 +40,15 @@ export function createPanel(name = null) {
   // newPanelControlSet for why a library default arrives already carried in the document.
   const startingSet = newPanelControlSet(get(defaultControlSetId), get(controlSetLibrary));
 
-  return {
+  return panelDefaults({
     id,
     panelGuid: makeGuid(),
-    // VST3 / plugin export identity (surfaced in Panel Properties → Export). The exporter
-    // (tools/scripts/export-panel-vst3.mjs) reads these; defaults mirror what used to be hardcoded.
-    // pluginName '' ⇒ fall back to the panel name. Together with panelGuid these drive the unique FUID.
-    exportSettings: {
-      pluginName: '',
-      vendor: 'Tedjuh',
-      manufacturerCode: 'Tdjh',
-      version: '1.0.0',
-      // Embed the native CPython runtime (full stdlib) so Python scripts run window-closed + offline.
-      // 'auto' = include only when the panel actually has Python scripts; 'on'/'off' force it.
-      // Costs ~the size of a CPython runtime + stdlib in the exported plugin (shown in the Export tab).
-      embedPython: 'auto',
-      // Compile-at-export C++/C#/Java handlers into native modules (no language runtime shipped).
-      // 'auto' = compile the native-handler languages the panel actually uses, when their toolchain is
-      // present on the export machine (clang for C++, .NET SDK for C#, GraalVM native-image for Java),
-      // failing if a required handler cannot build; 'on' = force; 'off' = omit native handlers.
-      compileNativeHandlers: 'auto',
-      // New panels select VST3 only. The installed compiler-free exporter also makes CLAP and LV2
-      // when they are selected.
-      // Existing explicit format selections remain part of their documents.
-      // AAX needs Avid's SDK + PACE signing, VST2 licensing closed in 2018, and AU/AUv3 need a
-      // macOS build, so none of those are settings here.
-      exportClap: false,
-      exportLv2: false,
-      // Total Recall: may the exported plugin push a restored session's values back at the synth
-      // when a project reopens? 'ask' (the default) asks once and remembers; 'always' sends without
-      // asking; 'never' leaves the hardware alone. Ask is the conservative default because a plugin
-      // that blasts SysEx at whatever is plugged in whenever a project opens is a bad citizen —
-      // the device may be a different synth today, or the same synth mid-take. A panel exported
-      // before this key existed reads as 'ask' too (Player/RestorePolicy.h), which is strictly more
-      // than the nothing it used to do.
-      restoreHardware: 'ask',
-    },
-    name: name ?? `Untitled ${id}`,
-    scriptId: `panel_${id}`,
-    author: '',
-    version: '1.0.0',
-    description: '',
-    enabled: true,
-    locked: false,
-    filePath: null,
-    width: 600,
-    height: 400,
-    resizable: false,
-    // The panel-wide emergency-stop key (see docs/panic.md). Lives on the panel
-    // rather than in app settings so it travels with an exported Player. Empty
-    // string switches it off — some rigs already have Escape bound.
-    panicShortcut: 'Escape',
-    minWidth: 0,
-    minHeight: 0,
-    maxWidth: 0,
-    maxHeight: 0,
-    lockAspectRatio: false,
-    bgLayerOrder: ['solid', 'gradient', 'image', 'texture'],
-    bgSolid: true,
-    bgColour: 'FF333333',
-    bgGradientEnabled: false,
-    bgGradientOpacity: 100,
-    bgGradientName: '',
-    bgGradient: {
-      type: 'linear',
-      angle: 90,
-      centerX: 50,
-      centerY: 50,
-      radiusX: 50,
-      radiusY: 50,
-      edge: 0,
-      stops: [
-        { color: 'FF0000', position: 0 },
-        { color: '0000FF', position: 100 },
-      ],
-    },
-    bgImageEnabled: false,
-    bgImage: '',
-    bgImageOpacity: 100,
-    bgImageFit: 'fill',
-    bgImageAlign: 'center',
-    bgImageOffsetX: 0,
-    bgImageOffsetY: 0,
-    bgImageBlend: 'normal',
-    bgImageBlur: 0,
-    bgImageTint: 'FFFFFF',
-    bgImageFlipH: false,
-    bgImageFlipV: false,
-    bgImageRotation: 0,
-    bgImageGrayscale: false,
-    bgImageSaturation: 100,
-    bgImageBrightness: 100,
-    bgImageContrast: 100,
-    bgImageTileScale: 1.0,
-    bgTextureEnabled: false,
-    bgTexture: '',
-    bgTextureOpacity: 100,
-    bgTextureFit: 'tile',
-    bgTextureAlign: 'center',
-    bgTextureOffsetX: 0,
-    bgTextureOffsetY: 0,
-    bgTextureBlend: 'normal',
-    bgTextureBlur: 0,
-    bgTextureTint: 'FFFFFF',
-    bgTextureFlipH: false,
-    bgTextureFlipV: false,
-    bgTextureRotation: 0,
-    bgTextureGrayscale: false,
-    bgTextureSaturation: 100,
-    bgTextureBrightness: 100,
-    bgTextureContrast: 100,
-    bgTextureTileScale: 1.0,
-    gridEnabled: true,
+    name,
     gridSize: get(defaultGridSize),
-    gridColour: '33FFFFFF',
-    gridLineWidth: 1,
-    gridType: 'lines',
-    gridSubdivision: 1,
-    gridSubColour: '55FFFFFF',
-    gridCentered: false,
-    gridOriginX: 0,
-    gridOriginY: 0,
     snapToGrid: get(defaultSnapToGrid),
-    // Ruler guides are part of the document: they save with the panel,
-    // restore with the session, and undo with everything else. They used to
-    // live in a session-only store — one reload and a layout's whole
-    // scaffold was gone.
-    guides: { horizontal: [], vertical: [] },
-    notepad: {
-      notes: [{ name: 'Note 1', content: '' }],
-      activeNoteIndex: 0,
-    },
-    viewer: {
-      images: [],
-      activeImageIndex: 0,
-    },
-    requiredProfiles: [],
-    // Total Recall S4: the program list the exported plugin shows a DAW, baked from a preset
-    // librarian bank at author time. Absent means the plugin reports the one nameless program it
-    // always did. The librarian lives in browser storage, which neither the Node exporter nor the
-    // plugin can reach — and a plugin should not scan an instrument's memory on every project
-    // load, so baking is the right answer rather than a workaround. See utils/programBank.js.
-    programBank: null,
-    // Captured panel states: named value maps the panel can recall or blend between. Stored on the
-    // document so they travel with it — a shared panel carries the scenes somebody built, not just
-    // the controls. Distinct from `parameterSnapshots` below, which despite the name is a cache of
-    // profile parameter METADATA rather than any captured value. See utils/snapshotModel.js.
-    snapshots: [],
-    // Routes: one source to many targets, each with its own window, depth, offset and curve. On the
-    // DOCUMENT rather than on a component, and that is the answer to the design note's open
-    // question — three editors are planned (properties-panel link, Link Mapper, node-graph) and if
-    // each kept its own routes a cable drawn on the canvas would be invisible in the Mapper. The
-    // Macro's slots and the Router's destinations are READ as routes rather than copied into here;
-    // see utils/routeAdapters.js.
-    routes: [],
-    // One key and scale the whole panel plays in. Components opt in with `followPanelKey` on their
-    // own section, and changing this WRITES the new key into each of them — see utils/panelKey.js
-    // for why a broadcast beats an indirection here. Absent means nothing follows anything.
-    musicalContext: null,
-    parameterSnapshots: {},
-    // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
-    // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
-    exportParameters: [],
-    scripts: [],
-    scripting: {
-      enabled: true,
-      runInPreview: true,
-      runOnExport: true,
-    },
-    // Card presets the document carries. They also live in the user's localStorage library
-    // (stores/cardPresets.js) — that is what makes them reusable across panels — but a preset
-    // that ONLY lives there is a preset a shared .cepanel arrives without, and the design the
-    // file describes then cannot be reproduced by the person who received it. So the file
-    // carries its own copy and the store merges the two on open, document winning.
-    cardPresets: [],
-    // The control set this panel's ready-made controls resolve their colour tokens against
-    // (models/controlSets.js). Always present in the model so readers can index into it; written
-    // to the file only when it is not the default — see serializePanel.
     controlSet: startingSet.controlSet,
-    // The sets this document carries with it (stores/controlSetLibrary.js): a set chosen from the
-    // user's library or imported from a file is copied here so a shared panel arrives with the set
-    // it was designed in — and so is a library set that is the default for new panels. Built-ins
-    // are never copied. Written only when there is something in it.
     controlSets: startingSet.controlSets,
-    modified: false,
-    controls: [],
-    // Paint order, back to front. One layer to begin with, because a panel with none is a panel
-    // whose controls have nowhere to live — normalizePanelLayers would invent it anyway.
-    layers: [createLayer()],
-  };
+  });
 }
 
 export function uniquePanelPaths(paths) {
@@ -261,11 +85,50 @@ function stripGeneratedControls(controls) {
 
 /**
  * Shrink a control to the form the document stores: a diff against the pristine control of the
- * same type. See documentShape.js — this is one line here because the interesting half is the
- * inverse, and the two have to stay exact inverses.
+ * same type, and the entries of its lists, which the pristine has nothing under, a diff against
+ * their own baselines. See documentShape.js and documentEntries.js — this is one line here because
+ * the interesting half is the inverse, and the two have to stay exact inverses. The export payload
+ * is this form too (exportFormDocument), and carries what both halves are against.
  */
-function toDocumentForm(control) {
-  return shrinkControl(control);
+function toDocumentForm(control, usedBaselines = null) {
+  return shrinkEntries(shrinkControl(control), usedBaselines);
+}
+
+/**
+ * The export payload in the form a plug-in is built from: its controls as a diff against their
+ * types and the entries of their lists as a diff against their baselines, like a saved document's,
+ * carrying the defaults both are against (`controlDefaults`), marked `documentForm: 'export'`.
+ *
+ * The payload used to be complete, every field of every control written out, because the plug-in's
+ * C++ reads controls raw and could not rebuild a default it never saw. GAIA's came to 12.2 MB, the
+ * same panel saved is 3.0 MB, and the difference was the same defaults again for each of its 818
+ * controls. Now the payload brings them once, per type, and the C++ rebuilds each control from them
+ * as it loads (Player/PanelValueModel.h), sharing them rather than copying. A drawing several
+ * controls share goes once too, as in a saved document (documentDrawings.js): 1.8 MB for GAIA. And
+ * an entry of a control's lists (a binding, a grab area, a value channel, a choice) is written as
+ * what it changes from its baseline, and the baselines its entries were written against travel as
+ * `controlDefaults.entries`, from which the C++ and the player page put them back (documentEntries.js):
+ * GAIA's payload went from 1.72 MB to 1.49, AN1x's from 1.93 to 1.44. `entries` is there, if empty,
+ * in every payload written this way; a payload without it has its entries whole.
+ *
+ * It takes the COMPLETE document serializePanelForExport writes, and it is the last thing done to
+ * one: everything before it in an export reads whole controls (the host parameter list, the fonts a
+ * panel carries and the characters they are cut to). A complete control still knows what its author
+ * deleted, which a diff has to record; only its authored parts travel sparse in that form, and they
+ * are made whole again first, so they are diffed from what they are rather than from a diff.
+ */
+export function exportFormDocument(doc) {
+  if (doc?.documentForm === 'export') return doc;
+  if (doc?.documentForm !== 'complete') {
+    throw new Error('exportFormDocument takes the complete document serializePanelForExport writes');
+  }
+  const whole = (doc.controls ?? []).map(expandAuthoredParts);
+  // A drawing more than one control uses goes once, as in a saved document (documentDrawings.js).
+  const used = new Set();
+  const { controls, drawings } = shareDrawings(whole.map((control) => toDocumentForm(control, used)));
+  const entries = Object.fromEntries(Object.entries(ENTRY_BASELINES).filter(([section]) => used.has(section)));
+  const controlDefaults = { ...exportDefaultsFor(whole), entries };
+  return { ...doc, documentForm: 'export', controls, ...(drawings ? { drawings } : {}), controlDefaults };
 }
 
 /**
@@ -304,7 +167,10 @@ function panelNameFromPath(filePath) {
  *   C++ (Player/PanelValueModel.h walks controls[] and reads Core, Behavior and Scripts straight
  *   off it), and that reader has no way to reconstruct a default it never saw. So the authoring
  *   document is compact and the export payload is complete, and the split is explicit rather than
- *   something the exporter has to remember.
+ *   something the exporter has to remember. Complete except for authored parts (every part of a
+ *   custom component, and any added to a built-in control), which no C++ reads and the player
+ *   page expands on load: they go out as a saved document has them (shrinkAuthoredParts in
+ *   documentShape.js says why, and what it costs).
  */
 export function serializePanel(panel, options = {}) {
   const { id, modified, ...data } = panel;
@@ -319,7 +185,12 @@ export function serializePanel(panel, options = {}) {
   const baked = options.bakeControlSet
     ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
     : controls;
-  data.controls = elide ? baked.map(toDocumentForm) : baked;
+  data.controls = elide ? baked.map((control) => toDocumentForm(control)) : baked.map(shrinkAuthoredParts);
+  // A saved document writes each drawing more than one control uses once, beside the controls
+  // (documentDrawings.js). The complete form keeps every control's own: it is the step before the
+  // export form, which does the same to its controls once they are a diff again.
+  const shared = elide ? shareDrawings(data.controls) : { controls: data.controls, drawings: null };
+  data.controls = shared.controls;
 
   // Panel identity. deserializePanel prefers the name the host derives from the filename, so a
   // stale `name` in the document is invisible in the app and only shows up when someone reads the
@@ -403,16 +274,28 @@ export function serializePanel(panel, options = {}) {
   // The format version goes first, where a person opening the file sees it. A document from a
   // newer CEditor keeps its number: writing ours would tell that newer version to run its
   // migrations again over a document that already had them (utils/panelFormat.js).
-  // A complete document says so. The exporters read a document either way (the app hands them this
-  // one; a person may pass a saved .cepanel), and a saved one has to be completed first —
-  // tools/scripts/lib/exportDocument.mjs. The mark is how they tell, where no structural test can:
-  // a default item the author deleted is simply absent from both forms.
-  const { formatVersion, documentForm, ...rest } = data;
-  return JSON.stringify({
+  // A complete document says so. It is the step before the export payload (exportFormDocument
+  // above), which needs controls that still know what their author deleted, and the exporters read
+  // a document in any form (tools/scripts/lib/exportDocument.mjs). The mark is how they tell, where
+  // no structural test can: a default item the author deleted is simply absent from both forms.
+  //
+  // Laid out one line per control section, not one per property (stores/documentLayout.js).
+  //
+  // The drawings table goes right after the controls that refer to it. A document from a newer
+  // CEditor brought its own table, which goes back with this one's shares over it
+  // (resolveDrawings' keepTable); a saved document only, since the complete form shares nothing.
+  const { formatVersion, documentForm, controlDefaults, drawings: carried, ...rest } = data;
+  const kept = carried && typeof carried === 'object' && !Array.isArray(carried) ? carried : null;
+  const table = elide && (kept || shared.drawings) ? { ...kept, ...shared.drawings } : null;
+  const doc = {
     formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
     ...(elide ? {} : { documentForm: 'complete' }),
-    ...rest,
-  }, null, 2);
+  };
+  for (const [key, value] of Object.entries(rest)) {
+    doc[key] = value;
+    if (key === 'controls' && table) doc.drawings = table;
+  }
+  return panelDocumentText(doc);
 }
 
 // What the last deserializePanel call had to say, for the caller to show: why a document was
@@ -422,6 +305,39 @@ export function serializePanel(panel, options = {}) {
 let lastOpenReport = { error: null, warnings: [] };
 export function panelOpenReport() {
   return lastOpenReport;
+}
+
+/**
+ * A document's panel-level fields, normalised as opening the document normalises them: the ones
+ * the editor does not take as written. Everything else is taken as it is. `controls` are the panel's
+ * expanded controls, which the layer list is checked against. Opening a file uses it, and so does
+ * the panel file view when its panel settings are applied (stores/panelFileText.js), so a setting
+ * typed there is read exactly as the same setting in a file would be.
+ *
+ * `captureSession` is present when the document has one, and undefined when that one makes no sense:
+ * the caller drops it then.
+ */
+export function panelFieldsFromDocument(data, controls) {
+  const fields = {
+    // A document written before presets travelled has no `cardPresets` key, and one written by
+    // hand can have anything at all in it. Normalising here means every reader downstream can
+    // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
+    // itself against a string or a null.
+    cardPresets: normalizeCardPresets(data.cardPresets),
+    controlSet: normalizeControlSet(data.controlSet),
+    controlSets: normalizeControlSetList(data.controlSets),
+    snapshots: dedupeSnapshotIds(data.snapshots),
+    // Migration lives here rather than in a version bump: a document with no `layers` gets one
+    // built from first-appearance order, which is exactly what rendering used to infer, so it
+    // looks identical on the first load and stops restacking on every load after it.
+    layers: normalizePanelLayers(data.layers, controls),
+  };
+  if (data.deviceSession) fields.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
+  // Coerced rather than trusted: everything downstream indexes into `baselines` as arrays of byte
+  // arrays, and a document can be hand-edited. `normalizeCaptureSession` returns null for anything
+  // it cannot make sense of, and for an empty session, which then reads as no session at all.
+  if (data.captureSession) fields.captureSession = normalizeCaptureSession(data.captureSession) ?? undefined;
+  return fields;
 }
 
 /**
@@ -438,47 +354,32 @@ export function deserializePanel(json, filePath, name) {
   }
   for (const warning of lastOpenReport.warnings) console.warn(`[panels] ${warning}`);
   const data = read.doc;
+  // An export payload (exportFormDocument) carries the defaults its controls are a diff against, for
+  // the plug-in's C++. expandControl below has its own, from the same code, so they are dropped
+  // rather than kept in the panel and written into a document that has no use for them.
+  delete data.controlDefaults;
   const id = nextId++;
-  if (data.deviceSession) {
-    data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
-  }
-  // Coerced rather than trusted: everything downstream indexes into `baselines` as arrays of byte
-  // arrays, and a document can be hand-edited. `normalizeCaptureSession` returns null for anything
-  // it cannot make sense of, and for an empty session, which then reads as no session at all.
-  if (data.captureSession) {
-    const session = normalizeCaptureSession(data.captureSession);
-    if (session) data.captureSession = session;
-    else delete data.captureSession;
-  }
 
   // The document stores each control as a diff against its type's defaults; the editor's model
   // is always the full control, because everything that reads one reads deep paths off it. Done
   // once and reused — expanding a 4.8 MB panel twice to build a layer list would be a silly way
-  // to spend a hundred milliseconds.
-  const controls = repairGaiaNoteChoices((data.controls ?? []).map(expandControl));
+  // to spend a hundred milliseconds. Equal sections are one object between the controls, as their
+  // defaults are (expandControls).
+  const controls = repairGaiaNoteChoices(expandControls(data.controls ?? []));
+  const fields = panelFieldsFromDocument(data, controls);
 
   const panel = {
     ...createPanel(),
     ...data,
     controls,
-    // A document written before presets travelled has no `cardPresets` key, and one written by
-    // hand can have anything at all in it. Normalising here means every reader downstream can
-    // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
-    // itself against a string or a null.
-    cardPresets: normalizeCardPresets(data.cardPresets),
-    controlSet: normalizeControlSet(data.controlSet),
-    controlSets: normalizeControlSetList(data.controlSets),
-    snapshots: dedupeSnapshotIds(data.snapshots),
-    // Migration lives here rather than in a version bump: a document with no `layers` gets one
-    // built from first-appearance order, which is exactly what rendering used to infer, so it
-    // looks identical on the first load and stops restacking on every load after it.
-    layers: normalizePanelLayers(data.layers, controls),
+    ...fields,
     formatVersion: read.migration.toVersion,
     id,
     filePath,
     name: name || data.name || `Untitled ${id}`,
     modified: false,
   };
+  if (Object.hasOwn(fields, 'captureSession') && !fields.captureSession) delete panel.captureSession;
   // A document an older format was converted from is marked modified: what is open is no longer
   // what is on disk, and saving it should be offered.
   if (read.migration.changed) {

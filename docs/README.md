@@ -49,6 +49,8 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
 - [CLAP export](clap-export.md) — the format map: CLAP, LV2, AU and VST3, and which are gated.
 - [Validating exported plug-ins](plugin-validation.md) — pluginval and clap-validator over an
   export: how to run them, where to get them, and the five defects the first run found.
+- [WebView2 profile folders](webview2-profiles.md) — the folder each webview gets on Windows, the
+  sweep of the ones left behind, and how to try one shared engine per DAW process.
 - [Beta differentiation](beta-differentiation.md) — what actually sets CEditor apart, and the
   three bets that would define the product.
 - [License decision](license-decision.md)

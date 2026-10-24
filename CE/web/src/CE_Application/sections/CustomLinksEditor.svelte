@@ -1,5 +1,6 @@
 <script>
   import { getSection, updateControlProperty, removeControlNode, applyControlPatch } from '../stores/controls.js';
+  import { createLink } from '../utils/customComponentFactory.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -227,17 +228,7 @@
   function addLink() {
     const name = String(newName ?? '').trim();
     if (!core?.id || !name || links?._children?.[name]) return;
-    updateControlProperty(core.id, `Links.${name}`, {
-      _type: 'Link',
-      name,
-      enabled: true,
-      type: 'map',
-      source: 'mainValue',
-      target: '',
-      condition: '',
-      expression: '',
-      notes: '',
-    });
+    updateControlProperty(core.id, `Links.${name}`, createLink(name));
     newName = '';
     selectedName = name;
   }

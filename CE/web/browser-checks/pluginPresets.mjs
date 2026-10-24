@@ -3,9 +3,11 @@
 // plug-in will not read, and one with nothing on disk. Only failures need attention.
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 
 const server = await createServer({
   configFile: fileURLToPath(new URL('../vite.config.js', import.meta.url)),
@@ -23,7 +25,7 @@ try {
   page.setDefaultTimeout(20000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/host.html`);
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/host.html`, { timeout: DEV_SERVER_FIRST_LOAD_MS });
   await page.getByRole('button', { name: 'Library', exact: true }).first().click();
   const report = page.getByTestId('plugin-presets');
   await report.waitFor();
@@ -52,7 +54,8 @@ try {
   assert.match(await wormhole.getByTestId('plugin-presets-browser-only').innerText(), /only in its own browser/);
   assert.equal(await wormhole.getByTestId('plugin-presets-add').count(), 1);
   assert.equal(await wormhole.locator('.load-failed').count(), 0, 'and it is not shown as an error');
-  await page.screenshot({ path: process.env.PRESETS_SCREENSHOT || 'C:/tmp/plugin-presets.png', fullPage: false });
+  // In the OS temp folder: a fixed C:/tmp path made a folder named "C:" inside the checkout off Windows.
+  await page.screenshot({ path: process.env.PRESETS_SCREENSHOT || join(tmpdir(), 'plugin-presets.png'), fullPage: false });
 
   // Removing the folder asks once more, then the row is back to offering the files.
   await transfigure.getByRole('button', { name: 'Remove folder' }).click();

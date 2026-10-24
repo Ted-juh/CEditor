@@ -15,12 +15,13 @@ import { get } from 'svelte/store';
 import { render } from 'svelte/server';
 
 import {
-  scriptApiForTesting, setRuntimeHost, drawCommandsFor, clearAllDrawings,
+  scriptApiForTesting, setRuntimeHost, drawCommandsFor, clearAllDrawings, resetScriptStateForTesting,
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptDrawings } from '../src/CE_Application/stores/scriptDraw.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { valueAtPath, setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
 import ScriptDrawOverlay from '../src/CE_Application/editor/ScriptDrawOverlay.svelte';
 import {
   WEBVIEW_ONLY_MEMBERS, LIFECYCLE_HOOKS, handlerNamesForRuntime,
@@ -106,13 +107,20 @@ test('a path takes the flat coordinate list every language writes the same way',
 
     api.drawClear();
     // An odd trailing value is dropped rather than silently pairing with a zero, which would put a
-    // point on the axis that the script never asked for.
+    // point on the axis that the script never asked for; it is said, once (drawShapes.test.js).
     api.drawPath([0, 1, 2, 3, 4]);
     assert.deepEqual(drawCommandsFor('screen')[0].points, [[0, 1], [2, 3]]);
 
     api.drawClear();
-    api.drawPath([0, 1, 'x', 3]);
-    assert.deepEqual(drawCommandsFor('screen')[0].points, [[0, 1]], 'a non-number is not a coordinate');
+    api.drawPath([0, 1, 'x', 3, 4, 5]);
+    assert.deepEqual(drawCommandsFor('screen')[0].points, [[0, 1], [4, 5]], 'a non-number is not a coordinate');
+
+    // With one point left there is no line to draw: rejected, where it drew nothing in silence.
+    api.drawClear();
+    clearScriptTrace();
+    assert.equal(api.drawPath([0, 1, 'x', 3]), false);
+    assert.deepEqual(drawCommandsFor('screen'), []);
+    assert.match(traced(), /ce\.draw\.path: points has one point, and a path needs at least two, so nothing was drawn\./);
   });
 });
 
@@ -269,6 +277,26 @@ test('a drawing is never written to the panel document', () => {
     'a scope trace on disk would be meaningless as well as wrong');
 });
 
+test('clear says when there is no such control, or no control to draw on', () => {
+  // Both returned false in silence, where every shape command says "no control to draw on".
+  resetScriptStateForTesting();
+  const panel = { id: 'p', name: 'P', width: 800, height: 400, controls: [createControl('Knob', { name: 'K' })], scripting: { modules: ['ce.core', 'ce.draw'] } };
+  setRuntimeHost({ panel, scripts: [], readValue: (c, p) => valueAtPath(c, p), writeValue: (c, p, v) => (setNestedValue(c, p, v), true) });
+  try {
+    clearScriptTrace();
+    const attached = scriptApiForTesting('K', 'clear-probe');
+    assert.equal(attached.drawClear(), true);
+    assert.equal(attached.drawClear('nosuch'), false);
+    const loose = scriptApiForTesting('', 'loose-probe');
+    assert.equal(loose.drawClear(), false);
+    assert.equal(loose.drawClear('K'), true, 'a target names the control for a script attached to none');
+    assert.deepEqual(get(scriptTrace).map((t) => `${t.kind}: ${t.message}`), [
+      'error: ce.draw.clear: no control named "nosuch".',
+      'error: ce.draw.clear: no control to draw on. Attach the script to a control, or pass a target name.',
+    ]);
+  } finally { setRuntimeHost(null); }
+});
+
 test('the draw verbs are webview-only and onDraw never fires window-closed', () => {
   for (const id of ['drawClear', 'drawFill', 'drawStroke', 'drawRect', 'drawCircle',
     'drawLine', 'drawPath', 'drawText', 'drawRedraw']) {
@@ -345,12 +373,23 @@ test('bare colours space themselves evenly, which is what a two-colour fade is',
   });
 });
 
-test('fewer than two usable stops is not a gradient', () => {
+test('fewer than two usable stops is not a gradient, and is said', () => {
   withPanel(scopePanel(), 'screen', (api) => {
+    clearScriptTrace();
     assert.equal(api.drawGradient(['#000']), undefined, 'one colour and nothing is a colour');
     assert.equal(api.drawGradient([]), undefined);
     assert.equal(api.drawGradient(null), undefined);
+    assert.equal(api.drawGradient('#000'), undefined, 'text is not a list, and was read as its letters');
     assert.equal(api.drawGradient(['#000', '']), undefined, 'and an empty colour is not one');
+    // Each said as a rejection: the first three returned nothing in silence, and "#000" was four
+    // stops, the first of which "is not a colour".
+    assert.deepEqual(get(scriptTrace).map((t) => `${t.kind}: ${t.message}`), [
+      'error: ce.draw.gradient: stops has one colour, and a gradient needs at least two, so there is no gradient.',
+      'error: ce.draw.gradient: stops has no colours, and a gradient needs at least two, so there is no gradient.',
+      'error: ce.draw.gradient: stops was not given, so there is no gradient.',
+      'error: ce.draw.gradient: stops is "#000", not a list of colours, so there is no gradient.',
+      'error: ce.draw.gradient: stop 2 of 2 has no colour, so there is no gradient. A stop is a colour, or { at, colour, opacity }.',
+    ]);
   });
 });
 
@@ -375,6 +414,27 @@ test('the overlay resolves a gradient with the app\'s own gradientCoords', () =>
 
 /* ----------------------------------------------------------------- dash / cap / join */
 
+test('a width that is not above 0, and a dashOffset that is not a number, are said once and drawn as the default', () => {
+  // Both were the default in silence. Text that is a number is read as one, as every number is.
+  withPanel(scopePanel(), 'screen', (api) => {
+    const lines = () => { const out = get(scriptTrace).map((t) => `${t.kind}: ${t.message}`); clearScriptTrace(); return out; };
+    const once = ' This is said only the first time.';
+    clearScriptTrace();
+    api.drawStroke('#FFF', 0); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).strokeWidth, 1);
+    assert.deepEqual(lines(), [`warn: ce.draw.stroke: the width is 0, not a number above 0, so 1 is drawn.${once}`]);
+    api.drawStroke('#FFF', 0); api.drawStroke('#FFF', '2'); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).strokeWidth, 2, 'text that is a number is read as one');
+    assert.deepEqual(lines(), [], 'said once, and nothing of a number');
+    api.drawStroke('#FFF', 1, { dash: [3, 3], dashOffset: 'x' }); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).dashOffset, null);
+    assert.deepEqual(lines(), [`warn: ce.draw.stroke: the dashOffset is "x", not a number of pixels, so 0 is used.${once}`]);
+    api.drawStroke('#FFF', 1, { dash: [3, 3], dashOffset: '4' }); api.drawLine(0, 0, 10, 10);
+    assert.equal(drawCommandsFor('screen').at(-1).dashOffset, 4);
+    assert.deepEqual(lines(), []);
+  });
+});
+
 test('a dash is a list of on/off lengths, the way every drawing API spells it', () => {
   withPanel(scopePanel(), 'screen', (api) => {
     api.drawStroke('#FFF', 1, { dash: [3, 3], cap: 'square', join: 'bevel' });
@@ -384,6 +444,45 @@ test('a dash is a list of on/off lengths, the way every drawing API spells it', 
     assert.equal(c.cap, 'square');
     assert.equal(c.join, 'bevel');
   });
+});
+
+test('a dash length that cannot be drawn is drawn as 0 and said once; a dash that is not a list is none, and said', () => {
+  resetScriptStateForTesting();   // what has been said is forgotten with the script set
+  withPanel(scopePanel(), 'screen', (api) => {
+    const drawn = (dash) => {
+      clearScriptTrace();
+      clearAllDrawings();
+      api.drawStroke('#FFF', 1, { dash });
+      api.drawLine(0, 0, 10, 10);
+      return [drawCommandsFor('screen')[0].dash, get(scriptTrace).filter((t) => t.kind !== 'log').map((t) => `${t.kind}: ${t.message}`)];
+    };
+    const once = ' This is said only the first time.';
+    // A negative length was clamped without a word, so { 3, -3 } drew a solid line and nothing said why.
+    assert.deepEqual(drawn([3, -3]), ['3 0', [`warn: ce.draw.stroke: length 2 of the dash is -3, which is less than 0, so 0 was used.${once}`]]);
+    assert.deepEqual(drawn([3, -3]), ['3 0', []], 'once: onDraw sets its stroke on every redraw');
+    assert.deepEqual(drawn(['x', 3]), ['0 3', [`warn: ce.draw.stroke: length 1 of the dash is "x", which is not a length in pixels, so 0 was used.${once}`]]);
+    assert.deepEqual(drawn([true, 3])[0], '0 3', 'true was read as 1');
+    assert.deepEqual(drawn([Infinity, 2])[0], '0 2', 'Infinity made the whole pattern one SVG drops');
+    // Not a list: a number was dropped without a word, and text taken apart a character at a time
+    // ("3 3" drew "3 0 3", and "10 5" drew "1 0 0 5").
+    // A warning: the line is drawn, solid. An error means the call did nothing (the owner's rule).
+    const solid = (shown) => `warn: ce.draw.stroke: the dash is ${shown}, not a list of lengths, so the line is solid. `
+      + `A dash is a list of lengths in pixels, drawn and skipped in turn.${once}`;
+    assert.deepEqual(drawn(3), [null, [solid('3')]]);
+    assert.deepEqual(drawn('3 3'), [null, [solid('"3 3"')]]);
+    assert.deepEqual(drawn('10 5'), [null, [solid('"10 5"')]]);
+    // What is no mistake says nothing: a list, text that is a number in one, a Lua table over the
+    // bridge, an odd list (repeated as SVG repeats it), no dash, an empty list, and all zeros.
+    assert.deepEqual(drawn([3, 3]), ['3 3', []]);
+    assert.deepEqual(drawn(['4', '2.5']), ['4 2.5', []]);
+    assert.deepEqual(drawn({ 1: 4, 2: 2 }), ['4 2', []]);
+    assert.deepEqual(drawn([3, 2, 1]), ['3 2 1', []]);
+    assert.deepEqual(drawn(undefined), [null, []]);
+    assert.deepEqual(drawn(false), [null, []], 'a Lua `recording and { 4, 2 }` when not recording');
+    assert.deepEqual(drawn([]), [null, []]);
+    assert.deepEqual(drawn([0, 0]), ['0 0', []]);
+  });
+  resetScriptStateForTesting();
 });
 
 test('an unknown cap or join is not one, and no dash is no dash', () => {
@@ -444,14 +543,20 @@ test('a rotation with no centre turns about the origin, and says so by omission'
   });
 });
 
-test('opacity clamps, and a non-number clears it', () => {
+test('opacity outside 0..1, or not a number, is refused and leaves what is in force; nothing clears it', () => {
+  // It used to clamp (5 was fully solid) and clear on a non-number ("50%" switched it off), both in
+  // silence. scriptVisualValues.test.js has the words.
   withPanel(scopePanel(), 'screen', (api) => {
+    api.drawOpacity(0.5);
     api.drawOpacity(5);
     api.drawRect(0, 0, 1, 1);
-    assert.equal(drawCommandsFor('screen')[0].opacity, 1);
+    assert.equal(drawCommandsFor('screen')[0].opacity, 0.5);
     api.drawOpacity('nonsense');
     api.drawRect(0, 0, 1, 1);
-    assert.equal(drawCommandsFor('screen')[1].opacity, null);
+    assert.equal(drawCommandsFor('screen')[1].opacity, 0.5);
+    api.drawOpacity();
+    api.drawRect(0, 0, 1, 1);
+    assert.equal(drawCommandsFor('screen')[2].opacity, null, 'no number switches it off, as documented');
   });
 });
 

@@ -26,6 +26,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <vector>
 
 namespace ceditor::scripting
@@ -119,8 +120,17 @@ public:
     // Values (Q1, Q2, Q8). `form` is "value" (default) | "normalizedValue" | "midiValue".
     // `transmit`: whether to also send to the synth (the runtime computes the default from origin).
     virtual juce::var getValue (const juce::String& path, const juce::String& form) = 0;
+    /** Why a script's get() of `path` that answered nothing found nothing, as the line to write, or
+        empty when nothing is wrong (the value is simply not set). Asked by each engine's get() only
+        after it got nothing, and only for a script's own get(): the engines' watch, compute and
+        snapshot read through getValue and stay quiet, as the editor's do. Default empty: a host
+        that cannot tell says nothing, which is what get() always did. */
+    virtual juce::String whyNoValue (const juce::String& path, const juce::String& form)
+    { juce::ignoreUnused (path, form); return {}; }
     // `options` may carry { transmit: bool }. If absent, the host applies the origin-based default
     // (loud, unless inbound or inside a noTransmit block) via ScriptRuntime::defaultTransmit().
+    // Text in its place is the value form, set(path, value, form), as the WebView runtime reads it;
+    // BridgeScriptHost refuses text that is not one of the three, as it does get()'s `form`.
     virtual void      setValue (const juce::String& path, const juce::var& value, const juce::var& options) = 0;
 
     // Device / MIDI (Q9).
@@ -179,10 +189,19 @@ public:
 
     /** ce.anim — start/stop/query. These route to ScriptRuntime, which owns the animation list;
         a host only forwards. `path` is a string OR a list of strings: one call, one shape, one
-        completion, which is what makes `stagger` worth having. */
-    virtual void startAnimation (const juce::String& kind, const juce::var& path,
+        completion, which is what makes `stagger` worth having. Returns whether it started, which
+        the preludes answer the script with (ScriptRuntime::startAnimation). */
+    virtual bool startAnimation (const juce::String& kind, const juce::var& path,
                                  double target, const juce::var& opts)
-    { juce::ignoreUnused (kind, path, target, opts); }
+    { juce::ignoreUnused (kind, path, target, opts); return false; }
+    /** Whether `path` is a colour property of the host's panel (ScriptColours.h's colourFieldAt),
+        which ScriptRuntime::startAnimation refuses to move: every tick would write a number into it.
+        Default false: a host with no panel document cannot tell, and moves what it is asked to. */
+    virtual bool isColourProperty (const juce::String& path) { juce::ignoreUnused (path); return false; }
+    /** Whether `path` names a control the host's panel does not have, which startAnimation refuses:
+        the move used to start, and every tick's write was refused. Default false, for the same
+        reason as above: a host with no panel document cannot tell. */
+    virtual bool namesMissingControl (const juce::String& path) { juce::ignoreUnused (path); return false; }
     virtual void stopAnimation (const juce::String& path) { juce::ignoreUnused (path); }
     virtual bool animationRunning (const juce::String& path) { juce::ignoreUnused (path); return false; }
     /** Where an animation IS, and everything running. running() answers whether; these answer how
@@ -258,7 +277,8 @@ public:
         already persists for as long as it is loaded. */
     /** `store` is "panel" (the document, and the DAW project state in the export) or "local" (this
         machine only, never written into the document — a panel you send somebody should not carry
-        the recipient's MIDI port choice). A host with no local store leaves loadSetting void and
+        the recipient's MIDI port choice; in the export, this instance's, saved with the project
+        under the machine's id). A host with no local store leaves loadSetting void and
         saveSetting a no-op, and settingsAvailable() says so once rather than per key.
 
         ce.storage's third scope, "script", needs nothing here: it is a key prefix the prelude
@@ -486,8 +506,12 @@ public:
         The position is a pure function of elapsed time, never an accumulated step: two runtimes
         integrating independently drift apart, two runtimes evaluating the same formula at the same
         elapsed time cannot. animationValueAt() below is that formula, and it is the thing the
-        WebView runtime has to match. */
-    void startAnimation (const juce::String& kind, const juce::var& path,
+        WebView runtime has to match.
+
+        Returns whether it started: false, after saying why, for a colour property as the path or
+        in a list of paths, where nothing in the list starts, and for nothing to move. The preludes
+        hand this back as the call's answer, as the WebView's startAnimationImpl answers. */
+    bool startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts = {});
 
     /** Stop one animation, or every one when `path` is empty. The value stays where it got to, and
@@ -551,7 +575,9 @@ public:
     juce::var declaredDeviceParameter  (const juce::String& role, const juce::String& id) const;
 
     /** The bytes that SET a declared parameter, or void when the parameter is not declared here —
-        which is how the caller knows to fall through to the device profile. */
+        which is how the caller knows to fall through to the device profile. Also void, after an
+        error saying why, when the value is one the parameter cannot read: a switch written as
+        "enabled", a choice it does not have, a number written as text that is not one. */
     juce::var encodeDeviceParameter (const juce::String& role, const juce::String& id,
                                      const juce::var& value) const;
 
@@ -629,15 +655,21 @@ private:
         std::array<double, 4> bezier {};   // a drawn curve's control points, when hasBezier
         bool hasBezier = false;
         double damping = 6.0, frequency = 12.0;
-        int repeat = 0, cycle = 0;     // repeat < 0 runs until stopped
+        int repeat = 0, cycle = 0;     // runs LEFT after this one; < 0 runs until stopped
         bool pingpong = false, paused = false;
         double heldProgress = 0.0;
         int groupId = 0;               // 0 = alone; otherwise one completion for the whole call
+        juce::String doneToken;        // the prelude's name for its done; empty = none to call
+        int scriptSet = 0;             // the loadScripts it was started under (animationScriptSet)
     };
     std::vector<Animation> animations;
-    struct AnimationGroup { int remaining = 0; bool completed = true; juce::StringArray paths; };
+    struct AnimationGroup { int remaining = 0; bool completed = true; juce::String token; };
     std::map<int, AnimationGroup> animationGroups;
     int animationGroupSeq = 0;
+    int animationScriptSet = 0;   // counts loadScripts: a done token is only good within one set
+    // The commands that have said a move's timing could not be read ("ce.anim.to duration"): each
+    // is said once per script set, as the WebView's animTimingWarned, which resetScriptState clears.
+    std::set<juce::String> animationTimingWarned;
     /** Progress, value, and the completion emit — shared by the tick and by the four verbs that
         need to know where an animation is without advancing it. */
     double animationProgressOf (const Animation& a, double nowMs, double beats) const;
@@ -660,22 +692,23 @@ private:
     struct DeclaredParameter
     {
         juce::String id, name, group, type { "number" }, access { "readWrite" };
-        juce::String wireKind, encoding { "u7" }, checksumKind { "roland" };
+        juce::String wireKind, encoding { "u7" }, checksumKind { "roland-7bit" };
         double min = 0.0, max = 127.0;
         int cc = 0, channel = 1, msb = 0, lsb = 0;
         int nibbles = 2, length = 0, pad = 32, trueValue = 1, falseValue = 0;
-        juce::StringArray tmpl;                       // sysex template tokens
-        juce::NamedValueSet variables;
-        juce::Array<juce::var> choices;               // { id, value } pairs
+        juce::StringArray tmpl;                       // sysex template: "41" (two hex digits) or "$token"
+        juce::NamedValueSet variables;                // each one byte, checked when declared
+        juce::Array<juce::var> choices;               // { id, value } pairs; a list of names becomes these
         juce::var descriptor() const;
     };
 
     struct DeclaredDump
     {
-        juce::String id, name, checksumType;
+        juce::String id, name, checksumType;          // checksumType canonical; empty means none
         juce::Array<int> prefix, suffix, request;
         int offset = 0, size = 0;
-        int checksumFrom = -1, checksumTo = -1, checksumAt = -1;
+        int checksumWidth = 1;
+        int checksumFrom = -1, checksumTo = -1, checksumAt = -1;   // -1: placed per message
         juce::StringArray fieldParameters;
         juce::Array<int> fieldOffsets;
     };
@@ -690,8 +723,10 @@ private:
 
     const DeclaredParameter* findDeclaredParameter (const juce::String& role, const juce::String& id) const;
     const DeclaredDump*      findDeclaredDump      (const juce::String& role, const juce::String& kind) const;
-    /** The number a value becomes on the wire — the parameter's own units, clamped to what fits. */
-    static int declaredParameterNumber (const DeclaredParameter& p, const juce::var& value);
+    /** The number a value becomes on the wire, in the parameter's own units, or false with `error`
+        saying why the value cannot be read (it is refused, not sent as the minimum). */
+    static bool declaredParameterNumber (const DeclaredParameter& p, const juce::var& value,
+                                         juce::int64& number, juce::String& error);
     /** Decode one declared layout against one message. Void unless it matched cleanly. */
     juce::var decodeDeclaredDump (const juce::String& role, const DeclaredDump& dump,
                                   const juce::Array<int>& bytes) const;

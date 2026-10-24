@@ -26,13 +26,22 @@
 import { validate as validatePanelSchema } from '../generated/panelDocumentValidator.js';
 import { deepClone } from './deepClone.js';
 import { migrateDottedControlNames } from './controlNames.js';
+import { resolveDrawings } from '../stores/documentDrawings.js';
+import { restoreDocumentEntries } from '../stores/documentEntries.js';
 
-export const PANEL_FORMAT_VERSION = 2;
+export const PANEL_FORMAT_VERSION = 4;
 
 const MIGRATIONS = {
   // 1 -> 2: control names lost their dots, and every reference that addresses a control by name
   // was converted with them (utils/controlNames.js has the reasoning and the list).
   1: (doc) => migrateDottedControlNames(doc),
+  // 2 -> 3: a drawing more than one control uses is written once (stores/documentDrawings.js). No
+  // step: a version-2 document has no table to convert. The number moves so that an older CEditor,
+  // which would open such a file with every shared drawing missing, says a newer one wrote it.
+  // 3 -> 4: the entries of a control's lists are written as a diff against a baseline
+  // (stores/documentEntries.js). No step, for the same reason: a version-3 document's entries are
+  // whole, and are read as they are. An older CEditor would open a version-4 file with the
+  // defaults of every binding, grab area, channel and choice missing.
 };
 
 /** The format version a document says it is. No field, or nonsense in it, reads as 1. */
@@ -124,11 +133,22 @@ export function readPanelDocument(json) {
   if (!check.ok) {
     return { doc: null, migration: null, error: `the document is not a valid panel: ${check.errors.join('; ')}` };
   }
+  // Drawings written once go back into the controls that use them before anything else sees the
+  // document, migrations included. Not a copy per control: the one caller expands the controls
+  // together, and a migration step works on a deepClone (resolveDrawings' `copy`).
+  // A newer document keeps its table too, so what this build does not understand in it survives.
+  const drawings = resolveDrawings(data, { keepTable: panelFormatVersion(data) > PANEL_FORMAT_VERSION, copy: false });
+  // So do the defaults the entries of a control's lists leave out, in a document that leaves them
+  // out (stores/documentEntries.js says which).
+  const whole = restoreDocumentEntries(drawings.doc, panelFormatVersion(data));
   let migration;
   try {
-    migration = migratePanelDocument(data);
+    migration = migratePanelDocument(whole);
   } catch (error) {
     return { doc: null, migration: null, error: `the document could not be converted from format ${panelFormatVersion(data)} (${error.message})` };
+  }
+  if (drawings.missing.length) {
+    migration.warnings.push(`Some controls use a drawing the file does not contain (${drawings.missing.join(', ')}); they open without it.`);
   }
   return { doc: migration.doc, migration, error: null };
 }

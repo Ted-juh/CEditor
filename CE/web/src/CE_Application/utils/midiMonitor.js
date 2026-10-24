@@ -14,6 +14,31 @@
 /** Directions the monitor distinguishes. C++ writes these strings. */
 export const MONITOR_DIRECTIONS = ['out', 'in'];
 
+/** How much of the log the UI keeps; C++ keeps the same. */
+export const MONITOR_EVENT_LIMIT = 500;
+
+/**
+ * The log after a midiMonitorEvents payload. C++ sends what is new, { events, full: false }, and
+ * the whole log, { events, full: true }, to a page that has just opened or after a Clear; a bare
+ * array is a whole log too (the older form, and what tests and checks hand the store). Events
+ * already held are not added again, and the last MONITOR_EVENT_LIMIT are kept.
+ *
+ * It used to be the whole log every time, up to 120 KB of JSON at up to 20 a second while MIDI
+ * flowed (DeviceProfileService::takeNewMonitorEvents says more).
+ */
+export function mergeMonitorEvents(current, payload) {
+  const whole = Array.isArray(payload) ? payload : payload?.full === true ? payload.events : null;
+  if (whole) return Array.isArray(whole) ? whole.slice(-MONITOR_EVENT_LIMIT) : [];
+  const fresh = Array.isArray(payload?.events) ? payload.events : [];
+  if (!fresh.length) return current;
+  const held = Array.isArray(current) ? current : [];
+  const newest = held.length ? Number(held[held.length - 1]?.eventId) : NaN;
+  const added = Number.isFinite(newest) ? fresh.filter((event) => !(Number(event?.eventId) <= newest)) : fresh;
+  if (!added.length) return held;
+  const merged = held.concat(added);
+  return merged.length > MONITOR_EVENT_LIMIT ? merged.slice(-MONITOR_EVENT_LIMIT) : merged;
+}
+
 const text = (value) => (typeof value === 'string' ? value : '');
 
 // Bridge snapshots deserialize into fresh objects. Preserve both row identity and

@@ -11,6 +11,7 @@
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
   import { pixelElementSelection, pixelSelectionKey, pixelElementId, selectPixelElement } from '../stores/pixelElementSelection.js';
   import { updateControlProperty } from '../stores/controls.js';
+  import { hostWindowShown } from '../stores/hostWindow.js';
 
   let { control = null, allControls = [], width = 0, height = 0, editable = false, scale = 1 } = $props();
 
@@ -514,8 +515,11 @@
     });
   });
 
-  // rAF clock for animations and widget ballistics.
+  // rAF clock for animations and widget ballistics. Unseen (stores/hostWindow.js) it stands still
+  // and nothing redraws; it keeps counting, so shown again the display is where it would have been.
   let frameTime = $state(0);
+  let hostShown = true;
+  onDestroy(hostWindowShown.subscribe((shown) => { hostShown = shown !== false; }));
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
   // Visibility during a blink must not stop/restart the clock driving it.
   let animActive = $derived(animMode !== 'off' || elements.some((e) => e?.kind === 'anim' && e?.visible !== false));
@@ -591,7 +595,7 @@
       let origin = -1;
       const loop = (t) => {
         if (origin < 0) origin = t;
-        frameTime = t - origin;
+        if (hostShown) frameTime = t - origin;
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
@@ -601,7 +605,7 @@
     // Clock text, blinking, and marquee windows change at human-scale intervals. Updating the
     // complete dot canvas at display refresh rate for them wastes almost every rendered frame.
     const origin = Date.now();
-    const timer = setInterval(() => { frameTime = Date.now() - origin; }, 100);
+    const timer = setInterval(() => { if (hostShown) frameTime = Date.now() - origin; }, 100);
     return () => clearInterval(timer);
   });
 

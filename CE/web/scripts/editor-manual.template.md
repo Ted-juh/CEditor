@@ -619,7 +619,8 @@ have states. Edit them on the **States** tab of the properties panel (one contro
    changing the normal look.
 3. **When** says when the state is active: seven switches — **Hover**, **Pressed**, **Focused**,
    **Dragging**, **Disabled**, **Checked**, **Mixed** — and an optional **Rule** for anything more
-   specific.
+   specific. A rule can compare the control's value: `value > 64` is active above 64, and
+   `valueNormalized >= 0.5` in the top half of the range, whatever the range is.
 4. **Overrides** lists what the state changes, with buttons to clear them.
 
 Add your own state by typing a name in **New** and pressing **Add**. When several states are active
@@ -662,6 +663,32 @@ name of the patch, a light blinking on a timer — you can attach a script. Scri
 
 The [scripting manual](scripting-manual.md) explains scripting from the beginning; start with
 [Scripting: getting started](scripting-getting-started.md).
+
+The dock on the right of the code has four tabs, and opens on the one you used last: **Insert**
+(the commands and your controls, to insert), **Library** (scripts you saved to reuse), **History**
+(earlier versions of the script) and **Values**. **Values** lists the values in the statement the
+caret is in, with what each means and any problem with it, and the code shows which: a faint band
+over the statement, a light box around the value under the pointer, an outlined box around the one
+you are editing. A colour's swatch opens the display panel's **Colors** tab, which shows in the
+script workspace for this (and from the **Dock** button on the left, which has a setting of its own
+here: a dock left open in the panel editor stays there, and one the swatch opened closes again when
+you finish); the colour is written into the code when you let go, as one step of the editor's undo,
+and **Cancel** puts back exactly what was there before. A gradient opens the **Gradient** tab the
+same way, with the angle and the stops alone, since a drawing's gradient is always linear. A list of
+choices is a dropdown in the row, a font family's of the fonts the panel can use, an image's of
+the library's and the panel's images, and a device parameter's (`ce.device.write("cutoff", …)`) of
+the parameters of the synth's device profile, each with its name; a number with a unit is a field; a
+curve written as four numbers has the **Animation** tab's curve editor under its row, written when
+you let go of a handle; and the points of an envelope (`ce.anim.envelope`) have its shape under
+their row, with each point to drag, a double-click to add one and **Remove** to take one out,
+written when you let go. A row that names one of the panel's controls, by its name or in a path,
+has **Select**: the control is selected on the panel when you go back to its tab, and the code is
+left as it is. A stroke's dash is drawn in its row as the line it makes.
+The lists are in the code as well: with the caret inside a
+value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
+selected, and the one you choose replaces the whole value. A property path is completed one part
+at a time: inside `"Cutoff."` the list is what Cutoff has, its value and its sections, and the part
+you choose replaces only the part the caret is in.
 
 Two things to know from the editor's side:
 
@@ -741,6 +768,58 @@ icons go along.
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
 
+### Reading and editing the file as text
+
+The script editor can show the panel's file as text, one item at a time, and you can edit it there.
+Open the **Script Editor**, then **Tools → Panel file**. On the left is an outline: **Panel settings**,
+then every control, with a container's controls under it. **Find a control...** searches them by name,
+type or id. The screen opens on the control that was selected when you opened the Script Editor.
+
+Each item is written the way the file writes it: only what differs from a new control of that type,
+or from a new panel. So a short text means a control close to its defaults, and **deleting a line
+puts that property back to its default**. Tick **Every field** to see all of the control's
+properties with their defaults, to look up a property's name; that view is for reading only.
+
+Change the text and press **Apply** (or Ctrl+Enter). **Revert** throws your changes away. An edit you
+have not applied stays when you look at another item; the outline marks it with a dot. Before
+anything is applied, CEditor checks:
+
+- **The text has to be valid JSON.** A mistake is shown with its line; click it to jump there.
+- **A control's type and id stay as they are.** Turning a knob into a slider is not an edit. The id
+  is what ties the control's scripts, layers and snapshots to it. The panel's `panelGuid` stays too:
+  it is the panel's identity to every plug-in exported from it.
+- **A name another control already has** is given `_2`, as a rename in the properties panel is.
+- **A property that no control in the panel uses** is kept as you wrote it, with a warning to check
+  the spelling, because it does nothing.
+
+Some things are not in the text and cannot be changed there, so no edit can lose them: a
+container's controls (they are items of their own), scripts (the script screens), the notes (the
+notepad), the panel's name (it is the file's name), the host parameter list (made from the controls
+on every save), and an embedded image, which shows as a short placeholder and is kept as it is.
+
+An applied edit is one step in the panel's undo history, named after what you edited, such as
+"Edit cutoff as text". Go back to the panel and press **Undo** to take it back. **Show on the
+panel** goes there with the control selected.
+
+**Values**, above the text, shows the script editor's dock with its **Values** tab alone: the colours,
+gradients and choices in the object the caret is in, a `Fill` say, read the way the panel reads them.
+A colour's swatch, or a gradient's strip, opens the display panel; what you choose there is written
+into the text as typing it would be, so it is an edit like any other, applied with **Apply**. In
+**Every field** and in the whole file the values are listed, to read, and nothing is edited.
+
+**Whole file**, at the top of the outline, shows the whole file instead, as **Save** would write it
+now, laid out to read. A large panel's file is long (the Roland GAIA's is about 71,000 lines), so the
+outline becomes its table of contents: click a control, or **Host parameters**, **Scripts**,
+**Shared drawings** or **Notes**, to go to its lines. As you scroll or click, the header says which
+line you are at and what it belongs to, and the outline marks that row. **Ctrl+F** finds text
+anywhere in the file, starting from where you are; **Enter** goes to the next match. You can select
+and copy what is on screen.
+
+The whole file is for reading. To change something, click in it and press **Edit this item** (or
+**One item**): it opens as an item, to edit as above. **Whole file** from an item takes you back to its
+lines. Embedded images are shortened to a placeholder here, and an edit you have not applied yet is
+not in it.
+
 ### Autosave and recovery
 
 CEditor's autosave does **not** save your file. It keeps a recovery copy of panels with unsaved
@@ -816,8 +895,14 @@ Preview, without the editor around it.
   synth. When a project is reopened, **Hardware Restore** decides whether that sound is sent back to
   the synth.
 
-On Windows, while the plugin window has keyboard focus, the DAW does not receive key presses — the
-space bar will not start playback. Click outside the plugin first.
+- **Keys.** Keys the panel does not use go to the DAW, so the space bar starts and stops playback and
+  the DAW's shortcuts work while the plugin window has focus. The panel keeps what it uses: what you
+  type into a text field or a field on its screen, Tab to move between controls, the arrow keys on a
+  knob you clicked or in a list it has open, and its panic key (Escape unless the panel sets
+  another). Space and Enter go to the DAW even after you click a control; they press a control only
+  when you reached it with Tab. In a field you are editing on the panel's screen they type a space
+  and finish the edit.
+  This is on Windows, where the plugin's window would otherwise take every key.
 
 ## 13. HoSTage, the instrument host
 
@@ -885,8 +970,6 @@ CEditor is a beta. Things to know before you rely on it:
   the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot save: closing its tab
   asks first, then its pages are gone. It can only be opened from the start screen, with no documents
   open.
-- **The DAW and the keyboard.** On Windows, the DAW gets no key presses while the plugin window has
-  focus.
 
 [Known issues](known-issues.md) lists the open problems in detail, and the
 [release notes](../RELEASE-NOTES.md) say what this version is.

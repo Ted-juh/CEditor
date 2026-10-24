@@ -29,7 +29,7 @@
   import { clearRecentFiles, groupRecentFiles, recentFileLabel, recentFiles } from '../stores/recentFiles.js';
   import { openComponentLibraryEntry, openDeviceProfileEntry, openRecentFile } from '../stores/recentFileActions.js';
   import {
-    PANEL_VISIBILITY_ITEMS, showDisplayPanel, showPropertiesPanel,
+    PANEL_VISIBILITY_ITEMS, displayPanelVisible, showPropertiesPanel,
     showTreePanel, togglePanelVisibility,
   } from '../stores/panelVisibility.js';
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
@@ -63,7 +63,7 @@
   // out from under us.
   let treeVisible = $derived($showTreePanel);
   let propertiesVisible = $derived($showPropertiesPanel);
-  let displayVisible = $derived($showDisplayPanel);
+  let displayVisible = $derived($displayPanelVisible);
   let visibilityFlags = $derived({ tree: treeVisible, properties: propertiesVisible, display: displayVisible });
 
   let componentLibraryEntries = $derived(componentPickerEntries($customComponentLibrary ?? []));

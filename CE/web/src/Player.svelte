@@ -9,15 +9,18 @@
   import { registerDocumentFonts } from './CE_Application/utils/documentFonts.js';
   import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
+  import { hostWindowShown } from './CE_Application/stores/hostWindow.js';
+  import { installHostKeyForwarding } from './CE_Application/utils/hostKeys.js';
+  import { DEFAULT_PANIC_SHORTCUT, isPanicShortcut } from './CE_Application/utils/panicLayout.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
-  import { createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
+  import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { choiceValueAt } from './CE_Application/utils/exportParameters.js';
   import { choiceParameterForControl, controlParamValue, hostValuePatch, hostParameterLeaf } from './CE_Application/utils/playerParameterSession.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource, startDeviceSync } from './CE_Application/stores/deviceProfiles.js';
-  import { playerDeviceTarget, startupReadPlan, createHostSeedTracker } from './CE_Application/utils/playerStartup.js';
+  import { playerDeviceTarget, startupReadPlan, createHostSeedTracker, sendFromBoundControls } from './CE_Application/utils/playerStartup.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
@@ -38,6 +41,9 @@
   // script-driven visual writes replace its shallow shell after mutating the addressed field.
   let panel = $state.raw(null);
   let panelLoadGeneration = $state(0);
+  // The instance storage for the current processor session (see loadPanel).
+  let instanceStorage = null;
+  let instanceStorageSession = null;
 
   // --- Live device output (step 1): pick a MIDI port and send for real ---
   let hasBridge = $state(false);
@@ -490,9 +496,7 @@
     nrpnState = EMPTY_NRPN_STATE;
     // Player is a runtime: make bound controls SEND (not dry-run). Safe — the engine still
     // only transmits when the role's output is a real hardware port (else it's a no-op).
-    for (const c of flatControls(next.controls ?? []))
-      for (const b of c?._children?.DeviceBindings?.bindings ?? [])
-        if (b && typeof b === 'object') b.dryRun = false;
+    sendFromBoundControls(next.controls);
     ({ deviceRole, profileId } = playerDeviceTarget(next));
     if (typeof window !== 'undefined' && window.__CE_PLAYER_SESSION__?.restored) sessionRestored = true;
     // Start (or restart) the panel script runtime for this panel — the SAME Lua/JS runtime the editor
@@ -502,12 +506,25 @@
     setPreviewModeEnabled(false);
     panel = next;
     panelLoadGeneration += 1;
+    // ce.storage: the plug-in instance's own stores, when there is an instance (the CEditor Player
+    // app has none, and the page then keeps its own). Each write goes back to it as it happens. Made
+    // once per session the processor hands over: the copy it sent is stale after the first write,
+    // and a reload of the panel within the session keeps what was written since.
+    const session = typeof window !== 'undefined' ? window.__CE_PLAYER_SESSION__ : null;
+    const backendForStorage = typeof window !== 'undefined' ? window.__JUCE__?.backend : null;
+    if (session !== instanceStorageSession) {
+      instanceStorageSession = session;
+      instanceStorage = session?.storage && backendForStorage
+        ? createInstanceStorage(session.storage, (change) => backendForStorage.emitEvent('scriptSetting', change))
+        : null;
+    }
+    const storage = instanceStorage;
     setRuntimeHost(createPlayerHost(
       () => panel,
       // The player keeps its document in $state.raw so native objects remain cloneable. A script
       // changing text, colour or visibility mutates that raw tree; replace the shallow panel shell
       // to tell Svelte and PanelPreviewSurface that the document changed.
-      { onDocumentWrite: () => { panel = { ...panel }; } },
+      { onDocumentWrite: () => { panel = { ...panel }; }, storage },
     ));
     rebuildParamControlMap(panel.controls ?? []);
     rebuildHostParamMaps(panel);
@@ -596,6 +613,8 @@
     let deviceUnsub = null;
     let restoreToken = null;
     let sessionToken = null;
+    let hostWindowToken = null;
+    let stopHostKeys = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
       listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
@@ -627,9 +646,20 @@
       });
       // A host that restores state into an open window: from here on this is a saved project, and
       // a read that has not started yet must not run over it.
+      // Whether the host's window is showing ours (stores/hostWindow.js): a plug-in's page is not
+      // told by the browser, so PlayerHost looks and says.
+      hostWindowToken = backend.addEventListener('hostWindow', (payload) => hostWindowShown.set(payload?.shown !== false));
       sessionToken = backend.addEventListener('sessionRestored', () => {
         sessionRestored = true;
         if (synthSyncTimer) { clearTimeout(synthSyncTimer); synthSyncTimer = 0; startupReadPort = null; }
+      });
+      // In a DAW, the keys the panel does not use go to the host: Space starts its transport while
+      // the plug-in has focus (utils/hostKeys.js). PlayerHost says whether this window is one.
+      stopHostKeys = installHostKeyForwarding({
+        enabled: () => window.__CE_PLAYER_SESSION__?.hostKeys === true,
+        send: (payload) => backend.emitEvent('hostKey', payload),
+        // The panel's panic key stays the panel's, whatever key it is.
+        pageKeeps: (event) => isPanicShortcut(event, { shortcut: panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT }),
       });
       backend.emitEvent('playerReady', {});
     } else if (window.__CE_PANEL__ != null) {
@@ -651,6 +681,9 @@
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
       if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
+      if (backend && hostWindowToken != null) backend.removeEventListener(hostWindowToken);
+      hostWindowShown.set(true);
+      if (stopHostKeys) stopHostKeys();
       if (portsUnsub) portsUnsub();
       if (inputsUnsub) inputsUnsub();
       if (inMsgUnsub) inMsgUnsub();

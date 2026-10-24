@@ -10,7 +10,10 @@ import { normalizeControlSetDefinition } from './controlSets.js';
 import { deepClone } from '../utils/deepClone.js';
 
 export const CONTROL_SET_PACKAGE_FORMAT = 'ceditor-controlset';
-export const CONTROL_SET_PACKAGE_VERSION = 1;
+// 2: a family value can go with another property (models/familyConditions.js), as the plate sets'
+// lettering goes with the plate. A version-1 reader would take such a value for the value itself
+// and draw an object as a colour, so it is told the file is newer and refuses it instead.
+export const CONTROL_SET_PACKAGE_VERSION = 2;
 
 function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;

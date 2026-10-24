@@ -82,3 +82,27 @@ test('nothing is offered for a synth no open panel uses — not on the start scr
   assert.deepEqual(readOfferCandidates(mappings, sources, new Set(), new Set(['Lead'])).ready, [], 'a panel for another synth');
   assert.equal(readOfferCandidates(mappings, sources, new Set(), new Set(['Roland GAIA SH-01'])).ready.length, 1, 'the GAIA panel open');
 });
+
+test('bound controls send in the player even when they share their bindings, frozen', async () => {
+  // A knob and its readout bound to one parameter: loaded together, the equal binding is one
+  // frozen object (expandControls), and the player's old in-place `b.dryRun = false` threw on it,
+  // so such a panel did not load in the player at all.
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { expandControls, shrinkControl } = await import('../src/CE_Application/stores/documentShape.js');
+  const { sendFromBoundControls: send } = await import('../src/CE_Application/utils/playerStartup.js');
+  const bound = (name) => {
+    const control = createControl('Knob');
+    control._children.Core.name = name;
+    control._children.DeviceBindings.bindings = [{ kind: 'deviceParameter', deviceRole: 'mainSynth', parameterId: 'cutoff', dryRun: true }];
+    return shrinkControl(control);
+  };
+  const controls = expandControls([bound('knob'), bound('readout')]);
+  const shared = controls[0]._children.DeviceBindings.bindings[0];
+  assert.equal(shared, controls[1]._children.DeviceBindings.bindings[0], 'one binding object');
+  assert.ok(Object.isFrozen(shared));
+
+  assert.doesNotThrow(() => send(controls));
+  for (const control of controls) assert.equal(control._children.DeviceBindings.bindings[0].dryRun, false);
+  assert.equal(shared.dryRun, true, 'the shared original is left as it was');
+  assert.equal(controls[0]._children.DeviceBindings.bindings[0].parameterId, 'cutoff');
+});

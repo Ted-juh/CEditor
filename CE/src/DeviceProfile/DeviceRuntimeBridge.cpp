@@ -78,19 +78,19 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         {
             e ("deviceIdentityOverride", s.overrideDeviceIdentityMismatch (p));
             e ("deviceSessionState", s.getSessionState());
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
         }))
         .withEventListener ("startDeviceSync", on ([] (S& s, E e, const juce::var& p)
         {
             e ("deviceSyncStarted", s.startDeviceSync (p));
             e ("deviceSessionState", s.getSessionState());
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
         }))
         .withEventListener ("startPresetListScan", on ([] (S& s, E e, const juce::var& p)
         {
             e ("presetListScanStarted", s.startPresetListScan (p));
             e ("deviceSessionState", s.getSessionState());
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
         }))
         .withEventListener ("cancelPresetListScan", on ([] (S& s, E e, const juce::var& p)
         {
@@ -105,7 +105,7 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         {
             e ("bulkDumpSendStarted", s.startBulkDumpSend (p));
             e ("deviceSessionState", s.getSessionState());
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
         }))
         .withEventListener ("cancelBulkDumpSend", on ([] (S& s, E e, const juce::var& p)
         {
@@ -144,7 +144,7 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         {
             e ("dumpMessageParsed", s.parseDumpMessage (p, true));
             e ("deviceRuntimeState", s.getRuntimeState());
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
             e ("deviceSessionState", s.getSessionState());
         }))
         .withEventListener ("ingestIncomingMidiMessage", on ([] (S& s, E e, const juce::var& p)
@@ -156,13 +156,13 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         .withEventListener ("requestMidiCiDiscovery", on ([] (S& s, E e, const juce::var& p)
         {
             e ("midiCiDiscoveryStarted", s.startMidiCiDiscovery (p));
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
             e ("deviceSessionState", s.getSessionState());
         }))
         .withEventListener ("setMidiCiProfile", on ([] (S& s, E e, const juce::var& p)
         {
             e ("midiCiProfileSet", s.setMidiCiProfile (p));
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
         }))
         .withEventListener ("runDeviceProfileTests", on ([] (S& s, E e, const juce::var& p)
         {
@@ -172,16 +172,17 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         {
             e ("deviceRuntimeState", s.getRuntimeState());
         }))
+        // The whole log, for a page that has just opened; after this it is sent only what is new.
         .withEventListener ("getMidiMonitorEvents", on ([] (S& s, E e, const juce::var&)
         {
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            e ("midiMonitorEvents", s.takeMonitorSnapshot());
         }))
         .withEventListener ("clearMidiMonitorEvents", on ([] (S& s, E e, const juce::var&)
         {
-            // Emitted back so the UI's list is replaced by the engine's, rather than merely agreeing
-            // with it until the next message arrives and contradicts it.
+            // Emitted back, whole, so the UI's list is replaced by the engine's, rather than merely
+            // agreeing with it until the next message arrives and contradicts it.
             s.clearMonitorEvents();
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            e ("midiMonitorEvents", s.takeMonitorSnapshot());
         }))
         .withEventListener ("getDeviceDiagnostics", on ([] (S& s, E e, const juce::var&)
         {

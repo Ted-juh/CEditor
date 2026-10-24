@@ -621,7 +621,7 @@
 
   function lockName(lane) {
     const name = (lane.name || (lane.type === 'cc' ? `CC${lane.ccNumber}` : lane.parameterId))
-      .replace(/^Lock\s*[—-]\s*/, '');
+      .replace(/^Lock\s*[\u2014-]\s*/, '');
     return lane.targetName ? `${name} · ${lane.targetName}` : name;
   }
 

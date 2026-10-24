@@ -41,6 +41,16 @@ try {
   assert.equal(adopted.Behavior.defaultCurrentValue, 64);
   assert.equal(adopted.Behavior.valueType, 'int');
   assert.equal(adopted.DeviceBindings.bindings[0].dryRun, false);
+  // The address line reads a device runtime, loaded the first time one is asked of it
+  // (deviceAddress.js). This profile is no DPD's, so each runtime is asked in turn: the generic CC
+  // one has a cutoff, GAIA a filter.cutoff, and a parameter none has says the DPD holds it.
+  const address = (wanted) => page.waitForFunction((source) => new RegExp(source)
+    .test(document.querySelector('.insight .dev-addr')?.textContent.trim() ?? ''), wanted.source);
+  await address(/^CC 74$/);
+  await page.evaluate(() => window.__workflow.bind({ parameterId: 'filter.cutoff' }));
+  await address(/^DT1 10 00 01 [0-9A-F]{2}$/);
+  await page.evaluate(() => window.__workflow.bind({ parameterId: 'no.such.parameter' }));
+  await address(/^addr → DPD$/);
 
   // These controls previously only changed the dropdown stores, leaving the backend untouched.
   await page.getByLabel('MIDI output', { exact: true }).selectOption('test-output');

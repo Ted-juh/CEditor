@@ -14,7 +14,8 @@
  * No editor concerns (no ValueTreeBridge, undo, file dialogs). This is the runtime that
  * an exported VST3/standalone (Phase C/D) wraps.
  */
-class PlayerHost : public juce::Component
+class PlayerHost : public juce::Component,
+                   private juce::Timer
 {
 public:
     // externalService: when the plugin processor owns the MIDI engine (so it persists window-closed),
@@ -71,10 +72,37 @@ public:
     std::function<bool()> isSessionRestored;
     void notifySessionRestored();
 
+    // --- ce.storage, window open --------------------------------------------------------------
+    // The instance's two stores ({ panel: {...}, local: {...} }), handed to the page with the panel,
+    // and each write the page makes ({ store, key, value } or { store, key, forget: true }) handed
+    // back, so the page and the window-closed runtime keep one store between them. Unset (the
+    // CEditor Player app, which has no plug-in instance), the page keeps its own.
+    std::function<juce::var()> scriptStores;
+    std::function<void (const juce::var& change)> onScriptSetting;
+
+    // --- Whether the webview came up ------------------------------------------------------------
+    /** The name of the WebView2 profile folder this window's webview was given; empty when there
+        is no webview (the runtime is missing). Off Windows the folder is made and goes unused. */
+    juce::String webViewProfile() const { return webViewProfileName; }
+
+    /** "page ready" when the page first answers, "panel shown" when it has the panel loaded. */
+    std::function<void (const juce::String& stage)> onWebViewStage;
+
+    // --- Keys for the DAW --------------------------------------------------------------------------
+    /** Set by the plug-in's editor: the keys the page does not use go to the host's window, so Space
+        starts the transport and the DAW's shortcuts work while the panel has focus. Windows only,
+        where the webview takes every key (HostKeyForwarding.h); elsewhere, and in the CEditor Player
+        app, which has no host, the page keeps them. Set before the page loads, which is told. */
+    bool forwardKeysToHost = false;
+
 private:
+    void timerCallback() override;
+    void sendHostWindow();
     void showStatusMessage (const juce::String& title, const juce::String& message);
     void loadPanelIntoWebView();
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
+    bool keysGoToHost() const;
+    void forwardKeyToHost (const juce::var& payload);
 
     juce::File panelFile;
     juce::String panelJson;
@@ -82,4 +110,6 @@ private:
     ceditor::device::DeviceProfileService& service;                      // owned or the processor's
     std::unique_ptr<juce::WebBrowserComponent> webView;
     std::unique_ptr<juce::Label> statusLabel;
+    juce::String webViewProfileName;
+    bool hostWindowShown = true;   // the host's window shows ours (timerCallback, Windows only)
 };

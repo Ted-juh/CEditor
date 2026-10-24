@@ -4,22 +4,36 @@ import { resolveControlForSet } from './controlSetFamilies.js';
 import { createPanel } from '../stores/panelModel.js';
 import { setAnatomy } from './controlAnatomy.js';
 import { starterDirection } from './controlSetCoverage.js';
+import { labelTreatmentFor } from './labelDesigns.js';
 
 // Gallery and starter share ordinary controls. Materialization exposes design values in the
 // inspector; the pin keeps the design when the user copies a control to another panel.
-export function createControlSetStarter(setId, { materialize = true } = {}) {
+//
+// `nextId` numbers the controls. Left out, each one gets the editor's own id and name, as any new
+// control does — taken from a counter that starts at the clock, so no two starters opened from the
+// gallery share one. The starters that ship as files pass a fixed sequence instead, so a file is
+// the same on every export and a test can hold it to the code (scripts/export-control-set-starters.mjs).
+export function createControlSetStarter(setId, { materialize = true, nextId = null } = {}) {
   const set = getControlSet(setId);
   if (!set) throw new Error(`Unknown control set: ${setId}`);
   const direction = starterDirection(setId);
   const controls = [];
   function place(type, x, y, width, height, extra = {}) {
-    let c = createControl(type, { Core: { controlSetId: setId, ...(setId === 'graphite' && setAnatomy(type, setId) ? { controlForm: setAnatomy(type, setId), formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
+    // Given a number, the id and the name createControl would have made from it.
+    const n = nextId?.();
+    let c = createControl(type, { ...(n == null ? {} : { name: `${type}_${n}` }), Core: { ...(n == null ? {} : { id: `ctrl_${n}` }), controlSetId: setId, ...(setId === 'graphite' && setAnatomy(type, setId) ? { controlForm: setAnatomy(type, setId), formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
     if (materialize) c = resolveControlForSet(c, set);
     controls.push(c);
     return c;
   }
+  // A caption is drawn the way the set draws a Label: printed on the panel, engraved, lit, on a brass
+  // plate or in a hairline frame (models/labelDesigns.js). Only Graphite has no Label design, and
+  // there the starter takes off the box every control is born with. Doing that under every set, as
+  // the starter did before sets designed labels, kept the plate sets' dark plate lettering and
+  // removed the plate it is lettered on.
+  const bareCaption = labelTreatmentFor(set) ? {} : { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } } };
   function label(title, x, y, width = 250, size = 13) {
-    place('Label', x, y, width, 26, { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } }, Text: { content: title, _children: { Font: { size } } } });
+    place('Label', x, y, width, 26, { ...bareCaption, Text: { content: title, _children: { Font: { size } } } });
   }
   if(direction?.physical) {
     label(set.name.toUpperCase(),26,16,650,24);

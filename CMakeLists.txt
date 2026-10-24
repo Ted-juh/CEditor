@@ -241,7 +241,18 @@ if(CEDITOR_BUILD_APP)
     # --- Player web bundle embedded into the player/plugin (self-contained, host-path-independent) ---
     # The player and the VST3 serve player.html + assets from this BinaryData, so the WebView paints
     # regardless of where the host loads the binary from (fixes blank UI in a DAW).
-    file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist/*")
+    #
+    # Not dist/ itself: dist-embed/, which the Vite build writes with dist/ (embedPlayerBundle in
+    # CE/web/vite.config.js, scripts/embed-web.mjs) — the files player.html and host.html can reach, the only two
+    # pages served from here, each gzip-compressed and inflated as the page asks for it
+    # (PlayerHost.cpp, HostRuntimeShared.h). Globbing dist/ embedded the editor too: 21.6 MB of
+    # every 37 MB plug-in, where these come to 6.3. A build that failed leaves no dist-embed/, and a
+    # player built without it would be blank wherever its dist/ is not on disk, so that stops here.
+    file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist-embed/*")
+    if (NOT PLAYER_WEB_DIST)
+        message(FATAL_ERROR "CE/web/dist-embed is empty: run `npm run build` in CE/web first. The build writes "
+                            "dist-embed/ with dist/, and the player, the plug-in and Hostage embed it.")
+    endif()
     juce_add_binary_data(PlayerWebData
         NAMESPACE PlayerWebData
         HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/PlayerWebData"
@@ -392,6 +403,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEditorPlayer PRIVATE
         "${CE_ROOT}/src/Player/PlayerMain.cpp"
         "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
@@ -521,6 +533,8 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEditorPlayerVST PRIVATE
         "${CE_ROOT}/src/Player/PluginProcessor.cpp"
         "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
+        "${CE_ROOT}/src/Player/PlayerStandaloneApp.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
@@ -543,6 +557,11 @@ if(CEDITOR_BUILD_APP)
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
         CEDITOR_SIDECAR_IDENTITY=$<IF:$<BOOL:${CEDITOR_TEMPLATE_PLAYER}>,1,0>
+        # The standalone is ours (Player/PlayerStandaloneApp.cpp): JUCE's keeps one settings file per
+        # product name, so every copy of a panel open at once, and every panel sharing a name, read
+        # and overwrote one plug-in state. PUBLIC, because the Standalone wrapper target compiles the
+        # JUCE file that reads it.
+        JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
     )
 
     # PUBLIC for CE_ROOT/src, not PRIVATE, and the reason is easy to trip over: juce_add_plugin puts
@@ -607,8 +626,8 @@ if(CEDITOR_BUILD_APP)
     # Two wrappers around the same InstrumentHostService the editor's preview uses: a standalone
     # (CEHostStandalone — owns the audio device, persists its session per user) and an outer VST3
     # (CEHostVST3 — the DAW owns audio and session; the rack rides in the project chunk). Both
-    # serve host.html out of PlayerWebData — the bundle glob above already embeds every dist/
-    # entry, so the runtime page ships without any packaging change.
+    # serve host.html out of PlayerWebData — the bundle above embeds what player.html and host.html
+    # reach (CE/web/scripts/embed-web.mjs), so the runtime page ships without any packaging change.
     #
     # Identity is stamped from cache variables because the Host Project build reuses these targets
     # per product: same shape, whatever name/code the project chose (the CEditorPlayerVST
@@ -677,6 +696,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEHostStandalone PRIVATE
         "${CE_ROOT}/src/InstrumentHost/HostRuntimeMain.cpp"
         "${CE_ROOT}/src/InstrumentHost/HostRuntimeShell.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         ${CE_HOST_COMMON_SOURCES}
     )
 
@@ -735,6 +755,7 @@ if(CEDITOR_BUILD_APP)
 
     target_sources(CEHostVST3 PRIVATE
         "${CE_ROOT}/src/InstrumentHost/HostPluginProcessor.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         ${CE_HOST_COMMON_SOURCES}
     )
 
@@ -981,6 +1002,31 @@ target_link_libraries(CEditorUpdateCheckTests PRIVATE
 
 add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
 ce_configure_test(CEditorUpdateCheckTests)
+
+# --- An exported plug-in's unused keys, handed to the DAW ---
+# The key message is a pure function of the key and runs anywhere; posting it is the Windows half,
+# driven there with real windows in the shape a DAW gives a plug-in (HostKeyForwarding.h). It is
+# reached otherwise only through PlayerHost.cpp, which needs a webview.
+add_executable(CEditorHostKeyForwardingTests "${CE_ROOT}/tests/HostKeyForwardingTests.cpp")
+target_include_directories(CEditorHostKeyForwardingTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorHostKeyForwardingTests PRIVATE juce::juce_core)
+if(WIN32)
+    target_link_libraries(CEditorHostKeyForwardingTests PRIVATE user32)
+endif()
+add_test(NAME HostKeyForwarding COMMAND CEditorHostKeyForwardingTests)
+ce_configure_test(CEditorHostKeyForwardingTests)
+
+# The WebView2 profile folders a player or host webview gets, and the sweep of the ones processes
+# that have gone left in temp (WebViewProfileFolders.h). Plain juce_core: the folders are files and
+# the sweep never makes a webview, so it runs anywhere.
+add_executable(CEditorWebViewProfileFolderTests
+    "${CE_ROOT}/tests/WebViewProfileFolderTests.cpp"
+    "${CE_ROOT}/src/WebViewProfileFolders.cpp"
+)
+target_include_directories(CEditorWebViewProfileFolderTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorWebViewProfileFolderTests PRIVATE juce::juce_core)
+add_test(NAME WebViewProfileFolders COMMAND CEditorWebViewProfileFolderTests)
+ce_configure_test(CEditorWebViewProfileFolderTests)
 
 add_executable(CEditorNativeFileAccessTests "${CE_ROOT}/tests/NativeFileAccessTests.cpp")
 target_include_directories(CEditorNativeFileAccessTests PRIVATE "${CE_ROOT}/src")
@@ -1765,6 +1811,35 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
     )
 endif()
 
+# A DAW, as far as the player's webview can tell: several copies of an exported player plug-in in
+# one process, every editor opened, closed and reopened, and a second process beside them, each
+# panel checked to have come up (tests/WebViewEngineProbe.cpp says how). It is what the shared
+# WebView2 engine switch (CEDITOR_WEBVIEW2_SHARED, docs/webview2-profiles.md) is tried with. Not a
+# ctest, for the reason the check above is not: it needs an exported plug-in, and a desktop.
+option(CEDITOR_WEBVIEW_ENGINE_PROBE "Build the webview engine probe (player copies in one process)" OFF)
+if (CEDITOR_WEBVIEW_ENGINE_PROBE)
+    add_executable(CEditorWebViewEngineProbe
+        "${CE_ROOT}/tests/WebViewEngineProbe.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
+    )
+    target_compile_features(CEditorWebViewEngineProbe PRIVATE cxx_std_23)
+    target_compile_definitions(CEditorWebViewEngineProbe PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+        # A console program turning the message loop itself, as the check above does.
+        JUCE_MODAL_LOOPS_PERMITTED=1
+    )
+    target_include_directories(CEditorWebViewEngineProbe PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorWebViewEngineProbe PRIVATE
+        juce::juce_audio_processors
+        juce::juce_gui_basics
+        $<$<PLATFORM_ID:Windows>:psapi>
+        $<$<PLATFORM_ID:Windows>:dbghelp>   # the stacks of a second process that does not finish
+    )
+endif()
+
 # The worker. Deliberately OUTSIDE the CEDITOR_BUILD_APP block: it needs none of what that
 # block exists to gate (no WebView2, no juceaide, no BinaryData) — juce_audio_processors with
 # VST3 hosting is its whole dependency, and that compiles on Linux too, given the same X11/ALSA
@@ -1894,7 +1969,10 @@ option(CEDITOR_PYTHON "Embed native CPython (full stdlib) as a third window-clos
 # Optional: load COMPILE-AT-EXPORT native handler modules (C++/C#/Java). No language runtime is
 # embedded — the exporter AOT-compiles each panel's handlers into a small native shared library that
 # the player loads via the flat C ABI in CE/src/Scripting/NativeHandlerAbi.h. Requires CEDITOR_SCRIPTING.
-# See CE/src/Scripting/native-handlers-design.md. OFF by default (feature is build-unverified).
+# See CE/src/Scripting/native-handlers-design.md. OFF by default because it is per export: the exporter
+# passes ON only for a panel with such handlers (export-panel-vst3.mjs). Not unverified: CI configures
+# with it ON, so MSVC builds the loader into the tests and the GAIA plug-in it validates, and
+# verify-all.mjs --require builds and runs real C++, C# and Java modules against it on Windows.
 option(CEDITOR_NATIVE_HANDLERS "Load compile-at-export native handler modules (C++/C#/Java) in the player" OFF)
 
 if (CEDITOR_SCRIPTING)
@@ -1944,7 +2022,9 @@ if (CEDITOR_SCRIPTING)
     # --- Optional: native embedded CPython (third language, full stdlib) ---
     if (CEDITOR_PYTHON)
         # Development.Embed gives the libpython needed to embed an interpreter (vs. build a C extension).
-        find_package(Python3 COMPONENTS Development.Embed REQUIRED)
+        # 3.12 or later: each instance runs in an interpreter of its own, made with
+        # Py_NewInterpreterFromConfig (PythonScriptEngine.cpp says why). The exporter bundles 3.13.
+        find_package(Python3 3.12 COMPONENTS Development.Embed REQUIRED)
         target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/PythonScriptEngine.cpp")
         target_link_libraries(ceditor_scripting PUBLIC Python3::Python)
         target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_PYTHON=1)
@@ -1959,8 +2039,10 @@ if (CEDITOR_SCRIPTING)
 ce_configure_test(CEditorPythonScriptTests)
         # The embedded interpreter needs a stdlib home. Exports stage a PythonRuntime folder next to
         # the plugin; for the bare test exe, point CEDITOR_PYTHONHOME at the dev Python found above
-        # (its runtime-DLL dir is the install root on Windows).
-        if (Python3_RUNTIME_LIBRARY_DIRS)
+        # (its runtime-DLL dir is the install root on Windows). Windows only: elsewhere that dir is
+        # /usr/lib/<triplet>, which is not a Python home ("Failed to import encodings module"), and the
+        # dev Python's compiled-in prefix already finds its stdlib.
+        if (WIN32 AND Python3_RUNTIME_LIBRARY_DIRS)
             list(GET Python3_RUNTIME_LIBRARY_DIRS 0 _ce_python_home)
             set_tests_properties(PythonScriptEngine PROPERTIES
                 ENVIRONMENT "CEDITOR_PYTHONHOME=${_ce_python_home}")

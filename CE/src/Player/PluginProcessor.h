@@ -3,39 +3,13 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <atomic>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 #include "PlayerHost.h"
 
-#ifndef CEDITOR_PLAYER_PANEL_PATH
- #define CEDITOR_PLAYER_PANEL_PATH ""
-#endif
-
-#ifndef CEDITOR_SIDECAR_IDENTITY
- #define CEDITOR_SIDECAR_IDENTITY 0
-#endif
-
-#if CEDITOR_SIDECAR_IDENTITY
- #include "Export/PanelIdentitySidecar.h"
-#endif
-
-/**
- * The panel this build loads.
- *
- * A per-panel build bakes the path and this is that path, exactly as before. A TEMPLATE build --
- * one prebuilt binary copied per panel rather than relinked -- has no meaningful path baked in and
- * finds the panel sitting beside itself instead. See CE/src/Export/PanelIdentitySidecar.h.
- *
- * Behind the guard so a build that does not opt in cannot start reading files next to itself.
- */
-static inline juce::File ceditorPlayerPanelFile()
-{
-   #if CEDITOR_SIDECAR_IDENTITY
-    return ceditor::exporter::resolvePlayerPanelFile (CEDITOR_PLAYER_PANEL_PATH);
-   #else
-    return juce::File (CEDITOR_PLAYER_PANEL_PATH);
-   #endif
-}
+#include "PlayerPanelFile.h"
+#include "StateLoadReport.h"
 
 #ifndef CEDITOR_VALUE_LAYER
  #define CEDITOR_VALUE_LAYER 0
@@ -70,33 +44,59 @@ static inline juce::File ceditorPlayerPanelFile()
  * the panel is loaded from a fixed path; Phase D bakes it per-panel with a unique identity.
  */
 class PlayerAudioProcessor : public juce::AudioProcessor
+                           , public ceditor::ReportsStateLoad
                           #if CEDITOR_VALUE_LAYER
                            , private juce::Timer
                           #endif
 {
 public:
-    PlayerAudioProcessor()
+    PlayerAudioProcessor() : PlayerAudioProcessor (readPanelDocument()) {}
+
+private:
+    /** The panel document, parsed ONCE for everything construction reads out of it: the host
+        parameters, the restore policy, the program bank and the window-closed script model.
+
+        It used to be parsed three times, once by each, and a parse is most of a second on a large
+        panel (GAIA's 12 MB took 0.37 s each), all of it on the thread the host builds us on, for
+        every instance in a project.
+
+        And once for every instance of the panel in the process, with scripting: the script model
+        keeps the document, its controls rebuilt from the defaults the payload carries, and each
+        instance holding its own was most of what it cost (GAIA: 14 MB parsed, 9.5 MB rebuilt, per
+        instance). The instances now share one (SharedPanelDocument), and each owns only what its
+        scripts write. Without scripting nothing is held once we are built, so nothing is shared. */
+    static std::shared_ptr<const ceditor::SharedPanelDocument> readPanelDocument()
+    {
+       #if CEDITOR_SCRIPTING
+        return ceditor::PanelValueModel::sharedForFile (ceditorPlayerPanelFile());
+       #elif CEDITOR_VALUE_LAYER
+        return std::make_shared<const ceditor::SharedPanelDocument> (
+            ceditor::SharedPanelDocument { juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString()) });
+       #else
+        return std::make_shared<const ceditor::SharedPanelDocument>();
+       #endif
+    }
+
+    explicit PlayerAudioProcessor (std::shared_ptr<const ceditor::SharedPanelDocument> panel)
         : juce::AudioProcessor (BusesProperties()
               .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
-        , panelParams (ce::parseExportParameters (ceditorPlayerPanelFile()))
+        , panelParams (ce::parseExportParameters (panel->doc))
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
+        const juce::var& panelDocument = panel->doc;
+        logTag = logTagFor (panelDocument);
 #if CEDITOR_VALUE_LAYER
-        // The panel document, parsed once for the two things the processor reads out of it directly:
-        // the restore policy and the baked program bank. Both are constant for the life of the
-        // plugin — the host caches getNumPrograms() the moment it loads us, so the bank had better
-        // not change afterwards.
+        // The two things the processor reads out of the panel directly: the restore policy and the
+        // baked program bank. Both are constant for the life of the plugin — the host caches
+        // getNumPrograms() the moment it loads us, so the bank had better not change afterwards.
         //
         // Absent policy means Ask, which is the conservative reading: a panel exported before that
         // setting existed pushed nothing at all.
-        {
-            const auto document = juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString());
-            restorePolicy = ce::readPanelRestorePolicy (document);
-            programBank = ce::parseProgramBank (document);
-        }
+        restorePolicy = ce::readPanelRestorePolicy (panelDocument);
+        programBank = ce::parseProgramBank (panelDocument);
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -104,10 +104,13 @@ public:
 #endif
 #if CEDITOR_SCRIPTING
         // window-closed: load the panel's scripts + fire onPanelLoad — ON the message thread,
-        // whichever thread the host is building us on (see onMessageThread).
-        onMessageThread ([this] { setupScripting(); });
+        // whichever thread the host is building us on (see onMessageThread). onMessageThread waits
+        // for it, so the document outlives the call.
+        onMessageThread ([this, &panel] { setupScripting (panel); });
 #endif
     }
+
+public:
 
     /**
      * Run `fn` on JUCE's message thread, now, and return when it is done.
@@ -292,6 +295,10 @@ private:
     std::atomic<int>    hostPosTimeSigNum { 0 };
     std::atomic<int>    hostPosTimeSigDen { 0 };
 
+    // What lastStateLoadAccepted reports (StateLoadReport.h): set by the state forms
+    // setStateInformation recognises, cleared at the start of every call.
+    std::atomic<bool>   stateLoadAccepted { false };
+
 public:
 
     // Everything the panel sends is queued here off the audio thread and drained into the host's output
@@ -302,6 +309,9 @@ public:
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
+
+    /** A line about the editor's webview, in this instance's log (scriptLogLine, below). */
+    void webViewLogLine (const juce::String& line) const { scriptLogLine ("[webview] " + line); }
 
     const juce::String getName() const override
     {
@@ -379,8 +389,8 @@ public:
         // The answer to "restore the hardware from this session?", if it has been given. Saved with
         // the project rather than globally: the decision was made about THIS session's patch and
         // this session's synth, and a different project is a different question.
-        if (restoreAnswer.isNotEmpty())
-            root.createNewChildElement ("RestoreAnswer")->addTextElement (restoreAnswer);
+        if (const auto answer = getRestoreAnswer(); answer.isNotEmpty())
+            root.createNewChildElement ("RestoreAnswer")->addTextElement (answer);
         // Which program the host had selected. Hosts do restore this themselves through
         // setCurrentProgram, but not all of them and not always before setStateInformation, so it
         // rides along and the two agree either way.
@@ -410,16 +420,19 @@ public:
        #if CEDITOR_SCRIPTING
         if (scriptRuntimeReady.load())
         {
-            juce::String stateJson, settingsJson;
+            juce::String stateJson, settingsJson, localJson;
             {
                 const juce::SpinLock::ScopedLockType lock (scriptStateLock);
                 stateJson = cachedScriptStateJson;
                 settingsJson = cachedScriptSettingsJson;
+                localJson = cachedScriptLocalJson;
             }
             root.createNewChildElement ("ScriptState")->addTextElement (stateJson);
             // ce.storage settings ride along separately: they are the runtime's, not any one
             // script's, so merging them into `store` would let a script overwrite another's key.
             root.createNewChildElement ("ScriptSettings")->addTextElement (settingsJson);
+            // "local" scope, per machine (localSettingsForState).
+            root.createNewChildElement ("ScriptLocal")->addTextElement (localJson);
         }
        #endif
         copyXmlToBinary (root, destData);
@@ -428,8 +441,11 @@ public:
 #endif
     }
 
+    bool lastStateLoadAccepted() const noexcept override { return stateLoadAccepted.load(); }
+
     void setStateInformation (const void* data, int sizeInBytes) override
     {
+        stateLoadAccepted.store (false);
 #if CEDITOR_VALUE_LAYER
         auto xml = getXmlFromBinary (data, sizeInBytes);
         if (xml == nullptr) return;
@@ -446,12 +462,12 @@ public:
             // the patch that was just restored, which is the wrong sound and the wrong order. A
             // change the host asked for before this state arrived goes with the state it preceded.
             const auto recall = ce::readSessionRecall (*xml, ce::hostProgramCount (programBank));
-            restoreAnswer = recall.restoreAnswer;
+            setRestoreAnswer (recall.restoreAnswer);
             currentProgram = recall.program;
             programChangePending.store (false);
-            restoredDumps = juce::var();
-            if (auto* dumps = xml->getChildByName ("DeviceDumps"))
-                restoredDumps = juce::JSON::parse (dumps->getAllSubText());
+            juce::var dumps;
+            if (auto* d = xml->getChildByName ("DeviceDumps"))
+                dumps = juce::JSON::parse (d->getAllSubText());
             markSessionRestored();
 
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
@@ -461,16 +477,22 @@ public:
             // Without this the whole feature was: values restored, ports reconnected, and the synth
             // left on whatever patch it happened to be on. The state was known and not transmitted,
             // which from the user's chair is the same as not having been saved.
-            armRestorePush();
+            stageRestorePush (std::move (dumps));
            #if CEDITOR_SCRIPTING
             {
                 const juce::SpinLock::ScopedLockType lock (scriptStateLock);
                 pendingScriptSettingsPresent = false;
                 pendingScriptStatePresent = false;
+                pendingScriptLocalPresent = false;
                 if (auto* sset = xml->getChildByName ("ScriptSettings"))
                 {
                     pendingScriptSettingsJson = sset->getAllSubText();
                     pendingScriptSettingsPresent = true;
+                }
+                if (auto* sloc = xml->getChildByName ("ScriptLocal"))
+                {
+                    pendingScriptLocalJson = sloc->getAllSubText();
+                    pendingScriptLocalPresent = true;
                 }
                 if (auto* sx = xml->getChildByName ("ScriptState"))
                 {
@@ -484,7 +506,7 @@ public:
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
         {
             // A state from before recall existed answered nothing and selected nothing.
-            restoreAnswer = {};
+            setRestoreAnswer ({});
             currentProgram = 0;
             programChangePending.store (false);
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
@@ -494,6 +516,7 @@ public:
         {
             return;
         }
+        stateLoadAccepted.store (true);
 
         // Every parameter may have just moved, and the host has to be told to read them again. A
         // DAW reopening a project builds a FRESH instance and loads the state into it, so what it
@@ -556,15 +579,13 @@ private:
         juce::var store (new juce::DynamicObject());
         scriptRuntime->onDawSaveState (store);
 
-        auto* settings = new juce::DynamicObject();
-        for (int i = 0; i < scriptSettings.size(); ++i)
-            settings->setProperty (scriptSettings.getName (i), scriptSettings.getValueAt (i));
-
         auto stateJson = juce::JSON::toString (store);
-        auto settingsJson = juce::JSON::toString (juce::var (settings));
+        auto settingsJson = juce::JSON::toString (settingsToVar (scriptSettings));
+        auto localJson = juce::JSON::toString (localSettingsForState());
         const juce::SpinLock::ScopedLockType lock (scriptStateLock);
         cachedScriptStateJson = std::move (stateJson);
         cachedScriptSettingsJson = std::move (settingsJson);
+        cachedScriptLocalJson = std::move (localJson);
     }
 
     /** Apply state parsed by a host callback. The timer is the thread handoff. */
@@ -573,27 +594,24 @@ private:
         if (scriptRuntime == nullptr || ! scriptRestorePending.exchange (false))
             return;
 
-        juce::String stateJson, settingsJson;
-        bool hasState = false, hasSettings = false;
+        juce::String stateJson, settingsJson, localJson;
+        bool hasState = false, hasSettings = false, hasLocal = false;
         {
             const juce::SpinLock::ScopedLockType lock (scriptStateLock);
             stateJson = std::move (pendingScriptStateJson);
             settingsJson = std::move (pendingScriptSettingsJson);
+            localJson = std::move (pendingScriptLocalJson);
             hasState = pendingScriptStatePresent;
             hasSettings = pendingScriptSettingsPresent;
+            hasLocal = pendingScriptLocalPresent;
             pendingScriptStatePresent = false;
             pendingScriptSettingsPresent = false;
+            pendingScriptLocalPresent = false;
         }
 
         // Settings first: a script's onDawRestoreState may well read one back.
-        if (hasSettings)
-        {
-            scriptSettings.clear();
-            const auto parsedSettings = juce::JSON::parse (settingsJson);
-            if (auto* obj = parsedSettings.getDynamicObject())
-                for (const auto& p : obj->getProperties())
-                    scriptSettings.set (p.name, p.value);
-        }
+        if (hasSettings) settingsFromVar (scriptSettings, juce::JSON::parse (settingsJson));
+        if (hasLocal)    localSettingsFromState (juce::JSON::parse (localJson));
         if (hasState)
             scriptRuntime->onDawRestoreState (juce::JSON::parse (stateJson));
         refreshScriptStateCache();
@@ -656,6 +674,7 @@ private:
 
     void timerCallback() override
     {
+        applyStagedRestore();
         const bool windowOpen = getActiveEditor() != nullptr;
        #if CEDITOR_SCRIPTING
         servicePendingScriptRestore();
@@ -779,16 +798,64 @@ private:
         sessionRestoreCount.fetch_add (1);
     }
 
-    /** Called from setStateInformation. Never sends — see the comment there for why. */
-    void armRestorePush()
+    /** Called from setStateInformation, on whatever thread the host calls it from. Never sends —
+        see the comment there for why — and touches nothing the timer owns: it stages the restore,
+        and applyStagedRestore arms it on the message thread.
+
+        It used to arm it here, and that wrote lastSentMidi from the host's thread while the timer
+        read and wrote it on the message thread. Most hosts call this on the message thread, so the
+        two never met. An LV2 on Linux runs a message thread of its own inside the plug-in while the
+        host restores from its own thread, and pluginval met them: a SIGSEGV inside the map's
+        comparator, in two LV2 runs of ten on a loaded machine. */
+    void stageRestorePush (juce::var dumps)
     {
         // Treat the restored snapshot as the baseline until the restore policy decides what may
         // be sent. Otherwise the ordinary automation loop sees an empty cache on its first tick
         // and pushes every parameter even when the policy is Never or still waiting for an answer.
-        rebaselineSentMidi();
+        // Taken here, from the values this call just restored (the raw parameters are atomics), so
+        // it is the same snapshot it always was however late the timer picks it up.
+        StagedRestore staged;
+        for (const auto& desc : panelParams)
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+                staged.baseline[desc.id] = raw->load();
+        staged.dumps = std::move (dumps);
+        staged.armedAtMs = juce::Time::getMillisecondCounterHiRes();
+        {
+            const juce::SpinLock::ScopedLockType lock (stagedRestoreLock);
+            stagedRestore = std::move (staged);
+        }
+        restoreStaged.store (true);
+    }
+
+    /** On the message thread, first thing on every tick: arm a restore setStateInformation staged,
+        before anything below can read lastSentMidi or the restore flags. */
+    void applyStagedRestore()
+    {
+        if (! restoreStaged.exchange (false)) return;
+        std::optional<StagedRestore> staged;
+        {
+            const juce::SpinLock::ScopedLockType lock (stagedRestoreLock);
+            staged.swap (stagedRestore);
+        }
+        if (! staged.has_value()) return;
+        lastSentMidi = std::move (staged->baseline);
+        restoredDumps = std::move (staged->dumps);
         restorePending = true;
         restorePromptSent = false;
-        restoreArmedAtMs = juce::Time::getMillisecondCounterHiRes();
+        restoreArmedAtMs = staged->armedAtMs;
+    }
+
+    /** The user's answer is written by setStateInformation (the host's thread) and the editor, and
+        read by getStateInformation (any thread) and the timer, so it lives behind a lock. */
+    juce::String getRestoreAnswer() const
+    {
+        const juce::SpinLock::ScopedLockType lock (restoreAnswerLock);
+        return restoreAnswer;
+    }
+    void setRestoreAnswer (const juce::String& answer)
+    {
+        const juce::SpinLock::ScopedLockType lock (restoreAnswerLock);
+        restoreAnswer = answer;
     }
 
     /** Is any role this panel actually binds reporting `ready`? */
@@ -934,7 +1001,7 @@ private:
 
         ce::RestoreSituation situation;
         situation.policy = restorePolicy;
-        situation.rememberedAnswer = restoreAnswer;
+        situation.rememberedAnswer = getRestoreAnswer();
         situation.deviceReady = anyBoundDeviceReady();
         situation.windowOpen = windowOpen;
         situation.promptAlreadySent = restorePromptSent;
@@ -1159,7 +1226,7 @@ public:
             return;
         }
         if (a != "always" && a != "never") return;
-        restoreAnswer = a;
+        setRestoreAnswer (a);
         updateHostDisplay();   // the project is dirty: this choice is saved with it
     }
 
@@ -1261,13 +1328,23 @@ private:
     // Total Recall S2. `restorePolicy` is the panel author's default, read once at construction;
     // `restoreAnswer` is the user's decision, which outranks it and is saved with the project.
     ce::RestorePolicy restorePolicy = ce::RestorePolicy::Ask;
-    juce::String restoreAnswer;          // "", "always" or "never"
+    juce::String restoreAnswer;          // "", "always" or "never" — only through get/setRestoreAnswer
+    mutable juce::SpinLock restoreAnswerLock;
     std::atomic<bool> sessionRestored { false };   // setStateInformation ran: a reopened project
     std::atomic<int> sessionRestoreCount { 0 };
-    bool restorePending = false;
-    bool restorePromptSent = false;
+    bool restorePending = false;         // these four, and lastSentMidi, are the message thread's:
+    bool restorePromptSent = false;      // setStateInformation stages a restore and the timer arms it
     double restoreArmedAtMs = 0.0;
     double restoreLastCheckedMs = 0.0;
+    struct StagedRestore
+    {
+        std::map<juce::String, float> baseline;   // the restored values, taken as already on the synth
+        juce::var dumps;                          // what becomes restoredDumps
+        double armedAtMs = 0.0;
+    };
+    juce::SpinLock stagedRestoreLock;
+    std::optional<StagedRestore> stagedRestore;   // guarded by stagedRestoreLock
+    std::atomic<bool> restoreStaged { false };
 
     // S3. `capturedDumps` is a JSON object of dumpId -> hex, rebuilt on the message thread and read
     // by getStateInformation, which the host may call from another one — hence the lock, held only
@@ -1279,6 +1356,7 @@ private:
     std::map<juce::String, float> lastCapturedValue;
     bool dumpCaptureBuilt = false;                 // refreshCapturedDumps has reached a profile
     std::set<juce::String> loggedSkippedDumps;     // dumps already reported as not captured
+    std::set<juce::String> deviceOverrideWarned;   // setVariable / setTiming names that have said a value was not used as given
 
     // S4. The bank is baked at export and never changes — the host caches getNumPrograms() the
     // moment it loads us. `programChangePending` is atomic because setCurrentProgram can arrive on
@@ -1374,14 +1452,31 @@ private:
     // Window-closed activity, appended to a file, so it is observable without a debugger or a MIDI
     // monitor: tail %TEMP%\ceditor-player-scripts.log.
     //
+    // Every line says which instance wrote it — the panel's name and an id of this instance's own —
+    // because every instance of every panel on the machine writes to this one file, and two copies
+    // of a panel used to read as one, their lines interleaved with nothing to tell them apart.
+    //
     // OUTSIDE BOTH GUARDS, for the reason written up on sendRawMidiBytes below: it used to live
     // under `#if CEDITOR_SCRIPTING`, and the restore push (CEDITOR_VALUE_LAYER) logs through it
     // too. The two flags are independent, so a build with the value layer on and scripting off had
     // the call and not the callee — the exact `C3861: identifier not found` that bit once already.
-    static void scriptLogLine (const juce::String& line)
+    void scriptLogLine (const juce::String& line) const
     {
         auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-player-scripts.log");
-        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  " + line + juce::newLine);
+        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  [" + logTag + "]  "
+                      + line + juce::newLine);
+    }
+
+    /** "GAIA SH-01 3f2a": the panel's name, and four hex digits that are this instance's. Set
+        first thing in the constructor, from the document it is built with. */
+    juce::String logTag;
+
+    static juce::String logTagFor (const juce::var& panelDocument)
+    {
+        auto name = juce::String (juce::CharPointer_UTF8 (JucePlugin_Name));
+        if (auto* doc = panelDocument.getDynamicObject())
+            if (const auto n = doc->getProperty ("name").toString(); n.isNotEmpty()) name = n;
+        return name + " " + juce::String::toHexString (juce::Random().nextInt (0x10000)).paddedLeft ('0', 4);
     }
 
 #if CEDITOR_SCRIPTING
@@ -1586,19 +1681,12 @@ private:
     }
    #endif
 
-    /** The `{ ok: false, error }` shape a script-facing callback returns when it cannot answer. */
-    static juce::var errorVar (const juce::String& message)
+    void setupScripting (const std::shared_ptr<const ceditor::SharedPanelDocument>& panel)
     {
-        auto* out = new juce::DynamicObject();
-        out->setProperty ("ok", false);
-        out->setProperty ("error", message);
-        return juce::var (out);
-    }
-
-    void setupScripting()
-    {
-        const auto json = ceditorPlayerPanelFile().loadFileAsString();
-        if (json.isEmpty() || ! scriptValues.loadFromJson (json)) return;
+        // The document construction already parsed, shared with every other instance of the panel:
+        // the script model copies what a script writes and leaves the shared document as it is.
+        if (panel == nullptr || ! panel->doc.isObject()) return;
+        scriptValues.load (panel);
 
         using namespace ceditor::scripting;
         BridgeScriptHost::Callbacks cb;
@@ -1606,6 +1694,14 @@ private:
         // control's own Behavior.min/max, so get("cutoff.normalizedValue") answers window-closed
         // exactly as it does in the panel view.
         cb.getValue = [this] (const juce::String& path, const juce::String& form) { return scriptValues.getValue (path, form); };
+        cb.whyNoValue = [this] (const juce::String& path) { return scriptValues.whyNoAnswer (path); };
+        // A colour is read by the editor's rule before it is written, and ce.anim refuses a colour
+        // property as its path (Scripting/ScriptColours.h), in the editor's words, so "red" written
+        // here is stored as "#FF0000" and "redd" is refused, window shut as in the panel view.
+        cb.colourWrites = [this] (const juce::String& call, const juce::String& path, const juce::var& value,
+                                  const juce::String& form) { return scriptValues.colourWrites (call, path, value, form); };
+        cb.isColourProperty = [this] (const juce::String& path) { return scriptValues.isColourProperty (path); };
+        cb.namesMissingControl = [this] (const juce::String& path) { return scriptValues.namesMissingControl (path); };
         cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER
@@ -1754,11 +1850,19 @@ private:
         // is the value that parameter should carry. Parameters no control is bound to are simply not
         // supplied, and the engine leaves the definition's default bytes in place and says which
         // they were — the ordinary case for a panel that covers part of a dump.
+        //
+        // A dump it cannot build gives nothing back and says why, as the editor's runtime does: it
+        // gave back { ok = false, error }, which a script testing the result for truth took for a
+        // dump, and said nothing. A kind the profile has no dump by is refused before this, in
+        // BridgeScriptHost::buildDump.
         cb.buildDump = [this] (const juce::String& kind) -> juce::var
         {
             auto* engine = deviceService.engineForRole ({});
             if (engine == nullptr)
-                return errorVar ("No device profile is loaded");
+            {
+                scriptLogLine ("[script] buildDump(\"" + kind + "\"): no device profile is chosen for mainSynth, so nothing was built.");
+                return {};
+            }
 
             auto* values = new juce::DynamicObject();
             for (const auto& desc : panelParams)
@@ -1772,7 +1876,10 @@ private:
 
             const auto built = engine->buildDumpMessage (kind, juce::var (values));
             if (! built.ok)
-                return errorVar (built.error);
+            {
+                scriptLogLine ("[script] buildDump(\"" + kind + "\"): " + built.error);
+                return {};
+            }
 
             // The shape a script gets back: the bytes to send, plus what was and was not covered.
             // `unmapped` is the interesting field — it is how a script can tell it is about to send
@@ -1806,27 +1913,54 @@ private:
                                  const juce::String& roleIn) -> bool
         {
             if (parameterId.isEmpty()) return false;
+            const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
             auto* req = new juce::DynamicObject();
-            req->setProperty ("deviceRole", roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn);
+            req->setProperty ("deviceRole", role);
             req->setProperty ("parameterId", parameterId);
             req->setProperty ("value", value);
             req->setProperty ("dryRun", false);      // actually send it
             const auto result = deviceService.compileParameterMessage (juce::var (req), true);
             auto* obj = result.getDynamicObject();
-            return obj != nullptr && (bool) obj->getProperty ("ok");
+            if (obj != nullptr && (bool) obj->getProperty ("ok")) return true;
+            // A parameter the profile does not have, and a device no profile is chosen for, both
+            // answered false without a word. Each is said, in the words the editor's runtime says it
+            // in (CE/web/src/CE_Application/scripting/deviceWords.js;
+            // test/deviceParameterTable.test.js holds the two to one text). A parameter the script
+            // declared never comes here: BridgeScriptHost sends it without a profile.
+            const auto error = obj != nullptr ? obj->getProperty ("error").toString() : juce::String();
+            if (error.startsWith ("Unknown parameter: "))
+                scriptLogLine ("[script] ce.device.write: \"" + parameterId + "\" is not a parameter of the "
+                               + role
+                               + " profile, so nothing was sent.");
+            else if (error.startsWith ("No device profile mapped for role: "))
+                scriptLogLine ("[script] ce.device.write: no device profile is chosen for " + role + ", so \""
+                               + parameterId
+                               + "\" was not sent. A parameter declared with ce.device.defineParameter is sent without one.");
+            return false;
         };
 
         // setVariable / setTiming. The override goes onto this project's ROLE MAPPING, merged over
         // the profile's defaults on the way to every recipe — a profile is a shared document and
         // two panels driving two units of the same synth must not have to edit it to disagree
         // about a device id.
-        cb.deviceSet = [this] (const juce::String& kind, const juce::String& name,
+        //
+        // A name left out, a role no profile is chosen for, a value that is no number, and a number
+        // used as the nearest whole one in range each answered false or was stored without a word,
+        // text and all. Each is said now, in the editor's runtime's words and order (deviceWords.js;
+        // test/deviceOverrides.test.js holds the two to them), the last once per name.
+        cb.deviceSet = [this] (const juce::String& kind, const juce::String& nameIn,
                                const juce::var& value, const juce::String& roleIn) -> bool
         {
-            if (name.isEmpty()) return false;
             const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
             const bool wantVars = kind == "variable";
             if (! wantVars && kind != "timing") return false;
+            const juce::String label = wantVars ? "setVariable" : "setTiming";
+            const auto name = nameIn.trim();
+            if (name.isEmpty())
+            {
+                scriptLogLine ("[script] ce.device." + label + ": a name is required, so nothing was changed.");
+                return false;
+            }
 
             const auto session = deviceService.getSessionState();
             auto* sessionObj = session.getDynamicObject();
@@ -1834,7 +1968,20 @@ private:
             auto* recordObj = record.getDynamicObject();
             const auto profileId = recordObj != nullptr ? recordObj->getProperty ("profileId").toString()
                                                         : juce::String();
-            if (profileId.isEmpty()) return false;   // nothing mapped — say so rather than pretend
+            if (profileId.isEmpty())
+            {
+                scriptLogLine ("[script] ce.device." + label + ": no device profile is chosen for " + role
+                               + ", so nothing was changed.");
+                return false;
+            }
+            const auto read = deviceOverrideValue (label, name, value, 0, wantVars ? 127 : 60000);
+            if (! read.ok)
+            {
+                scriptLogLine ("[script] " + read.refused);
+                return false;
+            }
+            if (read.said.isNotEmpty() && deviceOverrideWarned.insert (label + "/" + role + "/" + name).second)
+                scriptLogLine ("[script] " + read.said + " This is said only the first time.");
 
             // Carried forward whole: setDeviceRoleMapping replaces the mapping, so dropping the
             // ports here would silently unplug the device this call is about.
@@ -1851,7 +1998,7 @@ private:
                 if (auto* existing = recordObj->getProperty (slot).getDynamicObject())
                     for (const auto& e : existing->getProperties())
                         merged->setProperty (e.name, e.value);
-            merged->setProperty (juce::Identifier (name), value);
+            merged->setProperty (juce::Identifier (name), read.value);
             req->setProperty (slot, juce::var (merged));
             if (recordObj != nullptr)
                 req->setProperty (wantVars ? "timingOverrides" : "variables",
@@ -1954,18 +2101,35 @@ private:
             // coming in) rather than by asking the instrument, which almost none can be asked.
             if (kind == "recallPreset")
             {
+                const auto slot = p != nullptr ? p->getProperty ("slot") : juce::var (0);
                 auto* request = new juce::DynamicObject();
                 request->setProperty ("deviceRole", role);
-                request->setProperty ("slot", p != nullptr ? p->getProperty ("slot") : juce::var (0));
+                request->setProperty ("slot", slot);
                 request->setProperty ("dryRun", false);
                 auto result = deviceService.compilePresetRecallAction (juce::var (request), true);
 
-                if (auto* answered = result.getDynamicObject())
-                    if (answered->getProperty ("ok").equals (juce::var (true)))
-                    {
-                        currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
-                        currentPresetSource[role] = "panel";
-                    }
+                auto* answered = result.getDynamicObject();
+                if (answered != nullptr && answered->getProperty ("ok").equals (juce::var (true)))
+                {
+                    currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
+                    currentPresetSource[role] = "panel";
+                    return result;
+                }
+
+                // A recall that recalled nothing answered { ok: false } without a word. Said as the
+                // editor says it (CE/web/.../presetWords.js and panelRuntime's recallPresetImpl):
+                // the slot as it reads it, a role with no profile, and else the engine's own reason,
+                // which is the editor's local engine's too.
+                const double asNumber = slot.isString() ? slot.toString().getDoubleValue() : static_cast<double> (slot);
+                const bool isNumber = slot.isInt() || slot.isInt64() || slot.isDouble() || (slot.isString() && slot.toString().trim().containsOnly ("0123456789.-+eE"));
+                if (! isNumber || ! std::isfinite (asNumber) || juce::roundToInt (asNumber) < 0)
+                    scriptLogLine ("[script] recallPreset(slot): slot must be an integer >= 0.");
+                else if (deviceService.engineForRole (role) == nullptr)
+                    scriptLogLine ("[script] recallPreset(" + juce::String (juce::roundToInt (asNumber)) + "): no device profile is chosen for "
+                                   + role + ", so nothing was recalled.");
+                else
+                    scriptLogLine ("[script] recallPreset(" + juce::String (juce::roundToInt (asNumber)) + "): "
+                                   + (answered != nullptr ? answered->getProperty ("error").toString() : juce::String ("nothing was recalled.")));
                 return result;
             }
 
@@ -2086,6 +2250,42 @@ private:
             }
 
             // The ids of what a profile can build or ask for.
+            // The dumps the profile defines, by id: what requestDump, sendDump and buildDump take
+            // (BridgeScriptHost::unknownDumpKind). Void, not empty, when there is no document to
+            // say, so a kind is not refused for want of one.
+            if (kind == "dumps")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr) return {};
+                juce::Array<juce::var> out;
+                if (auto* arr = docObj->getProperty ("dumpDefinitions").getArray())
+                    for (const auto& item : *arr)
+                        if (auto* o = item.getDynamicObject())
+                            if (const auto id = o->getProperty ("id").toString(); id.isNotEmpty())
+                                out.add (juce::var (id));
+                return juce::var (out);
+            }
+
+            // The dump a request answers with: requestDump(kind, fn) waits for it under that id,
+            // which is the one its answer arrives under. Void for a kind that is no request.
+            if (kind == "answers")
+            {
+                const auto wanted = p != nullptr ? p->getProperty ("request").toString() : juce::String();
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    if (auto* arr = docObj->getProperty ("requests").getArray())
+                        for (const auto& item : *arr)
+                            if (auto* o = item.getDynamicObject(); o != nullptr && o->getProperty ("id").toString() == wanted)
+                            {
+                                auto* response = o->getProperty ("response").getDynamicObject();
+                                const auto dump = response != nullptr ? response->getProperty ("dump").toString()
+                                                                      : o->getProperty ("expectedDump").toString();
+                                return dump.isNotEmpty() ? juce::var (dump) : juce::var();
+                            }
+                return {};
+            }
+
             if (kind == "recipes" || kind == "requests")
             {
                 const auto doc = profileDocument();
@@ -2140,7 +2340,7 @@ private:
         // runAction / emitEvent are left unset on purpose: BridgeScriptHost routes them to the
         // ScriptRuntime, which resolves them against the loaded scripts. Stubbing them here is
         // what made run() and emit() silent no-ops in the shipped plugin.
-        cb.log = [] (const juce::String& msg, const juce::var& value)
+        cb.log = [this] (const juce::String& msg, const juce::var& value)
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));
         };
@@ -2164,53 +2364,35 @@ private:
             o->setProperty ("source", "host");
             return juce::var (o);
         };
-        // "panel" scope rides in the DAW project state (scriptSettings, saved with the session);
-        // "local" scope goes to the plugin's own settings file, which the project does not carry.
+        // Both scopes are this instance's own and ride in the DAW project state: "panel" scope as
+        // it is, "local" scope under this machine's id, so it applies on no other (see
+        // scriptMachineId). Window open, the page reads and writes these same two sets
+        // (scriptStoresForPage, applyScriptSettingFromPage).
         cb.saveSetting = [this] (const juce::String& key, const juce::var& value, const juce::String& store)
         {
-            if (store != "local") { scriptSettings.set (key, value); return; }
-            loadLocalSettings();
-            localSettings.set (key, value);
-            // Written through immediately: a machine-local setting has no "save the project" moment
-            // to ride along with, and the DAW may never close this instance politely.
-            if (! localStore()->update ([&] (juce::PropertySet& values)
-                {
-                    values.setValue (localKey (key), juce::JSON::toString (value));
-                }))
-                scriptLogLine ("[script] local setting could not be saved");
+            settingsFor (store).set (key, value);
+            noteScriptSettingsChanged();
         };
         cb.loadSetting = [this] (const juce::String& key, const juce::String& store)
         {
-            if (store != "local") return scriptSettings.getWithDefault (key, juce::var());
-            loadLocalSettings();
-            return localSettings.getWithDefault (key, juce::var());
+            return settingsFor (store).getWithDefault (key, juce::var());
         };
         cb.listSettings = [this] (const juce::String& store)
         {
-            if (store == "local") loadLocalSettings();
-            const auto& set = (store == "local" ? localSettings : scriptSettings);
+            const auto& set = settingsFor (store);
             juce::Array<juce::var> keys;
             for (int i = 0; i < set.size(); ++i) keys.add (set.getName (i).toString());
             return juce::var (keys);
         };
         cb.forgetSetting = [this] (const juce::String& key, const juce::String& store)
         {
-            if (store == "local") loadLocalSettings();
-            auto& set = (store == "local" ? localSettings : scriptSettings);
+            auto& set = settingsFor (store);
             if (! set.contains (key)) return false;      // so "cleaned up" reads differently from
             set.remove (key);                            // "there was nothing there"
-            if (store == "local")
-            {
-                if (! localStore()->update ([&] (juce::PropertySet& values)
-                    {
-                        values.removeValue (localKey (key));
-                    }))
-                    scriptLogLine ("[script] local setting could not be removed");
-            }
+            noteScriptSettingsChanged();
             return true;
         };
-        // Both stores are real here: the project state carries one and a properties file beside the
-        // app's own preferences carries the other.
+        // Both stores are real here: the project state carries both.
         cb.settingsAvailable = [] (const juce::String&) { return true; };
         cb.startTimer = [this] (const juce::String& id, int intervalMs) { scriptTimers.start (id, intervalMs); };
         cb.stopTimer  = [this] (const juce::String& id) { scriptTimers.stop (id); };
@@ -2218,7 +2400,7 @@ private:
         scriptHost = std::make_unique<BridgeScriptHost> (std::move (cb));
         scriptRuntime = std::make_unique<ScriptRuntime> (*scriptHost);
         scriptHost->attachRuntime (scriptRuntime.get());
-        scriptRuntime->setErrorLogger ([] (const juce::String& line) { scriptLogLine ("[script-error] " + line); });
+        scriptRuntime->setErrorLogger ([this] (const juce::String& line) { scriptLogLine ("[script-error] " + line); });
        #if CEDITOR_VALUE_LAYER
         scriptRuntime->setActivityCallback ([this] { scriptStateDirty.store (true); });
        #endif
@@ -2274,6 +2456,12 @@ private:
         if (! declaredModules.isEmpty())
             scriptLogLine ("scripting modules: " + declaredModules.joinIntoString (", "));
 
+        // "panel" scope starts from the settings the author saved into the document, as it does in
+        // the editor and as the page did window open. A restored project replaces them after.
+        if (scriptSettings.isEmpty())
+            if (auto* scripting = scriptValues.panel().getProperty ("scripting", {}).getDynamicObject())
+                settingsFromVar (scriptSettings, scripting->getProperty ("settings"));
+
         const auto loaded = ceditor::gatherPanelScripts (scriptValues.panel());
         scriptRuntime->loadScripts (loaded);
         for (const auto& f : scriptRuntime->failedScripts())
@@ -2305,75 +2493,125 @@ private:
     juce::SpinLock scriptStateLock;
     juce::String cachedScriptStateJson { "{}" };
     juce::String cachedScriptSettingsJson { "{}" };
-    juce::String pendingScriptStateJson, pendingScriptSettingsJson;
+    juce::String cachedScriptLocalJson { "{}" };
+    juce::String pendingScriptStateJson, pendingScriptSettingsJson, pendingScriptLocalJson;
     bool pendingScriptStatePresent = false;
     bool pendingScriptSettingsPresent = false;
+    bool pendingScriptLocalPresent = false;
     bool refreshingScriptState = false;
     std::atomic<bool> scriptRuntimeReady { false };
     std::atomic<bool> scriptRestorePending { false };
     std::atomic<bool> scriptStateDirty { false };
    #endif
-    // …and "local" scope, which is deliberately NOT saved with the project: a session handed to
-    // somebody else should carry the patch, not the sender's MIDI port choice. It goes to a
-    // properties file beside the app's own preferences instead, so it outlives the instance the way
-    // a machine-local setting is supposed to — "this machine only", not "this session only".
+    // …and "local" scope: this machine only, and this instance only. It is not the panel's to carry
+    // — a session handed to somebody else should carry the patch, not the sender's MIDI port choice
+    // — so it rides in the project state under this machine's id (scriptMachineId) and is applied
+    // on that machine alone; what other machines stored is carried through unread.
+    //
+    // Until October 2026 this was one properties file for the plugin as a whole, keyed by panel id,
+    // so every instance of a panel on the machine read and wrote the same values: two copies in one
+    // DAW, a standalone beside a plug-in, each overwrote the other's MIDI port choice. And the page,
+    // window open, kept its own copy in the WebView's localStorage instead.
     juce::NamedValueSet localSettings;
+    juce::var otherMachinesLocal;   // { machineId: { key: value } } for every machine but this one
 
-    /** The properties file behind "local" scope, opened on first use.
+    juce::NamedValueSet& settingsFor (const juce::String& store) { return store == "local" ? localSettings : scriptSettings; }
 
-        Lazily, because most panels never touch local scope and opening a file per plugin instance
-        for nothing is not free. One file for the plugin as a whole, keys prefixed by panel id, so
-        two panels loaded in one session do not read each other's. */
-    ceditor::SharedPropertiesFile* localStore()
+    /** A setting moved: the saved-state cache is rebuilt on the next timer tick. */
+    void noteScriptSettingsChanged()
     {
-        if (localProps == nullptr)
+       #if CEDITOR_VALUE_LAYER
+        scriptStateDirty.store (true);
+       #endif
+    }
+
+    static juce::var settingsToVar (const juce::NamedValueSet& set)
+    {
+        auto* o = new juce::DynamicObject();
+        for (int i = 0; i < set.size(); ++i) o->setProperty (set.getName (i), set.getValueAt (i));
+        return juce::var (o);
+    }
+
+    static void settingsFromVar (juce::NamedValueSet& set, const juce::var& from)
+    {
+        set.clear();
+        if (auto* o = from.getDynamicObject())
+            for (const auto& p : o->getProperties()) set.set (p.name, p.value);
+    }
+
+    /** This machine, as "local" scope means it: an id made once and kept beside the app's own
+        preferences. JUCE's getUniqueDeviceID would do, but on Linux it runs cat and lscpu as child
+        processes, which a plug-in has no business doing inside a DAW. If the file cannot be
+        written, the computer's name is the next best thing. */
+    static juce::String scriptMachineId()
+    {
+        static const juce::String id = []
         {
             juce::PropertiesFile::Options options;
             options.applicationName     = "CEditor";
-            options.filenameSuffix      = ".scriptlocal";
+            options.filenameSuffix      = ".machine";
             options.folderName          = "CEditor";
             options.osxLibrarySubFolder = "Application Support";
-            localProps = std::make_unique<ceditor::SharedPropertiesFile> (options);
-        }
-        return localProps.get();
+            ceditor::SharedPropertiesFile file (options);
+            juce::String made;
+            const bool kept = file.update ([&made] (juce::PropertySet& values)
+            {
+                made = values.getValue ("id");
+                if (made.isEmpty()) { made = juce::Uuid().toString(); values.setValue ("id", made); }
+            });
+            return kept && made.isNotEmpty() ? made : juce::SystemStats::getComputerName();
+        }();
+        return id;
     }
 
-    /** The panel this instance loaded, as a string to hang local settings off. */
-    juce::String localPanelId() const
+    /** The "local" element of the saved state: every machine's settings, this one's as they are now. */
+    juce::var localSettingsForState() const
     {
-        if (auto* obj = scriptValues.panel().getDynamicObject())
-        {
-            const auto id = obj->getProperty ("id").toString();
-            if (id.isNotEmpty()) return id;
-            const auto name = obj->getProperty ("name").toString();
-            if (name.isNotEmpty()) return name;
-        }
-        return "panel";
+        auto* all = new juce::DynamicObject();
+        if (auto* others = otherMachinesLocal.getDynamicObject())
+            for (const auto& p : others->getProperties()) all->setProperty (p.name, p.value);
+        all->setProperty (scriptMachineId(), settingsToVar (localSettings));
+        return juce::var (all);
     }
 
-    /** The file key for a script key: the panel id, so two panels do not share a namespace. */
-    juce::String localKey (const juce::String& key) const { return localPanelId() + "/" + key; }
-
-    /** Read the file's keys for this panel back into localSettings, once. */
-    void loadLocalSettings()
+    /** …and back: this machine's settings into localSettings, every other machine's kept aside. */
+    void localSettingsFromState (const juce::var& saved)
     {
-        if (localLoaded) return;
-        localLoaded = true;
-        const auto props = localStore()->read();
-        if (! props.has_value())
-        {
-            scriptLogLine ("[script] local settings could not be read");
-            return;
-        }
-        const auto prefix = localPanelId() + "/";
-        for (const auto& name : props->getAllKeys())
-            if (name.startsWith (prefix))
-                localSettings.set (name.substring (prefix.length()),
-                                   juce::JSON::parse ((*props)[name]));
+        const juce::Identifier here (scriptMachineId());
+        auto* others = new juce::DynamicObject();
+        juce::var mine;
+        if (auto* all = saved.getDynamicObject())
+            for (const auto& p : all->getProperties())
+            {
+                if (p.name == here) mine = p.value;
+                else others->setProperty (p.name, p.value);
+            }
+        settingsFromVar (localSettings, mine);
+        otherMachinesLocal = juce::var (others);
     }
 
-    std::unique_ptr<ceditor::SharedPropertiesFile> localProps;
-    bool localLoaded = false;
+public:
+    /** Both of this instance's stores, for the page to start from when the window opens. */
+    juce::var scriptStoresForPage() const
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("panel", settingsToVar (scriptSettings));
+        o->setProperty ("local", settingsToVar (localSettings));
+        return juce::var (o);
+    }
+
+    /** A write the page made, window open: { store, key, value } or { store, key, forget: true }. */
+    void applyScriptSettingFromPage (const juce::var& change)
+    {
+        const auto key = change.getProperty ("key", {}).toString();
+        if (key.isEmpty()) return;
+        auto& set = settingsFor (change.getProperty ("store", "panel").toString());
+        if ((bool) change.getProperty ("forget", false)) set.remove (key);
+        else set.set (key, change.getProperty ("value", {}));
+        noteScriptSettingsChanged();
+    }
+
+private:
     std::map<juce::String, juce::String> scriptBoundParamByPath;  // control path -> APVTS param id (bound)
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged
@@ -2400,6 +2638,25 @@ public:
         setResizable (true, true);
         setSize (800, 480);
 
+        // In a DAW, the keys the panel does not use are the DAW's: Space starts its transport while
+        // the plug-in has focus. The plug-in's own Standalone window has no host to hand them to.
+        host.forwardKeysToHost = p.wrapperType != juce::AudioProcessor::wrapperType_Standalone;
+
+        // A blank window and a drawn one look the same from outside the page, so the log says which
+        // it was: the profile folder the webview was given (WebViewProfileFolders.h, the switch for
+        // one engine per process included), then when the page answered and when the panel was in
+        // it. A window that logs "opened" and nothing after never got a working webview.
+        const auto opened = juce::Time::getMillisecondCounterHiRes();
+        const auto profile = host.webViewProfile();
+        p.webViewLogLine (profile.isEmpty() ? juce::String ("opened, no webview (runtime unavailable)")
+                                            : "opened, profile " + profile);
+        host.onWebViewStage = [&p, opened, profile] (const juce::String& stage)
+        {
+            p.webViewLogLine (stage + ", profile " + profile + ", "
+                              + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - opened))
+                              + " ms after opening");
+        };
+
         // The DAW playhead -> panel push runs whether or not the value layer is compiled
         // in: a Transport set to "Host / DAW" needs it, and that has nothing to do with
         // host parameters. startTimerHz is idempotent, so the value-layer block below
@@ -2418,6 +2675,12 @@ public:
         host.onRestoreAnswer = [&p] (const juce::String& answer) { p.answerRestorePrompt (answer); };
         // A new instance reads the synth on connect; a reopened project must not be read over.
         host.isSessionRestored = [&p] { return p.wasSessionRestored(); };
+       #if CEDITOR_SCRIPTING
+        // ce.storage, window open: the page starts from this instance's stores and writes back to
+        // them, so one store serves the window open and closed.
+        host.scriptStores = [&p] { return p.scriptStoresForPage(); };
+        host.onScriptSetting = [&p] (const juce::var& change) { p.applyScriptSettingFromPage (change); };
+       #endif
         seenSessionRestore = p.sessionRestoreGeneration();
         // host parameter -> UI: poll the (atomic) parameter values and push changes to the panel so
         // automation playback moves the on-screen controls. Polling keeps us off the audio thread.
