@@ -795,7 +795,8 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 13. Case "everywhere": done, below.
 14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
 15. `clear`: `clear("Screen", 2)` blanks every line. It takes the control only, and a second
-    argument is dropped without a word, as every verb drops one it does not take.
+    argument is dropped without a word, as every verb drops one it does not take. Taken up by the
+    LCD's script model, below, which items 8 to 14 wait on.
 
 **Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
 
@@ -959,6 +960,83 @@ from a list the app defines is read in any case; a name an author makes up is ex
 Not done, and noted for the owner: an unknown `ce.ui` kind still falls back to "info" without a
 word, and `ce.image.icon`'s fit still stores an unknown word as it is; both are those modules'
 reviews.
+
+### The LCD's script model
+
+Item 15 raised it. The owner read `clear("System1", 2)` as "page 2" as readily as "row 2", and
+asked for the whole of the LCD's scripting to be rethought as display → page → row → character.
+The owner's five decisions, 2026-10-24, from the proposal:
+
+1. Every display has pages. A display without layouts has one: its lines.
+2. A script writes a page's own text, drawn where no zone paints. Zones keep showing their
+   controls.
+3. A position is one table, every part optional: `{page = 2, row = 4, col = 15}` in Lua,
+   `{page: 2, row: 4, col: 15}` in JavaScript, `{"page": 2, "row": 4, "col": 15}` in Python. The
+   bare forms stay: `text(t, row, text)`, `clear(t)`, `clear(t, row)`.
+4. A page left out is the page showing.
+5. The Pixel Display has the same pages.
+
+The facts it is built on. A display without layouts draws `lines`, one text per row. A display
+with layouts draws the page showing from its zones (`composeLayout`, which starts from a blank grid
+and paints each zone's region) and never shows `lines`. A page stores no characters. Which page
+shows is decided as the panel runs: a soft key's `{ layout }` press (`lcdPressedLayout` in
+`PanelPreviewSurface.svelte`, transient), an overlay, the Selector's value, the default, with a
+page's `timeoutMs` returning it; in design mode, the inspector's Edit/Preview layout. Component
+verbs run only with the panel window open (the preludes' webview-only stubs), so the page showing
+is always there to ask.
+
+**The model.**
+
+- **A page** is a layout, by its number in the inspector (counted from 1) or its name as given in
+  the inspector (exact: an author's name). A number is a position, text a name. A display without
+  layouts has page 1, its `lines`.
+- **A page's text** is stored on the layout as `lines`, one text per row, saved with the panel as
+  the display's `lines` are. `composeLayout` starts from it instead of a blank grid, so a cell no
+  zone paints shows it. A new layout's text is empty, and the display's `lines` are not moved into
+  the first layout: a panel that has layouts carries default lines nobody sees, and would show
+  "PATCH:INIT VOICE" under its zones.
+- **The position table** takes `page`, `row` and `col`, in any case (they are words from a list
+  the app defines). Each is counted from 1, a fraction rounded; outside the page, the display's
+  rows or its columns: rejected with a console error, as `text` rejects a row now. Another key
+  (`{pg = 2}`): rejected with a console error that names the three.
+- **The commands**, on the page showing unless the table names one:
+
+| Call | Does |
+| --- | --- |
+| `text(t, 2, "VOL")` | Row 2 of the page showing: replaced. As now, on a display without layouts. |
+| `text(t, {page = 2, row = 4}, "VOL")` | Row 4 of page 2: replaced. |
+| `text(t, {row = 4, col = 15}, "X")` | From column 15 of row 4: written over, the rest of the row kept, as a hardware LCD prints at its cursor. Past the last column: cut, with the one-time warning. |
+| `text(t, {page = 2}, "VOL")` | Rejected with a console error: a row is needed. |
+| `clear(t)` | The page showing's text: blanked. |
+| `clear(t, 4)`, `clear(t, {row = 4})` | Row 4 of the page showing. |
+| `clear(t, {page = 2})` | All of page 2's text. |
+| `clear(t, {page = 2, row = 4, col = 15})` | One character. |
+| `read(t, "text")`, `read(t, "text", 2)`, `read(t, "text", {page = 2, row = 4, col = 15})` | Every row, one row, one character. |
+| `page(t, 2)`, `page(t, "Edit")` | Shows that page, as a soft key that opens it does: until a soft key, an overlay or the Selector changes it, or the page's own timeout returns it. New. |
+| `read(t, "page")` | The page showing. New. |
+| `fill(t, "text", {...})`, `size(t, "text")` | The page showing's rows. |
+
+  `clear` takes away only what a script wrote: a zone still shows its control. On a display with
+  layouts, `text(t, 2, "VOL")` used to write `lines` nobody sees, with a warning; it writes the
+  page showing now, which is what such a script meant.
+
+**Open, for the owner** (each with the recommendation first):
+
+- a. The inspector shows a layout's text as rows, editable as the display's Lines are, so text a
+  script left in a saved panel can be seen and cleared. Or: not shown.
+- b. `read(t, "page")` gives the page's number: names can repeat, a number cannot. Or: its name.
+- c. A page's text is drawn as lines are: `{value}`, `{pct}` and `{bar}` filled in, scrolled by
+  `scroll()`. Or: plain text only.
+- d. The cursor stays one per display, drawn on whichever page shows; `cursorAt` takes
+  `{row = 2, col = 5}` as well as `(col, row)`, and a `page` in it is rejected. Or: a cursor per
+  page.
+- e. The Pixel Display gets `page()` and `read(t, "page")`. Its element verbs stay by name, which
+  already reaches every page an element is on. Or: they take `{page = …}` as well.
+
+**The steps**, one commit each, verified as the items were: (1) a page's text in the data and the
+drawing, and the inspector if (a); (2) the position table in `text`, `clear` and `read`; (3)
+`page()` and `read(t, "page")`, through a store the preview and the runtime share; (4) the Pixel
+Display's; (5) the texts, the manual, the release notes. Then items 8 to 14.
 
 ### The branch
 
