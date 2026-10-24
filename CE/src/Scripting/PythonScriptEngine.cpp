@@ -1398,12 +1398,14 @@ def lerp(a=None, b=None, t=None):
     return x + (y - x) * f
 def curve(v, shape="linear"):
     import math
-    if shape == "exp": return v * v
-    if shape == "log": return math.sqrt(max(0, v))
-    if shape == "s":   return v * v * (3 - 2 * v)
+    # A name in any case, as every word from a list is read: "EXP" is "exp".
+    name = str(shape).strip().lower() if shape is not None else "linear"
+    if name == "exp": return v * v
+    if name == "log": return math.sqrt(max(0, v))
+    if name == "s":   return v * v * (3 - 2 * v)
     # A shape the list does not have used to return v in SILENCE, which reads as a curve that does
     # nothing rather than as a name that was never applied.
-    if shape not in ("linear", "", None):
+    if name not in ("linear", ""):
         log("curve(v, \"" + str(shape) + "\"): unknown shape — using linear. The names are "
             "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     return v
@@ -1582,7 +1584,7 @@ def indexOfRange(t, count):
 def crossfade(a, b, t, law=None):
     import math
     x, frm, to = norm(t, 0, 1), __num(a), __num(b)
-    law = str(law if law is not None else "linear").lower()
+    law = str(law if law is not None else "linear").strip().lower()
     if law == "equalpower":
         angle = x * math.pi / 2
         return frm * math.cos(angle) + to * math.sin(angle)
@@ -1716,7 +1718,7 @@ def shapeCurve(v, curve, tension=None):
     t = norm(v, 0, 1)
     ten = __num(tension, 0) or 1.6
     k = 1 + max(0, ten)
-    name = str(curve)
+    name = str(curve).strip().lower()   # in any case: "SCurve" is "scurve"
     if name == "exp": return t ** k
     if name == "log": return 1 - (1 - t) ** k
     if name in ("scurve", "s"): return t * t * (3 - 2 * t)
@@ -1835,7 +1837,7 @@ def unshape(y, curve, tension=None):
     v = norm(y, 0, 1)
     ten = __num(tension, 0) or 1.6
     k = 1 + max(0, ten)
-    name = str(curve)
+    name = str(curve).strip().lower()
     if name == "exp": return v ** (1 / k)
     if name == "log": return 1 - (1 - v) ** (1 / k)
     # The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.

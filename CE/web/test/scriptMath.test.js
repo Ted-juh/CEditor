@@ -196,6 +196,17 @@ test('curve still does what it did for the names it knows', () => {
   assert.equal(api.curve(0.5, 's'), 0.5);
 });
 
+test('a curve, shape or law name is read in any case, as every word from a list is', () => {
+  clearScriptTrace();
+  assert.equal(api.curve(0.5, 'EXP'), 0.25, '"EXP" was an unknown shape, and linear');
+  assert.equal(api.curve(0.25, ' Log '), 0.5);
+  assert.equal(api.shapeCurve(0.3, 'SCurve'), api.shapeCurve(0.3, 'scurve'));
+  assert.equal(api.unshape(0.5, 'HOLD'), api.unshape(0.5, 'hold'));
+  assert.equal(api.crossfade(0, 1, 0.5, 'EqualPower'), api.crossfade(0, 1, 0.5, 'equalPower'));
+  assert.equal(api.mapCurve(0.5, [[0, 0], [1, 1, 'Hold']]), 0);
+  assert.equal(traced(), '', 'and nothing is said of them');
+});
+
 test('a shape curve does not know is reported rather than silently linear', () => {
   clearScriptTrace();
   // Returning the input in silence reads as a curve that does nothing, rather than as a name that

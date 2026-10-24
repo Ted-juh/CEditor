@@ -183,13 +183,15 @@ function lerp(a, b, t)
 end
 function curve(v, shape)
   shape = shape or "linear"
-  if shape == "exp" then return v * v
-  elseif shape == "log" then return math.sqrt(math.max(0, v))
-  elseif shape == "s" then return v * v * (3 - 2 * v)
+  -- A name in any case, as every word from a list is read: "EXP" is "exp".
+  local name = tostring(shape):lower():match("^%s*(.-)%s*$")
+  if name == "exp" then return v * v
+  elseif name == "log" then return math.sqrt(math.max(0, v))
+  elseif name == "s" then return v * v * (3 - 2 * v)
   else
     -- A shape the list does not have used to return v in SILENCE, which reads as a curve that does
     -- nothing rather than as a name that was never applied.
-    if shape ~= "linear" and shape ~= "" then
+    if name ~= "linear" and name ~= "" then
       log("curve(v, \"" .. tostring(shape) .. "\"): unknown shape — using linear. The names are "
           .. "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     end
@@ -355,7 +357,7 @@ end
 -- that matters: a linear fade between two sounds dips in the middle, audibly.
 function crossfade(a, b, t, law)
   local x, from, to = norm(t, 0, 1), __num(a), __num(b)
-  law = tostring(law or "linear"):lower()
+  law = tostring(law or "linear"):lower():match("^%s*(.-)%s*$")
   if law == "equalpower" then
     local angle = x * math.pi / 2
     return from * math.cos(angle) + to * math.sin(angle)
@@ -497,7 +499,7 @@ function shapeCurve(v, curve, tension)
   local ten = __num(tension, 0)
   if ten == 0 then ten = 1.6 end
   local k = 1 + math.max(0, ten)
-  local name = tostring(curve)
+  local name = tostring(curve):lower():match("^%s*(.-)%s*$")   -- in any case: "SCurve" is "scurve"
   if name == "exp" then return t ^ k
   elseif name == "log" then return 1 - (1 - t) ^ k
   elseif name == "scurve" or name == "s" then return t * t * (3 - 2 * t)
@@ -632,7 +634,7 @@ function unshape(y, curve, tension)
   local ten = __num(tension, 0)
   if ten == 0 then ten = 1.6 end
   local k = 1 + math.max(0, ten)
-  local name = tostring(curve)
+  local name = tostring(curve):lower():match("^%s*(.-)%s*$")
   if name == "exp" then return v ^ (1 / k)
   elseif name == "log" then return 1 - (1 - v) ^ (1 / k)
   -- The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and would

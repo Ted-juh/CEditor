@@ -70,6 +70,9 @@ const CASES = [
   ['distance', [0, 0, 3, 4]], ['euclid', [8, 3]], ['almost', [0.1 + 0.2, 0.3]],
   ['indexOfRange', [0.5, 4]], ['approach', [0, 10, 0.5]],
   ['curve', [0.5, 'exp']], ['curve', [0.25, 'log']], ['curve', [0.5, 's']], ['curve', [0.5, 'linear']],
+  // A name in any case is the name, in every runtime: "EXP" was an unknown shape, and linear.
+  ['curve', [0.5, 'EXP']], ['curve', [0.5, ' S ']], ['crossfade', [0, 1, 0.5, 'EqualPower']],
+  ['shapeCurve', [0.3, 'SCurve']], ['unshape', [0.5, 'Exp']], ['mapCurve', [0.5, [[0, 0], [1, 1, 'HOLD']]]],
   ['noteName', [60]], ['noteName', [61]], ['noteName', [0]],
   // The panel's spelling, selected by the second argument being PRESENT — so all three states
   // (absent, true, false) are cases, not just the two values.

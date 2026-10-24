@@ -1581,7 +1581,7 @@ function indexImpl(t, count) {
 function crossfadeImpl(a, b, t, law) {
   const x = normImpl(t, 0, 1);
   const from = num(a), to = num(b);
-  const kind = String(law ?? 'linear').toLowerCase();
+  const kind = String(law ?? 'linear').trim().toLowerCase();
   if (kind === 'equalpower') {
     const angle = (x * Math.PI) / 2;
     return from * Math.cos(angle) + to * Math.sin(angle);
@@ -1786,7 +1786,7 @@ function polarImpl(angle, radius) {
 function shapeImpl(v, curve, tension) {
   const t = normImpl(v, 0, 1);
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
-  switch (String(curve)) {
+  switch (String(curve).trim().toLowerCase()) {   // in any case: "SCurve" is "scurve"
     case 'exp': return t ** k;
     case 'log': return 1 - (1 - t) ** k;
     // Both spellings, because the panel says "scurve" and the script API has always said "s".
@@ -1979,7 +1979,7 @@ function unshapeImpl(y, curve, tension) {
   // The same k as shape(), including the 1.6 default — an inverse computed against a different
   // exponent would be an inverse of nothing.
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
-  switch (String(curve)) {
+  switch (String(curve).trim().toLowerCase()) {
     case 'exp': return v ** (1 / k);
     case 'log': return 1 - (1 - v) ** (1 / k);
     // The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and
@@ -2014,10 +2014,12 @@ const helpers = {
   // A shape the list does not have used to return v in silence, which reads as a curve that does
   // nothing rather than as a name that was never applied.
   curve: (v, shape) => {
-    if (shape === 'exp') return v * v;
-    if (shape === 'log') return Math.sqrt(Math.max(0, v));
-    if (shape === 's') return v * v * (3 - 2 * v);
-    if (shape !== undefined && shape !== null && shape !== '' && shape !== 'linear') {
+    // A name in any case, as every word from a list is read: "EXP" is "exp".
+    const name = shape === undefined || shape === null ? 'linear' : String(shape).trim().toLowerCase();
+    if (name === 'exp') return v * v;
+    if (name === 'log') return Math.sqrt(Math.max(0, v));
+    if (name === 's') return v * v * (3 - 2 * v);
+    if (name !== '' && name !== 'linear') {
       addScriptTrace('log', '',
         `curve(v, ${JSON.stringify(String(shape))}): unknown shape — using linear. `
         + 'The names are "linear", "exp", "log" and "s"; for any other shape use map(v, points).');

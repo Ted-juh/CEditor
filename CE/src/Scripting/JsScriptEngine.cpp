@@ -431,12 +431,14 @@ function lerp(a, b, t) {
 }
 function curve(v, shape) {
   shape = shape || "linear";
-  if (shape === "exp") return v * v;
-  if (shape === "log") return Math.sqrt(Math.max(0, v));
-  if (shape === "s") return v * v * (3 - 2 * v);
+  // A name in any case, as every word from a list is read: "EXP" is "exp".
+  var name = String(shape).trim().toLowerCase();
+  if (name === "exp") return v * v;
+  if (name === "log") return Math.sqrt(Math.max(0, v));
+  if (name === "s") return v * v * (3 - 2 * v);
   // A shape the list does not have used to return v in SILENCE, which reads as a curve that does
   // nothing rather than as a name that was never applied.
-  if (shape !== "linear" && shape !== "")
+  if (name !== "linear" && name !== "")
     log("curve(v, \"" + shape + "\"): unknown shape — using linear. The names are \"linear\", "
         + "\"exp\", \"log\" and \"s\"; for any other shape use map(v, points).");
   return v;
@@ -583,7 +585,7 @@ function indexOfRange(t, count) {
 // that matters: a linear fade between two sounds dips in the middle, audibly.
 function crossfade(a, b, t, law) {
   var x = norm(t, 0, 1), from = __num(a), to = __num(b);
-  law = String(law === undefined || law === null ? "linear" : law).toLowerCase();
+  law = String(law === undefined || law === null ? "linear" : law).trim().toLowerCase();
   if (law === "equalpower") {
     var angle = x * Math.PI / 2;
     return from * Math.cos(angle) + to * Math.sin(angle);
@@ -714,7 +716,7 @@ function shapeCurve(v, curve, tension) {
   var t = norm(v, 0, 1);
   var ten = __num(tension, 0) || 1.6;
   var k = 1 + Math.max(0, ten);
-  var name = String(curve);
+  var name = String(curve).trim().toLowerCase();   // in any case: "SCurve" is "scurve"
   if (name === "exp") return Math.pow(t, k);
   if (name === "log") return 1 - Math.pow(1 - t, k);
   if (name === "scurve" || name === "s") return t * t * (3 - 2 * t);
@@ -821,7 +823,7 @@ function unshape(y, curve, tension) {
   var v = norm(y, 0, 1);
   var ten = __num(tension, 0) || 1.6;
   var k = 1 + Math.max(0, ten);
-  var name = String(curve);
+  var name = String(curve).trim().toLowerCase();
   if (name === "exp") return Math.pow(v, 1 / k);
   if (name === "log") return 1 - Math.pow(1 - v, 1 / k);
   // The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.
