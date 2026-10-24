@@ -26,6 +26,7 @@
   import Play from 'lucide-svelte/icons/play';
   import Gauge from 'lucide-svelte/icons/gauge';
   import Undo2 from 'lucide-svelte/icons/undo-2';
+  import { createRangeVariantSections } from '../utils/rangeVariant.js';
   import { RETURN_CURVE, RETURN_MODE } from '../utils/returnToRest.js';
   import { VALUE_FLOW, valueFlowOf } from '../utils/displayMode.js';
 
@@ -43,9 +44,9 @@
 
   let core = $derived(getSection(control, 'Core'));
   let behavior = $derived(getSection(control, 'Behavior'));
-  let buttonType = $derived(String(behavior?.buttonType ?? inferButtonType(core?.controlType)));
+  let buttonType = $derived(String(behavior?.family === 'range' ? (behavior.role ?? 'range') : behavior?.buttonType ?? inferButtonType(core?.controlType)));
   let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? ['custom']);
-  let showSubtypeSelector = $derived(buttonType !== 'radio' && buttonType !== 'combobox');
+  let showSubtypeSelector = $derived(!!SUBTYPE_OPTIONS[buttonType] && buttonType !== 'radio' && buttonType !== 'combobox');
   let momentarySubtype = $derived(String(behavior?.subtype ?? 'action'));
   let radioVisualStyle = $derived(String(behavior?.visualStyle ?? behavior?.subtype ?? 'radio'));
   let isRangeSpinbox = $derived(
@@ -143,22 +144,8 @@
     const target = variant === 'slider' ? 'slider' : 'spinner';
     if (rangeVariant === target) return;
 
-    const b = behavior ?? {};
-    const preserved = {
-      variant: target,
-      valueMode: 'range',
-      valueType: b.valueType ?? 'int',
-      min: numberOr(b.min, 0),
-      max: numberOr(b.max, 100),
-      step: numberOr(b.step, 1),
-      defaultStartValue: numberOr(b.defaultStartValue, numberOr(b.min, 0)),
-      defaultEndValue: numberOr(b.defaultEndValue, numberOr(b.max, 100)),
-    };
-
-    // 'Slider' gives role:'slider' + slider parts; 'Range' gives the spinbox
-    // spinner. Merge the preserved value config on top of the generated behavior.
-    const sections = createDefaultInteractiveSections(target === 'slider' ? 'Slider' : 'Range');
-    updateControlProperty(core.id, 'Behavior', { ...sections.Behavior, ...preserved });
+    const sections = createRangeVariantSections(behavior, target);
+    updateControlProperty(core.id, 'Behavior', sections.Behavior);
     updateControlProperty(core.id, 'Parts', sections.Parts);
     updateControlProperty(core.id, 'Bindings', sections.Bindings);
     updateControlProperty(core.id, 'States', sections.States);
@@ -219,7 +206,7 @@
   </PropertySection>
 
   <PropertySection title="Behavior" icon={Settings2}>
-    <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
+    <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the component's interaction family and role.">
       <input class="val" type="text" value={buttonType} readonly />
     </PropertyCell>
     {#if showSubtypeSelector && String(behavior.valueType ?? '') !== 'text'}
@@ -423,6 +410,7 @@
     </PropertySection>
   {/if}
 
+  {#if isRangeFamily}
   <PropertySection title="Return to rest" icon={Undo2}>
     <PropertyCell
       label="On release"
@@ -459,6 +447,8 @@
     {/if}
   </PropertySection>
 
+  {/if}
+
   <PropertySection title="Runtime" icon={Play}>
     <PropertyCell label="Input" span={2} hint="Keyboard focus, keyboard activation. Hover a chip for its name.">
       <FlagStrip
@@ -472,14 +462,16 @@
         }}
       />
     </PropertyCell>
-    <PropertyCell label="Emit" span={2} hint="Emit click events and state changes. Hover a chip for its name.">
+    <PropertyCell label="Emit" span={2} hint="Choose which scripting events this control emits. Hover a chip for its name.">
       <FlagStrip
         flags={[
           { key: 'click', title: 'Emit Click — expose click events to the future scripting/runtime layer', on: behavior.emitClick !== false, icon: MousePointerClick },
+          ...(buttonType === 'toggle' ? [{ key: 'value', title: 'Emit Value — emit value-change events when the toggle changes', on: behavior.emitValueChange === true, icon: ToggleRight }] : []),
           { key: 'state', title: 'Emit State — expose state changes to the future scripting/runtime layer', on: behavior.emitStateChange !== false, icon: Activity },
         ]}
         ontoggle={(key) => {
           if (key === 'click') set('emitClick', !(behavior.emitClick !== false));
+          else if (key === 'value') set('emitValueChange', !(behavior.emitValueChange === true));
           else if (key === 'state') set('emitStateChange', !(behavior.emitStateChange !== false));
         }}
       />

@@ -17,12 +17,13 @@
 // one animation at 60Hz evicts every real edit under it), which is why recording is suspended for
 // the duration instead.
 //
-// What makes a blanket restore safe is that the editor already locks authoring while previewing —
+// The editor locks control authoring while previewing —
 // the Properties panel swaps to the Preview Inspector and the canvas gates keys, drag, resize and
-// the context menu. So "changed while previewing" IS "changed by the runtime", and there is no
-// authored edit inside the bracket that could be thrown away with it.
+// the context menu. The Script Editor remains editable, however: its authored scripts must survive
+// the restore even when their workspace has already been saved and closed.
 //
 // NOT rehearsed:
+//   • authored panel scripts, including their source, bindings, additions and deletions;
 //   • the exported player, which owns its document and never puts it back (setRuntimeHost turns
 //     this off — see panelRuntime.setRuntimeHost);
 //   • MIDI. A rehearsal is about the document; messages already sent to a synth cannot be unsent,
@@ -88,7 +89,8 @@ export function beginPreviewRehearsal() {
 }
 
 /**
- * Put the document back exactly as it was, then resume recording and autosaving.
+ * Restore the control document, retaining authored scripts and persistent settings, then resume
+ * recording and autosaving.
  *
  * Compared before writing, so a preview that changed nothing does not touch the store at all —
  * that keeps `modified` false on a panel the author only looked at.
@@ -104,6 +106,15 @@ export function endPreviewRehearsal() {
     // Preserve those writes (including deletions) while reverting the visual preview.
     for (const panel of json) {
       const current = get(panels).find(p => p.id === panel.id);
+      // The Script Editor mirrors every edit into panel.scripts. Read the panel rather than an
+      // open workspace: saving clears its dirty flag, and closing it removes it altogether.
+      // Replacing the whole list also preserves deleted scripts instead of resurrecting them.
+      if (current && JSON.stringify(panel.scripts ?? []) !== JSON.stringify(current.scripts ?? [])) {
+        panel.scripts = JSON.parse(JSON.stringify(current.scripts ?? []));
+        // A save during Preview may contain temporary control values. The restored document
+        // must remain saveable so a subsequent save writes the base controls with these scripts.
+        panel.modified = true;
+      }
       if (!current?.scripting?.settings) continue;
       if (JSON.stringify(panel.scripting?.settings) !== JSON.stringify(current.scripting.settings)) {
         panel.scripting ??= {};

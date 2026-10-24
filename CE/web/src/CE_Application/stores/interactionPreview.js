@@ -307,7 +307,15 @@ export function removeInteractionPreviewSession(controlId) {
   });
 }
 
+// The runtime supplies its asynchronous Close work; document rollback must follow it.
+let previewStopBarrier = null;
+let previewStopPending = null;
+let previewRequested = false;
+export function setPreviewStopBarrier(callback) { previewStopBarrier = callback; }
+
 export function setPreviewModeEnabled(enabled) {
+  previewRequested = enabled === true;
+  if (previewStopPending) return previewStopPending;
   const nextEnabled = enabled === true;
   const wasEnabled = get(previewModeEnabled) === true;
 
@@ -324,12 +332,23 @@ export function setPreviewModeEnabled(enabled) {
   previewModeEnabled.set(nextEnabled);
 
   if (!nextEnabled) {
-    panelPreviewDebugEnabled.set(false);
-    panelPreviewSessions.set({});
-    previewInspectedControlId.set('');
-    // …and put it back AFTER, so the teardown the runtime just did inside .set() — onPanelClose,
-    // its writes included — is inside the bracket rather than landing on the restored document.
-    endPreviewRehearsal();
+    const finish = () => {
+      panelPreviewDebugEnabled.set(false);
+      panelPreviewSessions.set({});
+      previewInspectedControlId.set('');
+      endPreviewRehearsal();
+    };
+    const barrier = wasEnabled ? previewStopBarrier?.() : null;
+    if (barrier && typeof barrier.then === 'function') {
+      previewStopPending = Promise.resolve(barrier).finally(() => {
+        finish();
+        previewStopPending = null;
+        // A quick restart waits for Close and rollback instead of resetting the new run.
+        if (previewRequested) setPreviewModeEnabled(true);
+      });
+      return previewStopPending;
+    }
+    finish();
   }
 }
 
@@ -499,7 +518,15 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
 
   if (buttonType === 'radio' || role === 'radio') {
     const valueRows = getEnabledValueRows(control);
+    // Keyboard activation has no pointer target: retain the current choice instead of
+    // silently jumping to the default. Explicit pointer targets still take precedence.
+    const activeValues = currentSession.valueOverrideEnabled === true
+      ? (Array.isArray(currentSession.valueOverride) ? currentSession.valueOverride : [currentSession.valueOverride])
+      : [...resolveRadioSelectedKeys(valueRows, behavior)];
+    const activeRow = [...activeValues].reverse().map(value => valueRows.find(row =>
+      String(row?.internalValue ?? row?.id ?? '') === String(value))).find(Boolean);
     const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === requestedValue)
+      ?? (!Object.prototype.hasOwnProperty.call(options, 'value') ? activeRow : null)
       ?? valueRows.find((row) => row?.selectedByDefault === true)
       ?? valueRows[0]
       ?? null;

@@ -57,6 +57,9 @@ export function sanitizeScriptDocument(document) {
     id,
     name: String(document.name ?? document.title ?? 'Untitled Script Workspace'),
     panelId: String(document.panelId ?? ''), // the panel this script editor is bound to (for controls/Paths)
+    panelGuid: String(document.panelGuid ?? ''),
+    panelFilePath: String(document.panelFilePath ?? ''),
+    panelBindingPending: document.panelBindingPending === true,
     filePath: String(document.filePath ?? '').trim(),
     modified: document.modified === true,
     activeScriptId: scripts.some((script) => script.id === activeScriptId)

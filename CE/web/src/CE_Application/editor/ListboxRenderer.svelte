@@ -6,7 +6,7 @@
   import {
     listboxRows, listboxConfig, isSelectableRow,
     listboxRowHeight, listboxRowGap, listboxPadTop,
-    listboxContentHeight, listboxMaxScroll,
+    listboxContentHeight, listboxMaxScroll, listboxFilterHeight,
   } from '../utils/listboxLayout.js';
 
   let {
@@ -143,6 +143,7 @@
   {#if rows.length === 0}
     <div class="listbox-empty" style={`padding-left:${padLeft}px;`}>{cfg.emptyText ?? 'No items'}</div>
   {:else}
+    <div class="listbox-viewport" style={`padding-top:${padTop}px; clip-path:inset(${listboxFilterHeight(control)}px 0 0 0);`}>
     <div class="listbox-scroll" style={`transform: translateY(${-Math.max(0, scrollTop)}px);`}>
       {#if selIndex >= 0}
         <div class="listbox-sel-indicator" class:ind-outline={selStyle === 'outline'} style={`transform: translateY(${selIndex * stride}px); height:${rowH}px;`}></div>
@@ -206,6 +207,7 @@
         {/if}
       {/each}
     </div>
+    </div>
   {/if}
 </div>
 
@@ -216,6 +218,11 @@
     box-sizing: border-box;
     overflow: hidden;
     pointer-events: none;
+  }
+  .listbox-viewport {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
   }
   .listbox-scroll {
     display: flex;
@@ -271,7 +278,7 @@
   }
 
   /* Selection styles */
-  .listbox-row.sel-bar { background: var(--lb-accent); color: #0B0B0B; }
+  .listbox-row.sel-bar, .zebra .listbox-row.sel-bar { background: var(--lb-accent); color: #0B0B0B; }
   .listbox-row.sel-bold { font-weight: 700; }
   .listbox-row.sel-stripe::before {
     content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--lb-accent);

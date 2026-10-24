@@ -94,9 +94,8 @@ export function gradientToCSS(gradient, shape = 'rectangle') {
     }
 
     case 'squareRamp': {
-      // Concentric squares — CSS can't do Chebyshev distance natively.
-      // Rendered via canvas in squareRampToDataURL(), return placeholder here.
-      return '#333';
+      // Use the same raster as the gradient editor, fitted to the target box.
+      return `url("${squareRampToDataURL(gradient, 256, 256)}") center / 100% 100% no-repeat`;
     }
 
     case 'duotone': {
@@ -248,7 +247,11 @@ function interpolateRGB(stops, position) {
  * @param {number} height
  * @returns {string} data URL
  */
+const squareRampCache = new Map();
 export function squareRampToDataURL(gradient, width = 256, height = 256) {
+  if (typeof document === 'undefined') return '';
+  const key = JSON.stringify([gradient, width, height]);
+  if (squareRampCache.has(key)) return squareRampCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -281,5 +284,8 @@ export function squareRampToDataURL(gradient, width = 256, height = 256) {
   }
 
   ctx.putImageData(img, 0, 0);
-  return canvas.toDataURL();
+  const result = canvas.toDataURL();
+  if (squareRampCache.size >= 32) squareRampCache.delete(squareRampCache.keys().next().value);
+  squareRampCache.set(key, result);
+  return result;
 }

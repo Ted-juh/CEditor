@@ -1,3 +1,4 @@
+import { reconnectScriptBinding } from '../scripting/scriptPanelBinding.js';
 import { writable, derived, get } from 'svelte/store';
 import {
   savePanelAs as bridgeSavePanelAs,
@@ -428,6 +429,19 @@ export const editorZoomIncrement = writable(10);
 
 /** All open panels */
 export const panels = writable([]);
+// Register before runtime-derived stores so a recycled id cannot target another panel.
+let reconnectingScriptBindings = false;
+function reconnectScriptDocuments() {
+ if (reconnectingScriptBindings) return;
+ const documents=get(scriptDocuments), list=get(panels);
+ const next=documents.map(doc=>reconnectScriptBinding(doc,list));
+ if (next.some((doc,index)=>doc!==documents[index])) {
+  reconnectingScriptBindings=true;
+  try { scriptDocuments.set(next); } finally { reconnectingScriptBindings=false; }
+ }
+}
+panels.subscribe(reconnectScriptDocuments);
+scriptDocuments.subscribe(reconnectScriptDocuments);
 
 /** ID of the active (visible) panel */
 export const activePanelId = writable(null);

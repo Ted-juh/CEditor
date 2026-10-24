@@ -78,7 +78,7 @@ import {
   allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
-import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
+import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession, syncPanelPreviewSessions, setPreviewStopBarrier } from '../stores/interactionPreview.js';
 import {
   customChannelOfPath, customChannelPatch, hasLiveValue, isLiveValuePath, liveValuePatch,
   readLiveValue, readsLiveValue, whyChannelNotWritable,
@@ -175,8 +175,11 @@ let executionEpoch = 0;
 let documentWriteBatchDepth = 0;
 let documentWriteBatch = null;
 
+let teardownPanelId = null;
+function runtimeReadPanelId() { return teardownPanelId ?? get(scriptRuntimePanelId); }
+
 function storedActivePanel() {
-  return get(panels).find((p) => p.id === get(scriptRuntimePanelId)) ?? null;
+  return get(panels).find((p) => p.id === runtimeReadPanelId()) ?? null;
 }
 
 function beginDocumentWriteBatch() {
@@ -227,19 +230,19 @@ function writeEditorControlProperty(control, path, value) {
   rebaseDocumentWriteBatchIfPanelChanged();
   const controlId = control?._children?.Core?.id;
   if (!documentWriteBatch || controlId == null) {
-    updateControlProperty(controlId, path, value);
+    applyControlPatchesById(new Map([[controlId, { [path]: value }]]), runtimeReadPanelId(), { pin: true });
     return;
   }
   let draft = documentWriteBatch.drafts.get(controlId);
   if (!draft) {
     const panel = documentWriteBatch.panel ?? storedActivePanel();
     if (!panel || panel.id !== documentWriteBatch.panelId) {
-      updateControlProperty(controlId, path, value);
+      applyControlPatchesById(new Map([[controlId, { [path]: value }]]), runtimeReadPanelId(), { pin: true });
       return;
     }
     const source = findControlById(panel.controls, controlId);
     if (!source) {
-      updateControlProperty(controlId, path, value);
+      applyControlPatchesById(new Map([[controlId, { [path]: value }]]), runtimeReadPanelId(), { pin: true });
       return;
     }
     draft = deepClone(source);
@@ -289,7 +292,7 @@ export function setRuntimeHost(h) {
 
 function activePanel() {
   if (host) return host.panel ?? null;
-  const panelId = get(scriptRuntimePanelId);
+  const panelId = runtimeReadPanelId();
   if (documentWriteBatch?.panel && documentWriteBatch.panelId === panelId) return documentWriteBatch.panel;
   return storedActivePanel();
 }
@@ -596,7 +599,11 @@ function setValue(path, value, formOrOpts = '') {
     // Clamp: a 0–1 position outside 0–1 is a bug in the caller's maths, and letting it through
     // would drive the control past its own limits.
     const t = Math.max(0, Math.min(1, Number(value)));
-    value = range.min + t * (range.max - range.min);
+    // Boolean controls must keep their raw value type after a normalized write.
+    const valueType = String(control?._children?.Behavior?.valueType ?? "").toLowerCase();
+    value = valueType === "bool" || valueType === "boolean"
+      ? t >= 0.5
+      : range.min + t * (range.max - range.min);
   }
 
   const modelPath = resolveModelPath(control, segs);
@@ -665,7 +672,7 @@ function setValue(path, value, formOrOpts = '') {
   } else if (live && liveId) {
     updatePanelPreviewSession(liveId, channelName
       ? customChannelPatch(control, channelName, value, get(panelPreviewSessions))
-      : liveValuePatch(value));
+      : liveValuePatch(value, control, get(panelPreviewSessions)));
     wrote = true;
   } else {
     wrote = shape.writes;
@@ -3077,7 +3084,8 @@ function addWatch(scriptId, path, fn) {
   if (typeof fn !== 'function') return;
   // Seeded with the CURRENT value, not undefined: a watcher must not fire once on registration
   // just because it has never seen the value before. It reports changes, not existence.
-  putRule(watchers, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn, last: signatureOf(readWatch(path)) });
+  const value = readWatch(path);
+  putRule(watchers, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn, last: signatureOf(value), lastValue: value });
 }
 
 function addCompute(scriptId, path, fn) {
@@ -3212,6 +3220,7 @@ function listenerMatches(l, target) {
 /** Deliver `event` to on(…) listeners and to any already-loaded handler named for it. Synchronous,
     matching the C++ side — everything it calls has been loaded and cached by dispatchEvents. */
 function deliverEmit(name, target, data) {
+  const epoch = executionEpoch;
   if (emitDepth >= MAX_EMIT_DEPTH) {
     addScriptTrace('error', '', `emit("${name}") dropped: nesting exceeded ${MAX_EMIT_DEPTH} (emit/dispatch feedback loop?)`);
     return;
@@ -3223,6 +3232,7 @@ function deliverEmit(name, target, data) {
       try { withDocumentWriteBatch(() => l.fn(data)); } catch (e) { reportScriptError(l.scriptId, e); }
     }
     for (const s of activeScripts()) {
+      if (epoch !== executionEpoch) return;
       if (s.enabled === false || s.event !== name) continue;
       const fn = handlerCache.get(s.id)?.handlers?.[name];
       if (typeof fn !== 'function') continue;
@@ -7860,6 +7870,7 @@ async function handlersFor(script) {
 
 /** Load every active script, so listeners exist and run() can resolve before anything dispatches. */
 async function primeHandlers() {
+  const epoch = executionEpoch;
   // Errors raised WHILE loading are held: onError may be declared by a script that has not been
   // loaded yet, and telling nobody is the one outcome this hook exists to prevent.
   errorHook.defer = true;
@@ -7892,6 +7903,15 @@ async function primeHandlers() {
 //     whole job is "restore the synth, send a final dump" must not fire once per character typed.
 //     Editing a script is a RELOAD of the set, not the destruction of it.
 export function destroyLoadedScripts() {
+  const previousPanelId = teardownPanelId;
+  const wasDispatching = live.dispatching;
+  teardownPanelId = live.activePanelId;
+  live.dispatching = true;
+  try { withDocumentWriteBatch(() => destroyLoadedScriptHandlers()); }
+  finally { teardownPanelId = previousPanelId; live.dispatching = wasDispatching; }
+}
+
+function destroyLoadedScriptHandlers() {
   const loaded = [...handlerCache.values()];
   if (!loaded.length) return;
   handlerCache.clear();   // cleared FIRST: a handler that somehow re-enters must not be told twice
@@ -7941,8 +7961,9 @@ function resetScriptState() {
 
 /** Call a loaded script's handler. Used by dispatch — reuses the cached load. */
 async function invokeHandler(script, hook = null, payload = undefined) {
+  const epoch = executionEpoch;
   const handlers = await handlersFor(script);
-  if (!handlers) return;
+  if (!handlers || epoch !== executionEpoch) return;
   const fnName = hook || script.event;
   const fn = handlers[fnName];
   if (typeof fn !== 'function') {
@@ -8091,6 +8112,12 @@ export function approveCurrentPanelScripts(extraScript = pendingApprovalScript, 
  * declaration order, so a change can be reported as the channel that made it (valueEventsFor).
  */
 function controlValueState(control) {
+  // TextInput commits into Behavior rather than a Value section. Observe the
+  // same string that the native field and the public value watcher read.
+  if (control?._children?.Core?.controlType === 'TextInput') {
+    const value = String(control._children?.Behavior?.defaultValue ?? '');
+    return { sig: JSON.stringify(value), value, channels: null };
+  }
   const v = valueAtPath(control, 'Value.value');
   if (v !== undefined) return { sig: JSON.stringify(v), value: v, channels: null };
   const channels = control?._children?.ValueChannels?._children;
@@ -8193,6 +8220,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
   if (!events.length) return;
   if (!ensurePanelExecutionApproved()) { resetScriptState(); return; }
   const scripts = activeScripts();
+  const epoch = executionEpoch;
   live.dispatching = true;
   if (inbound) origin.inboundDepth += 1;
   try {
@@ -8200,10 +8228,15 @@ async function dispatchEvents(events, { inbound = false } = {}) {
     // own, so it would never be loaded by the match loop below and its listeners would never fire.
     await primeHandlers();
     for (const ev of events) {
+      if (epoch !== executionEpoch) return;
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
-      for (const s of matches) await invokeHandler(s, s.event, ev.payload);
+      for (const s of matches) {
+        if (epoch !== executionEpoch) return;
+        await invokeHandler(s, s.event, ev.payload);
+      }
+      if (epoch !== executionEpoch) return;
       // …then the explicit on(target, event, fn) listeners for the same event.
       for (const l of [...listeners]) {
         if (l.event !== ev.event || !listenerMatches(l, ev.controlName)) continue;
@@ -8212,24 +8245,27 @@ async function dispatchEvents(events, { inbound = false } = {}) {
     }
   } finally {
     if (inbound) origin.inboundDepth -= 1;
-    snapshotValues();          // absorb panels writes our scripts just made
-    live.dispatching = false;
-    // Changes that raised declared events skipped the reactive pass while this async
-    // dispatch was busy. Settle their watchers before absorbing the session baseline.
-    runReactive();
-    if (live.sessionsDirty) {
-      // Something arrived while we were busy. Do NOT seed — seeding is what would swallow it.
-      // Leave the baseline alone and diff again on the next microtask, so the change is measured
-      // against the state it actually changed from. Each pass advances the baseline, so a burst
-      // drains rather than looping.
-      live.sessionsDirty = false;
-      Promise.resolve().then(() => {
-        onPreviewSessionsChanged(get(panelPreviewSessions));
+    if (epoch === executionEpoch) {
+      snapshotValues();          // absorb panels writes our scripts just made
+      live.dispatching = false;
+      // Changes that raised declared events skipped the reactive pass while this async
+      // dispatch was busy. Settle their watchers before absorbing the session baseline.
+      runReactive();
+      if (live.sessionsDirty) {
+        // Something arrived while we were busy. Do NOT seed — seeding is what would swallow it.
+        // Leave the baseline alone and diff again on the next microtask, so the change is measured
+        // against the state it actually changed from. Each pass advances the baseline, so a burst
+        // drains rather than looping.
+        live.sessionsDirty = false;
+        Promise.resolve().then(() => {
+          if (epoch !== executionEpoch) return;
+          onPreviewSessionsChanged(get(panelPreviewSessions));
+          drainInteractionEvents();
+        });
+      } else {
+        seedSessionSnapshot();   // absorb the preview-overlay writes our scripts just made
         drainInteractionEvents();
-      });
-    } else {
-      seedSessionSnapshot();   // absorb the preview-overlay writes our scripts just made
-      drainInteractionEvents();
+      }
     }
   }
 }
@@ -8282,8 +8318,13 @@ function onPanelsChanged() {
 
 // The user's value in preview: a custom component's first channel, else the value override, else
 // the checked state.
-function sessionValue(session) {
+function sessionValue(session, control) {
   if (!session) return undefined;
+  const behavior = control?._children?.Behavior;
+  // Value events use the same active numeric value as script reads and watches.
+  if (behavior?.family === 'range') {
+    return readLiveValue({ [control._children.Core.id]: session }, control);
+  }
   const cv = session.customValues;
   if (cv && typeof cv === 'object') { const vals = Object.values(cv); if (vals.length) return vals[0]; }
   if (session.valueOverrideEnabled === true) return session.valueOverride;
@@ -8340,11 +8381,11 @@ const NO_CHANNELS = Object.freeze(new Set());
  * `dragTouched` the channels that moved at any point during it: a multi-channel drag commits those
  * on release (onPreviewSessionsChanged).
  */
-function sessionEntry(s, prev) {
+function sessionEntry(s, prev, control) {
   const dragging = s.dragging === true;
   const channels = s.customValues && typeof s.customValues === 'object' ? s.customValues : null;
   return {
-    value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
+    value: sessionValue(s, control), pressed: s.pressed === true, hover: s.hover === true,
     disabled: s.disabled === true, dragging,
     repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
     activeHandle: String(s.activeHandle ?? ''),
@@ -8370,7 +8411,8 @@ function seedSessionSnapshot() {
   const next = new Map();
   // Against the entry being replaced: this runs after every dispatch, in the middle of a drag as
   // often as not, and a re-seed that forgot where the drag began would commit every channel.
-  for (const [id, s] of Object.entries(sessions)) next.set(id, sessionEntry(s, live.sessionLast.get(id)));
+  const controlsById = new Map(flatControls(livePanel()?.controls ?? []).map((c) => [c?._children?.Core?.id, c]));
+  for (const [id, s] of Object.entries(sessions)) next.set(id, sessionEntry(s, live.sessionLast.get(id), controlsById.get(id)));
   live.sessionLast = next;
 }
 
@@ -8387,7 +8429,8 @@ function onPreviewSessionsChanged(sessions) {
   let controlsById = null;
   for (const [id, s] of Object.entries(sessions ?? {})) {
     const prev = live.sessionLast.get(id);
-    const cur = sessionEntry(s, prev);
+    controlsById ??= new Map(flatControls(livePanel()?.controls ?? []).map((c) => [c?._children?.Core?.id, c]));
+    const cur = sessionEntry(s, prev, controlsById.get(id));
     next.set(id, cur);
     if (!prev) continue;
     // Most entries are unchanged. Previously each entry walked the entire tree
@@ -8515,6 +8558,8 @@ function onPreviewSessionsChanged(sessions) {
 
 /* --- source 3: preview mode flag (lifecycle) --- */
 
+let previewStopWork = null;
+let previewStartWork = null;
 function onPreviewModeChanged(on) {
   if (on && !ensurePanelExecutionApproved()) {
     live.prevPreviewOn = false;
@@ -8531,25 +8576,31 @@ function onPreviewModeChanged(on) {
     // declares what it declares, rather than accumulating a second copy on every run.
     clearGeneratedControls();
     clearDeviceRuntimeDefinitions();
-    dispatchEvents([
+    previewStartWork = dispatchEvents([
       { event: 'onPanelLoad', controlName: null, payload: undefined },
       { event: 'onPanelBuild', controlName: null, payload: undefined },
       { event: 'onPanelReady', controlName: null, payload: { firstTime } },
     ]);
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {
-    dispatchEvents([{ event: 'onPanelClose', controlName: null, payload: undefined }]);
-    live.sessionLast.clear();
-    stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
-    clearGeneratedControls();   // …and a generated control outliving its build is just litter
-    clearDeviceRuntimeDefinitions();  // …and a declared parameter outliving its panel binds nothing
-    clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
-    stopAllAnimations();        // …and an animation writing into a panel that is gone is noise
-    clearScriptUi();            // …and a message about a panel nobody is looking at is worse
-    // …and a reactive rule outliving its preview rewrites the document forever after. compute()
-    // re-runs on every store change, so a rule registered during a preview kept firing while the
-    // author typed into the Properties panel afterwards — overwriting the field they were editing.
-    // Last, because it drops the handlers onPanelClose was dispatched into just above.
-    resetScriptState();
+    const epoch = executionEpoch;
+    previewStopWork = Promise.resolve(previewStartWork).then(() => {
+      if (epoch === executionEpoch) return dispatchEvents([{ event: 'onPanelClose', controlName: null, payload: undefined }]);
+    }).finally(() => {
+      if (epoch !== executionEpoch) return;
+      live.sessionLast.clear();
+      stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
+      clearGeneratedControls();   // …and a generated control outliving its build is just litter
+      clearDeviceRuntimeDefinitions();  // …and a declared parameter outliving its panel binds nothing
+      clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
+      stopAllAnimations();        // …and an animation writing into a panel that is gone is noise
+      clearScriptUi();            // …and a message about a panel nobody is looking at is worse
+      // …and a reactive rule outliving its preview rewrites the document forever after. compute()
+      // re-runs on every store change, so a rule registered during a preview kept firing while the
+      // author typed into the Properties panel afterwards — overwriting the field they were editing.
+      // Last, after the Close callback has finished using its handlers and state.
+      resetScriptState();
+      live.dispatching = false;
+    });
   }
   live.prevPreviewOn = on;
 }
@@ -8785,21 +8836,28 @@ function onDeviceRuntimeStateChanged(state) {
 export function initPanelRuntime() {
   if (live.inited) return;
   live.inited = true;
+  setPreviewStopBarrier(() => previewStopWork);
   setExportApprovalCheck(panel => String(panel?.id) === String(livePanel()?.id) && ensurePanelExecutionApproved(null, true));
   live.activePanelId = get(scriptRuntimePanelId);
   live.prevPreviewOn = get(previewModeEnabled) === true;
   snapshotValues();
   seedSessionSnapshot();
   live.unsubs.push(scriptRuntimePanelId.subscribe((id) => {
-    // Destroy BEFORE the id moves. A handler restoring the synth reads and writes through the
-    // ACTIVE panel, so telling it goodbye after the switch would have it writing into the panel
-    // that just arrived. The guard also makes the subscriber's immediate first call a no-op.
-    if (String(id) !== String(live.activePanelId)) destroyLoadedScripts();
+    if (String(id) === String(live.activePanelId)) return;
+    // The selection store has already moved. Destroy binds API reads and document writes
+    // to the outgoing panel until its synchronous final hook has completed.
+    destroyLoadedScripts();
     live.activePanelId = id;
-    resetScriptState();        // another panel's scripts, listeners and timers are not ours
-    snapshotValues();          // switching panels shouldn't fire spurious changes
+    resetScriptState();
+    live.dispatching = false;
+    live.sessionsDirty = false;
+    live.prevPreviewOn = false;
+    snapshotValues();
+    syncPanelPreviewSessions(livePanel()?.controls ?? []);
     seedSessionSnapshot();
     ensurePanelExecutionApproved();
+    // A tab switch can leave Preview on: it is still a new run for the incoming panel.
+    if (get(previewModeEnabled) === true) onPreviewModeChanged(true);
   }));
   live.unsubs.push(panels.subscribe(() => onPanelsChanged()));
   live.unsubs.push(scriptDocuments.subscribe(() => {

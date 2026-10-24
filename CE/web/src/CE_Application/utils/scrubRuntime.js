@@ -18,7 +18,7 @@ import {
   getSliderDirection,
 } from './sliderBehavior.js';
 
-import { mouseScrubOverrides } from './mouseBehavior.js';
+import { mouseScrubOverrides, getDragMode } from './mouseBehavior.js';
 
 import { readStoredJson } from './localStorageState.js';
 
@@ -86,15 +86,18 @@ export function isLinearSliderGeometry(behavior) {
 // 'knob' is the plugin-standard vertical drag, 'rotary' follows actual
 // rotation about the dial (unbounded turns, one full turn = the whole
 // range at sensitivity 1). 'absolute' keeps the classic angle mapping.
-export function getCircularSliderDragMode(behavior) {
+export function getCircularSliderDragMode(behavior, mouse = null) {
+  const mouseMode = getDragMode(mouse);
+  // An explicit Mouse mode wins over the circular track's legacy angle mapping.
+  if (mouseMode !== 'auto' && mouseMode !== 'relative') return mouseMode === 'circular' ? 'rotary' : 'knob';
   const mode = String(behavior?.circularDragMode ?? 'absolute').trim().toLowerCase();
-  return mode === 'knob' || mode === 'rotary' ? mode : 'absolute';
+  return mode === 'knob' || mode === 'rotary' ? mode : mouseMode === 'relative' ? 'knob' : 'absolute';
 }
 
 export function createCircularSliderScrub(behavior, startNormalized = 0, mouse = null) {
   const sensitivityScale = Math.max(0.01, numberOr(behavior?.circularDragSensitivity, 1));
   const reversed = isMouseDirectionReversed(behavior);
-  const base = getCircularSliderDragMode(behavior) === 'rotary'
+  const base = getCircularSliderDragMode(behavior, mouse) === 'rotary'
     ? {
         ...presets.rotary,
         // The core's rotary axis is counter-clockwise-positive (mathematical

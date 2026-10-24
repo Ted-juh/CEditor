@@ -129,3 +129,27 @@ test('preview control lookup cache follows immutable controls-array revisions', 
   assert.equal(get(panelPreviewSessions).slider.activeHandle, 'end',
     'a new controls array must not reuse the previous document revision\'s id index');
 });
+
+
+test('choice feedback maps receive values to row ids, preserving canonical ids and unknown values', () => {
+  const control = { _children: {
+    Core: { id: 'wave', controlType: 'Listbox' },
+    Behavior: { family: 'select', role: 'listbox', valueType: 'enum', defaultValue: 'saw' },
+    Value: { rows: [
+      { id: 'saw', internalValue: 'saw', receiveValue: 0, selectedByDefault: true },
+      { id: 'square', internalValue: 'square', receiveValue: 1 },
+      { id: 'triangle', internalValue: 'triangle', receiveValue: 2 },
+    ] },
+    DeviceBindings: { bindings: [{ kind: 'deviceParameter', deviceRole: 'synth', parameterId: 'waveform', port: 'selectedChoice' }] },
+  } };
+  setup([control]);
+  for (const [incoming, expected] of [[1, 'square'], ['2', 'triangle'], [0, 'saw'], ['square', 'square'], [99, 99]]) {
+    syncDeviceParameterToPanelPreview('synth', 'waveform', incoming);
+    assert.equal(get(panelPreviewSessions).wave.valueOverride, expected);
+  }
+  syncDeviceRuntimeStateToPanelPreview({ synth: { waveform: 2 } });
+  assert.equal(get(panelPreviewSessions).wave.valueOverride, 'triangle');
+  control._children.Value.rows.unshift({ id: 'canonical', internalValue: '1', receiveValue: 10 });
+  syncDeviceParameterToPanelPreview('synth', 'waveform', 1);
+  assert.equal(get(panelPreviewSessions).wave.valueOverride, '1', 'canonical ids win ambiguous wire matches');
+});

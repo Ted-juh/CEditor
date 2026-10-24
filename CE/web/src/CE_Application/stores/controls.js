@@ -136,6 +136,37 @@ export function applyResolvedValue(control, path, value) {
  */
 export function applyInspectorResolvedValue(control, path, value, stateName = inspectorStateNameForPath(path)) {
   if (stateName) return applyStateScopedValue(control, stateName, path, value);
+  // Enforce each target's own size limits for both inspector and toolbar edits,
+  // including multi-selection. A zero maximum means unbounded. If imported
+  // limits conflict, the minimum wins rather than permitting a negative range.
+  if (path === 'Transform.width' || path === 'Transform.height') {
+    const axis = path === 'Transform.width' ? 'Width' : 'Height';
+    const transform = getSection(control, 'Transform');
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return false;
+    const bounds = (name) => {
+      const min = Math.max(1, Number(transform?.[`min${name}`]) || 0);
+      const max = Number(transform?.[`max${name}`]);
+      return [min, max > 0 ? Math.max(min, max) : Infinity];
+    };
+    const [minimum, maximum] = bounds(axis);
+    value = Math.max(minimum, Math.min(maximum, numeric));
+    const otherAxis = axis === 'Width' ? 'Height' : 'Width';
+    const current = Number(transform?.[axis.toLowerCase()]);
+    const other = Number(transform?.[otherAxis.toLowerCase()]);
+    if (transform?.aspectLock && current > 0 && other > 0 && Number.isFinite(current) && Number.isFinite(other)) {
+      const ratio = other / current;
+      const [otherMin, otherMax] = bounds(otherAxis);
+      const low = Math.max(minimum, otherMin / ratio);
+      const high = Math.min(maximum, otherMax / ratio);
+      // No legal ratio-preserving size: reject the edit instead of violating a limit.
+      if (low > high) return false;
+      value = Math.max(low, Math.min(high, numeric));
+      const pairedPath = `Transform.${otherAxis.toLowerCase()}`;
+      applyResolvedValue(control, pairedPath, value * ratio);
+      pinDraftForSets(control, { [pairedPath]: value * ratio });
+    }
+  }
   const changed = applyResolvedValue(control, path, value);
   pinDraftForSets(control, { [path]: value });
   return changed;

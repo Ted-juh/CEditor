@@ -7,22 +7,32 @@
    * shows a glanceable summary, and offers a jump to where scripts are edited.
    *
    * Scripts are authored in the Behavior Designer, in the script document bound to
-   * this control's panel — that is the only script editor. The Scripts section on a
-   * control is the count/enable surface this zone summarises, not a second store of
-   * scripts; the button below opens the panel's document.
+   * this control's panel — that is the only script editor. Count the source scripts
+   * targeting this control in that document, including wildcard attachments.
+   * The control's Scripts section only determines whether this zone is offered.
    */
   import { get } from 'svelte/store';
   import { selectedControl, getSection } from '../stores/controls.js';
   import { selectedComponentIds, setActiveEditorTab, activePanel } from '../stores/panels.js';
-  import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
+  import { getOrCreateScriptDocForPanel, scriptDocuments } from '../stores/scriptWorkspace.js';
+  import { isSourceScript } from '../scripting/scriptModel.js';
 
   let control = $derived($selectedControl);
   let multiSelect = $derived($selectedComponentIds.size > 1);
   let scripts = $derived(getSection(control, 'Scripts'));
-  let scriptList = $derived(Array.isArray(scripts?.scripts) ? scripts.scripts : []);
+  // The bound workspace is also the runtime's first document source. The old
+  // per-control Scripts section does not contain Behavior Designer attachments.
+  let scriptDocument = $derived($scriptDocuments.find((doc) =>
+    String(doc.panelId) === String($activePanel?.id)));
+  let scriptList = $derived((scriptDocument?.scripts ?? $activePanel?.scripts ?? []).filter((script) => {
+    if (!isSourceScript(script) || script.scope !== 'component') return false;
+    const target = String(script.target ?? '*').toLowerCase();
+    return target === '*' || target === 'self'
+      || target === String(getSection(control, 'Core')?.name ?? '').toLowerCase();
+  }));
   let count = $derived(scriptList.length);
-  let enabled = $derived(scripts?.enabled !== false);
-  let runInPreview = $derived(scripts?.runInPreview !== false);
+  let enabledCount = $derived(scriptList.filter((script) => script.enabled !== false).length);
+  let enabled = $derived(enabledCount > 0);
   let visible = $derived(!!scripts && !multiSelect);
 
   function openScripts() {
@@ -48,7 +58,7 @@
       </div>
       <div class="s-row s-row-2">
         {#if count > 0}
-          <span class="s-hint">{runInPreview ? 'runs in preview' : 'preview off'}</span>
+          <span class="s-hint">{enabledCount} enabled</span>
         {:else}
           <span class="s-hint">no logic attached</span>
         {/if}

@@ -3,9 +3,10 @@
   import { parameterGroup, parameterAccent, parameterFeedback, parameterEntries, parameterBindingFor, splitParameterItemId } from '../utils/parameterStatus.js';
   import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
-  import { onDestroy, setContext, untrack } from 'svelte';
+  import { onDestroy, setContext, untrack, tick } from 'svelte';
+  import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
-  import { resolveControlFamily } from '../models/controlSetFamilies.js';
+  import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
@@ -5788,7 +5789,7 @@
   // The live text = Behavior.defaultValue (the input stays uncontrolled while
   // typing; this value only changes on commit or an inbound device update).
   function currentTextValue(control) {
-    return String(getBehavior(control)?.defaultValue ?? '');
+    return String(sessionFor(control)?.textOverride ?? getBehavior(control)?.defaultValue ?? '');
   }
   function commitTextValue(control, value) {
     if (isReadOnly(control) || isDisabled(control) || getBehavior(control)?.keyboardEnabled === false) return;
@@ -5797,6 +5798,8 @@
     const str = String(value ?? '');
     if (str === currentTextValue(control)) return;
     updateControlProperty(id, 'Behavior.defaultValue', str);
+    // A local commit supersedes the last device reply, including an empty reply.
+    patchControlSession(id, { textOverride: undefined });
     // Emit through the text port (SysEx patch-name value on the device side).
     emitDeviceBindingsForPatch(control, { textValue: str });
   }
@@ -5855,7 +5858,9 @@
   // the id/name are preserved so session reads/writes still resolve. Every
   // listbox row/hit-test read should go through this so it matches the renderer.
   function lbControl(control) {
-    return dependentControl(control, sessionFor(control)?.dependsParentValue);
+    // Match CanvasControl: control-set font/row styling changes list geometry.
+    const drawn = resolveControlForSet(resolvedPreviewFor(control)?.control ?? control, controlSetForPanel(panel));
+    return dependentControl(drawn, sessionFor(control)?.dependsParentValue);
   }
   function handleListboxFilterInput(control, event) {
     // Reset the scroll on a new query so the top match is visible.
@@ -6038,6 +6043,44 @@
     return row?.internalValue ?? row?.id ?? '';
   }
 
+  function handleComboboxKey(control, event, optionIndex = null) {
+    if (!isComboboxControl(control)) return false;
+    if (isDisabled(control) || isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false) return false;
+    const key = event.key;
+    const id = getControlId(control);
+    const open = openComboboxControlId === id;
+    if (key === 'Tab') { openComboboxControlId = ''; return false; }
+    if (key === 'Escape') {
+      if (!open) return false;
+      event.preventDefault(); event.stopPropagation();
+      openComboboxControlId = ''; comboboxElement(control)?.focus();
+      return true;
+    }
+    const rows = comboboxRows(control);
+    const index = optionIndex ?? rows.findIndex(row => String(rowValue(row)) === String(currentComboboxValue(control)));
+    const next = choiceKeyIndex(key, index, rows.length);
+    if (next != null) {
+      event.preventDefault(); event.stopPropagation();
+      openComboboxControlId = id;
+      tick().then(() => requestAnimationFrame(() => {
+        if (openComboboxControlId !== id) return;
+        const menu = Array.from(surfaceRef?.querySelectorAll?.('.panel-combobox-menu') ?? []).find(el => el.dataset.controlId === id);
+        menu?.querySelectorAll('[role="option"]')[next]?.focus();
+      }));
+      return true;
+    }
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault(); event.stopPropagation();
+      if (event.repeat) return true;
+      if (open && optionIndex != null && rows[optionIndex]) {
+        selectComboboxRow(control, rows[optionIndex]);
+        comboboxElement(control)?.focus();
+      } else toggleCombobox(id);
+      return true;
+    }
+    return false;
+  }
+
   function toggleCombobox(controlId) {
     comboboxQuery = '';
     openComboboxControlId = openComboboxControlId === controlId ? '' : controlId;
@@ -6218,7 +6261,7 @@
   }
 
   function beginSpinnerFieldEdit(control, role) {
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const behavior = getBehavior(control);
     const session = sessionFor(control);
@@ -6234,7 +6277,7 @@
   }
 
   function commitSpinnerField(control, role) {
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -6261,7 +6304,7 @@
 
   function handleSpinnerFieldInput(control, role, event) {
     event.stopPropagation();
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
@@ -6274,7 +6317,7 @@
 
   function handleSpinnerFieldKeyDown(control, role, event) {
     event.stopPropagation();
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
 
     if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
@@ -7023,7 +7066,7 @@
   }
 
   function beginRangeFieldEdit(control) {
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const controlId = getControlId(control);
     patchControlSession(controlId, {
       focused: true,
@@ -7034,7 +7077,7 @@
   }
 
   function commitRangeFieldInput(control) {
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const controlId = getControlId(control);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -7055,7 +7098,7 @@
 
   function handleRangeFieldInput(control, event) {
     event.stopPropagation();
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
       valueInputActive: true,
@@ -7065,7 +7108,7 @@
 
   function handleRangeFieldKeyDown(control, event) {
     event.stopPropagation();
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
 
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
@@ -8178,7 +8221,7 @@
           ? createSliderTrackScrub(dragBehavior, dragMouse, dragStart)
           : createRangeTrackScrub(dragBehavior, dragMouse, dragStart);
         sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
-      } else if (rect && getCircularSliderDragMode(dragBehavior) !== 'absolute') {
+      } else if (rect && getCircularSliderDragMode(dragBehavior, dragMouse) !== 'absolute') {
         // Relative dial drag: start from the picked handle's value, no jump.
         sliderScrub = createCircularSliderScrub(dragBehavior, dragStart, dragMouse);
         sliderScrub.begin(scrubSample(event), { bounds: rect });
@@ -8491,7 +8534,7 @@
   function handleFocus(control) {
     rememberParameter(getControlId(control));
     if (isDisabled(control)) return;
-    if (lastInputMode !== 'keyboard') return;
+    if (lastInputMode !== 'keyboard' || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
 
     const controlId = getControlId(control);
     keyboardFocusControlId = controlId;
@@ -8551,12 +8594,14 @@
     if (keyOwner && keyOwner !== event.currentTarget) return;
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
 
     const controlId = getControlId(control);
     lastInputMode = 'keyboard';
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
+
+    if (handleComboboxKey(control, event)) return;
 
     if (linkedEnvKey(control, event)) {
       event.preventDefault(); event.stopPropagation();
@@ -8724,8 +8769,8 @@
     if (keyOwner && keyOwner !== event.currentTarget) return;
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
-    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
-    if (isListboxControl(control)) return; // navigation/confirmation is completed on keydown
+    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isListboxControl(control) || isComboboxControl(control)) return; // navigation/confirmation is completed on keydown
     // Inspector Enter returns focus here before key-up. Never reinterpret that release
     // as a pointer edit at the grid centre (or repeat the last navigation button).
     if (control?._children?.Designer?.arpeggiator?.numericFields) return;
@@ -8986,13 +9031,14 @@
             }} />
         {/if}
         <!-- Row IDs/values are authored data and need not be unique (or nonempty). -->
-        {#each comboboxRows(control) as row}
+        {#each comboboxRows(control) as row, optionIndex}
           {@const selected = String(rowValue(row)) === String(currentComboboxValue(control))}
           <button
             type="button"
             class:selected
             role="option"
             aria-selected={selected}
+            onkeydown={(event) => handleComboboxKey(control, event, optionIndex)}
             onpointerdown={(event) => {
               event.preventDefault();
               event.stopPropagation();

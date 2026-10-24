@@ -1,5 +1,6 @@
 <script>
   import { untrack } from 'svelte';
+  import { resolveInteractionContext } from '../utils/interactionRuntime.js';
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
@@ -210,7 +211,8 @@
 
   let behavior = $derived(control?._children?.Behavior ?? null);
   let parts = $derived(resolveSliderSemanticParts(control?._children?.Parts ?? null));
-  let signals = $derived(runtime?.signals ?? {});
+  // Edit mode has no runtime overlay; its geometry must still use authored values.
+  let signals = $derived(runtime?.signals ?? resolveInteractionContext(control));
   let geometry = $derived(getSliderGeometry(behavior));
   let orientation = $derived(getSliderOrientation(behavior));
   let valueMode = $derived(getSliderValueMode(behavior));

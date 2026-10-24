@@ -13,7 +13,16 @@
  *
  * Returns { totalThick, layers[] }.
  */
-import { darken, lighten } from './colorHelpers.js';
+import { darken as darkenRGB, lighten as lightenRGB } from './colorHelpers.js';
+
+// Segment colors have already been converted to CSS #RRGGBBAA. Shade RGB only
+// and carry alpha through; the general helper also accepts stored AARRGGBB.
+function shadeCSS(colour, shade) {
+  const match = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(colour);
+  return match ? shade(match[1]) + (match[2] ?? '') : shade(colour);
+}
+const darken = (colour) => shadeCSS(colour, darkenRGB);
+const lighten = (colour) => shadeCSS(colour, lightenRGB);
 
 export function resolveStroke(style, thick, colour, side, dotRadius = 2) {
   const da = 'none';

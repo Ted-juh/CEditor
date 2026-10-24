@@ -24,6 +24,8 @@
 // that the path leads nowhere and points at ce.panel.info(). Silently accepting a write that moves
 // nothing is what this module is fixing, so it must not introduce a second one.
 
+import { getRangeActiveHandle, getRangeHandleValue, clampRangeHandleValue } from '../utils/rangeBehavior.js';
+
 import { resolveInteractionContext } from '../utils/interactionRuntime.js';
 import { constrainCustomValues } from '../utils/customComponentInteraction.js';
 
@@ -120,8 +122,20 @@ export function customChannelPatch(control, channelName, value, sessions) {
 }
 
 /** The session patch that moves a control to `value`. Both handles, as the player has always written. */
-export function liveValuePatch(value) {
+export function liveValuePatch(value, control, sessions = null) {
+  const behavior = control?._children?.Behavior;
+  if (behavior?.family === 'range' && behavior.role === 'spinbox' && behavior.valueMode === 'range') {
+    const session = sessions?.[String(control?._children?.Core?.id ?? '')];
+    const handle = getRangeActiveHandle(session);
+    return {
+      activeHandle: handle,
+      [`${handle}ValueOverrideEnabled`]: true,
+      [`${handle}ValueOverride`]: clampRangeHandleValue(behavior, session, handle, value),
+    };
+  }
   return {
+    ...(control?._children?.Behavior?.buttonType === 'toggle'
+      ? { checked: value === true, mixed: false } : {}),
     valueOverrideEnabled: true,
     valueOverride: value,
     currentValueOverrideEnabled: true,
@@ -152,10 +166,14 @@ export function readLiveValue(sessions, control, modelPath = null) {
     return values?.[channelName] ?? declared?.currentValue ?? declared?.defaultValue;
   }
 
-  if (session?.valueOverrideEnabled) return session.valueOverride;
-  if (session && 'currentValueOverride' in session && session.currentValueOverrideEnabled) {
-    return session.currentValueOverride;
+  const behavior = control?._children?.Behavior;
+  if (behavior?.family === 'range' && behavior.role === 'spinbox' && behavior.valueMode === 'range') {
+    return getRangeHandleValue(behavior, session, getRangeActiveHandle(session));
   }
+
+  if (session?.valueOverrideEnabled) return session.valueOverride;
+  // User input can disable the scripted override while leaving its legacy mirror intact.
+  // Resolve the current interaction state instead of reading that stale mirror.
   // No override: ask the same resolver the renderer uses. `valueRaw` is the drawn value for every
   // family — range, select, bool — so a script and the screen cannot disagree.
   try {

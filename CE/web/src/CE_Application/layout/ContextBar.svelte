@@ -27,7 +27,11 @@
   import Square from 'lucide-svelte/icons/square';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Image from 'lucide-svelte/icons/image';
-  import { selectedControl, selectedControls, getSection, updateControlProperty, updateSelectedProperty, applyControlPatchesById, renameControl } from '../stores/controls.js';
+  import { selectedControl, selectedControls, getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty, applyControlPatchesById, renameControl } from '../stores/controls.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { drawnForInspector } from '../models/controlSetFamilies.js';
+  import { stateEditScope } from '../stores/stateEditScope.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { layoutModeForIcon } from '../utils/iconLayout.js';
   import { selectedComponentIds, resolvedActivePanelId } from '../stores/panels.js';
   import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
@@ -43,7 +47,13 @@
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
   let background = $derived(getSection(control, 'Background'));
-  let text = $derived(getSection(control, 'Text'));
+  // Show the same set defaults and selected state as the Text inspector.
+  let textControl = $derived(drawnForInspector(
+    $stateEditScope?.mode === 'state' && $stateEditScope.stateName
+      ? resolveStateScopedControl(control, $stateEditScope.stateName) : control,
+    $activeControlSet,
+  ));
+  let text = $derived(getSection(textControl, 'Text'));
   let textFill = $derived(text?._children?.Fill ?? null);
   let font = $derived(text?._children?.Font ?? null);
   let position = $derived(text?._children?.Position ?? null);
@@ -69,7 +79,7 @@
     one_shot: ['single_use'],
   };
 
-  let buttonType = $derived(String(behavior?.buttonType ?? inferButtonType(controlType)));
+  let buttonType = $derived(String(behavior?.family === 'range' ? (behavior.role ?? 'range') : behavior?.buttonType ?? inferButtonType(controlType)));
   let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? null);
   let showSubtypeSelector = $derived(!!behavior && !!subtypeOptions);
   let rowCount = $derived(Array.isArray(valueSection?.rows) ? valueSection.rows.length : 0);
@@ -133,9 +143,11 @@
     return null;
   });
 
-  let weightedFontSelected = $derived(
-    $fontChoices.find(option => option.value === (font?.family ?? 'Arial'))?.supportsWeight === true
+  let selectedFontOption = $derived(
+    $fontChoices.find(option => option.value === (font?.family ?? 'Arial'))
+    ?? $fontChoices.find(option => option.family === (font?.family ?? 'Arial'))
   );
+  let weightedFontSelected = $derived(selectedFontOption?.supportsWeight === true);
   let effectiveWeightValue = $derived(font?.weightValue ?? (font?.weight === 'Bold' ? 700 : 400));
   let boldActive = $derived(weightedFontSelected ? effectiveWeightValue >= 700 : font?.weight === 'Bold');
   let textColour = $derived(toDisplayColour(textFill?.colour ?? 'FFFFFFFF'));
@@ -342,7 +354,10 @@
       </div>
 
       <div class="prop-group">
-        <select class="font-select" value={font?.family ?? 'Arial'} title="Font family" onchange={setFontFamily}>
+        <select class="font-select" value={selectedFontOption?.value ?? font?.family ?? 'Arial'} title="Font family" onchange={setFontFamily}>
+          {#if !selectedFontOption && font?.family}
+            <option value={font.family}>{font.family}</option>
+          {/if}
           {#each $fontChoices as option}
             <option value={option.value}>{option.label}</option>
           {/each}

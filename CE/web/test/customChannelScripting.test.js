@@ -61,6 +61,32 @@ function componentPanel(channels, { id = 'comp', name = 'comp' } = {}) {
 
 const api = () => rt.scriptApiForTesting('', 'custom-channels');
 
+test('TextInput commits emit string change events, respect the gate, and ignore unchanged text', async () => {
+  panels.set([]);
+  panelPreviewSessions.set({});
+  rt.resetScriptStateForTesting();
+  rt.setRuntimeHost(null);
+  const control = createControl('TextInput', { Core: { id: 'text', name: 'text' } });
+  addPanel({ id: 'text-panel', name: 'Text', controls: [control] });
+  setActivePanel('text-panel');
+  const behavior = get(panels)[0].controls[0]._children.Behavior;
+  rt.runPanelsChangedForTesting({ baseline: true });
+  const seen = [];
+  api().on('text', 'onValueChange', v => seen.push(['change', v]));
+  api().on('text', 'onValueChanged', v => seen.push(['commit', v]));
+  for (const value of ['Café 日本語', '']) {
+    behavior.defaultValue = value;
+    await rt.runPanelsChangedForTesting();
+    assert.deepEqual(seen.splice(0), [['change', value], ['commit', value]]);
+    await rt.runPanelsChangedForTesting();
+    assert.deepEqual(seen, []);
+  }
+  behavior.emitValueChange = false;
+  behavior.defaultValue = 'silent';
+  await rt.runPanelsChangedForTesting();
+  assert.deepEqual(seen, []);
+});
+
 test.afterEach(() => { rt.setRuntimeHost(null); panelPreviewSessions.set({}); });
 
 /* ------------------------------------------------------------------ path resolution */

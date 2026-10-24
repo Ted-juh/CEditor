@@ -940,3 +940,21 @@ test('applyCustomLinks executes map, offset, condition, toggle, and reset operat
   assert.equal(result.values.resetTarget, 0.33);
   assert.deepEqual([...result.targets], ['gain', 'yValue', 'mainValue', 'flag', 'resetTarget']);
 });
+
+ test('RT-037 radio activation preserves the current non-default choice and toggles that choice', () => {
+ const old=[get(panels),get(activePanelId),get(activeEditorTab),get(panelPreviewSessions)];
+ const control=makeRadioGroupControl('radio_keyboard');
+ try {
+ panels.set([{id:9037,name:'Keyboard',controls:[control]}]); activePanelId.set(9037); activeEditorTab.set({type:'panel',id:9037}); panelPreviewSessions.set({});
+ commitPanelPreviewSelectAction('radio_keyboard',{value:'bpf'});
+ assert.equal(commitPanelPreviewSelectAction('radio_keyboard').valueOverride,'bpf');
+ control._children.Behavior.allowDeselect=true;
+ assert.equal(commitPanelPreviewSelectAction('radio_keyboard').valueOverride,'');
+ assert.equal(commitPanelPreviewSelectAction('radio_keyboard').valueOverride,'off');
+ control._children.Behavior.selectionMode='multi';
+ commitPanelPreviewSelectAction('radio_keyboard',{value:'hpf'});
+ assert.deepEqual(commitPanelPreviewSelectAction('radio_keyboard').valueOverride,['off']);
+ control._children.Value.rows.forEach(row=>row.enabled=false);
+ assert.equal(commitPanelPreviewSelectAction('radio_keyboard'),null);
+ } finally {panels.set(old[0]);activePanelId.set(old[1]);activeEditorTab.set(old[2]);panelPreviewSessions.set(old[3]);}
+});

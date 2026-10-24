@@ -108,7 +108,7 @@ export function sliderControlValueFromPoint(snapshot, rect, point, start, dragSt
   const startNormalized = span > 0 ? clamp((numberOr(start?.value, min) - min) / span, 0, 1) : 0;
   const sample = (x, y) => ({ x, y, shiftKey: point?.fine === true, ctrlKey: point?.coarse === true, altKey: false, metaKey: false });
   const hasStart = Number.isFinite(Number(start?.clientX)) && Number.isFinite(Number(start?.clientY));
-  const relativeDial = !isLinearSliderGeometry(behavior) && getCircularSliderDragMode(behavior) !== 'absolute';
+  const relativeDial = !isLinearSliderGeometry(behavior) && getCircularSliderDragMode(behavior, mouse) !== 'absolute';
   let normalized = null;
   if (hasStart && (isLinearSliderGeometry(behavior) || relativeDial)) {
     let scrub = dragState?.scrub ?? null;

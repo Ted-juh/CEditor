@@ -237,3 +237,10 @@ export function hasDragOverrides(mouse = null) {
     || mouse.invertX === true
     || mouse.invertY === true;
 }
+
+/** Keep the surface's default tab stop unless an authored focus rule overrides it. */
+export function resolveSurfaceTabIndex(mouse, behavior, surfaceIndex) {
+  if (isDisplayOnly(behavior) || behavior?.focusable === false) return -1;
+  if (mouse?.focusable !== undefined) return resolveTabIndex(mouse);
+  return surfaceIndex !== undefined ? surfaceIndex : resolveTabIndex(mouse);
+}

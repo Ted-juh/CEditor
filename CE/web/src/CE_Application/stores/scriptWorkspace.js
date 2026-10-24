@@ -1,3 +1,4 @@
+import { prepareRestoredScriptBinding } from '../scripting/scriptPanelBinding.js';
 import { derived, get, writable } from 'svelte/store';
 import {
   isJuceAvailable,
@@ -44,7 +45,8 @@ function readPersistedState() {
     const parsed = JSON.parse(storage.getItem(SCRIPT_WORKSPACE_STORAGE_KEY) || '{}');
     const documents = (Array.isArray(parsed?.documents) ? parsed.documents : [])
       .map(sanitizeDocument)
-      .filter(Boolean);
+      .filter(Boolean)
+      .map(prepareRestoredScriptBinding);
     const activeId = String(parsed?.activeId ?? '').trim();
     return {
       documents,

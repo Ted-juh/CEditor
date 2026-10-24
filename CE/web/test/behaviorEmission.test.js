@@ -143,3 +143,19 @@ test('mixed bool state is a script-visible value without inventing a boolean', a
     assert.deepEqual(seen, ['mixed']);
   });
 });
+
+for (const subtype of ['toggle', 'sticky']) {
+  test(subtype + ' emits boolean changes by default and respects the Value switch', async () => {
+    for (const enabled of [true, false]) {
+      await withControl('ToggleButton', { subtype, ...(enabled ? {} : { emitValueChange: false }) }, async ({ id, api }) => {
+        const seen = [];
+        api.on('*', 'onValueChanged', value => seen.push(value));
+        for (const checked of [true, false]) {
+          panelPreviewSessions.update(sessions => ({ ...sessions, [id]: { ...sessions[id], checked } }));
+          await runPreviewSessionsForTesting();
+        }
+        assert.deepEqual(seen, enabled ? [true, false] : []);
+      });
+    }
+  });
+}

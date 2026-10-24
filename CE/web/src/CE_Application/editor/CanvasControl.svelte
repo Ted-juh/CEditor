@@ -97,7 +97,7 @@
     getMouseSection,
     resolveCursorCss,
     resolveHitTestClipPath,
-    resolveTabIndexFor,
+    resolveSurfaceTabIndex,
     resolveTabIndex,
     childrenAcceptPointer,
     showsFocusOutline,
@@ -452,8 +452,11 @@
   let renderTransform = $derived(getSection(renderControl, 'Transform') ?? transform);
   let background = $derived(getSection(renderControl, 'Background'));
   let text = $derived(getSection(renderControl, 'Text'));
-  let sourceBackground = $derived(getSection(sourceControl, 'Background') ?? background);
-  let sourceText = $derived(getSection(sourceControl, 'Text') ?? text);
+  // Radio items need the authored base/state tree, with the same set tokens resolved
+  // as the main control. Raw tokens are not valid renderer colours.
+  let resolvedSourceControl = $derived(resolveControlForSet(sourceControl, controlSet));
+  let sourceBackground = $derived(getSection(resolvedSourceControl, 'Background') ?? background);
+  let sourceText = $derived(getSection(resolvedSourceControl, 'Text') ?? text);
   let icon = $derived(getSection(renderControl, 'Icon'));
   let effects = $derived(getSection(renderControl, 'Effects'));
   let contentLayout = $derived(getSection(renderControl, 'ContentLayout'));
@@ -461,8 +464,8 @@
   let valueSection = $derived(getSection(renderControl, 'Value'));
   let statesSection = $derived(getSection(renderControl, 'States'));
   let sourceBehavior = $derived(getSection(sourceControl, 'Behavior') ?? behavior);
-  let sourceValueSection = $derived(getSection(sourceControl, 'Value') ?? valueSection);
-  let sourceStatesSection = $derived(getSection(sourceControl, 'States') ?? statesSection);
+  let sourceValueSection = $derived(getSection(resolvedSourceControl, 'Value') ?? valueSection);
+  let sourceStatesSection = $derived(getSection(resolvedSourceControl, 'States') ?? statesSection);
   let buttonType = $derived(String(sourceBehavior?.buttonType ?? behavior?.buttonType ?? '').trim().toLowerCase());
   // Cascading selectors: rows visible under the parent selector's current value
   // (a no-op unless this control has Value.dependsOn set).
@@ -658,11 +661,7 @@
   // The surface's own tab index wins when it set one — it knows about roles and
   // handle counts. The Mouse section fills in for everything else.
   let effectiveTabIndex = $derived(
-    // ...except for a display, where the surface does not know it is one. -1 wins over the
-    // surface's own index there, because a read-only control is never in the tab order.
-    mouseAppliesToSurface && resolveTabIndexFor(mouseSection, flowBehavior) === -1
-      ? -1
-      : (previewTabIndex !== undefined ? previewTabIndex : resolveTabIndex(mouseSection))
+    resolveSurfaceTabIndex(mouseSection, flowBehavior, previewTabIndex)
   );
 
   // --- Drag state (internal $state per feedback) ---
@@ -2359,6 +2358,10 @@
   // WebView2 intermittently drops masked foreignObject fills for custom-flow SVG text.
   // Fall back to direct glyph fill there so labels still render and the editor stays interactive.
   let useTextFillForeignObject = $derived(needsVisualTextFill && !usesCustomTextFlow);
+  // Native SVG paint avoids WebView2's masked foreignObject issue without dropping the texture.
+  let customTextureFill = $derived(usesCustomTextFlow && textFillMode === 'texture' && !!textFillTextureUrl);
+  let customTextureSize = $derived(Math.max(8, 64 * Math.max(0.1, numberOr(textFill?.textureTileScale, 1))));
+  let customTextureOpacity = $derived(Math.max(0, Math.min(1, numberOr(textFill?.textureOpacity, 100) / 100)));
   let textReflectionEnabled = $derived(
     textEffects?.reflectionEnabled === true || (textEffects?.reflectionEnabled == null && textEffects?.copyEnabled === true)
   );
@@ -4268,6 +4271,21 @@
     -->
     {#snippet textVisual(ns, fillGate, drawText)}
         <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
+          {#if customTextureFill}
+            <defs>
+              <filter id={`${textShapeMaskId(ns)}-texture-tint`} x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feFlood flood-color={cssColor(textFill?.textureTint ?? 'FFFFFFFF')} result="tint" />
+                <feBlend in="tint" in2="SourceGraphic" mode="multiply" />
+              </filter>
+              <pattern id={`${textShapeMaskId(ns)}-texture`} patternUnits="userSpaceOnUse"
+                x={(displayW - customTextureSize) / 2 + numberOr(textFill?.textureOffsetX, 0)}
+                y={(displayH - customTextureSize) / 2 + numberOr(textFill?.textureOffsetY, 0)}
+                width={customTextureSize} height={customTextureSize}>
+                <image href={textFillTextureUrl} width={customTextureSize} height={customTextureSize}
+                  preserveAspectRatio="none" filter={`url(#${textShapeMaskId(ns)}-texture-tint)`} />
+              </pattern>
+            </defs>
+          {/if}
           {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || fillGate || textReflectionFadeEnabled}
             <defs>
               {#if textReflectionFadeEnabled}
@@ -4354,7 +4372,11 @@
               </g>
             {:else if layer.key === 'fill'}
               <g style={textVisualEffectStyle}>
-                {#if fillGate && !textKnockout}
+                {#if customTextureFill && !textKnockout}
+                  <g opacity={customTextureOpacity}>
+                    {@render drawText({ 'fill': `url(#${textShapeMaskId(ns)}-texture)` }, 'text', 0, 0, '', undefined)}
+                  </g>
+                {:else if fillGate && !textKnockout}
                   <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId(ns)})`} style="pointer-events:none;">
                     <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
                   </foreignObject>
@@ -5082,6 +5104,12 @@
   .canvas-control.hidden-component {
     opacity: 0.25 !important;
     outline: calc(1px * var(--inv-scale, 1)) dashed #666;
+  }
+
+  /* Hidden controls remain discoverable in the editor, but never paint or take
+     focus in output preview (including a hidden container's descendants). */
+  .canvas-control.hidden-component.preview-surface {
+    display: none;
   }
 
   /* A HIDDEN CONTROL STOPS TAKING THE POINTER. `opacity: 0.25` alone left it fully interactive, so

@@ -44,11 +44,17 @@ function patchForBinding(control, binding, value) {
   }
 
   if (port === 'selectedChoice') {
+    // Feedback may contain a profile choice id or its numeric receive value.
+    // The interaction runtime selects by internal value, never by wire value.
+    const rows = control?._children?.Value?.rows ?? [];
+    const row = rows.find(row => String(row.internalValue ?? row.id) === String(value))
+      ?? rows.find(row => row.receiveValue != null && String(row.receiveValue) === String(value));
+    const selectedValue = row ? row.internalValue ?? row.id : value;
     return {
       checked: false,
       mixed: false,
       valueOverrideEnabled: true,
-      valueOverride: value,
+      valueOverride: selectedValue,
     };
   }
 

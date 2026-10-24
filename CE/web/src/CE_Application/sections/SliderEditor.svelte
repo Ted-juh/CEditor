@@ -32,6 +32,7 @@
   import BackgroundEditor from './BackgroundEditor.svelte';
   import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr } from '../utils/primitives.js';
+  import { getSliderDirection } from '../utils/sliderBehavior.js';
 
   let { control = null } = $props();
 
@@ -76,6 +77,11 @@
     } else {
       applyControlPatch(controlId, patch, { pin: true });
     }
+  }
+
+  function setSliderType(key, value) {
+    const next = { ...behavior, [key]: value };
+    setPatch({ [`Behavior.${key}`]: value, 'Behavior.direction': getSliderDirection(next) });
   }
 
   function regenerateSliderParts() {
@@ -208,7 +214,7 @@
 
   <PropertySection title="Type" icon={Shapes}>
     <PropertyCell label="Geometry" span={2} hint="Linear uses a track axis, circular uses a dial arc.">
-      <select class="val" value={geometry} onchange={(event) => set('Behavior.geometry', event.target.value)}>
+      <select class="val" value={geometry} onchange={(event) => setSliderType('geometry', event.target.value)}>
         <option value="linear">linear</option>
         <option value="circular">circular</option>
       </select>
@@ -223,13 +229,13 @@
 
     {#if geometry === 'linear'}
       <PropertyCell label="Orientation" span={2} hint="Horizontal and vertical stay within the same linear slider family.">
-        <select class="val" value={behavior.orientation ?? 'horizontal'} onchange={(event) => set('Behavior.orientation', event.target.value)}>
+        <select class="val" value={behavior.orientation ?? 'horizontal'} onchange={(event) => setSliderType('orientation', event.target.value)}>
           <option value="horizontal">horizontal</option>
           <option value="vertical">vertical</option>
         </select>
       </PropertyCell>
       <PropertyCell label="Direction" span={2} hint="Choose the authored value direction.">
-        <select class="val" value={behavior.direction ?? 'ltr'} onchange={(event) => set('Behavior.direction', event.target.value)}>
+        <select class="val" value={getSliderDirection(behavior)} onchange={(event) => set('Behavior.direction', event.target.value)}>
           {#if String(behavior.orientation ?? 'horizontal') === 'vertical'}
             <option value="btt">btt</option>
             <option value="ttb">ttb</option>
@@ -241,7 +247,7 @@
       </PropertyCell>
     {:else}
       <PropertyCell label="Direction" span={2} hint="Dial travel can run clockwise or counterclockwise.">
-        <select class="val" value={behavior.direction ?? 'cw'} onchange={(event) => set('Behavior.direction', event.target.value)}>
+        <select class="val" value={getSliderDirection(behavior)} onchange={(event) => set('Behavior.direction', event.target.value)}>
           <option value="cw">cw</option>
           <option value="ccw">ccw</option>
         </select>

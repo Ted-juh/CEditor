@@ -183,3 +183,64 @@ test('editor and player also agree about a control that has no value', () => {
   assert.equal(run(false), true, 'the editor refuses');
   assert.equal(run(true), true, 'and so does the player, rather than silently accepting it');
 });
+
+for (const withHost of [false, true]) {
+  test('normalized Toggle writes retain booleans in ' + (withHost ? 'player' : 'editor'), () => {
+    const { panel, control } = panelWith('ToggleButton', 'Toggle');
+    control._children.Behavior.min = 0;
+    control._children.Behavior.max = 1;
+    if (withHost) setRuntimeHost(createPlayerHost(panel));
+    try {
+      const api = scriptApiForTesting('', 'toggle-normalized');
+      for (const [position, expected] of [[1, true], [0, false], [0.49, false], [0.5, true], [-1, false], [2, true]]) {
+        api.set('Toggle.normalizedValue', position);
+        assert.equal(api.get('Toggle.value'), expected);
+        assert.equal(api.get('Toggle.normalizedValue'), expected ? 1 : 0);
+      }
+      assert.equal(traced(), '');
+    } finally { setRuntimeHost(null); panels.set([]); panelPreviewSessions.set({}); }
+  });
+}
+
+
+test('toggle reads and watchers follow user input after a script value write', async () => {
+  const { runReactiveForTesting, resetScriptStateForTesting } = await import('../src/CE_Application/scripting/panelRuntime.js');
+  const { updatePanelPreviewSession } = await import('../src/CE_Application/stores/interactionPreview.js');
+  for (const withHost of [false, true]) {
+    const { panel, id } = panelWith('ToggleButton', 'Toggle');
+    resetScriptStateForTesting();
+    if (withHost) setRuntimeHost(createPlayerHost(panel));
+    try {
+      const api = scriptApiForTesting('', 'toggle-user-after-script');
+      api.set('Toggle.value', false);
+      const changes = [];
+      api.watch('Toggle.value', (value, previous) => changes.push([previous, value]));
+      // The real toggle input relinquishes the scripted value override and changes checked.
+      updatePanelPreviewSession(id, { checked: true, valueOverrideEnabled: false });
+      assert.equal(onScreen(id), true);
+      assert.equal(api.get('Toggle.value'), true, 'read agrees with the visible toggle');
+      runReactiveForTesting();
+      updatePanelPreviewSession(id, { checked: false, valueOverrideEnabled: false });
+      runReactiveForTesting();
+      assert.deepEqual(changes, [[false, true], [true, false]]);
+    } finally {
+      resetScriptStateForTesting(); setRuntimeHost(null); panels.set([]); panelPreviewSessions.set({});
+    }
+  }
+});
+
+for (const withHost of [false, true]) {
+  test("scripted toggle writes move the visible state in " + (withHost ? "player" : "editor"), () => {
+    const { panel, id } = panelWith("ToggleButton", "Toggle");
+    if (withHost) setRuntimeHost(createPlayerHost(panel));
+    try {
+      const api = scriptApiForTesting("", "toggle-visible-write");
+      for (const expected of [true, false, true]) {
+        api.set("Toggle.value", expected);
+        assert.equal(api.get("Toggle.value"), expected);
+        assert.equal(onScreen(id), expected, "visible state follows script");
+        assert.equal(get(panelPreviewSessions)[id].checked, expected, "next user input starts from the displayed state");
+      }
+    } finally { setRuntimeHost(null); panels.set([]); panelPreviewSessions.set({}); }
+  });
+}

@@ -243,6 +243,7 @@ export const COMPONENT_TYPES = {
     defaultValue: false,
     includeSelectedState: true,
     portType: 'ToggleButton',
+    behavior: { emitValueChange: true },
     rows: [
       { id: 'off', displayText: 'Off', internalValue: false, sendValue: 0 },
       { id: 'on', displayText: 'On', internalValue: true, sendValue: 1 },

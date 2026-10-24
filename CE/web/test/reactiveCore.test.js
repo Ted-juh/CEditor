@@ -191,7 +191,7 @@ test('watch reports the previous value alongside the new one', async () => {
     rt.runReactiveForTesting();
     api.set('cutoff.value', 3);
     rt.runReactiveForTesting();
-    assert.deepEqual(seen, [[2, undefined], [3, 2]]);
+    assert.deepEqual(seen, [[2, 1], [3, 2]]);
   });
 });
 

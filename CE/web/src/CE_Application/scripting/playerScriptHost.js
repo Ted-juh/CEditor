@@ -86,7 +86,7 @@ export function createPlayerHost(panel, { onDocumentWrite = null } = {}) {
       if (isLiveValuePath(modelPath) && hasLiveValue(control)) {
         // Same path the player uses for incoming MIDI: move the on-screen control AND let the
         // host-parameter sync pick it up (panelPreviewSessions subscriber in Player.svelte).
-        updatePanelPreviewSession(id, liveValuePatch(value));
+        updatePanelPreviewSession(id, liveValuePatch(value, control, get(panelPreviewSessions)));
         return true;
       }
       const wrote = setValueAtPath(control, modelPath, value) !== false;
