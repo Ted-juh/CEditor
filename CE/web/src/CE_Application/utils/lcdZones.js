@@ -366,11 +366,16 @@ export function zoneScrollWindow(content, width, elapsedChars) {
 // priority) zones paint over earlier ones. getInfo(sourceId) -> info | null.
 // `elapsedChars` drives per-zone marquee: a zone with scroll:true whose content
 // overflows its region scrolls within it instead of truncating.
-export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0, state = {}) {
+// `text` is the layout's own text, one string per row (a layout's `lines`, which a script writes):
+// the grid starts from it, so it shows wherever no zone paints.
+export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0, state = {}, text = []) {
   const nRows = Math.max(0, Math.round(rows));
   const nCols = Math.max(0, Math.round(cols));
   const grid = [];
-  for (let r = 0; r < nRows; r += 1) grid.push(new Array(nCols).fill(' '));
+  for (let r = 0; r < nRows; r += 1) {
+    const line = String((Array.isArray(text) ? text[r] : '') ?? '');
+    grid.push(Array.from({ length: nCols }, (_, c) => line[c] ?? ' '));
+  }
 
   const ordered = (Array.isArray(zones) ? zones : [])
     .filter((z) => zoneVisibleWith(z, state))

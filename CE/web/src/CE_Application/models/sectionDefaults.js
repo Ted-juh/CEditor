@@ -692,8 +692,13 @@ export const SECTION_DEFAULTS = {
     fields: [],
     // Zones / layouts / pages. When layouts is non-empty the display composes its
     // rows from the active layout's zones instead of the lines/tokens above.
-    // layout: { id, name, timeoutMs, timeoutTo, zones:[ { id,name,row,colStart,colEnd,show,
+    // layout: { id, name, timeoutMs, timeoutTo, lines, zones:[ { id,name,row,colStart,colEnd,show,
     //   sourceId,text,label,precision,prefix,suffix,radix,align,priority,visible,press } ] }.
+    //
+    // `lines` is the layout's own text, one string per row, as `lines` above is the display's: what
+    // a script writes there with text() and clear(), and what the inspector's Text rows edit while
+    // the layout is the one being edited. It is drawn first and the zones paint over it, so it
+    // shows wherever no zone paints. Absent, the layout has no text of its own.
     //
     // `timeoutMs`/`timeoutTo` are a layout's AUTO-RETURN, and the one page transition a value
     // cannot express: selectorMap and overlays are pure functions of the current values, and

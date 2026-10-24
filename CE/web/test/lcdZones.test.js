@@ -419,6 +419,19 @@ test('visibleWhen shows a zone only on its own index — how a menu marks its se
   assert.equal(zoneVisibleWith(arrow(2, 0), {}), true);
 });
 
+test('a layout\'s own text shows wherever no zone paints', () => {
+  // What a script writes on a layout (its `lines`) is the grid composeLayout starts from: a zone's
+  // region paints over it, and a zone that paints nothing leaves it showing.
+  const zones = [
+    { row: 1, colStart: 1, colEnd: 4, show: 'static', text: 'COMP' },
+    { row: 2, colStart: 1, colEnd: 6, show: 'value', sourceId: 'GONE' },
+  ];
+  const text = ['abcdefghij', 'KLMNOPQRST', 'past the last row'];
+  assert.deepEqual(composeLayout(zones, 2, 8, () => null, 0, {}, text), ['COMPefgh', 'KLMNOPQR']);
+  assert.deepEqual(composeLayout([], 2, 4, null, 0, {}, ['ab']), ['ab  ', '    '], 'short rows and missing rows are blank');
+  assert.deepEqual(composeLayout(zones.slice(0, 1), 1, 6, null), ['COMP  '], 'no text: a blank grid, as before');
+});
+
 test('composeLayout paints only the zones state allows', () => {
   const rows = [
     { id: 'i0', show: 'static', text: 'ONE', row: 1, colStart: 3, colEnd: 5 },

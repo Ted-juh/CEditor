@@ -163,6 +163,10 @@
   let layouts = $derived(Array.isArray(pixel?.layouts) ? pixel.layouts : []);
   let editLayoutId = $derived($lcdDesignLayoutIds[core?.id] ?? '');
   let editLayout = $derived(layouts.find((l) => String(l?.id) === String(editLayoutId)) ?? layouts[0] ?? null);
+  // A layout as the lists show it: its number, which is how a script addresses it, and its name.
+  function layoutLabel(layout, index) {
+    return `${index + 1} · ${layout?.name || layout?.id || ''}`;
+  }
   let pages = $derived(pixel?.pages ?? {});
   let pixelsW = $derived(Math.max(8, Math.round(Number(pixel?.pixelsW ?? 128))));
   let pixelsH = $derived(Math.max(8, Math.round(Number(pixel?.pixelsH ?? 64))));
@@ -449,8 +453,8 @@
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Elements table edits and previews. Runtime switching follows the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
-            {#each layouts as l}
-              <option value={String(l.id)}>{l.name ?? l.id}</option>
+            {#each layouts as l, li}
+              <option value={String(l.id)}>{layoutLabel(l, li)}</option>
             {/each}
           </select>
           <button class="val erm" type="button" onclick={() => addLayout()} title="Add layout">＋</button>
@@ -458,7 +462,7 @@
           <button class="val erm" type="button" onclick={() => removeLayout(editLayout?.id)} title="Remove layout">✕</button>
         </div>
       </PropertyCell>
-      <PropertyCell label="Name" span={4} hint="Layout name (used by the Pages rules).">
+      <PropertyCell label="Name" span={4} hint="Layout name, used by the Pages rules and by scripts. Scripts also reach it by its number, as listed above.">
         <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
       </PropertyCell>
       <PropertyCell label="Transition" span={2} hint="Animate the new layout in when switching (runtime preview).">
@@ -499,8 +503,8 @@
       </PropertyCell>
       <PropertyCell label="Default" span={4} hint="Resting layout when no selector value matches.">
         <select class="val" value={pages.defaultLayoutId ?? ''} onchange={(event) => setPageProp('defaultLayoutId', event.target.value)}>
-          {#each layouts as l}
-            <option value={String(l.id)}>{l.name ?? l.id}</option>
+          {#each layouts as l, li}
+            <option value={String(l.id)}>{layoutLabel(l, li)}</option>
           {/each}
         </select>
       </PropertyCell>
@@ -533,8 +537,8 @@
               {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
-              {#each layouts as l}
-                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {#each layouts as l, li}
+                <option value={String(l.id)}>{layoutLabel(l, li)}</option>
               {/each}
             </select>
             <button class="val rule-move" type="button" title="Move rule up" disabled={i === 0} onclick={() => moveSelectorRow(i, -1)}>▲</button>
@@ -548,8 +552,8 @@
         <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
           <div class="field-row">
             <select class="val" title="Layout" value={String(ov.layoutId ?? '')} onchange={(event) => setOverlay(i, 'layoutId', event.target.value)}>
-              {#each layouts as l}
-                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {#each layouts as l, li}
+                <option value={String(l.id)}>{layoutLabel(l, li)}</option>
               {/each}
             </select>
             <select class="val" title="On change of" value={ov.sourceId ?? ''} onchange={(event) => setOverlay(i, 'sourceId', event.target.value)}>
