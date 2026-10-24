@@ -770,25 +770,24 @@ for it to be gone through one item at a time, as a new module is. The queue, fro
 LCD text against the rules above and a probe of each verb's edges in the runtime:
 
 1. `cursorAt`: done, below.
-2. `blinkRate`: the text says "Period in milliseconds" and the example "250 blinks four times a
-   second"; the renderer reads it as half the period (`Math.floor(frameTime / rate) % 2`), so 250
-   blinks twice a second, and it holds the rate at 60 or more where the range says 50.
-3. `animPreset`: any word is stored without a message ("bogus", "RAIN", 5), and the text has no
+2. `blinkRate`: done, below.
+3. `blink`: "Switch blinking of the whole display on or off.": only the lit text blinks.
+4. `animPreset`: any word is stored without a message ("bogus", "RAIN", 5), and the text has no
    `Invalid:` line.
-4. `valueMin` and `valueMax`: a minimum above the maximum is stored without a message, and neither
+5. `valueMin` and `valueMax`: a minimum above the maximum is stored without a message, and neither
    text says what it means for {pct} and {bar}.
-5. `glyph`: bits that are not eight rows of five ("abc") are stored without a message.
-6. `text`: a fraction of a row (1.5) writes row 2, which the text does not say.
-7. Parameter texts that are only the name: "Brightness.", "Contrast.", "Value.", "Value min.",
+6. `glyph`: bits that are not eight rows of five ("abc") are stored without a message.
+7. `text`: a fraction of a row (1.5) writes row 2, which the text does not say.
+8. Parameter texts that are only the name: "Brightness.", "Contrast.", "Value.", "Value min.",
    "Value max.", "Value precision.", "Value prefix.", "Value suffix.", "Edit text.", "Anim fps.".
-8. `showGhost` and `showGlass`: "Show or hide the ghost." says nothing of what the ghost is;
+9. `showGhost` and `showGlass`: "Show or hide the ghost." says nothing of what the ghost is;
    `showScanlines`' example says "if it is hidden" of a plural.
-9. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
+10. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
    `"node"` one and the Mod Matrix, none of which the LCD has; `fill`'s example passes a variable
    (`values`), and its note says "One document change". (The "already that way" in every verb's
    return note is reworded: see `verbNotes` above.)
-10. `backlightSource`: "Not on this panel, or not a control on this panel".
-11. The manual shows none of these texts: its component chapter lists the verbs' names only.
+11. `backlightSource`: "Not on this panel, or not a control on this panel".
+12. The manual shows none of these texts: its component chapter lists the verbs' names only.
 
 **Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
 
@@ -822,6 +821,22 @@ the decisions: "required", "1 ↔ 256", "invalid: unchanged", and no word on a f
 | `col` (number, optional) | Column, counted from 1. / Range: 1 ↔ the display's columns. / A fraction: rounded. / Outside the range: the nearest end. / Left out: unchanged. / Invalid: rejected with a console error. / Both left out: rejected with a console error. |
 | `row` (number, optional) | The same, with "Row" and "the display's rows". |
 | notes | The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off". Then the two every verb has. |
+
+**Item 2, `blinkRate`: done.** The text said "Period in milliseconds" and its example "250 blinks
+four times a second". The renderer lights the text for `blinkRate` ms and darkens it for as long
+(`Math.floor(frameTime / rate) % 2`; the inspector's hint said "half-cycle"), so 250 blinks twice a
+second. What the number means is kept: the full cycle would make every saved panel blink twice as
+fast. Two decisions the owner made: the range is 60 ↔ 5000, since the renderer draws nothing faster
+than 60 and the inspector's minimum was 60 (55 was stored, read back as 55 and drawn as 60; it is
+60 with the one-time warning now), and the inspector's Blink Rate stops at 5000 as a script does.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how fast the text blinks. |
+| Example | `ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second. |
+| `blinkRate` (number, required) | Time on, then the same time off, in milliseconds. / Range: 60 ↔ 5000. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Has an effect only while `blink()` is on. Default: off. / The cursor blinks at its own fixed speed. / Then the two every verb has. |
+| Inspector hint | Time on, then off, in milliseconds. |
 
 ### The branch
 

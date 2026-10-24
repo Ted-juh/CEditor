@@ -1021,8 +1021,8 @@
     <PropertyCell label="Blink" span={1} hint="Blink the lit text on and off.">
       <PropertyToggle value={display.blink === true} onchange={() => toggle('blink', false)} />
     </PropertyCell>
-    <PropertyCell label="Blink Rate" span={1} compact hint="Milliseconds per blink half-cycle.">
-      <NumberCell label="Rate" value={display.blinkRate ?? 500} defaultValue={500} step={50} min={60} onchange={(value) => set('blinkRate', value)} />
+    <PropertyCell label="Blink Rate" span={1} compact hint="Time on, then off, in milliseconds.">
+      <NumberCell label="Rate" value={display.blinkRate ?? 500} defaultValue={500} step={50} min={60} max={5000} onchange={(value) => set('blinkRate', value)} />
     </PropertyCell>
     <PropertyCell label="Cursor" span={2} hint="Show a cursor cell.">
       <select class="val" value={display.cursor ?? 'off'} onchange={(event) => set('cursor', event.target.value)}>

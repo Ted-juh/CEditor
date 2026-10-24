@@ -615,8 +615,13 @@ export const COMPONENT_FAMILIES = [
       v('scrollMode', 'scrollMode', ENUM, { doc: 'Set whether scrolled text loops round or bounces.', ex: ['"bounce"', 'bounces the text between its ends'] }),
       v('scrollRepeat', 'scrollRepeat', INT, { min: 0, max: 999, doc: 'Set how many times the text scrolls through.', ex: ['3', 'scrolls the text through three times, then stops'],
         argDocs: { scrollRepeat: 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('blinkRate', 'blinkRate', NUM, { min: 50, max: 5000, doc: 'Set the blink period.', ex: ['250', 'blinks four times a second'],
-        argDocs: { blinkRate: 'Period in milliseconds.\nRange: 50 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      // Time lit, then the same time dark: the renderer's half-cycle, so 250 blinks twice a second.
+      // 60 is the fastest it draws (LcdDisplayRenderer) and the inspector's minimum; 50 was stored
+      // and read back as 50 and drawn as 60.
+      v('blinkRate', 'blinkRate', NUM, { min: 60, max: 5000, doc: 'Set how fast the text blinks.',
+        ex: ['250', 'shows the text for 250 ms, then hides it for 250 ms: two blinks a second'],
+        argDocs: { blinkRate: 'Time on, then the same time off, in milliseconds.\nRange: 60 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Has an effect only while `blink()` is on. Default: off.', 'The cursor blinks at its own fixed speed.'] }),
       v('cursorBlink', 'cursorBlink', BOOL, { toggle: true, doc: 'Switch blinking of the cursor on or off.' }),
       v('valueMin', 'valueMin', NUM, { min: -1e9, max: 1e9, doc: 'Set the low end of the value\'s range, for the {pct} and {bar} tokens.', ex: ['0', 'makes 0 the empty end of the bar'] }),
       v('valueMax', 'valueMax', NUM, { min: -1e9, max: 1e9, doc: 'Set the high end of the value\'s range, for the {pct} and {bar} tokens.', ex: ['127', 'makes 127 the full end of the bar'] }),

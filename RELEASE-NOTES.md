@@ -155,6 +155,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   Either number may still be left out to move only the other.
 - The LCD Display's inspector counts the cursor's row and column from 1, as scripts do. It counted
   from 0, so its column 0 was a script's column 1.
+- `ce.components.lcd.blinkRate` takes 60 to 5000 ms, as the display and the inspector do: 50 to 59
+  are 60, with a console warning the first time. They were stored as given and drawn as 60. The
+  inspector's Blink Rate stops at 5000, as a script does.
 
 ## What you get
 

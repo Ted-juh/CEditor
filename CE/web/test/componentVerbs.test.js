@@ -723,6 +723,21 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.deepEqual(MEMBER_BY_ID.lcdRead.notes.slice(-2), ['Returns the value.', 'Rejected: no result, with a console error.']);
 });
 
+test('the LCD\'s blink rate is the time on, then off, from 60 ms as the display draws it', () => {
+  // The text said "Period" and "250 blinks four times a second"; the renderer lights the text for
+  // blinkRate ms and darkens it for as long, and draws nothing faster than 60, where 50 was stored.
+  const verb = byId('lcdBlinkRate');
+  const display = cfgFor('Display');
+  assert.deepEqual(componentScriptPatch(verb, display, [55]), { blinkRate: 60 });
+  assert.equal(componentClampWarning(verb, 'Screen', [55]), 'lcd Screen: blinkRate(55) — the blinkRate 55 is outside 60 to 5000, so 60 was used.');
+  const member = MEMBER_BY_ID.lcdBlinkRate;
+  assert.equal(member.summary, 'Set how fast the text blinks.');
+  assert.equal(member.example, '`ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second.');
+  assert.equal(member.params.find((p) => p.name === 'blinkRate').summary,
+    'Time on, then the same time off, in milliseconds.\nRange: 60 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(member.notes.slice(0, 2), ['Has an effect only while `blink()` is on. Default: off.', 'The cursor blinks at its own fixed speed.']);
+});
+
 test('text left out is refused, where it was written as ""', () => {
   // valuePrefix(t) and label(t) wrote "" in silence; a required value left out is rejected, as
   // every module's are. Text given, a number included, is still written as text.
