@@ -23,6 +23,16 @@ export function infoFraction(info) {
   return span === 0 ? 0 : clamp((numberOr(info?.value, 0) - min) / span, 0, 1);
 }
 
+/**
+ * Whether a control linked as a display's backlight source lights it: while the control is on (a
+ * switch, a button held), or while its value is at or past halfway along its range. It was 0.5 of
+ * the control's own number, so a knob from 0 to 127 lit it at 1, and one from -64 to 63 stayed dark
+ * up to 0 (the owner's decision on ce.components.lcd.backlightSource).
+ */
+export function backlightOnFrom(info) {
+  return info?.on === true || infoFraction(info) >= 0.5;
+}
+
 const BAR_EIGHTHS = ' ▏▎▍▌▋▊▉';
 
 /**

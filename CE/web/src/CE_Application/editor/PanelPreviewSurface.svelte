@@ -21,7 +21,7 @@
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
   } from '../utils/returnToRest.js';
   import {
-    collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
+    collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout, backlightOnFrom,
     pressTargetAt, layoutTimeout, isParamSource, parseParamSource, parameterInfo,
     isStateSource, stateKeyOf, stateInfo, moveCursor, regionStartOffset,
   } from '../utils/lcdZones.js';
@@ -1656,7 +1656,7 @@
         const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));
         cd.brightness = Math.round(frac * 100);
       }
-      if (backInfo) cd.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
+      if (backInfo) cd.backlightOn = backlightOnFrom(backInfo);
       if (primary) { cd.value = primary.value; cd.valueMin = primary.min; cd.valueMax = primary.max; }
       // Direct device bindings win over source-control drives (more specific).
       if (ownSession.brightnessOverride !== undefined) cd.brightness = ownSession.brightnessOverride;
@@ -5802,7 +5802,7 @@
       const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));
       cp.brightness = Math.round(frac * 100);
     }
-    if (backInfo) cp.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
+    if (backInfo) cp.backlightOn = backlightOnFrom(backInfo);
     // Direct device bindings win over source-control drives (more specific).
     if (ownSession.brightnessOverride !== undefined) cp.brightness = ownSession.brightnessOverride;
     if (ownSession.backlightOverride !== undefined) cp.backlightOn = ownSession.backlightOverride === true;

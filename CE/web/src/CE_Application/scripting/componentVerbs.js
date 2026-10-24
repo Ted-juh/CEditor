@@ -677,7 +677,9 @@ export const COMPONENT_FAMILIES = [
         argDocs: { valueSuffix: 'Text after the number in `{value}`. Not used by `{pct}` or `{bar}`.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
       v('valueSource', 'valueSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the value.' }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the brightness.' }),
-      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any', doc: 'Name the control that drives the backlight.' }),
+      // Any control: on while it is on, or past halfway along its range (lcdZones' backlightOnFrom).
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any', doc: 'Name the control that drives the backlight.',
+        ex: ['"Light"', 'makes the control called Light switch the backlight'], linkRule: 'On while the control is on, or past halfway.' }),
       // CGRAM, 1-based. This one CAN be an `item` verb where Pixel.elements could not, and the
       // difference is the hardware: a display has exactly eight glyph slots and always has, so
       // slot 1 is always there to write to. `Pixel.elements` starts empty, which is what made the
@@ -771,7 +773,8 @@ export const COMPONENT_FAMILIES = [
       v('layoutTransition', 'layoutTransition', ENUM, { doc: 'How one layout gives way to the next.' }),
       v('transitionMs', 'transitionMs', NUM, { min: 0, max: 5000 }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
-      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any',
+        ex: ['"Light"', 'makes the control called Light switch the backlight'], linkRule: 'On while the control is on, or past halfway.' }),
       v('layout', 'layouts', LAYOUT, { flat: 'its elements', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
         notes: ['Shown until an overlay or the Selector changes it.'] }),
     ],
@@ -1822,7 +1825,13 @@ export function verbParamSummary(verb, name, kind) {
     case LAYOUT:
       return ['Its number, counted from 1, or its name.', 'A name: case-insensitive.', 'A fraction: rounded.',
         `A display without layouts: 1, ${verb.flat}.`, 'Not a layout of the display: rejected with a console error.'].join('\n');
-    case LINK: return `The driving control's name.\nLeft out, or "": unlinked.\nNot on this panel, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}: rejected with a console error.`;
+    case LINK: {
+      // A source any control can be needs no kind in its refusal: "not a control on this panel"
+      // only repeated "not on this panel".
+      const what = verb.sourceKind === 'any' ? '' : `, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}`;
+      return ['The driving control\'s name.', 'Left out, or "": unlinked.', ...(verb.linkRule ? [verb.linkRule] : []),
+        `Not on this panel${what}: rejected with a console error.`].join('\n');
+    }
     case READ:
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
       return ['Element number of a list verb, counted from 1.', 'A fraction: rounded.',

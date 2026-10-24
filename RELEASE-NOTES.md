@@ -203,6 +203,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   one character. A layout is its number or its name; a range is a list, `col = {5, 10}`. A part the
   display does not have is refused with a console error that says why.
 - `ce.components.lcd.clear("Screen", 2)` blanks row 2. It blanked every row, the 2 dropped.
+- A knob or slider linked as a display's backlight source lights it from halfway along its range,
+  on the LCD and the Pixel Display. It lit it at 0.5 of the control's own number, so a knob from 0
+  to 127 switched it on at 1. A switch or a button works as before.
 - `ce.components.lcd.layout` and `ce.components.pixel.layout` show a layout by its number or its
   name, as a soft key does, and `read(t, "layout")` gives the number of the one showing. Nothing is
   written to the panel.

@@ -977,7 +977,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Backlt Src" span={2} hint="Drive the backlight on/off live from a toggle/button in preview.">
+    <PropertyCell label="Backlt Src" span={2} hint="A control that switches the backlight live: on while it is on, or past halfway along its range.">
       <select class="val" value={pixel.backlightSourceId ?? ''} onchange={(event) => set('backlightSourceId', event.target.value)}>
         <option value="">None</option>
         {#each allSources as src}

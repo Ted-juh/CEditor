@@ -787,7 +787,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 8. Parameter texts that are only the name: done, below.
 9. `showGhost`, `showGlass`, `showScanlines`, `showGrid`: done, below.
 10. The notes every family shares: done, below.
-11. `backlightSource`: "Not on this panel, or not a control on this panel".
+11. `backlightSource`: done, below.
 12. The manual shows none of these texts: its component chapter lists the verbs' names only.
 13. Case "everywhere": done, below.
 14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
@@ -993,6 +993,23 @@ change". Two decisions the owner made, each the recommendation:
 | `size` note | `size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number. |
 | `fill` example | `ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2. |
 | `fill` note | One undo step for the whole list, instead of one per element. |
+
+**Item 11, `backlightSource`: done.** Its refusal line said "Not on this panel, or not a control
+on this panel": any control can drive the backlight, so the second half only repeated the first.
+The text never said when the backlight is on, and the example drove it with a knob called Cutoff.
+Two decisions the owner made, each the recommendation:
+
+- A control lights the backlight while it is on, or at or past halfway along its range
+  (`backlightOnFrom` in `utils/lcdZones.js`, which the preview uses for the LCD and the Pixel
+  Display alike). It was 0.5 of the control's own number, so a knob from 0 to 127 lit it at 1 and
+  one from -64 to 63 stayed dark up to 0. A saved panel that links a knob switches at a different
+  point; a switch or a button is as it was. The inspector's hint says the same.
+- The example is a switch called Light, on both displays.
+
+| Field | Text |
+| --- | --- |
+| Example | `ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight. |
+| `name` | The driving control's name. / Left out, or "": unlinked. / On while the control is on, or past halfway. / Not on this panel: rejected with a console error. |
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music

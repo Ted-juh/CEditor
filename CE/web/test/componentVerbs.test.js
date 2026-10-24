@@ -739,6 +739,10 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(MEMBER_BY_ID.lcdFill.notes[0], 'One undo step for the whole list, instead of one per element.');
   assert.equal(MEMBER_BY_ID.transportRead.notes[0], '`read(target)`: every setting as a table, by verb name.', 'no lists: no list sentence');
   assert.equal(MEMBER_BY_ID.matrixSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "cell")`: { rows, cols }.');
+  // Item 11: a source any control can be says so once, and when it lights the backlight.
+  assert.equal(text('lcdBacklightSource', 'name'), 'The driving control\'s name.\nLeft out, or "": unlinked.\nOn while the control is on, or past halfway.\nNot on this panel: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.lcdBacklightSource.example, '`ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.');
+  assert.match(text('lcdValueSource', 'name'), /Not on this panel, or not a knob, slider or other range control: rejected with a console error\.$/);
   for (const verb of COMPONENT_VERBS.filter((v) => v.k === 'fill')) {
     assert.doesNotMatch(MEMBER_BY_ID[verb.id].example, /, values\)/, `${verb.id}: a list written out`);
   }
