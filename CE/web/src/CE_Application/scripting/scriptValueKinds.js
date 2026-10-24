@@ -685,10 +685,11 @@ export const OPACITY_SCALE_WARNINGS = {
 
 /**
  * A value from a closed list. `refusal(value, list, name)` gives the runtime's own sentence where it
- * has one. `anyCase`: the call reads its words in any case (utils/wordLists.js), so "Multiply" is
- * "multiply"; without it, a word in another case is said to be refused.
+ * has one. Every call reads its words in any case (utils/wordLists.js), so "Multiply" is "multiply".
+ * `anyCase: false` is for a value written straight into a property, which the renderer reads only
+ * as it is spelled: a word in another case is said to be refused there.
  */
-export function readEnum(value, values, { path, name, refusal, anyCase = false } = {}) {
+export function readEnum(value, values, { path, name, refusal, anyCase = true } = {}) {
   const meaning = { choices: values.map(String) };
   if (value === undefined || value === null) return { meaning, problem: null };
   if (values.some((v) => v === value)) return { meaning, problem: null };

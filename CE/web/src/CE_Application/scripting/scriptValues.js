@@ -602,9 +602,6 @@ function sibling(site, name) {
 }
 
 const moduleOf = (memberId) => memberModule()[memberId]?.module ?? '';
-// The modules whose calls read a word from a list in any case (utils/wordLists.js), as the component
-// verbs do: the Values tab takes "Multiply" there.
-const ANY_CASE_MODULES = new Set(['ce.ui', 'ce.draw', 'ce.image', 'ce.text', 'ce.panel', 'ce.anim', 'ce.math', 'ce.midi', 'ce.music', 'ce.time', 'ce.storage', 'ce.device', 'ce.core']);
 
 /** Fill in an Arg's kind, meaning, problem, options and editable. */
 function classify(arg, node, param, site, index) {
@@ -649,8 +646,7 @@ function classify(arg, node, param, site, index) {
     }
     case 'enum': {
       const values = param.values;
-      const read = readEnum(value, values, { path: site.path, name: param.name, refusal: ENUM_REFUSALS[site.memberId],
-        anyCase: COMPONENT_VERB_BY_ID.has(site.memberId) || ANY_CASE_MODULES.has(moduleOf(site.memberId)) });
+      const read = readEnum(value, values, { path: site.path, name: param.name, refusal: ENUM_REFUSALS[site.memberId] });
       return setRead(arg, 'enum', read, 'choice');
     }
     case 'number': {
@@ -1428,7 +1424,8 @@ export function readJsonValues(source, caret, context = {}) {
     if ((node.type === 'string' || node.type === 'number') && controlNode && rel.length === 2) {
       const values = sectionValues(rel[0], key);
       if (values) {
-        setRead(row, 'enum', readEnum(node.value, values, { name: key }), 'choice');
+        // Written straight into the property, which the renderer reads only as it is spelled.
+        setRead(row, 'enum', readEnum(node.value, values, { name: key, anyCase: false }), 'choice');
         rows.push(row);
       }
     }

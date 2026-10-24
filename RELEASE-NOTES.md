@@ -166,6 +166,15 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   ("Screen", "LEFT")` is "left", and `read`, `size`, `fill`, `insert` and `remove` take a verb's
   name in any case too. A word in another case was refused. Control names and a pixel display's
   element names are still matched exactly, since two can differ only in case.
+- Every word a script takes from a list the app defines is read in any case, and with spaces
+  around it, in the panel window and with it shut: blend modes, stroke caps and joins, image fits
+  and alignments, text styles, the arrangement words, easing curves, `ce.math`'s curve, shape and
+  crossfade names, note names (`"c4"`, `"eb4"`), byte order, a checksum's name, scale, chord, arp
+  pattern and voice-leading names, the storage scope, a message's kind, and `get`'s and `set`'s
+  value form. A capital letter was refused (`"Dorian"`, `"NormalizedValue"`, `"Multiply"`), drew or
+  played the default (`"COVER"`, `"EXP"`, `"DOWN"`), or, for `to7bit`'s `"MSB"`, reversed the bytes.
+  A name you or a script make up (a control, an element, a device parameter's own choices, a
+  settings key) is still matched exactly.
 - `ce.components.lcd.animPreset` and `ce.components.pixel.animPreset` take one of the six presets,
   "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Any other word is refused with a
   console error that lists them; it was stored, and the display drew no animation.

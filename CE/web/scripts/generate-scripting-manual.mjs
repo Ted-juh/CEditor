@@ -202,9 +202,13 @@ function fieldTable(param, lifecycle) {
     : ['| Name | Type | What it is |', '|---|---|---|'];
   const rows = param.fields.map((f) => {
     const type = f.unit ? `${f.type} (${f.unit})` : f.type;
-    // The list, unless the description already names every value in it.
+    // The list, unless the description already names every value in it. Every word from a list is
+    // read in any case (utils/wordLists.js), and the line says so, as a description that names its
+    // words does.
     const named = f.values?.every((v) => f.summary.includes(`"${v}"`));
-    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.` : '';
+    // (Not of what a handler is handed: that is read, not written.)
+    const words = !lifecycle && f.values?.every((v) => typeof v === 'string') ? ' Case-insensitive.' : '';
+    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.${words}` : '';
     const what = `${f.summary}${values}`;
     if (!withDefault) return `| \`${f.name}\` | ${cell(type)} | ${cell(what)} |`;
     const def = f.required ? 'required' : (f.default ?? '—');

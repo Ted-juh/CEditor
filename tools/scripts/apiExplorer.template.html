@@ -442,6 +442,7 @@ pre code { font-size: inherit; }
 .m-fieldtable .f-def { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
 .m-fieldtable .f-doc { color: var(--ink-2); min-width: 24ch; }
 .m-fieldtable .f-values { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.m-fieldtable .f-values .f-case { font-style: normal; font-size: 11px; color: var(--ink-3); align-self: center; }
 .m-fieldtable .f-values span {
   font-family: var(--mono); font-size: 11px; background: var(--code-bg);
   border: 1px solid var(--rule-soft); padding: 1px 5px; color: var(--ink-2);
@@ -2510,9 +2511,13 @@ function onDumpReceived(dump) {
     + `<b>${esc(a.name)}</b> <i>${esc(a.type)}</i>${a.required ? "" : " ?"}</span>`;
 
   /** One row of an options table: the field, what it holds, what it does if you leave it out. */
-  function fieldRow(f) {
+  function fieldRow(f, given) {
+    // Every word from a list is read in any case; said once, after the words, unless the
+    // description says it, or the field is handed to the script rather than written by it.
+    const anyCase = !given && (f.values ?? []).every((v) => typeof v === "string") && !/Case-insensitive/.test(f.summary ?? "")
+      ? `<em class="f-case">Case-insensitive.</em>` : "";
     const values = (f.values ?? []).length
-      ? `<div class="f-values">${f.values.map((v) => `<span>${esc(JSON.stringify(v))}</span>`).join("")}</div>`
+      ? `<div class="f-values">${f.values.map((v) => `<span>${esc(JSON.stringify(v))}</span>`).join("")}${anyCase}</div>`
       : "";
     return `
       <tr>
@@ -2544,7 +2549,7 @@ function onDumpReceived(dump) {
       const head = f.group && f.group !== group
         ? `<tr class="f-group"><td colspan="4">${esc(f.group)}</td></tr>` : "";
       group = f.group ?? group;
-      return head + fieldRow(f);
+      return head + fieldRow(f, a.given);
     }).join("");
 
     // What the reader does with the object, not a description of it: a handed-to-you payload is

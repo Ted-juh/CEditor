@@ -75,6 +75,12 @@ is the table of wording the owner rejected and what replaced it; read it before 
   the panel's own arithmetic; rejected where the result would be meaningless.
 - Text that is a number is read as one, except a timer's interval or delay (two runtimes could not
   read it, so "250" is refused everywhere).
+- A word from a list the app defines is read in any case, and with spaces around it, everywhere
+  (the owner, 2026-10-24, on `ce.components.lcd.animPreset`), and stored or used as the list spells
+  it: `listWord` in `utils/wordLists.js`, `__word` in each prelude. A name an author makes up (a
+  control, an element, a device parameter's choices, a settings key) stays exact. The text says
+  `Case-insensitive.` on the line that lists the words; the manual and the API explorer add it to
+  a list they print from `values`.
 - Shown to the owner one item at a time for a new module, until the owner says to continue without
   showing each item (said on `ce.draw.gradient`); then the rest of the module in one pass, with
   the decisions recorded in this file for review.
@@ -787,10 +793,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
    return note is reworded: see `verbNotes` above.)
 11. `backlightSource`: "Not on this panel, or not a control on this panel".
 12. The manual shows none of these texts: its component chapter lists the verbs' names only.
-13. Case "everywhere" (the owner, on item 4): the word lists of the other modules, about 50
-    parameters and options in ce.anim, ce.ui, ce.draw, ce.image, ce.text, ce.panel, ce.device,
-    ce.midi, ce.storage, ce.math, ce.music and ce.core, several read in the Lua, JavaScript and
-    Python preludes as well; `ce.draw`'s "Case-sensitive." was approved before and is reversed.
+13. Case "everywhere": done, below.
 14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
 
 **Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
@@ -879,6 +882,35 @@ the display drew nothing for a name `presetInto` does not know. Two decisions th
 
 Found on the way, for the queue: `animSpeed`'s range is 0 ↔ 16 in a script and 0.1 ↔ 5 on the
 inspector's preset Speed.
+
+**Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
+and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
+with ce.time, ce.storage with ce.device and ce.core), the owner having agreed the split: a word
+from a list the app defines is read in any case; a name an author makes up is exact.
+
+- One helper per runtime: `listWord(values, value)` in `utils/wordLists.js` (the list's spelling,
+  or null), `__word` beside `__steps` in each prelude, and `animCurveName` / `formWord` on the C++
+  side (`ScriptRuntime.cpp`, `BridgeScriptHost.h`). Where every word in a list is lower-case
+  (`ce.math`'s names, the storage scope, the byte order), the runtimes compare trimmed and
+  lower-cased.
+- Reversed on the way: `ce.draw`'s "Case-sensitive." on `cap`, `join`, `fit` and `blend`, which the
+  owner had approved; note names' "a capital letter" (the refusal says "a letter from A to G" in
+  every runtime, and "H4" is the unreadable example in the tests where "c4" was); `get`'s form in
+  another case, refused with "Write normalizedValue" (another spelling, ".normalizedValue" or
+  "normalised", still is).
+- Already any case, and left: `ce.time`'s divisions, `ce.device`'s type, encoding, direction and
+  filters, crossfade's law, a checksum's name, `sendTransport`'s action, the image layer, colour
+  names.
+- The Values tab reads every list in any case (`readEnum`'s `anyCase` defaults to true), except a
+  value written straight into a property, which the renderer reads only as it is spelled.
+- Verified: the full web suite, `scriptPreludeAgreement.test.js` for every prelude change, and the
+  C++ targets that run the preludes and the host (ScriptRuntime, PlayerScriptIntegration,
+  PythonScriptEngine with Python 3.13, PanelValueModel), built and run with GCC. MSVC has not seen
+  the C++ changes; CI will.
+
+Not done, and noted for the owner: an unknown `ce.ui` kind still falls back to "info" without a
+word, and `ce.image.icon`'s fit still stores an unknown word as it is; both are those modules'
+reviews.
 
 ### The branch
 

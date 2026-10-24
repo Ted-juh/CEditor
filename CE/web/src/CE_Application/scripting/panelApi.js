@@ -281,7 +281,7 @@ const SHARED_OPTION_FIELDS = {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
     summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
       + 'it; "script" is private to this one; "local" stays on this machine and is never written '
-      + 'into the panel document. A scope that is not one of these is refused, and so is an options '
+      + 'into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options '
       + 'table with any other key, such as a misspelled `scop`: nothing is saved or read, and a '
       + 'message says why, because falling back to "panel" would share a private setting.',
   },
