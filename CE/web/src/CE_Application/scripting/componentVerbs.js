@@ -750,22 +750,28 @@ for (const fam of COMPONENT_FAMILIES) {
  * They address an array by its VERB name (`fill(t, "step", …)`, not `fill(t, "steps", …)`), so the
  * vocabulary a script learns for writing is the vocabulary it uses for everything else.
  */
+// What a call gives back, as every component verb's notes say it. A list that cannot grow is
+// refused with a console error like any other refusal, so `insert` says the same.
+const RETURNS_TRUE = ['Returns true.', 'Rejected: false, with a console error. Nothing changes.'];
+const RETURNS_SET = ['Returns true. Already set: true, with a console line.', 'Rejected: false, with a console error. Nothing changes.'];
+const RETURNS_VALUE = (what) => [`Returns the ${what}.`, 'Rejected: no result, with a console error.'];
+
 const FAMILY_VERBS = [
   { v: 'read', k: READ, doc: 'Read back a setting, or every setting.',
     notes: ['`read(target)`: every setting as a table, by verb name. `read(target, "step")`: the whole list of a list verb; `read(target, "step", 3)`: one element, counted from 1.',
-      'Returns the value; rejected with a console error: no result.'] },
+      ...RETURNS_VALUE('value')] },
   { v: 'size', k: SIZE, doc: 'Read how many elements a list has.',
     notes: ['`size(target)`: every list as a table, by verb name; `size(target, "node")`: one number. The Mod Matrix answers { rows, cols }.',
-      'Returns the number; rejected with a console error: no result.'] },
+      ...RETURNS_VALUE('number')] },
   { v: 'fill', k: FILL, doc: 'Write a whole list in one call.',
     notes: ['One document change and one undo step, instead of one per element.',
-      'Returns true; rejected with a console error: false.'] },
+      ...RETURNS_TRUE] },
   { v: 'insert', k: INSERT, doc: 'Add one element to a list.',
     notes: ['The new element is the canvas\'s own template. Appended; with an index, inserted before that position, counted from 1.',
-      'Returns true; a list that cannot grow, or rejected with a console error: false.'] },
+      ...RETURNS_TRUE] },
   { v: 'remove', k: REMOVE, doc: 'Remove one element from a list.',
     notes: ['The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.',
-      'Returns true; rejected with a console error: false.'] },
+      ...RETURNS_TRUE] },
 ];
 
 /* ------------------------------------------------- the two every component spells the same
@@ -1562,8 +1568,8 @@ export function verbNotes(verb) {
   const own = Array.isArray(verb.notes) ? verb.notes : [];
   switch (verb.k) {
     case READ: case SIZE: case FILL: case INSERT: case REMOVE: return own;
-    case LINK: return [...own, 'Returns true; rejected with a console error: false. `read(target, "' + verb.v + '")` gives the control\'s name.'];
-    default: return [...own, 'Returns true; already that way: true, with a line in the console.', 'Rejected with a console error: false, and nothing changed.'];
+    case LINK: return [...own, ...RETURNS_SET, '`read(target, "' + verb.v + '")` gives the control\'s name.'];
+    default: return [...own, ...RETURNS_SET];
   }
 }
 

@@ -730,8 +730,11 @@ form at once:
 - `verbExample`: `` `ce.components.lcd.brightness("Screen", 80)` sets the brightness to 80. `` from
   the kind and a sample inside the range, a verb's own `ex` ([arguments, gloss]) winning; the
   family's `sample` names the control in them ("Screen" for the LCD).
-- `verbNotes`: what the call returns (true; already that way: true with a console line; rejected:
-  false), a verb's own `notes` first.
+- `verbNotes`: what the call returns, a verb's own `notes` first. Reworded at the owner's word on
+  2026-10-24 (`RETURNS_SET`, `RETURNS_TRUE`, `RETURNS_VALUE`): "Returns true. Already set: true,
+  with a console line." / "Rejected: false, with a console error. Nothing changes." for a verb that
+  sets something; "Returns the value." / "Rejected: no result, with a console error." for `read`
+  and `size`. It said "Returns true; already that way: true, with a line in the console."
 - `verbParamSummary`: each parameter's text, one rule per line, by kind and place: the target
   ("The LCD Display's control, by name. / Not an LCD Display: rejected…"), a number's `Range: lo ↔
   hi.` with "Outside the range: the nearest end." (the reducer clamps) and "Invalid: rejected",
@@ -782,7 +785,8 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
    `showScanlines`' example says "if it is hidden" of a plural.
 9. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
    `"node"` one and the Mod Matrix, none of which the LCD has; `fill`'s example passes a variable
-   (`values`), and its note says "One document change"; "already that way" in every verb's note.
+   (`values`), and its note says "One document change". (The "already that way" in every verb's
+   return note is reworded: see `verbNotes` above.)
 10. `backlightSource`: "Not on this panel, or not a control on this panel".
 11. The manual shows none of these texts: its component chapter lists the verbs' names only.
 

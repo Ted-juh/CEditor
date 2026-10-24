@@ -719,7 +719,8 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(MEMBER_BY_ID.lcdBacklight.example, '`ce.components.lcd.backlight("Screen")` switches the backlight on if it is off, and off if it is on.');
   assert.equal(MEMBER_BY_ID.lcdShowGlass.example, '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
   assert.equal(MEMBER_BY_ID.lcdValueSource.example, '`ce.components.lcd.valueSource("Screen", "Cutoff")` makes the control called Cutoff drive the value.');
-  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true; already that way: true, with a line in the console.', 'Rejected with a console error: false, and nothing changed.']);
+  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true. Already set: true, with a console line.', 'Rejected: false, with a console error. Nothing changes.']);
+  assert.deepEqual(MEMBER_BY_ID.lcdRead.notes.slice(-2), ['Returns the value.', 'Rejected: no result, with a console error.']);
 });
 
 test('text left out is refused, where it was written as ""', () => {
