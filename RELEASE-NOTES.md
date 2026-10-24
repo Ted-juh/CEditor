@@ -162,6 +162,13 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   any case, as off, as it reads `false`, 0 and "". Any text but "" was on, so
   `ce.components.lcd.blink("Screen", "false")` or `"OFF"` switched blinking on. This is every
   on/off verb of every component, 134 of them, the Arpeggiator's `mute` among them.
+- A component verb that takes a word from a list reads it in any case: `ce.components.lcd.scroll
+  ("Screen", "LEFT")` is "left", and `read`, `size`, `fill`, `insert` and `remove` take a verb's
+  name in any case too. A word in another case was refused. Control names and a pixel display's
+  element names are still matched exactly, since two can differ only in case.
+- `ce.components.lcd.animPreset` and `ce.components.pixel.animPreset` take one of the six presets,
+  "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Any other word is refused with a
+  console error that lists them; it was stored, and the display drew no animation.
 
 ## What you get
 

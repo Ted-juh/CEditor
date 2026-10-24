@@ -146,7 +146,7 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, readIndexRefusal, LIST_KINDS,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, familyVerbNamed, readIndexRefusal, LIST_KINDS,
   itemListLength, LINK_KIND, ELEM_KIND,
 } from './componentVerbs.js';
 import {
@@ -3634,7 +3634,7 @@ function componentReadAction(verb, path, args) {
     return out;
   }
 
-  const spec = specs[String(name)];
+  const spec = familyVerbNamed(verb.family, name);
   const refusedName = familyVerbRefusal(verb.family, 'read', name);
   if (refusedName) {
     addScriptTrace('error', '', refusedName);
@@ -3701,7 +3701,7 @@ function componentSizeAction(verb, path, args) {
   if (name === undefined || name === null || name === '') {
     return Object.fromEntries(lists.map(([verbName, spec]) => [verbName, sizeOf(spec)]));
   }
-  const spec = specs[String(name)];
+  const spec = familyVerbNamed(verb.family, name);
   if (!spec || !LIST_KINDS.includes(spec.k)) {
     addScriptTrace('error', '', familyVerbRefusal(verb.family, 'size', name));
     return undefined;
@@ -3714,8 +3714,7 @@ function componentFillAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'fill');
   if (!cfg) return false;
   const [name, values] = args;
-  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const spec = specs[String(name ?? '')];
+  const spec = familyVerbNamed(verb.family, name);
   if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
     addScriptTrace('error', '', familyVerbRefusal(verb.family, 'fill', name));
     return false;
@@ -3818,8 +3817,7 @@ function componentRemoveAction(verb, path, args) {
 
 /** The list-addressing verb a name refers to, having complained if it is not one. */
 function componentListSpec(verb, forWhat, name) {
-  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const spec = specs[String(name ?? '')];
+  const spec = familyVerbNamed(verb.family, name);
   if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
   addScriptTrace('error', '', familyVerbRefusal(verb.family, forWhat, name));
   return null;

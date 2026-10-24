@@ -646,7 +646,8 @@ function classify(arg, node, param, site, index) {
     }
     case 'enum': {
       const values = param.values;
-      const read = readEnum(value, values, { path: site.path, name: param.name, refusal: ENUM_REFUSALS[site.memberId] });
+      const read = readEnum(value, values, { path: site.path, name: param.name, refusal: ENUM_REFUSALS[site.memberId],
+        anyCase: COMPONENT_VERB_BY_ID.has(site.memberId) });
       return setRead(arg, 'enum', read, 'choice');
     }
     case 'number': {

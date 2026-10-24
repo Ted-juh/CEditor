@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, componentClampWarning, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
+  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, componentClampWarning, familyVerbNamed, familyVerbRefusal, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -709,7 +709,7 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(MEMBER_BY_ID.lcdBrightness.summary, 'Set the brightness of the lit segments or pixels.');
   assert.equal(text('lcdBrightness', 'brightness'), 'Brightness.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
-  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-sensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-insensitive.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(text('lcdBacklight', 'target'), 'The LCD Display\'s control, by name.\nNot an LCD Display: rejected with a console error.');
   assert.equal(text('lcdCursorAt', 'col'), 'Column, counted from 1.\nRange: 1 ↔ the display\'s columns.\nA fraction: rounded.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.');
@@ -760,6 +760,29 @@ test('an on/off verb reads false, off and 0 as off, as words in any case too', (
     'true: the text blinks.\nfalse: the text is steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.deepEqual(member.notes.slice(0, 2), ['Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.',
     'The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.']);
+});
+
+test('a word from a list is read in any case, and a preset animation is one of the six it draws', () => {
+  // animPreset stored any word and the display drew nothing for one it did not know; every list of
+  // words was case-sensitive, so scroll(t, "LEFT") was refused.
+  const preset = byId('lcdAnimPreset');
+  const display = cfgFor('Display');
+  assert.deepEqual(preset.values, ['wave', 'scanner', 'rain', 'starfield', 'spinner', 'plasma']);
+  assert.deepEqual(byId('pixelAnimPreset').values, preset.values);
+  assert.deepEqual(componentScriptPatch(preset, display, ['PLASMA']), { animPreset: 'plasma' });
+  assert.deepEqual(componentScriptPatch(preset, display, [' Starfield ']), { animPreset: 'starfield' });
+  for (const bad of ['bogus', 5, undefined]) {
+    assert.deepEqual(componentScriptPatch(preset, display, [bad]), {});
+    assert.equal(componentRequestLegal(preset, display, [bad]), false, `${JSON.stringify(bad)} is refused`);
+  }
+  assert.deepEqual(componentScriptPatch(byId('lcdScroll'), display, ['LEFT']), { scroll: 'left' });
+  assert.equal(MEMBER_BY_ID.lcdAnimPreset.params.find((p) => p.name === 'animPreset').summary,
+    'One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.lcdAnimPreset.notes[0], 'Plays only on a graphic display, while `anim()` is "preset".');
+  // …and the verb names read, size, fill, insert and remove take.
+  assert.equal(familyVerbNamed('lcd', 'SCROLLSPEED')?.v, 'scrollSpeed');
+  assert.equal(familyVerbNamed('lcd', 'toString'), null, 'never one of Object\'s own');
+  assert.equal(familyVerbRefusal('lcd', 'size', 'GLYPH'), null);
 });
 
 test('text left out is refused, where it was written as ""', () => {

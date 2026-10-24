@@ -772,8 +772,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 1. `cursorAt`: done, below.
 2. `blinkRate`: done, below.
 3. `blink`: done, below.
-4. `animPreset`: any word is stored without a message ("bogus", "RAIN", 5), and the text has no
-   `Invalid:` line.
+4. `animPreset`: done, below.
 5. `valueMin` and `valueMax`: a minimum above the maximum is stored without a message, and neither
    text says what it means for {pct} and {bar}.
 6. `glyph`: bits that are not eight rows of five ("abc") are stored without a message.
@@ -788,6 +787,11 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
    return note is reworded: see `verbNotes` above.)
 11. `backlightSource`: "Not on this panel, or not a control on this panel".
 12. The manual shows none of these texts: its component chapter lists the verbs' names only.
+13. Case "everywhere" (the owner, on item 4): the word lists of the other modules, about 50
+    parameters and options in ce.anim, ce.ui, ce.draw, ce.image, ce.text, ce.panel, ce.device,
+    ce.midi, ce.storage, ce.math, ce.music and ce.core, several read in the Lua, JavaScript and
+    Python preludes as well; `ce.draw`'s "Case-sensitive." was approved before and is reversed.
+14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
 
 **Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
 
@@ -853,6 +857,28 @@ other value: true.` (`OFF_RULE`).
 | Example | `ce.components.lcd.blink("Screen", true)` makes the text blink. |
 | `blink` (true or false, optional) | true: the text blinks. / false: the text is steady. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
 | notes | Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay. / The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off. / Then the two every verb has. |
+
+**Item 4, `animPreset`: done.** Any word was stored ("bogus", "RAIN", 5) and returned true, and
+the display drew nothing for a name `presetInto` does not know. Two decisions the owner made:
+
+- An unknown name is refused with a console error that lists the six, as `scroll` and `cursor`
+  refuse one: `animPreset` is an enum now, for the LCD and the Pixel Display alike, its list
+  `ANIM_PRESETS` in `componentTables.js`.
+- Case does not matter, "everywhere". For the component verbs that is every list of words
+  (`coerce` ENUM through `wordIn`: any case, spaces trimmed, stored as the list spells it; the text
+  says `Case-insensitive.` where it said `Case-sensitive.`), and the verb names `read`, `size`,
+  `fill`, `insert` and `remove` take (`familyVerbNamed`, which also stops "toString" finding
+  Object's own). The Values sidebar takes "LEFT" for a component verb (`readEnum`'s `anyCase`).
+  Control names and element names stay exact: they are names an author typed, and two can differ
+  only in case. The rest of the API is the next item.
+
+| Field | Text |
+| --- | --- |
+| `animPreset` (options, required) | One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive. / Invalid: rejected with a console error. |
+| notes | Plays only on a graphic display, while `anim()` is "preset". / Then the two every verb has. |
+
+Found on the way, for the queue: `animSpeed`'s range is 0 ↔ 16 in a script and 0.1 ↔ 5 on the
+inspector's preset Speed.
 
 ### The branch
 

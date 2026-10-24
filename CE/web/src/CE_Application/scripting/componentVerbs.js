@@ -51,6 +51,12 @@ const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const OFF_WORDS = new Set(['', 'false', 'off', '0']);
 const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
 const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
+/** The word of a list a script wrote, in any case and with spaces around it, as the list spells it;
+ *  null when the list has no such word. */
+const wordIn = (values, value) => {
+  const want = String(value ?? '').trim().toLowerCase();
+  return values.find((x) => typeof x === 'string' && x.toLowerCase() === want) ?? null;
+};
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
 // One property of one element of a pixel display's scene, addressed by the NAME the author typed
 // beside it. Not `item`, and the two reasons are written out in utils/pixelElements.js: the list
@@ -613,8 +619,10 @@ export const COMPONENT_FAMILIES = [
         notes: ['The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".'] }),
       v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'] }),
       v('anim', 'animMode', ENUM, { doc: 'Set the animation behind the text of a graphic display: off, a file, or a preset.', ex: ['"preset"', 'plays the chosen preset animation'] }),
-      v('animPreset', 'animPreset', STR, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
-        argDocs: { animPreset: 'The preset\'s name: "wave", "scanner", "rain", "starfield", "spinner" or "plasma".' } }),
+      // A list of names, as scroll and cursor are: any word was stored, and the display drew nothing
+      // for one it did not know.
+      v('animPreset', 'animPreset', ENUM, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
+        notes: ['Plays only on a graphic display, while `anim()` is "preset".'] }),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16, doc: 'Set the speed of the preset animation, as a multiple of its normal speed.', ex: ['2', 'plays the preset animation at twice its normal speed'],
         // The graphic canvas reads it as Math.max(0.05, Number(animSpeed) || 1): 0 is normal speed,
         // not a pause, and anything below 0.05 is 0.05.
@@ -711,7 +719,7 @@ export const COMPONENT_FAMILIES = [
       v('gamma', 'gamma', NUM, { min: 0.1, max: 4 }),
       v('glow', 'glow', NUM, UNIT),
       v('anim', 'animMode', ENUM),
-      v('animPreset', 'animPreset', STR),
+      v('animPreset', 'animPreset', ENUM),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16 }),
       v('animLoop', 'animLoop', BOOL, { toggle: true }),
       v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
@@ -916,9 +924,10 @@ function coerce(kind, value, spec, current) {
     case STR: return value === undefined || value === null ? null : String(value);
     case ENUM: {
       // An unrecognised value is a NO-OP, never a silently wrong setting: a typo that leaves the
-      // arpeggiator alone is debuggable, one that quietly sets it to "up" is not.
-      const want = typeof value === 'number' ? value : String(value ?? '');
-      return spec.values.some((x) => x === want) ? want : null;
+      // arpeggiator alone is debuggable, one that quietly sets it to "up" is not. A word in another
+      // case is the word: "LEFT" is "left", stored as the list spells it.
+      if (typeof value === 'number') return spec.values.some((x) => x === value) ? value : null;
+      return wordIn(spec.values, value);
     }
     default: return null;
   }
@@ -1339,9 +1348,18 @@ export function familyVerbNames(family, forWhat) {
   return Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear).map(([k]) => k).sort();
 }
 
+/** A family's verb by the name a script wrote, in any case: `read(t, "SCROLLSPEED")` reads
+ *  scrollSpeed. null when it has none by that name (and never one of Object's own, "toString"). */
+export function familyVerbNamed(family, name) {
+  const specs = VERBS_BY_FAMILY[family] ?? {};
+  const want = String(name ?? '').trim();
+  if (Object.hasOwn(specs, want)) return specs[want];
+  return Object.values(specs).find((s) => s.v.toLowerCase() === want.toLowerCase()) ?? null;
+}
+
 /** What `read`, `size`, `fill`, `insert` or `remove` says of a name it has no verb by, or null. */
 export function familyVerbRefusal(family, forWhat, name) {
-  const spec = (VERBS_BY_FAMILY[family] ?? {})[String(name ?? '')];
+  const spec = familyVerbNamed(family, name);
   if (forWhat === 'read') {
     const names = familyVerbNames(family, 'read').join(', ');
     if (!spec) return `${family}.read: "${name}" is not a verb of this component. One of: ${names}.`;
@@ -1628,7 +1646,7 @@ export function verbParamSummary(verb, name, kind) {
   switch (verb.k) {
     case NUM: case INT: return [`${words}.`, ...RANGE_LINES(verb, verb.k)].join('\n');
     case BOOL: return verb.toggle ? `Left out: toggles.\n${OFF_RULE}` : OFF_RULE;
-    case ENUM: return `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`;
+    case ENUM: return `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`;
     case STR: return `${words}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case XY: {
       const size = verb.fit?.[name === verbArgs(verb)[0] ? verb.fx : verb.fy];
@@ -1644,13 +1662,13 @@ export function verbParamSummary(verb, name, kind) {
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
         : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
-        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`
+        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case ELEM:
       if (name === 'name') return 'The element\'s name, as given in the inspector.\nNot an element of this display: rejected with a console error.';
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
         : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
-        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`
+        : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case CELL:
       if (name === 'row') return 'Row, counted from 1.\nNot a row the grid has: rejected with a console error.';

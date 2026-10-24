@@ -50,6 +50,8 @@ import { RECORDER_SOURCES } from '../utils/noteRecorderLayout.js';
 export const LCD_SCROLLS = ['off', 'left', 'right'];
 export const LCD_CURSORS = ['off', 'block', 'underline'];
 export const PIXEL_ANIM_MODES = ['off', 'file', 'preset'];
+// The effects LcdGraphicCanvas's presetInto draws; a name it does not know drew nothing.
+export const ANIM_PRESETS = ['wave', 'scanner', 'rain', 'starfield', 'spinner', 'plasma'];
 /* …and the coverage audit's crop. Same rule: each is held to the editor's own `<select>` by
  * componentEnums.test.js, because the value is consumed by a renderer conditional rather than by a
  * table any module exports. `orientation` is spelled by four components and they do NOT agree —
@@ -95,6 +97,7 @@ export const VERB_VALUES = {
   'meter.orientation': METER_ORIENTATIONS,
   'matrix.cellStyle': MATRIX_CELL_STYLES,
   'lcd.anim': PIXEL_ANIM_MODES,
+  'lcd.animPreset': ANIM_PRESETS,
   'lcd.scrollMode': LCD_SCROLL_MODES,
   'pixel.layoutTransition': PIXEL_LAYOUT_TRANSITIONS,
   // One table for all four corners: they offer the same vocabulary, and a corner that offered a
@@ -127,6 +130,7 @@ export const VERB_VALUES = {
   'lcd.scroll': LCD_SCROLLS,
   'lcd.cursor': LCD_CURSORS,
   'pixel.anim': PIXEL_ANIM_MODES,
+  'pixel.animPreset': ANIM_PRESETS,
 };
 
 /** …and the same for the five hand-written families, whose reducers already validate against these

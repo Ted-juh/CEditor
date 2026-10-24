@@ -33,7 +33,7 @@ import {
   DRAW_SHAPES, drawNumber, shapeOutline, outsideWords, pointList, pointRadius, curveTension, pixelScale, pixelGapWords, clipWords,
 } from './drawShapes.js';
 import {
-  COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, indexRefusal, itemCurrent, listNoun,
+  COMPONENT_VERBS, componentIndexRange, componentRefusalLine, componentRefusalReason, componentClampWarning, familyVerbNamed, indexRefusal, itemCurrent, listNoun,
   familyVerbNames, familyVerbRefusal, verbNameArgs, readIndexRefusal, LIST_KINDS,
 } from './componentVerbs.js';
 import {
@@ -686,11 +686,13 @@ export const OPACITY_SCALE_WARNINGS = {
  * reads only its spelling (ce.draw.blend, ce.draw.stroke's cap and join), and refuses "Multiply" in
  * the words it refuses "sausage" in, with the spelling it wanted as the "Did you mean".
  */
-export function readEnum(value, values, { path, name, refusal } = {}) {
+export function readEnum(value, values, { path, name, refusal, anyCase = false } = {}) {
   const meaning = { choices: values.map(String) };
   if (value === undefined || value === null) return { meaning, problem: null };
   if (values.some((v) => v === value)) return { meaning, problem: null };
-  const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.toLowerCase()) : undefined;
+  const exactish = typeof value === 'string' ? values.find((v) => typeof v === 'string' && v.toLowerCase() === value.trim().toLowerCase()) : undefined;
+  // A call that reads its words in any case (every component verb) takes "LEFT" as "left".
+  if (exactish !== undefined && anyCase) return { meaning, problem: null };
   if (exactish !== undefined && !refusal) {
     return { meaning, problem: { severity: 'warning', message: `${path ? `${path}: ` : ''}"${value}" is written "${exactish}" in the list of ${name}'s values; a call that reads only that spelling refuses it.` } };
   }
@@ -1423,7 +1425,7 @@ function readFamilyVerbName(value, verb, control) {
   const meaning = { hint: null, choices: familyVerbNames(verb.family, verb.k === 'read' ? 'read' : 'list') };
   const refused = typeof value === 'string' || typeof value === 'number' ? familyVerbRefusal(verb.family, verb.k, value) : null;
   if (refused) return { meaning, problem: { severity: 'error', message: refused } };
-  const named = COMPONENT_VERBS.find((v) => v.family === verb.family && v.v === String(value));
+  const named = familyVerbNamed(verb.family, value);
   const cfg = control?._children?.[verb.section] ?? null;
   if (named && cfg) {
     const range = componentIndexRange(named, cfg);
