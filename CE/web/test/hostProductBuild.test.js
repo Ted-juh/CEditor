@@ -382,8 +382,13 @@ test('the editor installer archives matching worker symbols outside its install 
   const installer = readFileSync(path.join(
     repoRoot, 'tools', 'installer', 'CEditor.iss'), 'utf8');
 
-  assert.match(script, /function Archive-PrivateWorkerSymbols[\s\S]*Get-FileHash[\s\S]*symbols\.json/,
+  assert.match(script, /function Archive-PrivateWorkerSymbols[\s\S]*Get-Sha256Hex \$workerExe[\s\S]*Get-Sha256Hex \$workerPdb[\s\S]*symbols\.json/,
     'editor packaging must hash and preserve the matching PDB with a machine-readable manifest');
+  // Hashed with .NET, not Get-FileHash: on Windows PowerShell 5.1 with a changed PSModulePath that
+  // cmdlet is "not recognized" and the installer build failed after the whole native build.
+  assert.match(script, /function Get-Sha256Hex[\s\S]*\[System\.Security\.Cryptography\.SHA256\]::Create\(\)/,
+    'the symbol hash comes from .NET so it works whatever PowerShell modules load');
+  assert.doesNotMatch(script, /Get-FileHash -/, 'no Get-FileHash call: it is not always there on Windows PowerShell');
   assert.match(script, /build\\package\\private-symbols/,
     'private symbols must live beside rather than under the staged install tree');
   assert.doesNotMatch(installer, /\.pdb\b/i,

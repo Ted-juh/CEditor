@@ -157,6 +157,23 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
     }
 }
 
+# SHA-256 of a file as lowercase hex, straight from .NET. Not Get-FileHash: in Windows PowerShell
+# 5.1 that is a function in the Utility module's script part, and on a machine whose PSModulePath
+# has been changed (PowerShell 7 installed, an IDE's terminal, a user-level override) only the
+# module's compiled half loads, so Write-Host works and Get-FileHash is "not recognized" -- after
+# a full native build has already run.
+function Get-Sha256Hex([string]$Path) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
 function Archive-PrivateWorkerSymbols([string]$BuildDir, [string]$SymbolsRoot,
                                       [string]$Version, [string]$Configuration) {
     # These files are for support/development only. They deliberately live beside the packaging
@@ -170,8 +187,8 @@ function Archive-PrivateWorkerSymbols([string]$BuildDir, [string]$SymbolsRoot,
         throw "Could not archive worker symbols: $workerPdb is missing."
     }
 
-    $exeHash = (Get-FileHash -LiteralPath $workerExe -Algorithm SHA256).Hash.ToLowerInvariant()
-    $pdbHash = (Get-FileHash -LiteralPath $workerPdb -Algorithm SHA256).Hash.ToLowerInvariant()
+    $exeHash = Get-Sha256Hex $workerExe
+    $pdbHash = Get-Sha256Hex $workerPdb
     $archiveDir = Join-Path (Join-Path $SymbolsRoot $Version) $exeHash.Substring(0, 16)
     New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
     Copy-Item -LiteralPath $workerPdb -Destination (Join-Path $archiveDir "CEditorPluginWorker.pdb") -Force
