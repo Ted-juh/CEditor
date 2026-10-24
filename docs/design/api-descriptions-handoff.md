@@ -784,8 +784,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 5. `valueMin` and `valueMax`: kept as merged, below.
 6. `glyph`: done, below.
 7. `text`: done, below.
-8. Parameter texts that are only the name: "Brightness.", "Contrast.", "Value.", "Value min.",
-   "Value max.", "Value precision.", "Value prefix.", "Value suffix.", "Edit text.", "Anim fps.".
+8. Parameter texts that are only the name: done, below.
 9. `showGhost` and `showGlass`: "Show or hide the ghost." says nothing of what the ghost is;
    `showScanlines`' example says "if it is hidden" of a plural.
 10. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
@@ -933,6 +932,31 @@ Description, example and `index` unchanged.
 | `text` (text, required) | The four lines as merged, then: Left out: rejected with a console error. |
 
 Description and example unchanged.
+
+**Item 8, texts that were only the name: done.** Eight parameters said their own name and nothing
+else ("Brightness.", "Value prefix."); `valueMin` and `valueMax` stay as merged (item 5). Each first
+line now says what the setting is, and the probe added what it found unsaid. Three decisions the
+owner made, each the recommendation, all texts and no change to behaviour:
+
+- `editText` from a script is stored as given: the field's character set (upper case by default)
+  and its length (16) govern typing at the screen. A script may set a name read from the synth.
+- A linked control wins: while `brightnessSource()` or `valueSource()` links one, the script's
+  `brightness()` or `value()` is stored and the control sets what is shown. Said in a note.
+- Brightness 0 is not dark (the lit text is drawn at 35% + 65% of it), and the text says so; the
+  drawing is as it was.
+
+| Parameter | Text |
+| --- | --- |
+| `brightness` | How bright the lit characters are. / Range: 0 ↔ 100. / 0: the dimmest, still lit. / Outside the range: the nearest end. / Invalid: rejected with a console error. Note: While `brightnessSource()` links a control, that control sets the brightness. |
+| `contrast` | How visible the unlit segments are. / Also how strongly the backlight glows. / Range: 0 ↔ 100. / 0: unlit segments hidden. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| `value` | The number shown. / Outside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends. / Invalid: rejected with a console error. Note: While `valueSource()` links a control, that control sets the value and its range. |
+| `valuePrecision` | Decimal places `{value}` shows. `{pct}` is always whole. / then its range lines. |
+| `valuePrefix`, `valueSuffix` | Text before (after) the number in `{value}`. Not used by `{pct}` or `{bar}`. / A number: written as text. / Left out: rejected with a console error. |
+| `editText` | The text in the field. / Not held to the field's characters or length: those apply to typing. / A number: written as text. / Left out: rejected with a console error. |
+| `animFps` | Frames per second. / Only for a sprite sheet: a GIF or APNG plays at its own speed. / then its range lines. |
+
+The Pixel Display's `brightness`, `contrast`, `editText` and `animFps` say only their names too;
+they are that module's review.
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music

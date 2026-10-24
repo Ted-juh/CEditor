@@ -610,8 +610,14 @@ export const COMPONENT_FAMILIES = [
       v('clear', 'lines', LINE, { clear: true, doc: 'Blank the layout showing, or part of it.', ex: ['', 'blanks the display'],
         notes: ['Only text is blanked: a zone still shows its control.'] }),
       v('backlight', 'backlightOn', BOOL, { toggle: true, doc: 'Switch the backlight on or off.' }),
-      v('brightness', 'brightness', NUM, { min: 0, max: 100, doc: 'Set the brightness of the lit segments or pixels.', ex: ['80', 'sets the brightness to 80'] }),
-      v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast, which is how visible the unlit segments are.', ex: ['55', 'sets the contrast to 55'] }),
+      // Brightness 0 is not dark: the renderer draws the lit text at 35% + 65% of it. And while a
+      // control is linked as the source, that control sets what is shown (PanelPreviewSurface).
+      v('brightness', 'brightness', NUM, { min: 0, max: 100, doc: 'Set the brightness of the lit segments or pixels.', ex: ['80', 'sets the brightness to 80'],
+        argDocs: { brightness: 'How bright the lit characters are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While `brightnessSource()` links a control, that control sets the brightness.'] }),
+      // Contrast is the unlit cells' visibility, and the backlight glow's strength (35% + 50% of it).
+      v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast, which is how visible the unlit segments are.', ex: ['55', 'sets the contrast to 55'],
+        argDocs: { contrast: 'How visible the unlit segments are.\nAlso how strongly the backlight glows.\nRange: 0 ↔ 100.\n0: unlit segments hidden.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('scroll', 'scroll', ENUM, { doc: 'Set which way the lines scroll, or stop them scrolling.', ex: ['"left"', 'scrolls the lines to the left'] }),
       v('scrollSpeed', 'scrollSpeed', NUM, { min: 0, max: 60, doc: 'Set the scrolling speed, in characters per second.',
         argDocs: { scrollSpeed: 'Characters per second.\nRange: 0 ↔ 60.\n0: no scrolling.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
@@ -628,7 +634,9 @@ export const COMPONENT_FAMILIES = [
         fit: { cursorCol: 'cols', cursorRow: 'rows' },
         args: ['col', 'row'], doc: 'Put the cursor on a cell.', ex: ['5, 2', 'puts the cursor on column 5 of row 2'],
         notes: ['The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".'] }),
-      v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'] }),
+      v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'],
+        argDocs: { value: 'The number shown.\nOutside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends.\nInvalid: rejected with a console error.' },
+        notes: ['While `valueSource()` links a control, that control sets the value and its range.'] }),
       v('anim', 'animMode', ENUM, { doc: 'Set the animation behind the text of a graphic display: off, a file, or a preset.', ex: ['"preset"', 'plays the chosen preset animation'] }),
       // A list of names, as scroll and cursor are: any word was stored, and the display drew nothing
       // for one it did not know.
@@ -638,7 +646,8 @@ export const COMPONENT_FAMILIES = [
         // The graphic canvas reads it as Math.max(0.05, Number(animSpeed) || 1): 0 is normal speed,
         // not a pause, and anything below 0.05 is 0.05.
         argDocs: { animSpeed: 'Speed factor.\nRange: 0 ↔ 16.\n1: normal; 0 is read as 1.\nBelow 0.05: 0.05.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'] }),
+      v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'],
+        argDocs: { animFps: 'Frames per second.\nOnly for a sprite sheet: a GIF or APNG plays at its own speed.\nRange: 1 ↔ 120.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('animLoop', 'animLoop', BOOL, { toggle: true, doc: 'Switch looping of the animation on or off.',
         argDocs: { animLoop: `Left out: toggles.\nfalse: the last frame holds.\n${OFF_RULE}` } }),
       v('scrollMode', 'scrollMode', ENUM, { doc: 'Set whether scrolled text loops round or bounces.', ex: ['"bounce"', 'bounces the text between its ends'] }),
@@ -654,9 +663,12 @@ export const COMPONENT_FAMILIES = [
       v('cursorBlink', 'cursorBlink', BOOL, { toggle: true, doc: 'Switch blinking of the cursor on or off.' }),
       v('valueMin', 'valueMin', NUM, { min: -1e9, max: 1e9, doc: 'Set the low end of the value\'s range, for the {pct} and {bar} tokens.', ex: ['0', 'makes 0 the empty end of the bar'] }),
       v('valueMax', 'valueMax', NUM, { min: -1e9, max: 1e9, doc: 'Set the high end of the value\'s range, for the {pct} and {bar} tokens.', ex: ['127', 'makes 127 the full end of the bar'] }),
-      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Set how many decimal places the value shows.', ex: ['2', 'shows the value with two decimal places'] }),
-      v('valuePrefix', 'valuePrefix', STR, { doc: 'Set the text written before the value.', ex: ['"Vol "', 'shows the value as Vol 64'] }),
-      v('valueSuffix', 'valueSuffix', STR, { doc: 'Set the text written after the value.', ex: ['" dB"', 'shows the value as 64 dB'] }),
+      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Set how many decimal places the value shows.', ex: ['2', 'shows the value with two decimal places'],
+        argDocs: { valuePrecision: 'Decimal places `{value}` shows. `{pct}` is always whole.\nRange: 0 ↔ 6, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('valuePrefix', 'valuePrefix', STR, { doc: 'Set the text written before the value.', ex: ['"Vol "', 'shows the value as Vol 64'],
+        argDocs: { valuePrefix: 'Text before the number in `{value}`. Not used by `{pct}` or `{bar}`.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
+      v('valueSuffix', 'valueSuffix', STR, { doc: 'Set the text written after the value.', ex: ['" dB"', 'shows the value as 64 dB'],
+        argDocs: { valueSuffix: 'Text after the number in `{value}`. Not used by `{pct}` or `{bar}`.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
       v('valueSource', 'valueSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the value.' }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the brightness.' }),
       v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any', doc: 'Name the control that drives the backlight.' }),
@@ -681,7 +693,9 @@ export const COMPONENT_FAMILIES = [
       // and the one genuinely EDITABLE value a display owns. It was reachable by typing at the
       // screen and by a device binding on the `text` port, and by nothing else: no script could
       // read the patch name the user had just entered, which is the obvious thing to want.
+      // A script's text is stored as given: the field's character set and length govern typing.
       v('editText', 'editText', STR, { doc: 'Set the text in the display\'s editable field.', ex: ['"INIT VOICE"', 'puts INIT VOICE in the field'],
+        argDocs: { editText: 'The text in the field.\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.' },
         notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.'] }),
       v('layout', 'layouts', LAYOUT, { flat: 'its lines', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
         notes: ['Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.'] }),

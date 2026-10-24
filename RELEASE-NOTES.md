@@ -144,7 +144,10 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - Every component verb has an example, a note saying what it returns, and a text for each
   parameter with its range and what is rejected, in the Insert picker, the hover card and the API
   explorer. The LCD Display's verbs say what each setting is: the scrolling speed in characters
-  per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show.
+  per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show,
+  that brightness 0 is the dimmest and still lit, that a control linked as the source sets the
+  brightness or the value whatever a script writes, and that a script's edit-field text is not held
+  to the characters and length that typing is.
 - `ce.components.lcd.cursorAt` keeps the cursor on the display: a column or row past the
   display's own size is its last column or row, with a console warning the first time. It took
   anything up to 256, and column 40 of a 16-column display put the cursor nowhere. A fraction is

@@ -712,7 +712,17 @@ test('every component verb has an example, notes and a text for each parameter, 
 test('the LCD\'s verbs say what each setting is, with its range and what is rejected', () => {
   const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
   assert.equal(MEMBER_BY_ID.lcdBrightness.summary, 'Set the brightness of the lit segments or pixels.');
-  assert.equal(text('lcdBrightness', 'brightness'), 'Brightness.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdBrightness', 'brightness'), 'How bright the lit characters are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // Item 8: no LCD parameter's text is only its name ("Brightness.", "Value prefix."), except
+  // valueMin and valueMax, kept as merged at the owner's word (item 5).
+  const nameOnly = COMPONENT_VERBS.filter((v) => v.family === 'lcd')
+    .flatMap((v) => MEMBER_BY_ID[v.id].params.map((p) => [v, p]))
+    .filter(([v, p]) => p.name !== 'target' && !['valueMin', 'valueMax'].includes(v.v)
+      && p.summary.split('\n')[0].toLowerCase().replace(/[^a-z]/g, '') === p.name.toLowerCase())
+    .map(([v, p]) => `${v.v}.${p.name}`);
+  assert.deepEqual(nameOnly, []);
+  assert.deepEqual(MEMBER_BY_ID.lcdValue.notes[0], 'While `valueSource()` links a control, that control sets the value and its range.');
+  assert.equal(text('lcdEditText', 'editText').split('\n')[1], 'Not held to the field\'s characters or length: those apply to typing.');
   assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-insensitive.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
