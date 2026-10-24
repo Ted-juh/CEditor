@@ -158,6 +158,10 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.lcd.blinkRate` takes 60 to 5000 ms, as the display and the inspector do: 50 to 59
   are 60, with a console warning the first time. They were stored as given and drawn as 60. The
   inspector's Blink Rate stops at 5000, as a script does.
+- A component verb that switches something on or off reads the text "false", "off" and "0", in
+  any case, as off, as it reads `false`, 0 and "". Any text but "" was on, so
+  `ce.components.lcd.blink("Screen", "false")` or `"OFF"` switched blinking on. This is every
+  on/off verb of every component, 134 of them, the Arpeggiator's `mute` among them.
 
 ## What you get
 

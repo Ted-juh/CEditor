@@ -710,7 +710,7 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(text('lcdBrightness', 'brightness'), 'Brightness.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-sensitive.\nInvalid: rejected with a console error.');
-  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0 or "": false; any other value: true.');
+  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(text('lcdBacklight', 'target'), 'The LCD Display\'s control, by name.\nNot an LCD Display: rejected with a console error.');
   assert.equal(text('lcdCursorAt', 'col'), 'Column, counted from 1.\nRange: 1 ↔ the display\'s columns.\nA fraction: rounded.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.');
   assert.equal(text('lcdCursorAt', 'row').split('\n')[1], 'Range: 1 ↔ the display\'s rows.');
@@ -736,6 +736,30 @@ test('the LCD\'s blink rate is the time on, then off, from 60 ms as the display 
   assert.equal(member.params.find((p) => p.name === 'blinkRate').summary,
     'Time on, then the same time off, in milliseconds.\nRange: 60 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(member.notes.slice(0, 2), ['Has an effect only while `blink()` is on. Default: off.', 'The cursor blinks at its own fixed speed.']);
+});
+
+test('an on/off verb reads false, off and 0 as off, as words in any case too', () => {
+  // Any text but "" was on, so blink(t, "false") and blink(t, "OFF") switched blinking on.
+  const verb = byId('lcdBlink');
+  const on = { ...cfgFor('Display'), blink: true };
+  const off = { ...cfgFor('Display'), blink: false };
+  for (const word of [false, 0, '', 'false', 'FALSE', 'False', 'off', 'OFF', ' Off ', '0']) {
+    assert.deepEqual(componentScriptPatch(verb, on, [word]), { blink: false }, `${JSON.stringify(word)} is off`);
+  }
+  for (const word of [true, 1, -1, 'true', 'on', 'ON', 'x', '1']) {
+    assert.deepEqual(componentScriptPatch(verb, off, [word]), { blink: true }, `${JSON.stringify(word)} is on`);
+  }
+  // The set of steps that are on reads its second argument the same way.
+  const mute = COMPONENT_VERBS.find((v) => v.k === 'indexset');
+  const muted = { ...cfgFor(COMPONENT_FAMILIES.find((f) => f.id === mute.family).section), [mute.f]: [0] };
+  assert.deepEqual(componentScriptPatch(mute, muted, [1, 'Off']), { [mute.f]: [] });
+  const member = MEMBER_BY_ID.lcdBlink;
+  assert.equal(member.summary, 'Switch the text blinking on or off.');
+  assert.equal(member.example, '`ce.components.lcd.blink("Screen", true)` makes the text blink.');
+  assert.equal(member.params.find((p) => p.name === 'blink').summary,
+    'true: the text blinks.\nfalse: the text is steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(member.notes.slice(0, 2), ['Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.',
+    'The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.']);
 });
 
 test('text left out is refused, where it was written as ""', () => {

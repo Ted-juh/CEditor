@@ -771,7 +771,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 
 1. `cursorAt`: done, below.
 2. `blinkRate`: done, below.
-3. `blink`: "Switch blinking of the whole display on or off.": only the lit text blinks.
+3. `blink`: done, below.
 4. `animPreset`: any word is stored without a message ("bogus", "RAIN", 5), and the text has no
    `Invalid:` line.
 5. `valueMin` and `valueMax`: a minimum above the maximum is stored without a message, and neither
@@ -837,6 +837,22 @@ than 60 and the inspector's minimum was 60 (55 was stored, read back as 55 and d
 | `blinkRate` (number, required) | Time on, then the same time off, in milliseconds. / Range: 60 ↔ 5000. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
 | notes | Has an effect only while `blink()` is on. Default: off. / The cursor blinks at its own fixed speed. / Then the two every verb has. |
 | Inspector hint | Time on, then off, in milliseconds. |
+
+**Item 3, `blink`: done.** "Switch blinking of the whole display on or off." was wrong: the
+renderer hides only the lit glyphs on the off phase, and draws the unlit segments, the backlight,
+the cursor, images and animations throughout. The owner's decision, for every on/off verb of every
+component (134, through `coerce` BOOL and the Arpeggiator's `mute` set; `isOff` in `componentVerbs.js`): the
+text "false", "off" and "0", in any case and with spaces around it, is off, as `false`, 0 and ""
+are. Any text but "" was on, so `blink(t, "false")` and `blink(t, "OFF")` switched it on. Every
+on/off parameter's text says it: `0, "", "false", "off" or "0": false. Case-insensitive.` / `Any
+other value: true.` (`OFF_RULE`).
+
+| Field | Text |
+| --- | --- |
+| Description | Switch the text blinking on or off. |
+| Example | `ce.components.lcd.blink("Screen", true)` makes the text blink. |
+| `blink` (true or false, optional) | true: the text blinks. / false: the text is steady. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
+| notes | Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay. / The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off. / Then the two every verb has. |
 
 ### The branch
 

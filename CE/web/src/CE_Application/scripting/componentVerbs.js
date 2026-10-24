@@ -46,6 +46,11 @@ import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } fr
 import { shownValue } from './shownValue.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
+// What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
+// case. Any other text was on, so blink(t, "false") and blink(t, "OFF") switched it on.
+const OFF_WORDS = new Set(['', 'false', 'off', '0']);
+const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
+const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
 // One property of one element of a pixel display's scene, addressed by the NAME the author typed
 // beside it. Not `item`, and the two reasons are written out in utils/pixelElements.js: the list
@@ -593,7 +598,12 @@ export const COMPONENT_FAMILIES = [
       v('scroll', 'scroll', ENUM, { doc: 'Set which way the lines scroll, or stop them scrolling.', ex: ['"left"', 'scrolls the lines to the left'] }),
       v('scrollSpeed', 'scrollSpeed', NUM, { min: 0, max: 60, doc: 'Set the scrolling speed, in characters per second.',
         argDocs: { scrollSpeed: 'Characters per second.\nRange: 0 ↔ 60.\n0: no scrolling.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('blink', 'blink', BOOL, { toggle: true, doc: 'Switch blinking of the whole display on or off.' }),
+      // Only the lit text blinks: the renderer hides the glyphs on the off phase and draws the
+      // unlit segments, the backlight, the cursor, images and animations throughout.
+      v('blink', 'blink', BOOL, { toggle: true, doc: 'Switch the text blinking on or off.', ex: ['true', 'makes the text blink'],
+        argDocs: { blink: `true: the text blinks.\nfalse: the text is steady.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.',
+          'The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.'] }),
       v('cursor', 'cursor', ENUM, { doc: 'Set the cursor\'s shape, or hide it.', ex: ['"block"', 'shows a block cursor'] }),
       // `fit`: a cell of the display, so 1 to its columns and rows, not to 256. Column 40 of a
       // 16-column display was stored without a word and the cursor was drawn nowhere.
@@ -611,7 +621,7 @@ export const COMPONENT_FAMILIES = [
         argDocs: { animSpeed: 'Speed factor.\nRange: 0 ↔ 16.\n1: normal; 0 is read as 1.\nBelow 0.05: 0.05.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'] }),
       v('animLoop', 'animLoop', BOOL, { toggle: true, doc: 'Switch looping of the animation on or off.',
-        argDocs: { animLoop: 'Left out: toggles.\nfalse: the last frame holds.\n0 or "": false; any other value: true.' } }),
+        argDocs: { animLoop: `Left out: toggles.\nfalse: the last frame holds.\n${OFF_RULE}` } }),
       v('scrollMode', 'scrollMode', ENUM, { doc: 'Set whether scrolled text loops round or bounces.', ex: ['"bounce"', 'bounces the text between its ends'] }),
       v('scrollRepeat', 'scrollRepeat', INT, { min: 0, max: 999, doc: 'Set how many times the text scrolls through.', ex: ['3', 'scrolls the text through three times, then stops'],
         argDocs: { scrollRepeat: 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
@@ -901,7 +911,7 @@ function coerce(kind, value, spec, current) {
     case BOOL:
       // No argument toggles, so one footswitch can do both jobs. `current` is what it toggles from.
       if (value === undefined || value === null) return !(current === true);
-      return value !== false && value !== 0 && value !== '';
+      return !isOff(value);
     // Text left out is refused, as every required value left out is: it was written as "".
     case STR: return value === undefined || value === null ? null : String(value);
     case ENUM: {
@@ -1076,7 +1086,7 @@ export function componentScriptPatch(verb, cfg, args = []) {
       // elsewhere — so the only illegal index is one that is not a whole number at or above zero.
       if (!Number.isFinite(at) || at < 0) return {};
       const on = list.includes(at);
-      const want = b === undefined || b === null ? !on : (b !== false && b !== 0 && b !== '');
+      const want = b === undefined || b === null ? !on : !isOff(b);
       if (want === on) return {};
       const next = want ? [...list, at].sort((x, y) => x - y) : list.filter((n) => n !== at);
       return { [verb.f]: next };
@@ -1617,7 +1627,7 @@ export function verbParamSummary(verb, name, kind) {
   const indexLines = (what, plural) => `${cap(what)} number, counted from 1.\nNot one of the ${plural}: rejected with a console error.`;
   switch (verb.k) {
     case NUM: case INT: return [`${words}.`, ...RANGE_LINES(verb, verb.k)].join('\n');
-    case BOOL: return verb.toggle ? 'Left out: toggles.\n0 or "": false; any other value: true.' : '0 or "": false; any other value: true.';
+    case BOOL: return verb.toggle ? `Left out: toggles.\n${OFF_RULE}` : OFF_RULE;
     case ENUM: return `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`;
     case STR: return `${words}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case XY: {
@@ -1633,13 +1643,13 @@ export function verbParamSummary(verb, name, kind) {
     case ITEM:
       if (name === 'index') return indexLines(noun, `${noun}s`);
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
-        : kind === BOOL ? 'Left out: toggles.\n0 or "": false; any other value: true.'
+        : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
         : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case ELEM:
       if (name === 'name') return 'The element\'s name, as given in the inspector.\nNot an element of this display: rejected with a console error.';
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
-        : kind === BOOL ? 'Left out: toggles.\n0 or "": false; any other value: true.'
+        : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
         : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-sensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case CELL:
@@ -1649,7 +1659,7 @@ export function verbParamSummary(verb, name, kind) {
       return [`${cap(name)}.`, ...RANGE_LINES(verb, NUM)].join('\n');
     case INDEXSET:
       if (name === 'index') return `${cap(noun)} number, counted from 1.\nBelow 1, or invalid: rejected with a console error.`;
-      return 'Left out: toggles.\n0 or "": off; any other value: on.';
+      return 'Left out: toggles.\n0, "", "false", "off" or "0": off. Case-insensitive.\nAny other value: on.';
     case LINK: return `The driving control's name.\nLeft out, or "": unlinked.\nNot on this panel, or not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}: rejected with a console error.`;
     case READ:
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
