@@ -10,8 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent,
-} from '../src/CE_Application/scripting/componentVerbs.js';
+  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -645,4 +644,62 @@ test('a verb that rewrites a list of colours reads every colour in it, and names
   } finally {
     setRuntimeHost(null);
   }
+});
+
+/* ------------------------------------------- the texts every component verb is described by */
+
+test('every component verb has an example, notes and a text for each parameter, in the form the modules share', () => {
+  // The texts are generated from the spec (verbSummary, verbExample, verbNotes, verbParamSummary),
+  // with a verb's own doc, ex, notes and argDocs winning: one sentence, an example in code marks,
+  // what the call returns, and one rule per line for each parameter.
+  for (const verb of COMPONENT_VERBS) {
+    const member = MEMBER_BY_ID[verb.id];
+    assert.ok(member, `${verb.id} is not a member`);
+    assert.match(member.summary, /\.$/, `${verb.id}: "${member.summary}" is not a sentence`);
+    // The generated sentences, and the LCD's own: the other families' hand-written docs are the
+    // modules still to be done (docs/design/api-descriptions-handoff.md).
+    if (!verb.doc || verb.family === 'lcd') {
+      assert.match(member.summary, /^[A-Z`][^.]*\.$/, `${verb.id}: "${member.summary}" is not one sentence`);
+    }
+    assert.match(member.example, /^`ce\.components\.[a-z]+\.[A-Za-z]+\("[^"]+"[^`]*\)` .+\.$/, `${verb.id}: "${member.example}" is not an example`);
+    assert.ok(Array.isArray(member.notes) && member.notes.length, `${verb.id} has no notes`);
+    assert.ok(member.notes.some((n) => /Returns/.test(n)), `${verb.id}: no note says what it returns`);
+    for (const param of member.params) {
+      assert.ok(param.summary, `${verb.id}.${param.name} has no text`);
+      for (const line of param.summary.split('\n')) {
+        assert.match(line, /^(?:[A-Z0-9"`<≤≥]|true|false).*[.]$/, `${verb.id}.${param.name}: "${line}" is not a rule of its own`);
+      }
+    }
+  }
+});
+
+test('the LCD\'s verbs say what each setting is, with its range and what is rejected', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.lcdBrightness.summary, 'Set the brightness of the lit segments or pixels.');
+  assert.equal(text('lcdBrightness', 'brightness'), 'Brightness.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-sensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0 or "": false; any other value: true.');
+  assert.equal(text('lcdBacklight', 'target'), 'The LCD Display\'s control, by name.\nNot an LCD Display: rejected with a console error.');
+  assert.equal(text('lcdCursorAt', 'col').split('\n')[0], 'Column, counted from 1.');
+  assert.equal(MEMBER_BY_ID.lcdBacklight.example, '`ce.components.lcd.backlight("Screen")` switches the backlight on if it is off, and off if it is on.');
+  assert.equal(MEMBER_BY_ID.lcdShowGlass.example, '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
+  assert.equal(MEMBER_BY_ID.lcdValueSource.example, '`ce.components.lcd.valueSource("Screen", "Cutoff")` makes the control called Cutoff drive the value.');
+  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true; already that way: true, with a line in the console.', 'Rejected with a console error: false, and nothing changed.']);
+});
+
+test('text left out is refused, where it was written as ""', () => {
+  // valuePrefix(t) and label(t) wrote "" in silence; a required value left out is rejected, as
+  // every module's are. Text given, a number included, is still written as text.
+  const prefix = COMPONENT_VERBS.find((v) => v.id === 'lcdValuePrefix');
+  const cfg = { valuePrefix: 'Vol ' };
+  assert.deepEqual(componentScriptPatch(prefix, cfg, [undefined]), {});
+  assert.equal(componentRequestLegal(prefix, cfg, [undefined]), false);
+  assert.equal(componentRefusalReason(prefix, cfg, [undefined]), 'No text was given.');
+  assert.deepEqual(componentScriptPatch(prefix, cfg, ['']), { valuePrefix: '' }, 'an empty text is a text');
+  assert.deepEqual(componentScriptPatch(prefix, cfg, [5]), { valuePrefix: '5' });
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
+  assert.equal(componentRequestLegal(glyph, display, [1, undefined]), false);
+  assert.equal(componentRefusalReason(glyph, display, [1, undefined]), 'No text was given.');
 });

@@ -97,14 +97,15 @@ is the table of wording the owner rejected and what replaced it; read it before 
 
 ### Left
 
-The table under [The branch](#the-branch): 617 descriptions in the modules not yet done, of which
-176 need the most work by the 2026-10-21 measure. The `ce.components.*` modules are the bulk
+The table under [The branch](#the-branch): 580 descriptions in the modules not yet done, of which
+154 need the most work by the 2026-10-21 measure (every component verb already has the generated
+form; see [`ce.components.lcd`: done](#cecomponentslcd-done-and-the-component-generator-with-it)). The `ce.components.*` modules are the bulk
 (roughly 400 descriptions over 20 components); they are panel-window only, so their runtime is
 `panelRuntime.js` and the C++ engines define them as explaining stubs: no prelude work, and the
 sidebar's `readDrawShape`-style readers do not apply. Then `ce.panel`, `ce.device`, `ce.music`,
 `ce.core`, `ce.storage`, `ce.image`, `ce.text`, `ce.ui` and the lifecycle hooks. After the
 commands: the module descriptions (41, the picker's group headings) and the event descriptions
-(38), with the same rules. Next by the table: `ce.components.lcd` (37 descriptions, 22 that need
+(38), with the same rules. Next by the table: `ce.components.arp` (30 descriptions, 15 that need
 the most work).
 
 ---
@@ -714,7 +715,48 @@ one, `tap` with fewer than two usable taps, `clockTempo` with an empty list, the
 no tempo) returns nothing without a word; `stopTimer` with an id that is not running says nothing;
 `syncTimer`'s `follow` that is not true or false is true (`Invalid: true.`).
 
-Next in the table: `ce.components.lcd` (37 descriptions, 22 that need the most work).
+## `ce.components.lcd`: done, and the component generator with it
+
+The component modules are data, not prose: `componentVerbs.js` declares each family's verbs (field,
+kind, range) and `panelApi.js` expands them into members, so their texts are generated. Rewriting
+`ce.components.lcd` meant rewriting the generator, and every component verb (about 400) took the
+form at once:
+
+- `verbSummary`: one sentence from the kind and the field's name in words ("Set the scroll speed.",
+  "Switch the backlight on or off.", "Name the control that drives the value."), a verb's own `doc`
+  winning. The five every family gets (`read`, `size`, `fill`, `insert`, `remove`) have one sentence
+  each and their detail in `notes`.
+- `verbExample`: `` `ce.components.lcd.brightness("Screen", 80)` sets the brightness to 80. `` from
+  the kind and a sample inside the range, a verb's own `ex` ([arguments, gloss]) winning; the
+  family's `sample` names the control in them ("Screen" for the LCD).
+- `verbNotes`: what the call returns (true; already that way: true with a console line; rejected:
+  false), a verb's own `notes` first.
+- `verbParamSummary`: each parameter's text, one rule per line, by kind and place: the target
+  ("The LCD Display's control, by name. / Not an LCD Display: rejected…"), a number's `Range: lo ↔
+  hi.` with "Outside the range: the nearest end." (the reducer clamps) and "Invalid: rejected",
+  a whole number's "A fraction: rounded.", an enum's `One of "off", "left" or "right". Case-sensitive.`,
+  a toggle's "Left out: toggles.", an index's "counted from 1", a link's "Left out, or "":
+  unlinked.", the LCD line's cut and blank-cell warnings; a verb's own `argDocs[name]` winning. A
+  range of ±1e9 (the LCD's value) is shown as none.
+- The LCD's 37 verbs have their own `doc` (and `ex`, `argDocs` where the generated text is not
+  enough), from the renderer's reading of each field: scrollSpeed in characters per second,
+  blinkRate in milliseconds, animSpeed as a multiple of normal speed, the value tokens.
+- One silence ended, for every family: a text verb called with no text wrote "" (`coerce` STR);
+  it is rejected ("No text was given."), and "" given on purpose is still written.
+
+The manual's component chapter lists each family's summary and its verb names only (the texts show
+in the picker, the hover card, the sidebar hint and the API explorer), so no `MODULE_INTROS` entry
+was needed. `componentVerbs.test.js` holds every component verb to the form (an example in code
+marks, a note on what it returns, a text per parameter whose every line is a rule) and the LCD's
+texts to their words; the one-sentence check is on the generated sentences and the LCD's, since the
+other families' hand-written `doc`s are the modules still to do.
+
+**For the remaining component modules**, the work is therefore per family: read its `doc`s and
+replace the prose ones (`verbSummary` already covers a verb with none), add `ex` where the generated
+example reads mechanically, `argDocs` where a parameter means more than its name, and a `sample`
+control name; probe its reducer edges (they share `componentScriptPatch`, so most are done); then
+widen the one-sentence check in `componentVerbs.test.js` to that family. Next by the table:
+`ce.components.arp` (30 descriptions, 15 that need the most work).
 
 ### The branch
 
@@ -739,7 +781,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.anim | 12 | 12, all done |
 | ce.draw | 27 | 18, all done |
 | ce.time | 22 | 15, all done |
-| ce.components.lcd | 37 | 22 |
+| ce.components.lcd | 37 | 22, all done |
 | ce.components.arp | 30 | 15 |
 | ce.components.pixel | 28 | 13 |
 | ce.components.meter | 25 | 11 |
@@ -794,10 +836,12 @@ not open a pull request unless asked.
 
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
-on 2026-10-22", "ce.draw: done" and "ce.time: done". ce.midi, ce.math, ce.anim, ce.draw and
-ce.time are done; continue with ce.components.lcd, in technical English, schematic, one rule per
-line, with ranges, as its table says, showing every parameter and option of the command in its
-item. Check each command at its edges in the runtime first, and put what is silent or wrong to me
-as a decision. Show me one item at a time, its text now and every field as proposed, and wait for
-my answer before the next.
+on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
+ce.anim, ce.draw, ce.time and ce.components.lcd are done; continue with ce.components.arp, in
+technical English, schematic, one rule per line, with ranges, as its table says, showing every
+parameter and option of the command in its item. The component texts are generated from
+componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check
+each command at its edges in the runtime first, and put what is silent or wrong to me as a decision.
+Show me one item at a time, its text now and every field as proposed, and wait for my answer before
+the next.
 ```

@@ -15,6 +15,7 @@
 // offers. Everything else follows from that.
 
 import test from 'node:test';
+import { MEMBER_BY_ID } from '../src/CE_Application/scripting/panelApi.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -188,7 +189,9 @@ test('every link verb is declared the way the reference will describe it', () =>
     // the two things that are not guessable from the signature alone.
     const summary = verbSummary(verb);
     assert.match(summary, /[Nn]ame/, `${verb.id}: its summary never mentions a name`);
-    assert.match(summary, /unlink/, `${verb.id}: its summary never says how to clear it`);
+    // …and how to clear it is the name parameter's own text, one rule per line.
+    const name = (MEMBER_BY_ID[verb.id]?.params ?? []).find((param) => param.name === 'name');
+    assert.match(name?.summary ?? '', /unlink/, `${verb.id}: its name parameter never says how to clear it`);
   }
   // Nine distinct flat names: two families spell `brightnessSource`, so the prefix has to be doing
   // its job.

@@ -27,7 +27,7 @@
 
 import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
 import {
-  COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
+  COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs, verbExample, verbNotes, verbParamSummary,
   verbArgKinds, verbArgOptional, verbIndexArgs, verbNameArgs,
 } from './componentVerbs.js';
 import { HAND_WRITTEN_VALUES } from './componentTables.js';
@@ -3713,9 +3713,9 @@ function verbValueTyping(verb, kind) {
   return {};
 }
 
-const panelVerb = (id, signature, summary, params) => ({
+const panelVerb = (id, signature, summary, params, extra = {}) => ({
   id, signature, summary, params, category: 'Panel components',
-  runtime: RUNTIME_WEBVIEW, scopes: ['component', 'panel'],
+  runtime: RUNTIME_WEBVIEW, scopes: ['component', 'panel'], ...extra,
 });
 
 const T = { name: 'target', type: 'targetRef', required: true };
@@ -3895,10 +3895,14 @@ export const PANEL_COMMANDS = [
     const kinds = verbArgKinds(verb);
     const optional = verbArgOptional(verb);
     const args = verbArgs(verb);
+    // The example, the notes and each parameter's text come from the spec as well (componentVerbs'
+    // verbExample, verbNotes and verbParamSummary), in the form every other module's take: one rule
+    // per line, the range and what is rejected. A verb's own `ex`, `notes` and `argDocs` win.
     return panelVerb(verb.id, verbSignature(verb), verbSummary(verb),
-      [T, ...args.map((name, i) => ({
+      [{ ...T, summary: verbParamSummary(verb, 'target', 'target') }, ...args.map((name, i) => ({
         name,
         type: PARAM_TYPE_FOR[kinds[i]] ?? 'value',
+        summary: verbParamSummary(verb, name, kinds[i]),
         // Both halves come from the spec rather than from this file's reading of it, and
         // componentVerbs.test.js holds them to the signature line — which is how the two used to
         // disagree, every optional argument being published as required.
@@ -3909,7 +3913,7 @@ export const PANEL_COMMANDS = [
         ...(verbIndexArgs(verb).includes(name) ? { kind: 'componentIndex' } : {}),
         // …and the name of one of the family's verbs, which read, size, fill, insert and remove take.
         ...(verbNameArgs(verb).includes(name) ? { kind: 'componentWord' } : {}),
-      }))]);
+      }))], { example: verbExample(verb), notes: verbNotes(verb) });
   }),
 ];
 
