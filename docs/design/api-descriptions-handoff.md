@@ -786,10 +786,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 7. `text`: done, below.
 8. Parameter texts that are only the name: done, below.
 9. `showGhost`, `showGlass`, `showScanlines`, `showGrid`: done, below.
-10. The notes every family shares, on the LCD: `read`'s names a `"step"` verb and `size`'s a
-   `"node"` one and the Mod Matrix, none of which the LCD has; `fill`'s example passes a variable
-   (`values`), and its note says "One document change". (The "already that way" in every verb's
-   return note is reworded: see `verbNotes` above.)
+10. The notes every family shares: done, below.
 11. `backlightSource`: "Not on this panel, or not a control on this panel".
 12. The manual shows none of these texts: its component chapter lists the verbs' names only.
 13. Case "everywhere": done, below.
@@ -975,6 +972,27 @@ decisions the owner made, each the recommendation:
 | `showGrid` | Show or hide the grid: faint lines between the cells or pixels. | Default: hidden. |
 
 The Pixel Display's four are still derived, and say only their names: that module's review.
+
+**Item 10, the notes every family shares: done.** `read`'s note named a `"step"` list, `size`'s a
+`"node"` one and the Mod Matrix, on all 23 components, and only the Turing Machine, the Orbit and
+the Mod Matrix have each; eight components have no lists at all and their `read` note described
+reading one. `fill`'s example passed a `values` never shown, and its note said "One document
+change". Two decisions the owner made, each the recommendation:
+
+- The texts are made from each component's own lists, for all 23 (`familyNotes` and `sampleList`
+  in `componentVerbs.js`): `read` and `size` name the first list by name, a grid answers in rows
+  and columns, a Pixel Display's elements are read by name, and a component without lists has only
+  the first sentence of `read`'s note.
+- `fill`'s example writes its list out, as `ce.draw`'s do, in the first list's own kind of value:
+  `{"PATCH 12", "VOL 100"}` on the LCD, `{0.25, 0.5, 0.75}` for steps, `{true, false, true}` for
+  lanes, `{{0.5, 0}, {0, 0.5}}` for the Mod Matrix.
+
+| Field, on the LCD | Text |
+| --- | --- |
+| `read` note | `read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. |
+| `size` note | `size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number. |
+| `fill` example | `ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2. |
+| `fill` note | One undo step for the whole list, instead of one per element. |
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music

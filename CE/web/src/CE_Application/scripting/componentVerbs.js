@@ -827,15 +827,11 @@ const RETURNS_SET = ['Returns true. Already set: true, with a console line.', 'R
 const RETURNS_VALUE = (what) => [`Returns the ${what}.`, 'Rejected: no result, with a console error.'];
 
 const FAMILY_VERBS = [
-  { v: 'read', k: READ, doc: 'Read back a setting, or every setting.',
-    notes: ['`read(target)`: every setting as a table, by verb name. `read(target, "step")`: the whole list of a list verb; `read(target, "step", 3)`: one element, counted from 1.',
-      ...RETURNS_VALUE('value')] },
-  { v: 'size', k: SIZE, doc: 'Read how many elements a list has.',
-    notes: ['`size(target)`: every list as a table, by verb name; `size(target, "node")`: one number. The Mod Matrix answers { rows, cols }.',
-      ...RETURNS_VALUE('number')] },
-  { v: 'fill', k: FILL, doc: 'Write a whole list in one call.',
-    notes: ['One document change and one undo step, instead of one per element.',
-      ...RETURNS_TRUE] },
+  // read's, size's and fill's notes name the family's own lists (familyNotes, below): they named a
+  // "step" and a "node" list and the Mod Matrix on every component, and only one had each.
+  { v: 'read', k: READ, doc: 'Read back a setting, or every setting.' },
+  { v: 'size', k: SIZE, doc: 'Read how many elements a list has.' },
+  { v: 'fill', k: FILL, doc: 'Write a whole list in one call.' },
   { v: 'insert', k: INSERT, doc: 'Add one element to a list.',
     notes: ['The new element is the canvas\'s own template. Appended; with an index, inserted before that position, counted from 1.',
       ...RETURNS_TRUE] },
@@ -1605,6 +1601,47 @@ export function verbSummary(verb) {
 
 /** A sample value for a verb's own value, for its example: a number inside its range, the first of
  *  an enum's words, text. */
+/** A family's list verbs, in the order they are declared: what fill's example writes. */
+function declaredLists(verb) {
+  return Object.values(VERBS_BY_FAMILY[verb.family] ?? {}).filter((spec) => LIST_KINDS.includes(spec.k) && !spec.clear);
+}
+
+/** A few values a list takes, written out as a script would: `{0.25, 0.5, 0.75}`. */
+function sampleList(spec) {
+  if (spec.k === CELL && spec.grid) return { text: '{{0.5, 0}, {0, 0.5}}', count: 2 };
+  if (spec.k === LINE) return spec.section === 'Display' ? { text: '{"PATCH 12", "VOL 100"}', count: 2 } : { text: '{"One", "Two"}', count: 2 };
+  const kind = spec.k === ITEM ? spec.kind : NUM;
+  if (kind === BOOL) return { text: '{true, false, true}', count: 3 };
+  if (kind === ENUM && Array.isArray(spec.values) && spec.values.length > 1) return { text: `{"${spec.values[0]}", "${spec.values[1]}"}`, count: 2 };
+  if (kind === STR || kind === ENUM) return { text: '{"One", "Two"}', count: 2 };
+  const lo = Number.isFinite(spec.min) && Math.abs(spec.min) < 1e6 ? spec.min : 0;
+  const hi = Number.isFinite(spec.max) && Math.abs(spec.max) < 1e6 ? spec.max : 1;
+  const at = (t) => (kind === INT ? Math.round(lo + (hi - lo) * t) : Math.round((lo + (hi - lo) * t) * 100) / 100);
+  return { text: `{${[0.25, 0.5, 0.75].map(at).join(', ')}}`, count: 3 };
+}
+
+/** read's and size's notes, from the family's own lists: the first by name, as firstList takes it. */
+function familyNotes(verb) {
+  const lists = Object.values(VERBS_BY_FAMILY[verb.family] ?? {})
+    .filter((spec) => LIST_KINDS.includes(spec.k) && !spec.clear).sort((a, b) => a.v.localeCompare(b.v));
+  const named = Object.values(VERBS_BY_FAMILY[verb.family] ?? {}).filter((spec) => spec.k === ELEM).sort((a, b) => a.v.localeCompare(b.v));
+  const first = lists[0];
+  const grid = lists.find((spec) => spec.k === CELL && spec.grid);
+  if (verb.k === SIZE) {
+    if (!first) return [];
+    const one = first === grid ? `\`size(target, "${first.v}")\`: { rows, cols }.` : `\`size(target, "${first.v}")\`: one number.`;
+    const rows = grid && grid !== first ? ` \`size(target, "${grid.v}")\`: { rows, cols }.` : '';
+    return [`\`size(target)\`: every list as a table, by verb name; ${one}${rows}`];
+  }
+  const all = '`read(target)`: every setting as a table, by verb name.';
+  if (first === grid && first) return [`${all} \`read(target, "${first.v}")\`: the whole grid, as rows; \`read(target, "${first.v}", 2, 3)\`: row 2, column 3.`];
+  if (first) return [`${all} \`read(target, "${first.v}")\`: the whole list; \`read(target, "${first.v}", 3)\`: one ${itemNoun(first)}, counted from 1.`];
+  // An element's text is what a reader of a pixel display reads first.
+  const element = named.find((spec) => spec.v === 'text') ?? named[0];
+  if (element) return [`${all} \`read(target, "${element.v}")\`: every element's, by name; \`read(target, "${element.v}", "title")\`: one element's.`];
+  return [all];
+}
+
 function sampleValue(verb, kind) {
   const spec = verb.k === ITEM || verb.k === ELEM ? { ...verb, min: verb.min, max: verb.max } : verb;
   switch (kind) {
@@ -1654,7 +1691,14 @@ export function verbExample(verb) {
     case LAYOUT: return `\`${call}(${target}, 2)\` shows layout 2.`;
     case READ: return `\`${call}(${target})\` gives every setting as a table.`;
     case SIZE: return `\`${call}(${target})\` gives the length of every list as a table.`;
-    case FILL: { const [name, noun] = firstList(verb); return `\`${call}(${target}, "${name}", values)\` writes the ${noun}s from the first, one value per element.`; }
+    case FILL: {
+      // A list written out, as ce.draw's examples write theirs, rather than a `values` never shown.
+      const spec = declaredLists(verb)[0];
+      if (!spec) break;
+      const { text, count } = sampleList(spec);
+      const noun = spec.k === CELL && spec.grid ? 'row' : itemNoun(spec);
+      return `\`${call}(${target}, "${spec.v}", ${text})\` writes ${noun}s 1 ${count === 2 ? 'and 2' : `to ${count}`}${spec.k === CELL && spec.grid ? ' of the grid' : ''}.`;
+    }
     case INSERT: { const [name, noun] = firstList(verb, true); return `\`${call}(${target}, "${name}")\` adds ${article(noun)} ${noun} at the end.`; }
     case REMOVE: { const [name, noun] = firstList(verb, true); return `\`${call}(${target}, "${name}")\` removes the last ${noun}.`; }
     case ITEM: return verb.kind === BOOL
@@ -1676,7 +1720,10 @@ export function verbExample(verb) {
 export function verbNotes(verb) {
   const own = Array.isArray(verb.notes) ? verb.notes : [];
   switch (verb.k) {
-    case READ: case SIZE: case FILL: case INSERT: case REMOVE: return own;
+    case READ: return [...familyNotes(verb), ...RETURNS_VALUE('value')];
+    case SIZE: return [...familyNotes(verb), ...RETURNS_VALUE('number')];
+    case FILL: return ['One undo step for the whole list, instead of one per element.', ...RETURNS_TRUE];
+    case INSERT: case REMOVE: return own;
     case LINK: return [...own, ...RETURNS_SET, '`read(target, "' + verb.v + '")` gives the control\'s name.'];
     case LAYOUT: return [...own, ...RETURNS_SET, '`read(target, "layout")` gives the number of the layout showing.'];
     default: return [...own, ...RETURNS_SET];

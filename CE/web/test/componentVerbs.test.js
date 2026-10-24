@@ -732,6 +732,16 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
     '`ce.components.drumpads.zones("DrumPads")` switches the zones on if they are off, and off if they are on.');
   assert.equal(MEMBER_BY_ID.lcdShowGlass.example,
     '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
+  // Item 10: read's, size's and fill's texts name the component's own lists.
+  assert.equal(MEMBER_BY_ID.lcdRead.notes[0], '`read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1.');
+  assert.equal(MEMBER_BY_ID.lcdSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number.');
+  assert.equal(MEMBER_BY_ID.lcdFill.example, '`ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2.');
+  assert.equal(MEMBER_BY_ID.lcdFill.notes[0], 'One undo step for the whole list, instead of one per element.');
+  assert.equal(MEMBER_BY_ID.transportRead.notes[0], '`read(target)`: every setting as a table, by verb name.', 'no lists: no list sentence');
+  assert.equal(MEMBER_BY_ID.matrixSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "cell")`: { rows, cols }.');
+  for (const verb of COMPONENT_VERBS.filter((v) => v.k === 'fill')) {
+    assert.doesNotMatch(MEMBER_BY_ID[verb.id].example, /, values\)/, `${verb.id}: a list written out`);
+  }
   assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-insensitive.\nInvalid: rejected with a console error.');
   assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
