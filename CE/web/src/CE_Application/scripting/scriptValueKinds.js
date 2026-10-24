@@ -21,6 +21,7 @@ import {
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, divisionIdOf } from './timeTables.js';
 import { ANIM_CURVE_NAMES, EASING_BEZIERS, bezierOf } from './easingTables.js';
+import { listWord } from '../utils/wordLists.js';
 import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, checksumNames, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
@@ -332,9 +333,10 @@ export function readCurve(value) {
     };
   }
   if (typeof value === 'string') {
-    if (ANIM_CURVE_NAMES.includes(value)) {
-      meaning.name = value;
-      meaning.bezier = EASING_BEZIERS[value] ? [...EASING_BEZIERS[value]] : null;
+    const name = listWord(ANIM_CURVE_NAMES, value);   // in any case, as the runtime reads it
+    if (name) {
+      meaning.name = name;
+      meaning.bezier = EASING_BEZIERS[name] ? [...EASING_BEZIERS[name]] : null;
       return { meaning, problem: null };
     }
     return {

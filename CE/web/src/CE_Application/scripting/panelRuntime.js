@@ -4651,7 +4651,8 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // option is (warnAnimTiming): it was a line on every call, and a curve that was neither a name
   // nor numbers (curve = 5) was linear without a word. ScriptRuntime::startAnimation says the same.
   const curveVerb = `ce.anim.${kind}`;
-  let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
+  // A name in any case (utils/wordLists.js): "OutCubic" is "outCubic". ScriptRuntime reads it so too.
+  let curve = typeof opts?.curve === 'string' ? (listWord(ANIM_CURVE_NAMES, opts.curve) ?? opts.curve) : 'linear';
   let bezier = null;
   if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
     bezier = drawnCurve(opts.curve);

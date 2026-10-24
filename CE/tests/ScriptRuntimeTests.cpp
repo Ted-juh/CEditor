@@ -3328,6 +3328,11 @@ int main()
         timing.startAnimation ("to", juce::var ("k"), 100.0, opts ({ { "duration", -1.0 } }));
         check (said() == "warn:ce.anim.to: a duration of -1 is less than 0, so the move takes 1 ms: it jumps." + once,
                "a script set loaded afresh is told again");
+        // A curve's name is read in any case, as every word from a list is: "OutCubic" and "EXP"
+        // were not curves this build knew, and the move was linear.
+        timing.startAnimation ("to", juce::var ("p1"), 100.0, opts ({ { "curve", " OutCubic " } }));
+        timing.startAnimation ("to", juce::var ("p2"), 100.0, opts ({ { "curve", "EXP" } }));
+        check (said().isEmpty(), "a curve's name in any case is the curve, and nothing is said");
         // A curve that cannot be used is said once per command too. It was a line on every call,
         // and a curve that was neither a name nor numbers was linear without a word.
         timing.startAnimation ("to", juce::var ("p"), 100.0, opts ({ { "curve", "outBak" } }));

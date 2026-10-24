@@ -1114,6 +1114,8 @@ test('record example 6: an easing curve, and a duration in milliseconds', () => 
   assert.equal(writeValue(js, 'javascript', optOf(argOf(callOf(read(js, 'javascript', 'ce.')), 'opts'), 'curve'), [0.2, 0.9, 0.3, 1.4]).text, '[0.2, 0.9, 0.3, 1.4]');
   const drawn = 'ce.anim.to("cutoff", 127, { curve = { 0.2, 0.9, 0.3, 1.4 } })';
   assert.equal(writeValue(drawn, 'lua', optOf(argOf(callOf(read(drawn, 'lua', 'ce.')), 'opts'), 'curve'), 'outBack').text, '"outBack"');
+  assert.deepEqual(optOf(argOf(callOf(read('ce.anim.to("cutoff", 127, { curve = "OUTBACK" })', 'lua', 'ce.')), 'opts'), 'curve').meaning.bezier,
+    [0.175, 0.885, 0.32, 1.275], 'a name in any case is the name');
   const typo = optOf(argOf(callOf(read('ce.anim.to("cutoff", 127, { curve = "outBak" })', 'lua', 'ce.')), 'opts'), 'curve');
   assert.match(typo.problem.message, /^ce\.anim\.to: "outBak" is not a curve this build knows — animating linear\..* Did you mean "outBack"\?$/);
 });
