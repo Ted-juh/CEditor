@@ -48,6 +48,8 @@ import {
   drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
+import { lcdReadAt, lcdWriteAt, lcdRows } from './lcdPositions.js';
+import { layoutShowing } from '../stores/displayLayouts.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
@@ -3490,14 +3492,29 @@ function writeComponentFields(verb, path, patch) {
   return true;
 }
 
+/** The LCD's text and clear, and read's "text": addressed by position, on a layout (lcdPositions.js). */
+const isLcdText = (verb) => verb.family === 'lcd' && verb.k === 'line';
+
+/**
+ * A display's section with the layout it is showing, as the preview hands it to the renderer
+ * (`__page.activeLayoutId`), so text(), clear() and read() with no layout act on the layout on
+ * screen. The preview decides it (stores/displayLayouts.js); with none, the display rests on its
+ * default and lcdPositions.js finds that itself.
+ */
+function withLayoutShowing(path, section) {
+  const id = layoutShowing(findControlByName(path)?._children?.Core?.id);
+  return id ? { ...section, __page: { activeLayoutId: id } } : section;
+}
+
 const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
-  const cfg = getValue(`${path}.${verb.section}`);
-  if (!cfg || typeof cfg !== 'object') {
+  const stored = getValue(`${path}.${verb.section}`);
+  if (!stored || typeof stored !== 'object') {
     addScriptTrace('error', '', `${verb.family}: ${wrongTargetMessage(path, verb.section, verb.label)}`);
     return false;
   }
+  const cfg = isLcdText(verb) ? withLayoutShowing(path, stored) : stored;
   const patch = componentScriptPatch(verb, cfg, args);
   const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
@@ -3533,8 +3550,11 @@ function componentVerbAction(verb, target, args) {
 const lcdLineWarned = new Set();   // resetScriptState clears it
 function lcdLineSaid(verb, path, display, args, shown) {
   if (verb.family !== 'lcd' || verb.v !== 'text') return;
-  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, args[1])) {
-    const key = `${path}\u0000${args[0]}\u0000${reason}`;
+  // The row as written, which from a column on is more than the text given.
+  const { line } = lcdWriteAt(display, args[0], args[1]);
+  if (line === undefined) return;
+  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, line)) {
+    const key = `${path}\u0000${JSON.stringify(args[0])}\u0000${reason}`;
     if (lcdLineWarned.has(key)) continue;
     lcdLineWarned.add(key);
     addScriptTrace('warn', '', `${message} This is said only the first time.`);
@@ -3674,6 +3694,14 @@ function componentReadAction(verb, path, args) {
     return elementAt(cfg, sites[0])?.[spec.item];
   }
 
+  // The LCD's text is read by position (lcdPositions.js): every row of the layout showing, one row,
+  // the columns of one, or another layout's.
+  if (isLcdText(spec)) {
+    const { value, refusal } = lcdReadAt(withLayoutShowing(path, cfg), index);
+    if (refusal) addScriptTrace('error', '', `${verb.family}.read("${spec.v}", ${JSON.stringify(index)}): ${refusal}`);
+    return refusal ? undefined : value;
+  }
+
   const list = componentListValue(cfg, spec);
   if (!list) return undefined;
   if (index === undefined || index === null) return list;
@@ -3702,6 +3730,7 @@ function componentSizeAction(verb, path, args) {
   const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
 
   const sizeOf = (spec) => {
+    if (isLcdText(spec)) return lcdRows(cfg);
     const list = componentList(cfg, spec);
     if (!list) return undefined;
     if (spec.k === 'cell' && spec.grid) {
@@ -3738,6 +3767,7 @@ function componentFillAction(verb, path, args) {
     addScriptTrace('error', '', `${verb.family}.fill("${name}"): needs a list of values.`);
     return false;
   }
+  if (isLcdText(spec)) return lcdFill(verb, path, cfg, name, values);
   const list = componentList(cfg, spec);
   if (!list) return false;
 
@@ -3785,6 +3815,35 @@ function componentFillAction(verb, path, args) {
   }
   if (!writeComponentFields(verb, path, { [spec.f]: next })) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${calls.length} value(s)`);
+  return true;
+}
+
+/** fill(t, "text", rows): the rows of the layout showing from the first, as text() writes each. */
+function lcdFill(verb, path, cfg, name, values) {
+  const rows = lcdRows(cfg);
+  if (values.length > rows) {
+    addScriptTrace('error', '',
+      `${verb.family}.fill("${name}"): ${values.length} values for ${rows} rows — refused. `
+      + `${verb.family}.size("${name}") says how many there are.`);
+    return false;
+  }
+  let work = withLayoutShowing(path, cfg);
+  let patch = {};
+  for (const [i, value] of values.entries()) {
+    const done = lcdWriteAt(work, i + 1, value);
+    if (done.refusal) {
+      addScriptTrace('error', '', `${verb.family}.fill("${name}"): row ${i + 1}: ${done.refusal} Nothing was written.`);
+      return false;
+    }
+    patch = { ...patch, ...done.patch };
+    work = { ...work, ...done.patch };
+  }
+  if (!Object.keys(patch).length) {
+    addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") — already that way`);
+    return true;
+  }
+  if (!writeComponentFields(verb, path, patch)) return false;
+  addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${values.length} value(s)`);
   return true;
 }
 

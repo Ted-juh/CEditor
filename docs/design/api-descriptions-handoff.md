@@ -77,8 +77,10 @@ is the table of wording the owner rejected and what replaced it; read it before 
   read it, so "250" is refused everywhere).
 - A word from a list the app defines is read in any case, and with spaces around it, everywhere
   (the owner, 2026-10-24, on `ce.components.lcd.animPreset`), and stored or used as the list spells
-  it: `listWord` in `utils/wordLists.js`, `__word` in each prelude. A name an author makes up (a
-  control, an element, a device parameter's choices, a settings key) stays exact. The text says
+  it: `listWord` in `utils/wordLists.js`, `__word` in each prelude. A name an author makes up is
+  matched as it was: this rule does not reach it. (A control's name and a pixel element's were
+  matched in any case and trimmed already, `nameIndexFor` and `elementAnswersTo`; the records
+  below said "exact" of them until 2026-10-24, which was never so.) The text says
   `Case-insensitive.` on the line that lists the words; the manual and the API explorer add it to
   a list they print from `values`.
 - Shown to the owner one item at a time for a new module, until the owner says to continue without
@@ -874,8 +876,8 @@ the display drew nothing for a name `presetInto` does not know. Two decisions th
   says `Case-insensitive.` where it said `Case-sensitive.`), and the verb names `read`, `size`,
   `fill`, `insert` and `remove` take (`familyVerbNamed`, which also stops "toString" finding
   Object's own). The Values sidebar takes "LEFT" for a component verb (`readEnum`'s `anyCase`).
-  Control names and element names stay exact: they are names an author typed, and two can differ
-  only in case. The rest of the API is the next item.
+  Control names and element names are not touched by it. (This said they "stay exact"; they were
+  matched in any case already, and still are.) The rest of the API is the next item.
 
 | Field | Text |
 | --- | --- |
@@ -935,7 +937,7 @@ Description and example unchanged.
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
 with ce.time, ce.storage with ce.device and ce.core), the owner having agreed the split: a word
-from a list the app defines is read in any case; a name an author makes up is exact.
+from a list the app defines is read in any case; a name an author makes up is matched as it was.
 
 - One helper per runtime: `listWord(values, value)` in `utils/wordLists.js` (the list's spelling,
   or null), `__word` beside `__steps` in each prelude, and `animCurveName` / `formWord` on the C++
@@ -988,7 +990,8 @@ is always there to ask.
 **The model.**
 
 - **A page** is a layout, by its number in the inspector (counted from 1) or its name as given in
-  the inspector (exact: an author's name). A number is a position, text a name. A display without
+  the inspector (in any case and trimmed, as a control's name and a pixel element's are matched).
+  A number is a position, text a name. A display without
   layouts has page 1, its `lines`.
 - **A page's text** is stored on the layout as `lines`, one text per row, saved with the panel as
   the display's `lines` are. `composeLayout` starts from it instead of a blank grid, so a cell no

@@ -733,7 +733,7 @@ test('a number counted from 1 is rounded, and every such parameter says so', () 
   const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
   assert.deepEqual(componentScriptPatch(text, lines, [1.5, 'X']), { lines: ['A', 'X'] });
   assert.deepEqual(componentScriptPatch(text, lines, [1.4, 'X']), { lines: ['X', 'B'] });
-  assert.equal(componentRefusalReason(text, lines, [2.5, 'X']), 'There is no line 2.5: the lines are 1 to 2.');
+  assert.equal(componentRefusalReason(text, lines, [2.5, 'X']), 'There is no row 2.5: the rows are 1 to 2.');
   const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
   const slots = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
   assert.equal(componentScriptPatch(glyph, slots, [1.5, '#']).glyphs[1].bits, '#');
@@ -763,8 +763,9 @@ test('a line\'s text left out is refused, as every text verb\'s is; "" still bla
   assert.deepEqual(componentScriptPatch(text, lines, [1, '']), { lines: ['', 'B'] });
   assert.deepEqual(componentScriptPatch(text, lines, [2, 42]), { lines: ['A', '42'] });
   assert.match(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'text').summary, /\nLeft out: rejected with a console error\.$/);
-  assert.equal(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'row').summary,
-    'Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.');
+  const at = MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'at').summary.split('\n');
+  assert.equal(at[0], 'Row, counted from 1, on the layout showing.');
+  assert.ok(at.includes('A fraction: rounded.'));
 });
 
 test('the LCD\'s blink rate is the time on, then off, from 60 ms as the display draws it', () => {

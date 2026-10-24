@@ -41,6 +41,7 @@
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
+  import { provideDisplayLayouts } from '../stores/displayLayouts.js';
   import { updateControlProperty } from '../stores/controls.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
@@ -847,6 +848,25 @@
   // TRANSIENT, exactly like lcdEdit above it — a press is a performance action, not an edit to the
   // panel document, so it must not reach the store and must not survive leaving preview.
   let lcdPressedLayout = $state({});
+
+  // The layout each display shows, and showing another, for scripts (stores/displayLayouts.js):
+  // text() and clear() with no layout act on the layout on screen, and layout() shows one as a soft
+  // key does, timeout and all. A Pixel Display has no soft keys; a script's layout() is kept in the
+  // same map and wins over its selector the same way.
+  onDestroy(provideDisplayLayouts({
+    showing: (id) => {
+      const control = controlById(id);
+      if (!control) return '';
+      return String(control?._children?.Core?.controlType ?? '') === 'PixelDisplay'
+        ? resolvePixelActiveLayoutId(control) : resolveLcdActiveLayoutId(control);
+    },
+    show: (id, layoutId) => {
+      const control = controlById(id);
+      if (!control) return;
+      lcdPressedLayout = { ...lcdPressedLayout, [id]: String(layoutId ?? '') };
+      lcdScheduleLayoutTimeout(control, String(layoutId ?? ''));
+    },
+  }));
 
   function lcdDisplayOf(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
@@ -5740,6 +5760,11 @@
     const designId = String(get(lcdDesignLayoutIds)[getControlId(control)] ?? '');
     const hasDesign = designId && layouts.some((l) => String(l?.id ?? '') === designId);
     const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    // A script's layout() beats the selector and the design default, as a soft key does on an LCD.
+    const shown = String(lcdPressedLayout[getControlId(control)] ?? '');
+    if (shown && layouts.some((l) => String(l?.id ?? '') === shown)) {
+      return resolveActiveLayoutId({ ...effPages, defaultLayoutId: shown }, layouts, { activeOverlayLayoutId });
+    }
     return resolveActiveLayoutId(effPages, layouts, { selectorValue, activeOverlayLayoutId });
   }
 

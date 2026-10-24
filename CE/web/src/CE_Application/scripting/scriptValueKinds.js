@@ -52,6 +52,7 @@ import {
 } from './deviceWords.js';
 import { countRolesInControls } from '../utils/deviceRoles.js';
 import { lcdLine, lcdLineWords } from './lcdLines.js';
+import { lcdPosition, lcdPositionWords, lcdReadAt, lcdRows, lcdWriteAt, lcdClearAt, isPositionTable } from './lcdPositions.js';
 import { findFont, findAxis, axisWords, axisClampWords, axisRefusalWords } from './textStyle.js';
 
 /* ----------------------------------------------------------------------------- did you mean */
@@ -1324,6 +1325,20 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     const range = componentIndexRange(verb, cfg);
     const noun = verb.grid ? (at === 0 ? 'row' : 'column') : listNoun(verb);
     const say = (reason) => ({ meaning, problem: reason ? { severity: 'error', message: literal ? componentRefusalLine(verb, target, args, cfg) : reason } : null });
+    // The LCD's text and clear take a position (lcdPositions.js): a row of the layout showing, or a
+    // table of layout, row and col. Judged by what the position says alone, as the text after it
+    // has a row of its own.
+    if (verb.k === 'line' && verb.section === 'Display') {
+      const pos = lcdPosition(cfg, value);
+      const refused = pos.refusal ?? (verb.clear ? lcdClearAt(cfg, value) : lcdWriteAt(cfg, value, '')).refusal;
+      if (refused) return say(refused);
+      if (!isPositionTable(value)) Object.assign(meaning, { min: 1, max: lcdRows(cfg) });
+      else meaning.integer = false;
+      const now = pos.rows && pos.rows[0] === pos.rows[1] ? lcdReadAt(cfg, value).value : undefined;
+      meaning.hint = value === undefined || value === null ? null
+        : `${isPositionTable(value) ? lcdPositionWords(cfg, value) : `row ${pos.rows[0] + 1} of ${lcdRows(cfg)}`}${typeof now === 'string' ? ` · now ${shownValue(now)}` : ''}`;
+      return { meaning, problem: pos.clamped ? { severity: 'warning', message: pos.clamped } : null };
+    }
     if (verb.k === 'elem') {
       meaning.choices = range?.names ?? [];
       meaning.hint = elementSites(cfg, value).length ? `an element of ${target}` : null;

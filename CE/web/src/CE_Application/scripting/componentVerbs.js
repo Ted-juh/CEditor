@@ -46,6 +46,7 @@ import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } fr
 import { shownValue } from './shownValue.js';
 import { listWord } from '../utils/wordLists.js';
 import { glyphBitsRefusal } from '../utils/lcdUserGlyphs.js';
+import { lcdWriteAt, lcdClearAt, lcdRows } from './lcdPositions.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 // What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
@@ -54,6 +55,11 @@ const OFF_WORDS = new Set(['', 'false', 'off', '0']);
 const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
 const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
+// The kind of LINE's first argument: a row number, or a table of layout, row and col (lcdPositions.js).
+const POSITION = 'position';
+// The LCD's lines are addressed by position, on a layout (lcdPositions.js); the Joystick's corner
+// labels, the other LINE verb, by a plain number into its list, as before.
+const lcdLines = (verb) => verb.k === LINE && verb.section === 'Display';
 // One property of one element of a pixel display's scene, addressed by the NAME the author typed
 // beside it. Not `item`, and the two reasons are written out in utils/pixelElements.js: the list
 // starts empty, so an index addresses nothing on a fresh display; and the index is the paint order,
@@ -1102,6 +1108,13 @@ export function componentScriptPatch(verb, cfg, args = []) {
     }
 
     case LINE: {
+      if (lcdLines(verb)) {
+        // Where on the display, and on which layout: lcdPositions.js reads a row number or a table
+        // of layout, row and col, and writes the layout's own text (the display's lines when it has
+        // no layouts). A section with neither lines nor rows is not a display, and has nothing.
+        if (!Array.isArray(c.lines) && !isFinite_(Number(c.rows))) return {};
+        return verb.clear ? lcdClearAt(c, a).patch : lcdWriteAt(c, a, b).patch;
+      }
       const list = Array.isArray(c[verb.f]) ? c[verb.f] : null;
       if (!list) return {};
       if (verb.clear) {
@@ -1170,6 +1183,7 @@ export function componentRequestLegal(verb, cfg, args = []) {
       return coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]) !== null;
     }
     case LINE: {
+      if (lcdLines(verb)) return !(verb.clear ? lcdClearAt(c, a) : lcdWriteAt(c, a, b)).refusal;
       const list = listOf(verb.f);
       return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null && b !== undefined && b !== null;
     }
@@ -1200,7 +1214,7 @@ const LIST_NOUNS = {
   'DrumPads.pads': 'pad', 'Turing.steps': 'step', 'Looper.lanes': 'lane', 'Orbit.nodes': 'node',
   'Timbre.anchors': 'anchor', 'Router.destinations': 'destination', 'Router.curve': 'point',
   'Macro.slots': 'slot', 'Constraint.members': 'member', 'Envelope.points': 'point',
-  'Joystick.cornerLabels': 'corner', 'Meter.zones': 'zone', 'Display.lines': 'line', 'Display.glyphs': 'glyph',
+  'Joystick.cornerLabels': 'corner', 'Meter.zones': 'zone', 'Display.lines': 'row', 'Display.glyphs': 'glyph',
   'Arp.mutes': 'step',
 };
 
@@ -1218,7 +1232,7 @@ export function verbIndexArgs(verb) {
     case ITEM: case INDEXSET: return ['index'];
     case ELEM: return ['name'];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col'] : ['index']);
-    case LINE: return verb.clear ? [] : ['row'];
+    case LINE: return lcdLines(verb) ? ['at'] : (verb.clear ? [] : ['row']);
     default: return [];
   }
 }
@@ -1232,7 +1246,9 @@ export function componentIndexRange(verb, cfg) {
     case CELL:
       if (verb.grid) return { rows: Array.isArray(c.rows) ? c.rows.length : 0, cols: Array.isArray(c.cols) ? c.cols.length : 0 };
       return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
-    case LINE: return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
+    case LINE:
+      if (lcdLines(verb)) return { count: lcdRows(c) };
+      return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
     case ELEM: {
       const names = [];
       for (const { elements } of elementLists(c)) for (const el of elements) { const n = elementLabel(el); if (n && !names.includes(n)) names.push(n); }
@@ -1281,6 +1297,7 @@ export function componentRefusalReason(verb, cfg, args = []) {
       return indexRefusal(a, range.count, noun) ?? valueOf(NUM, b);
     }
     case LINE: {
+      if (lcdLines(verb)) return (verb.clear ? lcdClearAt(c, a) : lcdWriteAt(c, a, b)).refusal ?? null;
       if (verb.clear) return null;
       const range = componentIndexRange(verb, c);
       return range ? indexRefusal(a, range.count, noun) ?? valueOf(STR, b) : `It has no ${noun}s.`;
@@ -1313,6 +1330,11 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
   const given = [];
   // A refused call used nothing, so it has no nearest end to say.
   if (verb.k === XY && !xyLegal(args[0], args[1])) return null;
+  // A range of rows or columns that runs past the display's edge stops at it.
+  if (lcdLines(verb)) {
+    const said = (verb.clear ? lcdClearAt(cfg, args[0]) : lcdWriteAt(cfg, args[0], args[1])).clamped;
+    return said ? `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — ${said}` : null;
+  }
   if (verb.k === NUM || verb.k === INT) given.push([names[0], args[0]]);
   else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
   else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
@@ -1415,7 +1437,7 @@ export function verbArgs(verb) {
     case ITEM: return ['index', verb.item];
     case ELEM: return ['name', verb.item];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col', 'amount'] : ['index', 'value']);
-    case LINE: return verb.clear ? [] : ['row', 'text'];
+    case LINE: return lcdLines(verb) ? (verb.clear ? ['at'] : ['at', 'text']) : (verb.clear ? [] : ['row', 'text']);
     case INDEXSET: return ['index', 'on'];
     case BOOL: return [verb.v];
     // The five every family gets. Their optional arguments are rendered in verbSignature, which is
@@ -1443,7 +1465,7 @@ export function verbArgKinds(verb) {
     case ITEM: return [INT, verb.kind];
     case ELEM: return [STR, verb.kind];
     case CELL: return verb.clear ? [] : (verb.grid ? [INT, INT, NUM] : [INT, NUM]);
-    case LINE: return verb.clear ? [] : [INT, STR];
+    case LINE: return lcdLines(verb) ? (verb.clear ? [POSITION] : [POSITION, STR]) : (verb.clear ? [] : [INT, STR]);
     case INDEXSET: return [INT, BOOL];
     case LINK: return [STR];
     case READ: return [STR, INT];
@@ -1473,6 +1495,7 @@ export function verbArgOptional(verb) {
     case ITEM: case ELEM: return [false, boolValue];
     case BOOL: return [Boolean(verb.toggle)];
     case XY: return [true, true];                     // either axis alone; both left out is refused
+    case LINE: return lcdLines(verb) && verb.clear ? [true] : verbArgs(verb).map(() => false);
     default: return verbArgs(verb).map(() => false);
   }
 }
@@ -1660,6 +1683,23 @@ export function verbParamSummary(verb, name, kind) {
     }
     case LINE:
       if (name === 'row') return `Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.`;
+      if (name === 'at' && verb.clear) {
+        return ['Row, counted from 1, on the layout showing.',
+          'Or a table naming the layout, the rows and the columns: {layout = 2, row = 4, col = 15}.',
+          '`layout`: its number, counted from 1, or its name. Left out: the layout showing.',
+          '`row` and `col`: a number, or a range {5, 10}. Left out: every row, every column.',
+          'A fraction: rounded.', 'A range past the display: to its last row or column.',
+          'Left out: every row of the layout showing.', 'Not on the display: rejected with a console error.'].join('\n');
+      }
+      if (name === 'at') {
+        return ['Row, counted from 1, on the layout showing.',
+          'Or a table naming the layout, the row and the column: {layout = 2, row = 4, col = 15}.',
+          '`layout`: its number, counted from 1, or its name. Left out: the layout showing.',
+          '`col`: written from that column on, the rest of the row kept.',
+          '`col` as a range {5, 10}: written into those columns, padded with blanks or cut.',
+          'A fraction: rounded.', 'A range past the display: to its last column.',
+          'Not on the display: rejected with a console error.'].join('\n');
+      }
       return 'The line.\nLonger than the display: cut at its width unless it scrolls, with a console warning the first time.\nA character the display cannot draw: a blank cell, with a console warning the first time.\nA number: written as text.\nLeft out: rejected with a console error.';
     case ITEM:
       if (name === 'index') return indexLines(noun, `${noun}s`);
