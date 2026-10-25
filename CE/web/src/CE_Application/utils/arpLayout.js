@@ -116,9 +116,42 @@ export function orderNotes(notes, pattern) {
 }
 
 // The full step sequence for a control given its base notes.
+//
+// "asPlayed" walks the notes in the order they were pressed. Only an outside source has an order
+// (the preview hands __sourceNotes over as pressed: a linked Chord Pad's pads in the order they
+// went down, MIDI input by arrival), and the base set is sorted, so the order is read from there
+// and repeated an octave up for each octave. Its own chord has no order but its own, low to high.
+// It played as "up" for as long as it was offered, because every note set was sorted on the way.
 export function arpSequence(control, baseNotes) {
   const cfg = arpConfig(control);
-  return orderNotes(expandOctaves(baseNotes, cfg.octaves ?? 1), arpPattern(control));
+  const pattern = arpPattern(control);
+  if (pattern === 'asPlayed' && arpSourceIsExternal(control) && Array.isArray(cfg.__sourceNotes)) {
+    const played = [...new Set(cfg.__sourceNotes.map((n) => clampInt(n, 0, 127)))];
+    const oc = clampInt(cfg.octaves ?? 1, 1, 4);
+    const out = [];
+    for (let o = 0; o < oc; o += 1) for (const n of played) { const v = n + o * 12; if (v <= 127) out.push([v]); }
+    return out;
+  }
+  return orderNotes(expandOctaves(baseNotes, cfg.octaves ?? 1), pattern);
+}
+
+/**
+ * The cell a step plays: the step's own, or for "random" one picked by `rand` (0..1, passed in so
+ * this stays testable). The cells are still drawn low to high; the walk is what is random. A hand
+ * mute silences the cell, so a muted note is never picked to sound. "random" played as "up" for as
+ * long as it was offered: nothing ever chose.
+ */
+export function arpStepCell(control, stepIndex, length, rand = 0) {
+  const n = Math.max(1, Math.round(num(length, 1)));
+  if (arpPattern(control) !== 'random') return Math.round(num(stepIndex, 0));
+  return clampInt(Math.floor(num(rand, 0) * n), 0, n - 1);
+}
+
+/** The cell the playhead is on: the one the preview last played (`__head`), or where the phase is. */
+export function arpHead(control, length) {
+  const n = Math.max(1, Math.round(num(length, 1)));
+  const h = arpConfig(control).__head;
+  return Number.isInteger(h) && h >= 0 && h < n ? h : stepIndexAt(arpPhase(control), n);
 }
 
 // --- Euclidean rest pattern (Bjorklund): `pulses` hits spread over `steps` ----

@@ -4721,15 +4721,16 @@ Good to know:
 
 ##### `ce.components.arp.pattern(target, pattern) -> boolean`
 
-Set the pattern.
+Set the order the notes are played in.
 
-Example: `ce.components.arp.pattern("Arpeggiator", "down")` sets the pattern to "down".
+Example: `ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `pattern` (text, required): One of "up", "down", "updown", "downup", "asPlayed", "random" or "chord". Case-insensitive.<br>Invalid: rejected with a console error.
+- `pattern` (text, required): "up": low to high.<br>"down": high to low.<br>"updown": up, then down; the top and bottom notes once.<br>"downup": down, then up; the same.<br>"asPlayed": in the order the notes were pressed. Its own chord: as "up".<br>"random": one note at random each step.<br>"chord": every note at once, each step.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "up".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

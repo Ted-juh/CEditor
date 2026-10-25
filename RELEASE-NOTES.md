@@ -221,6 +221,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   zone; `zoneSource("Screen", "Cutoff", "Resonance")` links one to a control by its name.
 - A Pixel Display's element names that differ only in case are one name to `read`, as they always
   were to the commands; `read(t, "text")` listed both spellings.
+- The Arpeggiator's "Random" pattern plays a note at random each step, and "As played" plays a
+  linked Chord Pad's or the MIDI input's notes in the order they were pressed. Both played low to
+  high, exactly as "Up". The playhead shows the note a random step played.
 
 ## What you get
 

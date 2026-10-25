@@ -160,7 +160,15 @@ export const COMPONENT_FAMILIES = [
     summary: 'Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.',
     verbs: [
       v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the arpeggiator. No argument toggles.' }),
-      v('pattern', 'pattern', ENUM),
+      // Item 1 of the owner's review: "random" and "asPlayed" played as "up" (every note set was
+      // sorted, and nothing chose at random); arpLayout.arpSequence and arpStepCell now play them.
+      v('pattern', 'pattern', ENUM, { doc: 'Set the order the notes are played in.',
+        ex: ['"updown"', 'plays the notes low to high, then back down'],
+        argDocs: { pattern: ['"up": low to high.', '"down": high to low.', '"updown": up, then down; the top and bottom notes once.',
+          '"downup": down, then up; the same.', '"asPlayed": in the order the notes were pressed. Its own chord: as "up".',
+          '"random": one note at random each step.', '"chord": every note at once, each step.',
+          'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: "up".'] }),
       v('rate', 'rate', NUM, { ...RATE, doc: 'Free-running rate in steps per second. Ignored while synced.' }),
       v('division', 'division', ENUM, { doc: 'Note value per step while synced to the transport.' }),
       v('sync', 'syncToTransport', BOOL, { toggle: true }),

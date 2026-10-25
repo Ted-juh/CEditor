@@ -139,7 +139,7 @@
   } from '../utils/chordPadLayout.js';
   import {
     arpConfig, arpRate, arpVelocity, arpChannel, arpBaseNotes, arpSequence,
-    stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
+    stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds, arpStepCell, arpHead,
     effectiveSwing as arpEffectiveSwing,
     arpGeometry, arpCellAt, toggleMute, arpPhase,
     arpSynced, arpDivision, syncedPhaseAt,
@@ -224,7 +224,7 @@
     setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
   } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
-  import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries } from '../utils/midiNoteInput.js';
+  import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries, heldNotesInOrder as inputHeldInOrder } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     activeMidiControlBindings,
@@ -3533,6 +3533,7 @@
   const arpTimers = {};         // id -> [timeoutId...]  (swing delays + note-offs)
   const arpSounding = {};       // id -> Set(note) currently ringing
   const arpLatched = {};        // id -> last non-empty linked note set
+  const arpPlayedCell = {};     // id -> the cell a "random" arp last played, for its playhead
   const arpBeatsState = {};     // id -> last transport reading, for synced arps
   const arpJumpState = {};      // id -> transport jump counter seen (see tickSyncedArp)
   let arpTickerRunning = false;
@@ -3563,12 +3564,13 @@
       // Straight off the hardware keyboard — the same held-note model the echo
       // displays use, so an arp and a lit Chord Pad always agree.
       ensureNoteInput();
-      live = inputHeldNotes($midiNoteState.notes, numberOr(cfg.inputChannel, 0));
+      live = inputHeldInOrder($midiNoteState.notes, numberOr(cfg.inputChannel, 0));
     } else {
       const linkId = String(cfg.linkId ?? '');
       const map = linkId ? (chordHeld[linkId] ?? {}) : {};
-      live = [...new Set(Object.values(map).flat())].sort((a, b) => a - b);
+      live = [...new Set(Object.values(map).flat())];
     }
+    // In the order pressed, for "asPlayed" (arpLayout.arpSequence); every other pattern sorts them.
     const id = getControlId(control);
     if (live.length) { arpLatched[id] = live; return live; }
     if (cfg.latch === true && Array.isArray(arpLatched[id])) return arpLatched[id];
@@ -3581,6 +3583,8 @@
     const arp = { ...control._children?.Arp };
     if (phase !== null) arp.__phase = phase;
     if (notes) arp.__sourceNotes = notes;
+    const played = arpPlayedCell[getControlId(control)];
+    if (played !== undefined) arp.__head = played;
     return { ...control, _children: { ...control._children, Arp: arp } };
   }
   /** What the renderer draws that moves: its `head` into the sequence, and the notes the sequence is
@@ -3588,7 +3592,14 @@
   function arpShownStep(control, raw = control) {
     const live = arpControlWith(control, arpPhaseFor(raw));
     const seq = arpSequence(live, arpBaseNotes(live));
-    return `${seq.length ? stepIndexAt(arpPhase(live), seq.length) : -1}:${seq.map(String).join(' ')}`;
+    return `${seq.length ? arpHead(live, seq.length) : -1}:${seq.map(String).join(' ')}`;
+  }
+  /** The cell a step plays, picked once per step; a "random" arp's pick is its playhead too. */
+  function arpPlayCell(control, live, idx, length) {
+    const id = getControlId(control);
+    const cell = arpStepCell(live, idx, length, Math.random());
+    if (cell !== idx) arpPlayedCell[id] = cell; else delete arpPlayedCell[id];
+    return cell;
   }
   function arpPhaseFor(control) {
     const id = getControlId(control);
@@ -3652,10 +3663,12 @@
       if (arpLastIdx[id] > idx) raiseComponentCycle(control, 0, 1);
       arpLastIdx[id] = idx;
       // `global` is the free-running step number and `idx` the position in the note sequence: the
-      // Euclidean mask is measured in the former, hand mutes in the latter.
-      if (stepFires(live, idx, global)) {
-        arpFireStep(control, seq[idx], idx, bpm);
-        raiseComponent(control, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
+      // Euclidean mask is measured in the former, hand mutes in the latter. "random" plays a cell
+      // of its own picking (arpStepCell); swing still follows the step.
+      const cell = arpPlayCell(control, live, idx, seq.length);
+      if (stepFires(live, cell, global)) {
+        arpFireStep(control, seq[cell], idx, bpm);
+        raiseComponent(control, 'onStep', { index: cell + 1, of: seq.length, notes: [...seq[cell]] });
       }
     }
   }
@@ -3677,6 +3690,7 @@
         if (!seq.length) {                       // nothing held — park at the start
           arpPhaseState[id] = 0;
           arpLastIdx[id] = -1;
+          delete arpPlayedCell[id];
           arpCycles[id] = 0;
           delete arpLastStep[id];
           // Forget the synced reading too, or the first frame after notes come
@@ -3713,9 +3727,10 @@
           arpLastStep[id] = global;
           // A muted step is not a step that fired, so it raises nothing — the event follows the
           // notes, which is what a script lighting an LED off it wants.
-          if (stepFires(live, idx, global)) {
-            arpFireStep(c, seq[idx], idx);
-            raiseComponent(c, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
+          const cell = arpPlayCell(c, live, idx, seq.length);
+          if (stepFires(live, cell, global)) {
+            arpFireStep(c, seq[cell], idx);
+            raiseComponent(c, 'onStep', { index: cell + 1, of: seq.length, notes: [...seq[cell]] });
           }
         }
       }
@@ -3733,6 +3748,8 @@
     const notes = arpSourceNotes(control);
     const next = { ...arp, __phase: arpPhaseFor(control) };
     if (notes) next.__sourceNotes = notes;
+    const played = arpPlayedCell[getControlId(control)];
+    if (played !== undefined) next.__head = played;
     return { ...resolved, control: { ...base, _children: { ...base._children, Arp: next } } };
   }
   function arpGeomFor(control) {

@@ -5,8 +5,9 @@ import {
   euclid, stepFires, stepEverFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
   arpGeometry, arpCell, arpCellAt, arpVelocity, arpChannel, ARP_PATTERNS,
   toggleMute, midiNoteLabel, arpUseFlats, arpSource, arpSourceIsExternal, ARP_SOURCES,
-  arpSynced, arpDivision, arpBeatsPerStep, syncedStepAt, syncedPhaseAt,
+  arpSynced, arpDivision, arpBeatsPerStep, syncedStepAt, syncedPhaseAt, arpStepCell, arpHead,
 } from '../src/CE_Application/utils/arpLayout.js';
+import { heldNotesInOrder, applyNoteEvents } from '../src/CE_Application/utils/midiNoteInput.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
 function ap(a) { return { _children: { Core: { controlType: 'Arp' }, Arp: a } }; }
@@ -67,6 +68,40 @@ test('arpSequence combines octaves + pattern', () => {
   assert.deepEqual(flat(arpSequence(c, [60, 64])), [60, 64, 72, 76]);
   const d = ap({ pattern: 'down', octaves: 2 });
   assert.deepEqual(flat(arpSequence(d, [60, 64])), [76, 72, 64, 60]);
+});
+
+// Item 1 of the owner's review of ce.components.arp: both played as "up" for as long as they were
+// offered, because every note set was sorted on the way and nothing chose at random.
+test('"asPlayed" walks an outside source in the order pressed, octave by octave', () => {
+  const linked = ap({ source: 'link', pattern: 'asPlayed', octaves: 2, __sourceNotes: [67, 60, 64, 60] });
+  assert.deepEqual(flat(arpSequence(linked, arpBaseNotes(linked))), [67, 60, 64, 79, 72, 76], 'repeats counted once, where first pressed');
+  assert.deepEqual(arpBaseNotes(linked), [60, 64, 67], 'the base set is still low to high, for everything else');
+  const own = ap({ source: 'chord', pattern: 'asPlayed', key: 0, scale: 'minor', degree: 0, baseOctave: 3 });
+  assert.deepEqual(flat(arpSequence(own, arpBaseNotes(own))), [48, 51, 55], 'its own chord: as "up"');
+  const up = ap({ source: 'input', pattern: 'up', __sourceNotes: [67, 60, 64] });
+  assert.deepEqual(flat(arpSequence(up, arpBaseNotes(up))), [60, 64, 67], 'other patterns sort as before');
+});
+
+test('MIDI input is held in the order it arrived, for "asPlayed"', () => {
+  const on = (note, channel = 1) => ({ kind: 'noteOn', channel, note, velocity: 100 });
+  let state = applyNoteEvents(undefined, [on(67)], 10);
+  state = applyNoteEvents(state, [on(60), on(64, 2)], 20);
+  state = applyNoteEvents(state, [on(55)], 15);
+  assert.deepEqual(heldNotesInOrder(state), [67, 55, 60, 64]);
+  assert.deepEqual(heldNotesInOrder(state, 2), [64]);
+});
+
+test('"random" plays a cell of its own picking each step; the playhead follows what played', () => {
+  const rnd = ap({ pattern: 'random' });
+  assert.equal(arpStepCell(rnd, 0, 4, 0), 0);
+  assert.equal(arpStepCell(rnd, 0, 4, 0.74), 2);
+  assert.equal(arpStepCell(rnd, 3, 4, 0.9999), 3);
+  assert.equal(arpStepCell(rnd, 3, 4, 1), 3, 'held to the last cell');
+  assert.equal(arpStepCell(ap({ pattern: 'up' }), 2, 4, 0.1), 2, 'any other pattern: the step\'s own cell');
+  assert.deepEqual(flat(arpSequence(rnd, [64, 60, 67])), [60, 64, 67], 'the cells are drawn low to high');
+  assert.equal(arpHead(ap({ pattern: 'random', __phase: 0.1, __head: 2 }), 3), 2);
+  assert.equal(arpHead(ap({ pattern: 'random', __phase: 0.1 }), 3), 0, 'nothing played yet: where the phase is');
+  assert.equal(arpHead(ap({ pattern: 'up', __phase: 0.5, __head: 7 }), 3), 1, 'a head past the sequence is ignored');
 });
 
 test('euclid spreads pulses over steps', () => {

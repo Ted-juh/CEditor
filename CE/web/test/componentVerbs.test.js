@@ -781,6 +781,19 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.deepEqual(MEMBER_BY_ID.lcdRead.notes.slice(-2), ['Returns the value.', 'Rejected: no result, with a console error.']);
 });
 
+// The owner's review of ce.components.arp, one item at a time (docs/design/api-descriptions-handoff.md).
+test('the Arpeggiator\'s verbs say what each setting does, as the owner approved them', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  // Item 1: pattern.
+  assert.equal(MEMBER_BY_ID.arpPattern.summary, 'Set the order the notes are played in.');
+  assert.equal(MEMBER_BY_ID.arpPattern.example, '`ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down.');
+  assert.equal(text('arpPattern', 'pattern'), ['"up": low to high.', '"down": high to low.',
+    '"updown": up, then down; the top and bottom notes once.', '"downup": down, then up; the same.',
+    '"asPlayed": in the order the notes were pressed. Its own chord: as "up".', '"random": one note at random each step.',
+    '"chord": every note at once, each step.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n'));
+  assert.equal(MEMBER_BY_ID.arpPattern.notes[0], 'Default: "up".');
+});
+
 test('a number counted from 1 is rounded, and every such parameter says so', () => {
   // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
   const lines = { lines: ['A', 'B'] };

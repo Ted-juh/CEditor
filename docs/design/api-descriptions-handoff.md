@@ -1262,6 +1262,59 @@ unreadable or wrong; that is where the detail lives now, and it can be longer.
 Not in scope: names, signatures, behaviour, and the console messages a refused call writes. Those
 are the runtime's words and their tests pin them.
 
+## `ce.components.arp`: the owner's review
+
+Started 2026-10-25, one item at a time as the LCD's was. The queue, from a read of the 30 texts
+against the engine (`utils/arpLayout.js`, the preview's ticker in `PanelPreviewSurface.svelte`) and
+the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the runtime:
+
+1. `pattern`: done, below.
+2. `rate`: takes 0.01 to 200; nothing plays slower than 0.1; the inspector offers 0.1 to 40.
+3. `octaves`: 5 and 6 are stored and play as 4; the inspector offers 1 to 4.
+4. `gate`: 0 is taken; the inspector starts at 0.05; the engine holds at most 99% of a step.
+5. `swing`: a negative swing plays straight; while synced the Transport's swing is used unless the
+   inspector's swing source is "own", which no script can set.
+6. `phase`: likely ignored once the arp has run in the preview (to confirm in the browser); `read`
+   gives the stored value, not where it is.
+7. `mute`: `read(t, "mute")` gives the steps counted from 0 (`[2]` after `mute(t, 3)`); a step
+   past the sequence is stored without a word.
+8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): the
+   degree counts from 0, degrees 5 and 6 of a five-note scale play as 4, the key is a number only.
+9. `latch`: does something only with a linked Chord Pad or MIDI input.
+10. `source`, `link`, `inputChannel`: `link` "drives the link"; its refusals are worded unlike
+    every other command's.
+11. `run`, `sync`, `division`: texts.
+12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: pulses past the steps fire every step;
+    rotate takes -32 to 32 where the inspector offers 0 to 31.
+13. `velocity`, `channel`: texts.
+14. `editable`, `showNotes`, `showHeader`: texts.
+15. The family: its summary, the control name in the examples, `read`'s notes.
+
+**Item 1, `pattern`: done.** "random" and "asPlayed" played exactly as "up" for as long as they
+were offered: every note set was sorted on the way (`arpBaseNotes`, `expandOctaves`, and the
+preview's linked and MIDI notes), and nothing chose at random. No test covered either. At the
+owner's word ("As recommended") both work:
+
+- "random": each step plays a cell picked at random (`arpStepCell`, its randomness passed in as
+  the file's other functions take theirs). The cells are drawn low to high; the playhead shows the
+  cell that played (`__head`, `arpHead`); `onStep` names it; a hand mute silences the cell, and
+  swing still follows the step.
+- "asPlayed": the preview hands a linked Chord Pad's notes over in the order the pads went down
+  and MIDI input in the order it arrived (`heldNotesInOrder`, by the arrival time the store
+  already kept), and `arpSequence` walks them in that order, repeated an octave up per octave. Its
+  own chord has no order but its own: as "up".
+
+Checked in a running preview (a scratch Playwright probe): a "random" arp's playhead went
+1 4 0 5 1 4 1 2 … while an "up" one walked 0 to 5 in turn, and an "asPlayed" arp on MIDI input
+laid out G4 C4 E4 as the keys went down, C4 E4 G4 once switched to "up".
+
+| Field | Text |
+| --- | --- |
+| Description | Set the order the notes are played in. |
+| Example | `ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down. |
+| `pattern` (string, required) | "up": low to high. / "down": high to low. / "updown": up, then down; the top and bottom notes once. / "downup": down, then up; the same. / "asPlayed": in the order the notes were pressed. Its own chord: as "up". / "random": one note at random each step. / "chord": every note at once, each step. / Case-insensitive. / Invalid: rejected with a console error. |
+| notes | Default: "up". / Then the two every command has. |
+
 ## Checking each batch
 
 From `CE/web`:

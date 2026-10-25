@@ -177,6 +177,13 @@ export function heldNoteEntries(state, channel = 0) {
 export function heldNotes(state, channel = 0) {
   return [...new Set(heldNoteEntries(state, channel).map((v) => v.note))].sort((a, b) => a - b);
 }
+// …and in the order they arrived, for an arpeggiator walking them "as played". A note held on two
+// channels counts once, where it first arrived; entries with no time keep the order they were added.
+export function heldNotesInOrder(state, channel = 0) {
+  const ch = Math.round(num(channel, 0));
+  const entries = Object.values(state ?? EMPTY_NOTE_STATE).filter((v) => ch === 0 || v.channel === ch);
+  return [...new Set(entries.sort((a, b) => num(a.at, 0) - num(b.at, 0)).map((v) => v.note))];
+}
 export function isNoteHeld(state, note, channel = 0) {
   return heldNotes(state, channel).includes(Math.round(num(note, -1)));
 }
