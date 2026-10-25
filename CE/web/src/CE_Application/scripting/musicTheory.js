@@ -98,6 +98,19 @@ export function noteNumberOf(name) {
 }
 
 /**
+ * A key's note as a pitch class, 0 (C) to 11 (B): a name, "C", "F#", "Eb", in any case and with or
+ * without an octave, read by noteNumberOf's rule; or a number, round the octave (12 is C, -1 is B).
+ * null for anything else: a name it cannot read is refused, not taken as C.
+ */
+export function pitchClassOf(value) {
+  if (typeof value === 'boolean' || value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (text !== '' && Number.isFinite(Number(text))) return mod12(Math.round(Number(text)));
+  const n = noteNumberOf(/\d$/.test(text) ? text : `${text}4`);
+  return n === undefined ? null : mod12(n);
+}
+
+/**
  * 60 -> "C4". With `flats` left out, ce.music's plain spelling ("C#4"); given, the panel's: true for
  * flats ("D♭4"), false for sharps ("C♯4").
  */

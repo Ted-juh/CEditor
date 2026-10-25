@@ -843,6 +843,18 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpMute', 'on'), 'true: muted.\nfalse: plays.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.deepEqual(MEMBER_BY_ID.arpMute.notes.slice(0, 3), ['A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.',
     '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.', 'Default: none muted.']);
+  // Item 8: its own chord (arpOwnChord.test.js drives it).
+  assert.equal(MEMBER_BY_ID.arpKey.example, '`ce.components.arp.key("Arpeggiator", "F#")` builds its chord in F♯.');
+  assert.equal(MEMBER_BY_ID.arpKey.params.find((p) => p.name === 'key').type, 'number or name');
+  assert.equal(text('arpKey', 'key'), 'The key\'s note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.\nPast 11 or below 0: round the octave; 12 is C.\nA fraction: rounded.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpKey.notes.slice(0, 3), ['Its own chord only: with `source()` "link" or "input" the notes come from there.',
+    'Following the panel\'s key: replaced at its next change.', 'Default: 0 (C).']);
+  assert.equal(MEMBER_BY_ID.arpDegree.summary, 'Set which step of the scale its chord is built on.');
+  assert.equal(text('arpDegree', 'degree'), 'Step of the scale, counted from 1: 1 is the key\'s own chord.\nRange: 1 ↔ the scale\'s notes: 7, 6 for "blues", 5 for the pentatonics.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
+  assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  assert.equal(MEMBER_BY_ID.arpBaseOctave.example, '`ce.components.arp.baseOctave("Arpeggiator", 4)` puts the chord\'s root in octave 4, as in C4, middle C.');
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

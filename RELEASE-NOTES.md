@@ -240,6 +240,11 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `read(t, "mute")` on the Arpeggiator gives the muted steps counted from 1, as `mute()` takes them,
   and `read(t, "mute", 3)` whether step 3 is muted. It gave them counted from 0, and the list's
   third entry.
+- The Arpeggiator's own chord: `degree` counts from 1, as `ce.music.degreeChord` does and as the
+  inspector now shows it, up to the scale's own length (5 on a pentatonic, where 6 and 7 played as
+  5); `key` takes a note's name, `key("Arp", "F#")`, and a number goes round the octave, 12 is C (it
+  was B). `followPanelKey(t, true)`, on every component that has it, takes the panel's key at once
+  as the inspector's toggle does; it waited for the panel's next key change.
 
 ## What you get
 

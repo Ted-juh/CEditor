@@ -1275,8 +1275,8 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 5. `swing`: done, below, with `swingSource`.
 6. `phase`: done, below.
 7. `mute`: done, below.
-8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): the
-   degree counts from 0, degrees 5 and 6 of a five-note scale play as 4, the key is a number only.
+8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): done,
+   below.
 9. `latch`: does something only with a linked Chord Pad or MIDI input.
 10. `source`, `link`, `inputChannel`: `link` "drives the link"; its refusals are worded unlike
     every other command's.
@@ -1412,6 +1412,37 @@ new one.
 | `index` (number, required) | Step number, counted from 1, as the cells are drawn from the left. / A fraction: rounded. / Past the last step: kept, for when the sequence grows. / Below 1, or invalid: rejected with a console error. |
 | `on` (true or false, optional) | true: muted. / false: plays. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
 | notes | A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change. / `read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted. / Default: none muted. / Then the two every command has. |
+
+**Item 8, its own chord: done.** Six commands that matter only while it plays its own chord
+(the inspector hides them for a linked Chord Pad or MIDI input). Four decisions, at the owner's word
+("As recommended"):
+
+- `degree` counts from 1, as `ce.music.degreeChord` does, stored one lower (`oneBased`), so saved
+  panels are unchanged; the inspector's "Deg" counts from 1 too. It counted from 0.
+- Its range is the scale's own length (`rangeFrom`, the new hook for a number verb whose range
+  the control gives): 1 to 7, 6 for "blues", 5 for the pentatonics, past it the nearest end with the
+  one-time warning. It took 0 to 6 on any scale, and degrees 5 and 6 of a pentatonic played as 4.
+- `key` takes a note's name too, "C", "F#", "Eb", in any case (`pitchClassOf` in `musicTheory.js`,
+  by `ce.music`'s own note reading; a name it cannot read is refused, not taken as C as the panel
+  key's `rootFrom` takes it), and a number goes round the octave, 12 is C, as `phrase.key` does.
+  `key(t, 12)` was B, the nearest end. The hooks: `readValue` reads the value before the verb's
+  range, `valueRefusal` says why one cannot be read, `argKind` types the parameter "number or name".
+- `followPanelKey(t, true)` takes the panel's key and scale at once, in the same write, as the
+  inspector's toggle does (`setFollowsPanelKey`); it set the flag alone, and the control kept its
+  own key until the panel's next change. Again when already following, so a `key()` written on a
+  follower since is brought back. The runtime's `panelKeyCatchUp` does it for every family's
+  `followPanelKey` (the Chord Pad's, the Note Ribbon's and the rest), whose texts are their reviews'.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `key` | Set the key of its own chord. · `key("Arpeggiator", "F#")` builds its chord in F♯. | The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B. / Past 11 or below 0: round the octave; 12 is C. / A fraction: rounded. / Invalid: rejected with a console error. | Its own chord only: with `source()` "link" or "input" the notes come from there. / Following the panel's key: replaced at its next change. / Default: 0 (C). |
+| `scale` | Set the scale of its own chord. · `scale("Arpeggiator", "dorian")` builds its chord from the Dorian scale. | (the list) | Its own chord only. / Following the panel's key: replaced at its next change. / Default: "minor". |
+| `degree` | Set which step of the scale its chord is built on. · `degree("Arpeggiator", 5)` builds its chord on the fifth step. | Step of the scale, counted from 1: 1 is the key's own chord. / Range: 1 ↔ the scale's notes: 7, 6 for "blues", 5 for the pentatonics. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Its own chord only. / A scale changed to a shorter one: its last step. / Default: 1. |
+| `chordType` | Set how many notes its chord has. · `chordType("Arpeggiator", "seventh")` adds the seventh: four notes. | "triad": three notes. / "seventh": four, the seventh added. / Case-insensitive. / Invalid: rejected with a console error. | Its own chord only. / Default: "triad". |
+| `baseOctave` | Set the octave its chord starts in. · `baseOctave("Arpeggiator", 4)` puts the chord's root in octave 4, as in C4, middle C. | The root's octave, as in C3. Middle C is C4. / Range: -1 ↔ 8, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Its own chord only. / A note above 127 is left out. / Default: 3. |
+| `followPanelKey` | Follow the panel's key and scale, or keep its own. · `followPanelKey("Arpeggiator", true)` takes the panel's key and scale, and changes with them. | true: the panel's key and scale, at once and at every change. / false: its own. / Left out: toggles. / The usual false words. | Default: false. |
+
+Each ends with the two notes every command has.
 
 ## Checking each batch
 

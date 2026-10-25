@@ -118,8 +118,9 @@
           {#each scaleKeys as k (k)}<option value={k}>{SCALE_LABELS[k] ?? k}</option>{/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Degree" span={1} compact hint="Which scale degree the chord is built on (0 = tonic).">
-        <NumberCell label="Deg" min={0} max={degreeCount - 1} step={1} value={num(a.degree, 0)} defaultValue={0} onchange={(v) => set('degree', clampInt(v, 0, degreeCount - 1, 0))} />
+      <!-- Counted from 1, as ce.components.arp.degree and ce.music.degreeChord count; stored from 0. -->
+      <PropertyCell label="Degree" span={1} compact hint="Which step of the scale the chord is built on (1 = the key's own chord).">
+        <NumberCell label="Deg" min={1} max={degreeCount} step={1} value={num(a.degree, 0) + 1} defaultValue={1} onchange={(v) => set('degree', clampInt(v, 1, degreeCount, 1) - 1)} />
       </PropertyCell>
       <PropertyCell label="Chord" span={1} hint="Triad or four-note seventh.">
         <select class="val" value={a.chordType ?? 'triad'} onchange={(e) => set('chordType', e.target.value)}>

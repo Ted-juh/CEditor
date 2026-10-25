@@ -37,6 +37,8 @@
 
 import { scriptRangeOf } from '../models/inspectorFieldSets.js';
 import { VERB_VALUES } from './componentTables.js';
+import { pitchClassOf } from './musicTheory.js';
+import { SCALES as CHORD_SCALES } from '../utils/chordPadLayout.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
@@ -54,6 +56,13 @@ const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const OFF_WORDS = new Set(['', 'false', 'off', '0']);
 const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
 const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
+// The Arpeggiator's own chord (item 8 of the owner's review of the arp): what its key, scale, degree,
+// chord type and octave set, and only while it plays that chord.
+const OWN_CHORD = 'Its own chord only.';
+const OWN_CHORD_ONLY = 'Its own chord only: with `source()` "link" or "input" the notes come from there.';
+const FOLLOWER_REPLACED = 'Following the panel\'s key: replaced at its next change.';
+/** How many notes a chord scale has, the most a degree can be: 7, 6 for blues, 5 for the pentatonics. */
+const scaleNoteCount = (scale) => (CHORD_SCALES[String(scale ?? 'minor')] ?? CHORD_SCALES.minor).length;
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
 // The kind of LINE's first argument: a row number, or a table of layout, row and col (lcdPositions.js).
 const POSITION = 'position';
@@ -203,11 +212,31 @@ export const COMPONENT_FAMILIES = [
           'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: ['Not synced: its own swing, either way.', 'Default: "transport".'] }),
       v('latch', 'latch', BOOL, { toggle: true }),
-      v('key', 'key', INT, { min: 0, max: 11, doc: 'Root as a pitch class, 0 = C.' }),
-      v('scale', 'scale', ENUM),
-      v("followPanelKey", "followPanelKey", BOOL, { toggle: true, doc: "Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise." }),
-      v('degree', 'degree', INT, { min: 0, max: 6 }),
-      v('chordType', 'chordType', ENUM),
+      // Item 8, its own chord. `key` reads a note name or wraps a number round the octave
+      // (`readValue`, pitchClassOf), as phrase.key wraps; `degree` counts from 1 as
+      // ce.music.degreeChord does, stored one lower, to the scale's own length (`rangeFrom`);
+      // followPanelKey(true) takes the panel's key at once, as the inspector's toggle does (the
+      // runtime's panelKeyCatchUp, for every family's).
+      v('key', 'key', INT, { min: 0, max: 11, readValue: pitchClassOf, argKind: 'pitchClass',
+        valueRefusal: (value) => `${shownValue(value)} is not a note: a name such as "C", "F#" or "Eb", or 0 to 11.`,
+        doc: 'Set the key of its own chord.', ex: ['"F#"', 'builds its chord in F♯'],
+        argDocs: { key: ['The key\'s note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.', 'Past 11 or below 0: round the octave; 12 is C.',
+          'A fraction: rounded.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: [OWN_CHORD_ONLY, FOLLOWER_REPLACED, 'Default: 0 (C).'] }),
+      v('scale', 'scale', ENUM, { doc: 'Set the scale of its own chord.', ex: ['"dorian"', 'builds its chord from the Dorian scale'],
+        notes: [OWN_CHORD, FOLLOWER_REPLACED, 'Default: "minor".'] }),
+      v("followPanelKey", "followPanelKey", BOOL, { toggle: true, doc: 'Follow the panel\'s key and scale, or keep its own.',
+        ex: ['true', 'takes the panel\'s key and scale, and changes with them'],
+        argDocs: { followPanelKey: `true: the panel's key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.'] }),
+      v('degree', 'degree', INT, { min: 1, max: 7, oneBased: true, rangeFrom: (c) => ({ max: scaleNoteCount(c.scale) }),
+        doc: 'Set which step of the scale its chord is built on.', ex: ['5', 'builds its chord on the fifth step'],
+        argDocs: { degree: ['Step of the scale, counted from 1: 1 is the key\'s own chord.', 'Range: 1 ↔ the scale\'s notes: 7, 6 for "blues", 5 for the pentatonics.',
+          'A fraction: rounded.', 'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: [OWN_CHORD, 'A scale changed to a shorter one: its last step.', 'Default: 1.'] }),
+      v('chordType', 'chordType', ENUM, { doc: 'Set how many notes its chord has.', ex: ['"seventh"', 'adds the seventh: four notes'],
+        argDocs: { chordType: ['"triad": three notes.', '"seventh": four, the seventh added.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: [OWN_CHORD, 'Default: "triad".'] }),
       v('velocity', 'velocity', INT, VELOCITY),
       v('channel', 'channel', INT, CHANNEL),
       v('euclid', 'euclidEnabled', BOOL, { toggle: true }),
@@ -241,7 +270,11 @@ export const COMPONENT_FAMILIES = [
           '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.',
           'Default: none muted.'] }),
       v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Which channel it takes notes from. 0 means omni.' }),
-      v('baseOctave', 'baseOctave', INT, { min: -1, max: 8 }),
+      v('baseOctave', 'baseOctave', INT, { min: -1, max: 8, doc: 'Set the octave its chord starts in.',
+        ex: ['4', 'puts the chord\'s root in octave 4, as in C4, middle C'],
+        argDocs: { baseOctave: ['The root\'s octave, as in C3. Middle C is C4.', 'Range: -1 ↔ 8, whole.', 'A fraction: rounded.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: [OWN_CHORD, 'A note above 127 is left out.', 'Default: 3.'] }),
       v('source', 'source', ENUM, { doc: 'Where the notes come from: its own chord, a linked Chord Pad, or incoming MIDI.' }),
       // The Chord Pad the arp takes its notes from, while `source` is "link".
       v('link', 'linkId', LINK, { sourceKind: 'chordPad' }),
@@ -1039,6 +1072,17 @@ function axisRange(verb, field, c) {
   return Number.isFinite(size) ? { ...verb, max: Math.max(1, Math.round(size)) } : verb;
 }
 
+/**
+ * A number verb as it reads one call: its range, or the range the control gives it (`rangeFrom`: the
+ * Arpeggiator's degree, to its scale's length), and the value as the verb reads it (`readValue`: the
+ * Arpeggiator's key, a note name or a number round the octave). `value` is null when it cannot be read.
+ */
+function scalarCall(verb, c, given) {
+  const spec = verb.rangeFrom ? { ...verb, ...verb.rangeFrom(c && typeof c === 'object' ? c : {}) } : verb;
+  const value = verb.readValue && given !== undefined && given !== null ? verb.readValue(given) : given;
+  return { spec, value };
+}
+
 // An XY call's two numbers: either may be left out, but not both, and one that is given has to be
 // a number. `cursorAt(t, "x", 2)` moved the row and dropped the "x" without a word.
 const xyGiven = (x) => x !== undefined && x !== null;
@@ -1125,7 +1169,8 @@ export function componentScriptPatch(verb, cfg, args = []) {
 
   switch (verb.k) {
     case NUM: case INT: case STR: case ENUM: case BOOL: {
-      const next = coerce(verb.k, a, verb, c[verb.f]);
+      const { spec, value } = scalarCall(verb, c, a);
+      const next = value === null ? null : coerce(verb.k, value, spec, c[verb.f]);
       if (next === null) return {};
       // oneBased verbs address a list position, so they are stored one lower than they are written.
       const stored = verb.oneBased && isFinite_(next) && next >= 0 ? next - 1 : next;
@@ -1295,8 +1340,11 @@ export function componentRequestLegal(verb, cfg, args = []) {
       return true;                                    // anything coerces; no argument toggles
     case STR:
       return a !== undefined && a !== null;
-    case NUM: case INT:
-      return a === undefined || a === null ? false : Number.isFinite(Number(a));
+    case NUM: case INT: {
+      if (a === undefined || a === null) return false;
+      const { value } = scalarCall(verb, c, a);
+      return value !== null && Number.isFinite(Number(value));
+    }
     case ENUM:
       return coerce(ENUM, a, verb, c[verb.f]) !== null;
     case XY:
@@ -1420,7 +1468,12 @@ export function componentRefusalReason(verb, cfg, args = []) {
   const valueOf = (kind, value) => ((kind === NUM || kind === INT) && clampNum(value, verb) === null ? notNumber(value)
     : kind === STR && (value === undefined || value === null) ? 'No text was given.' : null);
   switch (verb.k) {
-    case NUM: case INT: return Number.isFinite(Number(a)) && a !== null && a !== undefined ? null : notNumber(a);
+    case NUM: case INT: {
+      if (a === undefined || a === null) return notNumber(a);
+      const { value } = scalarCall(verb, c, a);
+      if (value !== null && Number.isFinite(Number(value))) return null;
+      return verb.valueRefusal ? verb.valueRefusal(a) : notNumber(a);
+    }
     case STR: return a === undefined || a === null ? 'No text was given.' : null;
     case ITEM: {
       const range = componentIndexRange(verb, c);
@@ -1488,7 +1541,7 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
     const said = (verb.clear ? lcdClearAt(cfg, args[0]) : lcdWriteAt(cfg, args[0], args[1])).clamped;
     return said ? `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — ${said}` : null;
   }
-  if (verb.k === NUM || verb.k === INT) given.push([names[0], args[0]]);
+  if (verb.k === NUM || verb.k === INT) given.push([names[0], scalarCall(verb, cfg, args[0]).value]);
   else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
   else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
   else if (verb.k === XY) given.push([names[0], args[0], verb.fx], [names[1], args[1], verb.fy]);
@@ -1496,7 +1549,7 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
     if (value === undefined || value === null || typeof value === 'boolean') continue;
     const n = Number(value);
     if (!isFinite_(n)) continue;
-    const spec = field ? axisRange(verb, field, cfg) : verb;
+    const spec = field ? axisRange(verb, field, cfg) : scalarCall(verb, cfg, value).spec;
     const lo = isFinite_(spec.min) ? spec.min : -Infinity;
     const hi = isFinite_(spec.max) ? spec.max : Infinity;
     if (n >= lo && n <= hi) continue;
@@ -1627,7 +1680,8 @@ export function verbArgKinds(verb) {
     case SIZE: return [STR];
     case FILL: return [STR, 'list'];
     case INSERT: case REMOVE: return [STR, INT];
-    default: return [verb.k];
+    // A value read some other way than its kind says (the arp's key: a note's name, or a number).
+    default: return [verb.argKind ?? verb.k];
   }
 }
 

@@ -51,6 +51,7 @@ import { lcdLineWords } from './lcdLines.js';
 import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout, lcdZonePlaceOf, lcdZoneSourceFor, lcdZoneSourceName } from './lcdPositions.js';
 import { layoutShowing, showLayout } from '../stores/displayLayouts.js';
 import { phaseNow, seekPhase } from '../stores/componentPhases.js';
+import { contextForControl } from '../utils/panelKey.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
@@ -3531,6 +3532,13 @@ function componentVerbAction(verb, target, args) {
     given = [args[0], id ?? undefined];
   }
   const patch = componentScriptPatch(verb, cfg, given);
+  // followPanelKey(t, true) takes the panel's key and scale at once, in the same write, as the
+  // inspector's toggle does (stores/panelKeyActions.setFollowsPanelKey): it set the flag alone, and
+  // the control kept its own key until the panel's next change. Again when already following, so a
+  // key() written on a follower since is brought back into line.
+  if (verb.f === 'followPanelKey' && ('followPanelKey' in patch ? patch.followPanelKey === true : cfg.followPanelKey === true)) {
+    Object.assign(patch, panelKeyCatchUp(path, verb.section, cfg));
+  }
   const keys = Object.keys(patch);
   // A number past the verb's range is used as the nearest end, and said once per verb.
   const clamped = componentClampWarning(verb, path, args, cfg);
@@ -3582,6 +3590,19 @@ function componentSeekAction(verb, path, cfg, args, shown) {
   seekPhase(findControlByName(path)?._children?.Core?.id, patch[verb.f]);
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${patch[verb.f]}`);
   return true;
+}
+
+/** The key and scale a control that follows the panel's key should have, where they differ from its own. */
+function panelKeyCatchUp(path, section, cfg) {
+  const control = findControlByName(path);
+  if (!control) return {};
+  const following = { ...control, _children: { ...control._children, [section]: { ...cfg, followPanelKey: true } } };
+  const context = contextForControl(activePanel(), following);
+  if (!context?.following) return {};
+  const out = {};
+  if (Number(cfg.key) !== context.root) out.key = context.root;
+  if (String(cfg.scale) !== context.scale) out.scale = context.scale;
+  return out;
 }
 
 // A line the LCD cannot show all of (cut at its width, a character it has no shape for, a display

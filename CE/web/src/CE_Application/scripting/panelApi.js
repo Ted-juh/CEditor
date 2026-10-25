@@ -3691,6 +3691,8 @@ const PARAM_TYPE_FOR = {
   // Where on an LCD (lcdPositions.js): a row, or a table of layout, row and col. And a layout, by
   // its number or its name.
   position: 'number or table', layoutRef: 'number or name',
+  // A key's note, as a name or a number (componentVerbs' pitchClassOf).
+  pitchClass: 'number or name',
 };
 
 /** What the value a component verb writes may be, as the spec says it: the closed list an enum

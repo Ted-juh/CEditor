@@ -4876,15 +4876,18 @@ Good to know:
 
 ##### `ce.components.arp.key(target, key) -> boolean`
 
-Root as a pitch class, 0 = C.
+Set the key of its own chord.
 
-Example: `ce.components.arp.key("Arpeggiator", 6)` sets the key to 6.
+Example: `ce.components.arp.key("Arpeggiator", "F#")` builds its chord in F♯.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `key` (number, required): Key.<br>Range: 0 ↔ 11, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Its own chord only: with `source()` "link" or "input" the notes come from there.
+- Following the panel's key: replaced at its next change.
+- Default: 0 (C).
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4892,15 +4895,18 @@ Good to know:
 
 ##### `ce.components.arp.scale(target, scale) -> boolean`
 
-Set the scale.
+Set the scale of its own chord.
 
-Example: `ce.components.arp.scale("Arpeggiator", "minor")` sets the scale to "minor".
+Example: `ce.components.arp.scale("Arpeggiator", "dorian")` builds its chord from the Dorian scale.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Its own chord only.
+- Following the panel's key: replaced at its next change.
+- Default: "minor".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4908,15 +4914,16 @@ Good to know:
 
 ##### `ce.components.arp.followPanelKey(target [, followPanelKey]) -> boolean`
 
-Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise.
+Follow the panel's key and scale, or keep its own.
 
-Example: `ce.components.arp.followPanelKey("Arpeggiator")` switches the follow panel key on if it is off, and off if it is on.
+Example: `ce.components.arp.followPanelKey("Arpeggiator", true)` takes the panel's key and scale, and changes with them.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `followPanelKey` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4924,15 +4931,18 @@ Good to know:
 
 ##### `ce.components.arp.degree(target, degree) -> boolean`
 
-Set the degree.
+Set which step of the scale its chord is built on.
 
-Example: `ce.components.arp.degree("Arpeggiator", 3)` sets the degree to 3.
+Example: `ce.components.arp.degree("Arpeggiator", 5)` builds its chord on the fifth step.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `degree` (number, required): Degree.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `degree` (number, required): Step of the scale, counted from 1: 1 is the key's own chord.<br>Range: 1 ↔ the scale's notes: 7, 6 for "blues", 5 for the pentatonics.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Its own chord only.
+- A scale changed to a shorter one: its last step.
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4940,15 +4950,17 @@ Good to know:
 
 ##### `ce.components.arp.chordType(target, chordType) -> boolean`
 
-Set the chord type.
+Set how many notes its chord has.
 
-Example: `ce.components.arp.chordType("Arpeggiator", "seventh")` sets the chord type to "seventh".
+Example: `ce.components.arp.chordType("Arpeggiator", "seventh")` adds the seventh: four notes.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `chordType` (text, required): One of "triad" or "seventh". Case-insensitive.<br>Invalid: rejected with a console error.
+- `chordType` (text, required): "triad": three notes.<br>"seventh": four, the seventh added.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Its own chord only.
+- Default: "triad".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5108,15 +5120,18 @@ Good to know:
 
 ##### `ce.components.arp.baseOctave(target, baseOctave) -> boolean`
 
-Set the base octave.
+Set the octave its chord starts in.
 
-Example: `ce.components.arp.baseOctave("Arpeggiator", 4)` sets the base octave to 4.
+Example: `ce.components.arp.baseOctave("Arpeggiator", 4)` puts the chord's root in octave 4, as in C4, middle C.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `baseOctave` (number, required): Base octave.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `baseOctave` (number, required): The root's octave, as in C3. Middle C is C4.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Its own chord only.
+- A note above 127 is left out.
+- Default: 3.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
