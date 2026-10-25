@@ -4738,15 +4738,17 @@ Good to know:
 
 ##### `ce.components.arp.rate(target, rate) -> boolean`
 
-Free-running rate in steps per second. Ignored while synced.
+Set how many steps a second it plays, while not synced.
 
-Example: `ce.components.arp.rate("Arpeggiator", 100)` sets the rate to 100.
+Example: `ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `rate` (number, required): Rate.<br>Range: 0.01 ↔ 200.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `rate` (number, required): Steps per second.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While synced to the Transport: no effect; `division()` sets the step.
+- Default: 6.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6753,10 +6755,10 @@ Good to know:
 
 Set the rate.
 
-Example: `ce.components.turing.rate("TuringMachine", 100)` sets the rate to 100.
+Example: `ce.components.turing.rate("TuringMachine", 20.1)` sets the rate to 20.1.
 
 - `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
-- `rate` (number, required): Rate.<br>Range: 0.01 ↔ 200.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `rate` (number, required): Rate.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
@@ -7306,10 +7308,10 @@ Good to know:
 
 Set the rate.
 
-Example: `ce.components.orbit.rate("Orbit", 100)` sets the rate to 100.
+Example: `ce.components.orbit.rate("Orbit", 20.1)` sets the rate to 20.1.
 
 - `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
-- `rate` (number, required): Rate.<br>Range: 0.01 ↔ 200.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `rate` (number, required): Rate.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 

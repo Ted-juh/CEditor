@@ -116,7 +116,10 @@ const toggleGloss = (field) => {
 // repeating it here (models/inspectorFieldSets.js), so a script and the inspector cannot disagree.
 const FIELD = scriptRangeOf;
 
-const RATE = { min: 0.01, max: 200 };
+// The Arpeggiator's rate, the inspector's range (item 2 of the owner's review of the arp): it took
+// 0.01 to 200, the engine plays nothing slower than 0.1, and above about 60 the preview, moving once
+// a frame, skips steps.
+const RATE = { min: 0.1, max: 40 };
 const UNIT = { min: 0, max: 1 };
 const NOTE = { min: 0, max: 127 };
 const CHANNEL = { min: 1, max: 16 };
@@ -169,7 +172,10 @@ export const COMPONENT_FAMILIES = [
           '"random": one note at random each step.', '"chord": every note at once, each step.',
           'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: ['Default: "up".'] }),
-      v('rate', 'rate', NUM, { ...RATE, doc: 'Free-running rate in steps per second. Ignored while synced.' }),
+      v('rate', 'rate', NUM, { ...RATE, doc: 'Set how many steps a second it plays, while not synced.',
+        ex: ['8', 'plays eight steps a second'],
+        argDocs: { rate: ['Steps per second.', 'Range: 0.1 ↔ 40.', 'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['While synced to the Transport: no effect; `division()` sets the step.', 'Default: 6.'] }),
       v('division', 'division', ENUM, { doc: 'Note value per step while synced to the transport.' }),
       v('sync', 'syncToTransport', BOOL, { toggle: true }),
       v('octaves', 'octaves', INT, { min: 1, max: 6 }),

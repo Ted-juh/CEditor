@@ -792,6 +792,15 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
     '"asPlayed": in the order the notes were pressed. Its own chord: as "up".', '"random": one note at random each step.',
     '"chord": every note at once, each step.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n'));
   assert.equal(MEMBER_BY_ID.arpPattern.notes[0], 'Default: "up".');
+  // Item 2: rate, the inspector's range.
+  assert.equal(MEMBER_BY_ID.arpRate.summary, 'Set how many steps a second it plays, while not synced.');
+  assert.equal(MEMBER_BY_ID.arpRate.example, '`ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second.');
+  assert.equal(text('arpRate', 'rate'), 'Steps per second.\nRange: 0.1 ↔ 40.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpRate.notes.slice(0, 2), ['While synced to the Transport: no effect; `division()` sets the step.', 'Default: 6.']);
+  const rate = COMPONENT_VERBS.find((verb) => verb.id === 'arpRate');
+  assert.deepEqual([rate.min, rate.max], [0.1, 40]);
+  assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [0.05]), { rate: 0.1 });
+  assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [300]), { rate: 40 });
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

@@ -224,6 +224,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - The Arpeggiator's "Random" pattern plays a note at random each step, and "As played" plays a
   linked Chord Pad's or the MIDI input's notes in the order they were pressed. Both played low to
   high, exactly as "Up". The playhead shows the note a random step played.
+- `ce.components.arp.rate` takes 0.1 to 40 steps a second, as the inspector does; past it, the
+  nearest end with a console warning the first time. It took 0.01 to 200, and played nothing slower
+  than 0.1 and skipped steps above about 60.
 
 ## What you get
 

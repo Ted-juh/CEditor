@@ -1269,7 +1269,7 @@ against the engine (`utils/arpLayout.js`, the preview's ticker in `PanelPreviewS
 the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the runtime:
 
 1. `pattern`: done, below.
-2. `rate`: takes 0.01 to 200; nothing plays slower than 0.1; the inspector offers 0.1 to 40.
+2. `rate`: done, below.
 3. `octaves`: 5 and 6 are stored and play as 4; the inspector offers 1 to 4.
 4. `gate`: 0 is taken; the inspector starts at 0.05; the engine holds at most 99% of a step.
 5. `swing`: a negative swing plays straight; while synced the Transport's swing is used unless the
@@ -1314,6 +1314,20 @@ laid out G4 C4 E4 as the keys went down, C4 E4 G4 once switched to "up".
 | Example | `ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down. |
 | `pattern` (string, required) | "up": low to high. / "down": high to low. / "updown": up, then down; the top and bottom notes once. / "downup": down, then up; the same. / "asPlayed": in the order the notes were pressed. Its own chord: as "up". / "random": one note at random each step. / "chord": every note at once, each step. / Case-insensitive. / Invalid: rejected with a console error. |
 | notes | Default: "up". / Then the two every command has. |
+
+**Item 2, `rate`: done.** It took 0.01 to 200. The engine plays nothing slower than 0.1 (`arpRate`),
+so 0.05 was stored and played at 0.1 without a word; and the preview moves once a frame and does
+not play the steps it slept through, so above about 60 steps a second steps were skipped. The
+inspector offers 0.1 to 40. At the owner's word ("As recommended") a script takes the inspector's
+range, as the LCD's `animSpeed` does: outside it, the nearest end with the one-time warning.
+`RATE` in `componentVerbs.js` is the arp's alone.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how many steps a second it plays, while not synced. |
+| Example | `ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second. |
+| `rate` (number, required) | Steps per second. / Range: 0.1 ↔ 40. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | While synced to the Transport: no effect; `division()` sets the step. / Default: 6. / Then the two every command has. |
 
 ## Checking each batch
 
