@@ -254,6 +254,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.pixel.show` with no third argument hides an element that stores no `visible`, as
   it is drawn shown; the first call wrote the shown it already was and nothing hid. `read` answers
   true for such an element's `show` and false for its `blink`, where it gave nil.
+- `ce.components.pixel.x`, `y`, `w` and `h` say in the console when a number past their range was
+  used as its nearest end, and why a call was refused (`"big" is not a number.`), as every other
+  number command does; both were silent.
 
 ## What you get
 

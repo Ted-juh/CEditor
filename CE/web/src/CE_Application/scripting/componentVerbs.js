@@ -57,6 +57,10 @@ const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const OFF_WORDS = new Set(['', 'false', 'off', '0']);
 const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
 const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
+// A Pixel Display element's position and size (item 2 of the owner's review of the pixel).
+const PIXEL_RANGE = (min) => `Range: ${min} ↔ 4096, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.`;
+const PIXEL_OFF_SCREEN = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
+const PIXEL_TEXT_KINDS = 'The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".';
 // The Arpeggiator's own chord (item 8 of the owner's review of the arp): what its key, scale, degree,
 // chord type and octave set, and only while it plays that chord.
 const OWN_CHORD = 'Its own chord only.';
@@ -964,14 +968,26 @@ export const COMPONENT_FAMILIES = [
       // Position and size in GRID pixels, which is what the inspector's X/Y/W/H columns are. The
       // range is wider than any panel in both directions on purpose: sliding an element off the
       // left edge and back is how a script animates one in, and clamping that to 0 would park it.
-      v('x', 'elements', ELEM, { item: 'x', kind: INT, min: -4096, max: 4096,
-        doc: 'Move one element, by name, to an x in grid pixels.' }),
-      v('y', 'elements', ELEM, { item: 'y', kind: INT, min: -4096, max: 4096,
-        doc: 'Move one element, by name, to a y in grid pixels.' }),
-      v('w', 'elements', ELEM, { item: 'w', kind: INT, min: 0, max: 4096,
-        doc: 'The width of one element, by name, in grid pixels. For text kinds this is the align/clip box.' }),
-      v('h', 'elements', ELEM, { item: 'h', kind: INT, min: 0, max: 4096,
-        doc: 'The height of one element, by name, in grid pixels. For text kinds this is the font height.' }),
+      // What each draws is the renderer's (PixelDisplayRenderer.svelte, pixelFont.pixelTextMetrics),
+      // written down at the owner's word (item 2 of the pixel's review).
+      v('x', 'elements', ELEM, { item: 'x', kind: INT, min: -4096, max: 4096, doc: 'Set an element\'s left edge, by its name.',
+        ex: ['"Title", 10', 'puts the element called Title 10 pixels from the screen\'s left edge'],
+        argDocs: { x: `Pixels of the grid, from the screen's left edge; 0: at the edge.\n${PIXEL_RANGE(-4096)}` },
+        notes: [PIXEL_OFF_SCREEN] }),
+      v('y', 'elements', ELEM, { item: 'y', kind: INT, min: -4096, max: 4096, doc: 'Set an element\'s top edge, by its name.',
+        ex: ['"Title", 20', 'puts the element called Title 20 pixels below the screen\'s top edge'],
+        argDocs: { y: `Pixels of the grid, from the screen's top edge; 0: at the edge.\n${PIXEL_RANGE(-4096)}` },
+        notes: [PIXEL_OFF_SCREEN] }),
+      v('w', 'elements', ELEM, { item: 'w', kind: INT, min: 0, max: 4096, doc: 'Set an element\'s width, by its name.',
+        ex: ['"Title", 64', 'makes the element called Title 64 pixels wide'],
+        argDocs: { w: ['Pixels of the grid.', 'A text kind: the box its text is aligned and cut in; 0: as wide as the text.',
+          'Any other kind: its width; drawn at least 1 wide, 4 for "anim".', PIXEL_RANGE(0)].join('\n') },
+        notes: [PIXEL_TEXT_KINDS, 'A text kind 0 wide is not wrapped or scrolled.'] }),
+      v('h', 'elements', ELEM, { item: 'h', kind: INT, min: 0, max: 4096, doc: 'Set an element\'s height, by its name.',
+        ex: ['"Title", 16', 'draws the text of the element called Title at twice the size'],
+        argDocs: { h: ['Pixels of the grid.', 'A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.',
+          'Any other kind: its height; drawn at least 1 high, 4 for "anim".', PIXEL_RANGE(0)].join('\n') },
+        notes: [PIXEL_TEXT_KINDS] }),
       // Three element properties are STILL NOT HERE, each for a reason rather than by omission.
       // `kind` and `sourceId` are authoring choices — what an element IS and what drives it — and
       // rewriting those mid-song is a different panel, not a performance. `colour` is styling,
@@ -1615,7 +1631,7 @@ export function componentRefusalReason(verb, cfg, args = []) {
       if (elementSites(c, a, verb.list ?? 'elements').length) {
         if (verb.place) return lcdZonePlace(c, b).refusal ?? null;
         if (verb.link) return b === undefined || b === null ? 'No control was given: a control\'s name, or "" to unlink.' : null;
-        return verb.kind === STR && (b === undefined || b === null) ? 'No text was given.' : null;
+        return valueOf(verb.kind, b);
       }
       const { names } = componentIndexRange(verb, c);
       return `There is no ${noun} called ${shownValue(a)}.${names.length ? ` The ${noun}s are ${names.map((n) => `"${n}"`).join(', ')}.` : ' It has none yet.'}`;
@@ -1649,6 +1665,12 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
   else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
   else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
   else if (verb.k === XY) given.push([names[0], args[0], verb.fx], [names[1], args[1], verb.fy]);
+  // An element's number (pixel.x and the rest) was clamped without a word (item 2 of the owner's
+  // review of the pixel). A name the display has not got is refused, and used nothing.
+  else if (verb.k === ELEM && (verb.kind === NUM || verb.kind === INT)) {
+    if (cfg && !elementSites(cfg, args[0], verb.list ?? 'elements').length) return null;
+    given.push([names[1], args[1]]);
+  }
   for (const [name, value, field] of given) {
     if (value === undefined || value === null || typeof value === 'boolean') continue;
     const n = Number(value);

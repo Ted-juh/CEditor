@@ -11814,16 +11814,17 @@ Good to know:
 
 ##### `ce.components.pixel.x(target, name, x) -> boolean`
 
-Move one element, by name, to an x in grid pixels.
+Set an element's left edge, by its name.
 
-Example: `ce.components.pixel.x("PixelDisplay", "title", 0)` sets the x of the element called title.
+Example: `ce.components.pixel.x("PixelDisplay", "Title", 10)` puts the element called Title 10 pixels from the screen's left edge.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
-- `x` (number, required): X.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `x` (number, required): Pixels of the grid, from the screen's left edge; 0: at the edge.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11831,16 +11832,17 @@ Good to know:
 
 ##### `ce.components.pixel.y(target, name, y) -> boolean`
 
-Move one element, by name, to a y in grid pixels.
+Set an element's top edge, by its name.
 
-Example: `ce.components.pixel.y("PixelDisplay", "title", 0)` sets the y of the element called title.
+Example: `ce.components.pixel.y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
-- `y` (number, required): Y.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `y` (number, required): Pixels of the grid, from the screen's top edge; 0: at the edge.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11848,16 +11850,18 @@ Good to know:
 
 ##### `ce.components.pixel.w(target, name, w) -> boolean`
 
-The width of one element, by name, in grid pixels. For text kinds this is the align/clip box.
+Set an element's width, by its name.
 
-Example: `ce.components.pixel.w("PixelDisplay", "title", 2048)` sets the w of the element called title.
+Example: `ce.components.pixel.w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
-- `w` (number, required): W.<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `w` (number, required): Pixels of the grid.<br>A text kind: the box its text is aligned and cut in; 0: as wide as the text.<br>Any other kind: its width; drawn at least 1 wide, 4 for "anim".<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".
+- A text kind 0 wide is not wrapped or scrolled.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11865,16 +11869,17 @@ Good to know:
 
 ##### `ce.components.pixel.h(target, name, h) -> boolean`
 
-The height of one element, by name, in grid pixels. For text kinds this is the font height.
+Set an element's height, by its name.
 
-Example: `ce.components.pixel.h("PixelDisplay", "title", 2048)` sets the h of the element called title.
+Example: `ce.components.pixel.h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
-- `h` (number, required): H.<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `h` (number, required): Pixels of the grid.<br>A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.<br>Any other kind: its height; drawn at least 1 high, 4 for "anim".<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

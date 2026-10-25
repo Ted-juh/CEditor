@@ -15,8 +15,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptApiForTesting, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import {
@@ -541,6 +543,21 @@ test('the scene verbs clamp like every other number verb', () => {
     assert.equal(api.pixelRead('pixel', 'x', 'title'), -30);
     assert.equal(api.pixelW('pixel', 'title', -5), true, 'a width clamps to 0 rather than refusing');
     assert.equal(api.pixelRead('pixel', 'w', 'title'), 0);
+  });
+});
+
+test('an element\'s number past its range is said once, and one refused says why', () => {
+  // Clamped without a word, and refused with no reason, where every other number command says
+  // both (item 2 of the owner's review of the pixel).
+  resetScriptStateForTesting();
+  withPixelScene((api) => {
+    const said = (fn) => { clearScriptTrace(); fn(); return get(scriptTrace).filter((t) => t.kind !== 'log').map((t) => t.message); };
+    assert.deepEqual(said(() => api.pixelX('pixel', 'title', 5000)),
+      ['pixel pixel: x("title", 5000) — the x 5000 is outside -4096 to 4096, so 4096 was used. This is said only the first time.']);
+    assert.deepEqual(said(() => api.pixelX('pixel', 'title', 6000)), [], 'once');
+    assert.deepEqual(said(() => api.pixelH('pixel', 'title', 'big')), ['pixel pixel: h("title", "big") — refused, nothing changed. "big" is not a number.']);
+    assert.deepEqual(said(() => api.pixelY('pixel', 'title')), ['pixel pixel: y("title") — refused, nothing changed. No number was given.']);
+    assert.match(said(() => api.pixelW('pixel', 'tempo', -9))[0], /There is no element called "tempo"/, 'no element: refused, not clamped');
   });
 });
 

@@ -933,6 +933,35 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
   assert.equal(MEMBER_BY_ID.pixelBlink.example, '`ce.components.pixel.blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.');
   assert.equal(text('pixelBlink', 'on'), 'true: blinks: 530 ms shown, 530 ms hidden.\nfalse: steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.pixelBlink.notes[0], 'Every blinking element blinks in step. A hidden element does not blink.');
+  // Item 2: x, y, w and h, as the renderer draws them.
+  const range = (min) => `Range: ${min} ↔ 4096, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.`;
+  const offScreen = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
+  const textKinds = 'The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".';
+  assert.equal(MEMBER_BY_ID.pixelX.summary, 'Set an element\'s left edge, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelX.example, '`ce.components.pixel.x("PixelDisplay", "Title", 10)` puts the element called Title 10 pixels from the screen\'s left edge.');
+  assert.equal(text('pixelX', 'x'), `Pixels of the grid, from the screen's left edge; 0: at the edge.\n${range(-4096)}`);
+  assert.equal(MEMBER_BY_ID.pixelX.notes[0], offScreen);
+  assert.equal(MEMBER_BY_ID.pixelY.summary, 'Set an element\'s top edge, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelY.example, '`ce.components.pixel.y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen\'s top edge.');
+  assert.equal(text('pixelY', 'y'), `Pixels of the grid, from the screen's top edge; 0: at the edge.\n${range(-4096)}`);
+  assert.equal(MEMBER_BY_ID.pixelY.notes[0], offScreen);
+  assert.equal(MEMBER_BY_ID.pixelW.summary, 'Set an element\'s width, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelW.example, '`ce.components.pixel.w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide.');
+  assert.equal(text('pixelW', 'w'), ['Pixels of the grid.', 'A text kind: the box its text is aligned and cut in; 0: as wide as the text.',
+    'Any other kind: its width; drawn at least 1 wide, 4 for "anim".', range(0)].join('\n'));
+  assert.deepEqual(MEMBER_BY_ID.pixelW.notes.slice(0, 2), [textKinds, 'A text kind 0 wide is not wrapped or scrolled.']);
+  assert.equal(MEMBER_BY_ID.pixelH.summary, 'Set an element\'s height, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelH.example, '`ce.components.pixel.h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size.');
+  assert.equal(text('pixelH', 'h'), ['Pixels of the grid.',
+    'A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.',
+    'Any other kind: its height; drawn at least 1 high, 4 for "anim".', range(0)].join('\n'));
+  assert.equal(MEMBER_BY_ID.pixelH.notes[0], textKinds);
+  // …and a number past the range is said, one that is not a number refused with why.
+  const cfg = pixelCfg();
+  assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['title', -3], cfg), 'pixel Px: w("title", -3) — the w -3 is outside 0 to 4096, so 0 was used.');
+  assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['tempo', -3], cfg), null, 'no such element: refused, nothing used');
+  assert.equal(componentRefusalReason(byId('pixelX'), cfg, ['title', 'left']), '"left" is not a number.');
+  assert.equal(componentRefusalReason(byId('pixelX'), cfg, ['title']), 'No number was given.');
 });
 
 test('an element without `visible` is shown and one without `blink` steady, so a bare call starts from there', () => {

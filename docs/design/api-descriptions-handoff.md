@@ -1564,7 +1564,7 @@ against the renderer (`PixelDisplayRenderer.svelte`, `LcdGraphicCanvas.svelte`) 
 (`PixelDisplayEditor.svelte`), and a probe of each command's edges in the runtime:
 
 1. `show`, `blink`, and the `name` all eight element commands take: done, below.
-2. `x`, `y`, `w`, `h`.
+2. `x`, `y`, `w`, `h`: done, below.
 3. `text`, `label`.
 4. Parity with the LCD's zones: an element's `kind` and `source`.
 5. `brightness`, `contrast`.
@@ -1598,6 +1598,25 @@ element with that name, on every layout. / Not an element of the display: reject
 error.
 
 Each ends with the two notes every command has. The examples say "PixelDisplay" until item 14.
+
+**Item 2, `x`, `y`, `w` and `h`: done.** A number past the range was used as its nearest end
+without a word, and a refusal gave no reason (`x("Title", "big")`: "refused, nothing changed"),
+where every other number command says both. At the owner's word ("As recommended") they say both
+(`componentClampWarning` and `componentRefusalReason` take an element's number), and the ranges
+stay: -4096 to 4096 for a position, 0 to 4096 for a size, wider than any grid (the inspector's is
+8 to 1024, and its X/Y/W/H cells have no limit) so an element can be parked off the screen. What
+each draws is the renderer's: a text kind's `w` is the box it is aligned and cut in, 0 as wide as
+the text and neither wrapped nor scrolled; its `h` sizes the letters (`pixelTextMetrics`: the
+built-in font 1× below 16, then by 8); any other kind draws at least 1, `anim` at least 4.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `x` | Set an element's left edge, by its name. · `x("PixelDisplay", "Title", 10)` puts the element called Title 10 pixels from the screen's left edge. | Pixels of the grid, from the screen's left edge; 0: at the edge. / Range: -4096 ↔ 4096, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default. |
+| `y` | Set an element's top edge, by its name. · `y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge. | As `x`, from the screen's top edge. | As `x`. |
+| `w` | Set an element's width, by its name. · `w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide. | Pixels of the grid. / A text kind: the box its text is aligned and cut in; 0: as wide as the text. / Any other kind: its width; drawn at least 1 wide, 4 for "anim". / Range: 0 ↔ 4096, whole. / Then as `x`. | The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock". / A text kind 0 wide is not wrapped or scrolled. |
+| `h` | Set an element's height, by its name. · `h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size. | Pixels of the grid. / A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height. / Any other kind: its height; drawn at least 1 high, 4 for "anim". / Range: 0 ↔ 4096, whole. / Then as `x`. | The text kinds, as `w`. |
+
+Each ends with the two notes every command has.
 
 ## Checking each batch
 
