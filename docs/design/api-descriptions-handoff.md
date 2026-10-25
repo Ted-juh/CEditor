@@ -788,7 +788,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 9. `showGhost`, `showGlass`, `showScanlines`, `showGrid`: done, below.
 10. The notes every family shares: done, below.
 11. `backlightSource`: done, below.
-12. The manual shows none of these texts: its component chapter lists the verbs' names only.
+12. The manual: done, below.
 13. Case "everywhere": done, below.
 14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
 15. `clear`: done, by the LCD's script model, below: `clear("Screen", 2)` blanks row 2. That
@@ -1010,6 +1010,18 @@ Two decisions the owner made, each the recommendation:
 | --- | --- |
 | Example | `ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight. |
 | `name` | The driving control's name. / Left out, or "": unlinked. / On while the control is on, or past halfway. / Not on this panel: rejected with a console error. |
+
+**Item 12, the manual: done.** Its component chapter gave each component one line, a summary and
+its commands' names, so the texts the picker, the hover card and the API explorer show were in the
+manual nowhere. At the owner's word ("Full entries"), every component command has a full entry now,
+as every other module's has: 499 of them, under a heading per component (`#### ce.components.lcd:
+LCD Display`) inside its group (`componentChapter` in `generate-scripting-manual.mjs`). The ones
+not yet reviewed print what the generator writes for them today, which is what the picker shows.
+
+What it costs: the manual went from 256 KB to 568 KB, and the in-app help bundle from about 470 KB
+to about 780 KB. The help overlay loads the bundle the first time it opens, not at start-up, so
+`helpDocs.test.js`'s guard (which said the bundle sat in the eager entry chunk) was corrected and
+raised from 600 KB to 1 MB.
 
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
