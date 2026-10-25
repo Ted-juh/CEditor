@@ -1277,7 +1277,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 7. `mute`: done, below.
 8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): done,
    below.
-9. `latch`: does something only with a linked Chord Pad or MIDI input.
+9. `latch`: done, below.
 10. `source`, `link`, `inputChannel`: `link` "drives the link"; its refusals are worded unlike
     every other command's.
 11. `run`, `sync`, `division`: texts.
@@ -1443,6 +1443,19 @@ new one.
 | `followPanelKey` | Follow the panel's key and scale, or keep its own. · `followPanelKey("Arpeggiator", true)` takes the panel's key and scale, and changes with them. | true: the panel's key and scale, at once and at every change. / false: its own. / Left out: toggles. / The usual false words. | Default: false. |
 
 Each ends with the two notes every command has.
+
+**Item 9, `latch`: done, texts only.** It does what it should (`arpSourceNotes`): with a linked
+Chord Pad or MIDI input, the last notes held keep playing after they are let go, notes held again
+replace them, turning it off while nothing is held stops it, and a Panic with "clear local" (its
+default) lets them go. With its own chord it does nothing, which the inspector's hint said and the
+script's text did not. Approved as proposed ("As recommended").
+
+| Field | Text |
+| --- | --- |
+| Description | Keep playing the last notes held after they are let go. |
+| Example | `ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go. |
+| `latch` (true or false, optional) | true: the last notes held keep playing. / false: it stops when they are let go. / Left out: toggles. / The usual false words. |
+| notes | With `source()` "link" or "input" only: its own chord always plays. / Notes held again replace the latched ones. / A Panic lets them go. / Default: false. / Then the two every command has. |
 
 ## Checking each batch
 

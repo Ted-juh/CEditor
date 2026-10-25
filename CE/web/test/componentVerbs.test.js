@@ -854,6 +854,12 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 9: latch.
+  assert.equal(MEMBER_BY_ID.arpLatch.summary, 'Keep playing the last notes held after they are let go.');
+  assert.equal(MEMBER_BY_ID.arpLatch.example, '`ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.');
+  assert.equal(text('arpLatch', 'latch'), 'true: the last notes held keep playing.\nfalse: it stops when they are let go.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(MEMBER_BY_ID.arpLatch.notes.slice(0, 4), ['With `source()` "link" or "input" only: its own chord always plays.',
+    'Notes held again replace the latched ones.', 'A Panic lets them go.', 'Default: false.']);
   assert.equal(MEMBER_BY_ID.arpBaseOctave.example, '`ce.components.arp.baseOctave("Arpeggiator", 4)` puts the chord\'s root in octave 4, as in C4, middle C.');
 });
 

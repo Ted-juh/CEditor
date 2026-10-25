@@ -211,7 +211,12 @@ export const COMPONENT_FAMILIES = [
         argDocs: { swingSource: ['"transport": the Transport\'s swing, while synced.', '"own": `swing()`, always.',
           'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: ['Not synced: its own swing, either way.', 'Default: "transport".'] }),
-      v('latch', 'latch', BOOL, { toggle: true }),
+      // Item 9: what latch keeps, and that it is for a linked Chord Pad or MIDI input only.
+      v('latch', 'latch', BOOL, { toggle: true, doc: 'Keep playing the last notes held after they are let go.',
+        ex: ['true', 'keeps playing the last chord held on the linked Chord Pad after it is let go'],
+        argDocs: { latch: `true: the last notes held keep playing.\nfalse: it stops when they are let go.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['With `source()` "link" or "input" only: its own chord always plays.', 'Notes held again replace the latched ones.',
+          'A Panic lets them go.', 'Default: false.'] }),
       // Item 8, its own chord. `key` reads a note name or wraps a number round the octave
       // (`readValue`, pitchClassOf), as phrase.key wraps; `degree` counts from 1 as
       // ce.music.degreeChord does, stored one lower, to the scale's own length (`rangeFrom`);

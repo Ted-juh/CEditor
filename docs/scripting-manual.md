@@ -4860,15 +4860,19 @@ Good to know:
 
 ##### `ce.components.arp.latch(target [, latch]) -> boolean`
 
-Switch the latch on or off.
+Keep playing the last notes held after they are let go.
 
-Example: `ce.components.arp.latch("Arpeggiator")` switches the latch on if it is off, and off if it is on.
+Example: `ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `latch` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `latch` (true or false, optional): true: the last notes held keep playing.<br>false: it stops when they are let go.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- With `source()` "link" or "input" only: its own chord always plays.
+- Notes held again replace the latched ones.
+- A Panic lets them go.
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
