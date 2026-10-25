@@ -274,15 +274,28 @@ export const COMPONENT_FAMILIES = [
         notes: ['A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.',
           '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.',
           'Default: none muted.'] }),
-      v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Which channel it takes notes from. 0 means omni.' }),
+      // Item 10: where the notes come from, the Chord Pad, and the MIDI input's channel.
+      v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Set which MIDI channel it takes notes from.',
+        ex: ['2', 'plays only the notes held on channel 2'],
+        argDocs: { inputChannel: ['Channel 1 ↔ 16, or 0: any channel.', 'Range: 0 ↔ 16, whole.', 'A fraction: rounded.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Only while `source()` is "input".', 'Default: 0, any channel.'] }),
       v('baseOctave', 'baseOctave', INT, { min: -1, max: 8, doc: 'Set the octave its chord starts in.',
         ex: ['4', 'puts the chord\'s root in octave 4, as in C4, middle C'],
         argDocs: { baseOctave: ['The root\'s octave, as in C3. Middle C is C4.', 'Range: -1 ↔ 8, whole.', 'A fraction: rounded.',
           'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: [OWN_CHORD, 'A note above 127 is left out.', 'Default: 3.'] }),
-      v('source', 'source', ENUM, { doc: 'Where the notes come from: its own chord, a linked Chord Pad, or incoming MIDI.' }),
-      // The Chord Pad the arp takes its notes from, while `source` is "link".
-      v('link', 'linkId', LINK, { sourceKind: 'chordPad' }),
+      v('source', 'source', ENUM, { doc: 'Set where the notes come from.', ex: ['"input"', 'plays the notes held on the MIDI input'],
+        argDocs: { source: ['"chord": its own chord, from `key()`, `scale()` and `degree()`.', '"link": the notes held on the Chord Pad set by `link()`.',
+          '"input": the notes held on the MIDI input, on `inputChannel()`.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: "chord".'] }),
+      // The Chord Pad the arp takes its notes from, while `source` is "link". Kept apart from
+      // `source` at the owner's word: link() does not switch the source.
+      v('link', 'linkId', LINK, { sourceKind: 'chordPad', doc: 'Set the Chord Pad it plays from.',
+        ex: ['"Pads"', 'plays the chords held on the Chord Pad called Pads'],
+        argDocs: { name: ['The Chord Pad\'s name. Case-insensitive.', 'Left out, or "": none.',
+          'Not on this panel, or not a Chord Pad: rejected with a console error.'].join('\n') },
+        notes: ['Played only while `source()` is "link".', 'The Chord Pad stays silent while the arp plays from it.', 'Default: none.'] }),
     ],
   },
   {
@@ -1905,7 +1918,8 @@ export function verbNotes(verb) {
     case SIZE: return [...familyNotes(verb), ...RETURNS_VALUE('number')];
     case FILL: return ['One undo step for the whole list, instead of one per element.', ...RETURNS_TRUE];
     case INSERT: case REMOVE: return own;
-    case LINK: return [...own, ...RETURNS_SET, '`read(target, "' + verb.v + '")` gives the control\'s name.'];
+    // A link that takes one kind of control names it: the arp's link reads back the Chord Pad's name.
+    case LINK: return [...own, ...RETURNS_SET, '`read(target, "' + verb.v + '")` gives the ' + (verb.sourceKind === 'chordPad' ? 'Chord Pad' : 'control') + '\'s name.'];
     case LAYOUT: return [...own, ...RETURNS_SET, '`read(target, "layout")` gives the number of the layout showing.'];
     default: return [...own, ...RETURNS_SET];
   }

@@ -4024,18 +4024,20 @@ function componentLinkAction(verb, path, args) {
     return true;
   }
 
+  // Refused in the words every other verb is (componentRefusalLine's), which these two lines were
+  // not: "arp.link: no control named …" and "arp.link("Knob"): refused — it is not …" (item 10 of
+  // the owner's review of the arp, for every family's link).
+  const refuse = (why) => {
+    const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+    addScriptTrace('error', '', `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed. ${why}`);
+    return false;
+  };
   const found = sourceByName(controls, wanted);
-  if (!found) {
-    addScriptTrace('error', '',
-      `${verb.family}.${verb.v}: no control named "${wanted}" on this panel.`);
-    return false;
-  }
+  if (!found) return refuse(`There is no control called ${shownValue(wanted)} on this panel.`);
   if (!sourceAccepts(verb.sourceKind, found, selfId)) {
-    const why = String(found._children?.Core?.id ?? '') === selfId
-      ? 'a control cannot drive itself'
-      : `it is not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}`;
-    addScriptTrace('error', '', `${verb.family}.${verb.v}("${wanted}"): refused — ${why}.`);
-    return false;
+    return refuse(String(found._children?.Core?.id ?? '') === selfId
+      ? 'A control cannot drive itself.'
+      : `${shownValue(wanted)} is not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}.`);
   }
 
   const id = String(found._children.Core.id);

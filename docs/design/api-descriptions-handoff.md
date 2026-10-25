@@ -1278,8 +1278,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): done,
    below.
 9. `latch`: done, below.
-10. `source`, `link`, `inputChannel`: `link` "drives the link"; its refusals are worded unlike
-    every other command's.
+10. `source`, `link`, `inputChannel`: done, below.
 11. `run`, `sync`, `division`: texts.
 12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: pulses past the steps fire every step;
     rotate takes -32 to 32 where the inspector offers 0 to 31.
@@ -1456,6 +1455,26 @@ script's text did not. Approved as proposed ("As recommended").
 | Example | `ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go. |
 | `latch` (true or false, optional) | true: the last notes held keep playing. / false: it stops when they are let go. / Left out: toggles. / The usual false words. |
 | notes | With `source()` "link" or "input" only: its own chord always plays. / Notes held again replace the latched ones. / A Panic lets them go. / Default: false. / Then the two every command has. |
+
+**Item 10, `source`, `link` and `inputChannel`: done.** `link`'s text was the generic link's
+("Name the control that drives the link.", its example naming "Cutoff", which it refuses), and its
+refusals were worded unlike every other command's: `arp.link("Knob"): refused — it is not a Chord
+Pad.` and `arp.link: no control named "Nope" on this panel.` At the owner's word ("As
+recommended"): `link` and `source` stay apart, the text saying the Chord Pad plays only while
+`source()` is "link"; and a refused link, on all nine link verbs of every family, says so as every
+verb does (`componentLinkAction`): `arp Arp: link("Knob") — refused, nothing changed. "Knob" is not
+a Chord Pad.`, `… There is no control called "Nope" on this panel.`, `… A control cannot drive
+itself.` `scriptControlSources.test.js` asked every link's summary to name "a name" and its
+parameter to say "unlink"; it takes the name in the parameter's first line and "": none too, which
+is where the approved text says both.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `source` | Set where the notes come from. · `source("Arpeggiator", "input")` plays the notes held on the MIDI input. | "chord": its own chord, from `key()`, `scale()` and `degree()`. / "link": the notes held on the Chord Pad set by `link()`. / "input": the notes held on the MIDI input, on `inputChannel()`. / Case-insensitive. / Invalid: rejected with a console error. | Default: "chord". |
+| `link` | Set the Chord Pad it plays from. · `link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads. | The Chord Pad's name. Case-insensitive. / Left out, or "": none. / Not on this panel, or not a Chord Pad: rejected with a console error. | Played only while `source()` is "link". / The Chord Pad stays silent while the arp plays from it. / `read(target, "link")` gives the Chord Pad's name. / Default: none. |
+| `inputChannel` | Set which MIDI channel it takes notes from. · `inputChannel("Arpeggiator", 2)` plays only the notes held on channel 2. | Channel 1 ↔ 16, or 0: any channel. / Range: 0 ↔ 16, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Only while `source()` is "input". / Default: 0, any channel. |
+
+Each ends with the two notes every command has.
 
 ## Checking each batch
 

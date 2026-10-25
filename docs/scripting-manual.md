@@ -5108,15 +5108,17 @@ Good to know:
 
 ##### `ce.components.arp.inputChannel(target, inputChannel) -> boolean`
 
-Which channel it takes notes from. 0 means omni.
+Set which MIDI channel it takes notes from.
 
-Example: `ce.components.arp.inputChannel("Arpeggiator", 8)` sets the input channel to 8.
+Example: `ce.components.arp.inputChannel("Arpeggiator", 2)` plays only the notes held on channel 2.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `inputChannel` (number, required): Input channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `inputChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `source()` is "input".
+- Default: 0, any channel.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5143,15 +5145,16 @@ Good to know:
 
 ##### `ce.components.arp.source(target, source) -> boolean`
 
-Where the notes come from: its own chord, a linked Chord Pad, or incoming MIDI.
+Set where the notes come from.
 
-Example: `ce.components.arp.source("Arpeggiator", "link")` sets the source to "link".
+Example: `ce.components.arp.source("Arpeggiator", "input")` plays the notes held on the MIDI input.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `source` (text, required): One of "chord", "link" or "input". Case-insensitive.<br>Invalid: rejected with a console error.
+- `source` (text, required): "chord": its own chord, from `key()`, `scale()` and `degree()`.<br>"link": the notes held on the Chord Pad set by `link()`.<br>"input": the notes held on the MIDI input, on `inputChannel()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "chord".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5159,18 +5162,21 @@ Good to know:
 
 ##### `ce.components.arp.link(target [, name]) -> boolean`
 
-Name the control that drives the link.
+Set the Chord Pad it plays from.
 
-Example: `ce.components.arp.link("Arpeggiator", "Cutoff")` makes the control called Cutoff drive the link.
+Example: `ce.components.arp.link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Not on this panel, or not a Chord Pad: rejected with a console error.
+- `name` (text, optional): The Chord Pad's name. Case-insensitive.<br>Left out, or "": none.<br>Not on this panel, or not a Chord Pad: rejected with a console error.
 
 Good to know:
 
+- Played only while `source()` is "link".
+- The Chord Pad stays silent while the arp plays from it.
+- Default: none.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
-- `read(target, "link")` gives the control's name.
+- `read(target, "link")` gives the Chord Pad's name.
 
 *Short name: `arpLink`.*
 

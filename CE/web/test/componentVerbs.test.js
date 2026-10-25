@@ -854,6 +854,15 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 10: source, link and inputChannel.
+  assert.equal(MEMBER_BY_ID.arpSource.summary, 'Set where the notes come from.');
+  assert.equal(text('arpSource', 'source'), '"chord": its own chord, from `key()`, `scale()` and `degree()`.\n"link": the notes held on the Chord Pad set by `link()`.\n"input": the notes held on the MIDI input, on `inputChannel()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.arpLink.summary, 'Set the Chord Pad it plays from.');
+  assert.equal(MEMBER_BY_ID.arpLink.example, '`ce.components.arp.link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads.');
+  assert.equal(text('arpLink', 'name'), 'The Chord Pad\'s name. Case-insensitive.\nLeft out, or "": none.\nNot on this panel, or not a Chord Pad: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpLink.notes.slice(0, 3), ['Played only while `source()` is "link".', 'The Chord Pad stays silent while the arp plays from it.', 'Default: none.']);
+  assert.equal(MEMBER_BY_ID.arpInputChannel.summary, 'Set which MIDI channel it takes notes from.');
+  assert.equal(text('arpInputChannel', 'inputChannel'), 'Channel 1 ↔ 16, or 0: any channel.\nRange: 0 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   // Item 9: latch.
   assert.equal(MEMBER_BY_ID.arpLatch.summary, 'Keep playing the last notes held after they are let go.');
   assert.equal(MEMBER_BY_ID.arpLatch.example, '`ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.');

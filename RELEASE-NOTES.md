@@ -245,6 +245,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   5); `key` takes a note's name, `key("Arp", "F#")`, and a number goes round the octave, 12 is C (it
   was B). `followPanelKey(t, true)`, on every component that has it, takes the panel's key at once
   as the inspector's toggle does; it waited for the panel's next key change.
+- A component's link that is refused (`ce.components.arp.link`, `meter.source`, `lcd.valueSource`
+  and the six others) says so in the console as every other command does:
+  `arp Arp: link("Knob") — refused, nothing changed. "Knob" is not a Chord Pad.`
 
 ## What you get
 

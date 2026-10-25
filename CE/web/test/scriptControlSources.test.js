@@ -81,7 +81,8 @@ test('a name the panel does not have is refused, and says so', () => {
   withPanel((c, live) => {
     assert.equal(c.meter.source('Level', 'Resonance'), false);
     assert.equal(live('Level')._children.Meter.valueSourceId, '');
-    assert.match(said(), /no control named "Resonance"/);
+    // In the words every other verb's refusal is in (item 10 of the owner's review of the arp).
+    assert.match(said(), /^meter Level: source\("Resonance"\) — refused, nothing changed\. There is no control called "Resonance" on this panel\.$/m);
   });
 });
 
@@ -187,11 +188,14 @@ test('every link verb is declared the way the reference will describe it', () =>
     assert.equal(verbSignature(verb), `${verb.id}(target [, name]) -> boolean`);
     // The reference text has to tell a reader it takes a name and that an empty one unlinks —
     // the two things that are not guessable from the signature alone.
+    // The summary or the name parameter's first line may say it: the arp's link, as the owner
+    // approved it, is "Set the Chord Pad it plays from." with "The Chord Pad's name." under it.
     const summary = verbSummary(verb);
-    assert.match(summary, /[Nn]ame/, `${verb.id}: its summary never mentions a name`);
-    // …and how to clear it is the name parameter's own text, one rule per line.
     const name = (MEMBER_BY_ID[verb.id]?.params ?? []).find((param) => param.name === 'name');
-    assert.match(name?.summary ?? '', /unlink/, `${verb.id}: its name parameter never says how to clear it`);
+    assert.match(`${summary}\n${name?.summary ?? ''}`, /[Nn]ame/, `${verb.id}: neither its summary nor its name parameter mentions a name`);
+    // …and how to clear it is the name parameter's own text, one rule per line: "unlinked", or
+    // "none" where the text says what is linked rather than that a link is.
+    assert.match(name?.summary ?? '', /unlink|"": none/, `${verb.id}: its name parameter never says how to clear it`);
   }
   // Nine distinct flat names: two families spell `brightnessSource`, so the prefix has to be doing
   // its job.
