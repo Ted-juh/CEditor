@@ -107,7 +107,7 @@ function noSuch(noun, plural, value, count) {
  * Which layout a `layout` part names, counted from 0, or why it names none. `flat` is what a display
  * without layouts shows as its one: an LCD's lines, a Pixel Display's elements (layout() on either).
  */
-export function lcdLayoutIndex(display, value, flat = 'its lines') {
+export function lcdLayoutIndex(display, value, flat = 'its own rows') {
   const list = layoutsOf(display);
   const count = lcdLayoutCount(display);
   if (typeof value === 'string') {

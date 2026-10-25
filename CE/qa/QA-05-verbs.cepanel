@@ -1475,10 +1475,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_LCD_Display_lcd_Write_to_a_character_LCD_a_line_at_a_time_plus_backlight_brightness_and_scrolling_","id":"qa_group_21","controlType":"Label"},
+        "Core": {"name":"group_LCD_Display_lcd_Write_to_a_character_LCD_by_layout_row_and_column_plus_backlight_brightness_and_scrolling_","id":"qa_group_21","controlType":"Label"},
         "Transform": {"x":28,"y":5605,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"LCD Display — lcd.*  (Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"LCD Display — lcd.*  (Write to a character LCD by layout, row and column, plus backlight, brightness and scrolling.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"

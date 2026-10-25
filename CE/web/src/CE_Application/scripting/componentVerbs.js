@@ -606,7 +606,7 @@ export const COMPONENT_FAMILIES = [
   },
   {
     id: 'lcd', section: 'Display', prefix: 'lcd', label: 'LCD Display', sample: 'Screen', article: 'an',
-    summary: 'Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.',
+    summary: 'Write to a character LCD by layout, row and column, plus backlight, brightness and scrolling.',
     verbs: [
       // A row of a layout, or the display's lines when it has none: the owner's script model,
       // docs/design/api-descriptions-handoff.md ("The LCD's script model"), and lcdPositions.js.
@@ -624,7 +624,11 @@ export const COMPONENT_FAMILIES = [
       // Contrast is the unlit cells' visibility, and the backlight glow's strength (35% + 50% of it).
       v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast, which is how visible the unlit segments are.', ex: ['55', 'sets the contrast to 55'],
         argDocs: { contrast: 'How visible the unlit segments are.\nAlso how strongly the backlight glows.\nRange: 0 ↔ 100.\n0: unlit segments hidden.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
-      v('scroll', 'scroll', ENUM, { doc: 'Set which way the lines scroll, or stop them scrolling.', ex: ['"left"', 'scrolls the lines to the left'] }),
+      // A row moves only when it is longer than the display (linePeriod in the renderer), and a
+      // layout's rows are composed at the display's width, so on one this does nothing: a zone
+      // scrolls by its own Overflow setting, at scrollSpeed.
+      v('scroll', 'scroll', ENUM, { doc: 'Set which way the rows scroll, or stop them scrolling.', ex: ['"left"', 'scrolls the rows to the left'],
+        notes: ['Only a row longer than the display moves.', 'On a display with layouts: no effect. A zone set to scroll does so at `scrollSpeed()`.'] }),
       v('scrollSpeed', 'scrollSpeed', NUM, { min: 0, max: 60, doc: 'Set the scrolling speed, in characters per second.',
         argDocs: { scrollSpeed: 'Characters per second.\nRange: 0 ↔ 60.\n0: no scrolling.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       // Only the lit text blinks: the renderer hides the glyphs on the off phase and draws the
@@ -640,7 +644,7 @@ export const COMPONENT_FAMILIES = [
         fit: { cursorCol: 'cols', cursorRow: 'rows' },
         args: ['col', 'row'], doc: 'Put the cursor on a cell.', ex: ['5, 2', 'puts the cursor on column 5 of row 2'],
         notes: ['The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".'] }),
-      v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a line has {value}'],
+      v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'Set the value the {value}, {pct} and {bar} tokens show.', ex: ['64', 'shows 64 wherever a row has {value}'],
         argDocs: { value: 'The number shown.\nOutside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends.\nInvalid: rejected with a console error.' },
         notes: ['While `valueSource()` links a control, that control sets the value and its range.'] }),
       v('anim', 'animMode', ENUM, { doc: 'Set the animation behind the text of a graphic display: off, a file, or a preset.', ex: ['"preset"', 'plays the chosen preset animation'] }),
@@ -692,9 +696,9 @@ export const COMPONENT_FAMILIES = [
       // family picks up insert/remove for free, which scriptComponents.test.js catches.
       v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true, refuseValue: glyphBitsRefusal,
         doc: 'Define one of the eight user glyphs.',
-        ex: ['1, ".#.#.|#####|#####|.###.|..#..|.....|.....|....."', 'puts a heart in slot 1, shown in a line by \\x00'],
+        ex: ['1, ".#.#.|#####|#####|.###.|..#..|.....|.....|....."', 'puts a heart in slot 1, shown in a row by \\x00'],
         argDocs: { index: 'Glyph slot.\nRange: 1 ↔ 8.\nA fraction: rounded.\nOutside the range: rejected with a console error.',
-          bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a line by \\x00 to \\x07 for slots 1 to 8.\n'
+          bits: 'Eight rows of five: "#" lit, "." unlit, rows separated by "|".\nShown in a row by \\x00 to \\x07 for slots 1 to 8.\n'
             + '"1" and "0": the same as "#" and ".".\nFewer than eight rows, or fewer than five cells in a row: the rest unlit.\n'
             + 'Empty, or nothing lit: the slot is cleared.\nOther characters: rejected with a console error.\n'
             + 'More than eight rows, or a row longer than five: rejected with a console error.' } }),
@@ -706,7 +710,7 @@ export const COMPONENT_FAMILIES = [
       v('editText', 'editText', STR, { doc: 'Set the text in the display\'s editable field.', ex: ['"INIT VOICE"', 'puts INIT VOICE in the field'],
         argDocs: { editText: 'The text in the field.\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.' },
         notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.'] }),
-      v('layout', 'layouts', LAYOUT, { flat: 'its lines', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
+      v('layout', 'layouts', LAYOUT, { flat: 'its own rows', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
         notes: ['Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.'] }),
       // The four overlays, declared here rather than derived (derivedFlagVerbs) for what each is.
       v('showGlass', 'showGlass', BOOL, { toggle: true, doc: 'Show or hide the glass: a sheen across the screen.',

@@ -1032,6 +1032,15 @@ the one-time warning. A script that set 8 plays at 5. The text loses its two lin
 end: "Speed factor. / Range: 0.1 ↔ 5. / 1: normal. / Outside the range: the nearest end. /
 Invalid: rejected with a console error."
 
+**After the queue: "line" wording, done.** The model says "row", and five texts still said "line":
+`scroll`'s description and example ("the rows"), `value`'s and `glyph`'s examples and `glyph`'s
+`bits` ("in a row"), `layout`'s "A display without layouts: 1, its own rows." (and its refusals),
+and the family's summary, "Write to a character LCD by layout, row and column, plus backlight,
+brightness and scrolling." `scroll` gained two notes, because "the rows scroll" would have been
+untrue on a display with layouts: "Only a row longer than the display moves." and "On a display
+with layouts: no effect. A zone set to scroll does so at `scrollSpeed()`." (A layout's rows are
+composed at the display's width, and the renderer moves only a row longer than that.)
+
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
 with ce.time, ce.storage with ce.device and ce.core), the owner having agreed the split: a word
@@ -1237,9 +1246,9 @@ Read docs/design/api-descriptions-handoff.md and follow it, above all the sectio
 on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
 ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item review is done
 too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
-script can address). Two LCD questions are open for the owner: script commands for a layout's
-zones, by name as a Pixel Display's elements are, and the "line" left in `scroll`'s description
-and the family's summary. Then continue with ce.components.arp, in
+script can address), and so is its "line" wording. One LCD question is being worked on with the
+owner: script commands for a layout's zones, by name as a Pixel Display's elements are ("Zones by
+name" in this file). Then continue with ce.components.arp, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check

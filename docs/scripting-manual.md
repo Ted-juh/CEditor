@@ -10911,7 +10911,7 @@ Components that show something rather than set it.
 
 #### ce.components.lcd: LCD Display
 
-Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.
+Write to a character LCD by layout, row and column, plus backlight, brightness and scrolling.
 
 ##### `ce.components.lcd.text(target, at, text) -> boolean`
 
@@ -10999,15 +10999,17 @@ Good to know:
 
 ##### `ce.components.lcd.scroll(target, scroll) -> boolean`
 
-Set which way the lines scroll, or stop them scrolling.
+Set which way the rows scroll, or stop them scrolling.
 
-Example: `ce.components.lcd.scroll("Screen", "left")` scrolls the lines to the left.
+Example: `ce.components.lcd.scroll("Screen", "left")` scrolls the rows to the left.
 
 - `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
 - `scroll` (text, required): One of "off", "left" or "right". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only a row longer than the display moves.
+- On a display with layouts: no effect. A zone set to scroll does so at `scrollSpeed()`.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11085,7 +11087,7 @@ Good to know:
 
 Set the value the {value}, {pct} and {bar} tokens show.
 
-Example: `ce.components.lcd.value("Screen", 64)` shows 64 wherever a line has {value}.
+Example: `ce.components.lcd.value("Screen", 64)` shows 64 wherever a row has {value}.
 
 - `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
 - `value` (number, required): The number shown.<br>Outside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends.<br>Invalid: rejected with a console error.
@@ -11380,11 +11382,11 @@ Good to know:
 
 Define one of the eight user glyphs.
 
-Example: `ce.components.lcd.glyph("Screen", 1, ".#.#.|#####|#####|.###.|..#..|.....|.....|.....")` puts a heart in slot 1, shown in a line by \x00.
+Example: `ce.components.lcd.glyph("Screen", 1, ".#.#.|#####|#####|.###.|..#..|.....|.....|.....")` puts a heart in slot 1, shown in a row by \x00.
 
 - `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
 - `index` (number, required): Glyph slot.<br>Range: 1 ↔ 8.<br>A fraction: rounded.<br>Outside the range: rejected with a console error.
-- `bits` (text, required): Eight rows of five: "#" lit, "." unlit, rows separated by "|".<br>Shown in a line by \x00 to \x07 for slots 1 to 8.<br>"1" and "0": the same as "#" and ".".<br>Fewer than eight rows, or fewer than five cells in a row: the rest unlit.<br>Empty, or nothing lit: the slot is cleared.<br>Other characters: rejected with a console error.<br>More than eight rows, or a row longer than five: rejected with a console error.
+- `bits` (text, required): Eight rows of five: "#" lit, "." unlit, rows separated by "|".<br>Shown in a row by \x00 to \x07 for slots 1 to 8.<br>"1" and "0": the same as "#" and ".".<br>Fewer than eight rows, or fewer than five cells in a row: the rest unlit.<br>Empty, or nothing lit: the slot is cleared.<br>Other characters: rejected with a console error.<br>More than eight rows, or a row longer than five: rejected with a console error.
 
 Good to know:
 
@@ -11417,7 +11419,7 @@ Show one of the display's layouts.
 Example: `ce.components.lcd.layout("Screen", 2)` shows layout 2.
 
 - `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
-- `layout` (number or name, required): Its number, counted from 1, or its name.<br>A name: case-insensitive.<br>A fraction: rounded.<br>A display without layouts: 1, its lines.<br>Not a layout of the display: rejected with a console error.
+- `layout` (number or name, required): Its number, counted from 1, or its name.<br>A name: case-insensitive.<br>A fraction: rounded.<br>A display without layouts: 1, its own rows.<br>Not a layout of the display: rejected with a console error.
 
 Good to know:
 

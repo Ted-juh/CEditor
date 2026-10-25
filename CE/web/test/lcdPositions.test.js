@@ -67,7 +67,7 @@ test('what a position cannot mean is refused with why', () => {
   assert.equal(why({ row: 1, col: 17 }), 'There is no column 17: the columns are 1 to 16.');
   assert.equal(why({ layout: 3, row: 1 }), 'There is no layout 3: the layouts are 1 to 2.');
   assert.equal(why({ layout: 'Edt', row: 1 }), 'There is no layout "Edt". One of: "Home", "Edit".');
-  assert.equal(lcdWriteAt(PLAIN, { layout: 2, row: 1 }, 'X').refusal, 'There is no layout 2: this display has one, its lines.');
+  assert.equal(lcdWriteAt(PLAIN, { layout: 2, row: 1 }, 'X').refusal, 'There is no layout 2: this display has one, its own rows.');
   assert.equal(why({ row: 1, row_: 2 }), '"row_" is not part of a position: one of "layout", "row" or "col".');
   assert.equal(why({ row: 1, ROW: 2 }), '"row" is given twice.');
   assert.equal(why({ layout: 2 }), 'A row is needed: text writes one row.');
@@ -169,10 +169,10 @@ test('layout() shows a layout as a soft key does, and read(t, "layout") answers 
   } finally { withdraw(); }
 });
 
-test('a display without layouts has one, its lines or its elements', () => {
+test('a display without layouts has one, its own rows or its elements', () => {
   const lcdDone = run(PLAIN, (lcdApi) => [lcdApi.layout('Lcd', 1), lcdApi.read('Lcd', 'layout'), lcdApi.layout('Lcd', 2)]);
   assert.deepEqual(lcdDone.result, [true, 1, false]);
-  assert.deepEqual(lcdDone.said, ['lcd Lcd: layout(2) — refused, nothing changed. There is no layout 2: this display has one, its lines.']);
+  assert.deepEqual(lcdDone.said, ['lcd Lcd: layout(2) — refused, nothing changed. There is no layout 2: this display has one, its own rows.']);
 
   resetScriptStateForTesting();
   const pixel = createControl('PixelDisplay', { name: 'Px' });
