@@ -1557,6 +1557,48 @@ is no .NET at all and saying in the annotations when the fallback was used; both
 newest SDK present when 10 is not. When the download works again, nothing is to undo. It did on the
 next run (44710fd, 20:11 UTC): `setup-dotnet` installed 10.0.x and the fallback was not used.
 
+## `ce.components.pixel`: the owner's review
+
+Started 2026-10-25, one item at a time as the arp's was. The queue, from a read of the 29 texts
+against the renderer (`PixelDisplayRenderer.svelte`, `LcdGraphicCanvas.svelte`) and the inspector
+(`PixelDisplayEditor.svelte`), and a probe of each command's edges in the runtime:
+
+1. `show`, `blink`, and the `name` all eight element commands take: done, below.
+2. `x`, `y`, `w`, `h`.
+3. `text`, `label`.
+4. Parity with the LCD's zones: an element's `kind` and `source`.
+5. `brightness`, `contrast`.
+6. `gamma`.
+7. `glow`.
+8. The animation: `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`.
+9. `layoutTransition`, `transitionMs`.
+10. `editText`.
+11. `backlight`, `brightnessSource`.
+12. The overlays: `showGlass`, `showGhost`, `showScanlines`, `showGrid`.
+13. `layout`.
+14. The family: its summary, the name in the examples (`"PixelDisplay"`), and `read`'s texts.
+
+**Item 1, `show`, `blink` and `name`: done.** The renderer draws an element unless its `visible`
+is false, and the inspector's Vis toggle reads it the same way, but a bare `show()` toggled from
+the value stored, so on an element without one the first call wrote the true it already was and
+nothing hid; `read(t, "show")` gave nil for it. At the owner's word ("As recommended") an element
+without `visible` counts as shown (`absent: true`, as the LCD's zones), and one without `blink` as
+steady (`absent: false`), so `read` answers false rather than nil. The third argument is named
+`on`, as `lcd.zoneShow`'s. The blink rate stays the renderer's, 530 ms each way on one clock for
+every element (`blinkPhase`), and is written down. The name was matched in any case and on every
+layout, and the text said neither.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `show` | Show or hide an element, by its name. · `show("PixelDisplay", "Title")` hides the element called Title if it is shown, and shows it if it is hidden. | `on`: true: shown. / false: hidden. / Left out: toggles. / The usual false words. | |
+| `blink` | Make an element blink, by its name. · `blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks. | `on`: true: blinks: 530 ms shown, 530 ms hidden. / false: steady. / Left out: toggles. / The usual false words. | Every blinking element blinks in step. A hidden element does not blink. |
+
+`name`, on all eight: The element's name, as given in the element table. Case-insensitive. / Every
+element with that name, on every layout. / Not an element of the display: rejected with a console
+error.
+
+Each ends with the two notes every command has. The examples say "PixelDisplay" until item 14.
+
 ## Checking each batch
 
 From `CE/web`:
@@ -1587,8 +1629,9 @@ ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item
 too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
 script can address), and so is its "line" wording. So are the LCD's script commands for a layout's
 zones, by name as a Pixel Display's elements are ("Zones by name" in this file), and so is
-ce.components.arp ("ce.components.arp: the owner's review" in this file, all fifteen items). Then
-continue with ce.components.pixel, the next by the table, in
+ce.components.arp ("ce.components.arp: the owner's review" in this file, all fifteen items).
+ce.components.pixel is under way ("ce.components.pixel: the owner's review" in this file, its queue
+and the items done); continue with its next item, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check

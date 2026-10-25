@@ -949,10 +949,18 @@ export const COMPONENT_FAMILIES = [
         doc: 'The text of one element, by name. What a `static` element draws.' }),
       v('label', 'elements', ELEM, { item: 'label', kind: STR,
         doc: 'The caption under one element, by name — or the name override on a `name` element.' }),
-      v('show', 'elements', ELEM, { item: 'visible', kind: BOOL,
-        doc: 'Show or hide one element, by name. No third argument toggles.' }),
-      v('blink', 'elements', ELEM, { item: 'blink', kind: BOOL,
-        doc: 'Blink one element, by name. No third argument toggles.' }),
+      // An element without `visible` is drawn, so it counts as shown (`absent`) and a toggle starts
+      // from there: the first show() on one wrote the true it already was (item 1 of the owner's
+      // review of the pixel). One without `blink` is steady, so read answers false, not nil.
+      v('show', 'elements', ELEM, { item: 'visible', arg: 'on', kind: BOOL, absent: true, doc: 'Show or hide an element, by its name.',
+        ex: ['"Title"', 'hides the element called Title if it is shown, and shows it if it is hidden'],
+        argDocs: { on: `true: shown.\nfalse: hidden.\nLeft out: toggles.\n${OFF_RULE}` } }),
+      // The rate is the renderer's (PixelDisplayRenderer's blinkPhase, the LCD cursor's): one clock
+      // for every element, so they blink in step.
+      v('blink', 'elements', ELEM, { item: 'blink', arg: 'on', kind: BOOL, absent: false, doc: 'Make an element blink, by its name.',
+        ex: ['"Title"', 'makes the element called Title blink if it is steady, and steady if it blinks'],
+        argDocs: { on: `true: blinks: 530 ms shown, 530 ms hidden.\nfalse: steady.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Every blinking element blinks in step. A hidden element does not blink.'] }),
       // Position and size in GRID pixels, which is what the inspector's X/Y/W/H columns are. The
       // range is wider than any panel in both directions on purpose: sliding an element off the
       // left edge and back is how a script animates one in, and clamping that to 0 would park it.
@@ -2083,7 +2091,7 @@ export function verbParamSummary(verb, name, kind) {
       if (name === 'name' && verb.list === 'zones') {
         return 'The zone\'s name, as given in the zone table. Case-insensitive.\nEvery zone with that name, on every layout.\nNot a zone of the display: rejected with a console error.';
       }
-      if (name === 'name') return 'The element\'s name, as given in the inspector.\nNot an element of this display: rejected with a console error.';
+      if (name === 'name') return 'The element\'s name, as given in the element table. Case-insensitive.\nEvery element with that name, on every layout.\nNot an element of the display: rejected with a console error.';
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
         : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
         : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`

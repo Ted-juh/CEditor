@@ -251,6 +251,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - The Arpeggiator's `euclidPulses` takes 0 to the rhythm's steps, as the inspector does; 20 on 8 steps
   was stored and sounded every step. `euclidRotate` goes round the steps, -1 the last, as the
   rhythm always did; it took -32 to 32 and stopped there.
+- `ce.components.pixel.show` with no third argument hides an element that stores no `visible`, as
+  it is drawn shown; the first call wrote the shown it already was and nothing hid. `read` answers
+  true for such an element's `show` and false for its `blink`, where it gave nil.
 
 ## What you get
 

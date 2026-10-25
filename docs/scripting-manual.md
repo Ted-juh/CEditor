@@ -11750,7 +11750,7 @@ The text of one element, by name. What a `static` element draws.
 Example: `ce.components.pixel.text("PixelDisplay", "title", "text")` sets the text of the element called title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
 - `text` (text, required): Text.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
@@ -11767,7 +11767,7 @@ The caption under one element, by name — or the name override on a `name` elem
 Example: `ce.components.pixel.label("PixelDisplay", "title", "text")` sets the label of the element called title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
 - `label` (text, required): Label.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
@@ -11777,15 +11777,15 @@ Good to know:
 
 *Short name: `pixelLabel`.*
 
-##### `ce.components.pixel.show(target, name [, visible]) -> boolean`
+##### `ce.components.pixel.show(target, name [, on]) -> boolean`
 
-Show or hide one element, by name. No third argument toggles.
+Show or hide an element, by its name.
 
-Example: `ce.components.pixel.show("PixelDisplay", "title")` switches visible of the element called title on or off.
+Example: `ce.components.pixel.show("PixelDisplay", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
-- `visible` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `on` (true or false, optional): true: shown.<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
@@ -11794,18 +11794,19 @@ Good to know:
 
 *Short name: `pixelShow`.*
 
-##### `ce.components.pixel.blink(target, name [, blink]) -> boolean`
+##### `ce.components.pixel.blink(target, name [, on]) -> boolean`
 
-Blink one element, by name. No third argument toggles.
+Make an element blink, by its name.
 
-Example: `ce.components.pixel.blink("PixelDisplay", "title")` switches blink of the element called title on or off.
+Example: `ce.components.pixel.blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
-- `blink` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `on` (true or false, optional): true: blinks: 530 ms shown, 530 ms hidden.<br>false: steady.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Every blinking element blinks in step. A hidden element does not blink.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11818,7 +11819,7 @@ Move one element, by name, to an x in grid pixels.
 Example: `ce.components.pixel.x("PixelDisplay", "title", 0)` sets the x of the element called title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
 - `x` (number, required): X.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
@@ -11835,7 +11836,7 @@ Move one element, by name, to a y in grid pixels.
 Example: `ce.components.pixel.y("PixelDisplay", "title", 0)` sets the y of the element called title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
 - `y` (number, required): Y.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
@@ -11852,7 +11853,7 @@ The width of one element, by name, in grid pixels. For text kinds this is the al
 Example: `ce.components.pixel.w("PixelDisplay", "title", 2048)` sets the w of the element called title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
 - `w` (number, required): W.<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
@@ -11869,7 +11870,7 @@ The height of one element, by name, in grid pixels. For text kinds this is the f
 Example: `ce.components.pixel.h("PixelDisplay", "title", 2048)` sets the h of the element called title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, required): The element's name, as given in the inspector.<br>Not an element of this display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
 - `h` (number, required): H.<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:

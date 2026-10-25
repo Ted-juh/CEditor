@@ -920,6 +920,38 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(MEMBER_BY_ID.arpBaseOctave.example, '`ce.components.arp.baseOctave("Arp", 4)` puts the chord\'s root in octave 4, as in C4, middle C.');
 });
 
+// The owner's review of ce.components.pixel, one item at a time (docs/design/api-descriptions-handoff.md).
+test('the Pixel Display\'s verbs say what each setting does, as the owner approved them', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  // Item 1: show and blink, and the name all eight element verbs take.
+  const name = 'The element\'s name, as given in the element table. Case-insensitive.\nEvery element with that name, on every layout.\nNot an element of the display: rejected with a console error.';
+  for (const id of ['pixelText', 'pixelLabel', 'pixelShow', 'pixelBlink', 'pixelX', 'pixelY', 'pixelW', 'pixelH']) assert.equal(text(id, 'name'), name, id);
+  assert.equal(MEMBER_BY_ID.pixelShow.summary, 'Show or hide an element, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelShow.example, '`ce.components.pixel.show("PixelDisplay", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.');
+  assert.equal(text('pixelShow', 'on'), 'true: shown.\nfalse: hidden.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.summary, 'Make an element blink, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.example, '`ce.components.pixel.blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.');
+  assert.equal(text('pixelBlink', 'on'), 'true: blinks: 530 ms shown, 530 ms hidden.\nfalse: steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.notes[0], 'Every blinking element blinks in step. A hidden element does not blink.');
+});
+
+test('an element without `visible` is shown and one without `blink` steady, so a bare call starts from there', () => {
+  // The renderer draws an element unless `visible` is false. The toggle started from the missing
+  // value, so the first show() on such an element wrote the true it already was and nothing hid.
+  const cfg = pixelCfg();
+  delete cfg.elements[0].visible;
+  delete cfg.layouts[0].elements[0].visible;
+  const show = byId('pixelShow');
+  const hidden = componentScriptPatch(show, cfg, ['title']);
+  assert.equal(hidden.elements[0].visible, false, 'the first bare show hides it');
+  assert.equal(hidden.layouts[0].elements[0].visible, false, 'on the page too');
+  assert.deepEqual(componentScriptPatch(show, cfg, ['title', true]), {}, 'shown already: nothing to write');
+  assert.equal(componentRequestLegal(show, cfg, ['title', true]), true);
+  const blink = byId('pixelBlink');
+  assert.equal(componentScriptPatch(blink, cfg, ['title']).elements[0].blink, true, 'a bare blink starts it');
+  assert.deepEqual(componentScriptPatch(blink, cfg, ['title', false]), {}, 'steady already');
+});
+
 test('a number counted from 1 is rounded, and every such parameter says so', () => {
   // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
   const lines = { lines: ['A', 'B'] };

@@ -521,6 +521,17 @@ test('show and blink toggle when called with nothing to set', () => {
   });
 });
 
+test('read answers shown and steady for an element that stores neither, as it is drawn', () => {
+  withPixelScene((api) => {
+    api.set('pixel.Pixel.elements', [{ id: 'el_0', name: 'title', kind: 'static', text: 'INIT', x: 2, y: 2, w: 0, h: 8 }]);
+    api.set('pixel.Pixel.layouts', []);
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), true);
+    assert.equal(api.pixelRead('pixel', 'blink', 'title'), false);
+    assert.equal(api.pixelShow('pixel', 'title'), true);
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), false, 'one bare call hides it');
+  });
+});
+
 test('the scene verbs clamp like every other number verb', () => {
   withPixelScene((api) => {
     assert.equal(api.pixelX('pixel', 'title', 999999), true);
