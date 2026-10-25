@@ -60,6 +60,7 @@ const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny ot
 // A Pixel Display element's position and size (item 2 of the owner's review of the pixel).
 const PIXEL_RANGE = (min) => `Range: ${min} ↔ 4096, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.`;
 const PIXEL_OFF_SCREEN = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
+const PIXEL_NO_GLYPH = 'A character the font cannot draw: a blank.';
 const PIXEL_TEXT_KINDS = 'The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".';
 // The Arpeggiator's own chord (item 8 of the owner's review of the arp): what its key, scale, degree,
 // chord type and octave set, and only while it plays that chord.
@@ -949,10 +950,21 @@ export const COMPONENT_FAMILIES = [
       // So the element carries a `name` the author types, beside its group, and these address that.
       // The four names below are the same four the index-addressed attempt used and failed with —
       // pixelText, pixelShow, pixelX, pixelY — which is the neatest way to say what changed.
-      v('text', 'elements', ELEM, { item: 'text', kind: STR,
-        doc: 'The text of one element, by name. What a `static` element draws.' }),
-      v('label', 'elements', ELEM, { item: 'label', kind: STR,
-        doc: 'The caption under one element, by name — or the name override on a `name` element.' }),
+      // Which kinds draw each, and what the built-in font cannot (pixelFont.js), at the owner's word
+      // (item 3 of the pixel's review). Stored on any kind, and not checked against the font: as the
+      // LCD's zoneText and zoneLabel.
+      v('text', 'elements', ELEM, { item: 'text', kind: STR, doc: 'Set the text of a "static" element, by its name.',
+        ex: ['"Title", "INIT VOICE"', 'writes INIT VOICE in the element called Title'],
+        argDocs: { text: ['The text.', 'Shown by "static", between its prefix and suffix.',
+          'Shown by "name" while it has no label and no control, and by "edit" while its control has no text.',
+          '"\\n": a new line while the element wraps; a blank otherwise.',
+          `${PIXEL_NO_GLYPH} The built-in font has none for $ & ^ \` { | } ~ and letters with accents.`,
+          'A number: written as text.', 'Left out: rejected with a console error.'].join('\n') } }),
+      v('label', 'elements', ELEM, { item: 'label', kind: STR, doc: 'Set an element\'s caption, or the name a "name" element shows, by its name.',
+        ex: ['"Cutoff", "CUT"', 'shows CUT under the element called Cutoff'],
+        argDocs: { label: ['The text.', '"name": shown in place of its control\'s name; "": the control\'s name.',
+          '"hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none.',
+          'Other kinds: not shown.', PIXEL_NO_GLYPH, 'A number: written as text.', 'Left out: rejected with a console error.'].join('\n') } }),
       // An element without `visible` is drawn, so it counts as shown (`absent`) and a toggle starts
       // from there: the first show() on one wrote the true it already was (item 1 of the owner's
       // review of the pixel). One without `blink` is steady, so read answers false, not nil.

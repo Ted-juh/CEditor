@@ -11745,13 +11745,13 @@ Drive a pixel display: its elements' text, visibility and position, plus backlig
 
 ##### `ce.components.pixel.text(target, name, text) -> boolean`
 
-The text of one element, by name. What a `static` element draws.
+Set the text of a "static" element, by its name.
 
-Example: `ce.components.pixel.text("PixelDisplay", "title", "text")` sets the text of the element called title.
+Example: `ce.components.pixel.text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
-- `text` (text, required): Text.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `text` (text, required): The text.<br>Shown by "static", between its prefix and suffix.<br>Shown by "name" while it has no label and no control, and by "edit" while its control has no text.<br>"\n": a new line while the element wraps; a blank otherwise.<br>A character the font cannot draw: a blank. The built-in font has none for $ & ^ ` { | } ~ and letters with accents.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
@@ -11762,13 +11762,13 @@ Good to know:
 
 ##### `ce.components.pixel.label(target, name, label) -> boolean`
 
-The caption under one element, by name — or the name override on a `name` element.
+Set an element's caption, or the name a "name" element shows, by its name.
 
-Example: `ce.components.pixel.label("PixelDisplay", "title", "text")` sets the label of the element called title.
+Example: `ce.components.pixel.label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
-- `label` (text, required): Label.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `label` (text, required): The text.<br>"name": shown in place of its control's name; "": the control's name.<br>"hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none.<br>Other kinds: not shown.<br>A character the font cannot draw: a blank.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 

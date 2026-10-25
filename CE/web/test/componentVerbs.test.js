@@ -16,6 +16,7 @@ import {
 } from '../src/CE_Application/scripting/panelApi.js';
 import { apiSurfaceNames as runtimeNames } from '../src/CE_Application/scripting/panelRuntime.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
+import { glyphRows } from '../src/CE_Application/utils/pixelFont.js';
 
 const byId = (id) => COMPONENT_VERB_BY_ID[id];
 
@@ -956,6 +957,21 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
     'A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.',
     'Any other kind: its height; drawn at least 1 high, 4 for "anim".', range(0)].join('\n'));
   assert.equal(MEMBER_BY_ID.pixelH.notes[0], textKinds);
+  // Item 3: text and label, which kinds draw each, and what the font cannot.
+  assert.equal(MEMBER_BY_ID.pixelText.summary, 'Set the text of a "static" element, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelText.example, '`ce.components.pixel.text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.');
+  assert.equal(text('pixelText', 'text'), ['The text.', 'Shown by "static", between its prefix and suffix.',
+    'Shown by "name" while it has no label and no control, and by "edit" while its control has no text.',
+    '"\\n": a new line while the element wraps; a blank otherwise.',
+    'A character the font cannot draw: a blank. The built-in font has none for $ & ^ ` { | } ~ and letters with accents.',
+    'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
+  assert.equal(MEMBER_BY_ID.pixelLabel.summary, 'Set an element\'s caption, or the name a "name" element shows, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelLabel.example, '`ce.components.pixel.label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff.');
+  assert.equal(text('pixelLabel', 'label'), ['The text.', '"name": shown in place of its control\'s name; "": the control\'s name.',
+    '"hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none.',
+    'Other kinds: not shown.', 'A character the font cannot draw: a blank.', 'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
+  const lacking = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).filter((c) => !glyphRows(c));
+  assert.deepEqual(lacking, ['$', '&', '^', '`', '{', '|', '}', '~'], 'the printable ASCII the built-in font has no glyph for, as the text names it');
   // …and a number past the range is said, one that is not a number refused with why.
   const cfg = pixelCfg();
   assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['title', -3], cfg), 'pixel Px: w("title", -3) — the w -3 is outside 0 to 4096, so 0 was used.');

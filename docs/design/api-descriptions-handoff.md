@@ -1565,7 +1565,7 @@ against the renderer (`PixelDisplayRenderer.svelte`, `LcdGraphicCanvas.svelte`) 
 
 1. `show`, `blink`, and the `name` all eight element commands take: done, below.
 2. `x`, `y`, `w`, `h`: done, below.
-3. `text`, `label`.
+3. `text`, `label`: done, below.
 4. Parity with the LCD's zones: an element's `kind` and `source`.
 5. `brightness`, `contrast`.
 6. `gamma`.
@@ -1615,6 +1615,23 @@ built-in font 1× below 16, then by 8); any other kind draws at least 1, `anim` 
 | `y` | Set an element's top edge, by its name. · `y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge. | As `x`, from the screen's top edge. | As `x`. |
 | `w` | Set an element's width, by its name. · `w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide. | Pixels of the grid. / A text kind: the box its text is aligned and cut in; 0: as wide as the text. / Any other kind: its width; drawn at least 1 wide, 4 for "anim". / Range: 0 ↔ 4096, whole. / Then as `x`. | The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock". / A text kind 0 wide is not wrapped or scrolled. |
 | `h` | Set an element's height, by its name. · `h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size. | Pixels of the grid. / A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height. / Any other kind: its height; drawn at least 1 high, 4 for "anim". / Range: 0 ↔ 4096, whole. / Then as `x`. | The text kinds, as `w`. |
+
+Each ends with the two notes every command has.
+
+**Item 3, `text` and `label`: done, texts only.** Which kinds draw each was nowhere: `text` is
+drawn by "static" between its prefix and suffix, by "name" while it has no label and no control,
+and by "edit" while its control has no text (`resolveZoneContent`); `label` by "name" in place of
+its control's name, and by the eight widget kinds as a caption 7 pixels high under the widget, or
+above it with no room below. The built-in font has no glyph for `` $ & ^ ` { | } ~ ``, letters with
+accents, "€", "♯", "♭" or a tab, and draws each as a blank. At the owner's word ("As
+recommended") both are written down and neither is said in the console, as the LCD's `zoneText`
+and `zoneLabel`: a check against the font would need each element's, built-in or a custom sheet.
+A text on a kind that does not draw it is stored, as there. A test holds the list to the font.
+
+| Command | Description · Example | Parameter |
+| --- | --- | --- |
+| `text` | Set the text of a "static" element, by its name. · `text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title. | The text. / Shown by "static", between its prefix and suffix. / Shown by "name" while it has no label and no control, and by "edit" while its control has no text. / "\n": a new line while the element wraps; a blank otherwise. / A character the font cannot draw: a blank. The built-in font has none for $ & ^ \` { \| } ~ and letters with accents. / A number: written as text. / Left out: rejected with a console error. |
+| `label` | Set an element's caption, or the name a "name" element shows, by its name. · `label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff. | The text. / "name": shown in place of its control's name; "": the control's name. / "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none. / Other kinds: not shown. / A character the font cannot draw: a blank. / A number: written as text. / Left out: rejected with a console error. |
 
 Each ends with the two notes every command has.
 
