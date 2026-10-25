@@ -230,6 +230,10 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.arp.octaves` takes 1 to 4, as the inspector does; 5 and 6 were stored and played
   as 4.
 - `ce.components.arp.gate` takes 0.05 to 1, as the inspector does; 0 played a 10 ms blip.
+- `ce.components.arp.swing` takes 0 to 1, as the inspector does; a negative swing played straight.
+  `ce.components.arp.swingSource` sets whose swing a synced arp plays, the Transport's or its own,
+  as the inspector's "Swing from" does: on a synced arp `swing()` did nothing, and no script could
+  change that.
 
 ## What you get
 

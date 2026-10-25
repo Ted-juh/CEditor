@@ -816,6 +816,20 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(MEMBER_BY_ID.arpGate.notes[0], 'Default: 0.6.');
   const gate = COMPONENT_VERBS.find((verb) => verb.id === 'arpGate');
   assert.deepEqual(componentScriptPatch(gate, { gate: 0.6 }, [0]), { gate: 0.05 });
+  // Item 5: swing, as the engine reads it, and whose swing a synced arp plays.
+  assert.equal(MEMBER_BY_ID.arpSwing.summary, 'Set how far every second step is delayed.');
+  assert.equal(MEMBER_BY_ID.arpSwing.example, '`ce.components.arp.swing("Arpeggiator", 0.5)` delays every second step by a quarter of a step.');
+  assert.equal(text('arpSwing', 'swing'), 'Part of half a step: 1 delays every second step by half a step.\n0: straight.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpSwing.notes.slice(0, 2), ['While synced: the Transport\'s swing, unless `swingSource()` is "own".', 'Default: 0.']);
+  const swing = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwing');
+  assert.deepEqual(componentScriptPatch(swing, { swing: 0.3 }, [-0.5]), { swing: 0 });
+  assert.equal(MEMBER_BY_ID.arpSwingSource.summary, 'Set whose swing a synced arp plays: the Transport\'s or its own.');
+  assert.equal(MEMBER_BY_ID.arpSwingSource.example, '`ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced.');
+  assert.equal(text('arpSwingSource', 'swingSource'), '"transport": the Transport\'s swing, while synced.\n"own": `swing()`, always.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpSwingSource.notes.slice(0, 2), ['Not synced: its own swing, either way.', 'Default: "transport".']);
+  const source = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwingSource');
+  assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['OWN']), { swingSource: 'own' });
+  assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['clock']), {});
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

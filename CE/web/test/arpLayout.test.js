@@ -6,6 +6,7 @@ import {
   arpGeometry, arpCell, arpCellAt, arpVelocity, arpChannel, ARP_PATTERNS,
   toggleMute, midiNoteLabel, arpUseFlats, arpSource, arpSourceIsExternal, ARP_SOURCES,
   arpSynced, arpDivision, arpBeatsPerStep, syncedStepAt, syncedPhaseAt, arpStepCell, arpHead,
+  effectiveSwing, swingSource,
 } from '../src/CE_Application/utils/arpLayout.js';
 import { heldNotesInOrder, applyNoteEvents } from '../src/CE_Application/utils/midiNoteInput.js';
 
@@ -102,6 +103,16 @@ test('"random" plays a cell of its own picking each step; the playhead follows w
   assert.equal(arpHead(ap({ pattern: 'random', __phase: 0.1, __head: 2 }), 3), 2);
   assert.equal(arpHead(ap({ pattern: 'random', __phase: 0.1 }), 3), 0, 'nothing played yet: where the phase is');
   assert.equal(arpHead(ap({ pattern: 'up', __phase: 0.5, __head: 7 }), 3), 1, 'a head past the sequence is ignored');
+});
+
+// Item 5 of the owner's review of the arp: swingSource is a script command now, so whose swing a
+// synced arp plays is held here.
+test('a synced arp plays the Transport\'s swing unless its swing source is "own"', () => {
+  assert.equal(swingSource(ap({})), 'transport', 'absent reads as the Transport, as the default now says');
+  assert.equal(effectiveSwing(ap({ syncToTransport: true, swing: 0.4 }), 0.2), 0.2);
+  assert.equal(effectiveSwing(ap({ syncToTransport: true, swing: 0.4, swingSource: 'own' }), 0.2), 0.4);
+  assert.equal(effectiveSwing(ap({ syncToTransport: false, swing: 0.4 }), 0.2), 0.4, 'free-running: its own, either way');
+  assert.equal(effectiveSwing(ap({ syncToTransport: false, swing: -0.5, swingSource: 'own' }), 0.2), 0, 'below 0: straight');
 });
 
 test('euclid spreads pulses over steps', () => {

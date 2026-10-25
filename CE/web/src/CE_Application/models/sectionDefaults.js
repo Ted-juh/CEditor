@@ -1322,6 +1322,10 @@ export const SECTION_DEFAULTS = {
     octaves: 1,                   // repeat the note set upward
     gate: 0.6,                    // note length as a fraction of the step
     swing: 0,                     // 0 = straight, 1 = max shuffle (delays odd steps)
+    // Whose swing a SYNCED arp plays: the Transport's ('transport') or `swing` above ('own'). A
+    // free-running arp always plays its own (arpLayout.effectiveSwing). The inspector's "Swing from"
+    // set it before it was a default here; absent, it read as 'transport', which this keeps.
+    swingSource: 'transport',
     latch: false,                 // keep arpeggiating after the source releases
     // Its own chord (source = 'chord').
     key: 0,                       // tonic pitch class (0 = C)

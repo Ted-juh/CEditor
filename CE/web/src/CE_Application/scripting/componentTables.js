@@ -20,7 +20,7 @@
 
 import { SCALE_NAMES } from './musicTheory.js';
 import { DIVISION_IDS } from '../utils/transportLayout.js';
-import { ARP_PATTERNS, ARP_SOURCES } from '../utils/arpLayout.js';
+import { ARP_PATTERNS, ARP_SOURCES, SWING_SOURCES as ARP_SWING_SOURCES } from '../utils/arpLayout.js';
 import { CHORDPAD_MODES, CHORD_TYPES, CHORDPAD_VOICINGS } from '../utils/chordPadLayout.js';
 import { RIBBON_MODES } from '../utils/noteRibbonLayout.js';
 import {
@@ -77,6 +77,7 @@ export const VERB_VALUES = {
   'arp.scale': SCALE_NAMES,
   'arp.chordType': CHORD_TYPES,
   'arp.source': ARP_SOURCES,
+  'arp.swingSource': ARP_SWING_SOURCES,
   'chordpad.mode': CHORDPAD_MODES,
   'chordpad.scale': SCALE_NAMES,
   'chordpad.chordType': CHORD_TYPES,

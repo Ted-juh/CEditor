@@ -1233,7 +1233,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.draw | 27 | 18, all done |
 | ce.time | 22 | 15, all done |
 | ce.components.lcd | 37 | 22, all done |
-| ce.components.arp | 30 | 15 |
+| ce.components.arp | 31 | 15 |
 | ce.components.pixel | 28 | 13 |
 | ce.components.meter | 25 | 11 |
 | ce.components.chordpad | 22 | 11 |
@@ -1272,8 +1272,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 2. `rate`: done, below.
 3. `octaves`: done, below.
 4. `gate`: done, below.
-5. `swing`: a negative swing plays straight; while synced the Transport's swing is used unless the
-   inspector's swing source is "own", which no script can set.
+5. `swing`: done, below, with `swingSource`.
 6. `phase`: likely ignored once the arp has run in the preview (to confirm in the browser); `read`
    gives the stored value, not where it is.
 7. `mute`: `read(t, "mute")` gives the steps counted from 0 (`[2]` after `mute(t, 3)`); a step
@@ -1352,6 +1351,26 @@ script takes 0.05 to 1: past it, the nearest end with the one-time warning.
 | Example | `ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step. |
 | `gate` (number, required) | Part of the step. / 1: held to the next step; 99% of it, so a repeated note sounds again. / Range: 0.05 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
 | notes | Default: 0.6. / Then the two every command has. |
+
+**Item 5, `swing`: done, and `swingSource` added.** It took -1 to 1; the engine reads it from 0 to 1
+(`effectiveSwing`), so a negative swing was stored and played straight. The inspector offers 0 to 1.
+And while synced an arp plays the Transport's swing unless the inspector's "Swing from" is "Its
+own": a script's `swing()` on a synced arp did nothing, and no script could change that. At the
+owner's word ("Do recommended") a script takes 0 to 1, and `swingSource(t, "transport" | "own")`
+sets whose swing a synced arp plays, read back by `read(t, "swingSource")`. `swingSource` joins the
+Arp's section defaults as "transport", which is what an absent one always read as, so no saved
+panel changes; its words are `SWING_SOURCES`, the module's own (`componentTables.VERB_VALUES`).
+
+| Field | Text |
+| --- | --- |
+| `swing` description | Set how far every second step is delayed. |
+| `swing` example | `ce.components.arp.swing("Arpeggiator", 0.5)` delays every second step by a quarter of a step. |
+| `swing` (number, required) | Part of half a step: 1 delays every second step by half a step. / 0: straight. / Range: 0 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| `swing` notes | While synced: the Transport's swing, unless `swingSource()` is "own". / Default: 0. / Then the two every command has. |
+| `swingSource` description | Set whose swing a synced arp plays: the Transport's or its own. |
+| `swingSource` example | `ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced. |
+| `swingSource` (string, required) | "transport": the Transport's swing, while synced. / "own": `swing()`, always. / Case-insensitive. / Invalid: rejected with a console error. |
+| `swingSource` notes | Not synced: its own swing, either way. / Default: "transport". / Then the two every command has. |
 
 ## Checking each batch
 

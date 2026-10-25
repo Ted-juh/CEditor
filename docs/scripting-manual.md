@@ -4824,19 +4824,39 @@ Good to know:
 
 ##### `ce.components.arp.swing(target, swing) -> boolean`
 
-Set the swing.
+Set how far every second step is delayed.
 
-Example: `ce.components.arp.swing("Arpeggiator", 0)` sets the swing to 0.
+Example: `ce.components.arp.swing("Arpeggiator", 0.5)` delays every second step by a quarter of a step.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `swing` (number, required): Swing.<br>Range: -1 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `swing` (number, required): Part of half a step: 1 delays every second step by half a step.<br>0: straight.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While synced: the Transport's swing, unless `swingSource()` is "own".
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
 *Short name: `arpSwing`.*
+
+##### `ce.components.arp.swingSource(target, swingSource) -> boolean`
+
+Set whose swing a synced arp plays: the Transport's or its own.
+
+Example: `ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `swingSource` (text, required): "transport": the Transport's swing, while synced.<br>"own": `swing()`, always.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Not synced: its own swing, either way.
+- Default: "transport".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpSwingSource`.*
 
 ##### `ce.components.arp.latch(target [, latch]) -> boolean`
 
