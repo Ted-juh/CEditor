@@ -203,6 +203,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   one character. A layout is its number or its name; a range is a list, `col = {5, 10}`. A part the
   display does not have is refused with a console error that says why.
 - `ce.components.lcd.clear("Screen", 2)` blanks row 2. It blanked every row, the 2 dropped.
+- `ce.components.lcd.animSpeed` and `ce.components.pixel.animSpeed` take 0.1 to 5, as the inspector's
+  preset Speed does; past it, the nearest end with a console warning the first time. They took 0 to
+  16, and 0 played at normal speed.
 - The scripting manual describes every component command in full: what it does, an example, each
   parameter and what comes back. It listed them by name only.
 - A knob or slider linked as a display's backlight source lights it from halfway along its range,

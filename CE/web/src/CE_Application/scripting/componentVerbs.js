@@ -648,10 +648,11 @@ export const COMPONENT_FAMILIES = [
       // for one it did not know.
       v('animPreset', 'animPreset', ENUM, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
         notes: ['Plays only on a graphic display, while `anim()` is "preset".'] }),
-      v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16, doc: 'Set the speed of the preset animation, as a multiple of its normal speed.', ex: ['2', 'plays the preset animation at twice its normal speed'],
-        // The graphic canvas reads it as Math.max(0.05, Number(animSpeed) || 1): 0 is normal speed,
-        // not a pause, and anything below 0.05 is 0.05.
-        argDocs: { animSpeed: 'Speed factor.\nRange: 0 ↔ 16.\n1: normal; 0 is read as 1.\nBelow 0.05: 0.05.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      // The inspector's range (its preset Speed is 0.1 to 5), at the owner's word. A script could set
+      // 0 to 16, and the graphic canvas reads it as Math.max(0.05, Number(animSpeed) || 1): 0 played
+      // at normal speed and anything below 0.05 at 0.05, neither of which the inspector could show.
+      v('animSpeed', 'animSpeed', NUM, { min: 0.1, max: 5, doc: 'Set the speed of the preset animation, as a multiple of its normal speed.', ex: ['2', 'plays the preset animation at twice its normal speed'],
+        argDocs: { animSpeed: 'Speed factor.\nRange: 0.1 ↔ 5.\n1: normal.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'],
         argDocs: { animFps: 'Frames per second.\nOnly for a sprite sheet: a GIF or APNG plays at its own speed.\nRange: 1 ↔ 120.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
       v('animLoop', 'animLoop', BOOL, { toggle: true, doc: 'Switch looping of the animation on or off.',
@@ -767,7 +768,7 @@ export const COMPONENT_FAMILIES = [
       v('glow', 'glow', NUM, UNIT),
       v('anim', 'animMode', ENUM),
       v('animPreset', 'animPreset', ENUM),
-      v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16 }),
+      v('animSpeed', 'animSpeed', NUM, { min: 0.1, max: 5 }),   // the inspector's range, as the LCD's
       v('animLoop', 'animLoop', BOOL, { toggle: true }),
       v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
       v('layoutTransition', 'layoutTransition', ENUM, { doc: 'How one layout gives way to the next.' }),

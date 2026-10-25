@@ -790,7 +790,7 @@ LCD text against the rules above and a probe of each verb's edges in the runtime
 11. `backlightSource`: done, below.
 12. The manual: done, below.
 13. Case "everywhere": done, below.
-14. `animSpeed`: 0 ↔ 16 in a script, 0.1 ↔ 5 on the inspector's preset Speed.
+14. `animSpeed`: done, below.
 15. `clear`: done, by the LCD's script model, below: `clear("Screen", 2)` blanks row 2. That
     every verb drops an argument it does not take, without a word, is wider than the LCD and is
     not on this queue unless the owner puts it there.
@@ -1023,6 +1023,15 @@ to about 780 KB. The help overlay loads the bundle the first time it opens, not 
 `helpDocs.test.js`'s guard (which said the bundle sat in the eager entry chunk) was corrected and
 raised from 600 KB to 1 MB.
 
+**Item 14, `animSpeed`: done.** A script could set the preset speed from 0 to 16, and the
+inspector's preset Speed (and a Pixel element's speed) runs from 0.1 to 5. The graphic canvas reads
+it as `Math.max(0.05, Number(animSpeed) || 1)`, so 0 played at normal speed and 0.02 at 0.05, which
+the text had to say and the inspector could not show. At the owner's word scripts take the
+inspector's range, 0.1 ↔ 5, on the LCD and the Pixel Display alike; past it, the nearest end with
+the one-time warning. A script that set 8 plays at 5. The text loses its two lines about the low
+end: "Speed factor. / Range: 0.1 ↔ 5. / 1: normal. / Outside the range: the nearest end. /
+Invalid: rejected with a console error."
+
 **Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
 and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
 with ce.time, ce.storage with ce.device and ce.core), the owner having agreed the split: a word
@@ -1226,9 +1235,11 @@ not open a pull request unless asked.
 ```
 Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
 on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
-ce.anim, ce.draw, ce.time and ce.components.lcd are done, but ce.components.lcd is still being
-reviewed by the owner one item at a time: take the next item in its queue ("The owner's review, one
-item at a time") first. Then continue with ce.components.arp, in
+ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item review is done
+too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
+script can address). Two LCD questions are open for the owner: script commands for a layout's
+zones, by name as a Pixel Display's elements are, and the "line" left in `scroll`'s description
+and the family's summary. Then continue with ce.components.arp, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check

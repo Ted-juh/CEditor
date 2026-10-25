@@ -11138,7 +11138,7 @@ Set the speed of the preset animation, as a multiple of its normal speed.
 Example: `ce.components.lcd.animSpeed("Screen", 2)` plays the preset animation at twice its normal speed.
 
 - `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
-- `animSpeed` (number, required): Speed factor.<br>Range: 0 ↔ 16.<br>1: normal; 0 is read as 1.<br>Below 0.05: 0.05.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `animSpeed` (number, required): Speed factor.<br>Range: 0.1 ↔ 5.<br>1: normal.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
@@ -11821,10 +11821,10 @@ Good to know:
 
 Set the anim speed.
 
-Example: `ce.components.pixel.animSpeed("PixelDisplay", 8)` sets the anim speed to 8.
+Example: `ce.components.pixel.animSpeed("PixelDisplay", 2.6)` sets the anim speed to 2.6.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `animSpeed` (number, required): Anim speed.<br>Range: 0 ↔ 16.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `animSpeed` (number, required): Anim speed.<br>Range: 0.1 ↔ 5.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 

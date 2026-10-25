@@ -743,6 +743,15 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(text('lcdBacklightSource', 'name'), 'The driving control\'s name.\nLeft out, or "": unlinked.\nOn while the control is on, or past halfway.\nNot on this panel: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.lcdBacklightSource.example, '`ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.');
   assert.match(text('lcdValueSource', 'name'), /Not on this panel, or not a knob, slider or other range control: rejected with a console error\.$/);
+  // Item 14: the preset speed takes the inspector's range, 0.1 to 5, on both displays. 0 played at
+  // normal speed and 0.02 at 0.05, neither of which the inspector could show.
+  for (const id of ['lcdAnimSpeed', 'pixelAnimSpeed']) {
+    const speed = COMPONENT_VERBS.find((v) => v.id === id);
+    assert.deepEqual(componentScriptPatch(speed, { animSpeed: 1 }, [0]), { animSpeed: 0.1 }, id);
+    assert.deepEqual(componentScriptPatch(speed, { animSpeed: 1 }, [8]), { animSpeed: 5 }, id);
+    assert.match(componentClampWarning(speed, 'Screen', [8], {}), /is outside 0\.1 to 5, so 5 was used\.$/);
+  }
+  assert.equal(text('lcdAnimSpeed', 'animSpeed'), 'Speed factor.\nRange: 0.1 ↔ 5.\n1: normal.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   for (const verb of COMPONENT_VERBS.filter((v) => v.k === 'fill')) {
     assert.doesNotMatch(MEMBER_BY_ID[verb.id].example, /, values\)/, `${verb.id}: a list written out`);
   }
