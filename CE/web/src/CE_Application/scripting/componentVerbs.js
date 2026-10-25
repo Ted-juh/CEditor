@@ -270,8 +270,17 @@ export const COMPONENT_FAMILIES = [
       v('chordType', 'chordType', ENUM, { doc: 'Set how many notes its chord has.', ex: ['"seventh"', 'adds the seventh: four notes'],
         argDocs: { chordType: ['"triad": three notes.', '"seventh": four, the seventh added.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: [OWN_CHORD, 'Default: "triad".'] }),
-      v('velocity', 'velocity', INT, VELOCITY),
-      v('channel', 'channel', INT, CHANNEL),
+      // Item 13: every note at the arp's own velocity, on its own channel.
+      v('velocity', 'velocity', INT, { ...VELOCITY, doc: 'Set how hard every note it plays is struck.',
+        ex: ['110', 'plays every note at velocity 110'],
+        argDocs: { velocity: ['MIDI velocity.', 'Range: 1 ↔ 127, whole.', 'A fraction: rounded.', 'Outside the range: the nearest end.',
+          'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['The same for every note: the velocity the notes were held at is not used.', 'Default: 96.'] }),
+      v('channel', 'channel', INT, { ...CHANNEL, doc: 'Set which MIDI channel it plays on.',
+        ex: ['10', 'plays its notes on channel 10'],
+        argDocs: { channel: ['MIDI channel.', 'Range: 1 ↔ 16, whole.', 'A fraction: rounded.', 'Outside the range: the nearest end.',
+          'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: 1.'] }),
       // Item 12, the Euclidean rhythm (arpLayout.euclid). Pulses run to the rhythm's own steps, as the
       // inspector's do: 20 on 8 steps was stored and played every step. Rotate goes round the steps,
       // as the engine already did: it took -32 to 32 and stopped there.

@@ -4980,15 +4980,17 @@ Good to know:
 
 ##### `ce.components.arp.velocity(target, velocity) -> boolean`
 
-Set the velocity.
+Set how hard every note it plays is struck.
 
-Example: `ce.components.arp.velocity("Arpeggiator", 64)` sets the velocity to 64.
+Example: `ce.components.arp.velocity("Arpeggiator", 110)` plays every note at velocity 110.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `velocity` (number, required): Velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The same for every note: the velocity the notes were held at is not used.
+- Default: 96.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4996,15 +4998,16 @@ Good to know:
 
 ##### `ce.components.arp.channel(target, channel) -> boolean`
 
-Set the channel.
+Set which MIDI channel it plays on.
 
-Example: `ce.components.arp.channel("Arpeggiator", 9)` sets the channel to 9.
+Example: `ce.components.arp.channel("Arpeggiator", 10)` plays its notes on channel 10.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `channel` (number, required): Channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

@@ -854,6 +854,14 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 13: velocity and channel.
+  assert.equal(MEMBER_BY_ID.arpVelocity.summary, 'Set how hard every note it plays is struck.');
+  assert.equal(MEMBER_BY_ID.arpVelocity.example, '`ce.components.arp.velocity("Arpeggiator", 110)` plays every note at velocity 110.');
+  assert.equal(text('arpVelocity', 'velocity'), 'MIDI velocity.\nRange: 1 ↔ 127, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpVelocity.notes.slice(0, 2), ['The same for every note: the velocity the notes were held at is not used.', 'Default: 96.']);
+  assert.equal(MEMBER_BY_ID.arpChannel.summary, 'Set which MIDI channel it plays on.');
+  assert.equal(MEMBER_BY_ID.arpChannel.example, '`ce.components.arp.channel("Arpeggiator", 10)` plays its notes on channel 10.');
+  assert.equal(text('arpChannel', 'channel'), 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   // Item 12: the Euclidean rhythm.
   assert.equal(MEMBER_BY_ID.arpEuclid.summary, 'Switch the Euclidean rhythm on or off.');
   assert.equal(MEMBER_BY_ID.arpEuclid.example, '`ce.components.arp.euclid("Arpeggiator", true)` plays only the steps the rhythm hits.');

@@ -1281,7 +1281,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 10. `source`, `link`, `inputChannel`: done, below.
 11. `run`, `sync`, `division`: done, below.
 12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: done, below.
-13. `velocity`, `channel`: texts.
+13. `velocity`, `channel`: done, below.
 14. `editable`, `showNotes`, `showHeader`: texts.
 15. The family: its summary, the control name in the examples, `read`'s notes.
 
@@ -1509,6 +1509,25 @@ off (it took -32 to 32 and stopped there). Checked in the engine: rotate 1 moves
 | `euclidRotate` | Turn the rhythm by a number of steps. · `euclidRotate("Arpeggiator", 1)` moves every hit a step earlier. | Steps to turn it: each hit that many steps earlier. / Past the steps, or below 0: round them; -1 is the last. / A fraction: rounded. / Invalid: rejected with a console error. | Default: 0. |
 
 Each ends with the two notes every command has.
+
+**Item 13, `velocity` and `channel`: done, texts only.** Every note plays at the arp's own
+velocity (`arpFireStep` reads `arpVelocity`), the velocity a linked Chord Pad or the MIDI input held
+it at not used, on its own channel. Approved as proposed ("Item 13 approved").
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `velocity` | Set how hard every note it plays is struck. · `velocity("Arpeggiator", 110)` plays every note at velocity 110. | MIDI velocity. / Range: 1 ↔ 127, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | The same for every note: the velocity the notes were held at is not used. / Default: 96. |
+| `channel` | Set which MIDI channel it plays on. · `channel("Arpeggiator", 10)` plays its notes on channel 10. | MIDI channel. / Range: 1 ↔ 16, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Default: 1. |
+
+Each ends with the two notes every command has.
+
+**CI, 2026-10-25.** From 19:02 UTC Microsoft's download host refused .NET 10.0.403 and the
+10.0.14 runtime (HTTP 409 from `dotnetorigin.blob.core.windows.net`) to `actions/setup-dotnet`, and
+`web-tests` and `windows` failed before building or testing anything, three runs in a row. At the
+owner's word ("Do what is necessary to get it through") `ci.yml`'s two `setup-dotnet` steps carry
+on past a failed download, and a step after each lists the runner image's SDKs, failing when there
+is no .NET at all and saying in the annotations when the fallback was used; both C# checks take the
+newest SDK present when 10 is not. When the download works again, nothing is to undo.
 
 ## Checking each batch
 
