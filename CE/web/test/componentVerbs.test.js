@@ -854,6 +854,20 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 11: run, sync and division.
+  assert.equal(MEMBER_BY_ID.arpRun.summary, 'Start or stop the arp.');
+  assert.equal(MEMBER_BY_ID.arpRun.example, '`ce.components.arp.run("Arpeggiator", false)` stops it.');
+  assert.equal(text('arpRun', 'run'), 'true: plays.\nfalse: stops.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(MEMBER_BY_ID.arpRun.notes.slice(0, 3), ['Free-running: it starts again where it stopped.', 'Synced: it plays only while the Transport runs.', 'Default: true.']);
+  assert.equal(MEMBER_BY_ID.arpSync.summary, 'Follow the Transport\'s tempo, or run at its own rate.');
+  assert.equal(MEMBER_BY_ID.arpSync.example, '`ce.components.arp.sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`.');
+  assert.match(text('arpSync', 'sync'), /^true: one step per `division\(\)` at the Transport's tempo, in step with its position\.\nfalse: `rate\(\)` steps a second\.\nLeft out: toggles\./);
+  assert.equal(MEMBER_BY_ID.arpDivision.summary, 'Set how long each step is while synced.');
+  assert.equal(MEMBER_BY_ID.arpDivision.example, '`ce.components.arp.division("Arpeggiator", "1/8T")` plays eighth-note triplets.');
+  assert.equal(text('arpDivision', 'division'), ['A note value, "1/1" a whole note to "1/32".', '"D" after it: dotted, half as long again.',
+    '"T" after it: a triplet, two-thirds as long.',
+    'One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.',
+    'Invalid: rejected with a console error.'].join('\n'));
   // Item 10: source, link and inputChannel.
   assert.equal(MEMBER_BY_ID.arpSource.summary, 'Set where the notes come from.');
   assert.equal(text('arpSource', 'source'), '"chord": its own chord, from `key()`, `scale()` and `degree()`.\n"link": the notes held on the Chord Pad set by `link()`.\n"input": the notes held on the MIDI input, on `inputChannel()`.\nCase-insensitive.\nInvalid: rejected with a console error.');

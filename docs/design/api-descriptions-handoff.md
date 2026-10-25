@@ -1279,7 +1279,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
    below.
 9. `latch`: done, below.
 10. `source`, `link`, `inputChannel`: done, below.
-11. `run`, `sync`, `division`: texts.
+11. `run`, `sync`, `division`: done, below.
 12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: pulses past the steps fire every step;
     rotate takes -32 to 32 where the inspector offers 0 to 31.
 13. `velocity`, `channel`: texts.
@@ -1473,6 +1473,22 @@ is where the approved text says both.
 | `source` | Set where the notes come from. · `source("Arpeggiator", "input")` plays the notes held on the MIDI input. | "chord": its own chord, from `key()`, `scale()` and `degree()`. / "link": the notes held on the Chord Pad set by `link()`. / "input": the notes held on the MIDI input, on `inputChannel()`. / Case-insensitive. / Invalid: rejected with a console error. | Default: "chord". |
 | `link` | Set the Chord Pad it plays from. · `link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads. | The Chord Pad's name. Case-insensitive. / Left out, or "": none. / Not on this panel, or not a Chord Pad: rejected with a console error. | Played only while `source()` is "link". / The Chord Pad stays silent while the arp plays from it. / `read(target, "link")` gives the Chord Pad's name. / Default: none. |
 | `inputChannel` | Set which MIDI channel it takes notes from. · `inputChannel("Arpeggiator", 2)` plays only the notes held on channel 2. | Channel 1 ↔ 16, or 0: any channel. / Range: 0 ↔ 16, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Only while `source()` is "input". / Default: 0, any channel. |
+
+Each ends with the two notes every command has.
+
+**Item 11, `run`, `sync` and `division`: done, texts only.** All three do what they should:
+stopped, a free-running arp holds its place and starts again from there; synced, it takes one step
+per division at the Transport's tempo, in step with its position, silent while the Transport is
+stopped, `rate()` and `phase()` without effect and the Transport's swing played unless
+`swingSource()` is "own"; "D" is dotted (x1.5) and "T" a triplet (x2/3), `DIVISIONS` in
+`transportLayout.js`. Approved as proposed ("Approved"). The division's list in its text is the
+transport's own (`DIVISION_WORDS`, from `DIVISION_IDS`).
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `run` | Start or stop the arp. · `run("Arpeggiator", false)` stops it. | true: plays. / false: stops. / Left out: toggles. / The usual false words. | Free-running: it starts again where it stopped. / Synced: it plays only while the Transport runs. / Default: true. |
+| `sync` | Follow the Transport's tempo, or run at its own rate. · `sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`. | true: one step per `division()` at the Transport's tempo, in step with its position. / false: `rate()` steps a second. / Left out: toggles. / The usual false words. | Synced: silent while the Transport is stopped. / Synced: `rate()` and `phase()` have no effect, and the Transport's swing plays unless `swingSource()` is "own". / Default: false. |
+| `division` | Set how long each step is while synced. · `division("Arpeggiator", "1/8T")` plays eighth-note triplets. | A note value, "1/1" a whole note to "1/32". / "D" after it: dotted, half as long again. / "T" after it: a triplet, two-thirds as long. / One of "1/1", … "1/16T". Case-insensitive. / Invalid: rejected with a console error. | While synced only: free-running, `rate()` sets the step. / Default: "1/16". |
 
 Each ends with the two notes every command has.
 

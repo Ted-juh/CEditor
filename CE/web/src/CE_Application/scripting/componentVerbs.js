@@ -39,6 +39,7 @@ import { scriptRangeOf } from '../models/inspectorFieldSets.js';
 import { VERB_VALUES } from './componentTables.js';
 import { pitchClassOf } from './musicTheory.js';
 import { SCALES as CHORD_SCALES } from '../utils/chordPadLayout.js';
+import { DIVISION_IDS } from '../utils/transportLayout.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
@@ -61,6 +62,11 @@ const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny ot
 const OWN_CHORD = 'Its own chord only.';
 const OWN_CHORD_ONLY = 'Its own chord only: with `source()` "link" or "input" the notes come from there.';
 const FOLLOWER_REPLACED = 'Following the panel\'s key: replaced at its next change.';
+/** The transport's note values, as an enum's text lists them: "1/1", "1/2", … or "1/16T". */
+const DIVISION_WORDS = (() => {
+  const quoted = DIVISION_IDS.map((id) => `"${id}"`);
+  return `${quoted.slice(0, -1).join(', ')} or ${quoted[quoted.length - 1]}`;
+})();
 /** How many notes a chord scale has, the most a degree can be: 7, 6 for blues, 5 for the pentatonics. */
 const scaleNoteCount = (scale) => (CHORD_SCALES[String(scale ?? 'minor')] ?? CHORD_SCALES.minor).length;
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
@@ -171,7 +177,10 @@ export const COMPONENT_FAMILIES = [
     id: 'arp', section: 'Arp', prefix: 'arp', label: 'Arpeggiator',
     summary: 'Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.',
     verbs: [
-      v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the arpeggiator. No argument toggles.' }),
+      // Item 11: run, sync and division, texts only.
+      v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the arp.', ex: ['false', 'stops it'],
+        argDocs: { run: `true: plays.\nfalse: stops.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Free-running: it starts again where it stopped.', 'Synced: it plays only while the Transport runs.', 'Default: true.'] }),
       // Item 1 of the owner's review: "random" and "asPlayed" played as "up" (every note set was
       // sorted, and nothing chose at random); arpLayout.arpSequence and arpStepCell now play them.
       v('pattern', 'pattern', ENUM, { doc: 'Set the order the notes are played in.',
@@ -185,8 +194,15 @@ export const COMPONENT_FAMILIES = [
         ex: ['8', 'plays eight steps a second'],
         argDocs: { rate: ['Steps per second.', 'Range: 0.1 ↔ 40.', 'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: ['While synced to the Transport: no effect; `division()` sets the step.', 'Default: 6.'] }),
-      v('division', 'division', ENUM, { doc: 'Note value per step while synced to the transport.' }),
-      v('sync', 'syncToTransport', BOOL, { toggle: true }),
+      v('division', 'division', ENUM, { doc: 'Set how long each step is while synced.', ex: ['"1/8T"', 'plays eighth-note triplets'],
+        argDocs: { division: ['A note value, "1/1" a whole note to "1/32".', '"D" after it: dotted, half as long again.',
+          '"T" after it: a triplet, two-thirds as long.', `One of ${DIVISION_WORDS}. Case-insensitive.`, 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['While synced only: free-running, `rate()` sets the step.', 'Default: "1/16".'] }),
+      v('sync', 'syncToTransport', BOOL, { toggle: true, doc: 'Follow the Transport\'s tempo, or run at its own rate.',
+        ex: ['true', 'steps in time with the Transport, one step per `division()`'],
+        argDocs: { sync: `true: one step per \`division()\` at the Transport's tempo, in step with its position.\nfalse: \`rate()\` steps a second.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Synced: silent while the Transport is stopped.',
+          'Synced: `rate()` and `phase()` have no effect, and the Transport\'s swing plays unless `swingSource()` is "own".', 'Default: false.'] }),
       // Item 3: 1 to 4, what plays (expandOctaves) and what the inspector offers; 5 and 6 played as 4.
       v('octaves', 'octaves', INT, { min: 1, max: 4, doc: 'Set how many octaves the notes are repeated over, upward.',
         ex: ['2', 'plays the notes, then the same notes an octave up'],

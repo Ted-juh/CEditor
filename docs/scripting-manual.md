@@ -4705,15 +4705,18 @@ Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.
 
 ##### `ce.components.arp.run(target [, run]) -> boolean`
 
-Start or stop the arpeggiator. No argument toggles.
+Start or stop the arp.
 
-Example: `ce.components.arp.run("Arpeggiator")` switches the running on if it is off, and off if it is on.
+Example: `ce.components.arp.run("Arpeggiator", false)` stops it.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `run` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `run` (true or false, optional): true: plays.<br>false: stops.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Free-running: it starts again where it stopped.
+- Synced: it plays only while the Transport runs.
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4756,15 +4759,17 @@ Good to know:
 
 ##### `ce.components.arp.division(target, division) -> boolean`
 
-Note value per step while synced to the transport.
+Set how long each step is while synced.
 
-Example: `ce.components.arp.division("Arpeggiator", "1/2")` sets the division to "1/2".
+Example: `ce.components.arp.division("Arpeggiator", "1/8T")` plays eighth-note triplets.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `division` (text, required): One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
+- `division` (text, required): A note value, "1/1" a whole note to "1/32".<br>"D" after it: dotted, half as long again.<br>"T" after it: a triplet, two-thirds as long.<br>One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While synced only: free-running, `rate()` sets the step.
+- Default: "1/16".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -4772,15 +4777,18 @@ Good to know:
 
 ##### `ce.components.arp.sync(target [, sync]) -> boolean`
 
-Switch the sync to transport on or off.
+Follow the Transport's tempo, or run at its own rate.
 
-Example: `ce.components.arp.sync("Arpeggiator")` switches the sync to transport on if it is off, and off if it is on.
+Example: `ce.components.arp.sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `sync` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `sync` (true or false, optional): true: one step per `division()` at the Transport's tempo, in step with its position.<br>false: `rate()` steps a second.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Synced: silent while the Transport is stopped.
+- Synced: `rate()` and `phase()` have no effect, and the Transport's swing plays unless `swingSource()` is "own".
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
