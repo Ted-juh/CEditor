@@ -5012,15 +5012,19 @@ Good to know:
 
 ##### `ce.components.arp.euclid(target [, euclid]) -> boolean`
 
-Switch the euclid enabled on or off.
+Switch the Euclidean rhythm on or off.
 
-Example: `ce.components.arp.euclid("Arpeggiator")` switches the euclid enabled on if it is off, and off if it is on.
+Example: `ce.components.arp.euclid("Arpeggiator", true)` plays only the steps the rhythm hits.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `euclid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `euclid` (true or false, optional): true: the rhythm decides which steps sound.<br>false: every step sounds.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`.
+- It runs against the notes: an 8-step rhythm over a 3-note chord lands on different notes each time round.
+- Hand mutes stay silent either way.
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5028,15 +5032,16 @@ Good to know:
 
 ##### `ce.components.arp.euclidSteps(target, euclidSteps) -> boolean`
 
-Set the euclid steps.
+Set how many steps the rhythm is long.
 
-Example: `ce.components.arp.euclidSteps("Arpeggiator", 17)` sets the euclid steps to 17.
+Example: `ce.components.arp.euclidSteps("Arpeggiator", 8)` makes an 8-step rhythm.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `euclidSteps` (number, required): Euclid steps.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `euclidSteps` (number, required): Steps in the rhythm.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 8.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5044,15 +5049,17 @@ Good to know:
 
 ##### `ce.components.arp.euclidPulses(target, euclidPulses) -> boolean`
 
-Set the euclid pulses.
+Set how many of the rhythm's steps sound.
 
-Example: `ce.components.arp.euclidPulses("Arpeggiator", 16)` sets the euclid pulses to 16.
+Example: `ce.components.arp.euclidPulses("Arpeggiator", 3)` sounds 3 steps, spread as evenly as they go.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `euclidPulses` (number, required): Euclid pulses.<br>Range: 0 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `euclidPulses` (number, required): Hits, spread as evenly as they go.<br>0: none sound.<br>Range: 0 ↔ `euclidSteps()`, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Steps lowered below it later: every step sounds.
+- Default: 5.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5060,15 +5067,16 @@ Good to know:
 
 ##### `ce.components.arp.euclidRotate(target, euclidRotate) -> boolean`
 
-Set the euclid rotate.
+Turn the rhythm by a number of steps.
 
-Example: `ce.components.arp.euclidRotate("Arpeggiator", 0)` sets the euclid rotate to 0.
+Example: `ce.components.arp.euclidRotate("Arpeggiator", 1)` moves every hit a step earlier.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `euclidRotate` (number, required): Euclid rotate.<br>Range: -32 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `euclidRotate` (number, required): Steps to turn it: each hit that many steps earlier.<br>Past the steps, or below 0: round them; -1 is the last.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

@@ -854,6 +854,15 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 12: the Euclidean rhythm.
+  assert.equal(MEMBER_BY_ID.arpEuclid.summary, 'Switch the Euclidean rhythm on or off.');
+  assert.equal(MEMBER_BY_ID.arpEuclid.example, '`ce.components.arp.euclid("Arpeggiator", true)` plays only the steps the rhythm hits.');
+  assert.equal(MEMBER_BY_ID.arpEuclid.notes[0], 'The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`.');
+  assert.equal(MEMBER_BY_ID.arpEuclidSteps.summary, 'Set how many steps the rhythm is long.');
+  assert.equal(text('arpEuclidPulses', 'euclidPulses'), 'Hits, spread as evenly as they go.\n0: none sound.\nRange: 0 ↔ `euclidSteps()`, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.arpEuclidPulses.notes[0], 'Steps lowered below it later: every step sounds.');
+  assert.equal(MEMBER_BY_ID.arpEuclidRotate.example, '`ce.components.arp.euclidRotate("Arpeggiator", 1)` moves every hit a step earlier.');
+  assert.equal(text('arpEuclidRotate', 'euclidRotate'), 'Steps to turn it: each hit that many steps earlier.\nPast the steps, or below 0: round them; -1 is the last.\nA fraction: rounded.\nInvalid: rejected with a console error.');
   // Item 11: run, sync and division.
   assert.equal(MEMBER_BY_ID.arpRun.summary, 'Start or stop the arp.');
   assert.equal(MEMBER_BY_ID.arpRun.example, '`ce.components.arp.run("Arpeggiator", false)` stops it.');

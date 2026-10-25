@@ -67,6 +67,18 @@ const DIVISION_WORDS = (() => {
   const quoted = DIVISION_IDS.map((id) => `"${id}"`);
   return `${quoted.slice(0, -1).join(', ')} or ${quoted[quoted.length - 1]}`;
 })();
+/** The Arpeggiator's rhythm length, as arpLayout.euclid reads it within the verb's own 1 to 32. */
+const euclidStepCount = (c) => {
+  const n = Math.round(Number(c?.euclidSteps ?? 8));
+  return Number.isFinite(n) ? Math.min(32, Math.max(1, n)) : 8;
+};
+/** A rotation round the rhythm's steps: -1 is the last, a whole turn is none. null when not a number. */
+const euclidRotation = (value, c) => {
+  const n = Number(value);
+  if (typeof value === 'boolean' || !Number.isFinite(n)) return null;
+  const steps = euclidStepCount(c);
+  return ((Math.round(n) % steps) + steps) % steps;
+};
 /** How many notes a chord scale has, the most a degree can be: 7, 6 for blues, 5 for the pentatonics. */
 const scaleNoteCount = (scale) => (CHORD_SCALES[String(scale ?? 'minor')] ?? CHORD_SCALES.minor).length;
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
@@ -260,10 +272,30 @@ export const COMPONENT_FAMILIES = [
         notes: [OWN_CHORD, 'Default: "triad".'] }),
       v('velocity', 'velocity', INT, VELOCITY),
       v('channel', 'channel', INT, CHANNEL),
-      v('euclid', 'euclidEnabled', BOOL, { toggle: true }),
-      v('euclidSteps', 'euclidSteps', INT, { min: 1, max: 32 }),
-      v('euclidPulses', 'euclidPulses', INT, { min: 0, max: 32 }),
-      v('euclidRotate', 'euclidRotate', INT, { min: -32, max: 32 }),
+      // Item 12, the Euclidean rhythm (arpLayout.euclid). Pulses run to the rhythm's own steps, as the
+      // inspector's do: 20 on 8 steps was stored and played every step. Rotate goes round the steps,
+      // as the engine already did: it took -32 to 32 and stopped there.
+      v('euclid', 'euclidEnabled', BOOL, { toggle: true, doc: 'Switch the Euclidean rhythm on or off.',
+        ex: ['true', 'plays only the steps the rhythm hits'],
+        argDocs: { euclid: `true: the rhythm decides which steps sound.\nfalse: every step sounds.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`.',
+          'It runs against the notes: an 8-step rhythm over a 3-note chord lands on different notes each time round.',
+          'Hand mutes stay silent either way.', 'Default: false.'] }),
+      v('euclidSteps', 'euclidSteps', INT, { min: 1, max: 32, doc: 'Set how many steps the rhythm is long.',
+        ex: ['8', 'makes an 8-step rhythm'],
+        argDocs: { euclidSteps: ['Steps in the rhythm.', 'Range: 1 ↔ 32, whole.', 'A fraction: rounded.', 'Outside the range: the nearest end.',
+          'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: 8.'] }),
+      v('euclidPulses', 'euclidPulses', INT, { min: 0, max: 32, rangeFrom: (c) => ({ max: euclidStepCount(c) }),
+        doc: 'Set how many of the rhythm\'s steps sound.', ex: ['3', 'sounds 3 steps, spread as evenly as they go'],
+        argDocs: { euclidPulses: ['Hits, spread as evenly as they go.', '0: none sound.', 'Range: 0 ↔ `euclidSteps()`, whole.', 'A fraction: rounded.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Steps lowered below it later: every step sounds.', 'Default: 5.'] }),
+      v('euclidRotate', 'euclidRotate', INT, { readValue: (value, c) => euclidRotation(value, c),
+        doc: 'Turn the rhythm by a number of steps.', ex: ['1', 'moves every hit a step earlier'],
+        argDocs: { euclidRotate: ['Steps to turn it: each hit that many steps earlier.', 'Past the steps, or below 0: round them; -1 is the last.',
+          'A fraction: rounded.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: 0.'] }),
       // The four the phase-7 spec skipped. `phase` was already a verb on the Orbit and the
       // Envelope, so a script could put those on the downbeat and not the Arpeggiator; `mutes`
       // was per-step muting reachable from the grid and nowhere else, while the Looper's lanes
@@ -1113,7 +1145,7 @@ function axisRange(verb, field, c) {
  */
 function scalarCall(verb, c, given) {
   const spec = verb.rangeFrom ? { ...verb, ...verb.rangeFrom(c && typeof c === 'object' ? c : {}) } : verb;
-  const value = verb.readValue && given !== undefined && given !== null ? verb.readValue(given) : given;
+  const value = verb.readValue && given !== undefined && given !== null ? verb.readValue(given, c && typeof c === 'object' ? c : {}) : given;
   return { spec, value };
 }
 

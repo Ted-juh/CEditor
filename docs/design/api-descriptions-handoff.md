@@ -1280,8 +1280,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 9. `latch`: done, below.
 10. `source`, `link`, `inputChannel`: done, below.
 11. `run`, `sync`, `division`: done, below.
-12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: pulses past the steps fire every step;
-    rotate takes -32 to 32 where the inspector offers 0 to 31.
+12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: done, below.
 13. `velocity`, `channel`: texts.
 14. `editable`, `showNotes`, `showHeader`: texts.
 15. The family: its summary, the control name in the examples, `read`'s notes.
@@ -1489,6 +1488,25 @@ transport's own (`DIVISION_WORDS`, from `DIVISION_IDS`).
 | `run` | Start or stop the arp. · `run("Arpeggiator", false)` stops it. | true: plays. / false: stops. / Left out: toggles. / The usual false words. | Free-running: it starts again where it stopped. / Synced: it plays only while the Transport runs. / Default: true. |
 | `sync` | Follow the Transport's tempo, or run at its own rate. · `sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`. | true: one step per `division()` at the Transport's tempo, in step with its position. / false: `rate()` steps a second. / Left out: toggles. / The usual false words. | Synced: silent while the Transport is stopped. / Synced: `rate()` and `phase()` have no effect, and the Transport's swing plays unless `swingSource()` is "own". / Default: false. |
 | `division` | Set how long each step is while synced. · `division("Arpeggiator", "1/8T")` plays eighth-note triplets. | A note value, "1/1" a whole note to "1/32". / "D" after it: dotted, half as long again. / "T" after it: a triplet, two-thirds as long. / One of "1/1", … "1/16T". Case-insensitive. / Invalid: rejected with a console error. | While synced only: free-running, `rate()` sets the step. / Default: "1/16". |
+
+Each ends with the two notes every command has.
+
+**Item 12, the Euclidean rhythm: done.** `euclidPulses()` hits spread over `euclidSteps()` steps,
+turned by `euclidRotate()` (`arpLayout.euclid`), measured in the free-running step number so a
+rhythm of one length runs against a note set of another. Two decisions, at the owner's word ("As
+recommended"): pulses take 0 to the rhythm's own steps (`rangeFrom`), as the inspector's do,
+past them the nearest end with the one-time warning (20 on 8 steps was stored and played every
+step); and a rotation goes round the steps, as the engine already did (`readValue`, now handed
+the control's settings too): -1 is the last, 40 on 8 steps is 0, no warning since nothing is cut
+off (it took -32 to 32 and stopped there). Checked in the engine: rotate 1 moves hits 3 6 8 to
+2 5 7, each a step earlier.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `euclid` | Switch the Euclidean rhythm on or off. · `euclid("Arpeggiator", true)` plays only the steps the rhythm hits. | true: the rhythm decides which steps sound. / false: every step sounds. / Left out: toggles. / The usual false words. | The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`. / It runs against the notes: an 8-step rhythm over a 3-note chord lands on different notes each time round. / Hand mutes stay silent either way. / Default: false. |
+| `euclidSteps` | Set how many steps the rhythm is long. · `euclidSteps("Arpeggiator", 8)` makes an 8-step rhythm. | Steps in the rhythm. / Range: 1 ↔ 32, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Default: 8. |
+| `euclidPulses` | Set how many of the rhythm's steps sound. · `euclidPulses("Arpeggiator", 3)` sounds 3 steps, spread as evenly as they go. | Hits, spread as evenly as they go. / 0: none sound. / Range: 0 ↔ `euclidSteps()`, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Steps lowered below it later: every step sounds. / Default: 5. |
+| `euclidRotate` | Turn the rhythm by a number of steps. · `euclidRotate("Arpeggiator", 1)` moves every hit a step earlier. | Steps to turn it: each hit that many steps earlier. / Past the steps, or below 0: round them; -1 is the last. / A fraction: rounded. / Invalid: rejected with a console error. | Default: 0. |
 
 Each ends with the two notes every command has.
 

@@ -71,3 +71,18 @@ test('followPanelKey(true) takes the panel\'s key and scale at once; again when 
   assert.deepEqual(read.result, [true, 10, 5, false]);
   assert.deepEqual(read.said, ['arp Arp: key("X") — refused, nothing changed. "X" is not a note: a name such as "C", "F#" or "Eb", or 0 to 11.']);
 });
+
+// Item 12: the Euclidean rhythm's pulses run to its own steps, and its rotation goes round them.
+test('pulses run to the rhythm\'s steps, and a rotation goes round them', () => {
+  const pulses = verb('arpEuclidPulses');
+  assert.deepEqual(componentScriptPatch(pulses, { euclidSteps: 8, euclidPulses: 5 }, [20]), { euclidPulses: 8 });
+  assert.equal(componentClampWarning(pulses, 'Arp', [20], { euclidSteps: 8 }),
+    'arp Arp: euclidPulses(20) — the euclidPulses 20 is outside 0 to 8, so 8 was used.');
+  assert.deepEqual(componentScriptPatch(pulses, { euclidSteps: 16, euclidPulses: 5 }, [12]), { euclidPulses: 12 });
+  const rotate = verb('arpEuclidRotate');
+  assert.deepEqual([-1, 9, 40, 2.6].map((n) => componentScriptPatch(rotate, { euclidSteps: 8, euclidRotate: 5 }, [n]).euclidRotate), [7, 1, 0, 3]);
+  assert.equal(componentClampWarning(rotate, 'Arp', [40], { euclidSteps: 8 }), null, 'round the steps is not past an end');
+  assert.deepEqual(componentScriptPatch(rotate, { euclidSteps: 8, euclidRotate: 0 }, ['x']), {});
+  assert.equal(componentRefusalReason(rotate, { euclidSteps: 8 }, ['x']), '"x" is not a number.');
+});
+

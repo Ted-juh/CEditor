@@ -248,6 +248,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - A component's link that is refused (`ce.components.arp.link`, `meter.source`, `lcd.valueSource`
   and the six others) says so in the console as every other command does:
   `arp Arp: link("Knob") — refused, nothing changed. "Knob" is not a Chord Pad.`
+- The Arpeggiator's `euclidPulses` takes 0 to the rhythm's steps, as the inspector does; 20 on 8 steps
+  was stored and sounded every step. `euclidRotate` goes round the steps, -1 the last, as the
+  rhythm always did; it took -32 to 32 and stopped there.
 
 ## What you get
 
