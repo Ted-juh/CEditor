@@ -227,6 +227,8 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.arp.rate` takes 0.1 to 40 steps a second, as the inspector does; past it, the
   nearest end with a console warning the first time. It took 0.01 to 200, and played nothing slower
   than 0.1 and skipped steps above about 60.
+- `ce.components.arp.octaves` takes 1 to 4, as the inspector does; 5 and 6 were stored and played
+  as 4.
 
 ## What you get
 

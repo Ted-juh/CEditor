@@ -1270,7 +1270,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 
 1. `pattern`: done, below.
 2. `rate`: done, below.
-3. `octaves`: 5 and 6 are stored and play as 4; the inspector offers 1 to 4.
+3. `octaves`: done, below.
 4. `gate`: 0 is taken; the inspector starts at 0.05; the engine holds at most 99% of a step.
 5. `swing`: a negative swing plays straight; while synced the Transport's swing is used unless the
    inspector's swing source is "own", which no script can set.
@@ -1328,6 +1328,18 @@ range, as the LCD's `animSpeed` does: outside it, the nearest end with the one-t
 | Example | `ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second. |
 | `rate` (number, required) | Steps per second. / Range: 0.1 ↔ 40. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
 | notes | While synced to the Transport: no effect; `division()` sets the step. / Default: 6. / Then the two every command has. |
+
+**Item 3, `octaves`: done.** It took 1 to 6; the engine repeats the notes over at most four octaves
+(`expandOctaves`, and `arpSequence`'s "asPlayed" walk), so 5 and 6 were stored and played as 4
+without a word. The inspector offers 1 to 4. At the owner's word ("As recommended") a script takes
+1 to 4: past it, the nearest end with the one-time warning.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how many octaves the notes are repeated over, upward. |
+| Example | `ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up. |
+| `octaves` (number, required) | Octaves, from the notes up. / 1: the notes only. / Range: 1 ↔ 4, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | A note above 127 is left out. / With "chord": every octave at once. / Default: 1. / Then the two every command has. |
 
 ## Checking each batch
 

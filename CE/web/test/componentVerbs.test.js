@@ -801,6 +801,13 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.deepEqual([rate.min, rate.max], [0.1, 40]);
   assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [0.05]), { rate: 0.1 });
   assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [300]), { rate: 40 });
+  // Item 3: octaves, what plays and what the inspector offers.
+  assert.equal(MEMBER_BY_ID.arpOctaves.summary, 'Set how many octaves the notes are repeated over, upward.');
+  assert.equal(MEMBER_BY_ID.arpOctaves.example, '`ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up.');
+  assert.equal(text('arpOctaves', 'octaves'), 'Octaves, from the notes up.\n1: the notes only.\nRange: 1 ↔ 4, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpOctaves.notes.slice(0, 3), ['A note above 127 is left out.', 'With "chord": every octave at once.', 'Default: 1.']);
+  const octaves = COMPONENT_VERBS.find((verb) => verb.id === 'arpOctaves');
+  assert.deepEqual(componentScriptPatch(octaves, { octaves: 1 }, [6]), { octaves: 4 });
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

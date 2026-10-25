@@ -4788,15 +4788,18 @@ Good to know:
 
 ##### `ce.components.arp.octaves(target, octaves) -> boolean`
 
-Set the octaves.
+Set how many octaves the notes are repeated over, upward.
 
-Example: `ce.components.arp.octaves("Arpeggiator", 4)` sets the octaves to 4.
+Example: `ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `octaves` (number, required): Octaves.<br>Range: 1 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `octaves` (number, required): Octaves, from the notes up.<br>1: the notes only.<br>Range: 1 ↔ 4, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- A note above 127 is left out.
+- With "chord": every octave at once.
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

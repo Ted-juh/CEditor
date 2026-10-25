@@ -178,7 +178,12 @@ export const COMPONENT_FAMILIES = [
         notes: ['While synced to the Transport: no effect; `division()` sets the step.', 'Default: 6.'] }),
       v('division', 'division', ENUM, { doc: 'Note value per step while synced to the transport.' }),
       v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('octaves', 'octaves', INT, { min: 1, max: 6 }),
+      // Item 3: 1 to 4, what plays (expandOctaves) and what the inspector offers; 5 and 6 played as 4.
+      v('octaves', 'octaves', INT, { min: 1, max: 4, doc: 'Set how many octaves the notes are repeated over, upward.',
+        ex: ['2', 'plays the notes, then the same notes an octave up'],
+        argDocs: { octaves: ['Octaves, from the notes up.', '1: the notes only.', 'Range: 1 ↔ 4, whole.', 'A fraction: rounded.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['A note above 127 is left out.', 'With "chord": every octave at once.', 'Default: 1.'] }),
       v('gate', 'gate', NUM, { ...UNIT, doc: 'How much of each step is held, 0..1.' }),
       v('swing', 'swing', NUM, { min: -1, max: 1 }),
       v('latch', 'latch', BOOL, { toggle: true }),
