@@ -16,12 +16,12 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 447 verbs",
+  "description": "QA-05 — 23 verb families, 453 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 6257,
+  "height": 6296,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -115,7 +115,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 447 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 453 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -1505,7 +1505,7 @@
         "Core": {"name":"caption_qa_cap_43","id":"qa_cap_43","controlType":"Label"},
         "Transform": {"x":312,"y":5641,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
-        "Text": {"content":"38 verbs","_children":{"Font":{"size":11}}},
+        "Text": {"content":"44 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
@@ -1513,9 +1513,9 @@
     {
       "_children": {
         "Core": {"name":"verbs_lcd","id":"qa05_lcd_verbs","controlType":"Label"},
-        "Transform": {"x":312,"y":5663,"width":470,"height":263},
+        "Transform": {"x":312,"y":5663,"width":470,"height":302},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"lcd.text(line)                lcd.cursorBlink[on]\nlcd.clear(line)               lcd.valueMin(num)\nlcd.backlight[on]             lcd.valueMax(num)\nlcd.brightness(num)           lcd.valuePrecision(int)\nlcd.contrast(num)             lcd.valuePrefix(str)\nlcd.scroll(enum)              lcd.valueSuffix(str)\nlcd.scrollSpeed(num)          lcd.valueSource(link)\nlcd.blink[on]                 lcd.brightnessSource(link)\nlcd.cursor(enum)              lcd.backlightSource(link)\nlcd.cursorAt(xy)              lcd.glyph(item)\nlcd.value(num)                lcd.editText(str)\nlcd.anim(enum)                lcd.layout(layout)\nlcd.animPreset(enum)          lcd.showGlass[on]\nlcd.animSpeed(num)            lcd.showGhost[on]\nlcd.animFps(num)              lcd.showScanlines[on]\nlcd.animLoop[on]              lcd.showGrid[on]\nlcd.scrollMode(enum)          lcd.read(read)\nlcd.scrollRepeat(int)         lcd.size(size)\nlcd.blinkRate(num)            lcd.fill(fill)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"lcd.text(line)                lcd.valuePrecision(int)\nlcd.clear(line)               lcd.valuePrefix(str)\nlcd.backlight[on]             lcd.valueSuffix(str)\nlcd.brightness(num)           lcd.valueSource(link)\nlcd.contrast(num)             lcd.brightnessSource(link)\nlcd.scroll(enum)              lcd.backlightSource(link)\nlcd.scrollSpeed(num)          lcd.glyph(item)\nlcd.blink[on]                 lcd.editText(str)\nlcd.cursor(enum)              lcd.zoneText(elem)\nlcd.cursorAt(xy)              lcd.zoneLabel(elem)\nlcd.value(num)                lcd.zoneShow(elem)\nlcd.anim(enum)                lcd.zoneAt(elem)\nlcd.animPreset(enum)          lcd.zoneSource(elem)\nlcd.animSpeed(num)            lcd.zoneKind(elem)\nlcd.animFps(num)              lcd.layout(layout)\nlcd.animLoop[on]              lcd.showGlass[on]\nlcd.scrollMode(enum)          lcd.showGhost[on]\nlcd.scrollRepeat(int)         lcd.showScanlines[on]\nlcd.blinkRate(num)            lcd.showGrid[on]\nlcd.cursorBlink[on]           lcd.read(read)\nlcd.valueMin(num)             lcd.size(size)\nlcd.valueMax(num)             lcd.fill(fill)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
@@ -1523,7 +1523,7 @@
     {
       "_children": {
         "Core": {"name":"group_Pixel_Display_pixel_Drive_a_pixel_display_its_elements_text_visibility_and_position_plus_backlight_brightness_and_animation_","id":"qa_group_22","controlType":"Label"},
-        "Transform": {"x":28,"y":5960,"width":1544,"height":26},
+        "Transform": {"x":28,"y":5999,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"Pixel Display — pixel.*  (Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
@@ -1533,7 +1533,7 @@
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_44","id":"qa_cap_44","controlType":"Label"},
-        "Transform": {"x":28,"y":5996,"width":260,"height":18},
+        "Transform": {"x":28,"y":6035,"width":260,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"PixelDisplay — the component these drive","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1543,14 +1543,14 @@
     {
       "_children": {
         "Core": {"name":"qa05_pixel","id":"qa05_pixel_component","controlType":"PixelDisplay"},
-        "Transform": {"x":28,"y":6018}
+        "Transform": {"x":28,"y":6057}
       },
       "_type": "Control"
     },
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_45","id":"qa_cap_45","controlType":"Label"},
-        "Transform": {"x":312,"y":5996,"width":470,"height":18},
+        "Transform": {"x":312,"y":6035,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"29 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1560,7 +1560,7 @@
     {
       "_children": {
         "Core": {"name":"verbs_pixel","id":"qa05_pixel_verbs","controlType":"Label"},
-        "Transform": {"x":312,"y":6018,"width":470,"height":211},
+        "Transform": {"x":312,"y":6057,"width":470,"height":211},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"pixel.text(elem)              pixel.animPreset(enum)\npixel.label(elem)             pixel.animSpeed(num)\npixel.show(elem)              pixel.animLoop[on]\npixel.blink(elem)             pixel.animFps(num)\npixel.x(elem)                 pixel.layoutTransition(enum)\npixel.y(elem)                 pixel.transitionMs(num)\npixel.w(elem)                 pixel.brightnessSource(link)\npixel.h(elem)                 pixel.backlightSource(link)\npixel.editText(str)           pixel.layout(layout)\npixel.backlight[on]           pixel.showGlass[on]\npixel.brightness(num)         pixel.showGhost[on]\npixel.contrast(num)           pixel.showScanlines[on]\npixel.gamma(num)              pixel.showGrid[on]\npixel.glow(num)               pixel.read(read)\npixel.anim(enum)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}

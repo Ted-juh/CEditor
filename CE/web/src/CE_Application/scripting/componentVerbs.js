@@ -42,11 +42,11 @@ import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
   drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
 } from '../utils/drumPadLayout.js';
-import { elementSites, elementAt, elementsPatch, elementLists, elementLabel } from '../utils/pixelElements.js';
+import { elementSites, elementAt, elementsPatch, elementsUpdate, elementNames } from '../utils/pixelElements.js';
 import { shownValue } from './shownValue.js';
 import { listWord } from '../utils/wordLists.js';
 import { glyphBitsRefusal } from '../utils/lcdUserGlyphs.js';
-import { lcdWriteAt, lcdClearAt, lcdRows, lcdLayoutIndex, lcdLayoutCount } from './lcdPositions.js';
+import { lcdWriteAt, lcdClearAt, lcdRows, lcdLayoutIndex, lcdLayoutCount, lcdZonePlace } from './lcdPositions.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 // What reads as off for an on/off verb: false, 0, "", and the words "false", "off" and "0" in any
@@ -710,6 +710,35 @@ export const COMPONENT_FAMILIES = [
       v('editText', 'editText', STR, { doc: 'Set the text in the display\'s editable field.', ex: ['"INIT VOICE"', 'puts INIT VOICE in the field'],
         argDocs: { editText: 'The text in the field.\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.' },
         notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.'] }),
+      // ZONES, BY NAME (the owner's decision after the LCD's review): a layout's zones, addressed as
+      // a Pixel Display's elements are (utils/pixelElements.js with `list: 'zones'`). The name is
+      // the one typed in the zone table, matched in any case, and it reaches every zone carrying it
+      // on every layout, as duplicating a layout keeps the names. Prefixed `zone`, because `text`
+      // and the rest already mean the display's own.
+      v('zoneText', 'layouts', ELEM, { list: 'zones', item: 'text', kind: STR, doc: 'Set the text of a fixed-text zone, by its name.',
+        ex: ['"Title", "VOL"', 'writes VOL in the zone called Title'],
+        argDocs: { text: 'The text.\nShown by a zone that shows fixed text.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
+      v('zoneLabel', 'layouts', ELEM, { list: 'zones', item: 'label', kind: STR, doc: 'Set the name a name zone shows in place of its control\'s, by its name.',
+        ex: ['"Cutoff", "CUT"', 'shows CUT in the zone called Cutoff, in place of the control\'s name'],
+        argDocs: { label: 'The name shown.\n"": the control\'s own name.\nShown by a zone that shows a name.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
+      v('zoneShow', 'layouts', ELEM, { list: 'zones', item: 'visible', arg: 'on', kind: BOOL, absent: true, doc: 'Show or hide a zone, by its name.',
+        ex: ['"Cutoff"', 'hides the zone called Cutoff if it is shown, and shows it if it is hidden'],
+        argDocs: { on: `true: shown.\nfalse: hidden; the layout's text shows through.\nLeft out: toggles.\n${OFF_RULE}` } }),
+      v('zoneAt', 'layouts', ELEM, { list: 'zones', item: 'at', arg: 'place', kind: POSITION, place: true, doc: 'Move a zone, by its name.',
+        ex: ['"Cutoff", {row = 2, col = {1, 8}}', 'moves the zone called Cutoff to columns 1 to 8 of row 2'],
+        argDocs: { place: ['A table: {row = 2, col = {1, 8}}, each part optional.', '`row`: one row, counted from 1.',
+          '`col`: the first column, the zone keeping its width up to the display\'s edge; or a range {1, 8}.',
+          'A row number alone: the row.', 'A part left out: unchanged.', 'A fraction: rounded.',
+          'A range past the display: to its last column.', 'Not on the display: rejected with a console error.'].join('\n') } }),
+      v('zoneSource', 'layouts', ELEM, { list: 'zones', item: 'sourceId', arg: 'control', kind: STR, link: true, doc: 'Link a zone to another control, by its name.',
+        ex: ['"Cutoff", "Resonance"', 'makes the zone called Cutoff show the control called Resonance'],
+        argDocs: { control: ['The control\'s name. Case-insensitive.', '"": unlinked.',
+          '"@active": the control last touched.', '"@active#value", "@active#switch" or "@active#choice": the last of that kind.',
+          '"@edit": the display\'s editable field.', 'This display, or not on this panel: rejected with a console error.',
+          'Left out: rejected with a console error.'].join('\n') },
+        notes: ['`read(target, "zoneSource", "Cutoff")` gives the control\'s name.'] }),
+      v('zoneKind', 'layouts', ELEM, { list: 'zones', item: 'show', arg: 'kind', kind: ENUM, doc: 'Set what a zone shows, by its name.',
+        ex: ['"Cutoff", "bar"', 'makes the zone called Cutoff show its control as a bar'] }),
       v('layout', 'layouts', LAYOUT, { flat: 'its own rows', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
         notes: ['Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.'] }),
       // The four overlays, declared here rather than derived (derivedFlagVerbs) for what each is.
@@ -1102,11 +1131,21 @@ export function componentScriptPatch(verb, cfg, args = []) {
       // The FIRST match decides what a toggle toggles from. Two elements of the same name are the
       // same element on two pages (duplicating a layout keeps names and re-mints ids), so letting
       // each flip from its own state would drive them apart on the first `show` with no argument.
-      const sites = elementSites(c, a);
+      const list = verb.list ?? 'elements';
+      const sites = elementSites(c, a, list);
       if (!sites.length) return {};
-      const next = coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]);
+      // zoneAt moves each zone by the place given, keeping its own width (lcdPositions.js).
+      if (verb.place) {
+        const { place, refusal } = lcdZonePlace(c, b);
+        return refusal ? {} : elementsUpdate(c, sites, place, list);
+      }
+      // A zone without `visible` is shown (`absent`), so a toggle starts from there.
+      const next = coerce(verb.kind, b, verb, elementAt(c, sites[0], list)?.[verb.item] ?? verb.absent);
       if (next === null) return {};
-      return elementsPatch(c, sites, verb.item, next);
+      if (verb.absent !== undefined) {
+        return elementsUpdate(c, sites, (el) => ((el[verb.item] ?? verb.absent) === next ? el : { ...el, [verb.item]: next }), list);
+      }
+      return elementsPatch(c, sites, verb.item, next, list);
     }
 
     case CELL: {
@@ -1224,9 +1263,11 @@ export function componentRequestLegal(verb, cfg, args = []) {
       // difference between this and the index-addressed attempt: "there is no element called
       // tempo" is something the console can say and a script can branch on. An index past the end
       // of an empty list said nothing at all.
-      const sites = elementSites(c, a);
+      const list = verb.list ?? 'elements';
+      const sites = elementSites(c, a, list);
       if (!sites.length) return false;
-      return coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]) !== null;
+      if (verb.place) return !lcdZonePlace(c, b).refusal;
+      return coerce(verb.kind, b, verb, elementAt(c, sites[0], list)?.[verb.item]) !== null;
     }
     case LAYOUT: return !lcdLayoutIndex(c, a, verb.flat).refusal;
     case LINE: {
@@ -1299,9 +1340,7 @@ export function componentIndexRange(verb, cfg) {
       if (lcdLines(verb)) return { count: lcdRows(c) };
       return Array.isArray(c[verb.f]) ? { count: c[verb.f].length } : null;
     case ELEM: {
-      const names = [];
-      for (const { elements } of elementLists(c)) for (const el of elements) { const n = elementLabel(el); if (n && !names.includes(n)) names.push(n); }
-      return { names };
+      return { names: elementNames(c, verb.list ?? 'elements') };
     }
     case INDEXSET: return { count: null };
     default: return null;
@@ -1361,9 +1400,14 @@ export function componentRefusalReason(verb, cfg, args = []) {
       return bad !== undefined ? `${shownValue(bad)} is not a number.` : xyGiven(a) || xyGiven(b) ? null : 'No number was given.';
     }
     case ELEM: {
-      if (elementSites(c, a).length) return null;
+      const noun = verb.list === 'zones' ? 'zone' : 'element';
+      if (elementSites(c, a, verb.list ?? 'elements').length) {
+        if (verb.place) return lcdZonePlace(c, b).refusal ?? null;
+        if (verb.link) return b === undefined || b === null ? 'No control was given: a control\'s name, or "" to unlink.' : null;
+        return verb.kind === STR && (b === undefined || b === null) ? 'No text was given.' : null;
+      }
       const { names } = componentIndexRange(verb, c);
-      return `There is no element called ${shownValue(a)}.${names.length ? ` The elements are ${names.map((n) => `"${n}"`).join(', ')}.` : ' It has none yet.'}`;
+      return `There is no ${noun} called ${shownValue(a)}.${names.length ? ` The ${noun}s are ${names.map((n) => `"${n}"`).join(', ')}.` : ' It has none yet.'}`;
     }
     default: return null;
   }
@@ -1381,6 +1425,11 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
   // A refused call used nothing, so it has no nearest end to say.
   if (verb.k === XY && !xyLegal(args[0], args[1])) return null;
   // A range of rows or columns that runs past the display's edge stops at it.
+  if (verb.place) {
+    if (!elementSites(cfg, args[0], verb.list).length) return null;
+    const said = lcdZonePlace(cfg, args[1]).clamped;
+    return said ? `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — ${said}` : null;
+  }
   if (lcdLines(verb)) {
     const said = (verb.clear ? lcdClearAt(cfg, args[0]) : lcdWriteAt(cfg, args[0], args[1])).clamped;
     return said ? `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — ${said}` : null;
@@ -1485,7 +1534,7 @@ export function verbArgs(verb) {
   switch (verb.k) {
     case XY: return verb.args ?? ['x', 'y'];
     case ITEM: return ['index', verb.item];
-    case ELEM: return ['name', verb.item];
+    case ELEM: return ['name', verb.arg ?? verb.item];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col', 'amount'] : ['index', 'value']);
     case LINE: return lcdLines(verb) ? (verb.clear ? ['at'] : ['at', 'text']) : (verb.clear ? [] : ['row', 'text']);
     case INDEXSET: return ['index', 'on'];
@@ -1628,6 +1677,15 @@ function sampleList(spec) {
   return { text: `{${[0.25, 0.5, 0.75].map(at).join(', ')}}`, count: 3 };
 }
 
+/** What read's index is for a family whose elements or zones are addressed by name. */
+function elementReadLines(verb) {
+  const named = Object.values(VERBS_BY_FAMILY[verb.family] ?? {}).filter((spec) => spec.k === ELEM);
+  const element = named.find((spec) => spec.v === 'text' || spec.v === 'zoneText') ?? named[0];
+  if (!element) return [];
+  const noun = element.list === 'zones' ? 'zone' : 'element';
+  return [`For ${noun === 'zone' ? 'a' : 'an'} ${noun} verb, such as "${element.v}": the ${noun}'s name, case-insensitive.`];
+}
+
 /** read's and size's notes, from the family's own lists: the first by name, as firstList takes it. */
 function familyNotes(verb) {
   const lists = Object.values(VERBS_BY_FAMILY[verb.family] ?? {})
@@ -1642,11 +1700,13 @@ function familyNotes(verb) {
     return [`\`size(target)\`: every list as a table, by verb name; ${one}${rows}`];
   }
   const all = '`read(target)`: every setting as a table, by verb name.';
+  // An element's text is what a reader of a pixel display reads first, and a zone's of an LCD.
+  const element = named.find((spec) => spec.v === 'text' || spec.v === 'zoneText') ?? named[0];
+  const noun = element?.list === 'zones' ? 'zone' : 'element';
+  const byName = element ? `\`read(target, "${element.v}")\`: every ${noun}'s, by name; \`read(target, "${element.v}", "${noun === 'zone' ? 'Title' : 'title'}")\`: one ${noun}'s.` : '';
   if (first === grid && first) return [`${all} \`read(target, "${first.v}")\`: the whole grid, as rows; \`read(target, "${first.v}", 2, 3)\`: row 2, column 3.`];
-  if (first) return [`${all} \`read(target, "${first.v}")\`: the whole list; \`read(target, "${first.v}", 3)\`: one ${itemNoun(first)}, counted from 1.`];
-  // An element's text is what a reader of a pixel display reads first.
-  const element = named.find((spec) => spec.v === 'text') ?? named[0];
-  if (element) return [`${all} \`read(target, "${element.v}")\`: every element's, by name; \`read(target, "${element.v}", "title")\`: one element's.`];
+  if (first) return [`${all} \`read(target, "${first.v}")\`: the whole list; \`read(target, "${first.v}", 3)\`: one ${itemNoun(first)}, counted from 1.${byName ? ` ${byName}` : ''}`];
+  if (element) return [`${all} ${byName}`];
   return [all];
 }
 
@@ -1814,6 +1874,9 @@ export function verbParamSummary(verb, name, kind) {
         : kind === ENUM ? `One of ${oneOfWords(verb.values)}. Case-insensitive.\nInvalid: rejected with a console error.`
         : `${cap(verb.item)}.\nA number: written as text.\nLeft out: rejected with a console error.`;
     case ELEM:
+      if (name === 'name' && verb.list === 'zones') {
+        return 'The zone\'s name, as given in the zone table. Case-insensitive.\nEvery zone with that name, on every layout.\nNot a zone of the display: rejected with a console error.';
+      }
       if (name === 'name') return 'The element\'s name, as given in the inspector.\nNot an element of this display: rejected with a console error.';
       return kind === NUM || kind === INT ? [`${cap(verb.item)}.`, ...RANGE_LINES(verb, kind)].join('\n')
         : kind === BOOL ? `Left out: toggles.\n${OFF_RULE}`
@@ -1841,6 +1904,7 @@ export function verbParamSummary(verb, name, kind) {
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
       return ['Element number of a list verb, counted from 1.', 'A fraction: rounded.',
         ...(verb.family === 'lcd' ? ['For "text": a row or a table, as `text()` takes it.'] : []),
+        ...elementReadLines(verb),
         'Left out: the whole list.', 'Not one the list has: rejected with a console error.'].join('\n');
     case SIZE: return 'A list verb of this component, by name.\nLeft out: every list, as a table.\nNot a list verb: rejected with a console error.';
     case FILL:

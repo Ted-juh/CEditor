@@ -214,6 +214,13 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.lcd.layout` and `ce.components.pixel.layout` show a layout by its number or its
   name, as a soft key does, and `read(t, "layout")` gives the number of the one showing. Nothing is
   written to the panel.
+- An LCD Display's zones have a name, in a new Name column of the zone table, and scripts reach
+  them by it: `zoneText`, `zoneLabel`, `zoneShow`, `zoneAt`, `zoneSource` and `zoneKind` on
+  `ce.components.lcd`, and `read(t, "zoneText")` and the like. A name reaches every zone carrying
+  it on every layout, in any case. `zoneAt("Screen", "Cutoff", {row = 2, col = {1, 8}})` moves a
+  zone; `zoneSource("Screen", "Cutoff", "Resonance")` links one to a control by its name.
+- A Pixel Display's element names that differ only in case are one name to `read`, as they always
+  were to the commands; `read(t, "text")` listed both spellings.
 
 ## What you get
 

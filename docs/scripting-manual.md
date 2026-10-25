@@ -11412,6 +11412,109 @@ Good to know:
 
 *Short name: `lcdEditText`.*
 
+##### `ce.components.lcd.zoneText(target, name, text) -> boolean`
+
+Set the text of a fixed-text zone, by its name.
+
+Example: `ce.components.lcd.zoneText("Screen", "Title", "VOL")` writes VOL in the zone called Title.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `text` (text, required): The text.<br>Shown by a zone that shows fixed text.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneText`.*
+
+##### `ce.components.lcd.zoneLabel(target, name, label) -> boolean`
+
+Set the name a name zone shows in place of its control's, by its name.
+
+Example: `ce.components.lcd.zoneLabel("Screen", "Cutoff", "CUT")` shows CUT in the zone called Cutoff, in place of the control's name.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `label` (text, required): The name shown.<br>"": the control's own name.<br>Shown by a zone that shows a name.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneLabel`.*
+
+##### `ce.components.lcd.zoneShow(target, name [, on]) -> boolean`
+
+Show or hide a zone, by its name.
+
+Example: `ce.components.lcd.zoneShow("Screen", "Cutoff")` hides the zone called Cutoff if it is shown, and shows it if it is hidden.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `on` (true or false, optional): true: shown.<br>false: hidden; the layout's text shows through.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneShow`.*
+
+##### `ce.components.lcd.zoneAt(target, name, place) -> boolean`
+
+Move a zone, by its name.
+
+Example: `ce.components.lcd.zoneAt("Screen", "Cutoff", {row = 2, col = {1, 8}})` moves the zone called Cutoff to columns 1 to 8 of row 2.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `place` (number or table, required): A table: {row = 2, col = {1, 8}}, each part optional.<br>`row`: one row, counted from 1.<br>`col`: the first column, the zone keeping its width up to the display's edge; or a range {1, 8}.<br>A row number alone: the row.<br>A part left out: unchanged.<br>A fraction: rounded.<br>A range past the display: to its last column.<br>Not on the display: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneAt`.*
+
+##### `ce.components.lcd.zoneSource(target, name, control) -> boolean`
+
+Link a zone to another control, by its name.
+
+Example: `ce.components.lcd.zoneSource("Screen", "Cutoff", "Resonance")` makes the zone called Cutoff show the control called Resonance.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `control` (text, required): The control's name. Case-insensitive.<br>"": unlinked.<br>"@active": the control last touched.<br>"@active#value", "@active#switch" or "@active#choice": the last of that kind.<br>"@edit": the display's editable field.<br>This display, or not on this panel: rejected with a console error.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- `read(target, "zoneSource", "Cutoff")` gives the control's name.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneSource`.*
+
+##### `ce.components.lcd.zoneKind(target, name, kind) -> boolean`
+
+Set what a zone shows, by its name.
+
+Example: `ce.components.lcd.zoneKind("Screen", "Cutoff", "bar")` makes the zone called Cutoff show its control as a bar.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `kind` (text, required): One of "static", "name", "value", "pct", "bar", "midiValue", "note", "text", "state", "address", "edit", "hbar", "vbar", "hslider", "vslider" or "needle". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneKind`.*
+
 ##### `ce.components.lcd.layout(target, layout) -> boolean`
 
 Show one of the display's layouts.
@@ -11506,11 +11609,11 @@ Example: `ce.components.lcd.read("Screen")` gives every setting as a table.
 
 - `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
 - `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
-- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>For "text": a row or a table, as `text()` takes it.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>For "text": a row or a table, as `text()` takes it.<br>For a zone verb, such as "zoneText": the zone's name, case-insensitive.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
 
 Good to know:
 
-- `read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1.
+- `read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. `read(target, "zoneText")`: every zone's, by name; `read(target, "zoneText", "Title")`: one zone's.
 - Returns the value.
 - Rejected: no result, with a console error.
 
@@ -12023,7 +12126,7 @@ Example: `ce.components.pixel.read("PixelDisplay")` gives every setting as a tab
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
-- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>For an element verb, such as "text": the element's name, case-insensitive.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
 
 Good to know:
 

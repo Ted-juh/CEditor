@@ -645,6 +645,7 @@
       {#if editLayout && (editLayout.zones ?? []).length > 0}
         <div class="zone-head">
           <span class="zone-num">#</span>
+          <span class="zname">Name</span>
           <span class="zn">Row</span>
           <span class="zn">Start</span>
           <span class="zn">End</span>
@@ -662,6 +663,7 @@
         {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
           <div class="zone-cell">
             <span class="zone-num" title="Zone">#{i + 1}</span>
+            <input class="val zname" type="text" title="Script name — how ce.components.lcd.zoneText, zoneShow, zoneAt… address this zone, on every layout that has one by this name. Never drawn." placeholder="name" value={z.name ?? ''} onchange={(event) => setZone(i, 'name', event.target.value.trim())} />
             <span class="zn nc-wrap" title="Row"><NumberCell value={z.row ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'row', Math.round(value))} /></span>
             <span class="zn nc-wrap" title="Col start"><NumberCell value={z.colStart ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'colStart', Math.round(value))} /></span>
             <span class="zn nc-wrap" title="Col end"><NumberCell value={z.colEnd ?? cols} defaultValue={cols} step={1} min={1} onchange={(value) => setZone(i, 'colEnd', Math.round(value))} /></span>
@@ -1381,6 +1383,15 @@
     flex: 0 0 auto;
     text-align: center;
   }
+
+  /* The name a script reaches the zone by. */
+  .zone-head .zname,
+  .zone-cell .zname {
+    width: 64px;
+    flex: 0 0 auto;
+  }
+
+  .zone-head .zname { text-align: left; }
 
   .zone-head .zn2,
   .zone-cell .zn2 {

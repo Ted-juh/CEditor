@@ -1165,6 +1165,50 @@ Display's element verbs stay by name.
 
 Then items 8 to 14, one at a time.
 
+### Zones by name
+
+**Built, 2026-10-25**, after the owner's "1, 2 and 3 as recommended" on the proposal: six commands,
+one per property, and a name reaches every zone carrying it on every layout, as a Pixel Display's
+element names do. The Pixel's helpers (`utils/pixelElements.js`) take the list's key, `elements` or
+`zones`, so one set of rules decides what a name reaches on both displays; the verbs are ELEM verbs
+with `list: 'zones'` in `componentVerbs.js`.
+
+- **The zone table has a Name column**, after the zone's number. The name is never drawn.
+- **Names match in any case.** "Cutoff" on one layout and "cutoff" on another are one zone to a
+  script, so `read` lists the name once, as first spelled, and so does a refusal's list of the
+  names there are. (This was not true of the Pixel's elements either; it is now, for both.)
+- **An unnamed zone answers to its id** (`z_…`), the Pixel's rule. The proposal said such a zone
+  "can't be reached"; the id is shown nowhere in the inspector, so in practice it cannot, but
+  `read(t, "zoneText")` lists it under its id.
+
+| Command | Does |
+| --- | --- |
+| `zoneText(t, "Title", "VOL")` | A fixed-text zone's text. |
+| `zoneLabel(t, "Cutoff", "CUT")` | The name a name zone shows in place of its control's; `""`: the control's own. |
+| `zoneShow(t, "Cutoff" [, on])` | Shown or hidden; left out, toggles from the first zone's state. A zone without `visible` is shown. |
+| `zoneAt(t, "Cutoff", {row = 2, col = {1, 8}})` | Moves it. `col` alone keeps its width up to the edge; a range is exact; `layout` is refused, a zone stays on its layout. |
+| `zoneSource(t, "Cutoff", "Resonance")` | Links it to a control by name, stored by id as the picker stores it; `""` unlinks. |
+| `zoneKind(t, "Cutoff", "bar")` | What it shows: one of the zone table's sixteen kinds (`lcd.zoneKind` in `componentTables.VERB_VALUES`, the table's own list). |
+| `read(t, "zoneText")`, `read(t, "zoneText", "Title")` | Every zone's, by name, or one zone's. `zoneAt` reads as `{row, col = {first, last}}`, which `zoneAt` takes back; `zoneSource` as the control's name. |
+
+**Made on the way, for the owner to confirm:** `zoneSource` also takes the picker's other two
+entries, `"@active"` (with `"#value"`, `"#switch"` or `"#choice"`) and `"@edit"`, as the picker writes
+them. Without them `read(t, "zoneSource")` would answer `""` for a zone following the active
+control, which reads as unlinked.
+
+| Field | Text |
+| --- | --- |
+| `name` (every zone command) | The zone's name, as given in the zone table. Case-insensitive. / Every zone with that name, on every layout. / Not a zone of the display: rejected with a console error. |
+| `zoneText` `text` | The text. / Shown by a zone that shows fixed text. / A number: written as text. / Left out: rejected with a console error. |
+| `zoneLabel` `label` | The name shown. / "": the control's own name. / Shown by a zone that shows a name. / A number: written as text. / Left out: rejected with a console error. |
+| `zoneShow` `on` | true: shown. / false: hidden; the layout's text shows through. / Left out: toggles. / The usual false words. |
+| `zoneAt` `place` | A table: {row = 2, col = {1, 8}}, each part optional. / `row`: one row, counted from 1. / `col`: the first column, the zone keeping its width up to the display's edge; or a range {1, 8}. / A row number alone: the row. / A part left out: unchanged. / A fraction: rounded. / A range past the display: to its last column. / Not on the display: rejected with a console error. |
+| `zoneSource` `control` | The control's name. Case-insensitive. / "": unlinked. / "@active": the control last touched. / "@active#value", "@active#switch" or "@active#choice": the last of that kind. / "@edit": the display's editable field. / This display, or not on this panel: rejected with a console error. / Left out: rejected with a console error. |
+| `read` `index`, the LCD's and the Pixel's | One line more: For a zone verb, such as "zoneText": the zone's name, case-insensitive. (Pixel: an element verb, such as "text".) |
+
+Tests: `test/lcdZonesByName.test.js` (places, sources, every command and `read` through the runtime,
+refusals); the catch-all in `componentVerbs.test.js` gives the probe LCD a zone called "probe".
+
 ### The branch
 
 Everything above is on `main`, merged through three pull requests the owner asked for and merged
@@ -1246,9 +1290,9 @@ Read docs/design/api-descriptions-handoff.md and follow it, above all the sectio
 on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
 ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item review is done
 too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
-script can address), and so is its "line" wording. One LCD question is being worked on with the
-owner: script commands for a layout's zones, by name as a Pixel Display's elements are ("Zones by
-name" in this file). Then continue with ce.components.arp, in
+script can address), and so is its "line" wording. So are the LCD's script commands for a layout's
+zones, by name as a Pixel Display's elements are ("Zones by name" in this file); its one point "for
+the owner to confirm" is still open. Then continue with ce.components.arp, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check

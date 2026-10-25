@@ -1352,7 +1352,7 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
     }
     if (verb.k === 'elem') {
       meaning.choices = range?.names ?? [];
-      meaning.hint = elementSites(cfg, value).length ? `an element of ${target}` : null;
+      meaning.hint = elementSites(cfg, value, verb.list ?? 'elements').length ? `${verb.list === 'zones' ? 'a zone' : 'an element'} of ${target}` : null;
       return say(typeof value === 'string' ? componentRefusalReason(verb, cfg, [value, args[1]]) : null);
     }
     if (verb.k === 'indexset') {

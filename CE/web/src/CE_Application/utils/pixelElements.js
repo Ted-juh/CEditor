@@ -53,19 +53,24 @@ const listAt = (value) => (Array.isArray(value) ? value : []);
  *
  * `layout` is -1 for the flat list and the layout's index otherwise, which is all the patch builder
  * needs to know to write the right field back.
+ *
+ * `key` is what a layout calls its list: a Pixel Display's `elements`, which it also keeps flat
+ * beside its layouts, or an LCD's `zones`, which live in its layouts only. The LCD's zones are
+ * addressed by name the same way (componentVerbs.js, `list: 'zones'`), so one set of rules decides
+ * what a name reaches on both displays.
  */
-export function elementLists(cfg) {
-  const out = [{ layout: -1, elements: listAt(cfg?.elements) }];
+export function elementLists(cfg, key = 'elements') {
+  const out = key === 'elements' ? [{ layout: -1, elements: listAt(cfg?.elements) }] : [];
   listAt(cfg?.layouts).forEach((layout, i) => {
-    out.push({ layout: i, elements: listAt(layout?.elements) });
+    out.push({ layout: i, elements: listAt(layout?.[key]) });
   });
   return out;
 }
 
 /** Where every element answering to `name` lives: [{ layout, at }], empty when there is none. */
-export function elementSites(cfg, name) {
+export function elementSites(cfg, name, key = 'elements') {
   const sites = [];
-  for (const { layout, elements } of elementLists(cfg)) {
+  for (const { layout, elements } of elementLists(cfg, key)) {
     elements.forEach((el, at) => {
       if (elementAnswersTo(el, name)) sites.push({ layout, at });
     });
@@ -74,9 +79,9 @@ export function elementSites(cfg, name) {
 }
 
 /** The element at one site, or null. */
-export function elementAt(cfg, site) {
+export function elementAt(cfg, site, key = 'elements') {
   if (!site) return null;
-  const lists = elementLists(cfg);
+  const lists = elementLists(cfg, key);
   const found = lists.find((x) => x.layout === site.layout);
   const el = found?.elements[site.at];
   return el && typeof el === 'object' ? el : null;
@@ -90,29 +95,35 @@ export function elementAt(cfg, site) {
  * writes the whole field back and an in-place edit would look like a no-op to the change detection
  * between here and the store.
  */
-export function elementsPatch(cfg, sites, prop, value) {
-  const touched = sites.filter((site) => {
-    const el = elementAt(cfg, site);
-    return el && el[prop] !== value;
-  });
-  if (!touched.length) return {};
+export function elementsPatch(cfg, sites, prop, value, key = 'elements') {
+  return elementsUpdate(cfg, sites, (el) => (el[prop] === value ? el : { ...el, [prop]: value }), key);
+}
+
+/**
+ * The same, for a change that is more than one property or depends on the element: `update(el)`
+ * gives the element as it should be, or the same object when it already is. An LCD zone moved by
+ * zoneAt keeps its own width, so each zone's new columns follow from its own.
+ */
+export function elementsUpdate(cfg, sites, update, key = 'elements') {
+  const changed = new Map();
+  for (const site of sites) {
+    const el = elementAt(cfg, site, key);
+    if (!el) continue;
+    const next = update(el);
+    if (next && next !== el && Object.keys(next).some((k) => next[k] !== el[k])) changed.set(`${site.layout}:${site.at}`, next);
+  }
+  if (!changed.size) return {};
+  const at = (layout, i, el) => changed.get(`${layout}:${i}`) ?? el;
 
   const patch = {};
-  const flat = touched.filter((s) => s.layout === -1).map((s) => s.at);
-  if (flat.length) {
-    patch.elements = listAt(cfg?.elements)
-      .map((el, i) => (flat.includes(i) ? { ...el, [prop]: value } : el));
+  if (sites.some((s) => s.layout === -1 && changed.has(`-1:${s.at}`))) {
+    patch.elements = listAt(cfg?.elements).map((el, i) => at(-1, i, el));
   }
-  const inLayouts = touched.filter((s) => s.layout >= 0);
-  if (inLayouts.length) {
+  if (sites.some((s) => s.layout >= 0 && changed.has(`${s.layout}:${s.at}`))) {
     patch.layouts = listAt(cfg?.layouts).map((layout, li) => {
-      const here = inLayouts.filter((s) => s.layout === li).map((s) => s.at);
-      if (!here.length) return layout;
-      return {
-        ...layout,
-        elements: listAt(layout?.elements)
-          .map((el, i) => (here.includes(i) ? { ...el, [prop]: value } : el)),
-      };
+      const list = listAt(layout?.[key]);
+      if (!list.some((_, i) => changed.has(`${li}:${i}`))) return layout;
+      return { ...layout, [key]: list.map((el, i) => at(li, i, el)) };
     });
   }
   return patch;
@@ -125,14 +136,22 @@ export function elementsPatch(cfg, sites, prop, value) {
  * vanishing — a script that has one from the document can still use it, and a reader can see that
  * the element exists and has not been named.
  */
-export function elementPropTable(cfg, prop) {
+export function elementPropTable(cfg, prop, key = 'elements', readAs = null) {
   const out = {};
-  for (const { elements } of elementLists(cfg)) {
+  const seen = new Set();
+  for (const { elements } of elementLists(cfg, key)) {
     for (const el of elements) {
       const label = elementLabel(el);
-      if (!label || label in out) continue;
-      out[label] = el?.[prop];
+      // "Cutoff" and "cutoff" are one name, as a name matches in any case: the first spelling.
+      if (!label || seen.has(label.toLowerCase())) continue;
+      seen.add(label.toLowerCase());
+      out[label] = readAs ? readAs(el) : el?.[prop];
     }
   }
   return out;
+}
+
+/** Every name the display's elements answer to, once each in any case, the first spelling kept. */
+export function elementNames(cfg, key = 'elements') {
+  return Object.keys(elementPropTable(cfg, 'id', key));
 }

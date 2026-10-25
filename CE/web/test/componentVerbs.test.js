@@ -287,9 +287,17 @@ test('every verb either changes something or explains why it cannot', () => {
     id: 'el_probe', name: 'probe', kind: 'static', text: '', label: '',
     x: 0, y: 0, w: 0, h: 0, visible: true, blink: false,
   };
+  // An LCD's zones live only on its layouts, so its probe zone is on one.
+  const PROBE_ZONE = {
+    id: 'z_probe', name: 'probe', row: 1, colStart: 1, colEnd: 8,
+    show: 'static', sourceId: '', text: '', label: '', align: 'left', radix: 'dec',
+  };
   const probeCfg = (verb) => {
     const cfg = cfgFor(verb.section);
     if (verb.k !== 'elem') return cfg;
+    if (verb.list === 'zones') {
+      return { ...cfg, layouts: [{ id: 'lay_probe', name: 'Probe', zones: [{ ...PROBE_ZONE }] }] };
+    }
     return {
       ...cfg,
       elements: [{ ...PROBE_ELEMENT }],
@@ -325,6 +333,9 @@ test('every verb either changes something or explains why it cannot', () => {
       }
       case 'elem': {
         // Addressed by NAME, and the element the probe carries answers to "probe".
+        if (verb.place) return ['probe', { row: 2, col: [3, 6] }];
+        if (verb.kind === 'enum') return ['probe', verb.values.find((x) => x !== PROBE_ZONE[verb.item])];
+        if (verb.list === 'zones' && verb.kind === 'bool') return ['probe', false];
         if (verb.kind === 'bool') return ['probe', !(PROBE_ELEMENT[verb.item] === true)];
         if (verb.kind === 'str') return ['probe', 'spec-probe'];
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
@@ -733,7 +744,7 @@ test('the LCD\'s verbs say what each setting is, with its range and what is reje
   assert.equal(MEMBER_BY_ID.lcdShowGlass.example,
     '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
   // Item 10: read's, size's and fill's texts name the component's own lists.
-  assert.equal(MEMBER_BY_ID.lcdRead.notes[0], '`read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1.');
+  assert.equal(MEMBER_BY_ID.lcdRead.notes[0], '`read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. `read(target, "zoneText")`: every zone\'s, by name; `read(target, "zoneText", "Title")`: one zone\'s.');
   assert.equal(MEMBER_BY_ID.lcdSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number.');
   assert.equal(MEMBER_BY_ID.lcdFill.example, '`ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2.');
   assert.equal(MEMBER_BY_ID.lcdFill.notes[0], 'One undo step for the whole list, instead of one per element.');

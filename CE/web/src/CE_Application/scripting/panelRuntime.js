@@ -48,7 +48,7 @@ import {
   drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
-import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout } from './lcdPositions.js';
+import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout, lcdZonePlaceOf, lcdZoneSourceFor, lcdZoneSourceName } from './lcdPositions.js';
 import { layoutShowing, showLayout } from '../stores/displayLayouts.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
@@ -3515,9 +3515,21 @@ function componentVerbAction(verb, target, args) {
     return false;
   }
   const cfg = isLcdText(verb) ? withLayoutShowing(path, stored) : stored;
-  const patch = componentScriptPatch(verb, cfg, args);
-  const keys = Object.keys(patch);
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  // zoneSource is given a control's name and stores its id, as the zone table's picker does
+  // (lcdPositions.js). A zone that is not there is said by the reducer's own refusal, below.
+  let given = args;
+  if (verb.k === ELEM_KIND && verb.link) {
+    const selfId = findControlByName(path)?._children?.Core?.id;
+    const { id, refusal } = lcdZoneSourceFor(activePanel()?.controls ?? [], args[1], selfId);
+    if (refusal && elementSites(cfg, args[0], verb.list).length) {
+      addScriptTrace('error', '', `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed. ${refusal}`);
+      return false;
+    }
+    given = [args[0], id ?? undefined];
+  }
+  const patch = componentScriptPatch(verb, cfg, given);
+  const keys = Object.keys(patch);
   // A number past the verb's range is used as the nearest end, and said once per verb.
   const clamped = componentClampWarning(verb, path, args, cfg);
   if (clamped && !componentClampWarned.has(verb.id)) {
@@ -3529,7 +3541,7 @@ function componentVerbAction(verb, target, args) {
     // current value — so ask the spec whether the request was one the component could have
     // honoured at all. "Already that way" is a success; an unknown enum or an index past the end
     // of the list is not, and used to be indistinguishable from both success and silence.
-    if (componentRequestLegal(verb, cfg, args)) {
+    if (componentRequestLegal(verb, cfg, given)) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
       lcdLineSaid(verb, path, cfg, args, shown);
       return true;
@@ -3684,17 +3696,22 @@ function componentReadAction(verb, path, args) {
   // A name-addressed scene reads back BY NAME, in both shapes: the whole table, which is also how a
   // script discovers what the display has, or one element's value. A positional index would be the
   // wrong question — see LIST_KINDS in componentVerbs.js — so it is refused rather than guessed at.
+  // An LCD's zones read the same way, a zone's place as zoneAt takes it and its source by name.
   if (spec.k === ELEM_KIND) {
-    const table = elementPropTable(cfg, spec.item);
+    const list = spec.list ?? 'elements';
+    const readAs = spec.place ? (zone) => lcdZonePlaceOf(cfg, zone)
+      : spec.link ? (zone) => lcdZoneSourceName(activePanel()?.controls ?? [], zone?.[spec.item])
+        : (el) => el?.[spec.item] ?? spec.absent;
+    const table = elementPropTable(cfg, spec.item, list, readAs);
     if (index === undefined || index === null || index === '') return table;
-    const sites = elementSites(cfg, index);
+    const sites = elementSites(cfg, index, list);
     if (!sites.length) {
       addScriptTrace('error', '',
-        `${verb.family}.read("${name}", "${index}"): this display has no element called `
+        `${verb.family}.read("${name}", "${index}"): this display has no ${list === 'zones' ? 'zone' : 'element'} called `
         + `"${index}". One of: ${Object.keys(table).join(', ') || '(none)'}.`);
       return undefined;
     }
-    return elementAt(cfg, sites[0])?.[spec.item];
+    return readAs(elementAt(cfg, sites[0], list));
   }
 
   // The LCD's text is read by position (lcdPositions.js): every row of the layout showing, one row,

@@ -19,7 +19,8 @@
 // PURE, like lcdZones.js, so the reducer, the runtime's read and the Values tab answer alike.
 
 import { listWord } from '../utils/wordLists.js';
-import { resolveActiveLayoutId } from '../utils/lcdZones.js';
+import { resolveActiveLayoutId, ACTIVE_SOURCE_ID, EDIT_SOURCE_ID } from '../utils/lcdZones.js';
+import { sourceAccepts, sourceByName, sourceName } from '../utils/controlSources.js';
 import { shownValue } from './shownValue.js';
 
 /** The parts a position names, in the order the texts give them. */
@@ -272,4 +273,107 @@ export function lcdPositionWords(display, where) {
   const layout = layoutsOf(display).length ? `layout ${pos.layout + 1}${name ? ` (${name})` : ''}` : 'the lines';
   const cols = pos.cols ? `, ${pos.colFrom ? `from column ${pos.cols[0] + 1}` : span(pos.cols, 'column', 'columns')}` : '';
   return `${layout}, ${span(pos.rows, 'row', 'rows')}${cols}`;
+}
+
+/**
+ * zoneAt(): where a zone moves to. `where` is a table of `row` and `col` (a row number alone is the
+ * row): the row is one number, as a zone sits on one row; `col` is the first column, the zone
+ * keeping its width, or a range {first, last}. A part left out stays as it is. A zone stays on its
+ * layout, so `layout` is refused. Returns `{ place(zone) -> zone, refusal, clamped }`.
+ */
+export function lcdZonePlace(display, where) {
+  const rows = lcdRows(display);
+  const cols = lcdCols(display);
+  const refuse = (refusal) => ({ refusal });
+  if (where === undefined || where === null) return refuse('No place was given: a table of row and col, {row = 2, col = {1, 8}}.');
+  const parts = {};
+  if (!isPositionTable(where)) {
+    if (asList(where)) return refuse('A place names its parts: {row = 2, col = {1, 8}}.');
+    parts.row = where;
+  } else {
+    for (const [key, value] of Object.entries(where)) {
+      if (/^\d+$/.test(key)) return refuse(`${shownValue(value)} is in the place without a name: a range is written col = {1, 8}.`);
+      const part = listWord(POSITION_PARTS, key);
+      if (!part) return refuse(`${JSON.stringify(key)} is not part of a place: "row" or "col".`);
+      if (part === 'layout') return refuse('A zone stays on its layout: give its row and col.');
+      if (part in parts) return refuse(`"${part}" is given twice.`);
+      parts[part] = value;
+    }
+    if (parts.row === undefined && parts.col === undefined) return refuse('Give a row, a col or both: {row = 2, col = {1, 8}}.');
+  }
+  let row = null;
+  if (parts.row !== undefined && parts.row !== null) {
+    if (asList(parts.row)) return refuse('A zone is one row: give one number.');
+    const axis = axisOf('row', parts.row, rows);
+    if (axis.refusal) return refuse(axis.refusal);
+    row = axis.range[0];
+  }
+  let colRange = null;
+  let colFrom = null;
+  let clamped = null;
+  if (parts.col !== undefined && parts.col !== null) {
+    const axis = axisOf('col', parts.col, cols);
+    if (axis.refusal) return refuse(axis.refusal);
+    if (axis.single) colFrom = axis.range[0];
+    else colRange = axis.range;
+    clamped = axis.clamped ?? null;
+  }
+  const place = (zone) => {
+    const next = { ...zone };
+    if (row !== null) next.row = row + 1;
+    if (colRange) { next.colStart = colRange[0] + 1; next.colEnd = colRange[1] + 1; }
+    if (colFrom !== null) {
+      const start = Math.round(Number(zone?.colStart ?? 1));
+      const end = Math.round(Number(zone?.colEnd ?? cols));
+      const width = Math.max(1, (Number.isFinite(end) ? end : cols) - (Number.isFinite(start) ? start : 1) + 1);
+      next.colStart = colFrom + 1;
+      next.colEnd = Math.min(cols, colFrom + width);
+    }
+    return next;
+  };
+  return { place, refusal: null, clamped };
+}
+
+/** Where a zone is, as zoneAt takes it: { row, col: [first, last] }, counted from 1. */
+export function lcdZonePlaceOf(display, zone) {
+  const cols = lcdCols(display);
+  const whole = (value, fallback) => {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return { row: whole(zone?.row, 1), col: [whole(zone?.colStart, 1), whole(zone?.colEnd, cols)] };
+}
+
+/* The filters the zone table's "★ Active" offers beside it: any control, or one of three kinds. */
+const ACTIVE_FILTERS = ['value', 'switch', 'choice'];
+
+/**
+ * What zoneSource stores for what a script gave: { id, refusal }. A control is named and stored by
+ * its id, as the zone table's picker stores it; "" unlinks. The picker's other two entries are
+ * taken as it writes them: "@active" (the control last touched, "@active#value" and the like for
+ * one kind of control) and "@edit" (the display's editable field).
+ */
+export function lcdZoneSourceFor(controls, given, selfId = '') {
+  if (given === undefined || given === null) return { id: null, refusal: 'No control was given: a control\'s name, or "" to unlink.' };
+  const wanted = String(given).trim();
+  if (!wanted) return { id: '', refusal: null };
+  const lower = wanted.toLowerCase();
+  if (lower === EDIT_SOURCE_ID) return { id: EDIT_SOURCE_ID, refusal: null };
+  if (lower === ACTIVE_SOURCE_ID) return { id: ACTIVE_SOURCE_ID, refusal: null };
+  if (lower.startsWith(`${ACTIVE_SOURCE_ID}#`)) {
+    const filter = lower.slice(ACTIVE_SOURCE_ID.length + 1).trim();
+    return ACTIVE_FILTERS.includes(filter)
+      ? { id: `${ACTIVE_SOURCE_ID}#${filter}`, refusal: null }
+      : { id: null, refusal: `${shownValue(wanted)}: after "@active#" comes ${ACTIVE_FILTERS.map((f) => `"${f}"`).join(', ')}.` };
+  }
+  const found = sourceByName(controls, wanted);
+  if (!found) return { id: null, refusal: `There is no control called ${shownValue(wanted)} on this panel.` };
+  if (!sourceAccepts('any', found, selfId)) return { id: null, refusal: 'A display cannot show itself in a zone.' };
+  return { id: String(found._children?.Core?.id ?? ''), refusal: null };
+}
+
+/** What read(t, "zoneSource") gives: the control's name, "@active…" or "@edit" as stored, or "". */
+export function lcdZoneSourceName(controls, id) {
+  const stored = String(id ?? '');
+  return stored.startsWith('@') ? stored : sourceName(controls, stored);
 }
