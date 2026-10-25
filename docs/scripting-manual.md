@@ -5052,15 +5052,19 @@ Good to know:
 
 ##### `ce.components.arp.phase(target, phase) -> boolean`
 
-Where in the sequence it is, 0..1 — 0 is the downbeat.
+Move the arp to a point in its sequence.
 
-Example: `ce.components.arp.phase("Arpeggiator", 0.5)` sets the phase to 0.5.
+Example: `ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `phase` (number, required): Phase.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `phase` (number, required): Where in the sequence: 0 the start, 0.5 halfway.<br>1: the start again.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Running: the next step plays from there. Stopped: it starts from there.
+- While synced: no effect; the Transport's position decides.
+- `read(target, "phase")` gives where it is now.
+- Nothing is written to the panel.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

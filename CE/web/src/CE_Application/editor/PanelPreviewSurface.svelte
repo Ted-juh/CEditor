@@ -42,6 +42,7 @@
   import { get } from 'svelte/store';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
   import { provideDisplayLayouts } from '../stores/displayLayouts.js';
+  import { provideComponentPhases, takePendingPhase } from '../stores/componentPhases.js';
   import { updateControlProperty } from '../stores/controls.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
@@ -3603,8 +3604,29 @@
   }
   function arpPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts.
+    if (arpPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) arpPhaseState[id] = sought;
+    }
     return arpPhaseState[id] !== undefined ? arpPhaseState[id] : arpPhase(control);
   }
+  // A script's phase() and read(t, "phase") ask here (stores/componentPhases.js): where the arp is in
+  // its sequence, and a seek. Running, the next step plays from there; stopped, it starts there. A
+  // synced arp's position is the Transport's, so the runtime does not seek one.
+  onDestroy(provideComponentPhases({
+    where: (id) => {
+      const control = controlById(id);
+      return control && isArpControl(control) ? arpPhaseFor(control) : null;
+    },
+    seek: (id, phase) => {
+      const control = controlById(id);
+      if (!control || !isArpControl(control)) return;
+      arpPhaseState[id] = ((numberOr(phase, 0) % 1) + 1) % 1;
+      // Drawn there at once, stopped too: a stopped arp has no ticker to redraw it.
+      showStep(control, arpShownStep(withLiveSections(control), control));
+    },
+  }));
   function arpAllOff(control) {
     const id = getControlId(control);
     const timers = arpTimers[id] ?? [];
@@ -3744,7 +3766,9 @@
     const base = resolved?.control ?? control;
     const arp = base?._children?.Arp;
     if (!arp) return resolved;
-    if (arp.running !== false) { ensureArpTicker(); void shownSteps[getControlId(control)]; }
+    if (arp.running !== false) ensureArpTicker();
+    // Read stopped too, so a script's seek redraws the playhead where it will start.
+    void shownSteps[getControlId(control)];
     const notes = arpSourceNotes(control);
     const next = { ...arp, __phase: arpPhaseFor(control) };
     if (notes) next.__sourceNotes = notes;

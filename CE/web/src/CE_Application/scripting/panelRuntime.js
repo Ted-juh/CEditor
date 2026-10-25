@@ -50,6 +50,7 @@ import {
 import { lcdLineWords } from './lcdLines.js';
 import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout, lcdZonePlaceOf, lcdZoneSourceFor, lcdZoneSourceName } from './lcdPositions.js';
 import { layoutShowing, showLayout } from '../stores/displayLayouts.js';
+import { phaseNow, seekPhase } from '../stores/componentPhases.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
@@ -3516,6 +3517,7 @@ function componentVerbAction(verb, target, args) {
   }
   const cfg = isLcdText(verb) ? withLayoutShowing(path, stored) : stored;
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  if (verb.seek) return componentSeekAction(verb, path, cfg, args, shown);
   // zoneSource is given a control's name and stores its id, as the zone table's picker does
   // (lcdPositions.js). A zone that is not there is said by the reducer's own refusal, below.
   let given = args;
@@ -3554,6 +3556,31 @@ function componentVerbAction(verb, target, args) {
   if (!writeComponentFields(verb, path, patch)) return false;
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
   lcdLineSaid(verb, path, cfg, args, shown);
+  return true;
+}
+
+/**
+ * phase(t, x) on a component that runs in the preview: a seek, not a write (stores/componentPhases.js).
+ * The value is read as the verb reads it (range, the nearest end, refusals) against no stored value,
+ * so seeking to the number already stored still seeks.
+ */
+function componentSeekAction(verb, path, cfg, args, shown) {
+  const patch = componentScriptPatch(verb, { ...cfg, [verb.f]: null }, args);
+  if (!(verb.f in patch)) {
+    addScriptTrace('error', '', componentRefusalLine(verb, path, args, cfg));
+    return false;
+  }
+  const clamped = componentClampWarning(verb, path, args, cfg);
+  if (clamped && !componentClampWarned.has(verb.id)) {
+    componentClampWarned.add(verb.id);
+    addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
+  }
+  if (verb.seek.clock && cfg[verb.seek.clock] === true) {
+    addScriptTrace('warn', '', `${verb.family} ${path}: ${verb.v}(${shown}) — synced to the Transport, whose position decides; nothing changed.`);
+    return true;
+  }
+  seekPhase(findControlByName(path)?._children?.Core?.id, patch[verb.f]);
+  addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${patch[verb.f]}`);
   return true;
 }
 
@@ -3663,6 +3690,12 @@ function componentListValue(cfg, verb) {
   return [...list];
 }
 
+/** A seek verb's read: where the component is now (stores/componentPhases.js), else the stored value. */
+function componentPhaseNow(path, cfg, spec) {
+  const now = phaseNow(findControlByName(path)?._children?.Core?.id);
+  return now ?? componentScalarValue(cfg, spec);
+}
+
 function componentReadAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'read');
   if (!cfg) return undefined;
@@ -3677,6 +3710,7 @@ function componentReadAction(verb, path, args) {
       // the truthful answer for both "unlinked" and "linked to a control that has been deleted".
       if (spec.k === LINK_KIND) out[verbName] = sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
       else if (spec.k === LAYOUT_KIND) out[verbName] = lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
+      else if (spec.seek) out[verbName] = componentPhaseNow(path, cfg, spec);
       else if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
     }
     return out;
@@ -3691,6 +3725,8 @@ function componentReadAction(verb, path, args) {
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
   // The layout showing, counted from 1 as layout() takes it: 1 on a display without layouts.
   if (spec.k === LAYOUT_KIND) return lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
+  // Where it is now, as the preview runs it; the stored phase, where it starts, when nothing runs it.
+  if (spec.seek) return componentPhaseNow(path, cfg, spec);
   if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
 
   // A name-addressed scene reads back BY NAME, in both shapes: the whole table, which is also how a

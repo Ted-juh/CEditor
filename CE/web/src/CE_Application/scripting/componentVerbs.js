@@ -219,7 +219,16 @@ export const COMPONENT_FAMILIES = [
       // was per-step muting reachable from the grid and nowhere else, while the Looper's lanes
       // and the Orbit's nodes both had one; and the two below are what the arp LISTENS to, which
       // is a performance choice rather than an inspector one.
-      v('phase', 'phase', NUM, { ...UNIT, doc: 'Where in the sequence it is, 0..1 — 0 is the downbeat.' }),
+      // Item 6: a seek (stores/componentPhases.js). It wrote the stored phase, which the preview
+      // reads only when it opens, so a running arp never moved and read gave the number written.
+      // `seek.clock` is the field that hands the position to the Transport, when nothing can move it.
+      v('phase', 'phase', NUM, { ...UNIT, seek: { clock: 'syncToTransport' }, doc: 'Move the arp to a point in its sequence.',
+        ex: ['0.5', 'moves it halfway through its sequence'],
+        argDocs: { phase: ['Where in the sequence: 0 the start, 0.5 halfway.', '1: the start again.', 'Range: 0 ↔ 1.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Running: the next step plays from there. Stopped: it starts from there.',
+          'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.',
+          'Nothing is written to the panel.'] }),
       v('mute', 'mutes', INDEXSET, { doc: 'Mute or unmute one step, 1-based. No third argument toggles.' }),
       v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Which channel it takes notes from. 0 means omni.' }),
       v('baseOctave', 'baseOctave', INT, { min: -1, max: 8 }),

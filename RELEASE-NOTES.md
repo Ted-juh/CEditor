@@ -234,6 +234,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   `ce.components.arp.swingSource` sets whose swing a synced arp plays, the Transport's or its own,
   as the inspector's "Swing from" does: on a synced arp `swing()` did nothing, and no script could
   change that.
+- `ce.components.arp.phase` moves the arp to a point in its sequence: a running one at once, a
+  stopped one where it starts. `read(t, "phase")` gives where it is now. It wrote a number the
+  preview read only when it opened, so a running arp never moved and `read` gave the number back.
 
 ## What you get
 

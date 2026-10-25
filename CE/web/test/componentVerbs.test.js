@@ -830,6 +830,12 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   const source = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwingSource');
   assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['OWN']), { swingSource: 'own' });
   assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['clock']), {});
+  // Item 6: phase is a seek (arpPhaseSeek.test.js drives it).
+  assert.equal(MEMBER_BY_ID.arpPhase.summary, 'Move the arp to a point in its sequence.');
+  assert.equal(MEMBER_BY_ID.arpPhase.example, '`ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence.');
+  assert.equal(text('arpPhase', 'phase'), 'Where in the sequence: 0 the start, 0.5 halfway.\n1: the start again.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpPhase.notes.slice(0, 4), ['Running: the next step plays from there. Stopped: it starts from there.',
+    'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.', 'Nothing is written to the panel.']);
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

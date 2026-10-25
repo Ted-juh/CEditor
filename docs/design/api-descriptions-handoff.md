@@ -1273,8 +1273,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 3. `octaves`: done, below.
 4. `gate`: done, below.
 5. `swing`: done, below, with `swingSource`.
-6. `phase`: likely ignored once the arp has run in the preview (to confirm in the browser); `read`
-   gives the stored value, not where it is.
+6. `phase`: done, below.
 7. `mute`: `read(t, "mute")` gives the steps counted from 0 (`[2]` after `mute(t, 3)`); a step
    past the sequence is stored without a word.
 8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): the
@@ -1371,6 +1370,30 @@ panel changes; its words are `SWING_SOURCES`, the module's own (`componentTables
 | `swingSource` example | `ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced. |
 | `swingSource` (string, required) | "transport": the Transport's swing, while synced. / "own": `swing()`, always. / Case-insensitive. / Invalid: rejected with a console error. |
 | `swingSource` notes | Not synced: its own swing, either way. / Default: "transport". / Then the two every command has. |
+
+**Item 6, `phase`: done, as a seek.** It wrote the stored phase, which the preview reads only when
+it opens (`arpPhaseFor`: its own state wins from the first frame). Checked in a running preview: an
+arp on cell 2 of 6 took `phase("Arp", 0.5)`, returned true, stayed on cell 2 and walked on to 4;
+stopped, `phase("Arp", 0)` and started again, it went on from 4; `read(t, "phase")` gave the 0.5
+written. At the owner's word ("As recommended") `phase()` is a seek, as `layout()` is the LCD's:
+`stores/componentPhases.js` asks the preview, which moves a running arp at once (its next step
+plays from there) and a stopped one where it starts, redrawn there; `read(t, "phase")` answers
+where it is. Nothing is written to the panel. A synced arp's position is the Transport's, so it is
+not moved, with a console warning. With no preview a seek waits for the next one to open. The verb
+says so with `seek: { clock: 'syncToTransport' }`; the value is read as any number verb's (range,
+nearest end, refusals) against no stored value, so seeking to the stored number still seeks. The
+same check in the preview afterwards: cell 2, `phase(0.5)`, cell 4 at once; `read` 0.76 a moment
+later; stopped, `phase(0)` drew it on cell 1 and it started there.
+
+The Orbit's and the Looper's `phase` keep their position the same way and are likely as dead;
+that is their reviews', and `componentPhases.js` is where their preview code would answer.
+
+| Field | Text |
+| --- | --- |
+| Description | Move the arp to a point in its sequence. |
+| Example | `ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence. |
+| `phase` (number, required) | Where in the sequence: 0 the start, 0.5 halfway. / 1: the start again. / Range: 0 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Running: the next step plays from there. Stopped: it starts from there. / While synced: no effect; the Transport's position decides. / `read(target, "phase")` gives where it is now. / Nothing is written to the panel. / Then the two every command has. |
 
 ## Checking each batch
 
