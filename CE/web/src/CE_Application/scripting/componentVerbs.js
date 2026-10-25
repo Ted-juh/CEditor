@@ -353,6 +353,18 @@ export const COMPONENT_FAMILIES = [
         argDocs: { name: ['The Chord Pad\'s name. Case-insensitive.', 'Left out, or "": none.',
           'Not on this panel, or not a Chord Pad: rejected with a console error.'].join('\n') },
         notes: ['Played only while `source()` is "link".', 'The Chord Pad stays silent while the arp plays from it.', 'Default: none.'] }),
+      // Item 14: declared rather than derived (derivedFlagVerbs), for what each is; at the end, where
+      // the derived ones came.
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let a click on a step mute it, or not.', ex: ['false', 'stops clicks muting steps'],
+        argDocs: { editable: `true: a click on a step mutes or unmutes it.\nfalse: clicks do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Only clicks are locked: `mute()` still works.', 'Default: true.'] }),
+      v('showNotes', 'showNotes', BOOL, { toggle: true, doc: 'Show or hide the note names in the steps.', ex: ['false', 'hides the note names'],
+        argDocs: { showNotes: `true: each step shows its note, "C3", or a chord's count, "3♪".\nfalse: hidden.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['A step narrower than 22 or shorter than 26 pixels shows no name either way.', 'Default: true.'] }),
+      v('showHeader', 'showHeader', BOOL, { toggle: true, doc: 'Show or hide the strip above the steps.',
+        ex: ['false', 'hides the strip, and the steps take its room'],
+        argDocs: { showHeader: `true: the strip shows the pattern, where the notes come from and the rate.\nfalse: hidden; the steps take its room.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
     ],
   },
   {

@@ -1282,7 +1282,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 11. `run`, `sync`, `division`: done, below.
 12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: done, below.
 13. `velocity`, `channel`: done, below.
-14. `editable`, `showNotes`, `showHeader`: texts.
+14. `editable`, `showNotes`, `showHeader`: done, below.
 15. The family: its summary, the control name in the examples, `read`'s notes.
 
 **Item 1, `pattern`: done.** "random" and "asPlayed" played exactly as "up" for as long as they
@@ -1521,13 +1521,29 @@ it at not used, on its own channel. Approved as proposed ("Item 13 approved").
 
 Each ends with the two notes every command has.
 
+**Item 14, `editable`, `showNotes` and `showHeader`: done, texts only.** They were derived
+(`derivedFlagVerbs`: "Allow or lock touch control of the Arpeggiator.", "Show or hide the notes.")
+and are declared now, at the end of the family where the derived ones came, as the LCD's overlays
+are. A click on a step mutes it unless `editable` is off, `mute()` working either way; a step
+narrower than 22 or shorter than 26 pixels shows no note name whatever `showNotes` says; the strip
+`showHeader` hides gives the steps its room. Approved as proposed ("Approved").
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `editable` | Let a click on a step mute it, or not. · `editable("Arpeggiator", false)` stops clicks muting steps. | true: a click on a step mutes or unmutes it. / false: clicks do nothing. / Left out: toggles. / The usual false words. | Only clicks are locked: `mute()` still works. / Default: true. |
+| `showNotes` | Show or hide the note names in the steps. · `showNotes("Arpeggiator", false)` hides the note names. | true: each step shows its note, "C3", or a chord's count, "3♪". / false: hidden. / Left out: toggles. / The usual false words. | A step narrower than 22 or shorter than 26 pixels shows no name either way. / Default: true. |
+| `showHeader` | Show or hide the strip above the steps. · `showHeader("Arpeggiator", false)` hides the strip, and the steps take its room. | true: the strip shows the pattern, where the notes come from and the rate. / false: hidden; the steps take its room. / Left out: toggles. / The usual false words. | Default: true. |
+
+Each ends with the two notes every command has.
+
 **CI, 2026-10-25.** From 19:02 UTC Microsoft's download host refused .NET 10.0.403 and the
 10.0.14 runtime (HTTP 409 from `dotnetorigin.blob.core.windows.net`) to `actions/setup-dotnet`, and
 `web-tests` and `windows` failed before building or testing anything, three runs in a row. At the
 owner's word ("Do what is necessary to get it through") `ci.yml`'s two `setup-dotnet` steps carry
 on past a failed download, and a step after each lists the runner image's SDKs, failing when there
 is no .NET at all and saying in the annotations when the fallback was used; both C# checks take the
-newest SDK present when 10 is not. When the download works again, nothing is to undo.
+newest SDK present when 10 is not. When the download works again, nothing is to undo. It did on the
+next run (44710fd, 20:11 UTC): `setup-dotnet` installed 10.0.x and the fallback was not used.
 
 ## Checking each batch
 

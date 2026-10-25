@@ -5201,15 +5201,17 @@ Good to know:
 
 ##### `ce.components.arp.editable(target [, editable]) -> boolean`
 
-Allow or lock touch control of the Arpeggiator.
+Let a click on a step mute it, or not.
 
-Example: `ce.components.arp.editable("Arpeggiator")` switches the editable on if it is off, and off if it is on.
+Example: `ce.components.arp.editable("Arpeggiator", false)` stops clicks muting steps.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `editable` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `editable` (true or false, optional): true: a click on a step mutes or unmutes it.<br>false: clicks do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Only clicks are locked: `mute()` still works.
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5217,15 +5219,17 @@ Good to know:
 
 ##### `ce.components.arp.showNotes(target [, showNotes]) -> boolean`
 
-Show or hide the notes.
+Show or hide the note names in the steps.
 
-Example: `ce.components.arp.showNotes("Arpeggiator")` shows the notes if they are hidden, and hides them if they are shown.
+Example: `ce.components.arp.showNotes("Arpeggiator", false)` hides the note names.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `showNotes` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `showNotes` (true or false, optional): true: each step shows its note, "C3", or a chord's count, "3♪".<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- A step narrower than 22 or shorter than 26 pixels shows no name either way.
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5233,15 +5237,16 @@ Good to know:
 
 ##### `ce.components.arp.showHeader(target [, showHeader]) -> boolean`
 
-Show or hide the header.
+Show or hide the strip above the steps.
 
-Example: `ce.components.arp.showHeader("Arpeggiator")` shows the header if it is hidden, and hides it if it is shown.
+Example: `ce.components.arp.showHeader("Arpeggiator", false)` hides the strip, and the steps take its room.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `showHeader` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `showHeader` (true or false, optional): true: the strip shows the pattern, where the notes come from and the rate.<br>false: hidden; the steps take its room.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

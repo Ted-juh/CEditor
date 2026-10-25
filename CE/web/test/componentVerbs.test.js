@@ -854,6 +854,16 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 14: editable, showNotes and showHeader, declared rather than derived, in the same place.
+  assert.equal(MEMBER_BY_ID.arpEditable.summary, 'Let a click on a step mute it, or not.');
+  assert.equal(MEMBER_BY_ID.arpEditable.example, '`ce.components.arp.editable("Arpeggiator", false)` stops clicks muting steps.');
+  assert.equal(MEMBER_BY_ID.arpEditable.notes[0], 'Only clicks are locked: `mute()` still works.');
+  assert.equal(text('arpShowNotes', 'showNotes'), 'true: each step shows its note, "C3", or a chord\'s count, "3♪".\nfalse: hidden.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.arpShowNotes.notes[0], 'A step narrower than 22 or shorter than 26 pixels shows no name either way.');
+  assert.equal(MEMBER_BY_ID.arpShowHeader.example, '`ce.components.arp.showHeader("Arpeggiator", false)` hides the strip, and the steps take its room.');
+  const arpOrder = COMPONENT_VERBS.filter((verb) => verb.family === 'arp').map((verb) => verb.v);
+  assert.deepEqual(arpOrder.slice(arpOrder.indexOf('link'), arpOrder.indexOf('link') + 4), ['link', 'editable', 'showNotes', 'showHeader']);
+  assert.equal(arpOrder.filter((name) => name === 'editable').length, 1, 'declared once, not derived again');
   // Item 13: velocity and channel.
   assert.equal(MEMBER_BY_ID.arpVelocity.summary, 'Set how hard every note it plays is struck.');
   assert.equal(MEMBER_BY_ID.arpVelocity.example, '`ce.components.arp.velocity("Arpeggiator", 110)` plays every note at velocity 110.');
