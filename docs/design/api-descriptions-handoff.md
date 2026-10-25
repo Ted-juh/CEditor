@@ -1191,10 +1191,10 @@ with `list: 'zones'` in `componentVerbs.js`.
 | `zoneKind(t, "Cutoff", "bar")` | What it shows: one of the zone table's sixteen kinds (`lcd.zoneKind` in `componentTables.VERB_VALUES`, the table's own list). |
 | `read(t, "zoneText")`, `read(t, "zoneText", "Title")` | Every zone's, by name, or one zone's. `zoneAt` reads as `{row, col = {first, last}}`, which `zoneAt` takes back; `zoneSource` as the control's name. |
 
-**Made on the way, for the owner to confirm:** `zoneSource` also takes the picker's other two
-entries, `"@active"` (with `"#value"`, `"#switch"` or `"#choice"`) and `"@edit"`, as the picker writes
-them. Without them `read(t, "zoneSource")` would answer `""` for a zone following the active
-control, which reads as unlinked.
+**Made on the way, kept at the owner's word** ("Keep @active and @edit"): `zoneSource` also takes
+the picker's other two entries, `"@active"` (with `"#value"`, `"#switch"` or `"#choice"`) and
+`"@edit"`, as the picker writes them. Without them `read(t, "zoneSource")` would answer `""` for a
+zone following the active control, which reads as unlinked.
 
 | Field | Text |
 | --- | --- |
@@ -1291,8 +1291,8 @@ on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". 
 ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item review is done
 too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
 script can address), and so is its "line" wording. So are the LCD's script commands for a layout's
-zones, by name as a Pixel Display's elements are ("Zones by name" in this file); its one point "for
-the owner to confirm" is still open. Then continue with ce.components.arp, in
+zones, by name as a Pixel Display's elements are ("Zones by name" in this file). Then continue with
+ce.components.arp ("ce.components.arp: the owner's review" in this file), in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check
