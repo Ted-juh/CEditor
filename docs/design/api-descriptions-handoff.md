@@ -1271,7 +1271,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 1. `pattern`: done, below.
 2. `rate`: done, below.
 3. `octaves`: done, below.
-4. `gate`: 0 is taken; the inspector starts at 0.05; the engine holds at most 99% of a step.
+4. `gate`: done, below.
 5. `swing`: a negative swing plays straight; while synced the Transport's swing is used unless the
    inspector's swing source is "own", which no script can set.
 6. `phase`: likely ignored once the arp has run in the preview (to confirm in the browser); `read`
@@ -1340,6 +1340,18 @@ without a word. The inspector offers 1 to 4. At the owner's word ("As recommende
 | Example | `ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up. |
 | `octaves` (number, required) | Octaves, from the notes up. / 1: the notes only. / Range: 1 ↔ 4, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
 | notes | A note above 127 is left out. / With "chord": every octave at once. / Default: 1. / Then the two every command has. |
+
+**Item 4, `gate`: done.** It took 0 to 1. The engine holds a note for at least 10 ms and at most
+99% of its step (`gateSeconds`: a repeated note at a full gate would race its own note-off), so 0
+played a 10 ms blip. The inspector offers 0.05 to 1. At the owner's word ("As recommended") a
+script takes 0.05 to 1: past it, the nearest end with the one-time warning.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how long each note is held, as a part of its step. |
+| Example | `ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step. |
+| `gate` (number, required) | Part of the step. / 1: held to the next step; 99% of it, so a repeated note sounds again. / Range: 0.05 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Default: 0.6. / Then the two every command has. |
 
 ## Checking each batch
 

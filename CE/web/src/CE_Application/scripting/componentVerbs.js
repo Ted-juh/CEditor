@@ -184,7 +184,12 @@ export const COMPONENT_FAMILIES = [
         argDocs: { octaves: ['Octaves, from the notes up.', '1: the notes only.', 'Range: 1 ↔ 4, whole.', 'A fraction: rounded.',
           'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
         notes: ['A note above 127 is left out.', 'With "chord": every octave at once.', 'Default: 1.'] }),
-      v('gate', 'gate', NUM, { ...UNIT, doc: 'How much of each step is held, 0..1.' }),
+      // Item 4: the inspector's 0.05 to 1. 0 played a 10 ms blip (gateSeconds' floor), and 1 holds 99%.
+      v('gate', 'gate', NUM, { min: 0.05, max: 1, doc: 'Set how long each note is held, as a part of its step.',
+        ex: ['0.5', 'holds each note for half its step'],
+        argDocs: { gate: ['Part of the step.', '1: held to the next step; 99% of it, so a repeated note sounds again.',
+          'Range: 0.05 ↔ 1.', 'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: 0.6.'] }),
       v('swing', 'swing', NUM, { min: -1, max: 1 }),
       v('latch', 'latch', BOOL, { toggle: true }),
       v('key', 'key', INT, { min: 0, max: 11, doc: 'Root as a pitch class, 0 = C.' }),

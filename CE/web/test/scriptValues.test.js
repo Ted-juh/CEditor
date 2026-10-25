@@ -539,8 +539,9 @@ test('a component verb\'s value is typed by its spec: the divisions, the scales,
   assert.equal(argOf(callOf(read(src, 'lua', 'scale(')), 'scale').kind, 'scale');
   const gate = argOf(callOf(read(src, 'lua', 'gate')), 'gate');
   // Past its range the verb uses the nearest end, and says so in the console's words: it is not refused.
-  assert.deepEqual([gate.kind, gate.meaning.min, gate.meaning.max, gate.problem?.severity], ['number', 0, 1, 'warning']);
-  assert.equal(gate.problem.message, 'arp Arp: gate(1.5) — the gate 1.5 is outside 0 to 1, so 1 was used.');
+  // The arp's gate is 0.05 to 1, the inspector's range (item 4 of the owner's review of the arp).
+  assert.deepEqual([gate.kind, gate.meaning.min, gate.meaning.max, gate.problem?.severity], ['number', 0.05, 1, 'warning']);
+  assert.equal(gate.problem.message, 'arp Arp: gate(1.5) — the gate 1.5 is outside 0.05 to 1, so 1 was used.');
   const colour = argOf(callOf(read(src, 'lua', 'drumpads')), 'colour');
   assert.deepEqual([colour.kind, colour.problem?.severity], ['colour', 'error']);
 });

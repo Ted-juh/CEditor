@@ -229,6 +229,7 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   than 0.1 and skipped steps above about 60.
 - `ce.components.arp.octaves` takes 1 to 4, as the inspector does; 5 and 6 were stored and played
   as 4.
+- `ce.components.arp.gate` takes 0.05 to 1, as the inspector does; 0 played a 10 ms blip.
 
 ## What you get
 

@@ -4807,15 +4807,16 @@ Good to know:
 
 ##### `ce.components.arp.gate(target, gate) -> boolean`
 
-How much of each step is held, 0..1.
+Set how long each note is held, as a part of its step.
 
-Example: `ce.components.arp.gate("Arpeggiator", 0.5)` sets the gate to 0.5.
+Example: `ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `gate` (number, required): Gate.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `gate` (number, required): Part of the step.<br>1: held to the next step; 99% of it, so a repeated note sounds again.<br>Range: 0.05 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.6.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

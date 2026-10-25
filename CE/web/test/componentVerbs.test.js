@@ -126,7 +126,8 @@ test('a number verb clamps rather than refusing', () => {
   const cfg = cfgFor('Arp');
   assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [0.4]), { gate: 0.4 });
   assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [99]), { gate: 1 });
-  assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [-99]), { gate: 0 });
+  // The arp's gate starts at 0.05, the inspector's end (item 4 of the owner's review of the arp).
+  assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [-99]), { gate: 0.05 });
 });
 
 test('an int verb rounds', () => {
@@ -808,6 +809,13 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.deepEqual(MEMBER_BY_ID.arpOctaves.notes.slice(0, 3), ['A note above 127 is left out.', 'With "chord": every octave at once.', 'Default: 1.']);
   const octaves = COMPONENT_VERBS.find((verb) => verb.id === 'arpOctaves');
   assert.deepEqual(componentScriptPatch(octaves, { octaves: 1 }, [6]), { octaves: 4 });
+  // Item 4: gate, the inspector's range.
+  assert.equal(MEMBER_BY_ID.arpGate.summary, 'Set how long each note is held, as a part of its step.');
+  assert.equal(MEMBER_BY_ID.arpGate.example, '`ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step.');
+  assert.equal(text('arpGate', 'gate'), 'Part of the step.\n1: held to the next step; 99% of it, so a repeated note sounds again.\nRange: 0.05 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.arpGate.notes[0], 'Default: 0.6.');
+  const gate = COMPONENT_VERBS.find((verb) => verb.id === 'arpGate');
+  assert.deepEqual(componentScriptPatch(gate, { gate: 0.6 }, [0]), { gate: 0.05 });
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {
