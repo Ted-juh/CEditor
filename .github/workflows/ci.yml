@@ -73,9 +73,27 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # A download Microsoft refuses does not stop the run. On 2026-10-25 every attempt at 10.0.403
+      # (and the 10.0.14 runtime) came back HTTP 409 from dotnetorigin.blob.core.windows.net, for an
+      # hour and more, and the job failed here before anything was built or tested. The runner image
+      # carries .NET SDKs of its own, and both C# checks take the newest SDK there is when 10 is not
+      # (verify-csharp.mjs, validate-script-exports.mjs), so the step after this one lists them and
+      # fails only when there is no .NET at all; a fallback is said in the run's annotations. When
+      # the download works again the next run is on 10.0.x with nothing to undo.
       - uses: actions/setup-dotnet@v6
+        id: dotnet
+        continue-on-error: true
         with:
           dotnet-version: '10.0.x'
+
+      - name: .NET SDKs (the runner's own when the download above failed)
+        shell: pwsh
+        run: |
+          if ('${{ steps.dotnet.outcome }}' -ne 'success') {
+            Write-Output "::warning title=.NET::actions/setup-dotnet could not install 10.0.x; the C# checks run on the runner image's SDKs."
+          }
+          dotnet --list-sdks
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Install web dependencies
         working-directory: CE/web
@@ -166,9 +184,27 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # A download Microsoft refuses does not stop the run. On 2026-10-25 every attempt at 10.0.403
+      # (and the 10.0.14 runtime) came back HTTP 409 from dotnetorigin.blob.core.windows.net, for an
+      # hour and more, and the job failed here before anything was built or tested. The runner image
+      # carries .NET SDKs of its own, and both C# checks take the newest SDK there is when 10 is not
+      # (verify-csharp.mjs, validate-script-exports.mjs), so the step after this one lists them and
+      # fails only when there is no .NET at all; a fallback is said in the run's annotations. When
+      # the download works again the next run is on 10.0.x with nothing to undo.
       - uses: actions/setup-dotnet@v6
+        id: dotnet
+        continue-on-error: true
         with:
           dotnet-version: '10.0.x'
+
+      - name: .NET SDKs (the runner's own when the download above failed)
+        shell: pwsh
+        run: |
+          if ('${{ steps.dotnet.outcome }}' -ne 'success') {
+            Write-Output "::warning title=.NET::actions/setup-dotnet could not install 10.0.x; the C# checks run on the runner image's SDKs."
+          }
+          dotnet --list-sdks
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Install web dependencies
         working-directory: CE/web
