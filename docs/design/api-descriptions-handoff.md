@@ -1274,8 +1274,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 4. `gate`: done, below.
 5. `swing`: done, below, with `swingSource`.
 6. `phase`: done, below.
-7. `mute`: `read(t, "mute")` gives the steps counted from 0 (`[2]` after `mute(t, 3)`); a step
-   past the sequence is stored without a word.
+7. `mute`: done, below.
 8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): the
    degree counts from 0, degrees 5 and 6 of a five-note scale play as 4, the key is a number only.
 9. `latch`: does something only with a linked Chord Pad or MIDI input.
@@ -1394,6 +1393,25 @@ that is their reviews', and `componentPhases.js` is where their preview code wou
 | Example | `ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence. |
 | `phase` (number, required) | Where in the sequence: 0 the start, 0.5 halfway. / 1: the start again. / Range: 0 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
 | notes | Running: the next step plays from there. Stopped: it starts from there. / While synced: no effect; the Transport's position decides. / `read(target, "phase")` gives where it is now. / Nothing is written to the panel. / Then the two every command has. |
+
+**Item 7, `mute`: done.** `mute(t, 3)` muted step 3 as it should, and clicking a cell does the
+same; but "on" meant muted and nothing said so (the example read "switches step 3 on"),
+`read(t, "mute")` gave the stored steps, counted from 0 (`[2]` after `mute(t, 3)`), and
+`read(t, "mute", 1)` the list's first entry rather than whether step 1 was muted. A step past the
+sequence is stored without a word, and plays once the sequence reaches it. At the owner's word
+("As recommended") `read(t, "mute")` gives the muted steps counted from 1 and `read(t, "mute", 3)`
+true or false (panelRuntime's read, for the one `indexset` verb there is); a step past the end is
+kept, since the sequence grows with the notes held, and the text says so. `scriptComponents.test.js`
+held the script and the grid's toggle to one shape through the old read; it does now through the
+new one.
+
+| Field | Text |
+| --- | --- |
+| Description | Mute or unmute one step. |
+| Example | `ce.components.arp.mute("Arpeggiator", 3)` mutes step 3 if it plays, and lets it play if it is muted. |
+| `index` (number, required) | Step number, counted from 1, as the cells are drawn from the left. / A fraction: rounded. / Past the last step: kept, for when the sequence grows. / Below 1, or invalid: rejected with a console error. |
+| `on` (true or false, optional) | true: muted. / false: plays. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
+| notes | A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change. / `read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted. / Default: none muted. / Then the two every command has. |
 
 ## Checking each batch
 

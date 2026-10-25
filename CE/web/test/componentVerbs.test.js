@@ -836,6 +836,13 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpPhase', 'phase'), 'Where in the sequence: 0 the start, 0.5 halfway.\n1: the start again.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpPhase.notes.slice(0, 4), ['Running: the next step plays from there. Stopped: it starts from there.',
     'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.', 'Nothing is written to the panel.']);
+  // Item 7: mute.
+  assert.equal(MEMBER_BY_ID.arpMute.summary, 'Mute or unmute one step.');
+  assert.equal(MEMBER_BY_ID.arpMute.example, '`ce.components.arp.mute("Arpeggiator", 3)` mutes step 3 if it plays, and lets it play if it is muted.');
+  assert.equal(text('arpMute', 'index'), 'Step number, counted from 1, as the cells are drawn from the left.\nA fraction: rounded.\nPast the last step: kept, for when the sequence grows.\nBelow 1, or invalid: rejected with a console error.');
+  assert.equal(text('arpMute', 'on'), 'true: muted.\nfalse: plays.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(MEMBER_BY_ID.arpMute.notes.slice(0, 3), ['A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.',
+    '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.', 'Default: none muted.']);
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

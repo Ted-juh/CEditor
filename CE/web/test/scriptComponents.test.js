@@ -390,8 +390,10 @@ test('the arp’s per-step mutes agree with the grid’s own toggle', () => {
     for (const step of [3, 5, 3]) {
       // The app's function, imported — the muted steps are a SET of indices, not a boolean per
       // step, so a script writing one and a click on the grid have to agree about the shape. Fed
-      // the CURRENT mutes each time, because the third call toggles step 3 back off.
-      const expected = toggleMute({ _children: { Arp: { mutes: api.arpRead('arp', 'mute') } } }, step - 1);
+      // the CURRENT mutes each time, because the third call toggles step 3 back off. read counts the
+      // steps from 1, as mute() does, and the grid stores them from 0.
+      const stored = api.arpRead('arp', 'mute').map((n) => n - 1);
+      const expected = toggleMute({ _children: { Arp: { mutes: stored } } }, step - 1).map((n) => n + 1);
       assert.equal(api.arpMute('arp', step), true);
       assert.deepEqual(api.arpRead('arp', 'mute'), expected);
     }

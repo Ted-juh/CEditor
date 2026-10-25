@@ -229,7 +229,17 @@ export const COMPONENT_FAMILIES = [
         notes: ['Running: the next step plays from there. Stopped: it starts from there.',
           'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.',
           'Nothing is written to the panel.'] }),
-      v('mute', 'mutes', INDEXSET, { doc: 'Mute or unmute one step, 1-based. No third argument toggles.' }),
+      // Item 7: what "on" means, a step past the end kept, and read counting from 1 (panelRuntime).
+      v('mute', 'mutes', INDEXSET, { doc: 'Mute or unmute one step.',
+        ex: ['3', 'mutes step 3 if it plays, and lets it play if it is muted'],
+        argDocs: {
+          index: ['Step number, counted from 1, as the cells are drawn from the left.', 'A fraction: rounded.',
+            'Past the last step: kept, for when the sequence grows.', 'Below 1, or invalid: rejected with a console error.'].join('\n'),
+          on: `true: muted.\nfalse: plays.\nLeft out: toggles.\n${OFF_RULE}`,
+        },
+        notes: ['A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.',
+          '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.',
+          'Default: none muted.'] }),
       v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Which channel it takes notes from. 0 means omni.' }),
       v('baseOctave', 'baseOctave', INT, { min: -1, max: 8 }),
       v('source', 'source', ENUM, { doc: 'Where the notes come from: its own chord, a linked Chord Pad, or incoming MIDI.' }),

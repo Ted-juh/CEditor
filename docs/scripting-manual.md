@@ -5072,16 +5072,19 @@ Good to know:
 
 ##### `ce.components.arp.mute(target, index [, on]) -> boolean`
 
-Mute or unmute one step, 1-based. No third argument toggles.
+Mute or unmute one step.
 
-Example: `ce.components.arp.mute("Arpeggiator", 3)` switches step 3 on if it is off, and off if it is on.
+Example: `ce.components.arp.mute("Arpeggiator", 3)` mutes step 3 if it plays, and lets it play if it is muted.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
-- `index` (number, required): Step number, counted from 1.<br>A fraction: rounded.<br>Below 1, or invalid: rejected with a console error.
-- `on` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": off. Case-insensitive.<br>Any other value: on.
+- `index` (number, required): Step number, counted from 1, as the cells are drawn from the left.<br>A fraction: rounded.<br>Past the last step: kept, for when the sequence grows.<br>Below 1, or invalid: rejected with a console error.
+- `on` (true or false, optional): true: muted.<br>false: plays.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.
+- `read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.
+- Default: none muted.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

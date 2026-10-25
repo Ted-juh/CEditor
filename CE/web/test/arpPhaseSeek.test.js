@@ -1,4 +1,5 @@
 // arpPhaseSeek.test.js — ce.components.arp.phase is a seek (item 6 of the owner's review of the arp):
+// (and, through the same runtime, item 7: mute's read counts from 1, as mute() does)
 // it moves a running arp, or where a stopped one starts, through stores/componentPhases.js, and
 // read(t, "phase") answers where it is. It wrote the stored phase, which the preview reads only
 // when it opens, so a running arp never moved.
@@ -74,3 +75,14 @@ test('with no preview, a seek waits for the next one, and read gives it until th
   assert.equal(takePendingPhase(done.id), undefined, 'once');
   assert.equal(done.arp.phase, 0.1);
 });
+
+test('read gives the muted steps counted from 1, and one step as whether it is muted', () => {
+  const done = run({}, (arp) => [
+    arp.mute('Arp', 3), arp.mute('Arp', 9), arp.mute('Arp', 1), arp.read('Arp', 'mute'),
+    arp.read('Arp', 'mute', 3), arp.read('Arp', 'mute', 2), arp.read('Arp', 'mute', 0), arp.mute('Arp', 3, false), arp.read('Arp', 'mute'),
+  ]);
+  assert.deepEqual(done.result, [true, true, true, [1, 3, 9], true, false, undefined, true, [1, 9]]);
+  assert.deepEqual(done.arp.mutes, [0, 8], 'stored as the engine reads them, from 0; a step past the sequence kept');
+  assert.deepEqual(done.said, ['arp.read("mute", 0): 0 is not a step: the steps count from 1.']);
+});
+

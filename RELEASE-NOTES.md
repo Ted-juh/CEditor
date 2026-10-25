@@ -237,6 +237,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.arp.phase` moves the arp to a point in its sequence: a running one at once, a
   stopped one where it starts. `read(t, "phase")` gives where it is now. It wrote a number the
   preview read only when it opened, so a running arp never moved and `read` gave the number back.
+- `read(t, "mute")` on the Arpeggiator gives the muted steps counted from 1, as `mute()` takes them,
+  and `read(t, "mute", 3)` whether step 3 is muted. It gave them counted from 0, and the list's
+  third entry.
 
 ## What you get
 

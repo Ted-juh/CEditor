@@ -150,7 +150,7 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, familyVerbNamed, readIndexRefusal, LIST_KINDS,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentRefusalReason, componentClampWarning, familyVerbRefusal, familyVerbNamed, readIndexRefusal, LIST_KINDS,
   itemListLength, LINK_KIND, ELEM_KIND, LAYOUT_KIND,
 } from './componentVerbs.js';
 import {
@@ -3760,6 +3760,20 @@ function componentReadAction(verb, path, args) {
 
   const list = componentListValue(cfg, spec);
   if (!list) return undefined;
+  // A set of steps (the Arpeggiator's mutes) reads as the steps counted from 1, as mute() takes them,
+  // and one step as whether it is in the set. It read as the stored list, counted from 0, and one
+  // entry of it by position (item 7 of the owner's review of the arp).
+  if (spec.k === 'indexset') {
+    const steps = [...new Set(list.map((n) => Math.round(Number(n))).filter(Number.isFinite))]
+      .sort((a, b) => a - b).map((n) => n + 1);
+    if (index === undefined || index === null) return steps;
+    const refused = componentRefusalReason(spec, cfg, [index]);
+    if (refused) {
+      addScriptTrace('error', '', `${verb.family}.read("${spec.v}", ${JSON.stringify(index)}): ${refused}`);
+      return undefined;
+    }
+    return steps.includes(Math.round(Number(index)));
+  }
   if (index === undefined || index === null) return list;
 
   // 1-based, as everywhere else in this module — and for a grid the second index is the column.
