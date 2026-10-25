@@ -787,7 +787,7 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
   // Item 1: pattern.
   assert.equal(MEMBER_BY_ID.arpPattern.summary, 'Set the order the notes are played in.');
-  assert.equal(MEMBER_BY_ID.arpPattern.example, '`ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down.');
+  assert.equal(MEMBER_BY_ID.arpPattern.example, '`ce.components.arp.pattern("Arp", "updown")` plays the notes low to high, then back down.');
   assert.equal(text('arpPattern', 'pattern'), ['"up": low to high.', '"down": high to low.',
     '"updown": up, then down; the top and bottom notes once.', '"downup": down, then up; the same.',
     '"asPlayed": in the order the notes were pressed. Its own chord: as "up".', '"random": one note at random each step.',
@@ -795,7 +795,7 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(MEMBER_BY_ID.arpPattern.notes[0], 'Default: "up".');
   // Item 2: rate, the inspector's range.
   assert.equal(MEMBER_BY_ID.arpRate.summary, 'Set how many steps a second it plays, while not synced.');
-  assert.equal(MEMBER_BY_ID.arpRate.example, '`ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second.');
+  assert.equal(MEMBER_BY_ID.arpRate.example, '`ce.components.arp.rate("Arp", 8)` plays eight steps a second.');
   assert.equal(text('arpRate', 'rate'), 'Steps per second.\nRange: 0.1 ↔ 40.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpRate.notes.slice(0, 2), ['While synced to the Transport: no effect; `division()` sets the step.', 'Default: 6.']);
   const rate = COMPONENT_VERBS.find((verb) => verb.id === 'arpRate');
@@ -804,27 +804,27 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [300]), { rate: 40 });
   // Item 3: octaves, what plays and what the inspector offers.
   assert.equal(MEMBER_BY_ID.arpOctaves.summary, 'Set how many octaves the notes are repeated over, upward.');
-  assert.equal(MEMBER_BY_ID.arpOctaves.example, '`ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up.');
+  assert.equal(MEMBER_BY_ID.arpOctaves.example, '`ce.components.arp.octaves("Arp", 2)` plays the notes, then the same notes an octave up.');
   assert.equal(text('arpOctaves', 'octaves'), 'Octaves, from the notes up.\n1: the notes only.\nRange: 1 ↔ 4, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpOctaves.notes.slice(0, 3), ['A note above 127 is left out.', 'With "chord": every octave at once.', 'Default: 1.']);
   const octaves = COMPONENT_VERBS.find((verb) => verb.id === 'arpOctaves');
   assert.deepEqual(componentScriptPatch(octaves, { octaves: 1 }, [6]), { octaves: 4 });
   // Item 4: gate, the inspector's range.
   assert.equal(MEMBER_BY_ID.arpGate.summary, 'Set how long each note is held, as a part of its step.');
-  assert.equal(MEMBER_BY_ID.arpGate.example, '`ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step.');
+  assert.equal(MEMBER_BY_ID.arpGate.example, '`ce.components.arp.gate("Arp", 0.5)` holds each note for half its step.');
   assert.equal(text('arpGate', 'gate'), 'Part of the step.\n1: held to the next step; 99% of it, so a repeated note sounds again.\nRange: 0.05 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.arpGate.notes[0], 'Default: 0.6.');
   const gate = COMPONENT_VERBS.find((verb) => verb.id === 'arpGate');
   assert.deepEqual(componentScriptPatch(gate, { gate: 0.6 }, [0]), { gate: 0.05 });
   // Item 5: swing, as the engine reads it, and whose swing a synced arp plays.
   assert.equal(MEMBER_BY_ID.arpSwing.summary, 'Set how far every second step is delayed.');
-  assert.equal(MEMBER_BY_ID.arpSwing.example, '`ce.components.arp.swing("Arpeggiator", 0.5)` delays every second step by a quarter of a step.');
+  assert.equal(MEMBER_BY_ID.arpSwing.example, '`ce.components.arp.swing("Arp", 0.5)` delays every second step by a quarter of a step.');
   assert.equal(text('arpSwing', 'swing'), 'Part of half a step: 1 delays every second step by half a step.\n0: straight.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpSwing.notes.slice(0, 2), ['While synced: the Transport\'s swing, unless `swingSource()` is "own".', 'Default: 0.']);
   const swing = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwing');
   assert.deepEqual(componentScriptPatch(swing, { swing: 0.3 }, [-0.5]), { swing: 0 });
   assert.equal(MEMBER_BY_ID.arpSwingSource.summary, 'Set whose swing a synced arp plays: the Transport\'s or its own.');
-  assert.equal(MEMBER_BY_ID.arpSwingSource.example, '`ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced.');
+  assert.equal(MEMBER_BY_ID.arpSwingSource.example, '`ce.components.arp.swingSource("Arp", "own")` plays its own swing while synced.');
   assert.equal(text('arpSwingSource', 'swingSource'), '"transport": the Transport\'s swing, while synced.\n"own": `swing()`, always.\nCase-insensitive.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpSwingSource.notes.slice(0, 2), ['Not synced: its own swing, either way.', 'Default: "transport".']);
   const source = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwingSource');
@@ -832,19 +832,19 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['clock']), {});
   // Item 6: phase is a seek (arpPhaseSeek.test.js drives it).
   assert.equal(MEMBER_BY_ID.arpPhase.summary, 'Move the arp to a point in its sequence.');
-  assert.equal(MEMBER_BY_ID.arpPhase.example, '`ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence.');
+  assert.equal(MEMBER_BY_ID.arpPhase.example, '`ce.components.arp.phase("Arp", 0.5)` moves it halfway through its sequence.');
   assert.equal(text('arpPhase', 'phase'), 'Where in the sequence: 0 the start, 0.5 halfway.\n1: the start again.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpPhase.notes.slice(0, 4), ['Running: the next step plays from there. Stopped: it starts from there.',
     'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.', 'Nothing is written to the panel.']);
   // Item 7: mute.
   assert.equal(MEMBER_BY_ID.arpMute.summary, 'Mute or unmute one step.');
-  assert.equal(MEMBER_BY_ID.arpMute.example, '`ce.components.arp.mute("Arpeggiator", 3)` mutes step 3 if it plays, and lets it play if it is muted.');
+  assert.equal(MEMBER_BY_ID.arpMute.example, '`ce.components.arp.mute("Arp", 3)` mutes step 3 if it plays, and lets it play if it is muted.');
   assert.equal(text('arpMute', 'index'), 'Step number, counted from 1, as the cells are drawn from the left.\nA fraction: rounded.\nPast the last step: kept, for when the sequence grows.\nBelow 1, or invalid: rejected with a console error.');
   assert.equal(text('arpMute', 'on'), 'true: muted.\nfalse: plays.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.deepEqual(MEMBER_BY_ID.arpMute.notes.slice(0, 3), ['A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.',
     '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.', 'Default: none muted.']);
   // Item 8: its own chord (arpOwnChord.test.js drives it).
-  assert.equal(MEMBER_BY_ID.arpKey.example, '`ce.components.arp.key("Arpeggiator", "F#")` builds its chord in F♯.');
+  assert.equal(MEMBER_BY_ID.arpKey.example, '`ce.components.arp.key("Arp", "F#")` builds its chord in F♯.');
   assert.equal(MEMBER_BY_ID.arpKey.params.find((p) => p.name === 'key').type, 'number or name');
   assert.equal(text('arpKey', 'key'), 'The key\'s note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.\nPast 11 or below 0: round the octave; 12 is C.\nA fraction: rounded.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpKey.notes.slice(0, 3), ['Its own chord only: with `source()` "link" or "input" the notes come from there.',
@@ -854,43 +854,50 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
   assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 15: the family. "Arp" in the examples, the summary, and read's texts.
+  assert.equal(MODULE_BY_ID['ce.components.arp'].summary.split(' Panel view only')[0],
+    'Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm.');
+  assert.equal(MEMBER_BY_ID.arpRead.example, '`ce.components.arp.read("Arp")` gives every setting as a table.');
+  assert.equal(text('arpRead', 'index'), 'For "mute": a step number, counted from 1; true if that step is muted.\nA fraction: rounded.\nBelow 1, or invalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpRead.notes.slice(0, 3), ['`read(target)`: every setting as a table, by verb name.', '`read(target, "phase")`: where it is now.',
+    '`read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is.']);
   // Item 14: editable, showNotes and showHeader, declared rather than derived, in the same place.
   assert.equal(MEMBER_BY_ID.arpEditable.summary, 'Let a click on a step mute it, or not.');
-  assert.equal(MEMBER_BY_ID.arpEditable.example, '`ce.components.arp.editable("Arpeggiator", false)` stops clicks muting steps.');
+  assert.equal(MEMBER_BY_ID.arpEditable.example, '`ce.components.arp.editable("Arp", false)` stops clicks muting steps.');
   assert.equal(MEMBER_BY_ID.arpEditable.notes[0], 'Only clicks are locked: `mute()` still works.');
   assert.equal(text('arpShowNotes', 'showNotes'), 'true: each step shows its note, "C3", or a chord\'s count, "3♪".\nfalse: hidden.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.arpShowNotes.notes[0], 'A step narrower than 22 or shorter than 26 pixels shows no name either way.');
-  assert.equal(MEMBER_BY_ID.arpShowHeader.example, '`ce.components.arp.showHeader("Arpeggiator", false)` hides the strip, and the steps take its room.');
+  assert.equal(MEMBER_BY_ID.arpShowHeader.example, '`ce.components.arp.showHeader("Arp", false)` hides the strip, and the steps take its room.');
   const arpOrder = COMPONENT_VERBS.filter((verb) => verb.family === 'arp').map((verb) => verb.v);
   assert.deepEqual(arpOrder.slice(arpOrder.indexOf('link'), arpOrder.indexOf('link') + 4), ['link', 'editable', 'showNotes', 'showHeader']);
   assert.equal(arpOrder.filter((name) => name === 'editable').length, 1, 'declared once, not derived again');
   // Item 13: velocity and channel.
   assert.equal(MEMBER_BY_ID.arpVelocity.summary, 'Set how hard every note it plays is struck.');
-  assert.equal(MEMBER_BY_ID.arpVelocity.example, '`ce.components.arp.velocity("Arpeggiator", 110)` plays every note at velocity 110.');
+  assert.equal(MEMBER_BY_ID.arpVelocity.example, '`ce.components.arp.velocity("Arp", 110)` plays every note at velocity 110.');
   assert.equal(text('arpVelocity', 'velocity'), 'MIDI velocity.\nRange: 1 ↔ 127, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpVelocity.notes.slice(0, 2), ['The same for every note: the velocity the notes were held at is not used.', 'Default: 96.']);
   assert.equal(MEMBER_BY_ID.arpChannel.summary, 'Set which MIDI channel it plays on.');
-  assert.equal(MEMBER_BY_ID.arpChannel.example, '`ce.components.arp.channel("Arpeggiator", 10)` plays its notes on channel 10.');
+  assert.equal(MEMBER_BY_ID.arpChannel.example, '`ce.components.arp.channel("Arp", 10)` plays its notes on channel 10.');
   assert.equal(text('arpChannel', 'channel'), 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   // Item 12: the Euclidean rhythm.
   assert.equal(MEMBER_BY_ID.arpEuclid.summary, 'Switch the Euclidean rhythm on or off.');
-  assert.equal(MEMBER_BY_ID.arpEuclid.example, '`ce.components.arp.euclid("Arpeggiator", true)` plays only the steps the rhythm hits.');
+  assert.equal(MEMBER_BY_ID.arpEuclid.example, '`ce.components.arp.euclid("Arp", true)` plays only the steps the rhythm hits.');
   assert.equal(MEMBER_BY_ID.arpEuclid.notes[0], 'The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`.');
   assert.equal(MEMBER_BY_ID.arpEuclidSteps.summary, 'Set how many steps the rhythm is long.');
   assert.equal(text('arpEuclidPulses', 'euclidPulses'), 'Hits, spread as evenly as they go.\n0: none sound.\nRange: 0 ↔ `euclidSteps()`, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.arpEuclidPulses.notes[0], 'Steps lowered below it later: every step sounds.');
-  assert.equal(MEMBER_BY_ID.arpEuclidRotate.example, '`ce.components.arp.euclidRotate("Arpeggiator", 1)` moves every hit a step earlier.');
+  assert.equal(MEMBER_BY_ID.arpEuclidRotate.example, '`ce.components.arp.euclidRotate("Arp", 1)` moves every hit a step earlier.');
   assert.equal(text('arpEuclidRotate', 'euclidRotate'), 'Steps to turn it: each hit that many steps earlier.\nPast the steps, or below 0: round them; -1 is the last.\nA fraction: rounded.\nInvalid: rejected with a console error.');
   // Item 11: run, sync and division.
   assert.equal(MEMBER_BY_ID.arpRun.summary, 'Start or stop the arp.');
-  assert.equal(MEMBER_BY_ID.arpRun.example, '`ce.components.arp.run("Arpeggiator", false)` stops it.');
+  assert.equal(MEMBER_BY_ID.arpRun.example, '`ce.components.arp.run("Arp", false)` stops it.');
   assert.equal(text('arpRun', 'run'), 'true: plays.\nfalse: stops.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.deepEqual(MEMBER_BY_ID.arpRun.notes.slice(0, 3), ['Free-running: it starts again where it stopped.', 'Synced: it plays only while the Transport runs.', 'Default: true.']);
   assert.equal(MEMBER_BY_ID.arpSync.summary, 'Follow the Transport\'s tempo, or run at its own rate.');
-  assert.equal(MEMBER_BY_ID.arpSync.example, '`ce.components.arp.sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`.');
+  assert.equal(MEMBER_BY_ID.arpSync.example, '`ce.components.arp.sync("Arp", true)` steps in time with the Transport, one step per `division()`.');
   assert.match(text('arpSync', 'sync'), /^true: one step per `division\(\)` at the Transport's tempo, in step with its position\.\nfalse: `rate\(\)` steps a second\.\nLeft out: toggles\./);
   assert.equal(MEMBER_BY_ID.arpDivision.summary, 'Set how long each step is while synced.');
-  assert.equal(MEMBER_BY_ID.arpDivision.example, '`ce.components.arp.division("Arpeggiator", "1/8T")` plays eighth-note triplets.');
+  assert.equal(MEMBER_BY_ID.arpDivision.example, '`ce.components.arp.division("Arp", "1/8T")` plays eighth-note triplets.');
   assert.equal(text('arpDivision', 'division'), ['A note value, "1/1" a whole note to "1/32".', '"D" after it: dotted, half as long again.',
     '"T" after it: a triplet, two-thirds as long.',
     'One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.',
@@ -899,18 +906,18 @@ test('the Arpeggiator\'s verbs say what each setting does, as the owner approved
   assert.equal(MEMBER_BY_ID.arpSource.summary, 'Set where the notes come from.');
   assert.equal(text('arpSource', 'source'), '"chord": its own chord, from `key()`, `scale()` and `degree()`.\n"link": the notes held on the Chord Pad set by `link()`.\n"input": the notes held on the MIDI input, on `inputChannel()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.arpLink.summary, 'Set the Chord Pad it plays from.');
-  assert.equal(MEMBER_BY_ID.arpLink.example, '`ce.components.arp.link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads.');
+  assert.equal(MEMBER_BY_ID.arpLink.example, '`ce.components.arp.link("Arp", "Pads")` plays the chords held on the Chord Pad called Pads.');
   assert.equal(text('arpLink', 'name'), 'The Chord Pad\'s name. Case-insensitive.\nLeft out, or "": none.\nNot on this panel, or not a Chord Pad: rejected with a console error.');
   assert.deepEqual(MEMBER_BY_ID.arpLink.notes.slice(0, 3), ['Played only while `source()` is "link".', 'The Chord Pad stays silent while the arp plays from it.', 'Default: none.']);
   assert.equal(MEMBER_BY_ID.arpInputChannel.summary, 'Set which MIDI channel it takes notes from.');
   assert.equal(text('arpInputChannel', 'inputChannel'), 'Channel 1 ↔ 16, or 0: any channel.\nRange: 0 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   // Item 9: latch.
   assert.equal(MEMBER_BY_ID.arpLatch.summary, 'Keep playing the last notes held after they are let go.');
-  assert.equal(MEMBER_BY_ID.arpLatch.example, '`ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.');
+  assert.equal(MEMBER_BY_ID.arpLatch.example, '`ce.components.arp.latch("Arp", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.');
   assert.equal(text('arpLatch', 'latch'), 'true: the last notes held keep playing.\nfalse: it stops when they are let go.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.deepEqual(MEMBER_BY_ID.arpLatch.notes.slice(0, 4), ['With `source()` "link" or "input" only: its own chord always plays.',
     'Notes held again replace the latched ones.', 'A Panic lets them go.', 'Default: false.']);
-  assert.equal(MEMBER_BY_ID.arpBaseOctave.example, '`ce.components.arp.baseOctave("Arpeggiator", 4)` puts the chord\'s root in octave 4, as in C4, middle C.');
+  assert.equal(MEMBER_BY_ID.arpBaseOctave.example, '`ce.components.arp.baseOctave("Arp", 4)` puts the chord\'s root in octave 4, as in C4, middle C.');
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

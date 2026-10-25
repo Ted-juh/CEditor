@@ -488,10 +488,10 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"group_Arpeggiator_arp_Drive_the_Arpeggiator_pattern_rate_gate_swing_and_the_Euclidean_generator_","id":"qa_group_0","controlType":"Label"},
+        "Core": {"name":"group_Arpeggiator_arp_Play_notes_one_at_a_time_from_its_own_chord_a_Chord_Pad_or_the_MIDI_input_their_order_speed_length_swing_and_rhythm_","id":"qa_group_0","controlType":"Label"},
         "Transform": {"x":28,"y":28,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Arpeggiator — arp.*  (Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Arpeggiator — arp.*  (Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"

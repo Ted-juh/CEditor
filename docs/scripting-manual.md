@@ -4701,13 +4701,13 @@ Components that produce notes.
 
 #### ce.components.arp: Arpeggiator
 
-Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.
+Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm.
 
 ##### `ce.components.arp.run(target [, run]) -> boolean`
 
 Start or stop the arp.
 
-Example: `ce.components.arp.run("Arpeggiator", false)` stops it.
+Example: `ce.components.arp.run("Arp", false)` stops it.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `run` (true or false, optional): true: plays.<br>false: stops.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -4726,7 +4726,7 @@ Good to know:
 
 Set the order the notes are played in.
 
-Example: `ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down.
+Example: `ce.components.arp.pattern("Arp", "updown")` plays the notes low to high, then back down.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `pattern` (text, required): "up": low to high.<br>"down": high to low.<br>"updown": up, then down; the top and bottom notes once.<br>"downup": down, then up; the same.<br>"asPlayed": in the order the notes were pressed. Its own chord: as "up".<br>"random": one note at random each step.<br>"chord": every note at once, each step.<br>Case-insensitive.<br>Invalid: rejected with a console error.
@@ -4743,7 +4743,7 @@ Good to know:
 
 Set how many steps a second it plays, while not synced.
 
-Example: `ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second.
+Example: `ce.components.arp.rate("Arp", 8)` plays eight steps a second.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `rate` (number, required): Steps per second.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -4761,7 +4761,7 @@ Good to know:
 
 Set how long each step is while synced.
 
-Example: `ce.components.arp.division("Arpeggiator", "1/8T")` plays eighth-note triplets.
+Example: `ce.components.arp.division("Arp", "1/8T")` plays eighth-note triplets.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `division` (text, required): A note value, "1/1" a whole note to "1/32".<br>"D" after it: dotted, half as long again.<br>"T" after it: a triplet, two-thirds as long.<br>One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
@@ -4779,7 +4779,7 @@ Good to know:
 
 Follow the Transport's tempo, or run at its own rate.
 
-Example: `ce.components.arp.sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`.
+Example: `ce.components.arp.sync("Arp", true)` steps in time with the Transport, one step per `division()`.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `sync` (true or false, optional): true: one step per `division()` at the Transport's tempo, in step with its position.<br>false: `rate()` steps a second.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -4798,7 +4798,7 @@ Good to know:
 
 Set how many octaves the notes are repeated over, upward.
 
-Example: `ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up.
+Example: `ce.components.arp.octaves("Arp", 2)` plays the notes, then the same notes an octave up.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `octaves` (number, required): Octaves, from the notes up.<br>1: the notes only.<br>Range: 1 ↔ 4, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -4817,7 +4817,7 @@ Good to know:
 
 Set how long each note is held, as a part of its step.
 
-Example: `ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step.
+Example: `ce.components.arp.gate("Arp", 0.5)` holds each note for half its step.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `gate` (number, required): Part of the step.<br>1: held to the next step; 99% of it, so a repeated note sounds again.<br>Range: 0.05 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -4834,7 +4834,7 @@ Good to know:
 
 Set how far every second step is delayed.
 
-Example: `ce.components.arp.swing("Arpeggiator", 0.5)` delays every second step by a quarter of a step.
+Example: `ce.components.arp.swing("Arp", 0.5)` delays every second step by a quarter of a step.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `swing` (number, required): Part of half a step: 1 delays every second step by half a step.<br>0: straight.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -4852,7 +4852,7 @@ Good to know:
 
 Set whose swing a synced arp plays: the Transport's or its own.
 
-Example: `ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced.
+Example: `ce.components.arp.swingSource("Arp", "own")` plays its own swing while synced.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `swingSource` (text, required): "transport": the Transport's swing, while synced.<br>"own": `swing()`, always.<br>Case-insensitive.<br>Invalid: rejected with a console error.
@@ -4870,7 +4870,7 @@ Good to know:
 
 Keep playing the last notes held after they are let go.
 
-Example: `ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.
+Example: `ce.components.arp.latch("Arp", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `latch` (true or false, optional): true: the last notes held keep playing.<br>false: it stops when they are let go.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -4890,7 +4890,7 @@ Good to know:
 
 Set the key of its own chord.
 
-Example: `ce.components.arp.key("Arpeggiator", "F#")` builds its chord in F♯.
+Example: `ce.components.arp.key("Arp", "F#")` builds its chord in F♯.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
@@ -4909,7 +4909,7 @@ Good to know:
 
 Set the scale of its own chord.
 
-Example: `ce.components.arp.scale("Arpeggiator", "dorian")` builds its chord from the Dorian scale.
+Example: `ce.components.arp.scale("Arp", "dorian")` builds its chord from the Dorian scale.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
@@ -4928,7 +4928,7 @@ Good to know:
 
 Follow the panel's key and scale, or keep its own.
 
-Example: `ce.components.arp.followPanelKey("Arpeggiator", true)` takes the panel's key and scale, and changes with them.
+Example: `ce.components.arp.followPanelKey("Arp", true)` takes the panel's key and scale, and changes with them.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -4945,7 +4945,7 @@ Good to know:
 
 Set which step of the scale its chord is built on.
 
-Example: `ce.components.arp.degree("Arpeggiator", 5)` builds its chord on the fifth step.
+Example: `ce.components.arp.degree("Arp", 5)` builds its chord on the fifth step.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `degree` (number, required): Step of the scale, counted from 1: 1 is the key's own chord.<br>Range: 1 ↔ the scale's notes: 7, 6 for "blues", 5 for the pentatonics.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -4964,7 +4964,7 @@ Good to know:
 
 Set how many notes its chord has.
 
-Example: `ce.components.arp.chordType("Arpeggiator", "seventh")` adds the seventh: four notes.
+Example: `ce.components.arp.chordType("Arp", "seventh")` adds the seventh: four notes.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `chordType` (text, required): "triad": three notes.<br>"seventh": four, the seventh added.<br>Case-insensitive.<br>Invalid: rejected with a console error.
@@ -4982,7 +4982,7 @@ Good to know:
 
 Set how hard every note it plays is struck.
 
-Example: `ce.components.arp.velocity("Arpeggiator", 110)` plays every note at velocity 110.
+Example: `ce.components.arp.velocity("Arp", 110)` plays every note at velocity 110.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5000,7 +5000,7 @@ Good to know:
 
 Set which MIDI channel it plays on.
 
-Example: `ce.components.arp.channel("Arpeggiator", 10)` plays its notes on channel 10.
+Example: `ce.components.arp.channel("Arp", 10)` plays its notes on channel 10.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5017,7 +5017,7 @@ Good to know:
 
 Switch the Euclidean rhythm on or off.
 
-Example: `ce.components.arp.euclid("Arpeggiator", true)` plays only the steps the rhythm hits.
+Example: `ce.components.arp.euclid("Arp", true)` plays only the steps the rhythm hits.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `euclid` (true or false, optional): true: the rhythm decides which steps sound.<br>false: every step sounds.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -5037,7 +5037,7 @@ Good to know:
 
 Set how many steps the rhythm is long.
 
-Example: `ce.components.arp.euclidSteps("Arpeggiator", 8)` makes an 8-step rhythm.
+Example: `ce.components.arp.euclidSteps("Arp", 8)` makes an 8-step rhythm.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `euclidSteps` (number, required): Steps in the rhythm.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5054,7 +5054,7 @@ Good to know:
 
 Set how many of the rhythm's steps sound.
 
-Example: `ce.components.arp.euclidPulses("Arpeggiator", 3)` sounds 3 steps, spread as evenly as they go.
+Example: `ce.components.arp.euclidPulses("Arp", 3)` sounds 3 steps, spread as evenly as they go.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `euclidPulses` (number, required): Hits, spread as evenly as they go.<br>0: none sound.<br>Range: 0 ↔ `euclidSteps()`, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5072,7 +5072,7 @@ Good to know:
 
 Turn the rhythm by a number of steps.
 
-Example: `ce.components.arp.euclidRotate("Arpeggiator", 1)` moves every hit a step earlier.
+Example: `ce.components.arp.euclidRotate("Arp", 1)` moves every hit a step earlier.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `euclidRotate` (number, required): Steps to turn it: each hit that many steps earlier.<br>Past the steps, or below 0: round them; -1 is the last.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
@@ -5089,7 +5089,7 @@ Good to know:
 
 Move the arp to a point in its sequence.
 
-Example: `ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence.
+Example: `ce.components.arp.phase("Arp", 0.5)` moves it halfway through its sequence.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `phase` (number, required): Where in the sequence: 0 the start, 0.5 halfway.<br>1: the start again.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5109,7 +5109,7 @@ Good to know:
 
 Mute or unmute one step.
 
-Example: `ce.components.arp.mute("Arpeggiator", 3)` mutes step 3 if it plays, and lets it play if it is muted.
+Example: `ce.components.arp.mute("Arp", 3)` mutes step 3 if it plays, and lets it play if it is muted.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `index` (number, required): Step number, counted from 1, as the cells are drawn from the left.<br>A fraction: rounded.<br>Past the last step: kept, for when the sequence grows.<br>Below 1, or invalid: rejected with a console error.
@@ -5129,7 +5129,7 @@ Good to know:
 
 Set which MIDI channel it takes notes from.
 
-Example: `ce.components.arp.inputChannel("Arpeggiator", 2)` plays only the notes held on channel 2.
+Example: `ce.components.arp.inputChannel("Arp", 2)` plays only the notes held on channel 2.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `inputChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5147,7 +5147,7 @@ Good to know:
 
 Set the octave its chord starts in.
 
-Example: `ce.components.arp.baseOctave("Arpeggiator", 4)` puts the chord's root in octave 4, as in C4, middle C.
+Example: `ce.components.arp.baseOctave("Arp", 4)` puts the chord's root in octave 4, as in C4, middle C.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `baseOctave` (number, required): The root's octave, as in C3. Middle C is C4.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
@@ -5166,7 +5166,7 @@ Good to know:
 
 Set where the notes come from.
 
-Example: `ce.components.arp.source("Arpeggiator", "input")` plays the notes held on the MIDI input.
+Example: `ce.components.arp.source("Arp", "input")` plays the notes held on the MIDI input.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `source` (text, required): "chord": its own chord, from `key()`, `scale()` and `degree()`.<br>"link": the notes held on the Chord Pad set by `link()`.<br>"input": the notes held on the MIDI input, on `inputChannel()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
@@ -5183,7 +5183,7 @@ Good to know:
 
 Set the Chord Pad it plays from.
 
-Example: `ce.components.arp.link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads.
+Example: `ce.components.arp.link("Arp", "Pads")` plays the chords held on the Chord Pad called Pads.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `name` (text, optional): The Chord Pad's name. Case-insensitive.<br>Left out, or "": none.<br>Not on this panel, or not a Chord Pad: rejected with a console error.
@@ -5203,7 +5203,7 @@ Good to know:
 
 Let a click on a step mute it, or not.
 
-Example: `ce.components.arp.editable("Arpeggiator", false)` stops clicks muting steps.
+Example: `ce.components.arp.editable("Arp", false)` stops clicks muting steps.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `editable` (true or false, optional): true: a click on a step mutes or unmutes it.<br>false: clicks do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -5221,7 +5221,7 @@ Good to know:
 
 Show or hide the note names in the steps.
 
-Example: `ce.components.arp.showNotes("Arpeggiator", false)` hides the note names.
+Example: `ce.components.arp.showNotes("Arp", false)` hides the note names.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `showNotes` (true or false, optional): true: each step shows its note, "C3", or a chord's count, "3♪".<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -5239,7 +5239,7 @@ Good to know:
 
 Show or hide the strip above the steps.
 
-Example: `ce.components.arp.showHeader("Arpeggiator", false)` hides the strip, and the steps take its room.
+Example: `ce.components.arp.showHeader("Arp", false)` hides the strip, and the steps take its room.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `showHeader` (true or false, optional): true: the strip shows the pattern, where the notes come from and the rate.<br>false: hidden; the steps take its room.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
@@ -5256,15 +5256,17 @@ Good to know:
 
 Read back a setting, or every setting.
 
-Example: `ce.components.arp.read("Arpeggiator")` gives every setting as a table.
+Example: `ce.components.arp.read("Arp")` gives every setting as a table.
 
 - `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
 - `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
-- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+- `index` (number, optional): For "mute": a step number, counted from 1; true if that step is muted.<br>A fraction: rounded.<br>Below 1, or invalid: rejected with a console error.
 
 Good to know:
 
 - `read(target)`: every setting as a table, by verb name.
+- `read(target, "phase")`: where it is now.
+- `read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is.
 - Returns the value.
 - Rejected: no result, with a console error.
 

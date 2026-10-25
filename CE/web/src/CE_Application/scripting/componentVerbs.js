@@ -186,8 +186,14 @@ const PADS = {
 export const COMPONENT_FAMILIES = [
   /* ------------------------------------------------------------------ note generators */
   {
-    id: 'arp', section: 'Arp', prefix: 'arp', label: 'Arpeggiator',
-    summary: 'Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.',
+    // Item 15 of the owner's review: "Arp" in the examples, the component's name in the type list,
+    // and read's texts for what this family reads: no lists, a seek's phase, and the mutes by step.
+    id: 'arp', section: 'Arp', prefix: 'arp', label: 'Arpeggiator', sample: 'Arp',
+    summary: 'Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm.',
+    readIndex: ['For "mute": a step number, counted from 1; true if that step is muted.', 'A fraction: rounded.',
+      'Below 1, or invalid: rejected with a console error.'],
+    readNotes: ['`read(target, "phase")`: where it is now.',
+      '`read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is.'],
     verbs: [
       // Item 11: run, sync and division, texts only.
       v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the arp.', ex: ['false', 'stops it'],
@@ -1118,6 +1124,9 @@ export const COMPONENT_VERBS = COMPONENT_FAMILIES.flatMap((fam) =>
     label: fam.label,
     sample: fam.sample,
     article: fam.article,
+    // What read takes and gives, where the family says (the arp's).
+    readIndex: fam.readIndex,
+    readNotes: fam.readNotes,
     section: fam.section,
     // `arp` + `rate` -> `arpRate`. The flat name still exists because every member has one; the
     // namespaced spelling ce.components.arp.rate is the one anybody would actually write.
@@ -1895,6 +1904,7 @@ function familyNotes(verb) {
     return [`\`size(target)\`: every list as a table, by verb name; ${one}${rows}`];
   }
   const all = '`read(target)`: every setting as a table, by verb name.';
+  if (verb.k === READ && verb.readNotes) return [all, ...verb.readNotes];
   // An element's text is what a reader of a pixel display reads first, and a zone's of an LCD.
   const element = named.find((spec) => spec.v === 'text' || spec.v === 'zoneText') ?? named[0];
   const noun = element?.list === 'zones' ? 'zone' : 'element';
@@ -2098,6 +2108,7 @@ export function verbParamSummary(verb, name, kind) {
     }
     case READ:
       if (name === 'name') return 'A verb of this component, by name.\nLeft out: every setting, as a table.\nNot a verb that sets something: rejected with a console error.';
+      if (verb.readIndex) return verb.readIndex.join('\n');
       return ['Element number of a list verb, counted from 1.', 'A fraction: rounded.',
         ...(verb.family === 'lcd' ? ['For "text": a row or a table, as `text()` takes it.'] : []),
         ...elementReadLines(verb),

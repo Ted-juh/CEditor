@@ -1233,7 +1233,7 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.draw | 27 | 18, all done |
 | ce.time | 22 | 15, all done |
 | ce.components.lcd | 37 | 22, all done |
-| ce.components.arp | 31 | 15 |
+| ce.components.arp | 31 | 15, all done |
 | ce.components.pixel | 28 | 13 |
 | ce.components.meter | 25 | 11 |
 | ce.components.chordpad | 22 | 11 |
@@ -1283,7 +1283,7 @@ the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the r
 12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: done, below.
 13. `velocity`, `channel`: done, below.
 14. `editable`, `showNotes`, `showHeader`: done, below.
-15. The family: its summary, the control name in the examples, `read`'s notes.
+15. The family: done, below. The arp's review is done.
 
 **Item 1, `pattern`: done.** "random" and "asPlayed" played exactly as "up" for as long as they
 were offered: every note set was sorted on the way (`arpBaseNotes`, `expandOctaves`, and the
@@ -1536,6 +1536,18 @@ narrower than 22 or shorter than 26 pixels shows no note name whatever `showNote
 
 Each ends with the two notes every command has.
 
+**Item 15, the family: done.** At the owner's word ("Arp it is") every example names the control
+"Arp", the component's name in the type list, rather than its label: the tables above, written
+before, say "Arpeggiator" where the texts now say "Arp". The summary and `read`'s texts were
+proposed with it; `read` takes its own index text and notes from the family (`readIndex`,
+`readNotes`), since the arp has no lists and its only index is `read(t, "mute", 3)`.
+
+| Field | Text |
+| --- | --- |
+| Summary | Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm. (Then "Panel view only", as every module's.) |
+| `read` `index` | For "mute": a step number, counted from 1; true if that step is muted. / A fraction: rounded. / Below 1, or invalid: rejected with a console error. |
+| `read` notes | `read(target)`: every setting as a table, by verb name. / `read(target, "phase")`: where it is now. / `read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is. / Then the two `read` always has. |
+
 **CI, 2026-10-25.** From 19:02 UTC Microsoft's download host refused .NET 10.0.403 and the
 10.0.14 runtime (HTTP 409 from `dotnetorigin.blob.core.windows.net`) to `actions/setup-dotnet`, and
 `web-tests` and `windows` failed before building or testing anything, three runs in a row. At the
@@ -1574,8 +1586,9 @@ on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". 
 ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item review is done
 too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
 script can address), and so is its "line" wording. So are the LCD's script commands for a layout's
-zones, by name as a Pixel Display's elements are ("Zones by name" in this file). Then continue with
-ce.components.arp ("ce.components.arp: the owner's review" in this file), in
+zones, by name as a Pixel Display's elements are ("Zones by name" in this file), and so is
+ce.components.arp ("ce.components.arp: the owner's review" in this file, all fifteen items). Then
+continue with ce.components.pixel, the next by the table, in
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check
