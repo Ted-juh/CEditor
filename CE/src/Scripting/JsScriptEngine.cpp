@@ -1220,14 +1220,22 @@ var __FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 // Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
 // plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
 // the same generated table the Chord Pad and Harmoniser print from — true "E♭4", false "C♯4".
+// A number, or text that is one, rounded down; anything else is no answer, and says why. A name
+// ("C4") gave "undefinedNaN", where the editor gave nothing.
 function noteName(n, flats) {
-  n = Math.floor(n);
+  var v = __realNumber(n);
+  if (v === undefined) {
+    if (n === undefined || n === null) logError('ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.');
+    else logError('ce.music.name: ' + __shownValue(n) + ' is not a note number, so there is no answer. A note is a MIDI number, such as 60.');
+    return undefined;
+  }
+  n = Math.floor(v);
   var tbl = (flats === undefined || flats === null) ? __NOTES : (flats ? __CE_NOTE_FLAT : __CE_NOTE_SHARP);
   return tbl[__m12(n)] + (Math.floor(n / 12) - 1);
 }
 // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is UNDEFINED, not 0 — 0 is a
 // real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
-function noteNumber(name) {
+function __noteNumberOf(name) {
   // In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
   var m = /^([A-Ga-g])([#bB]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b").trim());
   if (!m) return undefined;
@@ -1236,6 +1244,16 @@ function noteNumber(name) {
   if (pc === undefined || pc < 0) return undefined;
   var oct = parseInt(m[3], 10) + ((acc === "b" && letter === "C") ? 0 : 1);
   return oct * 12 + pc;
+}
+// ce.music.number. The senders and the other helpers read a name with __noteNumberOf, above, and
+// say their own why.
+function noteNumber(name) {
+  var n = typeof name === "string" ? __noteNumberOf(name) : undefined;
+  if (n === undefined) {
+    if (name === undefined || name === null) logError('ce.music.number: no note name was given, so there is no answer.');
+    else logError('ce.music.number: ' + __shownValue(name) + ' is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  }
+  return n;
 }
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
@@ -1375,7 +1393,7 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55];
 // A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
 // unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 function __pitch(v) {
-  if (typeof v === "string") return noteNumber(v);
+  if (typeof v === "string") return __noteNumberOf(v);
   return typeof v === "number" && isFinite(v) ? Math.floor(v) : undefined;
 }
 // A word from a list, in any case and with spaces around it, as the list spells it (an array's
@@ -1549,7 +1567,7 @@ var __NOTE_LISTS = {
 function __noteListItem(v) {
   if (typeof v === "number") return isFinite(v) ? v : undefined;
   if (typeof v !== "string") return undefined;
-  var n = noteNumber(v);
+  var n = __noteNumberOf(v);
   if (n !== undefined && n !== null) return n;
   return __realNumber(v);
 }
@@ -2320,7 +2338,7 @@ function __midiArg(verb, kind, v) {
 // name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
 // table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
 function __note(n) {
-  var v = typeof n === "string" ? noteNumber(n) : (typeof n === "number" && isFinite(n) ? Math.floor(n + 0.5) : undefined);
+  var v = typeof n === "string" ? __noteNumberOf(n) : (typeof n === "number" && isFinite(n) ? Math.floor(n + 0.5) : undefined);
   return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
 }
 function __badNote(verb, note) {
@@ -2329,7 +2347,7 @@ function __badNote(verb, note) {
   if (note === undefined || note === null) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === "string") {
-    why = noteNumber(note) === undefined
+    why = __noteNumberOf(note) === undefined
       ? '"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + range;

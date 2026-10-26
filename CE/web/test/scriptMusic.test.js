@@ -655,3 +655,21 @@ test('no notes is no steps', () => {
   assert.deepEqual(api.arpOrder([], 'up'), []);
   assert.deepEqual(api.expandOctaves([], 2), []);
 });
+
+/* ------------------------------------------------------------ ce.music's review: name and number */
+
+test('name takes a number and number a name, and each says why when there is no answer', () => {
+  // A name given to name() raised in Lua and Python and gave "undefinedNaN" in the JavaScript engine;
+  // number() of anything it could not read gave nothing without a word. scriptPreludeAgreement.test.js
+  // holds the four runtimes to the same words.
+  const said = (fn) => { clearScriptTrace(); const value = fn(); return [value, get(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message)]; };
+  assert.deepEqual(said(() => api.noteName('60')), ['C4', []], 'text that is a number is read as one');
+  assert.deepEqual(said(() => api.noteName(60.7)), ['C4', []], 'a fraction is rounded down');
+  assert.deepEqual(said(() => api.noteName('C4')), [undefined, ['ce.music.name: "C4" is not a note number, so there is no answer. A note is a MIDI number, such as 60.']]);
+  assert.deepEqual(said(() => api.noteName()), [undefined, ['ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.']]);
+  assert.deepEqual(said(() => api.noteNumber(60)), [undefined, ['ce.music.number: 60 is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']]);
+  assert.deepEqual(said(() => api.noteNumber()), [undefined, ['ce.music.number: no note name was given, so there is no answer.']]);
+  assert.equal(said(() => api.noteNumber('B#3'))[1].length, 1, 'B# is not read, and says so');
+  // The senders and the other commands read a name with their own words, not number()'s.
+  assert.deepEqual(said(() => api.scaleNotes('H4'))[1], ['ce.music.scale: "H4" is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
+});

@@ -819,6 +819,12 @@ const REFUSAL_CASES = [
   ['hslToHex', [0, 'x', 50]], ['hslToHex', [NaN, 100, 50]], ['mixColour', ['000000', 'FFFFFF', 'x']],
   ['snap', [37]], ['snap', ['x', 10]], ['lerp', [10, 20]], ['lerp', [10, 'x', 0.5]],
   ['random', [1.2, 1.8]], ['random', ['x', 6]], ['random', [1, 6]],
+  // ce.music.name takes a number, or text that is one, and ce.music.number a name: anything else is
+  // no answer, and says why. A name given to name() raised in Lua and Python and gave "undefinedNaN"
+  // in the JavaScript engine; number() gave nothing without a word.
+  ['noteName', [null]], ['noteName', ['C4']], ['noteName', [true]], ['noteName', [NaN]], ['noteName', ['60']],
+  ['noteName', [60.7]], ['noteNumber', [null]], ['noteNumber', [60]], ['noteNumber', ['H4']],
+  ['noteNumber', ['C']], ['noteNumber', ['B#3']], ['noteNumber', ['Eb4']], ['noteNumber', [[60]]],
 ];
 
 /** The case's arguments with FN made a function in this realm. */

@@ -110,6 +110,9 @@ is the table of wording the owner rejected and what replaced it; read it before 
   a required value left out, or a wrong option, is refused or said; each would be a change in the
   panel runtime, `ScriptRuntime.cpp` and the three preludes, so they are left for the owner. The
   texts say what each does now.
+- `ce.music`, also in four runtimes: `degreeChord`'s step and size that are not numbers are 1 and 3
+  without a word, where the rule says the default with a warning; `arp`'s pattern left out is "up"
+  with a warning, where a required value left out is refused.
 
 ### Left
 
@@ -1242,22 +1245,22 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.time | 22 | 15, all done |
 | ce.components.lcd | 37 | 22, all done |
 | ce.components.arp | 31 | 15, all done |
-| ce.components.pixel | 28 | 13 |
-| ce.components.meter | 25 | 11 |
-| ce.components.chordpad | 22 | 11 |
-| ce.components.noteribbon | 20 | 11 |
-| ce.components.drumpads | 37 | 10 |
-| ce.components.transport | 16 | 10 |
-| ce.panel | 25 | 8 |
-| ce.components.envelope | 23 | 8 |
-| ce.components.turing | 16 | 8 |
-| ce.components.crossfader | 15 | 8 |
-| ce.device | 24 | 7 |
-| ce.components.router | 21 | 7 |
-| ce.components.ribbon | 15 | 7 |
-| ce.components.kinetic | 12 | 7 |
-| ce.components.orbit, looper, constellation, panic | 20, 17, 13, 9 | 6 each |
-| ce.music | 13 | 5 |
+| ce.components.pixel | 28 | 13, all done |
+| ce.components.meter | 25 | 11, all done |
+| ce.components.chordpad | 22 | 11, all done |
+| ce.components.noteribbon | 20 | 11, all done |
+| ce.components.drumpads | 37 | 10, all done |
+| ce.components.transport | 16 | 10, all done |
+| ce.panel | 25 | 8, all done |
+| ce.components.envelope | 23 | 8, all done |
+| ce.components.turing | 16 | 8, all done |
+| ce.components.crossfader | 15 | 8, all done |
+| ce.device | 24 | 7, all done |
+| ce.components.router | 21 | 7, all done |
+| ce.components.ribbon | 15 | 7, all done |
+| ce.components.kinetic | 12 | 7, all done |
+| ce.components.orbit, looper, constellation, panic | 20, 17, 13, 9 | 6 each, all done |
+| ce.music | 13 | 5, all done |
 | ce.core, ce.storage, ce.components.recorder, timbre, joystick | 15, 10, 15, 15, 16 | 4 each |
 | ce.image, ce.text, ce.components.macro, constraint | 8, 7, 16, 11 | 3 each |
 | ce.ui, ce.components.matrix | 9, 11 | 2 each |
@@ -1913,6 +1916,26 @@ once") checks it on a Crossfader: it fails without the effect. That file is run 
   tall or more; the panic key works whether or not the button can be pressed, and sends the most.
 - The summary no longer says pressing it is the global `panic()`, which sends no pitch bend and
   stops nothing on the panel.
+
+### `ce.music`
+
+Runs in the panel window (`panelRuntime.js`) and in the plug-in's three engines (the preludes in
+`LuaScriptEngine.cpp`, `PythonScriptEngine.cpp` and `JsScriptEngine.cpp`).
+
+- **Texts** for all 13. The examples name the `ce.music` commands, not the short names, which
+  differ (`lead` is `voiceLead`, `arp` is `arpOrder`). They no longer say a note name's letter
+  must be a capital, which has not been so since names were read in any case.
+- **`name()` takes a number, or text that is one**, rounded down; anything else is refused with
+  why, in all four runtimes. A name ("C4") stopped a Lua or Python script with an error, gave
+  "undefinedNaN" in the plug-in's JavaScript, and nothing in the panel window.
+- **`number()` says why it has no answer**: nothing given, a number, or a name it cannot read. It
+  gave nothing without a word, where every other `ce.music` command says. The senders and the other
+  commands read a name with the reader they had (`noteNumberOf`, `__noteNumberOf` in each prelude)
+  and say their own why. `scriptPreludeAgreement.test.js` holds the four runtimes to the same words.
+- **Optional where every runtime takes them so**: `degreeChord`'s scale and step ("major", 1) and
+  `lead`'s previous chord (the notes sorted). The signatures say so.
+- **Kept**: `scale()` and `chord()` give notes past 127 as they are, and `name()` names a number
+  outside 0 to 127 ("B-2" for -1): both are arithmetic a script may go on with; the texts say so.
 
 ## Checking each batch
 

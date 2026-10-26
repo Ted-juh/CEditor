@@ -1176,7 +1176,7 @@ const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
 // A number has to be a finite one: NaN, true or a table went through Number(v) || 0 and rooted the
 // answer at C-1 or C#-1 just as an unreadable name had. The answer itself may pass 127 (a chord on
 // G9 does), since these compute pitches; a sender refuses one that is not a MIDI note.
-const musicPitch = (v) => (typeof v === 'string' ? helpers.noteNumber(v)
+const musicPitch = (v) => (typeof v === 'string' ? noteNumberOf(v)
   : typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined);
 // A name in any case (utils/wordLists.js): "Dorian" and "MAJ7" are dorian and maj7. Never one of
 // Object's own: table["toString"] was a function.
@@ -2112,11 +2112,33 @@ const helpers = {
   // same table the Chord Pad, the Harmoniser and the Arpeggiator print from, so a script can label
   // a control with the spelling the component beside it is using.
   // The rule is musicTheory's, which the script editor's Values sidebar reads a note by too.
-  noteName: (n, flats) => noteNameOf(n, flats),
+  // A number, or text that is one, rounded down; anything else is no answer, and says why, in each
+  // prelude's words. A name ("C4") raised in Lua and Python and gave "undefinedNaN" in the
+  // JavaScript engine (ce.music's review, docs/design/api-descriptions-handoff.md).
+  noteName: (n, flats) => {
+    const v = typeof n === 'boolean' ? undefined : realNumber(n);
+    if (v === undefined) {
+      addScriptTrace('error', '', n === undefined || n === null
+        ? 'ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.'
+        : `ce.music.name: ${shownValue(n)} is not a note number, so there is no answer. A note is a MIDI number, such as 60.`);
+      return undefined;
+    }
+    return noteNameOf(v, flats);
+  },
   // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a
   // perfectly good MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in
-  // silence rather than showing up.
-  noteNumber: (name) => noteNumberOf(name),
+  // silence rather than showing up. It now says why, as the other ce.music commands do; the senders
+  // and those commands read a name with noteNumberOf, and say their own why.
+  noteNumber: (name) => {
+    const n = typeof name === 'string' ? noteNumberOf(name) : undefined;
+    if (n === undefined) {
+      addScriptTrace('error', '', name === undefined || name === null
+        ? 'ce.music.number: no note name was given, so there is no answer.'
+        : `ce.music.number: ${shownValue(name)} is not a note name, so there is no answer. A name is a letter `
+          + 'from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+    }
+    return n;
+  },
   // Does this key write its accidentals as flats? The Chord Pad's rule, exactly: judged by the
   // RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the answer straight to
   // noteName and a script's labels match the panel's without deciding anything itself.
@@ -2888,7 +2910,7 @@ function midiArg(verb, kind, v) {
 // data byte, which a synth reads as a status byte. Anything else, NaN or a table included, played
 // C-1 by the numeric path. Each is refused by refuseNote, in the preludes' __badNote words.
 const midiNote = (n) => {
-  const v = typeof n === 'string' ? helpers.noteNumber(n)
+  const v = typeof n === 'string' ? noteNumberOf(n)
     : typeof n === 'number' && Number.isFinite(n) ? Math.floor(n + 0.5) : undefined;
   return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
 };
@@ -2898,7 +2920,7 @@ function refuseNote(verb, note) {
   if (note === undefined || note === null) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === 'string') {
-    why = helpers.noteNumber(note) === undefined
+    why = noteNumberOf(note) === undefined
       ? `"${note}" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it `
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : `"${note}" is outside the MIDI notes, so nothing was sent. ${range}`;

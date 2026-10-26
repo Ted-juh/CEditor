@@ -1153,15 +1153,23 @@ local __FLAT_LETTER = { C = 11, D = 1, E = 3, F = 4, G = 6, A = 8, B = 10 }
 -- Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
 -- plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
 -- the same generated table the Chord Pad and Harmoniser print from — true "E♭4", false "C♯4".
+-- A number, or text that is one, rounded down; anything else is no answer, and says why. A name
+-- ("C4") went to math.floor and raised, where the editor gave nothing.
 function noteName(n, flats)
-  n = math.floor(n)
+  local v = __realNumber(n)
+  if v == nil then
+    if n == nil then logError('ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.')
+    else logError('ce.music.name: ' .. __shownValue(n) .. ' is not a note number, so there is no answer. A note is a MIDI number, such as 60.') end
+    return nil
+  end
+  n = math.floor(v)
   local tbl = NOTE_NAMES
   if flats ~= nil then if flats then tbl = __CE_NOTE_FLAT else tbl = __CE_NOTE_SHARP end end
   return tbl[__m12(n) + 1] .. tostring(math.floor(n / 12) - 1)
 end
 -- Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a real
 -- MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
-function noteNumber(name)
+local function __noteNumberOf(name)
   local s = string.gsub(tostring(name), "♯", "#")
   s = string.gsub(s, "♭", "b")
   -- In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
@@ -1179,6 +1187,17 @@ function noteNumber(name)
   local o = tonumber(oct) + 1
   if acc == "b" and letter == "C" then o = o - 1 end
   return o * 12 + pc
+end
+-- ce.music.number. The senders and the other helpers read a name with __noteNumberOf, above, and
+-- say their own why.
+function noteNumber(name)
+  local n = nil
+  if type(name) == "string" then n = __noteNumberOf(name) end
+  if n == nil then
+    if name == nil then logError('ce.music.number: no note name was given, so there is no answer.')
+    else logError('ce.music.number: ' .. __shownValue(name) .. ' is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
+  end
+  return n
 end
 
 -- BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
@@ -1317,7 +1336,7 @@ __CE_EASINGS["inOutBack"] = {0.68,-0.55,0.265,1.55}
 -- A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
 -- unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 local function __pitch(v)
-  if type(v) == "string" then return noteNumber(v) end
+  if type(v) == "string" then return __noteNumberOf(v) end
   if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then return math.floor(v) end
   return nil
 end
@@ -1419,7 +1438,7 @@ local function __noteListItem(v)
     return nil
   end
   if type(v) ~= "string" then return nil end
-  local n = noteNumber(v)
+  local n = __noteNumberOf(v)
   if n ~= nil then return n end
   return __realNumber(v)
 end
@@ -2341,7 +2360,7 @@ end
 -- table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
 local function __note(n)
   local v = nil
-  if type(n) == "string" then v = noteNumber(n)
+  if type(n) == "string" then v = __noteNumberOf(n)
   elseif type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge then v = math.floor(n + 0.5) end
   if v ~= nil and v >= 0 and v <= 127 then return v end
   return nil
@@ -2352,7 +2371,7 @@ local function __badNote(verb, note)
   if note == nil then
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
   elseif type(note) == "string" then
-    if noteNumber(note) == nil then
+    if __noteNumberOf(note) == nil then
       why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         .. 'has one, then the octave: "C4", "Eb3", "F#-1".'
     else

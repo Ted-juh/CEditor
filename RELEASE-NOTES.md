@@ -299,6 +299,10 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.kinetic.launch` and `velocity` throw a running ball again, where it went on as it
   was. Its `gravity` takes 0 to 4 and `bounce` 0 to 1, as the ball plays them: an upward pull played
   as none, and a bounce above 1 as 1.
+- `ce.music.name` refuses what is not a number, and `ce.music.number` what is not a note name, each
+  with a console error, in the panel window and the plug-in alike. A name given to `name` stopped a
+  Lua or Python script with an error and gave "undefinedNaN" in JavaScript; `number` gave nothing
+  without a word.
 
 ## What you get
 

@@ -4747,16 +4747,26 @@ export const HELPERS = [
   // semitones. The code is right and stays; the wording is what was wrong.
   {
     id: 'noteName', category: 'Music', signature: 'noteName(n [, flats])',
-    summary: 'Turn a MIDI note number into a name: 60 gives "C4" (middle C). With `flats` left out, you get plain text with # for sharps ("C#4"), which is easy to type and compare against. Pass `flats` to get the panel\'s own spelling instead: true gives flats ("D♭4") and false gives sharps ("C♯4"). `ce.music.spelling()` tells you which one a key uses.',
+    summary: 'Give the name of a MIDI note number.',
+    example: '`ce.music.name(61)` gives "C#4".',
+    notes: [
+      'Returns the name as text.',
+      '`ce.music.spelling()` says whether a key is spelled with flats.',
+    ],
     params: [
-      { name: 'n', type: 'number', required: true, kind: 'note' },
-      { name: 'flats', type: 'boolean', required: false },
+      { name: 'n', type: 'number', required: true, summary: 'Note number: 60 is middle C, C4.\nA fraction: rounded down.\nOutside 0 to 127: named the same way; -1 is "B-2".\nNot a number, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'flats', type: 'boolean', required: false, summary: 'Left out: # for a sharp, as "C#4", plain text to type and compare.\ntrue: flats, as the panel spells them: "D♭4".\nfalse: sharps, as the panel spells them: "C♯4".' },
     ],
   },
   {
     id: 'noteNumber', category: 'Music', signature: 'noteNumber(name) -> number',
-    summary: 'Turn a note name into a MIDI note number: "C4" gives 60 (middle C is C4). Sharps and flats can be typed either way, so "C#4", "C♯4", "Db4" and "D♭4" all work. The letter must be a capital and the octave must be there. A name it cannot read returns nothing rather than 0, because 0 is a real note (C-1).',
-    params: [{ name: 'name', type: 'string', required: true, kind: 'note' }],
+    summary: 'Give the MIDI note number of a note name.',
+    example: '`ce.music.number("Eb4")` gives 63.',
+    notes: [
+      'Returns the number. It can pass 127: "G#9" is 128.',
+      'A name it cannot read gives no result rather than 0, since 0 is a note: C-1.',
+    ],
+    params: [{ name: 'name', type: 'string', required: true, summary: 'A letter from A to G, then #, ♯, b or ♭ if it has one, then the octave: "C4" is 60, middle C. Case-insensitive; spaces round it are ignored.\nCb is the B below; B# and E# are not read.\nNo octave, a name that cannot be read, a number, or left out: no result, with a console error.', kind: 'note' }],
   },
   // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
   // tables are the panel's OWN: a script asking for "dorian" and a Chord Pad set to "dorian" mean
@@ -4764,27 +4774,42 @@ export const HELPERS = [
   // every prelude. `root` and `note` accept a MIDI number or a name ("C4"), like sendNote does.
   {
     id: 'scaleNotes', category: 'Music', signature: 'scaleNotes(root [, scale]) -> list',
-    summary: 'One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Give the notes of a scale, one octave up from its root.',
+    example: '`ce.music.scale("D4", "dorian")` gives {62, 64, 65, 67, 69, 71, 72}.',
+    notes: [
+      'Returns 7 notes; 5 for the pentatonic scales, 6 for "blues". The root is not repeated at the top.',
+      'Notes past 127 are given as they are; `sendNote()` refuses them.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'root', type: 'value', required: true, summary: 'The first note.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
     id: 'chordNotes', category: 'Music', signature: 'chordNotes(root [, type]) -> list',
-    summary: 'The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. To build a chord on a step of a key, use `ce.music.degreeChord()`.',
+    summary: 'Give the notes of a chord of a type, up from its root.',
+    example: '`ce.music.chord("D4", "min7")` gives {62, 65, 69, 72}.',
+    notes: [
+      'Returns the notes, lowest first. Notes past 127 are given as they are.',
+      'A chord on a step of a key: `ce.music.degreeChord()`.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'type', type: 'string', required: false, kind: 'chord' },
+      { name: 'root', type: 'value', required: true, summary: 'The lowest note.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'type', type: 'string', required: false, summary: 'One of "major", "minor", "dim", "aug", "sus2", "sus4", "power", "maj6", "min6", "dom7", "maj7", "min7", "minMaj7", "dim7", "m7b5", "aug7", "add9", "dom9", "maj9" and "min9". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'chord' },
     ],
   },
   {
     id: 'quantizeNote', category: 'Music', signature: 'quantizeNote(note, root [, scale]) -> number',
-    summary: 'Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Move a note to the nearest note of a key.',
+    example: '`ce.music.quantize(61, "C4")` gives 62.',
+    notes: [
+      'Returns the note. A note in the key is returned as it is.',
+      'Equally near two notes of the key: the higher.',
+    ],
     params: [
-      { name: 'note', type: 'value', required: true, kind: 'note' },
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'note', type: 'value', required: true, summary: 'The note to move.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   // Key, degree and voicing — phase 12. The three verbs above answer questions about a note or a
@@ -4794,68 +4819,115 @@ export const HELPERS = [
   // Chord Pad labelling the same chord have to agree, or the panel contradicts itself on screen.
   {
     id: 'noteSpelling', category: 'Music', signature: 'noteSpelling(root [, scale]) -> boolean',
-    summary: 'Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel\'s. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Tell whether a key is spelled with flats.',
+    example: '`ce.music.spelling("F4")` gives true.',
+    notes: [
+      'Returns true for the keys of F, B♭, E♭, A♭, D♭ and G♭; false for the others.',
+      'A minor-type scale ("minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "locrian", "pentatonicMin") is judged by the key a minor third above its root, as the Chord Pad judges it: C minor is spelled as E♭ major.',
+      'Pass it to `ce.music.name()` to spell as the panel does.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
     id: 'inScale', category: 'Music', signature: 'inScale(note, root [, scale]) -> boolean',
-    summary: 'Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Tell whether a note is in a key.',
+    example: '`ce.music.inScale(66, "C4")` gives false.',
+    notes: [
+      'Returns true or false.',
+      'In any octave: C2 is in the key of C5.',
+    ],
     params: [
-      { name: 'note', type: 'value', required: true, kind: 'note' },
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'note', type: 'value', required: true, summary: 'The note.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
     id: 'scaleDegree', category: 'Music', signature: 'scaleDegree(note, root [, scale]) -> number',
-    summary: 'Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Give which step of a key a note is.',
+    example: '`ce.music.degree("G4", "C4")` gives 5.',
+    notes: [
+      'Returns the step, counted from 1: 1 the root, 5 the fifth.',
+      'A note not in the key: no result, without a word. `ce.music.quantize()` moves it into the key first.',
+    ],
     params: [
-      { name: 'note', type: 'value', required: true, kind: 'note' },
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'note', type: 'value', required: true, summary: 'The note, in any octave.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
-    id: 'degreeChord', category: 'Music', signature: 'degreeChord(root, scale, degree [, size]) -> table',
-    summary: 'The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. For a chord you already know by name, use `ce.music.chord()`.',
+    id: 'degreeChord', category: 'Music', signature: 'degreeChord(root [, scale [, degree [, size]]]) -> table',
+    summary: 'Give the chord a key builds on one of its steps.',
+    example: '`ce.music.degreeChord("C4", "major", 5).name` gives "G".',
+    notes: [
+      'Returns { notes, names, name, quality, roman, degree, rootNote, offsets }: the notes; their names without the octave, and the chord\'s ("E♭m7"), spelled as the key is; its quality, as `ce.music.quality()` names it; its roman numeral ("V", "vii°"); the step; its lowest note; the notes as semitones above the root.',
+      'Built from every other note of the scale, as the Chord Pad builds it.',
+      'Named from its first four notes: a chord of 5 or more is named as its seventh chord.',
+      'A chord of a type: `ce.music.chord()`.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: true, kind: 'scale' },
-      { name: 'degree', type: 'number', required: true },
-      { name: 'size', type: 'number', required: false },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave places the chord.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
+      { name: 'degree', type: 'number', required: false, summary: 'Step, counted from 1: 1 the root, 5 the fifth.\nPast the last step: on into the octave above; 8 is the root an octave up.\n0 and below: the octave below; 0 is the last step.\nA fraction: rounded down.\nNot a number, or left out: 1.' },
+      { name: 'size', type: 'number', required: false, summary: 'Notes: 3 a triad, 4 a seventh chord.\nBelow 2: 2.\nA fraction: rounded down.\nNot a number, or left out: 3.' },
     ],
   },
   {
     id: 'chordQuality', category: 'Music', signature: 'chordQuality(notes) -> string',
-    summary: 'Name a chord from its notes: [60, 63, 70] gives "min7". Each note is a MIDI number or a name, such as 60 or "C4"; a list with anything else in it is refused, and says where. It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list.',
-    params: [{ name: 'notes', type: 'list', required: true, kind: 'noteList' }],
+    summary: 'Name a chord from its notes.',
+    example: '`ce.music.quality({60, 63, 67, 70})` gives "min7".',
+    notes: [
+      'Returns one of "maj", "min", "dim", "aug", "sus2", "sus4", "maj7", "dom7", "min7", "minMaj7", "dim7" and "m7b5", as the Chord Pad names chords.',
+      'Named from the lowest note: an inverted chord is named from its bass.',
+      'A chord it cannot place, such as a bare fifth or one note: "maj".',
+      'An empty list: no result, without a word.',
+    ],
+    params: [{ name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: no result, with a console error that says where.', kind: 'noteList' }],
   },
   {
-    id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes, previous [, mode]) -> list',
-    summary: 'Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Notes are MIDI numbers or names, and come back as numbers; a list with anything else in it is refused and gives an empty list. A mode there is none of is "closest", which is said the first time.',
+    id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes [, previous [, mode]]) -> list',
+    summary: 'Rearrange a chord so its notes move as little as they can from the chord before.',
+    example: '`ce.music.lead({72, 76, 79}, {60, 64, 67})` gives {60, 64, 67}.',
+    notes: [
+      'Returns the notes as numbers.',
+      'As the Harmoniser leads its voices.',
+    ],
     params: [
-      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
-      { name: 'previous', type: 'list', required: true, kind: 'noteList' },
-      { name: 'mode', type: 'string', required: false, values: VOICE_LEAD_MODES },
+      { name: 'notes', type: 'list', required: true, summary: 'The chord to rearrange: MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
+      { name: 'previous', type: 'list', required: false, summary: 'The chord before, as `notes`.\nLeft out, or empty: the notes sorted, low to high.\nNot a list, or a list with anything else in it: an empty list, with a console error.', kind: 'noteList' },
+      { name: 'mode', type: 'string', required: false, summary: '"closest": all the notes together move as little as they can.\n"smooth": the top note moves as little as it can; the others may jump.\n"off": the notes sorted, low to high.\nCase-insensitive.\nLeft out: "closest".\nAny other: "closest", with a console warning the first time.', values: VOICE_LEAD_MODES },
     ],
   },
   {
     id: 'expandOctaves', category: 'Music', signature: 'expandOctaves(notes [, octaves]) -> list',
-    summary: 'Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1; a number outside that, or not a whole one, is used as the nearest that is, which is said the first time. Notes that would go above 127 are left out, not squeezed onto 127. Notes are MIDI numbers or names, as chordQuality reads them.',
+    summary: 'Repeat notes in the octaves above, as an Arpeggiator spreads them.',
+    example: '`ce.music.octaves({60, 64}, 2)` gives {60, 64, 72, 76}.',
+    notes: [
+      'Returns the notes sorted, low to high, then again an octave up for each octave more.',
+      'A note that would pass 127 is left out.',
+      'The step before `ce.music.arp()`.',
+    ],
     params: [
-      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
-      { name: 'octaves', type: 'number', required: false, kind: 'number' },
+      { name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
+      { name: 'octaves', type: 'number', required: false, summary: 'Octaves, counting the notes\' own.\nRange: 1 ↔ 4, whole.\nOutside the range: the nearest end, with a console warning the first time.\nA fraction: rounded down, with a console warning the first time.\nNot a number: 1, with a console warning the first time.\nLeft out: 1.', kind: 'number' },
     ],
   },
   {
     id: 'arpOrder', category: 'Music', signature: 'arpOrder(notes, pattern) -> list',
-    summary: 'The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord; any other, or none, is "up", said the first time. Notes are used in the order given, so sort them first for a rising run, and come back as MIDI numbers. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel\'s arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`.',
+    summary: 'Give the order an arpeggiator pattern plays notes in.',
+    example: '`ce.music.arp({60, 64, 67}, "updown")` gives {{60}, {64}, {67}, {64}}.',
+    notes: [
+      'Returns a list of steps, each a list of notes.',
+      'Sort the notes first for a rising run; `ce.music.octaves()` sorts them.',
+      'Shuffled: `ce.math.shuffle()`.',
+    ],
     params: [
-      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
-      { name: 'pattern', type: 'string', required: true, values: ARP_ORDER_PATTERNS },
+      { name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
+      { name: 'pattern', type: 'string', required: true, summary: '"up": in the order given.\n"down": the order given, reversed.\n"updown": up, then down, not playing the top or the bottom twice.\n"downup": down, then up, the same way.\n"asPlayed": in the order given.\n"random": in the order given; the Arpeggiator picks each step as it plays.\n"chord": every note at once, in one step.\nCase-insensitive.\nAny other, or left out: "up", with a console warning the first time.', values: ARP_ORDER_PATTERNS },
     ],
   },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)

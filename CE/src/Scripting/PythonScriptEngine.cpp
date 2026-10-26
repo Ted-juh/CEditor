@@ -2256,13 +2256,21 @@ __FLAT_LETTER = { "C": 11, "D": 1, "E": 3, "F": 4, "G": 6, "A": 8, "B": 10 }
 # Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
 # plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
 # the same generated table the Chord Pad and Harmoniser print from - True "E♭4", False "C♯4".
+# A number, or text that is one, rounded down; anything else is no answer, and says why. A name
+# ("C4") went to math.floor and raised, where the editor gave nothing.
 def noteName(n, flats=None):
-    import math; n = math.floor(n)
+    import math
+    v = None if isinstance(n, bool) else __realNumber(n)
+    if v is None:
+        if n is None: logError('ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.')
+        else: logError('ce.music.name: ' + __shownValue(n) + ' is not a note number, so there is no answer. A note is a MIDI number, such as 60.')
+        return None
+    n = math.floor(v)
     tbl = __NOTES if flats is None else (__CE_NOTE_FLAT if flats else __CE_NOTE_SHARP)
     return tbl[__m12(n)] + str(math.floor(n / 12) - 1)
 # Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is None, not 0 - 0 is a
 # real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
-def noteNumber(name):
+def __noteNumberOf(name):
     import re
     # In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E-flat 4 and B-flat 3.
     m = re.match(r"^([A-Ga-g])([#bB]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b").strip())
@@ -2274,6 +2282,14 @@ def noteNumber(name):
         pc = __NOTES.index(letter + acc) if (letter + acc) in __NOTES else -1
     if pc < 0: return None
     return (int(m.group(3)) + (0 if (acc == "b" and letter == "C") else 1)) * 12 + pc
+# ce.music.number. The senders and the other helpers read a name with __noteNumberOf, above, and
+# say their own why.
+def noteNumber(name):
+    n = __noteNumberOf(name) if isinstance(name, str) else None
+    if n is None:
+        if name is None: logError('ce.music.number: no note name was given, so there is no answer.')
+        else: logError('ce.music.number: ' + __shownValue(name) + ' is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+    return n
 
 # BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # @module ce.music
@@ -2413,7 +2429,7 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 def __pitch(v):
     import math
     if isinstance(v, str):
-        return noteNumber(v)
+        return __noteNumberOf(v)
     if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
         return math.floor(v)
     return None
@@ -2531,7 +2547,7 @@ def __noteListItem(v):
     if isinstance(v, (int, float)):
         return v if math.isfinite(v) else None     # ints stay ints, so a note reads 60 and not 60.0
     if not isinstance(v, str): return None
-    n = noteNumber(v)
+    n = __noteNumberOf(v)
     if n is not None: return n
     r = __realNumber(v)
     return int(r) if r is not None and r == int(r) else r
@@ -3369,14 +3385,14 @@ def __midiArg(verb, kind, v):
 # table raised or played C-1. __badNote refuses each in the WebView runtime's words.
 def __note(n):
     import math
-    v = noteNumber(n) if isinstance(n, str) else (int(math.floor(n + 0.5)) if __finite(n) else None)
+    v = __noteNumberOf(n) if isinstance(n, str) else (int(math.floor(n + 0.5)) if __finite(n) else None)
     return v if v is not None and 0 <= v <= 127 else None
 def __badNote(verb, note):
     rng = "MIDI notes run from 0 to 127, which is C-1 to G9."
     if note is None:
         why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
     elif isinstance(note, str):
-        if noteNumber(note) is None:
+        if __noteNumberOf(note) is None:
             why = ('"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
                    + 'has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
