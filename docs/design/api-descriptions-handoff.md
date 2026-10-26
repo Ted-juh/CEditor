@@ -2175,8 +2175,9 @@ seventeen to eighteen minutes here (996 s and 1086 s for the two whole runs abov
 browser-checks job ran its 40 checks in 11.1 minutes on its last run and stops at thirty, so the
 file did not fit in it; raising that job's limit would have made a run about thirty minutes. It has
 a job of its own instead, `component-behavior` on `windows-latest` beside the other three, with a
-limit of forty minutes: a run takes as long as that job, about twenty minutes, where it took about
-thirteen.
+limit of forty minutes: a run takes as long as that job. On its first run (40361234538) the job took
+16.3 minutes, 15.6 of them the 95 cases, all passing, beside browser-checks' 13.1, web-tests' 12.8
+and the build's 7.8; a run took about thirteen before it.
 
 - No bundle: the harness runs the editor in a Vite dev server, which compiles the modules as they
   are asked for, so the job is checkout, `npm ci` and the cases.
@@ -2186,7 +2187,7 @@ thirteen.
 - The three cases `runAll.mjs` ran (`CASES`) are gone from it: the job runs them with the rest, and
   `npm run test:browser` is the 39 checks it was.
 
-CLAUDE.md's "twelve minutes" a run, said five times, is "twenty" now, and its local-verification
+CLAUDE.md's "twelve minutes" a run, said five times, is "sixteen" now, and its local-verification
 section names the job and how to run a few cases.
 
 ## Checking each batch

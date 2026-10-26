@@ -28,7 +28,8 @@
 #                             on, CTest, the native handlers end to end, and the plug-in through the
 #                             validators; 1.3 min of it fetching those, which later runs restore
 # A fourth joined them on 2026-10-26, at the owner's word, and is now the longest:
-#   component-behavior        the component acceptance harness, 95 cases (17-18 min of them here)
+#   component-behavior 16 min  the component acceptance harness, 95 cases: 15.6 min of them, on its
+#                             first run (40361234538), where browser-checks took 13 and web-tests 13
 # All of them run on Windows, as the one job did, so nothing that was checked there moved off it. The
 # bundle is built by both jobs that use it rather than handed from one to the other: under a minute
 # each, in parallel, where an artifact would make one job wait on the other.
@@ -145,8 +146,8 @@ jobs:
 
   # The component acceptance harness, browser-checks/componentBehavior.mjs: 95 cases, each a control
   # edited through the real inspector and driven by the pointer and the keys, saved, reloaded and
-  # checked again. About seventeen minutes, which the browser-checks job has not the time for (it
-  # stops at thirty), so it has a runner of its own. No bundle: it runs the editor in a Vite dev
+  # checked again. Sixteen minutes on its first run, which the browser-checks job has not the time
+  # for (it stops at thirty), so it has a runner of its own. No bundle: it runs the editor in a Vite dev
   # server, which compiles the modules as they are asked for. What a failing case saw (a screenshot
   # each, and results.json) is kept as an artifact.
   component-behavior:

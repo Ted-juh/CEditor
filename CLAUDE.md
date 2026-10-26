@@ -40,18 +40,18 @@ metered.
 ### The rules that survive, and what actually justifies them
 
 Most of the old rules were right for the wrong reason. A CI run costs no money and still costs
-twenty minutes of somebody's attention (four jobs side by side; `ci.yml`'s header has the timings)
+sixteen minutes of somebody's attention (four jobs side by side; `ci.yml`'s header has the timings)
 and a main branch that may be broken while they wait.
 
 1. **Verify locally, then push.** Unchanged, and it was never really about minutes: a red run is
-   twenty minutes of *your* wall clock before you learn anything, and everything except the
+   sixteen minutes of *your* wall clock before you learn anything, and everything except the
    Windows-only targets runs on this machine — see [Local verification](#local-verification).
 2. **Batch your commits.** Commit locally as often as you like. Push when the change is *finished
    and locally green*. One push per completed change keeps the run history a record of changes
    rather than of keystrokes.
 3. **Do not iterate against the runner.** `concurrency: cancel-in-progress` is set, so a second
    push kills the first run mid-flight. Pushing three speculative fixes does not get you three
-   answers — it gets you one, twenty minutes later, and you will not know which fix produced it.
+   answers — it gets you one, sixteen minutes later, and you will not know which fix produced it.
 4. **Use `[skip ci]` for changes that cannot affect the build.** Markdown and docs, comments,
    `.gitignore`, `LICENSE`, review notes. Not a saving any more — a signal-to-noise one. A run
    history where every entry means something is a history somebody reads.
@@ -68,7 +68,7 @@ and a main branch that may be broken while they wait.
 5. **When CI is red, reproduce it locally before pushing a fix.** Read the job log, make the
    failure happen here, fix everything you can see, then push once. You may now push a second time
    without it costing anything, which is exactly why the discipline has to come from somewhere
-   else: a fix you have not reproduced is a guess, and guessing at twenty minutes a turn is slow
+   else: a fix you have not reproduced is a guess, and guessing at sixteen minutes a turn is slow
    however free it is.
 6. **Do not widen CI without asking.** Kept, with a different justification — not cost, but that
    the shape of the project's automation is the owner's call, and every job added is time on
@@ -115,7 +115,7 @@ of work here as an excuse not to check anything at all off it.
 
 So a change to `CE/src/**` that never gets compiled locally is a choice, not a limitation. Compile
 it first; the run then confirms the two things above rather than telling you something a local
-build would have told you twenty minutes sooner.
+build would have told you sixteen minutes sooner.
 
 ---
 
