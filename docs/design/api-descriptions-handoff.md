@@ -103,6 +103,14 @@ is the table of wording the owner rejected and what replaced it; read it before 
   behaviour for the transport helpers, it is `optional: true` on those arguments in `timeWords.js`
   and the three `__TIME_NUMBERS` tables.
 
+- `ce.device`, which runs in four runtimes, answers without a word: `deviceParameter()` and
+  `deviceRead()` with no id give nothing, `deviceParameters(5)` an empty list, `devicePorts` with a
+  `direction` that is not "in" or "out" every port, `deviceSetTiming` with a name the profile does
+  not have stores it, and `deviceBind` binds to a parameter the profile does not have. The rules say
+  a required value left out, or a wrong option, is refused or said; each would be a change in the
+  panel runtime, `ScriptRuntime.cpp` and the three preludes, so they are left for the owner. The
+  texts say what each does now.
+
 ### Left
 
 The table under [The branch](#the-branch): 580 descriptions in the modules not yet done, of which
@@ -1756,6 +1764,155 @@ listed here per module, for review; the texts themselves are in `componentVerbs.
 - **Texts** for all 16: a beat is a quarter note whatever `beatUnit()` says, which is shown only;
   following an external clock or the host, the tempo, tapping and clock out are not used; a count-in
   holds every follower quiet; `clockDevice("")` is the panel's own device when it names exactly one.
+
+### `ce.panel`
+
+Panel view only (`RUNTIME_WEBVIEW`), so no prelude changed. Every command's text rewritten to the
+form: one sentence, an example, the rules a line each, and what it returns; the shared `props`
+options (`controlName` and the rest) and every option field likewise. Decided by the rules:
+
+- **A type is a word from a list the app defines**, so `create("knob")` and `find({ type = "knob" })`
+  read it in any case (`typeNamed`); a type that is not one refuses `find` with why (it found
+  nothing without a word). `find`'s `parent` filter reads a name in any case, as names are.
+- **An error means the call did nothing**: `create` and `clone` with a `parent` that is not there,
+  or not a container, made the control at the top level and said an error (`create`), or said
+  nothing (`clone`). Both now refuse, and nothing is made (`containerRefusal`).
+- **A value used as its default is said once**: `x`, `y`, `width` and `height` that are not numbers,
+  or a size not above 0, keep the control's own (`applyControlProps`, `panelSaid`); `distribute`'s
+  `gap`, `grid`'s `columns`, `gapX` and `gapY`, `circle`'s `radius` and `startAngle` that are not
+  numbers fall back to their defaults, and `columns` below 1 is 1, each said
+  (`arrangementPlan`'s `said`, which the Values tab shares).
+- **Refused with why, where it did nothing without a word**: no control named, or one where the
+  verb needs two (`distribute`, `match`, `grid`, `circle`, `flip`); a radius below 0 (it put each
+  control on the far side of the circle); `destroy()`, `info()`, `clone()` with no name;
+  `restore()` with no snapshot, or not a table.
+- **One name is a list of one** for the arranging commands: a text was read letter by letter, six
+  "no control named" lines for "Cutoff".
+- **Kept**: `destroy("Nobody")`, `info("Nobody")`, `entry` and `undefine` of an entry that is not
+  there answer false or nothing without a word, as a query with no result does; the texts say so.
+  The arranging commands return how many controls they placed or sized, moved or not, which the
+  texts now say rather than "moved".
+- `test/panelReview.test.js` pins each.
+
+### `ce.components.envelope`
+
+- **`preset()` seeds the shape**, points and sustain point, as the inspector's Preset does
+  (`applyPreset`); it wrote the name only, and the canvas then locked the new preset's levels on the
+  old points. A verb hook, `alsoWrites`, writes the other fields a setting brings with it.
+- **`pointX` keeps a point between its neighbours**, the first at 0 and the last at 1, as a drag
+  does (`envDragNode`): a point moved past the next was drawn re-sorted, under the numbers a script
+  went on using. A verb hook, `itemRange(c, at)`, gives an item its own range; the clamp warning
+  names it ("outside 0 to 0.5").
+- **`sustain`, `loopStart` and `loopEnd` count to the points there are** (`rangeFrom`); the loop's
+  start at 1, where 0 was taken and stored as -1. `sustain` 0 or -1 is none, as it was.
+- **Texts**: `timeMax` is the readout's only; the loop is marked on the curve; the snaps are a drag's.
+
+### `ce.components.turing`
+
+- **`phase()` is a seek**, as the arp's (its item 6): the preview keeps the Turing Machine's position
+  in its ticker, and `provideComponentPhases` now answers and moves it too.
+- **A change to the stored steps starts the running register from them** (an `$effect` in the
+  preview): once the register had mutated, the preview played its own copy and a script's `step()`
+  or `fill()`, or the inspector, was never heard.
+- **`length` takes 2 ↔ 64**, as the engine plays it (`turingLength`); 1 was stored and played as 2.
+  The texts give the rest: 0 or 1 levels is no quantizing; a longer loop's new steps start at 0.
+- The examples name the control "Turing", the type list's name.
+
+### `ce.components.crossfader`
+
+- **Texts** for all 15, from `crossfaderLayout.js`; the detent snaps a drag, not `mix()`. The four
+  return-spring verbs are one helper, `returnVerbs`, worded for each control's range, for the
+  Ribbon and the Vector Joystick to use too.
+
+### `ce.device`
+
+Runs in the panel window (`panelRuntime.js`) and in the plug-in (`ScriptRuntime.cpp` and the three
+preludes), so its texts were rewritten to the form and say what each does now, and its silences are
+left for the owner, below, since each one is a change in four runtimes. The option fields of
+`deviceDefineParameter` and `deviceDefineDump` keep their prose, which was already full.
+
+### `ce.components.router`
+
+- **Texts** for all 17, from `routerLayout.js`: each source's CC, the dead zone spread over the rest,
+  a negative depth turns the curve upside down.
+- **`curveX` keeps a point between its neighbours**, as the Envelope's do: the curve is sampled by
+  the Envelope's own `envValueAt`.
+
+### `ce.components.ribbon`
+
+- **Texts** for all 14, from `ribbonLayout.js` and the preview: a Pitch Wheel and a Mod Wheel are
+  Ribbons with other defaults, which each note gives; `bipolar` sends -1 to 1 and fills from the
+  middle; `snap()` steps a drag, not `value()`. The four return-spring verbs are the Crossfader's
+  `returnVerbs`, worded for a strip.
+- `editable`, `showGlow` and `showValue`, which were derived with a generic line, have texts of
+  their own.
+
+### `ce.components.kinetic`
+
+- **`gravity` takes 0 ↔ 4 and `bounce` 0 ↔ 1**, what the physics plays (`kineticParams`): the
+  inspector's field set widened both for a script (gravity -4, to pull up; bounce 1.5, for a wall
+  that adds speed), and the engine played an upward pull as none and 1.5 as 1. The widening is gone
+  from `inspectorFieldSets.js`, with a comment saying why.
+- **A change to the launch throws the ball again** (an `$effect` in the preview): the running ball
+  read `initial` only before its first frame, so `launch()` and `velocity()` were never seen once
+  it ran. Same class as the Turing Machine's register.
+- **Texts** for all 11: the units (boxes a second), the speed limit of 2.5, what `keepAlive` kicks.
+
+### `ce.components.orbit`
+
+- **`phase()` is a seek**, as the arp's and the Turing Machine's: the preview keeps the Orbit's
+  position, and `provideComponentPhases` now answers and moves it. A stopped Orbit is drawn there
+  and sends what its satellites say there at once (a counter, `sourceSought`, redraws it).
+- **`bars` takes 0.25 ↔ 64 in quarters**, as `orbitCycleBars` plays it (whole bars 1 to 64 could
+  not reach below 1); **`nodeDepth` takes 0 ↔ 1**, as `orbitNodes` clamps it (-1 to 0 was taken
+  and sent 0).
+- **Kept**: `nodeRatio` -16 ↔ 16 and `nodeAngle` -360 ↔ 360, wider than the inspector's, since the
+  engine plays any; the texts say where the inspector stops.
+- **Noticed, not changed**: what a node sends (its height, its place across, a sine of its angle,
+  or its radius) and whether it is turned upside down have no verbs; the depth note says they are
+  set in the inspector.
+
+### `ce.components.looper`
+
+- **`phase()` is a seek**, as the Orbit's.
+- **`bars` takes 0.25 ↔ 64 in quarters**, as `looperLoopBars` plays it and the inspector offers it.
+- **Texts** for all 12: a lane that is off, or has no recording, sends its rest value; `quantize`
+  rounds the played length to whole beats and keeps the number set; a drag records a lane, replacing
+  what it had.
+
+### `ce.components.constellation`
+
+- **`blend` takes 0.5 ↔ 16**, as `blendWeights` plays it (0.1 to 0.5 was taken and blended as 0.5);
+  **`bars` takes 0.25 ↔ 64 in quarters**, as `constellationWanderBars` plays it.
+- **Texts** for all 12. The probe's text said "the targets follow, which is the whole point", and
+  in the preview they did not: see the next section.
+
+### A script's write to a source is sent
+
+Found on the Constellation, and true of every source: a script's `macro.value()`, `ribbon.value()`,
+`crossfader.mix()`, `joystick.move()`, `timbre.move()`, `constellation.probe()`, a Mod Matrix cell or
+an Envelope point moved what was drawn and left every bound parameter where it was. Only a drag, a
+running ticker or an incoming signal sent a source's ports (`emitControlPortFanout`,
+`emitClockFanout`). An `$effect` in the preview now sends a change to what a stored source sends,
+once, as a commit:
+
+- Not on opening, as before: what is stored was never sent on opening.
+- Not what a drag has just sent and committed (`portsSentAs`), so a release is not sent twice.
+- Not a running Orbit, Looper, Kinetic or wandering Constellation, whose ticker sends what it plays,
+  nor a Router or a Turing Machine, which send on their own clock.
+
+`browser-checks/componentBehavior.mjs` ("A script write to a source reaches its bound parameter
+once") checks it on a Crossfader: it fails without the effect. That file is run by hand, not by
+`runAll.mjs`; adding it to CI is the owner's call.
+
+### `ce.components.panic`
+
+- **Texts** for all 8, from `panicLayout.js` and the preview's `firePanic`: All Sound Off then All
+  Notes Off on each channel; Reset All Controllers after them; a centred bend; `clearLocal` stops
+  the panel's own note controls; `""` writes PANIC; the summary line is drawn on a button 46 pixels
+  tall or more; the panic key works whether or not the button can be pressed, and sends the most.
+- The summary no longer says pressing it is the global `panic()`, which sends no pitch bend and
+  stops nothing on the panel.
 
 ## Checking each batch
 

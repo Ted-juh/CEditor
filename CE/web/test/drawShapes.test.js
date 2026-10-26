@@ -208,8 +208,10 @@ test('ce.panel.create\'s type is one of the types there are, refused in the runt
   const knob = row('ce.panel.create("Knob", {})');
   assert.deepEqual([knob.kind, knob.editable, knob.problem, meaningLine(knob)], ['componentType', 'choice', null, 'made 100 × 100 unless props say otherwise']);
   assert.ok(knob.meaning.choices.includes('SplitZone'));
-  const slip = row('ce.panel.create("knob", {})');
-  const said = run((api) => api.ce.panel.create('knob', {})).lines[0];
+  // A type in any case is the type, as the runtime reads it (ce.panel's review); a slip is refused.
+  assert.equal(row('ce.panel.create("knob", {})').problem, null);
+  const slip = row('ce.panel.create("Knobb", {})');
+  const said = run((api) => api.ce.panel.create('Knobb', {})).lines[0];
   assert.deepEqual(slip.problem, { severity: 'error', message: said });
   assert.equal(meaningLine(slip), 'did you mean "Knob"?');
 });

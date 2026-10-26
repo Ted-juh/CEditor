@@ -38,6 +38,7 @@
 import { scriptRangeOf } from '../models/inspectorFieldSets.js';
 import { VERB_VALUES } from './componentTables.js';
 import { pitchClassOf } from './musicTheory.js';
+import { envelopePreset } from '../utils/envelopeLayout.js';
 import { SCALES as CHORD_SCALES } from '../utils/chordPadLayout.js';
 import { DIVISION_IDS, MIN_BPM, MAX_BPM, MIN_BARS as LOOP_MIN_BARS, MAX_BARS as LOOP_MAX_BARS, MAX_LOOP_BAR, MAX_COUNT_IN_BARS } from '../utils/transportLayout.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -74,6 +75,38 @@ const NOTE_PAST_MIDI = 'A note past the MIDI range sounds at its end, 0 or 127.'
 const CHORDS_ONLY = 'Only in "chords" mode.';
 // The Transport while it follows another clock (transportLayout.transportIsFollowing).
 const TRANSPORT_FOLLOWING = 'While `source()` is "external" or "host": not used.';
+// An Envelope's points (envelopeLayout.js): how many, and where one may go, between its neighbours with
+// the first at 0 and the last at 1, as envDragNode keeps a drag.
+const envelopePointCount = (c) => (Array.isArray(c?.points) && c.points.length ? c.points.length : 4);
+const envelopePointRange = (c, at) => curvePointRange(c?.points, at);
+/** Where breakpoint `at` of a curve may go: between its neighbours, the first at 0 and the last at 1
+ *  (the Envelope's points, and the Router's transfer curve, which envValueAt samples the same way). */
+function curvePointRange(points, at) {
+  const pts = Array.isArray(points) ? points : [];
+  if (at <= 0) return { min: 0, max: 0 };
+  if (at >= pts.length - 1) return { min: 1, max: 1 };
+  const x = (i) => Math.min(1, Math.max(0, Number(pts[i]?.x) || 0));
+  return { min: x(at - 1), max: x(at + 1) };
+}
+// Where a control goes when it is let go (returnToRest.js), as the Crossfader, the Ribbon and the
+// Vector Joystick share it: four verbs with the same rules, worded for each control's own range.
+function returnVerbs(section, words) {
+  return [
+    v('returnMode', 'returnMode', ENUM, { doc: 'Set where it goes when it is let go.', ex: ['"center"', `springs back to ${words.centre} when let go`],
+      argDocs: { returnMode: [`"none": it stays where it is let go.`, `"center": back to ${words.centre}.`, `"min": back to ${words.min}.`,
+        `"max": back to ${words.max}.`, '"rest": back to `returnValue()`.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
+      notes: ['On letting go of a drag: a script\'s value stays.', 'Default: "none".'] }),
+    v('returnValue', 'returnValue', NUM, { ...FIELD(section, 'returnValue'), doc: `Set ${words.rest} it goes back to with \`returnMode()\` "rest".`, ex: ['0.25', 'goes back to a quarter of the way'],
+      argDocs: { returnValue: `${words.restLines}\nRange: ${FIELD(section, 'returnValue').min} ↔ ${FIELD(section, 'returnValue').max}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+      notes: ['Only while `returnMode()` is "rest".'] }),
+    v('returnTime', 'returnTime', NUM, { ...FIELD(section, 'returnTime'), doc: 'Set how long it takes to go back when let go.', ex: ['500', 'takes half a second to go back'],
+      argDocs: { returnTime: `Milliseconds for the whole way back.\n0: at once.\nRange: ${FIELD(section, 'returnTime').min} ↔ ${FIELD(section, 'returnTime').max}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+      notes: ['Only while `returnMode()` is not "none".'] }),
+    v('returnCurve', 'returnCurve', ENUM, { doc: 'Set how it moves on the way back.', ex: ['"exp"', 'springs back fast, then settles'],
+      argDocs: { returnCurve: '"linear": at one speed.\n"exp": fast, then settling, as a spring.\n"ease": slow, fast, slow.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+      notes: ['Only while `returnMode()` is not "none".'] }),
+  ];
+}
 // What a corner of a Drum Pad does (the preview's drumStrike).
 const PAD_CORNER_ACTIONS = ['"none": a plain hit.', '"roll": rolls while held, as `roll()` does.',
   '"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.', '"choke": silences the pad\'s choke group, and plays nothing.',
@@ -659,80 +692,240 @@ export const COMPONENT_FAMILIES = [
 
   /* ------------------------------------------------------------------- moving sources */
   {
-    id: 'turing', section: 'Turing', prefix: 'turing', label: 'Turing Machine',
-    summary: 'Drive the Turing Machine: run, rate, length, randomness, and individual steps.',
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.turing"): what turingLayout.js and the preview's ticker do with each.
+    id: 'turing', section: 'Turing', prefix: 'turing', label: 'Turing Machine', sample: 'Turing',
+    summary: 'Run a loop of stepped values that can change as it comes round: its speed, length, randomness, output levels and gate, and each step.',
+    readNotes: ['`read(target, "phase")`: where it is now.', '`read(target, "step")`: every step; `read(target, "step", 3)`: one.'],
     verbs: [
-      v('run', 'running', BOOL, { toggle: true }),
-      v('rate', 'rate', NUM, RATE),
-      v('division', 'division', ENUM),
-      v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('length', 'length', INT, { min: 1, max: 64 }),
-      v('randomness', 'randomness', NUM, UNIT),
-      v('quantize', 'quantizeLevels', INT, { min: 0, max: 32, doc: '0 leaves the steps continuous.' }),
-      v('gate', 'gateThreshold', NUM, UNIT),
-      v('step', 'steps', CELL, { ...UNIT, doc: 'Set one step of the sequence, 1-based.' }),
-      v('phase', 'phase', NUM, { ...UNIT, doc: 'Where in the sequence it is, 0..1.' }),
+      v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the sequence.', ex: ['false', 'stops it on the step it is at'],
+        argDocs: { run: `true: it advances.\nfalse: it holds its step.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Synced: it advances only while the Transport runs.', 'Default: true.'] }),
+      v('rate', 'rate', NUM, { ...RATE, doc: 'Set how many steps a second it advances, while not synced.', ex: ['4', 'advances four steps a second'],
+        argDocs: { rate: 'Steps per second.\nRange: 0.1 ↔ 40.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While synced to the Transport: no effect; `division()` sets the step.', 'The inspector stops at 30.', 'Default: 2.'] }),
+      v('division', 'division', ENUM, { doc: 'Set how long a step is while synced to the Transport.', ex: ['"1/16"', 'advances a step every sixteenth note'],
+        notes: ['Only while `sync()` is on.', 'Default: "1/8".'] }),
+      v('sync', 'syncToTransport', BOOL, { toggle: true, doc: 'Follow the Transport, or run at its own rate.',
+        argDocs: { sync: `true: a step every \`division()\`, where the Transport's position puts it.\nfalse: at \`rate()\`.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.'] }),
+      // The engine's 2 (turingLength): 1 was stored and played as 2.
+      v('length', 'length', INT, { min: 2, max: 64, doc: 'Set how many steps the loop has.', ex: ['16', 'makes the loop sixteen steps long'],
+        argDocs: { length: 'Steps.\nRange: 2 ↔ 64, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A step added by a longer loop starts at 0.', 'Default: 8.'] }),
+      v('randomness', 'randomness', NUM, { ...UNIT, doc: 'Set how likely a step is to change as the loop comes round to it.', ex: ['0.1', 'lets the loop change slowly'],
+        argDocs: { randomness: 'Chance a step is given a new value, each time it is reached.\n0: a locked loop.\n1: a new value every step.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.25.'] }),
+      v('quantize', 'quantizeLevels', INT, { min: 0, max: 32, doc: 'Set how many levels each step\'s output is snapped to.', ex: ['2', 'makes every step\'s output on or off'],
+        argDocs: { quantize: 'Levels, spread evenly from 0 to 1.\n0 or 1: not snapped.\n2: 0 or 1.\nRange: 0 ↔ 32, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The output only: the steps keep their own values.', 'The inspector stops at 24.', 'Default: 0.'] }),
+      v('gate', 'gateThreshold', NUM, { ...UNIT, doc: 'Set the level at which a step opens the gate.', ex: ['0.7', 'opens the gate only at the higher steps'],
+        argDocs: { gate: 'Level: the gate output is 1 at a step at or above it, 0 below.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.5.'] }),
+      v('step', 'steps', CELL, { ...UNIT, doc: 'Set the value of one step, by its number.', ex: ['3, 0.75', 'sets step 3 to 0.75'],
+        argDocs: { value: 'Value.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A running loop goes on from the steps as they now are; `randomness()` can change them as it comes round.'] }),
+      // As the arp's (its item 6): the preview keeps the position, so this is a seek
+      // (stores/componentPhases.js), where it wrote a number a running preview did not read again.
+      v('phase', 'phase', NUM, { ...UNIT, seek: { clock: 'syncToTransport' }, doc: 'Move the loop to a point in its sequence.',
+        ex: ['0.5', 'moves it halfway through its loop'],
+        argDocs: { phase: ['Where in the loop: 0 the start, 0.5 halfway.', '1: the start again.', 'Range: 0 ↔ 1.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Running: it advances from there. Stopped: it starts from there.',
+          'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.',
+          'Nothing is written to the panel.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the steps be drawn by dragging, or not.',
+        argDocs: { editable: `true: a drag across the bars sets the steps.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showGate', 'showGate', BOOL, { toggle: true, doc: 'Show or hide the row of gate dots under the steps.', notes: ['Default: shown.'] }),
+      v('showDivisions', 'showDivisions', BOOL, { toggle: true, doc: 'Show or hide the level lines across the steps.',
+        notes: ['How many: set in the inspector, under Divisions.', 'Default: hidden.'] }),
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.looper"): what looperLayout.js, LooperRenderer and the preview's ticker do.
     id: 'looper', section: 'Looper', prefix: 'looper', label: 'Looper',
-    summary: 'Drive the Looper: run, loop length, sync, and per-lane enable.',
+    summary: 'Loop movements recorded by hand, each lane sending its value round the loop: the loop\'s length and sync, and each lane.',
+    readNotes: ['`read(target, "phase")`: where it is now.', '`read(target, "laneRest")`: every lane\'s; `read(target, "laneRest", 2)`: one.'],
     verbs: [
-      v('run', 'running', BOOL, { toggle: true }),
-      v('seconds', 'loopSeconds', NUM, { min: 0.05, max: 600 }),
-      v('bars', 'loopBars', INT, { min: 1, max: 64 }),
-      v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('quantize', 'quantizeLoop', BOOL, { toggle: true }),
-      v('lane', 'lanes', ITEM, { item: 'enabled', kind: BOOL, doc: 'Enable or mute one lane, 1-based.' }),
-      v('laneRest', 'lanes', ITEM, { item: 'rest', kind: NUM, ...UNIT }),
-      v('phase', 'phase', NUM, { ...UNIT, doc: 'Where in the loop it is, 0..1.' }),
+      v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the loop.', ex: ['false', 'stops the loop where it is'],
+        argDocs: { run: `true: it plays.\nfalse: it stops where it is.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Synced: it plays only while the Transport runs.', 'Default: true.'] }),
+      v('seconds', 'loopSeconds', NUM, { min: 0.05, max: 600, doc: 'Set how long the loop is while not synced.', ex: ['8', 'makes the loop eight seconds long'],
+        argDocs: { seconds: 'Seconds.\nRange: 0.05 ↔ 600.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While synced to the Transport: no effect; `bars()` sets the loop.', 'The inspector takes 0.1 to 60.', 'Default: 4.'] }),
+      // The engine's range (looperLoopBars), in quarters as the inspector's: whole bars 1 to 64
+      // could not set the 0.25 to 1 it plays.
+      v('bars', 'loopBars', NUM, { min: LOOP_MIN_BARS, max: LOOP_MAX_BARS, doc: 'Set how many bars the loop is while synced to the Transport.', ex: ['4', 'makes the loop four bars long'],
+        argDocs: { bars: `Bars: 0.25 is one beat in 4/4.\nRange: ${LOOP_MIN_BARS} ↔ ${LOOP_MAX_BARS}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+        notes: ['Only while `sync()` is on.', 'Default: 2.'] }),
+      v('sync', 'syncToTransport', BOOL, { toggle: true, doc: 'Follow the Transport, or loop in its own time.',
+        argDocs: { sync: `true: the loop is \`bars()\` long, and starts on the bar line.\nfalse: \`seconds()\` long.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Synced: the grid in each lane marks the bars and beats.', 'Default: false.'] }),
+      v('quantize', 'quantizeLoop', BOOL, { toggle: true, doc: 'Round the loop\'s length to whole beats at the panel\'s tempo, or not.',
+        argDocs: { quantize: `true: \`seconds()\` is played to the nearest whole beat, one beat at least.\nfalse: as set.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['While not synced; `seconds()` keeps the number set.', 'Default: false.'] }),
+      v('lane', 'lanes', ITEM, { item: 'enabled', kind: BOOL, doc: 'Switch one lane on or off, by its number.', ex: ['2, false', 'holds lane 2 at its rest value'],
+        argDocs: { enabled: `true: it plays its recording.\nfalse: it sends its rest value, and is drawn faded.\nLeft out: toggles.\n${OFF_RULE}` } }),
+      v('laneRest', 'lanes', ITEM, { item: 'rest', kind: NUM, ...UNIT, doc: 'Set the value one lane sends while it has no recording or is off, by its number.', ex: ['1, 0.5', 'makes lane 1 send 0.5 until something is recorded'],
+        argDocs: { rest: 'Value.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A recording is made by dragging across the lane: left to right is the loop, the height the value.'] }),
+      // As the arp's (its item 6): the preview keeps the position, so this is a seek
+      // (stores/componentPhases.js), where it wrote a number a running preview did not read again.
+      v('phase', 'phase', NUM, { ...UNIT, seek: { clock: 'syncToTransport' }, doc: 'Move the loop to a point in its length.',
+        ex: ['0', 'moves the loop back to its start'],
+        argDocs: { phase: ['Where in the loop: 0 the start, 0.5 halfway.', '1: the start again.', 'Range: 0 ↔ 1.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Running: it plays on from there. Stopped: it starts from there, and its lanes send their values there.',
+          'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.',
+          'Nothing is written to the panel.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let a lane be recorded by dragging, or not.',
+        argDocs: { editable: `true: a drag across a lane records it, replacing what it had.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showPlayhead', 'showPlayhead', BOOL, { toggle: true, doc: 'Show or hide the line that moves across the lanes as the loop plays.', notes: ['Default: shown.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the time lines across the lanes.',
+        notes: ['Quarters of the loop; while synced, its bars and beats.', 'Default: shown.'] }),
+      v('showDivisions', 'showDivisions', BOOL, { toggle: true, doc: 'Show or hide the level lines across each lane.',
+        notes: ['How many: set in the inspector, under Major and Minor.', 'Default: hidden.'] }),
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.orbit"): what orbitLayout.js, OrbitRenderer and the preview's ticker do with each.
     id: 'orbit', section: 'Orbit', prefix: 'orbit', label: 'Orbit',
-    summary: 'Drive the Orbit: run, rate, phase, and each node\'s radius, angle and depth.',
+    summary: 'Turn satellites round a centre as modulation sources, each sending a value from where it is: their speed, and each one\'s orbit and depth.',
+    readNotes: ['`read(target, "phase")`: where it is now.', '`read(target, "nodeRadius")`: every node\'s; `read(target, "nodeRadius", 2)`: one.'],
     verbs: [
-      v('run', 'running', BOOL, { toggle: true }),
-      v('rate', 'rate', NUM, RATE),
-      v('bars', 'cycleBars', INT, { min: 1, max: 64 }),
-      v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('phase', 'phase', NUM, UNIT),
-      v('node', 'nodes', ITEM, { item: 'enabled', kind: BOOL, doc: 'Enable or silence one node, 1-based.' }),
-      v('nodeRadius', 'nodes', ITEM, { item: 'radius', kind: NUM, ...UNIT }),
-      v('nodeAngle', 'nodes', ITEM, { item: 'angle', kind: NUM, min: -360, max: 360 }),
-      v('nodeRatio', 'nodes', ITEM, { item: 'ratio', kind: NUM, min: -16, max: 16 }),
-      v('nodeDepth', 'nodes', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1 }),
+      v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the satellites.', ex: ['false', 'stops the satellites where they are'],
+        argDocs: { run: `true: they turn.\nfalse: they stop where they are.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Synced: they turn only while the Transport runs.', 'Default: true.'] }),
+      v('rate', 'rate', NUM, { ...RATE, doc: 'Set how many cycles a second it turns, while not synced.', ex: ['0.5', 'turns once every two seconds'],
+        argDocs: { rate: 'Cycles per second. In one cycle a node turns as many times as `nodeRatio()` says.\nRange: 0.1 ↔ 40.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While synced to the Transport: no effect; `bars()` sets the cycle.', 'The inspector stops at 10.', 'Default: 0.25.'] }),
+      // The engine's range (orbitCycleBars), in quarters as the Transport's loop: whole bars 1 to 64
+      // could not set the 0.25 to 1 the engine plays.
+      v('bars', 'cycleBars', NUM, { min: LOOP_MIN_BARS, max: LOOP_MAX_BARS, doc: 'Set how many bars one cycle takes while synced to the Transport.', ex: ['2', 'turns once every two bars'],
+        argDocs: { bars: `Bars: 0.25 is one beat in 4/4.\nRange: ${LOOP_MIN_BARS} ↔ ${LOOP_MAX_BARS}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+        notes: ['Only while `sync()` is on.', 'Default: 4.'] }),
+      v('sync', 'syncToTransport', BOOL, { toggle: true, doc: 'Follow the Transport, or turn at its own rate.',
+        argDocs: { sync: `true: a cycle every \`bars()\`, where the Transport's position puts it.\nfalse: at \`rate()\`.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.'] }),
+      // As the arp's (its item 6): the preview keeps the position, so this is a seek
+      // (stores/componentPhases.js), where it wrote a number a running preview did not read again.
+      v('phase', 'phase', NUM, { ...UNIT, seek: { clock: 'syncToTransport' }, doc: 'Move the satellites to a point in their cycle.',
+        ex: ['0', 'puts every satellite back where its angle starts it'],
+        argDocs: { phase: ['Where in the cycle: 0 the start, 0.5 halfway.', '1: the start again.', 'Range: 0 ↔ 1.',
+          'Outside the range: the nearest end.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Running: they turn on from there. Stopped: they start from there.',
+          'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.',
+          'Nothing is written to the panel.'] }),
+      v('node', 'nodes', ITEM, { item: 'enabled', kind: BOOL, doc: 'Switch one node on or off, by its number.', ex: ['2, false', 'silences node 2'],
+        argDocs: { enabled: `true: it turns and sends.\nfalse: it sends 0 and is drawn as an outline.\nLeft out: toggles.\n${OFF_RULE}` } }),
+      v('nodeRadius', 'nodes', ITEM, { item: 'radius', kind: NUM, ...UNIT, doc: 'Set how far from the centre one node turns, by its number.', ex: ['1, 0.5', 'puts node 1 halfway out'],
+        argDocs: { radius: 'Distance: 0 the centre, 1 the edge.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A node that sends its radius sends this; one that sends its place across or its height swings wider at a larger radius.'] }),
+      v('nodeAngle', 'nodes', ITEM, { item: 'angle', kind: NUM, min: -360, max: 360, doc: 'Set where one node starts its orbit, by its number.', ex: ['1, 90', 'starts node 1 at the top'],
+        argDocs: { angle: 'Degrees, counter-clockwise: 0 the right, 90 the top.\nBelow 0: clockwise; -90 is 270.\nRange: -360 ↔ 360.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Where it is at phase 0; a drag sets it too.'] }),
+      v('nodeRatio', 'nodes', ITEM, { item: 'ratio', kind: NUM, min: -16, max: 16, doc: 'Set how many turns one node makes in a cycle, by its number.', ex: ['3, -2', 'turns node 3 twice a cycle, clockwise'],
+        argDocs: { ratio: 'Turns per cycle.\nAbove 0: counter-clockwise. Below 0: clockwise.\n0: it stands still.\nRange: -16 ↔ 16.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A whole number comes back to where it started every cycle.', 'The inspector stops at -8 and 8.'] }),
+      // The engine's range (orbitNodes clamps depth to 0..1): -1 to 0 was taken and sent 0.
+      v('nodeDepth', 'nodes', ITEM, { item: 'depth', kind: NUM, ...UNIT, doc: 'Set how much of its value one node sends, by its number.', ex: ['2, 0.5', 'sends half of node 2\'s value'],
+        argDocs: { depth: 'Part of the value: 1 all of it, 0.5 half.\n0: nothing.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['What a node sends, and whether it is turned upside down, is set in the inspector, under Satellites.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the satellites be dragged, or not.',
+        argDocs: { editable: `true: a drag moves a satellite to a new radius and angle.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showTrails', 'showTrails', BOOL, { toggle: true, doc: 'Show or hide the trail behind each satellite.', notes: ['Default: shown.'] }),
+      v('showSpokes', 'showSpokes', BOOL, { toggle: true, doc: 'Show or hide the line from the centre to each satellite.', notes: ['Default: shown.'] }),
+      v('showRings', 'showRings', BOOL, { toggle: true, doc: 'Show or hide the ring each satellite turns on.', notes: ['Default: shown.'] }),
+      v('showValues', 'showValues', BOOL, { toggle: true, doc: 'Show or hide each satellite\'s value, as a percentage, above it.', notes: ['Default: hidden.'] }),
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.kinetic"): what kineticLayout.js and the preview's ticker do with each.
     id: 'kinetic', section: 'Kinetic', prefix: 'kinetic', label: 'Kinetic',
-    summary: 'Drive the Kinetic field: run, gravity, bounce, friction — and launch the ball.',
+    summary: 'Bounce a ball round a box as a modulation source: its gravity, bounce and drag, and where and how hard it is thrown.',
     verbs: [
-      v('run', 'running', BOOL, { toggle: true }),
-      v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('gravity', 'gravity', NUM, FIELD('Kinetic', 'gravity')),
-      v('bounce', 'restitution', NUM, FIELD('Kinetic', 'restitution')),
-      v('friction', 'friction', NUM, FIELD('Kinetic', 'friction')),
-      v('keepAlive', 'keepAlive', NUM, FIELD('Kinetic', 'keepAlive')),
-      v('launch', 'initial', XY, { fx: 'x', fy: 'y', ...UNIT, args: ['x', 'y'],
-        doc: 'Put the ball at (x, y) and let it go from there.' }),
-      v('velocity', 'initial', XY, { fx: 'vx', fy: 'vy', min: -4, max: 4, args: ['vx', 'vy'],
-        doc: 'Set the launch velocity, x and y.' }),
+      v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the ball.', ex: ['false', 'stops the ball where it is'],
+        argDocs: { run: `true: it moves.\nfalse: it stops where it is.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('sync', 'syncToTransport', BOOL, { toggle: true, doc: 'Move the ball in the Transport\'s time, or in its own.',
+        argDocs: { sync: `true: a faster tempo speeds it up, and a stopped Transport holds it.\nfalse: in real time.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.'] }),
+      v('gravity', 'gravity', NUM, { ...FIELD('Kinetic', 'gravity'), doc: 'Set how hard the ball is pulled down.', ex: ['1', 'lets the ball fall and settle'],
+        argDocs: { gravity: 'Pull, in boxes a second, a second.\n0: none.\nRange: 0 ↔ 4.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.'] }),
+      v('bounce', 'restitution', NUM, { ...FIELD('Kinetic', 'restitution'), doc: 'Set how much of its speed the ball keeps at a wall.', ex: ['0.5', 'halves its speed at every wall'],
+        argDocs: { bounce: 'Part kept: 1 all of it, 0 none.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.92.'] }),
+      v('friction', 'friction', NUM, { ...FIELD('Kinetic', 'friction'), doc: 'Set how fast the ball slows as it moves.', ex: ['0.2', 'slows the ball sooner'],
+        argDocs: { friction: 'Drag through the air.\n0: none.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.04.'] }),
+      v('keepAlive', 'keepAlive', NUM, { ...FIELD('Kinetic', 'keepAlive'), doc: 'Set how hard the ball is kicked when it nearly stops.', ex: ['0', 'lets the ball settle'],
+        argDocs: { keepAlive: 'Strength of a kick in a random direction.\n0: none; it settles.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.35.'] }),
+      // Both write the launch, which a running ball now reads again: the preview throws it anew from
+      // a launch that changes (where it read the launch only before its first frame).
+      v('launch', 'initial', XY, { fx: 'x', fy: 'y', ...UNIT, args: ['x', 'y'], doc: 'Put the ball at a point and throw it from there.',
+        ex: ['0.5, 0.9', 'throws the ball from the top middle of the box'],
+        argDocs: { x: 'Across the box: 0 the left, 1 the right.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.', y: 'Up the box: 0 the bottom, 1 the top.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.' },
+        notes: ['With the speed `velocity()` sets. A running ball is thrown again at once.', 'Default: 0.5, 0.7.'] }),
+      v('velocity', 'initial', XY, { fx: 'vx', fy: 'vy', min: -4, max: 4, args: ['vx', 'vy'], doc: 'Set how fast, and which way, the ball is thrown.',
+        ex: ['1, 0.5', 'throws the ball to the right and up'],
+        argDocs: { vx: 'Boxes a second across: below 0 to the left.\nRange: -4 ↔ 4.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.', vy: 'Boxes a second up: below 0 down.\nRange: -4 ↔ 4.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.' },
+        notes: ['Its speed stops at 2.5 boxes a second.', 'A running ball is thrown again at once, from where `launch()` puts it.', 'Default: 0.6, 0.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the ball be thrown by dragging, or not.',
+        argDocs: { editable: `true: a drag throws it.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showTrail', 'showTrail', BOOL, { toggle: true, doc: 'Show or hide the trail behind the ball.', notes: ['Default: shown.'] }),
+      v('showWalls', 'showWalls', BOOL, { toggle: true, doc: 'Show or hide the walls of the box.', notes: ['Default: shown.'] }),
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.constellation"): what constellationLayout.js and the preview do with each.
     id: 'constellation', section: 'Constellation', prefix: 'constellation', label: 'Constellation',
-    summary: 'Move the Constellation probe, change how it blends, and let it wander.',
+    summary: 'Move a probe over a map of presets, each a star with a value for every target, and send the presets\' values from where it is: the probe, how it blends, and its wander.',
     verbs: [
-      v('probe', '', XY, { fx: 'probeX', fy: 'probeY', ...UNIT, flat: true,
-        doc: 'Move the probe. The targets follow, which is the whole point.' }),
-      v('mode', 'mode', ENUM),
-      v('blend', 'blendPower', NUM, { min: 0.1, max: 16 }),
-      v('run', 'running', BOOL, { toggle: true, doc: 'Let the probe wander on its own.' }),
-      v('rate', 'wanderRate', NUM, { min: 0, max: 4 }),
-      v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('bars', 'wanderBars', INT, { min: 1, max: 64 }),
-      v('links', 'linkCount', INT, { min: 0, max: 16 }),
+      v('probe', '', XY, { fx: 'probeX', fy: 'probeY', ...UNIT, flat: true, doc: 'Move the probe to a point on the map.',
+        ex: ['0.25, 0.75', 'moves the probe to the upper left'],
+        argDocs: { x: 'Across the map: 0 the left, 1 the right.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.',
+          y: 'Up the map: 0 the bottom, 1 the top.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.' },
+        notes: ['Every target is sent its value from there, as `mode()` says.', 'While `run()` is on, the wander places the probe; it comes back here when it stops.', 'Default: 0.5, 0.5.'] }),
+      v('mode', 'mode', ENUM, { doc: 'Set whether the probe recalls the nearest preset or blends them.', ex: ['"snap"', 'sends the nearest preset\'s values exactly'],
+        argDocs: { mode: '"blend": a mix of every preset\'s values, the nearer the more.\n"snap": the nearest preset\'s values, and `onRecall` when that changes.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "blend".'] }),
+      // The engine's floor (blendWeights takes 0.5 at least): 0.1 to 0.5 was taken and blended as 0.5.
+      v('blend', 'blendPower', NUM, { min: 0.5, max: 16, doc: 'Set how strongly the nearer presets win in a blend.', ex: ['6', 'lets the nearest preset take over sooner'],
+        argDocs: { blend: 'Power of the distance.\nLow: an even mix. High: the nearest preset wins.\nRange: 0.5 ↔ 16.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Only while `mode()` is "blend".', 'The inspector takes 1 to 6.', 'Default: 2.'] }),
+      v('run', 'running', BOOL, { toggle: true, doc: 'Let the probe wander over the map on its own, or not.',
+        argDocs: { run: `true: it wanders, in a loop across the map.\nfalse: it stays where \`probe()\` puts it.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['A drag moves the probe all the same.', 'Default: false.'] }),
+      v('rate', 'wanderRate', NUM, { min: 0, max: 4, doc: 'Set how many times a second the wander goes round, while not synced.', ex: ['0.05', 'goes round once in twenty seconds'],
+        argDocs: { rate: 'Times round per second.\n0: it stands still.\nRange: 0 ↔ 4.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While synced to the Transport: no effect; `bars()` sets it.', 'The inspector takes 0.01 to 2.', 'Default: 0.08.'] }),
+      v('sync', 'syncToTransport', BOOL, { toggle: true, doc: 'Time the wander by the Transport, or by its own rate.',
+        argDocs: { sync: `true: once round every \`bars()\`, where the Transport's position puts it.\nfalse: at \`rate()\`.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.'] }),
+      // The engine's range (constellationWanderBars), in quarters: whole bars could not set below 1.
+      v('bars', 'wanderBars', NUM, { min: LOOP_MIN_BARS, max: LOOP_MAX_BARS, doc: 'Set how many bars the wander takes to go round, while synced to the Transport.', ex: ['16', 'goes round once in sixteen bars'],
+        argDocs: { bars: `Bars: 0.25 is one beat in 4/4.\nRange: ${LOOP_MIN_BARS} ↔ ${LOOP_MAX_BARS}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+        notes: ['Only while `sync()` is on.', 'Default: 8.'] }),
+      v('links', 'linkCount', INT, { min: 0, max: 16, doc: 'Set how many lines each preset draws to the presets that sound most like it.', ex: ['3', 'links each preset to its three closest'],
+        argDocs: { links: 'Presets, by how close their values are.\n0: no lines.\nRange: 0 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Drawn while `showLinks()` is on.', 'The inspector takes 1 to 6.', 'Default: 2.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the probe and the presets be dragged, or not.',
+        argDocs: { editable: `true: a drag on a preset moves it; anywhere else, it moves the probe.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showLinks', 'showLinks', BOOL, { toggle: true, doc: 'Show or hide the lines between presets that sound alike.', notes: ['How many: `links()`.', 'Default: shown.'] }),
+      v('showField', 'showField', BOOL, { toggle: true, doc: 'Show or hide the glow round each preset.', notes: ['Default: shown.'] }),
+      v('showLabels', 'showLabels', BOOL, { toggle: true, doc: 'Show or hide the presets\' names.',
+        notes: ['The nearest preset\'s is always shown; the others\' only while there are 8 or fewer.', 'Default: shown.'] }),
     ],
   },
   {
@@ -750,29 +943,55 @@ export const COMPONENT_FAMILIES = [
 
   /* ------------------------------------------------------------------- modulation maps */
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.router"): what routerLayout.js does with each.
     id: 'router', section: 'Router', prefix: 'router', label: 'Router',
-    summary: 'Re-point the Router: source, CC, channel, deadzone, and each destination\'s depth.',
+    summary: 'Take a signal from the MIDI input or a control, shape it through a curve, and send it to several destinations, each with its own depth.',
     verbs: [
-      v('source', 'source', ENUM),
-      v('cc', 'ccNumber', INT, { min: 0, max: 127 }),
-      v('channel', 'inputChannel', INT, { min: 0, max: 16, doc: '0 means omni.' }),
-      v('poly', 'polyMode', ENUM),
-      v('invert', 'invert', BOOL, { toggle: true }),
-      v('deadzone', 'deadzone', NUM, UNIT),
-      v('input', 'testInput', NUM, { ...UNIT, doc: 'Drive the router directly, as the test input does.' }),
-      v('dest', 'destinations', ITEM, { item: 'enabled', kind: BOOL }),
-      v('destDepth', 'destinations', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1 }),
-      // The transfer curve. It is sampled by envValueAt — the ENVELOPE's evaluator — so these are
-      // envelope breakpoints wearing another name, and the shape vocabulary is the envelope's own
-      // table rather than a second list that could disagree with it.
-      v('curveX', 'curve', ITEM, { item: 'x', kind: NUM, ...UNIT }),
-      v('curveY', 'curve', ITEM, { item: 'y', kind: NUM, ...UNIT }),
-      v('curveShape', 'curve', ITEM, { item: 'curve', kind: ENUM,
-        doc: 'How one segment of the transfer curve bends, 1-based.' }),
-      v('sourceControl', 'sourceControlId', LINK, { sourceKind: 'range',
-        doc: 'Name the control this Router follows, while `source` is "link" — a knob, slider or '
-          + 'other range control. No argument, or an empty name, unlinks it. Reads back as the '
-          + 'name, never as an id.' }),
+      v('source', 'source', ENUM, { doc: 'Set the signal it follows.', ex: ['"aftertouch"', 'follows channel aftertouch'],
+        argDocs: { source: ['"modwheel": CC 1.', '"aftertouch": channel aftertouch.', '"polyAftertouch": per-note aftertouch, one note\'s, as `poly()` picks it.',
+          '"breath": CC 2.', '"expression": CC 11.', '"foot": CC 4.', '"velocity": the velocity of the last note played.', '"cc": the CC set by `cc()`.',
+          '"link": the control set by `sourceControl()`.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['From the MIDI input on `channel()`; until one arrives, `input()` stands in.', 'Default: "modwheel".'] }),
+      v('cc', 'ccNumber', INT, { min: 0, max: 127, doc: 'Set the CC it follows while `source()` is "cc".', ex: ['74', 'follows CC 74'],
+        argDocs: { cc: 'Controller number.\nRange: 0 ↔ 127, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Only while `source()` is "cc".', 'Default: 1.'] }),
+      v('channel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Set which MIDI channel it listens to.', ex: ['2', 'follows channel 2 only'],
+        argDocs: { channel: ECHO_CHANNEL_LINES },
+        notes: ['Default: 0, any channel.'] }),
+      v('poly', 'polyMode', ENUM, { doc: 'Set which note\'s aftertouch it follows while `source()` is "polyAftertouch".', ex: ['"last"', 'follows the note pressed last'],
+        argDocs: { poly: '"highest": the note pressed hardest.\n"last": the note pressed last.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "highest".'] }),
+      v('invert', 'invert', BOOL, { toggle: true, doc: 'Turn the signal upside down before the curve.',
+        argDocs: { invert: `true: 0 becomes 1 and 1 becomes 0.\nfalse: as it comes.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Before `deadzone()`.', 'Default: false.'] }),
+      v('deadzone', 'deadzone', NUM, { ...UNIT, doc: 'Set how much of the bottom of the signal is ignored.', ex: ['0.1', 'ignores the bottom tenth of the signal'],
+        argDocs: { deadzone: 'Part of the signal, from 0: 0 up to it gives 0, and the rest is spread over 0 to 1.\n0: none.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.'] }),
+      v('input', 'testInput', NUM, { ...UNIT, doc: 'Set the signal it uses until the MIDI input sends one.', ex: ['0.8', 'drives it at 80% until a controller moves'],
+        argDocs: { input: 'Signal: 0 ↔ 1.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Not used once the source has arrived, or while `source()` is "link".', 'Default: 0.5.'] }),
+      v('dest', 'destinations', ITEM, { item: 'enabled', kind: BOOL, doc: 'Switch one destination on or off, by its number.', ex: ['2, false', 'stops sending to destination 2'],
+        argDocs: { enabled: `true: it is sent to.\nfalse: not.\nLeft out: toggles.\n${OFF_RULE}` } }),
+      v('destDepth', 'destinations', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1, doc: 'Set how strongly one destination follows, by its number.', ex: ['1, -0.5', 'sends half of the curve, upside down, to destination 1'],
+        argDocs: { depth: 'Part of the curve: 1 all of it, 0.5 half.\nBelow 0: the curve upside down.\n0: nothing.\nRange: -1 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The result is spread over the destination\'s own range, set in the inspector.'] }),
+      // The transfer curve, sampled by envValueAt as an envelope is: its points keep to their
+      // neighbours, as the Envelope's do.
+      v('curveX', 'curve', ITEM, { item: 'x', kind: NUM, ...UNIT, itemRange: (c, at) => curvePointRange(c?.curve, at),
+        doc: 'Move one point of the curve along the signal axis, by its number.', ex: ['2, 0.3', 'moves point 2 to a signal of 0.3'],
+        argDocs: { x: 'Signal: 0 ↔ 1.\nRange: between the points either side; the first point at 0, the last at 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('curveY', 'curve', ITEM, { item: 'y', kind: NUM, ...UNIT, doc: 'Set the output of one point of the curve, by its number.', ex: ['2, 0.8', 'sends 0.8 at point 2'],
+        argDocs: { y: 'Output: 0 ↔ 1.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('curveShape', 'curve', ITEM, { item: 'curve', kind: ENUM, doc: 'Set the shape of the segment of the curve that ends at one point, by its number.', ex: ['2, "exp"', 'curves the segment into point 2'],
+        argDocs: { curve: '"linear": straight.\n"exp": slow, then fast.\n"log": fast, then slow.\n"scurve": slow at both ends.\n"hold": flat, then a jump at the point.\nCase-insensitive.\nInvalid: rejected with a console error.' } }),
+      v('sourceControl', 'sourceControlId', LINK, { sourceKind: 'range', doc: 'Name the control it follows while `source()` is "link".',
+        ex: ['"Expression"', 'makes the control called Expression the signal'], linkRule: 'Its range is the signal\'s 0 to 1.' }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the curve\'s points be dragged, or not.',
+        argDocs: { editable: `true: a drag moves a point.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the grid behind the curve.', notes: ['Default: shown.'] }),
+      v('showDivisions', 'showDivisions', BOOL, { toggle: true, doc: 'Show or hide the level lines across the curve.', notes: ['Default: hidden.'] }),
     ],
   },
   {
@@ -812,67 +1031,149 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.envelope"): what envelopeLayout.js and EnvelopeRenderer do with each.
     id: 'envelope', section: 'Envelope', prefix: 'envelope', label: 'Envelope',
-    summary: 'Reshape an Envelope: a preset, a single breakpoint, the sustain point, the loop.',
+    summary: 'Shape an envelope from its points: a preset, each point\'s place, level and curve, the sustain point, the loop and the playhead.',
     verbs: [
-      v('preset', 'preset', ENUM),
-      v('pointX', 'points', ITEM, { item: 'x', kind: NUM, ...UNIT }),
-      v('pointY', 'points', ITEM, { item: 'y', kind: NUM, ...UNIT }),
-      v('pointCurve', 'points', ITEM, { item: 'curve', kind: ENUM }),
-      v('sustain', 'sustainIndex', INT, { min: -1, max: 64, doc: '1-based; -1 for no sustain point.', oneBased: true }),
-      v('loop', 'loopEnabled', BOOL, { toggle: true }),
-      v('loopStart', 'loopStart', INT, { min: 0, max: 64, oneBased: true }),
-      v('loopEnd', 'loopEnd', INT, { min: 0, max: 64, oneBased: true }),
-      v('timeMax', 'timeMax', NUM, { min: 1, max: 600000 }),
-      v('phase', 'phase', NUM, UNIT),
-      v('addOnDoubleClick', 'addOnDoubleClick', BOOL, { toggle: true,
-        doc: 'Whether a double-click on the curve adds a breakpoint.' }),
-      v('snapX', 'snapX', NUM, { min: 0, max: 1, doc: 'Snap step for time, 0..1. 0 is free.' }),
-      v('snapY', 'snapY', NUM, { min: 0, max: 1, doc: 'Snap step for level. 0 is free.' }),
-      v('fillUnder', 'fillUnder', BOOL, { toggle: true }),
-      v('phaseSource', 'phaseSourceId', LINK, { sourceKind: 'range' }),
+      // The inspector's Preset seeds the shape (applyPreset); the verb wrote the name and left the
+      // shape, which the canvas then read with the new preset's locks.
+      v('preset', 'preset', ENUM, { doc: 'Give the envelope a preset shape.', ex: ['"ad"', 'makes the envelope an attack and a decay'],
+        alsoWrites: (name) => {
+          const seeded = envelopePreset(name);
+          return { points: seeded.points.map((p, i) => ({ id: `e${i}`, x: p.x, y: p.y, curve: p.curve ?? 'linear', tension: 0 })), sustainIndex: seeded.sustainIndex };
+        },
+        argDocs: { preset: ['"adsr": attack, decay, sustain, release; the sustain at point 3.', '"ad": attack and decay.', '"ar": attack and release.',
+          '"dahdsr": delay, attack, hold, decay, sustain, release; the sustain at point 5.', '"mseg" or "free": five points, every one free to move.',
+          'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Its points and sustain point are replaced, as the inspector\'s Preset does.', 'Default: "adsr".'] }),
+      // Between its neighbours, the first at 0 and the last at 1, as a drag on the canvas keeps it
+      // (envDragNode): a script could put point 1 after point 2, and the points were drawn re-sorted
+      // under the numbers the script went on using.
+      v('pointX', 'points', ITEM, { item: 'x', kind: NUM, ...UNIT, itemRange: envelopePointRange,
+        doc: 'Move one point along the time axis, by its number.', ex: ['2, 0.1', 'moves point 2 to a tenth of the way along'],
+        argDocs: { x: 'Part of the time axis: 0 the start, 1 the end.\nRange: between the points either side; the first point at 0, the last at 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['1 on the time axis is `timeMax()` milliseconds.'] }),
+      v('pointY', 'points', ITEM, { item: 'y', kind: NUM, ...UNIT,
+        doc: 'Set the level of one point, by its number.', ex: ['3, 0.6', 'puts point 3 at 60%'],
+        argDocs: { y: 'Level: 0 the bottom, 1 the top.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The canvas keeps the levels a preset fixes, such as an ADSR\'s first and last at 0; a script can move them.'] }),
+      v('pointCurve', 'points', ITEM, { item: 'curve', kind: ENUM,
+        doc: 'Set the shape of the segment that ends at one point, by its number.', ex: ['2, "exp"', 'curves the rise into point 2'],
+        argDocs: { curve: '"linear": straight.\n"exp": slow, then fast.\n"log": fast, then slow.\n"scurve": slow at both ends.\n"hold": flat, then a jump at the point.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Point 1 starts the envelope: its curve is not drawn.'] }),
+      v('sustain', 'sustainIndex', INT, { min: -1, max: 64, oneBased: true, rangeFrom: (c) => ({ max: envelopePointCount(c) }),
+        doc: 'Set which point holds while a note is held.', ex: ['3', 'holds at point 3'],
+        argDocs: { sustain: 'Point number, counted from 1.\n0 or -1: no sustain point.\nRange: -1 ↔ the number of points, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 3, as "adsr" puts it.'] }),
+      v('loop', 'loopEnabled', BOOL, { toggle: true, doc: 'Mark a loop on the curve, from `loopStart()` to `loopEnd()`, or not.',
+        argDocs: { loop: `true: marked.\nfalse: not.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.'] }),
+      // Counted from 1 to the points there are: 0 was taken, and stored as -1, which read back as 0.
+      v('loopStart', 'loopStart', INT, { min: 1, max: 64, oneBased: true, rangeFrom: (c) => ({ max: envelopePointCount(c) }),
+        doc: 'Set the point the loop starts at.', ex: ['2', 'starts the loop at point 2'],
+        argDocs: { loopStart: 'Point number, counted from 1.\nRange: 1 ↔ the number of points, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 1.'] }),
+      v('loopEnd', 'loopEnd', INT, { min: 1, max: 64, oneBased: true, rangeFrom: (c) => ({ max: envelopePointCount(c) }),
+        doc: 'Set the point the loop ends at.', ex: ['3', 'ends the loop at point 3'],
+        argDocs: { loopEnd: 'Point number, counted from 1.\nRange: 1 ↔ the number of points, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 1.'] }),
+      v('timeMax', 'timeMax', NUM, { min: 1, max: 600000, doc: 'Set how many milliseconds the whole time axis stands for.', ex: ['2000', 'makes the time axis two seconds long'],
+        argDocs: { timeMax: 'Milliseconds, at 1 on the time axis.\nRange: 1 ↔ 600000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The times read out only: it does not change the shape.', 'Default: 1000.'] }),
+      v('phase', 'phase', NUM, { ...UNIT, doc: 'Put the playhead at a point along the time axis.', ex: ['0.5', 'puts the playhead halfway along'],
+        argDocs: { phase: 'Part of the time axis: 0 the start, 1 the end.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Shown while `showPlayhead()` is on.', 'While `phaseSource()` links a control, that control places it.', 'Default: 0.'] }),
+      v('addOnDoubleClick', 'addOnDoubleClick', BOOL, { toggle: true, doc: 'Let a double-click on the curve add a point, or not.',
+        argDocs: { addOnDoubleClick: `true: a double-click adds a point there.\nfalse: it does nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('snapX', 'snapX', NUM, { min: 0, max: 1, doc: 'Set the step a dragged point snaps to along the time axis.', ex: ['0.125', 'snaps points to eighths of the time axis'],
+        argDocs: { snapX: 'Part of the time axis.\n0: no snap.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Dragging only: `pointX()` is not snapped.', 'Default: 0.'] }),
+      v('snapY', 'snapY', NUM, { min: 0, max: 1, doc: 'Set the step a dragged point snaps to in level.', ex: ['0.25', 'snaps points to quarters of the level'],
+        argDocs: { snapY: 'Part of the level.\n0: no snap.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Dragging only: `pointY()` is not snapped.', 'Default: 0.'] }),
+      v('fillUnder', 'fillUnder', BOOL, { toggle: true, doc: 'Shade the area under the curve, or not.', notes: ['Default: on.'] }),
+      v('phaseSource', 'phaseSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that places the playhead.',
+        ex: ['"Position"', 'makes the control called Position move the playhead'], linkRule: 'Its range sets 0 to 1.' }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the points be dragged, added and removed by touch, or not.',
+        argDocs: { editable: `true: they can be.\nfalse: touches do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Only touch is locked: the commands still work.', 'Default: true.'] }),
+      v('showPlayhead', 'showPlayhead', BOOL, { toggle: true, doc: 'Show or hide the playhead: a dot on the curve at `phase()`.', notes: ['Default: hidden.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the grid behind the curve.', notes: ['Its divisions are set in the inspector. Default: shown.'] }),
     ],
   },
 
   /* -------------------------------------------------------------------- hands-on values */
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.ribbon"): what ribbonLayout.js and the preview do with each. A Pitch Wheel and
+    // a Mod Wheel are Ribbons with other defaults.
     id: 'ribbon', section: 'Ribbon', prefix: 'ribbon', label: 'Ribbon',
-    summary: 'Drive a Ribbon, and change what it does when you let go.',
+    summary: 'Drive a touch strip or wheel, such as a pitch or mod wheel: its value, its style, and where it goes when let go.',
     verbs: [
-      v('value', 'value', NUM, FIELD('Ribbon', 'value')),
-      v('bipolar', 'bipolar', BOOL, { toggle: true }),
-      v('returnMode', 'returnMode', ENUM),
-      v('returnValue', 'returnValue', NUM, FIELD('Ribbon', 'returnValue')),
-      // The unified spring's fields. `returnRate` was this component's own word for it and is
-      // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
-      // writing a field nothing reads back is a verb that appears to work.
-      v('returnTime', 'returnTime', NUM, { ...FIELD('Ribbon', 'returnTime'), doc: 'Milliseconds for the whole travel. 0 snaps.' }),
-      v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
-      v('snap', 'snap', NUM, FIELD('Ribbon', 'snap')),
-      v('orientation', 'orientation', ENUM),
-      v('style', 'style', ENUM, { doc: 'Ribbon, wheel, or the 3D wheel.' }),
-      v('label', 'label', STR),
-      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Decimal places on the readout.' }),
+      v('value', 'value', NUM, { ...FIELD('Ribbon', 'value'), doc: 'Set its position.', ex: ['0.75', 'puts it three quarters of the way'],
+        argDocs: { value: 'Position: 0 the start, 1 the end.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['`snap()` steps a drag, not this.', 'Default: 0.5; a Mod Wheel\'s: 0.'] }),
+      v('bipolar', 'bipolar', BOOL, { toggle: true, doc: 'Send its value as -1 to 1, as a pitch wheel does, or as 0 to 1.',
+        argDocs: { bipolar: `true: -1 at the start, 0 in the middle, 1 at the end; filled from the middle.\nfalse: 0 to 1.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['The readout shows it the same way.', 'Default: false; a Pitch Wheel\'s: true.'] }),
+      ...returnVerbs('Ribbon', { rest: 'the position', restLines: 'Position: 0 the start, 1 the end.', min: 'the start', max: 'the end', centre: 'the middle' }),
+      v('snap', 'snap', NUM, { ...FIELD('Ribbon', 'snap'), doc: 'Set the step a drag snaps to.', ex: ['0.25', 'snaps a drag to quarters'],
+        argDocs: { snap: 'Part of the travel.\n0: no snap.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A drag only: `value()` is not snapped.', 'Default: 0.'] }),
+      v('orientation', 'orientation', ENUM, { doc: 'Set which way it runs.', ex: ['"horizontal"', 'runs it from left to right'],
+        argDocs: { orientation: '"vertical": from the bottom up.\n"horizontal": from left to right.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "vertical".'] }),
+      v('style', 'style', ENUM, { doc: 'Set how it looks: a strip, a flat wheel, or a wheel drawn in 3D.', ex: ['"wheel3d"', 'draws it as a wheel in 3D'],
+        argDocs: { style: '"ribbon": a touch strip.\n"wheel": a flat wheel.\n"wheel3d": a wheel drawn in 3D.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "ribbon"; a Pitch or Mod Wheel\'s: "wheel".'] }),
+      v('label', 'label', STR, { doc: 'Set the caption under it.', ex: ['"PITCH"', 'captions it PITCH'],
+        argDocs: { label: 'The caption.\n"": none.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
+      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Set how many decimal places the readout shows.', ex: ['0', 'shows the readout as a whole number'],
+        argDocs: { valuePrecision: 'Decimal places.\nRange: 0 ↔ 6, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The readout shows while `showValue()` is on.', 'Default: 2.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let it be dragged, or not.',
+        argDocs: { editable: `true: a drag moves it.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showGlow', 'showGlow', BOOL, { toggle: true, doc: 'Show or hide the glow while it is held.', notes: ['Default: shown.'] }),
+      v('showValue', 'showValue', BOOL, { toggle: true, doc: 'Show or hide the readout: its value as a number.',
+        notes: ['-1 to 1 while `bipolar()` is on.', 'Default: hidden.'] }),
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.crossfader"): what crossfaderLayout.js and returnToRest.js do with each.
     id: 'crossfader', section: 'Crossfader', prefix: 'crossfader', label: 'Crossfader',
-    summary: 'Drive a Crossfader and change its law.',
+    summary: 'Blend between two sides, A and B: the blend, how the two levels follow it, its centre snap, and where it goes when let go.',
     verbs: [
-      v('mix', 'mix', NUM, FIELD('Crossfader', 'mix')),
-      v('law', 'law', ENUM),
-      v('bipolar', 'bipolar', BOOL, { toggle: true }),
-      v('detent', 'detent', NUM, FIELD('Crossfader', 'detent')),
-      v('returnMode', 'returnMode', ENUM, { doc: 'none | center | min | max | rest.' }),
-      v('returnValue', 'returnValue', NUM, FIELD('Crossfader', 'returnValue')),
-      // The unified spring's fields. `returnRate` was this component's own word for it and is
-      // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
-      // writing a field nothing reads back is a verb that appears to work.
-      v('returnTime', 'returnTime', NUM, { ...FIELD('Crossfader', 'returnTime'), doc: 'Milliseconds for the whole travel. 0 snaps.' }),
-      v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
-      v('orientation', 'orientation', ENUM),
-      v('labelA', 'labelA', STR),
-      v('labelB', 'labelB', STR),
+      v('mix', 'mix', NUM, { ...FIELD('Crossfader', 'mix'), doc: 'Set the blend between A and B.', ex: ['0.25', 'blends mostly A, a quarter B'],
+        argDocs: { mix: 'Position: 0 all A, 0.5 the middle, 1 all B.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['`detent()` snaps a drag, not this.', 'Default: 0.5.'] }),
+      v('law', 'law', ENUM, { doc: 'Set how the levels of A and B follow the blend.', ex: ['"linear"', 'makes the two levels add up to the whole'],
+        argDocs: { law: '"equalPower": constant loudness; each side at 71% (-3 dB) in the middle.\n"linear": the two add up to 1; each side at half (-6 dB) in the middle.\n"sharp": both full through the middle; a side cut only towards the far end.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "equalPower".'] }),
+      v('bipolar', 'bipolar', BOOL, { toggle: true, doc: 'Send the Mix output as -1 to 1, or as 0 to 1.',
+        argDocs: { bipolar: `true: -1 all A, 0 the middle, 1 all B.\nfalse: 0 to 1.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['The A and B outputs, the two levels, are 0 to 1 either way.', 'Default: false.'] }),
+      v('detent', 'detent', NUM, { ...FIELD('Crossfader', 'detent'), doc: 'Set how near the middle a drag snaps to it.', ex: ['0.05', 'snaps a drag within 5% of the middle to it'],
+        argDocs: { detent: 'Distance from the middle, as part of the whole travel.\n0: no snap.\n0.5 or more: every drag lands in the middle.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A drag only: `mix()` is not snapped.', 'The inspector stops at 0.5.', 'Default: 0.03.'] }),
+      ...returnVerbs('Crossfader', { rest: 'the blend', restLines: 'Position: 0 all A, 1 all B.', min: 'all A', max: 'all B', centre: 'the middle' }),
+      v('orientation', 'orientation', ENUM, { doc: 'Set which way the fader runs.', ex: ['"vertical"', 'puts A at the bottom and B at the top'],
+        argDocs: { orientation: '"horizontal": A at the left.\n"vertical": A at the bottom.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "horizontal".'] }),
+      v('labelA', 'labelA', STR, { doc: 'Set the name shown at the A end.', ex: ['"DRY"', 'names the A end DRY'],
+        argDocs: { labelA: 'The name.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Shown while `showLabels()` is on.', 'Default: "A".'] }),
+      v('labelB', 'labelB', STR, { doc: 'Set the name shown at the B end.', ex: ['"WET"', 'names the B end WET'],
+        argDocs: { labelB: 'The name.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Shown while `showLabels()` is on.', 'Default: "B".'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the handle be dragged, or not.',
+        argDocs: { editable: `true: a drag moves it.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showLabels', 'showLabels', BOOL, { toggle: true, doc: 'Show or hide the names at the two ends.', notes: ['Default: shown.'] }),
+      v('showGains', 'showGains', BOOL, { toggle: true, doc: 'Show or hide a bar for each side\'s level.', notes: ['Default: hidden.'] }),
     ],
   },
   {
@@ -1019,15 +1320,34 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.panic"): what panicLayout.js and the preview's firePanic send.
     id: 'panic', section: 'Panic', prefix: 'panicSet', label: 'Panic',
-    summary: 'Configure what a Panic button sends. Sending it is the global panic().',
+    summary: 'Set what a Panic button sends when pressed: which channels, and whether it also resets the controllers, centres pitch bend and stops the panel\'s own notes.',
     verbs: [
-      v('scope', 'scope', ENUM),
-      v('channel', 'channel', INT, CHANNEL),
-      v('resetControllers', 'resetControllers', BOOL, { toggle: true }),
-      v('centreBend', 'centreBend', BOOL, { toggle: true }),
-      v('clearLocal', 'clearLocal', BOOL, { toggle: true }),
-      v('label', 'label', STR),
+      v('scope', 'scope', ENUM, { doc: 'Set whether the button silences every channel or one.', ex: ['"channel"', 'silences only the channel `channel()` sets'],
+        argDocs: { scope: '"all": channels 1 to 16.\n"channel": the channel `channel()` sets.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Each channel is sent All Sound Off (CC 120), then All Notes Off (CC 123).', 'Default: "all".'] }),
+      v('channel', 'channel', INT, { ...CHANNEL, doc: 'Set the channel the button silences while `scope()` is "channel".', ex: ['10', 'silences channel 10'],
+        argDocs: { channel: 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Only while `scope()` is "channel".', 'Default: 1.'] }),
+      v('resetControllers', 'resetControllers', BOOL, { toggle: true, doc: 'Also send Reset All Controllers (CC 121), or not.',
+        argDocs: { resetControllers: `true: sent, after the notes are stopped; a mod wheel or pedal left up is released.\nfalse: not sent.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('centreBend', 'centreBend', BOOL, { toggle: true, doc: 'Also put pitch bend back to the centre, or not.',
+        argDocs: { centreBend: `true: a centred pitch bend is sent on each channel.\nfalse: not sent.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('clearLocal', 'clearLocal', BOOL, { toggle: true, doc: 'Also stop the notes this panel\'s own controls are playing, or not.',
+        argDocs: { clearLocal: `true: the Chord Pads, Keyboards, Arps, Note Ribbons, Drum Pads and the panel's other note controls stop.\nfalse: they play on.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('label', 'label', STR, { doc: 'Set the text on the button.', ex: ['"ALL OFF"', 'writes ALL OFF on the button'],
+        argDocs: { label: 'The text.\n"": PANIC.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Default: "PANIC".'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the button be pressed, or not.',
+        argDocs: { editable: `true: a press sends it.\nfalse: presses do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['The panic key, Escape unless the panel sets another, works either way, and sends the most: every channel, every message.', 'Default: true.'] }),
+      v('showSummary', 'showSummary', BOOL, { toggle: true, doc: 'Show or hide the line under the label that says what the button sends.',
+        notes: ['Drawn only on a button 46 pixels tall or more.', 'Default: shown.'] }),
     ],
   },
   {
@@ -1515,6 +1835,12 @@ function scalarCall(verb, c, given) {
   return { spec, value };
 }
 
+/** An item verb's range for element `at`, where it depends on the element (an envelope point lies
+ *  between its neighbours, `itemRange`); otherwise the verb's own. */
+function itemSpec(verb, c, at) {
+  return verb.itemRange ? { ...verb, ...verb.itemRange(c && typeof c === 'object' ? c : {}, at) } : verb;
+}
+
 // An XY call's two numbers: either may be left out, but not both, and one that is given has to be
 // a number. `cursorAt(t, "x", 2)` moved the row and dropped the "x" without a word.
 const xyGiven = (x) => x !== undefined && x !== null;
@@ -1606,7 +1932,13 @@ export function componentScriptPatch(verb, cfg, args = []) {
       if (next === null) return {};
       // oneBased verbs address a list position, so they are stored one lower than they are written.
       const stored = verb.oneBased && isFinite_(next) && next >= 0 ? next - 1 : next;
-      return stored === c[verb.f] ? {} : { [verb.f]: stored };
+      const patch = stored === c[verb.f] ? {} : { [verb.f]: stored };
+      // What else the setting writes, as the inspector writes it with it (the envelope's preset seeds
+      // its shape); only what differs, so the same preset on the same shape is already that way.
+      for (const [field, value2] of Object.entries(verb.alsoWrites?.(next, c) ?? {})) {
+        if (JSON.stringify(value2) !== JSON.stringify(c[field])) patch[field] = value2;
+      }
+      return patch;
     }
 
     case XY: {
@@ -1648,7 +1980,7 @@ export function componentScriptPatch(verb, cfg, args = []) {
       if (!list) return {};
       const row = list[at] && typeof list[at] === 'object' ? list[at] : {};
       const current = itemCurrent(verb, c, at);
-      const next = coerce(verb.kind, b, verb, current);
+      const next = coerce(verb.kind, b, itemSpec(verb, c, at), current);
       // A value the component cannot use as written (a glyph it cannot draw) is refused, not stored.
       if (next === null || next === current || verb.refuseValue?.(next)) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x)) };
@@ -1974,7 +2306,11 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
     return said ? `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — ${said}` : null;
   }
   if (verb.k === NUM || verb.k === INT) given.push([names[0], scalarCall(verb, cfg, args[0]).value]);
-  else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) given.push([names[1], args[1]]);
+  else if (verb.k === ITEM && (verb.kind === NUM || verb.kind === INT)) {
+    const length = verb.itemRange ? itemListLength(verb, cfg ?? {}) : null;
+    const at = length === null ? null : indexOf(args[0], length);
+    given.push([names[1], args[1], null, at === null ? null : itemSpec(verb, cfg ?? {}, at)]);
+  }
   else if (verb.k === CELL && !verb.clear) given.push(verb.grid ? ['amount', args[2]] : [names[1], args[1]]);
   else if (verb.k === XY) given.push([names[0], args[0], verb.fx], [names[1], args[1], verb.fy]);
   // An element's number (pixel.x and the rest) was clamped without a word (item 2 of the owner's
@@ -1983,11 +2319,11 @@ export function componentClampWarning(verb, path, args = [], cfg = null) {
     if (cfg && !elementSites(cfg, args[0], verb.list ?? 'elements').length) return null;
     given.push([names[1], args[1]]);
   }
-  for (const [name, value, field] of given) {
+  for (const [name, value, field, itemRange] of given) {
     if (value === undefined || value === null || typeof value === 'boolean') continue;
     const n = Number(value);
     if (!isFinite_(n)) continue;
-    const spec = field ? axisRange(verb, field, cfg) : scalarCall(verb, cfg, value).spec;
+    const spec = itemRange ?? (field ? axisRange(verb, field, cfg) : scalarCall(verb, cfg, value).spec);
     const lo = isFinite_(spec.min) ? spec.min : -Infinity;
     const hi = isFinite_(spec.max) ? spec.max : Infinity;
     if (n >= lo && n <= hi) continue;

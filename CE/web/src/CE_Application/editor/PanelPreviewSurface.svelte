@@ -81,7 +81,7 @@
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
     envDragNode, envAddNode, envRemoveNode, normalizePoints,
   } from '../utils/envelopeLayout.js';
-  import { controlPortValues } from '../utils/controlPortValues.js';
+  import { controlPortValues, isFanoutControl } from '../utils/controlPortValues.js';
   import {
     matrixConfig, matrixAmounts, matrixGeometry, matrixCellAtPoint, matrixCellRect,
     matrixAmountAt, matrixAmountFromDrag, matrixSetAmount, matrixIndex, matrixCols,
@@ -1871,6 +1871,7 @@
     const values = controlPortValues(control);
     if (!values) return;
     const controlId = getControlId(control);
+    portsSentAs[controlId] = JSON.stringify(values);
     for (const binding of activeDeviceBindings(control)) {
       const v = values[String(binding?.port ?? '')];
       if (v === undefined) continue;
@@ -1884,6 +1885,41 @@
       });
     }
   }
+  // A SCRIPT'S WRITE TO A SOURCE IS SENT. Only a drag, a running ticker or an incoming signal sent
+  // a source's ports, so ce.components.macro.value(), ribbon.value(), joystick.move(),
+  // constellation.probe() and the rest moved what was drawn and left every bound parameter where it
+  // was (the Constellation's review, docs/design/api-descriptions-handoff.md). So a change to what a
+  // stored source sends is sent, once, as a commit. Not on opening: what is stored was never sent
+  // on opening, and that is unchanged. Not what a drag has just sent and committed (`portsSentAs`).
+  // Not a running Orbit, Looper, Kinetic or wandering Constellation: its ticker sends what it
+  // plays, from where it is. Not a Router, whose ports follow its input, nor a Turing Machine,
+  // whose follow the step it is on: each sends on its own clock.
+  const portsSentAs = {};     // { [id]: the port values last sent, as JSON }
+  const portsStoredAs = {};   // { [id]: what the stored control sends, as JSON; '' while a ticker sends }
+  function storedSourceSends(control) {
+    switch (String(control?._children?.Core?.controlType ?? '')) {
+      case 'Keyboard': case 'Router': case 'Turing': return null;
+      case 'Orbit': return orbitConfig(control).running !== false ? null : orbitControlWith(control, orbitPhaseFor(control));
+      case 'Looper': return looperConfig(control).running !== false ? null : looperControlWith(control, looperPhaseFor(control));
+      case 'Kinetic': return kineticConfig(control).running !== false ? null : kineticControlWith(control, kineticStateFor(control));
+      case 'Constellation': return constellationConfig(control).running === true ? null : control;
+      default: return control;
+    }
+  }
+  $effect(() => {
+    for (const c of allControls) {
+      if (!isFanoutControl(c)) continue;
+      const id = getControlId(c);
+      if (!id) continue;
+      const sends = storedSourceSends(c);
+      const values = sends ? controlPortValues(sends) : null;
+      const seen = values ? JSON.stringify(values) : '';
+      const before = portsStoredAs[id];
+      portsStoredAs[id] = seen;
+      if (!seen || !before || before === seen || portsSentAs[id] === seen) continue;
+      untrack(() => emitControlPortFanout(sends, 'commit'));
+    }
+  });
   // Inject the live working points + resolved phase onto the resolved Envelope
   // so the renderer draws the in-progress drag and the playhead.
   function applyEnvelopeValueSource(control, resolved) {
@@ -2419,8 +2455,16 @@
   function orbitControls() {
     return allControls.filter((c) => isOrbitControl(c));
   }
+  // Bumped by a seek, so a stopped Orbit or Looper, which reads no clock, is drawn where it was
+  // moved to.
+  let sourceSought = $state(0);
   function orbitPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts, as the arp's.
+    if (orbitPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) orbitPhaseState[id] = sought;
+    }
     if (orbitPhaseState[id] !== undefined) return orbitPhaseState[id];
     return ((numberOr(orbitConfig(control).phase, 0) % 1) + 1) % 1;
   }
@@ -2505,7 +2549,7 @@
     const base = resolved?.control ?? control;
     const orbit = base?._children?.Orbit;
     if (!orbit) return resolved;
-    if (orbit.running !== false) { ensureOrbitTicker(); void orbitClock; }
+    if (orbit.running !== false) { ensureOrbitTicker(); void orbitClock; } else void sourceSought;
     const nextOrbit = { ...orbit, __phase: orbitPhaseFor(control) };
     const sess = sessionFor(control);
     if (Array.isArray(sess?.orbitNodes)) nextOrbit.nodes = sess.orbitNodes;
@@ -2568,6 +2612,11 @@
   }
   function looperPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts, as the arp's.
+    if (looperPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) looperPhaseState[id] = sought;
+    }
     if (looperPhaseState[id] !== undefined) return looperPhaseState[id];
     return ((numberOr(looperConfig(control).phase, 0) % 1) + 1) % 1;
   }
@@ -2621,7 +2670,7 @@
     const base = resolved?.control ?? control;
     const looper = base?._children?.Looper;
     if (!looper) return resolved;
-    if (looper.running !== false) { ensureLooperTicker(); void orbitClock; }
+    if (looper.running !== false) { ensureLooperTicker(); void orbitClock; } else void sourceSought;
     const next = { ...looper, __phase: looperPhaseFor(control) };
     if (looperSynced(control)) next.__beatsPerBar = $transport.beatsPerBar;
     const sess = sessionFor(control);
@@ -2881,6 +2930,11 @@
   }
   function turingPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts, as the arp's.
+    if (turingPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) turingPhaseState[id] = sought;
+    }
     if (turingPhaseState[id] !== undefined) return turingPhaseState[id];
     return ((numberOr(turingConfig(control).phase, 0) % 1) + 1) % 1;
   }
@@ -2888,6 +2942,21 @@
     const sess = sessionFor(control)?.turingSteps;
     return Array.isArray(sess) ? sess : turingSteps(control);
   }
+  // The register a running machine mutates is its own copy, in the session: a change to the
+  // panel's steps (a script's step() or fill(), the inspector) was never heard again once it had
+  // mutated. So a change to the stored steps starts the register from them (the Turing Machine's
+  // review, docs/design/api-descriptions-handoff.md).
+  const turingStoredSteps = {};   // { [id]: the stored steps last seen, as JSON }
+  $effect(() => {
+    for (const c of turingControls()) {
+      const id = getControlId(c);
+      const seen = JSON.stringify(turingConfig(c).steps ?? null);
+      if (turingStoredSteps[id] !== undefined && turingStoredSteps[id] !== seen) {
+        untrack(() => { if (Array.isArray(sessionFor(c)?.turingSteps)) patchControlSession(id, { turingSteps: undefined }); });
+      }
+      turingStoredSteps[id] = seen;
+    }
+  });
   /** The step the renderer highlights: its `head`, from the phase this injects. `raw` is the
       document's control, which the phase is kept under. */
   function turingShownStep(control, raw = control) {
@@ -3024,6 +3093,24 @@
   function kineticStateFor(control) {
     return kineticStateMap[getControlId(control)] ?? kineticInitial(control);
   }
+  // A running ball moves from its own state, and the stored launch (`initial`) was read only before
+  // its first frame: a script's launch() or velocity() was never seen once it ran. So a change to
+  // the launch throws the ball again from it (the Kinetic Modulator's review,
+  // docs/design/api-descriptions-handoff.md).
+  const kineticStoredLaunch = {};   // { [id]: the stored launch last seen, as JSON }
+  $effect(() => {
+    for (const c of kineticControls()) {
+      const id = getControlId(c);
+      const seen = JSON.stringify(kineticConfig(c).initial ?? null);
+      if (kineticStoredLaunch[id] !== undefined && kineticStoredLaunch[id] !== seen) {
+        untrack(() => {
+          kineticStateMap[id] = { ...kineticInitial({ ...c, _children: { ...c._children, Kinetic: { ...kineticConfig(c), __state: undefined } } }), bounced: false };
+          if (kineticConfig(c).running !== false) ensureKineticTicker();
+        });
+      }
+      kineticStoredLaunch[id] = seen;
+    }
+  });
   function kineticControlWith(control, state, trail, extra) {
     const k = { ...control._children?.Kinetic, __state: state };
     if (Array.isArray(trail)) k.__trail = trail;
@@ -3617,14 +3704,38 @@
   onDestroy(provideComponentPhases({
     where: (id) => {
       const control = controlById(id);
-      return control && isArpControl(control) ? arpPhaseFor(control) : null;
+      if (control && isArpControl(control)) return arpPhaseFor(control);
+      // The Turing Machine, the Orbit and the Looper keep their position the same way (their
+      // reviews): their phase() is a seek too.
+      if (control && isTuringControl(control)) return turingPhaseFor(control);
+      if (control && isOrbitControl(control)) return orbitPhaseFor(control);
+      if (control && isLooperControl(control)) return looperPhaseFor(control);
+      return null;
     },
     seek: (id, phase) => {
       const control = controlById(id);
-      if (!control || !isArpControl(control)) return;
-      arpPhaseState[id] = ((numberOr(phase, 0) % 1) + 1) % 1;
-      // Drawn there at once, stopped too: a stopped arp has no ticker to redraw it.
-      showStep(control, arpShownStep(withLiveSections(control), control));
+      const at = ((numberOr(phase, 0) % 1) + 1) % 1;
+      if (control && isArpControl(control)) {
+        arpPhaseState[id] = at;
+        // Drawn there at once, stopped too: a stopped arp has no ticker to redraw it.
+        showStep(control, arpShownStep(withLiveSections(control), control));
+      } else if (control && isTuringControl(control)) {
+        turingPhaseState[id] = at;
+        showStep(control, turingShownStep(control));
+      } else if (control && isOrbitControl(control)) {
+        orbitPhaseState[id] = at;
+        // A stopped Orbit has no ticker to redraw it or send what its satellites now say.
+        if (orbitConfig(control).running === false) {
+          sourceSought += 1;
+          emitControlPortFanout(orbitControlWith(control, at), 'commit');
+        }
+      } else if (control && isLooperControl(control)) {
+        looperPhaseState[id] = at;
+        if (looperConfig(control).running === false) {
+          sourceSought += 1;
+          emitControlPortFanout(looperControlWith(control, at), 'commit');
+        }
+      }
     },
   }));
   function arpAllOff(control) {

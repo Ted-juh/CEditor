@@ -1,7 +1,7 @@
 // componentPhases.js — where a running component is in its sequence, and a way to move it there, for
 // the script runtime.
 //
-// The preview keeps an arpeggiator's position in its own state (PanelPreviewSurface's ticker),
+// The preview keeps an arpeggiator's position, and a Turing Machine's, in its own state (PanelPreviewSurface's tickers),
 // transient and never in the panel: the stored `phase` is only where it starts when the preview
 // opens. A script's phase() wrote that stored number and nothing read it again, so a running arp
 // never moved and read(t, "phase") answered the number written rather than where the arp was. So

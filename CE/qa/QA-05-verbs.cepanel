@@ -676,10 +676,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Turing_Machine_turing_Drive_the_Turing_Machine_run_rate_length_randomness_and_individual_steps_","id":"qa_group_4","controlType":"Label"},
+        "Core": {"name":"group_Turing_Machine_turing_Run_a_loop_of_stepped_values_that_can_change_as_it_comes_round_its_speed_length_randomness_output_levels_and_gate_and_each_step_","id":"qa_group_4","controlType":"Label"},
         "Transform": {"x":28,"y":1326,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Turing Machine — turing.*  (Drive the Turing Machine: run, rate, length, randomness, and individual steps.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Turing Machine — turing.*  (Run a loop of stepped values that can change as it comes round: its speed, length, randomness, output levels and gate, and each step.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -723,10 +723,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Looper_looper_Drive_the_Looper_run_loop_length_sync_and_per_lane_enable_","id":"qa_group_5","controlType":"Label"},
+        "Core": {"name":"group_Looper_looper_Loop_movements_recorded_by_hand_each_lane_sending_its_value_round_the_loop_the_loop_s_length_and_sync_and_each_lane_","id":"qa_group_5","controlType":"Label"},
         "Transform": {"x":28,"y":1538,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Looper — looper.*  (Drive the Looper: run, loop length, sync, and per-lane enable.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Looper — looper.*  (Loop movements recorded by hand, each lane sending its value round the loop: the loop's length and sync, and each lane.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -763,17 +763,17 @@
         "Core": {"name":"verbs_looper","id":"qa05_looper_verbs","controlType":"Label"},
         "Transform": {"x":352,"y":1596,"width":470,"height":133},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"looper.run[on]                looper.showPlayhead[on]\nlooper.seconds(num)           looper.showGrid[on]\nlooper.bars(int)              looper.showDivisions[on]\nlooper.sync[on]               looper.read(read)\nlooper.quantize[on]           looper.size(size)\nlooper.lane(item)             looper.fill(fill)\nlooper.laneRest(item)         looper.insert(insert)\nlooper.phase(num)             looper.remove(remove)\nlooper.editable[on]","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"looper.run[on]                looper.showPlayhead[on]\nlooper.seconds(num)           looper.showGrid[on]\nlooper.bars(num)              looper.showDivisions[on]\nlooper.sync[on]               looper.read(read)\nlooper.quantize[on]           looper.size(size)\nlooper.lane(item)             looper.fill(fill)\nlooper.laneRest(item)         looper.insert(insert)\nlooper.phase(num)             looper.remove(remove)\nlooper.editable[on]","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"group_Orbit_orbit_Drive_the_Orbit_run_rate_phase_and_each_node_s_radius_angle_and_depth_","id":"qa_group_6","controlType":"Label"},
+        "Core": {"name":"group_Orbit_orbit_Turn_satellites_round_a_centre_as_modulation_sources_each_sending_a_value_from_where_it_is_their_speed_and_each_one_s_orbit_and_depth_","id":"qa_group_6","controlType":"Label"},
         "Transform": {"x":28,"y":1780,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Orbit — orbit.*  (Drive the Orbit: run, rate, phase, and each node's radius, angle and depth.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Orbit — orbit.*  (Turn satellites round a centre as modulation sources, each sending a value from where it is: their speed, and each one's orbit and depth.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -810,17 +810,17 @@
         "Core": {"name":"verbs_orbit","id":"qa05_orbit_verbs","controlType":"Label"},
         "Transform": {"x":252,"y":1838,"width":470,"height":146},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"orbit.run[on]                 orbit.editable[on]\norbit.rate(num)               orbit.showTrails[on]\norbit.bars(int)               orbit.showSpokes[on]\norbit.sync[on]                orbit.showRings[on]\norbit.phase(num)              orbit.showValues[on]\norbit.node(item)              orbit.read(read)\norbit.nodeRadius(item)        orbit.size(size)\norbit.nodeAngle(item)         orbit.fill(fill)\norbit.nodeRatio(item)         orbit.insert(insert)\norbit.nodeDepth(item)         orbit.remove(remove)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"orbit.run[on]                 orbit.editable[on]\norbit.rate(num)               orbit.showTrails[on]\norbit.bars(num)               orbit.showSpokes[on]\norbit.sync[on]                orbit.showRings[on]\norbit.phase(num)              orbit.showValues[on]\norbit.node(item)              orbit.read(read)\norbit.nodeRadius(item)        orbit.size(size)\norbit.nodeAngle(item)         orbit.fill(fill)\norbit.nodeRatio(item)         orbit.insert(insert)\norbit.nodeDepth(item)         orbit.remove(remove)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"group_Kinetic_kinetic_Drive_the_Kinetic_field_run_gravity_bounce_friction_and_launch_the_ball_","id":"qa_group_7","controlType":"Label"},
+        "Core": {"name":"group_Kinetic_kinetic_Bounce_a_ball_round_a_box_as_a_modulation_source_its_gravity_bounce_and_drag_and_where_and_how_hard_it_is_thrown_","id":"qa_group_7","controlType":"Label"},
         "Transform": {"x":28,"y":2072,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Kinetic — kinetic.*  (Drive the Kinetic field: run, gravity, bounce, friction — and launch the ball.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Kinetic — kinetic.*  (Bounce a ball round a box as a modulation source: its gravity, bounce and drag, and where and how hard it is thrown.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -864,10 +864,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Constellation_constellation_Move_the_Constellation_probe_change_how_it_blends_and_let_it_wander_","id":"qa_group_8","controlType":"Label"},
+        "Core": {"name":"group_Constellation_constellation_Move_a_probe_over_a_map_of_presets_each_a_star_with_a_value_for_every_target_and_send_the_presets_values_from_where_it_is_the_probe_how_it_blends_and_its_wander_","id":"qa_group_8","controlType":"Label"},
         "Transform": {"x":28,"y":2344,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Constellation — constellation.*  (Move the Constellation probe, change how it blends, and let it wander.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Constellation — constellation.*  (Move a probe over a map of presets, each a star with a value for every target, and send the presets' values from where it is: the probe, how it blends, and its wander.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -904,7 +904,7 @@
         "Core": {"name":"verbs_constellation","id":"qa05_constellation_verbs","controlType":"Label"},
         "Transform": {"x":312,"y":2402,"width":470,"height":107},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"constellation.probe(xy)       constellation.links(int)\nconstellation.mode(enum)      constellation.editable[on]\nconstellation.blend(num)      constellation.showLinks[on]\nconstellation.run[on]         constellation.showField[on]\nconstellation.rate(num)       constellation.showLabels[on]\nconstellation.sync[on]        constellation.read(read)\nconstellation.bars(int)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"constellation.probe(xy)       constellation.links(int)\nconstellation.mode(enum)      constellation.editable[on]\nconstellation.blend(num)      constellation.showLinks[on]\nconstellation.run[on]         constellation.showField[on]\nconstellation.rate(num)       constellation.showLabels[on]\nconstellation.sync[on]        constellation.read(read)\nconstellation.bars(num)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
@@ -958,10 +958,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Router_router_Re_point_the_Router_source_CC_channel_deadzone_and_each_destination_s_depth_","id":"qa_group_10","controlType":"Label"},
+        "Core": {"name":"group_Router_router_Take_a_signal_from_the_MIDI_input_or_a_control_shape_it_through_a_curve_and_send_it_to_several_destinations_each_with_its_own_depth_","id":"qa_group_10","controlType":"Label"},
         "Transform": {"x":28,"y":2968,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Router — router.*  (Re-point the Router: source, CC, channel, deadzone, and each destination's depth.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Router — router.*  (Take a signal from the MIDI input or a control, shape it through a curve, and send it to several destinations, each with its own depth.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1146,10 +1146,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Envelope_envelope_Reshape_an_Envelope_a_preset_a_single_breakpoint_the_sustain_point_the_loop_","id":"qa_group_14","controlType":"Label"},
+        "Core": {"name":"group_Envelope_envelope_Shape_an_envelope_from_its_points_a_preset_each_point_s_place_level_and_curve_the_sustain_point_the_loop_and_the_playhead_","id":"qa_group_14","controlType":"Label"},
         "Transform": {"x":28,"y":3986,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Envelope — envelope.*  (Reshape an Envelope: a preset, a single breakpoint, the sustain point, the loop.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Envelope — envelope.*  (Shape an envelope from its points: a preset, each point's place, level and curve, the sustain point, the loop and the playhead.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1193,10 +1193,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Ribbon_ribbon_Drive_a_Ribbon_and_change_what_it_does_when_you_let_go_","id":"qa_group_15","controlType":"Label"},
+        "Core": {"name":"group_Ribbon_ribbon_Drive_a_touch_strip_or_wheel_such_as_a_pitch_or_mod_wheel_its_value_its_style_and_where_it_goes_when_let_go_","id":"qa_group_15","controlType":"Label"},
         "Transform": {"x":28,"y":4250,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Ribbon — ribbon.*  (Drive a Ribbon, and change what it does when you let go.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Ribbon — ribbon.*  (Drive a touch strip or wheel, such as a pitch or mod wheel: its value, its style, and where it goes when let go.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1240,10 +1240,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Crossfader_crossfader_Drive_a_Crossfader_and_change_its_law_","id":"qa_group_16","controlType":"Label"},
+        "Core": {"name":"group_Crossfader_crossfader_Blend_between_two_sides_A_and_B_the_blend_how_the_two_levels_follow_it_its_centre_snap_and_where_it_goes_when_let_go_","id":"qa_group_16","controlType":"Label"},
         "Transform": {"x":28,"y":4492,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Crossfader — crossfader.*  (Drive a Crossfader and change its law.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Crossfader — crossfader.*  (Blend between two sides, A and B: the blend, how the two levels follow it, its centre snap, and where it goes when let go.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1428,10 +1428,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Panic_panicSet_Configure_what_a_Panic_button_sends_Sending_it_is_the_global_panic_","id":"qa_group_20","controlType":"Label"},
+        "Core": {"name":"group_Panic_panicSet_Set_what_a_Panic_button_sends_when_pressed_which_channels_and_whether_it_also_resets_the_controllers_centres_pitch_bend_and_stops_the_panel_s_own_notes_","id":"qa_group_20","controlType":"Label"},
         "Transform": {"x":28,"y":5445,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Panic — panicSet.*  (Configure what a Panic button sends. Sending it is the global panic().)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Panic — panicSet.*  (Set what a Panic button sends when pressed: which channels, and whether it also resets the controllers, centres pitch bend and stops the panel's own notes.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"

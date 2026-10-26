@@ -328,6 +328,13 @@ test('every verb either changes something or explains why it cannot', () => {
         }
         // A number inside the ITEM's own range rather than a fixed 0.375, which lands on the
         // default of any integer item whose range does not happen to start near it.
+        // An item whose range is its own (an envelope's point lies between its neighbours, and the
+        // first is pinned at 0) is probed at element 2, inside that range.
+        if (verb.itemRange) {
+          const range = verb.itemRange(cfgFor(verb.section), 1);
+          const mid = (range.min + range.max) / 2;
+          return [2, mid === itemCurrent(verb, cfgFor(verb.section), 1) ? (range.min + mid) / 2 : mid];
+        }
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
         const hi = Number.isFinite(verb.max) ? verb.max : 1;
         const step = verb.kind === 'int' ? 1 : (hi - lo) / 3;
@@ -1140,6 +1147,117 @@ test('the Transport\'s verbs take the clock\'s own ranges and say what each sets
   assert.equal(MEMBER_BY_ID.transportSource.summary, 'Set which clock the panel follows: its own, a MIDI clock, or the host.');
   assert.equal(text('transportSwing', 'swing'), 'Part of half a step: 1 delays every second step by half a step.\n0: straight.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.transportBeatUnit.notes[0], 'Shown only: a beat is a quarter note whatever it says.');
+});
+
+// ce.components.envelope, done in one pass at the owner's word.
+test('the Envelope\'s verbs keep its points as the canvas does, and its preset seeds its shape', () => {
+  const env = () => ({ ...SECTION_DEFAULTS.Envelope });
+  // preset() writes the shape with the name, as the inspector's Preset does.
+  const seeded = componentScriptPatch(byId('envelopePreset'), env(), ['AD']);
+  assert.equal(seeded.preset, 'ad');
+  assert.deepEqual(seeded.points.map((p) => [p.x, p.y]), [[0, 0], [0.3, 1], [1, 0]]);
+  assert.equal(seeded.sustainIndex, -1);
+  // A point stays between its neighbours; the first at 0, the last at 1.
+  const pointX = byId('envelopePointX');
+  assert.equal(componentScriptPatch(pointX, env(), [2, 0.9]).points[1].x, 0.5, 'point 2 stops at point 3');
+  assert.deepEqual(componentScriptPatch(pointX, env(), [1, 0.3]), {}, 'point 1 stays at 0');
+  assert.equal(componentClampWarning(pointX, 'Env', [2, 0.9], env()), 'envelope Env: pointX(2, 0.9) — the x 0.9 is outside 0 to 0.5, so 0.5 was used.');
+  // Counted from 1 to the points there are; 0 was stored as -1.
+  assert.deepEqual(componentScriptPatch(byId('envelopeLoopStart'), env(), [0]), {}, '0 is 1, point 1, already the start');
+  assert.deepEqual(componentScriptPatch(byId('envelopeLoopEnd'), env(), [9]), { loopEnd: 3 }, 'past the points: the last');
+  assert.deepEqual(componentScriptPatch(byId('envelopeSustain'), env(), [0]), { sustainIndex: -1 }, '0: none');
+  assert.equal(MEMBER_BY_ID.envelopePreset.summary, 'Give the envelope a preset shape.');
+  assert.equal(MEMBER_BY_ID.envelopePointX.summary, 'Move one point along the time axis, by its number.');
+  assert.equal(MEMBER_BY_ID.envelopeTimeMax.notes[0], 'The times read out only: it does not change the shape.');
+});
+
+// ce.components.turing, done in one pass at the owner's word.
+test('the Turing Machine\'s verbs say what the loop does, and its length starts at 2, as it plays', () => {
+  assert.deepEqual([byId('turingLength').min, byId('turingLength').max], [2, 64]);
+  assert.deepEqual(componentScriptPatch(byId('turingLength'), { length: 8 }, [1]), { length: 2 });
+  assert.ok(byId('turingPhase').seek, 'phase is a seek, as the arp\'s');
+  assert.equal(MEMBER_BY_ID.turingRandomness.summary, 'Set how likely a step is to change as the loop comes round to it.');
+  assert.equal(MEMBER_BY_ID.turingQuantize.params.find((p) => p.name === 'quantize').summary.split('\n')[1], '0 or 1: not snapped.');
+  assert.equal(MEMBER_BY_ID.turingRun.example, '`ce.components.turing.run("Turing", false)` stops it on the step it is at.');
+});
+
+// ce.components.crossfader, done in one pass at the owner's word.
+test('the Crossfader\'s verbs say how the blend sounds and springs back', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.crossfaderMix.summary, 'Set the blend between A and B.');
+  assert.equal(text('crossfaderLaw', 'law'), '"equalPower": constant loudness; each side at 71% (-3 dB) in the middle.\n"linear": the two add up to 1; each side at half (-6 dB) in the middle.\n"sharp": both full through the middle; a side cut only towards the far end.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('crossfaderReturnMode', 'returnMode'), '"none": it stays where it is let go.\n"center": back to the middle.\n"min": back to all A.\n"max": back to all B.\n"rest": back to `returnValue()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.crossfaderDetent.notes[0], 'A drag only: `mix()` is not snapped.');
+});
+
+// ce.components.router, done in one pass at the owner's word.
+test('the Router\'s verbs say what it follows and sends, and its curve keeps its points in order', () => {
+  const cfg = { ...SECTION_DEFAULTS.Router };
+  const curveX = byId('routerCurveX');
+  assert.deepEqual(componentScriptPatch(curveX, cfg, [1, 0.3]), {}, 'the first point stays at 0');
+  assert.equal(componentScriptPatch(curveX, cfg, [2, 1.5]).curve[1].x, cfg.curve[2].x, 'point 2 stops at point 3');
+  assert.equal(MEMBER_BY_ID.routerSource.summary, 'Set the signal it follows.');
+  assert.equal(MEMBER_BY_ID.routerDestDepth.params.find((p) => p.name === 'depth').summary.split('\n')[1], 'Below 0: the curve upside down.');
+});
+
+// ce.components.ribbon, done in one pass at the owner's word.
+test('the Ribbon\'s verbs say what a strip or wheel sends, and where it goes when let go', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.ribbonValue.summary, 'Set its position.');
+  assert.equal(MEMBER_BY_ID.ribbonSnap.notes[0], 'A drag only: `value()` is not snapped.');
+  assert.equal(text('ribbonStyle', 'style').split('\n')[2], '"wheel3d": a wheel drawn in 3D.');
+  assert.ok(MEMBER_BY_ID.ribbonReturnMode, 'the return spring is the Crossfader\'s, worded for a strip');
+});
+
+// ce.components.kinetic, done in one pass at the owner's word.
+test('the Kinetic\'s gravity and bounce take what the ball plays', () => {
+  // The physics plays 0..4 and 0..1 (kineticParams): an upward pull played as none, and a wall
+  // that kept more than all of the ball's speed played as one that kept it all.
+  assert.deepEqual([byId('kineticGravity').min, byId('kineticGravity').max], [0, 4]);
+  assert.deepEqual([byId('kineticBounce').min, byId('kineticBounce').max], [0, 1]);
+  assert.deepEqual(componentScriptPatch(byId('kineticGravity'), { ...SECTION_DEFAULTS.Kinetic }, [-1]), {}, '-1 is 0, already set');
+  assert.equal(MEMBER_BY_ID.kineticLaunch.notes[0], 'With the speed `velocity()` sets. A running ball is thrown again at once.');
+});
+
+// ce.components.orbit, done in one pass at the owner's word.
+test('the Orbit\'s phase is a seek, and its bars and depth take what it plays', () => {
+  assert.ok(byId('orbitPhase').seek, 'phase is a seek, as the arp\'s');
+  assert.equal(byId('orbitPhase').seek.clock, 'syncToTransport');
+  // orbitCycleBars plays 0.25..64; orbitNodes clamps a depth to 0..1.
+  assert.deepEqual([byId('orbitBars').k, byId('orbitBars').min, byId('orbitBars').max], ['num', 0.25, 64]);
+  assert.deepEqual([byId('orbitNodeDepth').min, byId('orbitNodeDepth').max], [0, 1]);
+  const cfg = { ...SECTION_DEFAULTS.Orbit };
+  assert.equal(componentScriptPatch(byId('orbitNodeDepth'), cfg, [2, -0.5]).nodes[1].depth, 0);
+  assert.deepEqual(componentScriptPatch(byId('orbitBars'), cfg, [0.5]), { cycleBars: 0.5 });
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(text('orbitNodeRatio', 'ratio').split('\n')[1], 'Above 0: counter-clockwise. Below 0: clockwise.');
+  assert.equal(MEMBER_BY_ID.orbitShowValues.summary, 'Show or hide each satellite\'s value, as a percentage, above it.');
+});
+
+// ce.components.looper, done in one pass at the owner's word.
+test('the Looper\'s phase is a seek, and its bars take quarters, as it plays', () => {
+  assert.ok(byId('looperPhase').seek, 'phase is a seek, as the arp\'s');
+  assert.deepEqual([byId('looperBars').k, byId('looperBars').min], ['num', 0.25]);
+  assert.deepEqual(componentScriptPatch(byId('looperBars'), { ...SECTION_DEFAULTS.Looper }, [0.25]), { loopBars: 0.25 });
+  assert.equal(MEMBER_BY_ID.looperLane.params.find((p) => p.name === 'enabled').summary.split('\n')[1], 'false: it sends its rest value, and is drawn faded.');
+  assert.equal(MEMBER_BY_ID.looperQuantize.notes[0], 'While not synced; `seconds()` keeps the number set.');
+});
+
+// ce.components.constellation, done in one pass at the owner's word.
+test('the Constellation\'s blend takes what it plays, and its probe says what is sent', () => {
+  // blendWeights takes a power of 0.5 at least.
+  assert.equal(byId('constellationBlend').min, 0.5);
+  assert.deepEqual(componentScriptPatch(byId('constellationBlend'), { ...SECTION_DEFAULTS.Constellation }, [0.1]), { blendPower: 0.5 });
+  assert.deepEqual([byId('constellationBars').k, byId('constellationBars').min], ['num', 0.25]);
+  assert.equal(MEMBER_BY_ID.constellationProbe.notes[1], 'While `run()` is on, the wander places the probe; it comes back here when it stops.');
+  assert.equal(MEMBER_BY_ID.constellationMode.params.find((p) => p.name === 'mode').summary.split('\n')[1], '"snap": the nearest preset\'s values, and `onRecall` when that changes.');
+});
+
+// ce.components.panic, done in one pass at the owner's word.
+test('the Panic\'s verbs say what a press sends', () => {
+  assert.equal(MEMBER_BY_ID.panicSetScope.notes[0], 'Each channel is sent All Sound Off (CC 120), then All Notes Off (CC 123).');
+  assert.equal(MEMBER_BY_ID.panicSetLabel.params.find((p) => p.name === 'label').summary.split('\n')[1], '"": PANIC.');
+  assert.equal(MEMBER_BY_ID.panicSetShowSummary.notes[0], 'Drawn only on a button 46 pixels tall or more.');
 });
 
 test('a number counted from 1 is rounded, and every such parameter says so', () => {

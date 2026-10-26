@@ -336,34 +336,35 @@ const SHARED_OPTION_FIELDS = {
   // read the same keys through applyControlProps.
   controlName: {
     name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-    summary: 'The control\'s name. Every other command addresses the control by this name.',
+    summary: 'The name every other command reaches it by.\nTaken already: a number is added; use the name given back.',
   },
   controlX: {
     name: 'x', type: 'number', default: '0', unit: 'pixels',
-    summary: 'Distance from the left edge of whatever contains it.',
+    summary: 'Pixels from the left edge of its container.\nNot a number: as it was, with a console warning the first time.',
   },
-  controlY: { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Distance from the top edge.' },
+  controlY: {
+    name: 'y', type: 'number', default: '0', unit: 'pixels',
+    summary: 'Pixels from the top edge of its container.\nNot a number: as it was, with a console warning the first time.',
+  },
   controlWidth: {
     name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-    summary: 'How wide to make it.',
+    summary: 'Pixels.\n0 or below, or not a number: as it was, with a console warning the first time.',
   },
   controlHeight: {
     name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-    summary: 'How tall to make it.',
+    summary: 'Pixels.\n0 or below, or not a number: as it was, with a console warning the first time.',
   },
   controlParent: {
     name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"', kind: 'control',
-    summary: 'The name of a container to put it inside.',
+    summary: 'The name of a container to put it in: a control with a Children section, such as a Container or a Group.\nNot a control, or not a container: rejected with a console error.',
   },
   controlSection: {
     name: '<section>', type: 'object', group: 'any section',
-    summary: 'Any section of the control, to set up as you make it — for example '
-      + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals '
-      + 'and all (Behavior, not behavior), and one the control does not have refuses the call. Inside '
-      + 'one, names are read in any capitals, as a path is: '
-      + '{ Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A '
-      + 'colour is stored as set() stores it, and a setting the section does not have is written with '
-      + 'a warning, as set() writes one.',
+    summary: ['Any section of the control, by the name set() uses, such as { Behavior = { min = 0, max = 127 } }.',
+      'The section\'s name as written: Behavior, not behavior.', 'A section the control does not have: rejected with a console error.',
+      'Inside one, names in any case, as in a path; a child given is merged into the one there: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest.',
+      'A colour: stored as set() stores it; one it would refuse: rejected with a console error.',
+      'A setting the section does not have: written, with a console warning, as set() writes one.'].join('\n'),
   },
 
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
@@ -877,11 +878,16 @@ export const COMMANDS = [
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
     refusal: 'false',
-    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request\'s own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.',
+    summary: 'Ask the synth to send a dump: every setting of a patch in one message.',
+    example: '`requestDump("patch")` asks the synth for its patch dump.',
+    notes: [
+      'When it arrives, the bound controls are filled and `onDumpReceived` runs.',
+      'Returns true when the request went out. Rejected: false, with a console error.',
+    ],
     params: [
-      { name: 'kind', type: 'dumpKind', required: true },
-      { name: 'fn', type: 'function', required: false },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, such as "system", or one declared with `deviceDefineDump()`; or a request\'s own id, such as "requestSystem".\nAny other: rejected with a console error.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(values, info) when the reply arrives, or when it does not.\n`info.ok` false: nothing arrived within `opts.timeout`.\nA request answered by several dumps at once: none is waited for; name the dump wanted.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The option below.', fields: optionFields([
         { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
           summary: 'How long to wait for the reply before giving up and calling `fn` with '
             + 'info.ok = false.' },
@@ -896,10 +902,15 @@ export const COMMANDS = [
   {
     id: 'recallPreset', category: 'Device / MIDI', signature: 'recallPreset(slot [, opts])',
     refusal: 'result',
-    summary: 'Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank\'s first preset, whatever program number it uses.',
+    summary: 'Switch the synth to a stored preset.',
+    example: '`recallPreset(64)` switches to preset 64, the first of the second bank on a synth whose banks hold 64.',
+    notes: [
+      'Sent as the device profile says the synth needs: a Program Change, a Bank Select and a Program Change, or a SysEx message.',
+      'Returns { ok, error, slot, name, category, messages }; refused: `ok` false, `error` saying why, and a console error.',
+    ],
     params: [
-      { name: 'slot', type: 'number', required: true, kind: 'presetSlot' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'slot', type: 'number', required: true, summary: 'Preset number across all banks, counted from 0, as the device profile numbers them: not the MIDI program number.\nNot a whole number from 0: rejected with a console error.', kind: 'presetSlot' },
+      { name: 'opts', type: 'object', required: false, summary: 'The option below.', fields: optionFields([
         { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
           summary: 'Which device to recall on, when the panel names more than one.' },
       ]) },
@@ -909,30 +920,48 @@ export const COMMANDS = [
   },
   {
     id: 'preset', category: 'Device / MIDI', signature: 'preset([role])',
-    summary: 'Describe the preset that is loaded now: { slot, program, name, category, bankId, bankLabel, writable, source }. Most synths do not announce their preset when they connect and cannot be asked, so this reports what the panel has seen — a Program Change arriving or a recallPreset going out. Until then `slot` is -1.',
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    summary: 'Describe the preset loaded now.',
+    example: '`preset().name` gives the loaded preset\'s name.',
+    notes: [
+      'Returns { slot, program, name, category, bankId, bankLabel, writable, source }.',
+      'What the panel has seen: a Program Change arriving or a `recallPreset()` going out. Until then `slot` is -1: most synths do not say, and cannot be asked.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: { lua: 'local p = preset()$0', javascript: 'const p = preset();$0' },
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
-    summary: 'Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth. Raw bytes can be a list of numbers or hex text, read a byte at a time as `sendSysex` reads it.',
-    params: [{ name: 'bytes', type: 'bytes', required: true }],
+    summary: 'Fill the panel from a dump, without sending anything to the synth.',
+    example: '`applyDump({ cutoff = 64 })` sets the controls bound to cutoff to 64.',
+    notes: [
+      'Returns how many values were applied.',
+    ],
+    params: [{ name: 'bytes', type: 'bytes', required: true, summary: 'A table of parameter ids and values: applied as they are.\nOr the dump\'s bytes, a list of numbers or hex text read a byte at a time as `sendSysex()` reads it: decoded by the device profile.\nBytes in the panel view: not decoded, with a console line; the exported plug-in decodes them.' }],
     scopes: 'any',
     snippet: { lua: 'applyDump(${1:bytes})$0', javascript: 'applyDump(${1:bytes})$0' },
   },
   {
     id: 'sendDump', category: 'Device / MIDI', signature: 'sendDump(kind)',
-    summary: 'Build a dump from the panel\'s current values and send it to the synth. `kind` is a dump the device profile defines, by its id, as requestDump takes it; a kind the profile has no dump by is refused and nothing is sent.',
-    params: [{ name: 'kind', type: 'dumpKind', required: true }],
+    summary: 'Build a dump from the panel\'s values and send it to the synth.',
+    example: '`sendDump("patch")` sends the panel\'s values to the synth as its patch dump.',
+    notes: [
+      'Rejected: with a console error; nothing is sent.',
+    ],
+    params: [{ name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, by its id, as `requestDump()` takes it.\nAny other: rejected with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'sendDump("${1:patch}")$0', javascript: 'sendDump("${1:patch}")$0' },
   },
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
-    summary: 'Build a dump from the panel\'s current values and return its bytes without sending them — for example to store it or change it first. `kind` is a dump the device profile defines, by its id, or one declared with defineDump; a kind it has no dump by is refused and nothing comes back.',
+    summary: 'Build a dump from the panel\'s values, and give back its bytes without sending them.',
+    example: '`local bytes = buildDump("patch")` keeps the panel\'s values as a patch dump.',
+    notes: [
+      'A profile\'s dump is built by the device host: in the panel view, only a dump declared with `deviceDefineDump()` is.',
+      'Returns a list of bytes. Rejected: no result, with a console error.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'kind', type: 'dumpKind', required: true }],
+    params: [{ name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, by its id, or one declared with `deviceDefineDump()`.\nAny other: rejected with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
@@ -2246,11 +2275,16 @@ export const COMMANDS = [
      from a script. */
   {
     id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
-    summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
+    summary: 'Create a control of a type, and give back its name.',
+    example: '`ce.panel.create("Knob", { name = "Cutoff", x = 20, y = 40 })` makes a knob called Cutoff at 20, 40.',
+    notes: [
+      'Returns its name. Rejected: no result, with a console error; nothing is created.',
+      'A control a script creates is not saved with the panel, and is cleared before each `onPanelBuild`, which is where to create it.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'type', type: 'string', required: true, kind: 'componentType' },
-      { name: 'props', type: 'object', required: false, fields: optionFields([
+      { name: 'type', type: 'string', required: true, summary: 'The control\'s type, such as "Knob": one of `ce.panel.types()`. Case-insensitive.\nNot a type, or left out: rejected with a console error.', kind: 'componentType' },
+      { name: 'props', type: 'object', required: false, summary: 'Its name, place, size and container, and any of its sections\' settings: the options below.\nLeft out: the type\'s own, at the top level.', fields: optionFields([
         'controlName', 'controlX', 'controlY', 'controlWidth', 'controlHeight', 'controlParent',
         'controlSection',
       ]) },
@@ -2263,11 +2297,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
-    summary: 'Copy an existing control, with all its settings, and return the copy\'s name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it, and a colour in them that `set()` would refuse means no copy is made.',
+    summary: 'Copy a control, with all its settings, and give back the copy\'s name.',
+    example: '`ce.panel.clone("Cutoff", { name = "Cutoff2", y = 120 })` makes a copy of Cutoff called Cutoff2, at y 120.',
+    notes: [
+      'Returns the copy\'s name. Rejected: no result, with a console error; nothing is copied.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'control' },
-      { name: 'props', type: 'object', required: false, at: 'name', fields: optionFields([
+      { name: 'name', type: 'string', required: true, summary: 'The control to copy.\nNot a control, or left out: rejected with a console error.', kind: 'control' },
+      { name: 'props', type: 'object', required: false, summary: 'As `ce.panel.create()`\'s: the options below.\nLeft out: a copy called its name with "_copy" added, in the same container.', at: 'name', fields: optionFields([
         { like: 'controlName', default: 'the original\'s name with _copy added' },
         'controlX', 'controlY', 'controlWidth', 'controlHeight',
         { like: 'controlParent', default: 'the original\'s container' },
@@ -2282,36 +2320,48 @@ export const COMMANDS = [
   },
   {
     id: 'panelDestroy', category: 'Panel structure', signature: 'panelDestroy(name)',
-    summary: 'Remove a control, together with everything inside it. Returns true if the control was there and has been removed, false if there was no such control. It works on any control: the ones you placed in the editor as well as the ones a script created.',
+    summary: 'Remove a control, and everything inside it.',
+    example: '`ce.panel.destroy("Cutoff")` removes the control called Cutoff.',
+    notes: [
+      'Any control: placed in the editor or made by a script.',
+      'Returns true when it was removed; false when there was no control of that name.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'string', required: true, kind: 'control' }],
+    params: [{ name: 'name', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: false, without a word.\nLeft out: rejected with a console error.', kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'ce.panel.destroy("${1:name}")$0', javascript: 'ce.panel.destroy("${1:name}");$0' },
   },
   {
     id: 'panelParent', category: 'Panel structure', signature: 'panelParent(name [, containerName])',
-    summary: 'Move a control into a container, or back to the top level of the panel when `containerName` is left out. Returns true on success. A container is any control with a Children section, such as a Container or a Group. A control cannot be moved into itself or into one of the controls it contains.',
+    summary: 'Move a control into a container, or out to the top level of the panel.',
+    example: '`ce.panel.parent("Cutoff", "Row")` moves Cutoff into the container called Row.',
+    notes: [
+      'Returns true when it moved. Rejected: false, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'control' },
-      { name: 'containerName', type: 'string', required: false, kind: 'control' },
+      { name: 'name', type: 'string', required: true, summary: 'The control to move.\nNot a control, or left out: rejected with a console error.', kind: 'control' },
+      { name: 'containerName', type: 'string', required: false, summary: 'A control with a Children section, such as a Container or a Group.\nLeft out, or "": the top level of the panel.\nNot a control, not a container, or the control itself or one inside it: rejected with a console error.', kind: 'control' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.panel.parent("${1:knob}", "${2:row}")$0', javascript: 'ce.panel.parent("${1:knob}", "${2:row}");$0' },
   },
   {
     id: 'panelFind', category: 'Panel structure', signature: 'panelFind([query])',
-    summary: 'List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.',
+    summary: 'List the names of the controls that match a query.',
+    example: '`ce.panel.find({ type = "Knob" })` gives the name of every knob.',
+    notes: [
+      'Containers and the controls inside them are both listed.',
+      'Returns a list of names, in panel order. Rejected: an empty list, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'query', type: 'object', required: false, fields: optionFields([
-      { name: 'name', type: 'text', sample: '"osc"', summary: 'Match controls whose name contains this.' },
-      { name: 'type', type: 'text', sample: '"Knob"', summary: 'Match one kind of control, such as "Knob". '
-        + 'ce.panel.types() lists the spellings.' },
+    params: [{ name: 'query', type: 'object', required: false, summary: 'Part of a name, in any case; or a table of the filters below, every one of which must match.\nLeft out: every control.\nAnything else, or a filter it does not have: rejected with a console error.', fields: optionFields([
+      { name: 'name', type: 'text', sample: '"osc"', summary: 'Part of a name, in any case.' },
+      { name: 'type', type: 'text', sample: '"Knob"', summary: 'A control type, such as "Knob": one of ce.panel.types(). Case-insensitive.\nNot a type: rejected with a console error.' },
       { name: 'generated', type: 'true or false',
-        summary: '`true` matches only controls a script created, `false` only the ones you placed '
-          + 'by hand. The text "true" is refused.' },
+        summary: 'Whether a script made the control.\ntrue: only the controls a script made.\nfalse: only the ones placed in the editor.\nNot true or false, such as the text "true": rejected with a console error.' },
       { name: 'parent', type: 'text', sample: '"row1"',
-        summary: 'Match only what is inside the container of this name.' },
+        summary: 'A container\'s name, in any case: only the controls directly inside it.' },
     ]) }],
     scopes: 'any',
     snippet: {
@@ -2321,15 +2371,23 @@ export const COMMANDS = [
   },
   {
     id: 'panelInfo', category: 'Panel structure', signature: 'panelInfo(name)',
-    summary: 'Describe a control: { name, id, type, x, y, width, height, parent, generated }, or nothing if there is no such control. `x` and `y` are measured from the control\'s container; use `ce.panel.rect()` for its position on the panel. `generated` is true for a control a script created.',
+    summary: 'Describe a control: its name, id, type, place, size and container, and whether a script made it.',
+    example: '`ce.panel.info("Cutoff").type` gives "Knob".',
+    notes: [
+      'Returns { name, id, type, x, y, width, height, parent, generated }. `x` and `y` are from its container\'s corner; `ce.panel.rect()` gives its place on the panel.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'string', required: true, kind: 'control' }],
+    params: [{ name: 'name', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: no result, without a word.\nLeft out: rejected with a console error.', kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'local c = ce.panel.info("${1:name}")$0', javascript: 'const c = ce.panel.info("${1:name}");$0' },
   },
   {
     id: 'panelTypes', category: 'Panel structure', signature: 'panelTypes()',
-    summary: 'List the names of every control type `ce.panel.create()` accepts.',
+    summary: 'List every control type `ce.panel.create()` takes.',
+    example: '`ce.panel.types()` gives { "Background", "Label", "Button", … }.',
+    notes: [
+      'Returns a list of type names.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
@@ -2360,15 +2418,18 @@ export const COMMANDS = [
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.',
+    summary: 'Line controls up on one edge or centre line.',
+    example: '`ce.panel.align({ "Cutoff", "Res" }, "top")` lines up the tops of Cutoff and Res.',
+    notes: [
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'edge', type: 'string', required: true, values: LAYOUT_WORDS.panelAlign.values },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list, or one name.\nA name that is not a control: said in the console, and skipped.\nNo control: rejected with a console error.' },
+      { name: 'edge', type: 'string', required: true, summary: '"left", "right", "top" or "bottom": that edge.\n"hCenter": the centre line across; "vCenter": the centre line down.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelAlign.values },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'to', type: 'text', default: 'the box the whole group occupies', sample: '"cutoff"',
-          summary: 'Name one of the controls to line the others up on, instead of on the group as '
-            + 'a whole. This is what the canvas calls the key object.' },
+          summary: 'One of the names given: the others line up on it, the canvas\'s key object.\nNot one of the names: rejected with a console error.' },
       ]) },
     ],
     scopes: 'any',
@@ -2380,23 +2441,24 @@ export const COMMANDS = [
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control\'s ("hSpacing") or every left edge in line with the topmost control\'s ("vSpacing"). Needs at least two controls; returns how many it moved.',
+    summary: 'Space controls out evenly between the first and the last.',
+    example: '`ce.panel.distribute({ "A", "B", "C" }, "hSpacing")` makes the gaps between A, B and C equal.',
+    notes: [
+      'The first and the last stay where they are, unless `opts.gap` is given.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'what', type: 'string', required: true, values: LAYOUT_WORDS.panelDistribute.values },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'what', type: 'string', required: true, summary: '"leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" or "bottomEdges": those positions evened out.\n"hSpacing" or "vSpacing": the gaps between them evened out, for controls of different sizes.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelDistribute.values },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'gap', type: 'number', default: 'worked out from the space available', sample: '12',
           unit: 'pixels',
-          summary: 'Force a fixed gap between the controls rather than spreading them to fill '
-            + 'what is there.' },
+          summary: 'Pixels between one control and the next, with "hSpacing" or "vSpacing": the last control moves too.\nNot a number: as left out, with a console warning the first time.' },
         // true is all distributePatches acts on (alignOpposite). This was typed as text, sampled
         // "top" and said it took ce.panel.align's words, every one of which did nothing.
         { name: 'align', type: 'true or false', default: 'false',
-          summary: 'With "hSpacing" or "vSpacing" only. true also lines them up across the other '
-            + 'axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge '
-            + 'level with the leftmost control\'s, and "vSpacing" puts every left edge in line with '
-            + 'the topmost control\'s. It is not an edge name: "top" or "left" does nothing.' },
+          summary: 'With "hSpacing" or "vSpacing" only.\ntrue: also lined up across: every top edge level with the leftmost control\'s, or every left edge with the topmost\'s.\nAnything but true, such as "top": not.' },
       ]) },
     ],
     scopes: 'any',
@@ -2404,14 +2466,18 @@ export const COMMANDS = [
   {
     id: 'panelMatch', category: 'Panel structure', signature: 'panelMatch(names, what [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.',
+    summary: 'Make controls the same width, height, or both.',
+    example: '`ce.panel.match({ "A", "B" }, "both")` gives B the size of A.',
+    notes: [
+      'Returns how many controls it sized, whether or not they changed. Rejected: 0, with a console error; nothing changes.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'what', type: 'string', required: true, values: LAYOUT_WORDS.panelMatch.values },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'what', type: 'string', required: true, summary: '"width", "height" or "both".\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelMatch.values },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'to', type: 'text', default: 'the first name you gave', sample: '"cutoff"',
-          summary: 'Name the control whose size the others should copy. It is not resized itself.' },
+          summary: 'One of the names given: the others take its size, and it keeps its own.\nNot one of the names: rejected with a console error.' },
       ]) },
     ],
     scopes: 'any',
@@ -2419,17 +2485,23 @@ export const COMMANDS = [
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Arrange controls in a grid of equal cells, each as big as the largest control. They are placed in reading order (top to bottom, then left to right, with controls at about the same height, within roughly 20 pixels, counted as one row), not in the order you list them. The first control in that order stays where it is and the grid grows from there. Needs at least two controls; returns how many it moved.',
+    summary: 'Arrange controls in a grid of equal cells, each as big as the largest.',
+    example: '`ce.panel.grid(pads, { columns = 4 })` lays the pads out four to a row.',
+    notes: [
+      'In reading order, not the order listed: top to bottom, then left to right; controls within about 20 pixels of the same height are one row.',
+      'The first in that order stays where it is, and the grid grows from there.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'columns', type: 'number', default: '3',
-          summary: 'How many controls per row.' },
+          summary: 'Controls to a row.\nA fraction: rounded.\nBelow 1: 1, with a console warning the first time.\nNot a number: 3, with a console warning the first time.' },
         { name: 'gapX', type: 'number', default: '10', unit: 'pixels',
-          summary: 'The gap between columns.' },
+          summary: 'Pixels between columns.\nNot a number: 10, with a console warning the first time.' },
         { name: 'gapY', type: 'number', default: '10', unit: 'pixels',
-          summary: 'The gap between rows.' },
+          summary: 'Pixels between rows.\nNot a number: 10, with a console warning the first time.' },
       ]) },
     ],
     scopes: 'any',
@@ -2441,56 +2513,79 @@ export const COMMANDS = [
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Arrange controls evenly around a circle, centred on the middle of the box they currently fill, in the order you list them. Each control\'s centre sits on the circle. `opts.startAngle` is in degrees, with 0 at three o\'clock and angles running clockwise, which differs from `ce.draw.arc()`, where 0 is twelve o\'clock. Needs at least two controls; returns how many it moved.',
+    summary: 'Arrange controls evenly round a circle, in the order listed.',
+    example: '`ce.panel.circle(knobs, { radius = 80 })` sets the knobs round a circle of radius 80.',
+    notes: [
+      'Centred on the middle of the box they fill now; each control\'s centre on the circle.',
+      '0 degrees is three o\'clock here, where `ce.draw.arc()` has twelve.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'radius', type: 'number', default: '100', unit: 'pixels',
-          summary: 'How far from the centre to place each control.' },
+          summary: 'Pixels from the centre to each control\'s centre.\nBelow 0: rejected with a console error.\nNot a number: 100, with a console warning the first time.' },
         { name: 'startAngle', type: 'number', default: '0', unit: 'degrees', hint: '0 is three o\'clock, increasing clockwise',
-          summary: 'Where the first control goes, clockwise from three o\'clock.' },
+          summary: 'Degrees, clockwise from three o\'clock: where the first control goes.\nNot a number: 0, with a console warning the first time.' },
       ]) },
     ],
     scopes: 'any',
   },
   {
     id: 'panelFlip', category: 'Panel structure', signature: 'panelFlip(names, axis) -> number',
-    summary: 'Mirror the positions of controls across the middle of the box they fill: "horizontal" swaps left and right, "vertical" swaps top and bottom. Only their positions change; the controls themselves are not turned or mirrored. Needs at least two controls; returns how many it moved.',
+    summary: 'Mirror the positions of controls across the middle of the box they fill.',
+    example: '`ce.panel.flip({ "A", "B" }, "horizontal")` swaps A and B left for right.',
+    notes: [
+      'Only their places change: the controls are not turned.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'axis', type: 'string', required: true, values: LAYOUT_WORDS.panelFlip.values },
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'axis', type: 'string', required: true, summary: '"horizontal": left and right swap.\n"vertical": top and bottom swap.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelFlip.values },
     ],
     scopes: 'any',
   },
   {
     id: 'panelRect', category: 'Panel structure', signature: 'panelRect(name) -> table',
-    summary: 'Get a control\'s position on the panel: { x, y, width, height, right, bottom }. Unlike Transform.x and Transform.y, this includes the offset of any container the control sits in. Give a list of names to get the box around the whole group. Returns nothing if none of the names is a control.',
+    summary: 'Get a control\'s box on the panel, or the box around several.',
+    example: '`ce.panel.rect("Cutoff").right` gives Cutoff\'s right edge, in panel pixels.',
+    notes: [
+      'Returns { x, y, width, height, right, bottom }, from the panel\'s corner: a container\'s offset included, which Transform.x and Transform.y leave out.',
+      'Rejected: no result, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'text or list', required: true }],
+    params: [{ name: 'name', type: 'text or list', required: true, summary: 'A control\'s name, or a list of names.\nA name that is not a control: said in the console, and skipped.\nNo control: rejected with a console error.' }],
     scopes: 'any',
   },
   {
     id: 'panelOrder', category: 'Panel structure', signature: 'panelOrder(names, where) -> number',
-    summary: 'Change which controls are drawn on top of which: "front", "forward", "backward" or "back". Controls only move among the others in the same container. Controls that come later in the panel are drawn over earlier ones, so "front" moves a control to the end of its container. Returns how many controls it moved.',
+    summary: 'Bring controls to the front, or send them to the back, among the controls in their container.',
+    example: '`ce.panel.order({ "Glow" }, "back")` draws Glow behind the other controls in its container.',
+    notes: [
+      'A control later in its container is drawn over the ones before it.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'where', type: 'string', required: true, values: LAYOUT_WORDS.panelOrder.values },
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list, or one name.\nA name that is not a control: said in the console, and skipped.\nNo control: rejected with a console error.' },
+      { name: 'where', type: 'string', required: true, summary: '"front": over all the others.\n"forward": over one more.\n"backward": under one more.\n"back": under all the others.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelOrder.values },
     ],
     scopes: 'any',
   },
   {
     id: 'panelBatch', category: 'Panel structure', signature: 'panelBatch(fn) -> boolean',
     summary: 'Make a set of changes count as one step, so one undo takes them all back.',
+    example: '`ce.panel.batch(function() ce.panel.grid(pads) end)` makes the grid one undo step.',
     notes: [
       { text: 'Code after an `await` in the function is not part of the batch.', check: 'noAwait' },
       'The panel shows the changes together when the function ends. Code inside it already sees its own earlier changes.',
       'The exported plugin has no undo: there the function just runs.',
+      'Returns true. Rejected: false, with a console error; nothing runs.',
     ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'fn', type: 'function', required: true, summary: 'The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.' }],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The function that makes the changes: run at once.\nIf it fails with an error: the step is closed all the same.\nNot a function, or left out: rejected with a console error.' }],
     scopes: 'any',
     snippet: {
       lua: 'ce.panel.batch(function()\n  $0\nend)',
@@ -2499,9 +2594,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelKeep', category: 'Panel structure', signature: 'panelKeep([path]) -> boolean',
-    summary: 'Keep a change made during preview. Preview is a rehearsal: when it stops, the panel goes back to how you built it, and anything a script changed is undone with it. `ce.panel.keep("Cutoff.Background.Fill.colour")` keeps one property; `ce.panel.keep()` with no path keeps everything this run changed. A control the script created cannot be kept, because the next run builds it again and keeping it would leave an extra copy every time. Returns false when nothing could be kept, including when the panel is not being previewed.',
+    summary: 'Keep a change made in preview, so it stays when preview stops.',
+    example: '`ce.panel.keep("Cutoff.Background.Fill.colour")` keeps the colour a script gave Cutoff\'s fill.',
+    notes: [
+      'Preview is a rehearsal: when it stops, the panel goes back to how it was built, and a script\'s changes with it.',
+      'A control a script made cannot be kept: the next run makes it again.',
+      'Returns true when something was kept; false when nothing could be, as when the panel is not previewing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'path', type: 'path', required: false }],
+    params: [{ name: 'path', type: 'path', required: false, summary: 'A property\'s path, as `set()` takes it.\nLeft out: every change this run made.' }],
     scopes: 'any',
     snippet: {
       lua: 'ce.panel.keep("${1:Cutoff.Background.Fill.colour}")$0',
@@ -2510,11 +2611,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelEntries', category: 'Panel structure', signature: 'panelEntries(control, section)',
-    summary: 'List the names of the entries in one of a control\'s collection sections (States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants), in the order the control holds them. Any other section name is refused with a message listing the ones that work.',
+    summary: 'List the names of the entries in one of a control\'s collection sections.',
+    example: '`ce.panel.entries("Cutoff", "States")` gives { "Hover", "Pressed", … }.',
+    notes: [
+      'Returns the names, in the control\'s order. Rejected: an empty list, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2524,12 +2629,16 @@ export const COMMANDS = [
   },
   {
     id: 'panelEntry', category: 'Panel structure', signature: 'panelEntry(control, section, name)',
-    summary: 'Get one entry from a collection section, or nothing if there is no entry of that name. Capitals in `name` do not matter, just as in a path.',
+    summary: 'Get one entry of a collection section, by its name.',
+    example: '`ce.panel.entry("Cutoff", "States", "Hover")` gives Cutoff\'s Hover state.',
+    notes: [
+      'Returns the entry as a table. Rejected: no result, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
-      { name: 'name', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
+      { name: 'name', type: 'string', required: true, summary: 'The entry\'s name. Case-insensitive.\nNot one of the section\'s: no result, without a word.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2539,13 +2648,19 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, or with `kind = "keyframes"` one that plays all the time over the frames you give. A state applies while its `when` flags hold and its `rule` is true, and a rule can compare the control\'s value: `rule = "value > 64"`. A key the section\'s entries do not have, capitals included, is refused with the keys it takes, and nothing is defined. Returns true if the entry was written.',
+    summary: 'Add an entry to a collection section, or replace the one of that name.',
+    example: '`ce.panel.define("Cutoff", "States", "Held", { when = { pressed = true } })` adds a state that applies while Cutoff is pressed.',
+    notes: [
+      'A new state has no condition and no changes; it applies while its `when` flags hold and its `rule` is true, such as `rule = "value > 64"`.',
+      'A new animation is a 120 ms change into hover and back; with `kind = "keyframes"`, one that plays all the time over the frames given.',
+      'Returns true when it was written. Rejected: false, with a console error; nothing is defined.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
-      { name: 'name', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: false },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
+      { name: 'name', type: 'string', required: true, summary: 'The entry\'s name. Case-insensitive: one of that name is replaced.' },
+      { name: 'spec', type: 'object', required: false, summary: 'The entry\'s settings, only those to set: the rest are the section\'s defaults.\nA key the section\'s entries do not have, in any case: rejected with a console error that lists the ones they take.\nLeft out: every setting its default.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2555,12 +2670,17 @@ export const COMMANDS = [
   },
   {
     id: 'panelUndefine', category: 'Panel structure', signature: 'panelUndefine(control, section, name)',
-    summary: 'Remove an entry from a collection section. Returns true if the entry was there, false if not. `set(path, nil)` does not remove an entry; this command does.',
+    summary: 'Remove an entry from a collection section.',
+    example: '`ce.panel.undefine("Cutoff", "States", "Disabled")` removes Cutoff\'s Disabled state.',
+    notes: [
+      '`set(path, nil)` does not remove an entry: this does.',
+      'Returns true when it was removed; false when there was none. Rejected: false, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
-      { name: 'name', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
+      { name: 'name', type: 'string', required: true, summary: 'The entry\'s name. Case-insensitive.\nNot one of the section\'s: false, without a word.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2570,13 +2690,18 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.',
+    summary: 'Change how a control looks in one of its states, such as hovered or pressed.',
+    example: '`ce.panel.patch("Cutoff", "Hover", { ["Background.Fill.colour"] = "red" })` turns Cutoff\'s fill red while it is hovered.',
+    notes: [
+      'This reaches the settings inside a state, which `set()` cannot.',
+      'Returns how many settings were applied. Rejected: 0, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'state', type: 'string', required: true },
-      { name: 'patch', type: 'object', required: true, kind: 'patch', at: 'control' },
-      { name: 'part', type: 'string', required: false },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'state', type: 'string', required: true, summary: 'The state\'s name, as `ce.panel.entries(control, "States")` lists them.\nNot one of its states: rejected with a console error.' },
+      { name: 'patch', type: 'object', required: true, summary: 'Property paths, such as "Background.Fill.colour", with their values in that state: added to what it changes already.\nA path in any case.\nA path that leads nowhere, a whole section, or a property its section lacks: not applied, with a console line saying why.\nA colour: stored as `set()` stores it; one it would refuse: rejected with a console error, and nothing is applied.', kind: 'patch', at: 'control' },
+      { name: 'part', type: 'string', required: false, summary: 'One part of a custom component, to change in that state.\nNot one of its parts: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2886,9 +3011,13 @@ export const COMMANDS = [
      so the five runtimes cannot disagree about what a parameter descriptor looks like. */
   {
     id: 'deviceProfile', category: 'Device / MIDI', signature: 'deviceProfile([role])',
-    summary: 'Describe the device profile in use for a device: { id, name, role, connected, ... }. Returns nothing when no profile is chosen. `role` names the device and defaults to "mainSynth".',
+    summary: 'Describe the device profile in use for a device.',
+    example: '`deviceProfile().name` gives the main synth\'s profile name.',
+    notes: [
+      'Returns { id, name, role, connected, … }; no profile chosen: no result.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'local p = deviceProfile()\nif p then log("device " .. p.name) end$0',
@@ -2898,9 +3027,13 @@ export const COMMANDS = [
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
     refusal: 'empty list',
-    summary: 'List the synth\'s parameters as the device profile describes them, each as { id, name, group, type, min, max, access }. Use `opts` to narrow the list, for example to one group. Returns an empty list when there is nothing to show, and nothing at all only when the ce.device module is switched off.',
+    summary: 'List the synth\'s parameters, as the device profile describes them.',
+    example: '`deviceParameters({ group = "Filter" })` lists the filter\'s parameters.',
+    notes: [
+      'Returns a list of { id, name, group, type, min, max, access }; none to show: an empty list.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'The options below, every one of which must match.\nLeft out: every parameter.\nNot a table: an empty list, without a word.', fields: optionFields([
       'role',
       { name: 'query', type: 'text', sample: '"cutoff"',
         summary: 'Keep only parameters whose name or id contains this.' },
@@ -2922,11 +3055,16 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameter', category: 'Device / MIDI', signature: 'deviceParameter(id [, role])',
-    summary: 'Describe one of the synth\'s parameters by its id, or return nothing if the device profile has no such parameter. Use it to check whether a synth has something before you try to change it.',
+    summary: 'Describe one of the synth\'s parameters, by its id.',
+    example: '`deviceParameter("cutoff").max` gives the highest value cutoff takes.',
+    notes: [
+      'Returns { id, name, group, type, min, max, access }.',
+      'Use it to see whether a synth has a parameter before writing it.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it.\nNot one of its parameters, or left out: no result, without a word.', kind: 'deviceParameter' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2939,11 +3077,15 @@ export const COMMANDS = [
   // that discovered eight oscillators could enumerate them and not address them.
   {
     id: 'deviceRead', category: 'Device / MIDI', signature: 'deviceRead(id [, role]) -> value',
-    summary: 'The last value the synth reported for a parameter, from a dump or a parameter message. Not a live query of the synth: it does not ask the synth anything. Returns nothing if the synth has never reported that parameter, which is different from 0.',
+    summary: 'Read the last value the synth reported for a parameter.',
+    example: '`deviceRead("cutoff")` gives the cutoff the synth last sent.',
+    notes: [
+      'Not a live query: what arrived in a dump or a parameter message; the synth is not asked.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id.\nNever reported, or left out: no result, without a word; not 0.', kind: 'deviceParameter' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2953,12 +3095,17 @@ export const COMMANDS = [
   },
   {
     id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
-    summary: 'Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter\'s own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent; so is any id the panel did not declare when no device profile is chosen for `role`.',
+    summary: 'Change a parameter on the synth by its id, without a control.',
+    example: '`deviceWrite("cutoff", 64)` sends cutoff 64 to the synth.',
+    notes: [
+      'The device profile builds the message.',
+      'Returns true when the message was dispatched, not whether the synth took it. Rejected: false, with a console error; nothing is sent.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'value', type: 'number or text', required: true },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it or `deviceDefineParameter()` declared it.\nNot one of them: rejected with a console error.', kind: 'deviceParameter' },
+      { name: 'value', type: 'number or text', required: true, summary: 'In the parameter\'s own units: those `deviceParameter()` gives the min and max of.\nA choice: its name, in any case, or its number.\nOne it cannot read: rejected with a console error.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2968,9 +3115,14 @@ export const COMMANDS = [
   },
   {
     id: 'deviceConnected', category: 'Device / MIDI', signature: 'deviceConnected([role])',
-    summary: 'Check whether a device is connected and ready. It is quick to call, and the right thing to check before asking for a dump.',
+    summary: 'Check whether a device is connected and ready.',
+    example: '`deviceConnected()` gives true once the main synth is.',
+    notes: [
+      'Quick to call: check it before asking for a dump.',
+      'Returns true or false.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'if deviceConnected() then requestDump("patch") end$0',
@@ -2992,10 +3144,15 @@ export const COMMANDS = [
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
     signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
-    summary: 'Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with anything wrong in it is refused and nothing is defined, with a message saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry. A value that write() cannot read is refused the same way, and nothing is sent.',
+    summary: 'Describe a synth parameter from the script.',
+    example: '`deviceDefineParameter("cutoff", { cc = 74 })` declares cutoff as CC 74.',
+    notes: [
+      'For a synth with no device profile, or a parameter a profile has wrong.',
+      'Returns true when it was defined. Rejected: false, with a console error; nothing is defined.',
+    ],
     params: [
-      { name: 'id', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: true, fields: optionFields([
+      { name: 'id', type: 'string', required: true, summary: 'The id to give it.\nOne the profile has: replaced, for this project.' },
+      { name: 'spec', type: 'object', required: true, summary: 'How it reaches the synth, `cc`, `nrpn` or `sysex`, and the options below.\nAnything wrong in it: rejected with a console error saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry.', fields: optionFields([
         { name: 'name', type: 'text', default: 'the id', sample: '"Cutoff"',
           summary: 'What to call it in the parameter list.' },
         { name: 'group', type: 'text', sample: '"Filter"', summary: 'Which group to file it under, such as "Filter".' },
@@ -3068,7 +3225,7 @@ export const COMMANDS = [
           summary: 'For a text parameter, the character code that fills it out to `length` (32 is '
             + 'a space).' },
       ]) },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3079,10 +3236,16 @@ export const COMMANDS = [
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
     signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
-    summary: 'Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Bytes are read the way defineParameter reads them, and a layout with anything wrong in it, or with no prefix to recognise it by, is refused with a message saying what. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.',
+    summary: 'Describe a SysEx dump layout from the script.',
+    example: '`deviceDefineDump("patch", { request = "F0 7D 01 F7", match = { prefix = "F0 7D 02" }, offset = 3, fields = { { parameter = "cutoff", offset = 0 } } })` declares a patch dump that starts with cutoff.',
+    notes: [
+      'Every field\'s parameter must be declared with `deviceDefineParameter()` first.',
+      'A dump of the layout arriving fills the bound controls and runs `onDumpReceived`, as a device profile\'s does.',
+      'Returns true when it was defined. Rejected: false, with a console error; nothing is defined.',
+    ],
     params: [
-      { name: 'kind', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: true, fields: optionFields([
+      { name: 'kind', type: 'string', required: true, summary: 'The name to give the dump, as `requestDump()` and `buildDump()` take it.' },
+      { name: 'spec', type: 'object', required: true, summary: 'The options below: the bytes that ask for it, how to recognise it, and where each value sits.\nBytes are read as `deviceDefineParameter()` reads them.\nAnything wrong in it, or no prefix to recognise it by: rejected with a console error saying what.', fields: optionFields([
         { name: 'name', type: 'text', default: 'the kind', sample: '"Patch"',
           summary: 'What to call this dump where it is listed.' },
         { name: 'request', type: 'text or list',
@@ -3117,7 +3280,7 @@ export const COMMANDS = [
             + 'value. Every parameter must already be declared with defineParameter; an unknown '
             + 'name is refused.' },
       ]) },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3131,11 +3294,16 @@ export const COMMANDS = [
     // Panel view only for the same reason ce.panel.create is: the binding lives on the control
     // model, and there is no control model with the window shut.
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Connect a control to a synth parameter from your script, so moving the control changes the parameter. It replaces any existing connection on the same port rather than adding a second one, and switches the control\'s device binding back on if it was off. The port defaults to "value".',
+    summary: 'Connect a control to a synth parameter, so moving the control changes it.',
+    example: '`deviceBind("Cutoff", "cutoff")` makes the control Cutoff send the synth\'s cutoff.',
+    notes: [
+      'It replaces a binding on the same port, and switches the control\'s device binding back on.',
+      'Returns true when bound. Rejected: false, with a console error.',
+    ],
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'parameterId', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'parameterId', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it.\nNot checked against the profile.', kind: 'deviceParameter' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.', fields: optionFields([
         'role',
         { name: 'port', type: 'text', default: '"value"',
           summary: 'Which part of the control is wired up. Binding again on the same port '
@@ -3152,10 +3320,14 @@ export const COMMANDS = [
     id: 'deviceUnbind', category: 'Device / MIDI',
     signature: 'deviceUnbind(control [, port]) -> boolean',
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Disconnect a control from its synth parameter. Returns whether there was a connection to remove.',
+    summary: 'Disconnect a control from its synth parameter.',
+    example: '`deviceUnbind("Cutoff")` stops Cutoff sending to the synth.',
+    notes: [
+      'Returns true when there was a binding to remove, false when not. Rejected: false, with a console error.',
+    ],
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'port', type: 'string', required: false },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'port', type: 'string', required: false, summary: 'The port to disconnect.\nLeft out: "value".' },
     ],
     scopes: 'any',
     snippet: {
@@ -3165,11 +3337,16 @@ export const COMMANDS = [
   },
   {
     id: 'devicePorts', category: 'Device / MIDI', signature: 'devicePorts([opts]) -> list',
-    summary: 'List the MIDI ports, each as { id, name, direction, type, hardware, role }. `hardware` is false for the two entries the app always shows ("No MIDI Input" and "Preview Only"); `role` names the device currently using the port, or is empty. Set `opts.direction` to "in" or "out" to list only one kind.',
+    summary: 'List the MIDI ports.',
+    example: '`devicePorts({ direction = "out" })` lists the ports that send.',
+    notes: [
+      'Returns a list of { id, name, direction, type, hardware, role }.',
+      '`hardware` is false for the two the app always shows, "No MIDI Input" and "Preview Only"; `role` names the device using the port, or is "".',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'The option below.\nLeft out: every port.', fields: optionFields([
       { name: 'direction', type: 'text', values: ['in', 'out'],
-        summary: 'List only the ports that receive, or only the ones that send.' },
+        summary: '"in": only the ports that receive.\n"out": only the ones that send.\nAnything else: every port, without a word.' },
     ]) }],
     scopes: 'any',
     snippet: {
@@ -3179,9 +3356,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceVariables', category: 'Device / MIDI', signature: 'deviceVariables([role]) -> table',
-    summary: 'The values the device profile fills into its messages — `channel`, `deviceId` and any others the profile has — with this project\'s own settings applied. Returns nothing when no profile is chosen for the device.',
+    summary: 'Read the values the device profile fills into its messages.',
+    example: '`deviceVariables().deviceId` gives the device id the panel sends.',
+    notes: [
+      'Returns `channel`, `deviceId` and any others the profile has, with this project\'s settings applied; no profile chosen: no result.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'log("device id " .. tostring(ce.device.variables().deviceId))$0',
@@ -3191,12 +3372,17 @@ export const COMMANDS = [
   {
     id: 'deviceSetVariable', category: 'Device / MIDI',
     signature: 'deviceSetVariable(name, value [, role]) -> boolean',
-    summary: 'Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16). A number is used as the nearest whole number from 0 to 127, which is said the first time it is not the number given; text that is not a number is refused. Refused too, and nothing is changed, for a device no profile is chosen for.',
+    summary: 'Change one of the values the device profile fills into its messages, for this project.',
+    example: '`deviceSetVariable("deviceId", 17)` talks to a second unit of the same synth.',
+    notes: [
+      'Saved with this project: the shared device profile is not changed, so two panels can use different device ids for one synth.',
+      'Returns true when it was set. Rejected: false, with a console error; nothing changes. A device no profile is chosen for: rejected.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'name', type: 'string', required: true },
-      { name: 'value', type: 'number', required: true },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'name', type: 'string', required: true, summary: 'The value\'s name, such as "deviceId" or "channel".\nLeft out: rejected with a console error.' },
+      { name: 'value', type: 'number', required: true, summary: 'A number.\nRange: 0 ↔ 127, whole; a channel 1 ↔ 16.\nA fraction: rounded.\nOutside the range: the nearest end, with a console warning the first time.\nText that is not a number: rejected with a console error.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3206,9 +3392,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceTiming', category: 'Device / MIDI', signature: 'deviceTiming([role]) -> table',
-    summary: 'How fast the panel may send to this device: `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project\'s own settings applied.',
+    summary: 'Read how fast the panel may send to the device.',
+    example: '`deviceTiming().minDelayBetweenMessagesMs` gives the least gap between messages.',
+    notes: [
+      'Returns `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project\'s settings applied.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'log("gap " .. tostring(ce.device.timing().minDelayBetweenMessagesMs) .. " ms")$0',
@@ -3218,12 +3408,17 @@ export const COMMANDS = [
   {
     id: 'deviceSetTiming', category: 'Device / MIDI',
     signature: 'deviceSetTiming(name, ms [, role]) -> boolean',
-    summary: 'Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself, uses the nearest whole number in range, and is refused for a device no profile is chosen for.',
+    summary: 'Change one timing setting, for this project.',
+    example: '`deviceSetTiming("minDelayBetweenMessagesMs", 20)` leaves at least 20 ms between messages.',
+    notes: [
+      'Saved with this project: the device profile is not changed.',
+      'Returns true when it was set. Rejected: false, with a console error. A device no profile is chosen for: rejected.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'name', type: 'string', required: true },
-      { name: 'ms', type: 'number', required: true },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'name', type: 'string', required: true, summary: 'The setting\'s name, as `deviceTiming()` lists it.\nNot checked against them.' },
+      { name: 'ms', type: 'number', required: true, summary: 'Milliseconds.\nRange: 0 ↔ 60000, whole.\nA fraction: rounded.\nOutside the range: the nearest end, with a console warning the first time.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3234,11 +3429,15 @@ export const COMMANDS = [
   {
     id: 'deviceCoverage', category: 'Device / MIDI',
     signature: 'deviceCoverage([feature [, role]]) -> table|string',
-    summary: 'What the device profile says it supports, as words rather than true/false. With no `feature`, returns the whole list — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Profiles answer "complete", "partial" or "notImplemented", and sometimes something more specific, so check for the words you care about.',
+    summary: 'Read what the device profile says it supports.',
+    example: '`deviceCoverage("realtimeEditing")` gives "complete", "partial" or "notImplemented".',
+    notes: [
+      'A profile can answer in words of its own: check for the ones that matter.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'feature', type: 'string', required: false },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'feature', type: 'string', required: false, summary: 'A feature\'s name, such as "singleParameterWrite", "realtimeEditing" or "editBufferDumpParse".\nLeft out: every feature, as a table.\nNot one the profile names: no result.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3248,9 +3447,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceRecipes', category: 'Device / MIDI', signature: 'deviceRecipes([role]) -> list',
-    summary: 'The names of the message templates this device profile can build — the formats its parameters are sent in. An empty list when no profile is chosen.',
+    summary: 'List the message templates the device profile can build.',
+    example: '`deviceRecipes()` gives the formats the synth\'s parameters are sent in.',
+    notes: [
+      'Returns a list of names; no profile chosen: an empty list.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'for _, id in ipairs(ce.device.recipes()) do log(id) end$0',
@@ -3259,9 +3462,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceRequests', category: 'Device / MIDI', signature: 'deviceRequests([role]) -> list',
-    summary: 'The names of the requests this device profile can send, such as an identity request or an edit-buffer request. Check here before assuming a synth supports one.',
+    summary: 'List the requests the device profile can send.',
+    example: '`deviceRequests()` gives names such as an identity request.',
+    notes: [
+      'Returns a list of names: check here before assuming a synth answers one.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'for _, id in ipairs(ce.device.requests()) do log(id) end$0',
@@ -3870,14 +4077,25 @@ export const PANEL_COMMANDS = [
   // footswitch action in a DAW with the window shut — which is exactly where it has to work.
   {
     id: 'panelSnapshot', category: 'Panel components', signature: 'panelSnapshot() -> object',
-    summary: 'Capture every control\'s current value, as an object keyed by control name. Controls that have no value of their own are left out. Store it with `ce.storage.saveSetting()` to keep it, or hold it in `state` for an A/B comparison, and put it back with `ce.panel.restore()`.',
+    summary: 'Capture every control\'s value, by name.',
+    example: '`local before = ce.panel.snapshot()` keeps the panel\'s values, to put back with `ce.panel.restore(before)`.',
+    notes: [
+      'A control without a value of its own is left out.',
+      'Keep it with `ce.storage.saveSetting()`, or in `state` for an A/B comparison.',
+      'Returns a table of control names and their values.',
+    ],
     params: [], scopes: 'any',
     snippet: { lua: 'local before = ce.panel.snapshot()$0', javascript: 'const before = ce.panel.snapshot();$0' },
   },
   {
     id: 'panelEach', category: 'Panel components', signature: 'panelEach(fn) -> number',
-    summary: 'Call `fn(name)` once for every control on the panel, including containers and the controls inside them, in the order they appear in the panel. Returns how many controls it visited. The list of names is taken before the first call, so `fn` can safely create or remove controls. To find out more about a control than its name, use `ce.panel.info()`.',
-    params: [{ name: 'fn', type: 'function', required: true }], scopes: 'any',
+    summary: 'Call a function once for every control, with its name.',
+    example: '`ce.panel.each(function(name) log(name) end)` logs every control\'s name.',
+    notes: [
+      '`ce.panel.info()` tells more about each.',
+      'Returns how many controls it was called for. Rejected: 0, with a console error.',
+    ],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'Called as fn(name) for every control, those inside containers too, in panel order.\nThe names are taken first, so it can make or remove controls.\nNot a function, or left out: rejected with a console error.' }], scopes: 'any',
     snippet: {
       lua: 'ce.panel.each(function(name)\n  $0\nend)',
       javascript: 'ce.panel.each(function (name) {\n  $0\n});',
@@ -3885,8 +4103,12 @@ export const PANEL_COMMANDS = [
   },
   {
     id: 'panelRestore', category: 'Panel components', signature: 'panelRestore(snapshot) -> number',
-    summary: 'Write the values from a `ce.panel.snapshot()` back to the controls. Returns how many values were written. A control the panel no longer has is skipped rather than stopping the whole restore.',
-    params: [{ name: 'snapshot', type: 'object', required: true }], scopes: 'any',
+    summary: 'Write the values of a `ce.panel.snapshot()` back to the controls.',
+    example: '`ce.panel.restore(before)` puts back the values `before` holds.',
+    notes: [
+      'Returns how many values were written. Rejected: 0, with a console error.',
+    ],
+    params: [{ name: 'snapshot', type: 'object', required: true, summary: 'A table of control names and values, as `ce.panel.snapshot()` gives.\nA control the panel no longer has: skipped.\nNot a table, or left out: rejected with a console error.' }], scopes: 'any',
     snippet: { lua: 'ce.panel.restore(before)$0', javascript: 'ce.panel.restore(before);$0' },
   },
 

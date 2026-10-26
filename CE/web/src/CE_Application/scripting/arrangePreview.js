@@ -109,11 +109,12 @@ export function readArrangement(memberId, args, { panel, controls } = {}) {
 
 /** What the row says of an arrangement, under its map. */
 function arrangementSaid({ memberId, verb, items, moved, refused }) {
-  if (refused) return 'Nothing moves.';
+  // Too few controls is said in the row's own words before the plan's refusal, which now names it too.
   if (!items.length) return 'None of the names is a control on this panel, so nothing moves.';
   if (memberId !== 'panelAlign' && items.length < 2) {
     return `${verb} needs at least two controls, and only "${items[0].name}" is one, so nothing moves.`;
   }
+  if (refused) return 'Nothing moves.';
   if (!moved) return memberId === 'panelMatch' ? 'Nothing changes size: they are already the same.' : 'Nothing moves: they are already where it puts them.';
   const still = items.filter((i) => !i.moved).map((i) => `"${i.name}"`);
   const verbed = memberId === 'panelMatch' ? 'Resizes' : 'Moves';

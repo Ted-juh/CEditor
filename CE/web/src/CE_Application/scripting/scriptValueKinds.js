@@ -1581,13 +1581,14 @@ export function readFontAxis(value, { name = '', family, faces, at, tag } = {}) 
 /**
  * ce.panel.create's type: the types there are, which ce.panel.types() lists, the size one is made
  * at, and the runtime's refusal for one there is none of, with the nearest when it is a slip. The
- * type is matched exactly, so "knob" is refused and "Knob" is one.
+ * type is matched in any case, as the runtime matches it (its review): "knob" is the Knob.
  */
 export function readComponentType(value, { types = {} } = {}) {
   const names = Object.keys(types);
   const meaning = { choices: names };
   if (typeof value !== 'string') return { meaning, problem: null };
-  const spec = types[value];
+  const given = value.trim().toLowerCase();
+  const spec = types[names.find((n) => n.toLowerCase() === given)];
   if (!spec) {
     const near = closest(value, names);
     if (near !== null) meaning.hint = `did you mean "${near}"?`;

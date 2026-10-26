@@ -405,6 +405,19 @@ try {
       const x=await handle.evaluate(e=>Number(e.getAttribute('x'))+Number(e.getAttribute('width'))/2);assert.equal(x,80,'return rests at configured 0.25');
       assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'&&e.payload.parameterId==='mix').at(-1)?.payload.value),0.25,'return emits its target');};await verify();await reopen(id);await verify();
   });
+  await check('A script write to a source reaches its bound parameter once, and a drag is not sent twice',async()=>{
+    // ce.components.crossfader.mix() and the other sources' verbs write the stored value; only a
+    // drag or a ticker used to send it, so a script moved the handle and nothing else.
+    const id=await fixture('Crossfader',{DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'mix',deviceRole:'mainSynth',parameterId:'mix',dryRun:true}]}});
+    await props.getByTitle('Enter Preview',{exact:true}).click();await settle();await captureMidi();
+    const sent=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'&&e.payload.parameterId==='mix').map(e=>e.payload.value));
+    const write=(value)=>page.evaluate(async({id,value})=>{const {updateControlProperty}=await import('/src/CE_Application/stores/controls.js');updateControlProperty(id,'Crossfader.mix',value);},{id,value});
+    assert.deepEqual(await sent(),[],'opening sends nothing');
+    await write(0.8);await settle();assert.deepEqual(await sent(),[0.8],'a stored write is sent');
+    await write(0.8);await settle();assert.deepEqual(await sent(),[0.8],'the same value again is not');
+    await captureMidi();await node(id).click({position:{x:80,y:80}});await settle();
+    const after=await sent();assert.ok(after.length>0,'the click sends');assert.equal(after.filter(v=>v===after.at(-1)).length<=2,true,`the release is not sent again when it is stored: ${JSON.stringify(after)}`);
+  });
   await check('Joystick geometry grid corners puck and six bound outputs follow real gestures',async()=>{
     const ports=['x','y','cornerTL','cornerTR','cornerBL','cornerBR'];
     const id=await fixture('VectorJoystick',{Joystick:{cornerLabels:['Top left','Top right','Bottom left','Bottom right'],puckColour:'FFFF0000',padColour:'FF000080',cornerColour:'FF00FF00'},DeviceBindings:{enabled:true,bindings:ports.map(port=>({kind:'deviceParameter',port,deviceRole:'mainSynth',parameterId:port,dryRun:true}))}});

@@ -6416,8 +6416,20 @@ function applyControlProps(control, props, sections, scriptId, call) {
   const core = control._children.Core;
   const transform = control._children.Transform;
   if (props.name != null) core.name = String(props.name);
+  // A place or a size that is not a number, or a size not above 0, leaves the control's own, and is
+  // said: it was dropped without a word.
   for (const [prop, key] of [['x', 'x'], ['y', 'y'], ['width', 'width'], ['height', 'height']]) {
-    if (props[prop] != null && Number.isFinite(Number(props[prop]))) transform[key] = Number(props[prop]);
+    const value = props[prop];
+    if (value == null) continue;
+    const n = Number(value);
+    const size = prop === 'width' || prop === 'height';
+    if (typeof value === 'boolean' || !Number.isFinite(n)) {
+      panelSaid(`${call}: the ${prop} ${JSON.stringify(value)} is not a number, so its own ${transform[key] ?? 0} was kept.`);
+    } else if (size && n <= 0) {
+      panelSaid(`${call}: the ${prop} ${n} is not above 0, so its own ${transform[key] ?? 0} was kept.`);
+    } else {
+      transform[key] = n;
+    }
   }
   // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
   // script setting one field does not wipe the rest of the section.
@@ -6495,13 +6507,29 @@ function childToMerge(node, name) {
 
 const isPlainTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
+/** Why a `parent` given to create or clone cannot hold the control, or null when it can or none was given. */
+function containerRefusal(parentName, call, outcome) {
+  if (parentName == null || parentName === '') return null;
+  const parent = controlNamed(parentName);
+  if (!parent) return `${call}: no control named "${parentName}" to put it in, so ${outcome}.`;
+  if (!isContainerControl(parent)) return `${call}: "${parentName}" is not a container (it has no Children section), so ${outcome}.`;
+  return null;
+}
+
 function panelCreateImpl(type, props, scriptId) {
-  const typeName = String(type ?? '');
-  if (!COMPONENT_TYPES[typeName]) {
-    addScriptTrace('error', '',
-      `ce.panel.create("${typeName}"): no such component type. ce.panel.types() lists them.`);
+  // The type in any case, as every word from a list the app defines is read: "knob" was refused.
+  const given = String(type ?? '').trim();
+  const typeName = typeNamed(given);
+  if (!typeName) {
+    addScriptTrace('error', '', given
+      ? `ce.panel.create("${given}"): no such component type. ce.panel.types() lists them.`
+      : 'ce.panel.create: no type was given. ce.panel.types() lists them.');
     return null;
   }
+  // A container that is not there, or is not a container, refuses the call: the control was made at
+  // the top level with an error said, and an error means the call did nothing.
+  const parentRefusal = containerRefusal(props?.parent, `ce.panel.create("${typeName}")`, 'nothing was created');
+  if (parentRefusal) { addScriptTrace('error', '', parentRefusal); return null; }
   let control;
   try { control = createControl(typeName); }
   catch (e) { addScriptTrace('error', '', `ce.panel.create("${typeName}"): ${e?.message ?? e}`); return null; }
@@ -6515,14 +6543,7 @@ function panelCreateImpl(type, props, scriptId) {
 
   const parentName = props?.parent ? String(props.parent) : null;
   const parent = parentName ? controlNamed(parentName) : null;
-  if (parentName && !parent) {
-    addScriptTrace('error', '', `ce.panel.create: no control named "${parentName}" to parent into.`);
-  }
   const parentId = parent && isContainerControl(parent) ? parent._children.Core.id : null;
-  if (parent && !parentId) {
-    addScriptTrace('error', '',
-      `ce.panel.create: "${parentName}" is not a container (it has no Children section), so the new control went to the top level.`);
-  }
 
   return updateControls((controls) => insertControlIntoTree(controls, parentId, control))
     ? control._children.Core.name
@@ -6530,8 +6551,13 @@ function panelCreateImpl(type, props, scriptId) {
 }
 
 function panelCloneImpl(name, props, scriptId) {
+  if (name == null || name === '') { addScriptTrace('error', '', 'ce.panel.clone: no control was named, so nothing was copied.'); return null; }
   const source = controlNamed(name);
   if (!source) { addScriptTrace('error', '', `ce.panel.clone: no control named "${name}".`); return null; }
+  // A container given that is not one refuses the call, as create's does: the copy went to the top
+  // level without a word.
+  const parentRefusal = containerRefusal(props?.parent, `ce.panel.clone("${name}")`, 'nothing was copied');
+  if (parentRefusal) { addScriptTrace('error', '', parentRefusal); return null; }
 
   const copy = remintControlIds(source);
   // Only what the script passes is read: the source's own colours are stored already.
@@ -6552,6 +6578,7 @@ function panelCloneImpl(name, props, scriptId) {
 }
 
 function panelDestroyImpl(name) {
+  if (name == null || name === '') { addScriptTrace('error', '', 'ce.panel.destroy: no control was named, so nothing was removed.'); return false; }
   const control = controlNamed(name);
   if (!control) return false;
   const id = control._children.Core.id;
@@ -6644,7 +6671,18 @@ function findQueryProblem(query) {
     if (v === undefined || v === null || typeof v === type) continue;
     return `${key} takes ${FIND_TAKES[type]}, not ${shownQueryValue(v)}, so nothing was found.`;
   }
+  // A type is one of the types, in any case: "knob" found nothing, and a type that is none found
+  // nothing without a word.
+  if (typeof query.type === 'string' && !typeNamed(query.type)) {
+    return `"${query.type}" is not a control type, so nothing was found. ce.panel.types() lists them.`;
+  }
   return null;
+}
+
+/** A control type spelled in any case, under its own spelling, or undefined. */
+function typeNamed(given) {
+  const wanted = String(given ?? '').trim().toLowerCase();
+  return Object.keys(COMPONENT_TYPES).find((t) => t.toLowerCase() === wanted);
 }
 
 function panelFindImpl(query) {
@@ -6659,15 +6697,16 @@ function panelFindImpl(query) {
     .map((c) => ({ control: c, info: controlSummary(c, controls) }))
     .filter(({ info }) => {
       if (q.name != null && !info.name.toLowerCase().includes(String(q.name).toLowerCase())) return false;
-      if (q.type != null && info.type !== String(q.type)) return false;
+      if (q.type != null && info.type !== typeNamed(q.type)) return false;
       if (q.generated != null && info.generated !== (q.generated === true)) return false;
-      if (q.parent != null && info.parent !== String(q.parent)) return false;
+      if (q.parent != null && String(info.parent ?? '').toLowerCase() !== String(q.parent).trim().toLowerCase()) return false;
       return true;
     })
     .map(({ info }) => info.name);
 }
 
 function panelInfoImpl(name) {
+  if (name == null || name === '') { addScriptTrace('error', '', 'ce.panel.info: no control was named.'); return null; }
   const control = controlNamed(name);
   if (!control) return null;
   return controlSummary(control, activePanel()?.controls ?? []);
@@ -6691,7 +6730,9 @@ function panelInfoImpl(name) {
 
 /** Transforms for a list of names, in PANEL space, skipping names that are not controls. */
 function panelTransforms(names, verb) {
-  const list = Array.isArray(names) ? names : (names == null ? [] : Object.values(names));
+  // One name is a list of one: a text was read letter by letter, each "no control named".
+  const list = Array.isArray(names) ? names
+    : (names == null ? [] : (typeof names === 'object' ? Object.values(names) : [names]));
   const controls = activePanel()?.controls ?? [];
   const out = [];
   for (const raw of list) {
@@ -6779,7 +6820,17 @@ function panelArrange(memberId, transforms, which, opts) {
     addScriptTrace('error', '', plan.refused);
     return 0;
   }
+  for (const said of plan.said ?? []) panelSaid(said);
   return panelApplyPatches(transforms, plan.patches);
+}
+
+// An option or a prop used as its default, said once (the owner's word on ce.panel); resetScriptState
+// clears it.
+const panelWarned = new Set();
+function panelSaid(said) {
+  if (!said || panelWarned.has(said)) return;
+  panelWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
 }
 
 function panelAlignImpl(names, edge, opts) {
@@ -6858,7 +6909,10 @@ function panelOrderImpl(names, where) {
     return 0;
   }
   const wanted = new Set(panelTransforms(names, 'order').map((t) => t.id));
-  if (!wanted.size) return 0;
+  if (!wanted.size) {
+    addScriptTrace('error', '', 'ce.panel.order: no control was named, so nothing was moved.');
+    return 0;
+  }
 
   const reorder = (siblings) => {
     const mine = siblings.filter((c) => wanted.has(c?._children?.Core?.id));
@@ -7413,7 +7467,10 @@ function panelSnapshotImpl() {
 }
 
 function panelRestoreImpl(snap) {
-  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) return 0;
+  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) {
+    addScriptTrace('error', '', `ce.panel.restore: ${snap == null ? 'no snapshot was given' : `${JSON.stringify(snap)} is not a snapshot`}: a table of control names and values, as ce.panel.snapshot() gives. Nothing was restored.`);
+    return 0;
+  }
   let n = 0;
   for (const [name, value] of Object.entries(snap)) {
     if (getValue(`${name}.value`) === undefined) continue;
@@ -10294,6 +10351,7 @@ function resetScriptState() {
   deviceOverrideWarned.clear();
   musicWarned.clear();
   drawWarned.clear();
+  panelWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

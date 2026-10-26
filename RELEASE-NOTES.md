@@ -275,6 +275,30 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   a loop from bar 1 to 999 and 0.25 to 64 bars long, a count-in of 0 to 8 bars. A script could set
   400, a negative swing, 9999 bars and a 16-bar count-in, and the clock played 300, straight, 999,
   64 and 8; `loopBars` took whole bars only, where the inspector takes quarters.
+- `ce.panel` says what it did not do. `create` and `find` read a type in any case ("knob"); a
+  container that is not there, or not a container, refuses `create` and `clone` (the control was
+  made at the top level with an error said); a place or size that is not a number is said, and the
+  control keeps its own; one name given to `align` and the others is a list of one (it was read
+  letter by letter); too few controls, a negative radius, an option that is not a number, and a
+  name or snapshot left out are each refused or said, where they did nothing without a word.
+- `ce.components.envelope.preset` gives the envelope the preset's shape, as the inspector's Preset
+  does; it wrote the name and left the shape. A point moved with `pointX`, and a Router curve point
+  with `curveX`, stays between its neighbours, the first at 0 and the last at 1, as a drag keeps
+  it; `loopStart` and `loopEnd` count from 1 to the points there are (0 was stored as -1).
+- `ce.components.turing.phase` moves a running Turing Machine, as the arp's does, and `read` gives
+  where it is; a change to its steps, by `step()` or the inspector, starts the running register from
+  them, where a register that had mutated went on without them. Its `length` starts at 2, as it plays.
+- A script that moves a source (`ce.components.macro.value`, `ribbon.value`, `crossfader.mix`,
+  `joystick.move`, `timbre.move`, `constellation.probe`, a Mod Matrix cell, an Envelope point) now
+  sends the new values to the parameters bound to it, as a drag does. It moved what was drawn and
+  sent nothing.
+- `ce.components.orbit.phase` and `ce.components.looper.phase` move a running Orbit or Looper, as the
+  arp's does, and `read` gives where it is. The Orbit's and the Looper's `bars`, and the
+  Constellation's, take quarters from 0.25, as they play; the Orbit's `nodeDepth` takes 0 to 1 and
+  the Constellation's `blend` 0.5 to 16, where values outside were taken and played as the nearest.
+- `ce.components.kinetic.launch` and `velocity` throw a running ball again, where it went on as it
+  was. Its `gravity` takes 0 to 4 and `bounce` 0 to 1, as the ball plays them: an upward pull played
+  as none, and a bounce above 1 as 1.
 
 ## What you get
 

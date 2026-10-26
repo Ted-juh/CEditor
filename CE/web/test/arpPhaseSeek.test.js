@@ -86,3 +86,43 @@ test('read gives the muted steps counted from 1, and one step as whether it is m
   assert.deepEqual(done.said, ['arp.read("mute", 0): 0 is not a step: the steps count from 1.']);
 });
 
+
+test('the Turing Machine\'s phase is a seek too, and read answers where it is', () => {
+  // Its review, after the arp's item 6: the preview keeps the Turing Machine's position as it keeps
+  // the arp's, so a stored phase was read only when the preview opened.
+  resetScriptStateForTesting();
+  const control = createControl('Turing', { name: 'Turing' });
+  const panel = { id: 'p', name: 'P', width: 800, height: 400, controls: [control], scripting: { modules: MODULES.map((m) => m.id) } };
+  setRuntimeHost({ panel, scripts: [], readValue: (c, p) => valueAtPath(c, p), writeValue: (c, p, v) => (setNestedValue(c, p, v), true) });
+  const sought = [];
+  let at = 0.2;
+  const withdraw = provideComponentPhases({ where: () => at, seek: (id, phase) => { sought.push([id, phase]); at = phase; } });
+  try {
+    const turing = scriptApiForTesting('Turing', 'turing-phase-probe').ce.components.turing;
+    assert.deepEqual([turing.read('Turing', 'phase'), turing.phase('Turing', 0.75), turing.read('Turing', 'phase')], [0.2, true, 0.75]);
+    assert.deepEqual(sought, [[control._children.Core.id, 0.75]]);
+    assert.equal(control._children.Turing.phase, 0, 'nothing written to the panel');
+  } finally { withdraw(); setRuntimeHost(null); }
+});
+
+test('the Orbit\'s and the Looper\'s phase are seeks too, and synced they say the Transport decides', () => {
+  // Their reviews: the preview keeps both positions as it keeps the arp's.
+  for (const [type, verbs] of [['Orbit', 'orbit'], ['Looper', 'looper']]) {
+    resetScriptStateForTesting();
+    const control = createControl(type, { name: type });
+    const panel = { id: 'p', name: 'P', width: 800, height: 400, controls: [control], scripting: { modules: MODULES.map((m) => m.id) } };
+    setRuntimeHost({ panel, scripts: [], readValue: (c, p) => valueAtPath(c, p), writeValue: (c, p, v) => (setNestedValue(c, p, v), true) });
+    const sought = [];
+    let at = 0.4;
+    const withdraw = provideComponentPhases({ where: () => at, seek: (id, phase) => { sought.push([id, phase]); at = phase; } });
+    try {
+      const api = scriptApiForTesting(type, `${verbs}-phase-probe`).ce.components[verbs];
+      assert.deepEqual([api.read(type, 'phase'), api.phase(type, 0.5), api.read(type, 'phase')], [0.4, true, 0.5], type);
+      assert.deepEqual(sought, [[control._children.Core.id, 0.5]], type);
+      assert.equal(control._children[type].phase, 0, `${type}: nothing written to the panel`);
+      control._children[type].syncToTransport = true;
+      api.phase(type, 0.25);
+      assert.equal(sought.length, 1, `${type}: synced, the Transport decides`);
+    } finally { withdraw(); setRuntimeHost(null); }
+  }
+});
