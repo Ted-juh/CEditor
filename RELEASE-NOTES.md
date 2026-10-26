@@ -260,6 +260,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.pixel.kind` and `ce.components.pixel.source` set what an element is and which
   control it shows, by the element's name, as `lcd.zoneKind` and `lcd.zoneSource` do for a zone:
   `pixel.source("Screen", "Cutoff", "Resonance")`. Only the inspector could set either.
+- `ce.components.pixel.gamma` takes 0.2 to 4 and `transitionMs` 0 to 2000, as the inspector does:
+  a gamma of 0.1 was stored and drawn as 0.2, and a transition up to 5000 ms could be set that the
+  inspector could not show.
 
 ## What you get
 

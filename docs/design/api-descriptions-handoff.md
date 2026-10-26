@@ -1567,16 +1567,17 @@ against the renderer (`PixelDisplayRenderer.svelte`, `LcdGraphicCanvas.svelte`) 
 2. `x`, `y`, `w`, `h`: done, below.
 3. `text`, `label`: done, below.
 4. Parity with the LCD's zones: an element's `kind` and `source`: done, below.
-5. `brightness`, `contrast`.
-6. `gamma`.
-7. `glow`.
-8. The animation: `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`.
-9. `layoutTransition`, `transitionMs`.
-10. `editText`.
-11. `backlight`, `brightnessSource`.
-12. The overlays: `showGlass`, `showGhost`, `showScanlines`, `showGrid`.
-13. `layout`.
-14. The family: its summary, the name in the examples (`"PixelDisplay"`), and `read`'s texts.
+5. `brightness`, `contrast`: done, below.
+6. `gamma`: done, below.
+7. `glow`: done, below.
+8. The animation: `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`: done, below.
+9. `layoutTransition`, `transitionMs`: done, below.
+10. `editText`: done, below.
+11. `backlight`, `brightnessSource`: done, below.
+12. The overlays: `showGlass`, `showGhost`, `showScanlines`, `showGrid`: done, below.
+13. `layout`: done, below.
+14. The family: its summary, the name in the examples (`"PixelDisplay"`), and `read`'s texts: done,
+    below. The pixel's review is done.
 
 **Item 1, `show`, `blink` and `name`: done.** The renderer draws an element unless its `visible`
 is false, and the inspector's Vis toggle reads it the same way, but a bare `show()` toggled from
@@ -1654,6 +1655,34 @@ and pitch sources and "adsr"'s four.
 
 Each ends with the two notes every command has.
 
+**Items 5 to 14: done in one pass**, at the owner's word on 2026-10-26 ("I think you know what to
+do, could you just continue through the modules and finish it?"): each item's recommendation
+taken, as item 5 was shown, and recorded here for review. The texts say what the canvas
+(`LcdGraphicCanvas.svelte`) and the renderer draw:
+
+- **5, `brightness` and `contrast`**, as shown: lit pixels at 10% + 90% of the brightness through
+  the gamma, so 0 is dim and lit; a linked `brightnessSource` sets it; the contrast is the unlit
+  pixels' visibility (half of it, never below 3%) and the backlight wash's strength.
+- **6, `gamma`: 0.2 ↔ 4**, the canvas's and the inspector's; 0.1 was stored and drawn as 0.2.
+  Above 1 lifts the lower brightnesses.
+- **7, `glow`**: a halo under each lit pixel, at most 2.6 times its size.
+- **8, the animation**: the LCD's approved texts, "behind the elements"; `animFps` keeps the LCD's
+  1 ↔ 120 (both inspectors stop at 60), for one range on the one engine.
+- **9, `layoutTransition` and `transitionMs`**: what each word does (a CSS fade, or a fade and a
+  10% slide from the right, on a change of layout); `transitionMs` takes the inspector's 0 ↔ 2000,
+  whole, where it took 5000.
+- **10, `editText`**: the LCD's text, and that an "edit" element linked to "@edit" shows it.
+- **11, `backlight` and `brightnessSource`**: a linked control wins over the script, said; the
+  source's range maps to 0 ↔ 100.
+- **12, the overlays**: declared as the LCD's; the grid is the editor's only (`editable` in the
+  renderer), never drawn in the preview or a plug-in, its spacing the inspector's Snap or 8.
+- **13, `layout`**: as made in "The LCD's script model"; nothing to change.
+- **14, the family**: "Screen" in every example, as the LCD's (the inspector's section is called
+  Screen too); the summary says what the module does; `read`'s index is a name (`readIndexKind`,
+  so it is typed "string"), and its notes name the element tables and the layout.
+
+Defaults are given in each note ("Default: 55."), as the arp's are.
+
 ## Checking each batch
 
 From `CE/web`:
@@ -1685,8 +1714,9 @@ too ("The owner's review, one item at a time", and "The LCD's script model", whi
 script can address), and so is its "line" wording. So are the LCD's script commands for a layout's
 zones, by name as a Pixel Display's elements are ("Zones by name" in this file), and so is
 ce.components.arp ("ce.components.arp: the owner's review" in this file, all fifteen items).
-ce.components.pixel is under way ("ce.components.pixel: the owner's review" in this file, its queue
-and the items done); continue with its next item, in
+ce.components.pixel is done too ("ce.components.pixel: the owner's review" in this file). The
+owner then said to continue through the modules and finish them without showing each item: take
+each recommendation, record it here, and carry on with the next module by the table,
 technical English, schematic, one rule per line, with ranges, as its table says, showing every
 parameter and option of the command in its item. The component texts are generated from
 componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check

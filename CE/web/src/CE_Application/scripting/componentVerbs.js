@@ -941,8 +941,16 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
-    id: 'pixel', section: 'Pixel', prefix: 'pixel', label: 'Pixel Display',
-    summary: 'Drive a pixel display: its elements\' text, visibility and position, plus backlight, brightness and animation.',
+    // Item 14 of the owner's review: "Screen" in the examples, as the LCD's, and read's texts for
+    // what this family reads: its elements by name, and the layout showing.
+    id: 'pixel', section: 'Pixel', prefix: 'pixel', label: 'Pixel Display', sample: 'Screen',
+    summary: 'Draw on a pixel screen by named elements: what each is, shows and where, plus its layouts, backlight, brightness and animation.',
+    // Its read takes a name, never a number: an element is reached by name (pixelElements.js).
+    readIndexKind: STR,
+    readIndex: ['For an element verb, such as "text": the element\'s name. Case-insensitive.', 'Left out: every element\'s, by name.',
+      'Not an element of the display: rejected with a console error.'],
+    readNotes: ['`read(target, "text")`: every element\'s, by name; `read(target, "text", "Title")`: one element\'s.',
+      '`read(target, "layout")`: the number of the layout showing.'],
     verbs: [
       // THE SCENE, ADDRESSED BY NAME. These eight are why the `elem` kind exists; the reasoning is
       // in utils/pixelElements.js and the short version is that neither of the two obvious keys
@@ -1019,26 +1027,70 @@ export const COMPONENT_FAMILIES = [
 
       // The on-screen editable field, as on the LCD: the buffer an `edit` element bound to '@edit'
       // shows. It was reachable by typing at the screen and by a device binding, and by nothing
-      // else — so no script could read the patch name the user had just entered.
-      v('editText', 'editText', STR,
-        { doc: 'The screen\'s editable text field (a patch name). Reads back what is in it.' }),
-      v('backlight', 'backlightOn', BOOL, { toggle: true }),
-      v('brightness', 'brightness', NUM, { min: 0, max: 100 }),
-      v('contrast', 'contrast', NUM, { min: 0, max: 100 }),
-      v('gamma', 'gamma', NUM, { min: 0.1, max: 4 }),
-      v('glow', 'glow', NUM, UNIT),
-      v('anim', 'animMode', ENUM),
-      v('animPreset', 'animPreset', ENUM),
-      v('animSpeed', 'animSpeed', NUM, { min: 0.1, max: 5 }),   // the inspector's range, as the LCD's
-      v('animLoop', 'animLoop', BOOL, { toggle: true }),
-      v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
-      v('layoutTransition', 'layoutTransition', ENUM, { doc: 'How one layout gives way to the next.' }),
-      v('transitionMs', 'transitionMs', NUM, { min: 0, max: 5000 }),
-      v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
-      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any',
+      // else — so no script could read the patch name the user had just entered. A script's text is
+      // stored as given, as the LCD's: the field's character set and length govern typing.
+      v('editText', 'editText', STR, { doc: 'Set the text in the display\'s editable field.', ex: ['"INIT VOICE"', 'puts INIT VOICE in the field'],
+        argDocs: { editText: 'The text in the field.\nShown by an "edit" element linked to "@edit".\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['`read(target, "editText")` gives what is in the field, typed at the screen or set here.', 'Default: "INIT".'] }),
+      // Items 5 to 12 of the owner's review of the pixel, the screen as a whole: what the canvas
+      // (LcdGraphicCanvas.svelte) and the renderer (PixelDisplayRenderer.svelte) do with each.
+      v('backlight', 'backlightOn', BOOL, { toggle: true, doc: 'Switch the backlight on or off.',
+        argDocs: { backlight: `true: the backlight colour washes the screen.\nfalse: off.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['While `backlightSource()` links a control, that control switches it.', 'Default: on.'] }),
+      // Lit dots are drawn at 10% + 90% of the brightness, through the gamma: 0 is dim, not dark.
+      v('brightness', 'brightness', NUM, { min: 0, max: 100, doc: 'Set how bright the lit pixels are.', ex: ['80', 'sets the brightness to 80'],
+        argDocs: { brightness: 'How bright the lit pixels are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit: a tenth as bright.\nShaped by `gamma()`.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['While `brightnessSource()` links a control, that control sets the brightness.', 'Default: 100.'] }),
+      // Unlit dots at half the contrast, never below 3%; the backlight wash at 35% + 50% of it.
+      v('contrast', 'contrast', NUM, { min: 0, max: 100, doc: 'Set the contrast: how visible the unlit pixels are.', ex: ['55', 'sets the contrast to 55'],
+        argDocs: { contrast: 'How visible the unlit pixels are.\nAlso how strongly the backlight glows.\nRange: 0 ↔ 100.\n0: the unlit pixels at their faintest, still visible.\n100: the unlit pixels half opaque.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The unlit pixels show only while `showGhost()` is on.', 'Default: 55.'] }),
+      // The canvas reads the gamma as 0.2 to 4, and so does the inspector: 0.1 was stored and drawn
+      // as 0.2 (item 6).
+      v('gamma', 'gamma', NUM, { min: 0.2, max: 4, doc: 'Set the brightness curve.', ex: ['2', 'lifts the dimmer brightnesses'],
+        argDocs: { gamma: 'The curve between `brightness()` and how bright the lit pixels are drawn.\n1: straight.\nAbove 1: the lower brightnesses lifted.\nBelow 1: lowered.\nRange: 0.2 ↔ 4.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 1.'] }),
+      // A halo under each lit dot, its radius 1 + 1.6 × glow times the dot's, at 28% × glow of its brightness.
+      v('glow', 'glow', NUM, { ...UNIT, doc: 'Set the glow: a halo around the lit pixels.', ex: ['0.5', 'gives the lit pixels a halo'],
+        argDocs: { glow: 'How large and strong the halo is.\n0: none.\n1: the largest, 2.6 times a pixel\'s size.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 0.'] }),
+      // The animation layer behind the elements, the LCD's engine: its texts, as approved there.
+      v('anim', 'animMode', ENUM, { doc: 'Set the animation behind the elements: off, a file, or a preset.', ex: ['"preset"', 'plays the chosen preset animation'],
+        notes: ['The file is chosen in the inspector.', 'Default: "off".'] }),
+      v('animPreset', 'animPreset', ENUM, { doc: 'Choose the preset animation.', ex: ['"rain"', 'plays the rain animation'],
+        notes: ['Plays while `anim()` is "preset".', 'Default: "wave".'] }),
+      v('animSpeed', 'animSpeed', NUM, { min: 0.1, max: 5, doc: 'Set the speed of the preset animation, as a multiple of its normal speed.', ex: ['2', 'plays the preset animation at twice its normal speed'],
+        argDocs: { animSpeed: 'Speed factor.\nRange: 0.1 ↔ 5.\n1: normal.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 1.'] }),
+      v('animLoop', 'animLoop', BOOL, { toggle: true, doc: 'Switch looping of the animation on or off.',
+        argDocs: { animLoop: `Left out: toggles.\nfalse: the last frame holds.\n${OFF_RULE}` },
+        notes: ['Default: on.'] }),
+      v('animFps', 'animFps', NUM, { min: 1, max: 120, doc: 'Set the frame rate of a sprite-sheet animation.', ex: ['24', 'plays the sheet at 24 frames per second'],
+        argDocs: { animFps: 'Frames per second.\nOnly for a sprite sheet: a GIF or APNG plays at its own speed.\nRange: 1 ↔ 120.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Default: 12.'] }),
+      // The renderer's CSS transition on a change of layout (item 9); the inspector's 0 to 2000 ms,
+      // where a script could set 5000.
+      v('layoutTransition', 'layoutTransition', ENUM, { doc: 'Set how a layout comes in when it is shown.', ex: ['"fade"', 'fades each layout in'],
+        argDocs: { layoutTransition: '"none": at once.\n"fade": faded in.\n"slide": faded in, sliding from the right.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Over `transitionMs()`.', 'Default: "none".'] }),
+      v('transitionMs', 'transitionMs', INT, { min: 0, max: 2000, doc: 'Set how long a layout takes to come in.', ex: ['500', 'brings each layout in over half a second'],
+        argDocs: { transitionMs: 'Milliseconds.\n0: at once.\nRange: 0 ↔ 2000, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['With `layoutTransition()` "none": no effect.', 'Default: 250.'] }),
+      v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the brightness.',
+        ex: ['"Cutoff"', 'makes the control called Cutoff drive the brightness'], linkRule: 'Its range sets 0 to 100.' }),
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any', doc: 'Name the control that drives the backlight.',
         ex: ['"Light"', 'makes the control called Light switch the backlight'], linkRule: 'On while the control is on, or past halfway.' }),
       v('layout', 'layouts', LAYOUT, { flat: 'its elements', doc: 'Show one of the display\'s layouts.', ex: ['2', 'shows layout 2'],
         notes: ['Shown until an overlay or the Selector changes it.'] }),
+      // The four overlays, declared as the LCD's are (item 12). The grid is the editor's only.
+      v('showGlass', 'showGlass', BOOL, { toggle: true, doc: 'Show or hide the glass: a sheen across the screen.',
+        notes: ['Its tint is set in the inspector, under Screen colours ▸ Glass. Default: shown.'] }),
+      v('showGhost', 'showGhost', BOOL, { toggle: true, doc: 'Show or hide the ghost: the faint unlit pixels behind the elements.',
+        notes: ['How faint is set by `contrast()`. Default: shown.'] }),
+      v('showScanlines', 'showScanlines', BOOL, { toggle: true, doc: 'Show or hide the scanlines: thin horizontal lines across the screen.',
+        notes: ['Default: hidden.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the design grid: lines every few pixels, in the editor only.',
+        notes: ['Not drawn in the preview or an exported plug-in.', 'Its spacing is the inspector\'s Snap: 8 pixels while that is 0.', 'Default: hidden.'] }),
     ],
   },
 ];
@@ -1175,6 +1227,7 @@ export const COMPONENT_VERBS = COMPONENT_FAMILIES.flatMap((fam) =>
     // What read takes and gives, where the family says (the arp's).
     readIndex: fam.readIndex,
     readNotes: fam.readNotes,
+    readIndexKind: fam.readIndexKind,
     section: fam.section,
     // `arp` + `rate` -> `arpRate`. The flat name still exists because every member has one; the
     // namespaced spelling ce.components.arp.rate is the one anybody would actually write.
@@ -1826,7 +1879,7 @@ export function verbArgKinds(verb) {
     case INDEXSET: return [INT, BOOL];
     case LINK: return [STR];
     case LAYOUT: return ['layoutRef'];
-    case READ: return [STR, INT];
+    case READ: return [STR, verb.readIndexKind ?? INT];
     case SIZE: return [STR];
     case FILL: return [STR, 'list'];
     case INSERT: case REMOVE: return [STR, INT];

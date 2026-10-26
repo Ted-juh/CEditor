@@ -1522,10 +1522,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Pixel_Display_pixel_Drive_a_pixel_display_its_elements_text_visibility_and_position_plus_backlight_brightness_and_animation_","id":"qa_group_22","controlType":"Label"},
+        "Core": {"name":"group_Pixel_Display_pixel_Draw_on_a_pixel_screen_by_named_elements_what_each_is_shows_and_where_plus_its_layouts_backlight_brightness_and_animation_","id":"qa_group_22","controlType":"Label"},
         "Transform": {"x":28,"y":6012,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Pixel Display — pixel.*  (Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Pixel Display — pixel.*  (Draw on a pixel screen by named elements: what each is, shows and where, plus its layouts, backlight, brightness and animation.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1562,7 +1562,7 @@
         "Core": {"name":"verbs_pixel","id":"qa05_pixel_verbs","controlType":"Label"},
         "Transform": {"x":312,"y":6070,"width":470,"height":224},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"pixel.text(elem)              pixel.anim(enum)\npixel.label(elem)             pixel.animPreset(enum)\npixel.show(elem)              pixel.animSpeed(num)\npixel.blink(elem)             pixel.animLoop[on]\npixel.x(elem)                 pixel.animFps(num)\npixel.y(elem)                 pixel.layoutTransition(enum)\npixel.w(elem)                 pixel.transitionMs(num)\npixel.h(elem)                 pixel.brightnessSource(link)\npixel.kind(elem)              pixel.backlightSource(link)\npixel.source(elem)            pixel.layout(layout)\npixel.editText(str)           pixel.showGlass[on]\npixel.backlight[on]           pixel.showGhost[on]\npixel.brightness(num)         pixel.showScanlines[on]\npixel.contrast(num)           pixel.showGrid[on]\npixel.gamma(num)              pixel.read(read)\npixel.glow(num)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"pixel.text(elem)              pixel.anim(enum)\npixel.label(elem)             pixel.animPreset(enum)\npixel.show(elem)              pixel.animSpeed(num)\npixel.blink(elem)             pixel.animLoop[on]\npixel.x(elem)                 pixel.animFps(num)\npixel.y(elem)                 pixel.layoutTransition(enum)\npixel.w(elem)                 pixel.transitionMs(int)\npixel.h(elem)                 pixel.brightnessSource(link)\npixel.kind(elem)              pixel.backlightSource(link)\npixel.source(elem)            pixel.layout(layout)\npixel.editText(str)           pixel.showGlass[on]\npixel.backlight[on]           pixel.showGhost[on]\npixel.brightness(num)         pixel.showScanlines[on]\npixel.contrast(num)           pixel.showGrid[on]\npixel.gamma(num)              pixel.read(read)\npixel.glow(num)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"

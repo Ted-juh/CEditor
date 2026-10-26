@@ -11741,13 +11741,13 @@ Good to know:
 
 #### ce.components.pixel: Pixel Display
 
-Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation.
+Draw on a pixel screen by named elements: what each is, shows and where, plus its layouts, backlight, brightness and animation.
 
 ##### `ce.components.pixel.text(target, name, text) -> boolean`
 
 Set the text of a "static" element, by its name.
 
-Example: `ce.components.pixel.text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.
+Example: `ce.components.pixel.text("Screen", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11764,7 +11764,7 @@ Good to know:
 
 Set an element's caption, or the name a "name" element shows, by its name.
 
-Example: `ce.components.pixel.label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff.
+Example: `ce.components.pixel.label("Screen", "Cutoff", "CUT")` shows CUT under the element called Cutoff.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11781,7 +11781,7 @@ Good to know:
 
 Show or hide an element, by its name.
 
-Example: `ce.components.pixel.show("PixelDisplay", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.
+Example: `ce.components.pixel.show("Screen", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11798,7 +11798,7 @@ Good to know:
 
 Make an element blink, by its name.
 
-Example: `ce.components.pixel.blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.
+Example: `ce.components.pixel.blink("Screen", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11816,7 +11816,7 @@ Good to know:
 
 Set an element's left edge, by its name.
 
-Example: `ce.components.pixel.x("PixelDisplay", "Title", 10)` puts the element called Title 10 pixels from the screen's left edge.
+Example: `ce.components.pixel.x("Screen", "Title", 10)` puts the element called Title 10 pixels from the screen's left edge.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11834,7 +11834,7 @@ Good to know:
 
 Set an element's top edge, by its name.
 
-Example: `ce.components.pixel.y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge.
+Example: `ce.components.pixel.y("Screen", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11852,7 +11852,7 @@ Good to know:
 
 Set an element's width, by its name.
 
-Example: `ce.components.pixel.w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide.
+Example: `ce.components.pixel.w("Screen", "Title", 64)` makes the element called Title 64 pixels wide.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11871,7 +11871,7 @@ Good to know:
 
 Set an element's height, by its name.
 
-Example: `ce.components.pixel.h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size.
+Example: `ce.components.pixel.h("Screen", "Title", 16)` draws the text of the element called Title at twice the size.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11889,7 +11889,7 @@ Good to know:
 
 Set what an element is, by its name.
 
-Example: `ce.components.pixel.kind("PixelDisplay", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.
+Example: `ce.components.pixel.kind("Screen", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11907,7 +11907,7 @@ Good to know:
 
 Link an element to a control, by its name.
 
-Example: `ce.components.pixel.source("PixelDisplay", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.
+Example: `ce.components.pixel.source("Screen", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
@@ -11925,15 +11925,17 @@ Good to know:
 
 ##### `ce.components.pixel.editText(target, editText) -> boolean`
 
-The screen's editable text field (a patch name). Reads back what is in it.
+Set the text in the display's editable field.
 
-Example: `ce.components.pixel.editText("PixelDisplay", "text")` sets the edit text to text.
+Example: `ce.components.pixel.editText("Screen", "INIT VOICE")` puts INIT VOICE in the field.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `editText` (text, required): Edit text.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `editText` (text, required): The text in the field.<br>Shown by an "edit" element linked to "@edit".<br>Not held to the field's characters or length: those apply to typing.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
+- `read(target, "editText")` gives what is in the field, typed at the screen or set here.
+- Default: "INIT".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11943,13 +11945,15 @@ Good to know:
 
 Switch the backlight on or off.
 
-Example: `ce.components.pixel.backlight("PixelDisplay")` switches the backlight on if it is off, and off if it is on.
+Example: `ce.components.pixel.backlight("Screen")` switches the backlight on if it is off, and off if it is on.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `backlight` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `backlight` (true or false, optional): true: the backlight colour washes the screen.<br>false: off.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- While `backlightSource()` links a control, that control switches it.
+- Default: on.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11957,15 +11961,17 @@ Good to know:
 
 ##### `ce.components.pixel.brightness(target, brightness) -> boolean`
 
-Set the brightness.
+Set how bright the lit pixels are.
 
-Example: `ce.components.pixel.brightness("PixelDisplay", 50)` sets the brightness to 50.
+Example: `ce.components.pixel.brightness("Screen", 80)` sets the brightness to 80.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `brightness` (number, required): Brightness.<br>Range: 0 ↔ 100.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `brightness` (number, required): How bright the lit pixels are.<br>Range: 0 ↔ 100.<br>0: the dimmest, still lit: a tenth as bright.<br>Shaped by `gamma()`.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While `brightnessSource()` links a control, that control sets the brightness.
+- Default: 100.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11973,15 +11979,17 @@ Good to know:
 
 ##### `ce.components.pixel.contrast(target, contrast) -> boolean`
 
-Set the contrast.
+Set the contrast: how visible the unlit pixels are.
 
-Example: `ce.components.pixel.contrast("PixelDisplay", 50)` sets the contrast to 50.
+Example: `ce.components.pixel.contrast("Screen", 55)` sets the contrast to 55.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `contrast` (number, required): Contrast.<br>Range: 0 ↔ 100.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `contrast` (number, required): How visible the unlit pixels are.<br>Also how strongly the backlight glows.<br>Range: 0 ↔ 100.<br>0: the unlit pixels at their faintest, still visible.<br>100: the unlit pixels half opaque.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The unlit pixels show only while `showGhost()` is on.
+- Default: 55.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11989,15 +11997,16 @@ Good to know:
 
 ##### `ce.components.pixel.gamma(target, gamma) -> boolean`
 
-Set the gamma.
+Set the brightness curve.
 
-Example: `ce.components.pixel.gamma("PixelDisplay", 2.1)` sets the gamma to 2.1.
+Example: `ce.components.pixel.gamma("Screen", 2)` lifts the dimmer brightnesses.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `gamma` (number, required): Gamma.<br>Range: 0.1 ↔ 4.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `gamma` (number, required): The curve between `brightness()` and how bright the lit pixels are drawn.<br>1: straight.<br>Above 1: the lower brightnesses lifted.<br>Below 1: lowered.<br>Range: 0.2 ↔ 4.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12005,15 +12014,16 @@ Good to know:
 
 ##### `ce.components.pixel.glow(target, glow) -> boolean`
 
-Set the glow.
+Set the glow: a halo around the lit pixels.
 
-Example: `ce.components.pixel.glow("PixelDisplay", 0.5)` sets the glow to 0.5.
+Example: `ce.components.pixel.glow("Screen", 0.5)` gives the lit pixels a halo.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `glow` (number, required): Glow.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `glow` (number, required): How large and strong the halo is.<br>0: none.<br>1: the largest, 2.6 times a pixel's size.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12021,15 +12031,17 @@ Good to know:
 
 ##### `ce.components.pixel.anim(target, anim) -> boolean`
 
-Set the anim mode.
+Set the animation behind the elements: off, a file, or a preset.
 
-Example: `ce.components.pixel.anim("PixelDisplay", "file")` sets the anim mode to "file".
+Example: `ce.components.pixel.anim("Screen", "preset")` plays the chosen preset animation.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `anim` (text, required): One of "off", "file" or "preset". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The file is chosen in the inspector.
+- Default: "off".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12037,15 +12049,17 @@ Good to know:
 
 ##### `ce.components.pixel.animPreset(target, animPreset) -> boolean`
 
-Set the anim preset.
+Choose the preset animation.
 
-Example: `ce.components.pixel.animPreset("PixelDisplay", "scanner")` sets the anim preset to "scanner".
+Example: `ce.components.pixel.animPreset("Screen", "rain")` plays the rain animation.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `animPreset` (text, required): One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Plays while `anim()` is "preset".
+- Default: "wave".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12053,15 +12067,16 @@ Good to know:
 
 ##### `ce.components.pixel.animSpeed(target, animSpeed) -> boolean`
 
-Set the anim speed.
+Set the speed of the preset animation, as a multiple of its normal speed.
 
-Example: `ce.components.pixel.animSpeed("PixelDisplay", 2.6)` sets the anim speed to 2.6.
+Example: `ce.components.pixel.animSpeed("Screen", 2)` plays the preset animation at twice its normal speed.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `animSpeed` (number, required): Anim speed.<br>Range: 0.1 ↔ 5.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `animSpeed` (number, required): Speed factor.<br>Range: 0.1 ↔ 5.<br>1: normal.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12069,15 +12084,16 @@ Good to know:
 
 ##### `ce.components.pixel.animLoop(target [, animLoop]) -> boolean`
 
-Switch the anim loop on or off.
+Switch looping of the animation on or off.
 
-Example: `ce.components.pixel.animLoop("PixelDisplay")` switches the anim loop on if it is off, and off if it is on.
+Example: `ce.components.pixel.animLoop("Screen")` switches the anim loop on if it is off, and off if it is on.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `animLoop` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `animLoop` (true or false, optional): Left out: toggles.<br>false: the last frame holds.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: on.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12085,15 +12101,16 @@ Good to know:
 
 ##### `ce.components.pixel.animFps(target, animFps) -> boolean`
 
-Set the anim fps.
+Set the frame rate of a sprite-sheet animation.
 
-Example: `ce.components.pixel.animFps("PixelDisplay", 60.5)` sets the anim fps to 60.5.
+Example: `ce.components.pixel.animFps("Screen", 24)` plays the sheet at 24 frames per second.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `animFps` (number, required): Anim fps.<br>Range: 1 ↔ 120.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `animFps` (number, required): Frames per second.<br>Only for a sprite sheet: a GIF or APNG plays at its own speed.<br>Range: 1 ↔ 120.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 12.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12101,15 +12118,17 @@ Good to know:
 
 ##### `ce.components.pixel.layoutTransition(target, layoutTransition) -> boolean`
 
-How one layout gives way to the next.
+Set how a layout comes in when it is shown.
 
-Example: `ce.components.pixel.layoutTransition("PixelDisplay", "fade")` sets the layout transition to "fade".
+Example: `ce.components.pixel.layoutTransition("Screen", "fade")` fades each layout in.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `layoutTransition` (text, required): One of "none", "fade" or "slide". Case-insensitive.<br>Invalid: rejected with a console error.
+- `layoutTransition` (text, required): "none": at once.<br>"fade": faded in.<br>"slide": faded in, sliding from the right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Over `transitionMs()`.
+- Default: "none".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12117,15 +12136,17 @@ Good to know:
 
 ##### `ce.components.pixel.transitionMs(target, transitionMs) -> boolean`
 
-Set the transition ms.
+Set how long a layout takes to come in.
 
-Example: `ce.components.pixel.transitionMs("PixelDisplay", 2500)` sets the transition ms to 2500.
+Example: `ce.components.pixel.transitionMs("Screen", 500)` brings each layout in over half a second.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `transitionMs` (number, required): Transition ms.<br>Range: 0 ↔ 5000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `transitionMs` (number, required): Milliseconds.<br>0: at once.<br>Range: 0 ↔ 2000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- With `layoutTransition()` "none": no effect.
+- Default: 250.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12135,10 +12156,10 @@ Good to know:
 
 Name the control that drives the brightness.
 
-Example: `ce.components.pixel.brightnessSource("PixelDisplay", "Cutoff")` makes the control called Cutoff drive the brightness.
+Example: `ce.components.pixel.brightnessSource("Screen", "Cutoff")` makes the control called Cutoff drive the brightness.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
-- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Its range sets 0 to 100.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
 
 Good to know:
 
@@ -12152,7 +12173,7 @@ Good to know:
 
 Name the control that drives the backlight.
 
-Example: `ce.components.pixel.backlightSource("PixelDisplay", "Light")` makes the control called Light switch the backlight.
+Example: `ce.components.pixel.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>On while the control is on, or past halfway.<br>Not on this panel: rejected with a console error.
@@ -12169,7 +12190,7 @@ Good to know:
 
 Show one of the display's layouts.
 
-Example: `ce.components.pixel.layout("PixelDisplay", 2)` shows layout 2.
+Example: `ce.components.pixel.layout("Screen", 2)` shows layout 2.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `layout` (number or name, required): Its number, counted from 1, or its name.<br>A name: case-insensitive.<br>A fraction: rounded.<br>A display without layouts: 1, its elements.<br>Not a layout of the display: rejected with a console error.
@@ -12185,15 +12206,16 @@ Good to know:
 
 ##### `ce.components.pixel.showGlass(target [, showGlass]) -> boolean`
 
-Show or hide the glass.
+Show or hide the glass: a sheen across the screen.
 
-Example: `ce.components.pixel.showGlass("PixelDisplay")` shows the glass if it is hidden, and hides it if it is shown.
+Example: `ce.components.pixel.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `showGlass` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Its tint is set in the inspector, under Screen colours ▸ Glass. Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12201,15 +12223,16 @@ Good to know:
 
 ##### `ce.components.pixel.showGhost(target [, showGhost]) -> boolean`
 
-Show or hide the ghost.
+Show or hide the ghost: the faint unlit pixels behind the elements.
 
-Example: `ce.components.pixel.showGhost("PixelDisplay")` shows the ghost if it is hidden, and hides it if it is shown.
+Example: `ce.components.pixel.showGhost("Screen")` shows the ghost if it is hidden, and hides it if it is shown.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `showGhost` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- How faint is set by `contrast()`. Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12217,15 +12240,16 @@ Good to know:
 
 ##### `ce.components.pixel.showScanlines(target [, showScanlines]) -> boolean`
 
-Show or hide the scanlines.
+Show or hide the scanlines: thin horizontal lines across the screen.
 
-Example: `ce.components.pixel.showScanlines("PixelDisplay")` shows the scanlines if they are hidden, and hides them if they are shown.
+Example: `ce.components.pixel.showScanlines("Screen")` shows the scanlines if they are hidden, and hides them if they are shown.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `showScanlines` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12233,15 +12257,18 @@ Good to know:
 
 ##### `ce.components.pixel.showGrid(target [, showGrid]) -> boolean`
 
-Show or hide the grid.
+Show or hide the design grid: lines every few pixels, in the editor only.
 
-Example: `ce.components.pixel.showGrid("PixelDisplay")` shows the grid if it is hidden, and hides it if it is shown.
+Example: `ce.components.pixel.showGrid("Screen")` shows the grid if it is hidden, and hides it if it is shown.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Not drawn in the preview or an exported plug-in.
+- Its spacing is the inspector's Snap: 8 pixels while that is 0.
+- Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12251,15 +12278,17 @@ Good to know:
 
 Read back a setting, or every setting.
 
-Example: `ce.components.pixel.read("PixelDisplay")` gives every setting as a table.
+Example: `ce.components.pixel.read("Screen")` gives every setting as a table.
 
 - `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
 - `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
-- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>For an element verb, such as "text": the element's name, case-insensitive.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+- `index` (text, optional): For an element verb, such as "text": the element's name. Case-insensitive.<br>Left out: every element's, by name.<br>Not an element of the display: rejected with a console error.
 
 Good to know:
 
-- `read(target)`: every setting as a table, by verb name. `read(target, "text")`: every element's, by name; `read(target, "text", "title")`: one element's.
+- `read(target)`: every setting as a table, by verb name.
+- `read(target, "text")`: every element's, by name; `read(target, "text", "Title")`: one element's.
+- `read(target, "layout")`: the number of the layout showing.
 - Returns the value.
 - Rejected: no result, with a console error.
 

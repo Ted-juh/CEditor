@@ -929,10 +929,10 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
   const name = 'The element\'s name, as given in the element table. Case-insensitive.\nEvery element with that name, on every layout.\nNot an element of the display: rejected with a console error.';
   for (const id of ['pixelText', 'pixelLabel', 'pixelShow', 'pixelBlink', 'pixelX', 'pixelY', 'pixelW', 'pixelH']) assert.equal(text(id, 'name'), name, id);
   assert.equal(MEMBER_BY_ID.pixelShow.summary, 'Show or hide an element, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelShow.example, '`ce.components.pixel.show("PixelDisplay", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.');
+  assert.equal(MEMBER_BY_ID.pixelShow.example, '`ce.components.pixel.show("Screen", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.');
   assert.equal(text('pixelShow', 'on'), 'true: shown.\nfalse: hidden.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.pixelBlink.summary, 'Make an element blink, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelBlink.example, '`ce.components.pixel.blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.example, '`ce.components.pixel.blink("Screen", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.');
   assert.equal(text('pixelBlink', 'on'), 'true: blinks: 530 ms shown, 530 ms hidden.\nfalse: steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(MEMBER_BY_ID.pixelBlink.notes[0], 'Every blinking element blinks in step. A hidden element does not blink.');
   // Item 2: x, y, w and h, as the renderer draws them.
@@ -940,34 +940,34 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
   const offScreen = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
   const textKinds = 'The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".';
   assert.equal(MEMBER_BY_ID.pixelX.summary, 'Set an element\'s left edge, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelX.example, '`ce.components.pixel.x("PixelDisplay", "Title", 10)` puts the element called Title 10 pixels from the screen\'s left edge.');
+  assert.equal(MEMBER_BY_ID.pixelX.example, '`ce.components.pixel.x("Screen", "Title", 10)` puts the element called Title 10 pixels from the screen\'s left edge.');
   assert.equal(text('pixelX', 'x'), `Pixels of the grid, from the screen's left edge; 0: at the edge.\n${range(-4096)}`);
   assert.equal(MEMBER_BY_ID.pixelX.notes[0], offScreen);
   assert.equal(MEMBER_BY_ID.pixelY.summary, 'Set an element\'s top edge, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelY.example, '`ce.components.pixel.y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen\'s top edge.');
+  assert.equal(MEMBER_BY_ID.pixelY.example, '`ce.components.pixel.y("Screen", "Title", 20)` puts the element called Title 20 pixels below the screen\'s top edge.');
   assert.equal(text('pixelY', 'y'), `Pixels of the grid, from the screen's top edge; 0: at the edge.\n${range(-4096)}`);
   assert.equal(MEMBER_BY_ID.pixelY.notes[0], offScreen);
   assert.equal(MEMBER_BY_ID.pixelW.summary, 'Set an element\'s width, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelW.example, '`ce.components.pixel.w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide.');
+  assert.equal(MEMBER_BY_ID.pixelW.example, '`ce.components.pixel.w("Screen", "Title", 64)` makes the element called Title 64 pixels wide.');
   assert.equal(text('pixelW', 'w'), ['Pixels of the grid.', 'A text kind: the box its text is aligned and cut in; 0: as wide as the text.',
     'Any other kind: its width; drawn at least 1 wide, 4 for "anim".', range(0)].join('\n'));
   assert.deepEqual(MEMBER_BY_ID.pixelW.notes.slice(0, 2), [textKinds, 'A text kind 0 wide is not wrapped or scrolled.']);
   assert.equal(MEMBER_BY_ID.pixelH.summary, 'Set an element\'s height, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelH.example, '`ce.components.pixel.h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size.');
+  assert.equal(MEMBER_BY_ID.pixelH.example, '`ce.components.pixel.h("Screen", "Title", 16)` draws the text of the element called Title at twice the size.');
   assert.equal(text('pixelH', 'h'), ['Pixels of the grid.',
     'A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.',
     'Any other kind: its height; drawn at least 1 high, 4 for "anim".', range(0)].join('\n'));
   assert.equal(MEMBER_BY_ID.pixelH.notes[0], textKinds);
   // Item 3: text and label, which kinds draw each, and what the font cannot.
   assert.equal(MEMBER_BY_ID.pixelText.summary, 'Set the text of a "static" element, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelText.example, '`ce.components.pixel.text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.');
+  assert.equal(MEMBER_BY_ID.pixelText.example, '`ce.components.pixel.text("Screen", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.');
   assert.equal(text('pixelText', 'text'), ['The text.', 'Shown by "static", between its prefix and suffix.',
     'Shown by "name" while it has no label and no control, and by "edit" while its control has no text.',
     '"\\n": a new line while the element wraps; a blank otherwise.',
     'A character the font cannot draw: a blank. The built-in font has none for $ & ^ ` { | } ~ and letters with accents.',
     'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
   assert.equal(MEMBER_BY_ID.pixelLabel.summary, 'Set an element\'s caption, or the name a "name" element shows, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelLabel.example, '`ce.components.pixel.label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff.');
+  assert.equal(MEMBER_BY_ID.pixelLabel.example, '`ce.components.pixel.label("Screen", "Cutoff", "CUT")` shows CUT under the element called Cutoff.');
   assert.equal(text('pixelLabel', 'label'), ['The text.', '"name": shown in place of its control\'s name; "": the control\'s name.',
     '"hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none.',
     'Other kinds: not shown.', 'A character the font cannot draw: a blank.', 'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
@@ -975,12 +975,12 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
   assert.deepEqual(lacking, ['$', '&', '^', '`', '{', '|', '}', '~'], 'the printable ASCII the built-in font has no glyph for, as the text names it');
   // Item 4: kind and source, as the LCD's zones have them; the kinds are the inspector's.
   assert.equal(MEMBER_BY_ID.pixelKind.summary, 'Set what an element is, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelKind.example, '`ce.components.pixel.kind("PixelDisplay", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.');
+  assert.equal(MEMBER_BY_ID.pixelKind.example, '`ce.components.pixel.kind("Screen", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.');
   assert.equal(text('pixelKind', 'kind'), 'One of "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon", "clock", "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope", "adsr", "anim" or "bitmap". Case-insensitive.\nInvalid: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.pixelKind.notes[0], 'Its other settings are kept: its place, size, text and source.');
   assert.deepEqual(byId('pixelKind').values, PIXEL_ELEMENT_KINDS);
   assert.equal(MEMBER_BY_ID.pixelSource.summary, 'Link an element to a control, by its name.');
-  assert.equal(MEMBER_BY_ID.pixelSource.example, '`ce.components.pixel.source("PixelDisplay", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.');
+  assert.equal(MEMBER_BY_ID.pixelSource.example, '`ce.components.pixel.source("Screen", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.');
   assert.equal(text('pixelSource', 'control'), text('lcdZoneSource', 'control'));
   assert.equal(text('pixelSource', 'control'), ['The control\'s name. Case-insensitive.', '"": unlinked.', '"@active": the control last touched.',
     '"@active#value", "@active#switch" or "@active#choice": the last of that kind.', '"@edit": the display\'s editable field.',
@@ -989,6 +989,32 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
     'Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"\'s level and "scope". Not used by "adsr", "anim" or "bitmap".',
     '"wave"\'s cutoff, resonance, LFO and pitch, and "adsr"\'s four: set in the inspector.',
     '`read(target, "source", "Cutoff")` gives the control\'s name.']);
+  // Items 5 to 13: the screen as a whole, as the canvas and the renderer draw it.
+  assert.equal(MEMBER_BY_ID.pixelBrightness.summary, 'Set how bright the lit pixels are.');
+  assert.equal(text('pixelBrightness', 'brightness'), 'How bright the lit pixels are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit: a tenth as bright.\nShaped by `gamma()`.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.pixelBrightness.notes.slice(0, 2), ['While `brightnessSource()` links a control, that control sets the brightness.', 'Default: 100.']);
+  assert.equal(MEMBER_BY_ID.pixelContrast.summary, 'Set the contrast: how visible the unlit pixels are.');
+  assert.equal(text('pixelContrast', 'contrast'), 'How visible the unlit pixels are.\nAlso how strongly the backlight glows.\nRange: 0 ↔ 100.\n0: the unlit pixels at their faintest, still visible.\n100: the unlit pixels half opaque.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.pixelContrast.notes.slice(0, 2), ['The unlit pixels show only while `showGhost()` is on.', 'Default: 55.']);
+  // Gamma: the canvas's and the inspector's 0.2, where 0.1 was stored and drawn as 0.2.
+  assert.deepEqual([byId('pixelGamma').min, byId('pixelGamma').max], [0.2, 4]);
+  assert.deepEqual(componentScriptPatch(byId('pixelGamma'), { gamma: 1 }, [0.1]), { gamma: 0.2 });
+  assert.equal(text('pixelGlow', 'glow'), 'How large and strong the halo is.\n0: none.\n1: the largest, 2.6 times a pixel\'s size.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // The animation layer: the LCD's texts.
+  for (const v of ['Anim', 'AnimPreset', 'AnimSpeed', 'AnimLoop', 'AnimFps']) {
+    assert.equal(text(`pixel${v}`, `a${v.slice(1)}`), text(`lcd${v}`, `a${v.slice(1)}`), v);
+  }
+  assert.equal(MEMBER_BY_ID.pixelAnim.summary, 'Set the animation behind the elements: off, a file, or a preset.');
+  // A layout's transition: the inspector's 2000 ms, where 5000 was stored.
+  assert.equal(text('pixelLayoutTransition', 'layoutTransition'), '"none": at once.\n"fade": faded in.\n"slide": faded in, sliding from the right.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.deepEqual(componentScriptPatch(byId('pixelTransitionMs'), { transitionMs: 250 }, [3000]), { transitionMs: 2000 });
+  assert.equal(text('pixelEditText', 'editText'), 'The text in the field.\nShown by an "edit" element linked to "@edit".\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.pixelShowGrid.summary, 'Show or hide the design grid: lines every few pixels, in the editor only.');
+  assert.equal(MEMBER_BY_ID.pixelShowGhost.summary, 'Show or hide the ghost: the faint unlit pixels behind the elements.');
+  // Item 14: the family.
+  assert.equal(MEMBER_BY_ID.pixelRead.example, '`ce.components.pixel.read("Screen")` gives every setting as a table.');
+  assert.equal(text('pixelRead', 'index'), 'For an element verb, such as "text": the element\'s name. Case-insensitive.\nLeft out: every element\'s, by name.\nNot an element of the display: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.pixelRead.params.find((p) => p.name === 'index').type, 'string');
   // …and a number past the range is said, one that is not a number refused with why.
   const cfg = pixelCfg();
   assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['title', -3], cfg), 'pixel Px: w("title", -3) — the w -3 is outside 0 to 4096, so 0 was used.');
