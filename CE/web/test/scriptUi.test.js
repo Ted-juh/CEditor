@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import {
   MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_WEBVIEW,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -315,5 +316,21 @@ test('a browser refusing the write does not throw into the script', () => {
       if (had) Object.defineProperty(globalThis, 'navigator', { value: before, configurable: true, writable: true });
       else delete globalThis.navigator;
     }
+  });
+});
+
+/* ------------------------------------------------------------ ce.ui's review */
+
+test('a message, an id or a question left out is said, and a kind or a duration that is not one too', () => {
+  fresh(() => {
+    const said = (fn) => { clearScriptTrace(); fn(); return get(scriptTrace).filter((t) => t.kind !== 'log').map((t) => `${t.kind}: ${t.message}`); };
+    assert.deepEqual(said(() => api.uiNotify()), ['error: ce.ui.notify: no message was given, so nothing was shown.']);
+    assert.deepEqual(said(() => api.uiNotify('hi', { kind: 'Warn' })), [], 'a kind in any case');
+    assert.match(said(() => api.uiNotify('hi', { kind: 'warning' }))[0], /^warn: ce.ui.notify: "warning" is not a kind, so "info" was used/);
+    assert.deepEqual(said(() => api.uiDismiss('x')), ['error: ce.ui.dismiss: "x" is not a message\'s id, so nothing was removed.']);
+    assert.deepEqual(said(() => api.uiUpdate()), ['error: ce.ui.update: no id was given, so nothing was changed.']);
+    assert.deepEqual(said(() => api.uiDialog({})), ['error: ce.ui.dialog: no title and no message were given, so nothing was asked.']);
+    assert.deepEqual(said(() => api.uiChoose({ title: 'T', items: [] })), ['error: ce.ui.choose: no items were given, so there is nothing to choose.']);
+    assert.deepEqual(said(() => api.uiCopy()), ['error: ce.ui.copy: no text was given, so nothing was copied.']);
   });
 });

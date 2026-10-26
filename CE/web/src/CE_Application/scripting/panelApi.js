@@ -447,14 +447,22 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelLoad', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelLoad()',
-    summary: 'Runs first, as soon as the panel is opened and before any controls exist. Use it to set up MIDI or send the synth a start-up message. Do not read or change controls here — they have not been created yet.',
+    summary: 'Runs first, when the panel opens, before any control exists.',
+    notes: [
+      'Set up MIDI here, or send the synth a start-up message.',
+      'Controls cannot be read or changed yet.',
+    ],
     params: [],
     snippet: { lua: 'function onPanelLoad()\n  $0\nend', javascript: 'function onPanelLoad() {\n  $0\n}' },
   },
   {
     id: 'onPanelBuild', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onPanelBuild()',
-    summary: 'Runs after onPanelLoad and before onPanelReady. This is the place to create, copy and arrange controls from a script. Controls made by a script are removed before each run, so this always starts from the panel as you built it.',
+    summary: 'Runs after `onPanelLoad`, to create, copy and arrange controls from a script.',
+    notes: [
+      'Controls a script made are removed before each run, so it starts from the panel as it was built.',
+      'Panel view only.',
+    ],
     params: [],
     snippet: {
       lua: 'function onPanelBuild()\n  for i = 1, 4 do\n    ce.panel.create("Knob", { name = "osc" .. i, x = 20 + i * 90, y = 40 })\n  end\n  $0\nend',
@@ -464,7 +472,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onError', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onError(info)',
-    summary: 'Runs when any script on the panel fails. `info` says which script failed, what it was doing and what the error was. The error is always written to the log as well. If onError itself fails, that error is logged and onError is not called again, so it cannot get stuck in a loop.',
+    summary: 'Runs when any script on the panel fails.',
+    notes: [
+      'The error is written to the console as well.',
+      'An error in `onError` itself is written to the console, and `onError` is not called for it, so it cannot loop.',
+    ],
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'script', type: 'text', summary: 'The name of the script that failed.' },
       { name: 'scriptId', type: 'text', summary: 'Its id, which stays the same when it is renamed.' },
@@ -481,7 +493,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onDraw(info)',
-    summary: 'Paints on top of the control this script is attached to; `info` gives the control\'s name and its current size. It runs when the control needs repainting, not on every frame: to animate, call `ce.draw.redraw()` from a timer.',
+    summary: 'Paints on top of the control this script is attached to.',
+    notes: [
+      'Runs when the control needs painting, not every frame: to animate, call `ce.draw.redraw()` from a timer.',
+      'Panel view only.',
+    ],
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'target', type: 'text', summary: 'The name of the control being painted.' },
       { name: 'width', type: 'number', unit: 'pixels', summary: 'How wide the control is right now.' },
@@ -495,7 +511,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelReady', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelReady(info)',
-    summary: 'Runs once the controls exist. This is the moment to ask the synth for its current settings and fill the controls. In a plugin it runs again each time the window is reopened, so put one-time work inside `if info.firstTime`.',
+    summary: 'Runs once the controls exist.',
+    notes: [
+      'Ask the synth for its settings here, and fill the controls.',
+      'In a plug-in it runs again each time the window opens: put one-time work inside `if info.firstTime`.',
+    ],
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'firstTime', type: 'true or false',
         summary: 'True the first time the panel opens, false when a plugin window is reopened. '
@@ -509,14 +529,23 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelClose', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelClose()',
-    summary: 'Runs when the panel window closes: you stopped the preview, or the plugin window was closed in the DAW. Your scripts keep running after this — timers still tick and MIDI still arrives. To clean up when the scripts themselves are stopped, use onPanelDestroy.',
+    summary: 'Runs when the panel window closes.',
+    notes: [
+      'The preview stopped, or the plug-in\'s window was closed in the DAW.',
+      'The scripts go on running: timers tick and MIDI arrives. `onPanelDestroy` runs when they stop.',
+    ],
     params: [],
     snippet: { lua: 'function onPanelClose()\n  $0\nend', javascript: 'function onPanelClose() {\n  $0\n}' },
   },
   {
     id: 'onPanelDestroy', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelDestroy()',
-    summary: 'Runs when the scripts are about to be stopped: another panel was opened, the scripts were replaced, or the plugin was removed. It is the last hook to run, and timers, saved state and MIDI still work, so this is the place to restore the synth or send a final dump. It runs exactly once, even if onPanelClose never did.',
+    summary: 'Runs when the scripts are about to stop.',
+    notes: [
+      'Another panel was opened, the scripts were replaced, or the plug-in was removed.',
+      'The last hook: timers, saved values and MIDI still work, so restore the synth or send a last dump here.',
+      'Once, even when `onPanelClose` never ran.',
+    ],
     params: [],
     snippet: { lua: 'function onPanelDestroy()\n  $0\nend', javascript: 'function onPanelDestroy() {\n  $0\n}' },
   },
@@ -531,7 +560,12 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawSaveState(store) -> object',
-    summary: 'Runs when the DAW saves the project. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.',
+    summary: 'Runs when the DAW saves the project: return what to keep.',
+    notes: [
+      'Return a table holding what you want saved.',
+      '`store` shows what other scripts saved so far; it is to read only, and changing it saves nothing.',
+      'In an exported plug-in only.',
+    ],
     params: [{ name: 'store', type: 'object' }],
     snippet: {
       lua: 'function onDawSaveState(store)\n  return { ${1:key} = ${2:value} }$0\nend',
@@ -541,7 +575,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawRestoreState(store)',
-    summary: 'Runs when the DAW reopens the project. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.',
+    summary: 'Runs when the DAW opens the project again: read your values back.',
+    notes: [
+      '`store` holds what your `onDawSaveState` returned, with every other script\'s.',
+      'In an exported plug-in only.',
+    ],
     params: [{ name: 'store', type: 'object' }],
     snippet: { lua: 'function onDawRestoreState(store)\n  $0\nend', javascript: 'function onDawRestoreState(store) {\n  $0\n}' },
   },
@@ -1391,11 +1429,17 @@ export const COMMANDS = [
      than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
-    summary: 'Show a short pop-up message to the person using the panel, and return its ID. It disappears after 3 seconds unless you set `opts.duration` (in milliseconds); 0 or less keeps it up until it is dismissed. Use it for things the user should know about, not for debugging — that is what `log()` is for. Pass the ID to `ce.ui.update()` to change the message in place, or to `ce.ui.dismiss()` to remove it.',
+    summary: 'Show a short message to the person using the panel.',
+    example: '`uiNotify("Patch saved")` shows Patch saved for three seconds.',
+    notes: [
+      'Returns its id, for `ce.ui.update()` and `ce.ui.dismiss()`.',
+      'For what the player should know; `log()` is for you.',
+      'A click on it removes it.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number: written as text.\nLeft out, or "": nothing is shown, with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds', min: null,
           summary: 'How long the message stays up. 0 or less keeps it visible until something '
@@ -1408,11 +1452,17 @@ export const COMMANDS = [
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
     refusal: 'false',
-    summary: 'Show a line of text in the status bar. It stays until you replace it; call this with no message to clear it. Use it for an ongoing state, such as "Recording" or "Synced" — for a one-off event, use `ce.ui.notify()`. Read the current status back with `ce.ui.state()`.',
+    summary: 'Show a line of text in the status bar, until it is replaced.',
+    example: '`uiStatus("Recording", { kind = "warn" })` shows Recording in the status bar.',
+    notes: [
+      'For a state that lasts, such as "Synced"; `ce.ui.notify()` is for an event.',
+      '`ce.ui.state()` reads it back.',
+      'Returns true.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'message', type: 'string', required: false },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['uiKind']) },
+      { name: 'message', type: 'string', required: false, summary: 'The text.\nLeft out, or "": the status bar is cleared.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['uiKind']) },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.ui.status("${1:Recording}")$0', javascript: 'ce.ui.status("${1:Recording}");$0' },
@@ -1420,10 +1470,16 @@ export const COMMANDS = [
   {
     id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
     refusal: 'unanswered',
-    summary: 'Ask a question with buttons. The answer arrives later through `onChoice`, which receives the label of the button that was clicked, or nothing if the dialog was closed without a choice. Only one dialog can be open at a time. The call itself returns true if the dialog appeared; if it returns false, nothing was shown — for example because another dialog is already open — and `onChoice` has already been called with nothing.',
+    summary: 'Ask a question with buttons.',
+    example: '`uiDialog({ title = "Overwrite the patch?", buttons = { "Cancel", "Overwrite" } }, fn)` asks, and calls fn with the button clicked.',
+    notes: [
+      'One dialog at a time.',
+      'Returns true if it appeared. Another dialog open: false, and `onChoice` called with nothing; `ce.ui.state()` says so.',
+      'No title and no message: false, with a console error, and `onChoice` called with nothing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true, fields: optionFields([
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         'uiTitle', 'uiMessage',
         { name: 'buttons', type: 'list of text', default: 'one button labelled "OK"',
           summary: 'The button labels, left to right. Whichever is clicked is what `onChoice` is '
@@ -1432,7 +1488,7 @@ export const COMMANDS = [
         { name: 'default', type: 'text', default: 'the first button', sample: '"Cancel"',
           summary: 'The label of the button focused when the dialog opens.' },
       ]) },
-      { name: 'onChoice', type: 'function', required: false },
+      { name: 'onChoice', type: 'function', required: false, summary: 'Called later with the label of the button clicked; nothing when it was closed without one.' },
     ],
     scopes: 'any',
     snippet: {
@@ -1453,10 +1509,16 @@ export const COMMANDS = [
   {
     id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
     refusal: 'unanswered',
-    summary: 'Ask the user to type some text. The answer arrives through `onAnswer`: the text they typed, or nothing if they cancelled. An empty answer (they accepted an empty field) is not the same as no answer. Pressing Enter accepts. Returns true if the dialog appeared; if it returns false, `onAnswer` has already been called with nothing.',
+    summary: 'Ask for a line of text.',
+    example: '`uiPrompt({ title = "Name this patch", value = "Init" }, fn)` asks, and calls fn with what was typed.',
+    notes: [
+      'Enter accepts.',
+      'Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.',
+      'No title and no message: false, with a console error, and `onAnswer` called with nothing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true,
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           'uiTitle', 'uiMessage',
           { name: 'value', type: 'text', default: 'empty', sample: 'get("patchName")',
@@ -1470,7 +1532,7 @@ export const COMMANDS = [
             summary: 'Which of the two buttons is drawn as the default one: the accept label or the '
               + 'cancel label. Pressing Enter in the field accepts either way.' },
         ]) },
-      { name: 'onAnswer', type: 'function', required: false },
+      { name: 'onAnswer', type: 'function', required: false, summary: 'Called later with the text typed; "" when an empty field was accepted; nothing when it was cancelled.' },
     ],
     scopes: 'any',
     snippet: {
@@ -1481,10 +1543,16 @@ export const COMMANDS = [
   {
     id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
     refusal: 'unanswered',
-    summary: 'Ask the user to pick from a list. The answer arrives through `onAnswer`: the chosen item, a list of items if `opts.multiple` is set, or nothing if they cancelled. A long list scrolls rather than making the dialog taller. Returns true if the dialog appeared; if it returns false — for example because `opts.items` is empty — `onAnswer` has already been called with nothing.',
+    summary: 'Ask for a choice from a list.',
+    example: '`uiChoose({ title = "Load which bank?", items = { "A", "B", "C" } }, fn)` asks, and calls fn with the bank chosen.',
+    notes: [
+      'A long list scrolls.',
+      'Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.',
+      'No title and no message, or no items: false, with a console error, and `onAnswer` called with nothing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true,
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           'uiTitle', 'uiMessage',
           { name: 'items', type: 'list of text', required: true,
@@ -1495,7 +1563,7 @@ export const COMMANDS = [
             summary: 'Allow more than one to be picked, in which case the answer is a list.' },
           'uiAccept', 'uiCancel', 'uiKind',
         ]) },
-      { name: 'onAnswer', type: 'function', required: false },
+      { name: 'onAnswer', type: 'function', required: false, summary: 'Called later with the item chosen; a list of them with `multiple`; nothing when it was cancelled.' },
     ],
     scopes: 'any',
     snippet: {
@@ -1505,20 +1573,30 @@ export const COMMANDS = [
   },
   {
     id: 'uiDismiss', category: 'User feedback', signature: 'uiDismiss([id]) -> number',
-    summary: 'Remove a message shown with `ce.ui.notify()`; the user can also remove one by clicking it. With no `id`, every message is removed. Returns how many were removed.',
+    summary: 'Remove a message `ce.ui.notify()` showed, or every one.',
+    example: '`uiDismiss(id)` removes that message.',
+    notes: [
+      'Returns how many were removed.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'id', type: 'number', required: false }],
+    params: [{ name: 'id', type: 'number', required: false, summary: 'The id `ce.ui.notify()` gave.\nLeft out: every message.\nNot a number: nothing is removed, with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'ce.ui.dismiss(${1:id})$0', javascript: 'ce.ui.dismiss(${1:id});$0' },
   },
   {
     id: 'uiUpdate', category: 'User feedback', signature: 'uiUpdate(id, message [, opts]) -> boolean',
-    summary: 'Change the text of a message that is already showing, in place. To show progress, show the first message with an `opts.duration` of 0 so it stays up, then update it as you go. Returns false once the message has gone — for example because the user dismissed it — so you know to stop updating.',
+    summary: 'Change the text of a message that is showing.',
+    example: '`uiUpdate(id, "Sending 3 of 8")` changes the message in place.',
+    notes: [
+      'For progress: show the first with `duration = 0`, so it stays, then change it as you go.',
+      'Returns true; false once the message has gone, such as when it was clicked away, so you know to stop.',
+      'No id, or no message: false, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'id', type: 'number', required: true },
-      { name: 'message', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'id', type: 'number', required: true, summary: 'The id `ce.ui.notify()` gave.' },
+      { name: 'message', type: 'string', required: true, summary: 'The new text.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: 'unchanged', sample: '5000',
           summary: 'A new lifetime for the message. If omitted, a sticky message stays sticky '
@@ -1533,16 +1611,27 @@ export const COMMANDS = [
   },
   {
     id: 'uiState', category: 'User feedback', signature: 'uiState() -> table',
-    summary: 'Return what is on screen: `status`, `statusKind`, `notifications` (a list, each with `id`, `message`, `kind` and `sticky`) and `dialog`. `dialog` is true while a dialog is open, which tells you why `ce.ui.dialog()` returned false: another dialog was already showing, rather than there being no panel window to show it in.',
+    summary: 'Give what is on screen: the status bar, the messages and whether a dialog is open.',
+    example: '`uiState().dialog` gives true while a dialog is open.',
+    notes: [
+      'Returns { status, statusKind, notifications, dialog }; each notification { id, message, kind, sticky }.',
+      '`dialog` true: why `ce.ui.dialog()` gave false, rather than there being no panel window.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     scopes: 'any',
     snippet: { lua: 'if not ce.ui.state().dialog then $0 end', javascript: 'if (!ce.ui.state().dialog) { $0 }' },
   },
   {
     id: 'uiCopy', category: 'User feedback', signature: 'uiCopy(text) -> boolean',
-    summary: 'Copy text to the clipboard. The copy happens in the background, and the system may refuse it unless it follows a click by the user, so true means the copy was attempted, not that it worked; a refusal is written to the script console. Scripts cannot read the clipboard.',
+    summary: 'Copy text to the clipboard.',
+    example: '`uiCopy(encodeJson(allSettings()))` copies the panel\'s settings as JSON.',
+    notes: [
+      'Returns true when it was tried, not that it worked: the system may refuse a copy that does not follow a click, which the console says.',
+      'Scripts cannot read the clipboard.',
+      'No text: false, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'text', type: 'string', required: true }],
+    params: [{ name: 'text', type: 'string', required: true, summary: 'The text.\nA number: written as text.' }],
     scopes: 'any',
     snippet: { lua: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")))$0', javascript: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")));$0' },
   },
@@ -4162,39 +4251,60 @@ const T = { name: 'target', type: 'targetRef', required: true };
 
 export const PANEL_COMMANDS = [
   // --- Zone Splitter ---
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.split"): what splitZoneLayout.js's script actions do with each.
   panelVerb('splitPreset', 'splitPreset(target, preset [, lowNote, highNote])',
-    `Apply a split layout — ${oneOf(HAND_WRITTEN_VALUES['split.preset'])} — optionally bounding the key range.`,
-    [T, { name: 'preset', type: 'string', required: true, kind: 'componentWord' },
-     { name: 'lowNote', type: 'number', required: false, kind: 'note' }, { name: 'highNote', type: 'number', required: false, kind: 'note' }]),
-  // A zone is its number counted from 1, as the panel labels it ("Zone 1"), or its label ("Bass").
-  // It was counted from 0, so zone 1 was the one labelled "Zone 2" (handWrittenVerbs.js).
-  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
-  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the top note of a zone, and with it the bottom of a zone that starts just above it. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
+    `Replace every zone with a layout: ${oneOf(HAND_WRITTEN_VALUES['split.preset'])}.`,
+    [T, { name: 'preset', type: 'string', required: true, kind: 'componentWord',
+      summary: '"whole": one zone, channel 1.\n"classic": the lower half on channel 1, an octave down; the upper half on channel 2.\n"splitLayer": a bass below; two channels layered above.\n"threeWay": bass, pad and lead across channels 1 to 3.\n"velLayer": the same keys, played softly on channel 1 and hard on channel 2.\nCase-insensitive.\nAny other: rejected with a console error.' },
+     { name: 'lowNote', type: 'number', required: false, kind: 'note', summary: 'The lowest note of the layout.\nA MIDI note number, or a name such as "C4".\nRange: 0 ↔ 127.\nOutside the range: the nearest end.\nAny other: rejected with a console error.\nLeft out: 36, C2.' },
+     { name: 'highNote', type: 'number', required: false, kind: 'note', summary: 'The highest note of the layout.\nA MIDI note number, or a name such as "C4".\nRange: 0 ↔ 127.\nOutside the range: the nearest end.\nAny other: rejected with a console error.\nLeft out: 96, C7.\nBelow `lowNote`: the two are swapped.' }],
+    { example: '`ce.components.split.preset("Split", "classic", "C2", "C6")` splits C2 to C6 in two halves.',
+      notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Let one zone sound, or mute it.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'enabled', type: 'boolean', required: true, summary: 'true: it sounds.\nfalse: muted.\nLeft out: it sounds.' }],
+    { example: '`ce.components.split.mute("Split", "Bass", false)` mutes the zone called Bass.', notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set the MIDI channel one zone plays on.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'channel', type: 'number', required: true, summary: 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.split.channel("Split", 2, 5)` sends zone 2 on channel 5.', notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nRange: -48 ↔ 48, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.split.transpose("Split", 1, -12)` plays zone 1 an octave down.', notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the top note of one zone.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'note', type: 'number', required: true, kind: 'note', summary: 'Its new top note.\nA MIDI note number, or a name such as "C4".\nRange: 0 ↔ 127.\nOutside the range: the nearest end.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.split.point("Split", 1, "B3")` ends zone 1 at B3.',
+      notes: ['A zone that starts just above it moves with it, as a drag of the split point does.', 'Returns true. Rejected: false, with a console error.'] }),
 
   // --- Phrase Sequencer ---
-  panelVerb('phraseSeed', 'phraseSeed(target, seed)', `Fill the grid from a named seed pattern — ${oneOf(HAND_WRITTEN_VALUES['phrase.seed'])}.`,
-    [T, { name: 'seed', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('phraseClear', 'phraseClear(target)', 'Clear every step.', [T]),
-  // A key is a pitch class, a number: "D" is refused, so it is not typed as text.
-  panelVerb('phraseKey', 'phraseKey(target, key)', 'Change the key the degrees resolve against: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.',
-    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord' }]),
-  panelVerb('phraseScale', 'phraseScale(target, scale)', 'Change the scale ("major"/"minor"/"dorian"…).',
-    [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
-  panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose the phrase, leaving the pattern alone.',
-    [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('phraseDirection', 'phraseDirection(target, direction)', `Play direction — ${oneOf(HAND_WRITTEN_VALUES['phrase.direction'])}.`,
-    [T, { name: 'direction', type: 'string', required: true, kind: 'componentWord' }]),
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.phrase"): what phraseLayout.js's phraseScriptPatch does with each.
+  panelVerb('phraseSeed', 'phraseSeed(target, seed)', `Fill the grid with a pattern: ${oneOf(HAND_WRITTEN_VALUES['phrase.seed'])}.`,
+    [T, { name: 'seed', type: 'string', required: true, kind: 'componentWord',
+      summary: '"clear": empty.\n"octaves": the root and the octave above, by turns.\n"arpUp": the chord walked upward across the bar.\n"riff": a one-bar line, off the beat, with ties.\n"random": a note of the scale on each step.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.seed("Phrase", "riff")` fills the grid with a riff.', notes: ['What the grid held is replaced.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseClear', 'phraseClear(target)', 'Empty the grid.', [T],
+    { example: '`ce.components.phrase.clear("Phrase")` switches every cell off.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseKey', 'phraseKey(target, key)', 'Set the key its rows play in.',
+    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord', summary: 'The key\'s note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.key("Phrase", "D")` plays the pattern in D.', notes: ['Row 1 is the key\'s note; each row up is the next step of the scale.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseScale', 'phraseScale(target, scale)', 'Set the scale its rows play.',
+    [T, { name: 'scale', type: 'string', required: true, kind: 'scale', summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.scale("Phrase", "dorian")` plays the pattern in the dorian mode.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose what the pattern plays, leaving the grid as it is.',
+    [T, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nRange: -48 ↔ 48, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.phrase.transpose("Phrase", 12)` plays the pattern an octave up.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseDirection', 'phraseDirection(target, direction)', `Set the order it plays the steps in: ${oneOf(HAND_WRITTEN_VALUES['phrase.direction'])}.`,
+    [T, { name: 'direction', type: 'string', required: true, kind: 'componentWord',
+      summary: '"forward": first to last.\n"reverse": last to first.\n"pingpong": forward, then back.\n"random": a step at random each time.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.direction("Phrase", "pingpong")` plays forward and back.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
   panelVerb('phraseRun', 'phraseRun(target, running)', 'Start or stop the sequencer.',
-    [T, { name: 'running', type: 'boolean', required: true }]),
-  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off. Steps and rows are counted from 1.',
-    [T, { name: 'step', type: 'number', required: true, kind: 'componentIndex' }, { name: 'row', type: 'number', required: true, kind: 'componentIndex' },
-     { name: 'on', type: 'boolean', required: true }]),
+    [T, { name: 'running', type: 'boolean', required: true, summary: 'true: it plays.\nfalse: it stops.\nLeft out: it plays.' }],
+    { example: '`ce.components.phrase.run("Phrase", false)` stops the sequencer.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one cell of the grid on or off.',
+    [T, { name: 'step', type: 'number', required: true, kind: 'componentIndex', summary: 'Step, counted from 1, left to right.\nA fraction: rounded.\nNot a step of the grid: rejected with a console error.' },
+     { name: 'row', type: 'number', required: true, kind: 'componentIndex', summary: 'Row, counted from 1, from the bottom: a step of the scale; a semitone in chromatic mode, set in the inspector.\nA fraction: rounded.\nNot a row of the grid: rejected with a console error.' },
+     { name: 'on', type: 'boolean', required: true, summary: 'true: on.\nfalse: off.\nLeft out: toggles.' }],
+    { example: '`ce.components.phrase.cell("Phrase", 1, 3, true)` plays row 3 on the first step.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
 
   // --- Phrase Recorder ---
   // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
@@ -4265,52 +4375,80 @@ export const PANEL_COMMANDS = [
       notes: ['Counted in whole loops: a loop longer than the count-in waits one loop.', 'Returns true. Already that way: true, with a console line.'] }),
 
   // --- Harmoniser ---
-  panelVerb('harmonyMode', 'harmonyMode(target, mode)',
-    `Harmoniser mode — ${oneOf(HAND_WRITTEN_VALUES['harmony.mode'])}.`,
-    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.',
-    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Change the scale the harmony follows.',
-    [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
-  panelVerb('harmonySize', 'harmonySize(target, size)', 'How many voices to add.',
-    [T, { name: 'size', type: 'number', required: true }]),
-  panelVerb('harmonyShape', 'harmonyShape(target, shape)', `Apply a named chord shape — ${oneOf(HAND_WRITTEN_VALUES['harmony.shape'])} — or a list of intervals in semitones.`,
-    [T, { name: 'shape', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)',
-    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
-    [T, { name: 'voicing', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
-    [T, { name: 'inversion', type: 'number', required: true }]),
-  panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Octave offset for the added voices.',
-    [T, { name: 'octave', type: 'number', required: true }]),
-  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)',
-    `What to do with out-of-key notes — ${oneOf(HAND_WRITTEN_VALUES['harmony.outOfKey'])}.`,
-    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Keep or drop the note actually played.',
-    [T, { name: 'keep', type: 'boolean', required: false }]),
-  panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'MIDI channel for the harmony voices.',
-    [T, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)',
-    `Voice-leading strategy — ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
-    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the voices over `ms` milliseconds.',
-    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
-  panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Override the chord used for one scale degree.',
-    [T, { name: 'degree', type: 'number', required: true, kind: 'componentIndex' }, { name: 'chord', type: 'string', required: true, kind: 'componentWord' }]),
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.harmony"): what harmoniserLayout.js's harmoniserScriptPatch does with each.
+  panelVerb('harmonyMode', 'harmonyMode(target, mode)', `Set how it builds the harmony: ${oneOf(HAND_WRITTEN_VALUES['harmony.mode'])}.`,
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord',
+      summary: '"diatonic": the chord the played note\'s step of the key has; always in the key.\n"memory": a fixed shape, `shape()`, on whatever note is played, in the key or not.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.mode("Harmoniser", "memory")` plays one chord shape on every note.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Set the key it harmonises in.',
+    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord', summary: 'The key\'s note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.key("Harmoniser", "Bb")` harmonises in B♭.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Set the scale it harmonises in.',
+    [T, { name: 'scale', type: 'string', required: true, kind: 'scale', summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.scale("Harmoniser", "minor")` harmonises in the minor key.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonySize', 'harmonySize(target, size)', 'Set how many notes each chord has.',
+    [T, { name: 'size', type: 'number', required: true, summary: 'Notes: 3 a triad, 4 a seventh chord.\nRange: 2 ↔ 6, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.size("Harmoniser", 4)` plays seventh chords.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyShape', 'harmonyShape(target, shape)', `Set the chord shape it plays: ${oneOf(HAND_WRITTEN_VALUES['harmony.shape'])}, or a list of intervals.`,
+    [T, { name: 'shape', type: 'string', required: true, kind: 'componentWord',
+      summary: 'A shape by name, case-insensitive; or a list of semitones above the played note, such as {0, 4, 7}, -36 to 36 each, 6 at most.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.shape("Harmoniser", "min7")` plays a minor seventh on every note.', notes: ['While `mode()` is "memory".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)', `Set how the notes of each chord are spread: ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
+    [T, { name: 'voicing', type: 'string', required: true, kind: 'componentWord',
+      summary: '"close": as close together as they go.\n"open": the middle note an octave up.\n"drop2": the second note from the top an octave down.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.voicing("Harmoniser", "open")` spreads each chord wider.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Set which note of each chord is lowest.',
+    [T, { name: 'inversion', type: 'number', required: true, summary: '0: the root lowest. 1: the third. 2: the fifth. 3: the seventh.\nPast the chord\'s notes: the highest inversion it has, 2 for a triad.\nRange: 0 ↔ 3, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.inversion("Harmoniser", 1)` puts the third lowest.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Move the added notes by whole octaves.',
+    [T, { name: 'octave', type: 'number', required: true, summary: 'Octaves: 1 up, -1 down.\nRange: -3 ↔ 3, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.octave("Harmoniser", -1)` puts the harmony an octave below.', notes: ['The played note stays where it is.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)', `Set what a played note outside the key does: ${oneOf(HAND_WRITTEN_VALUES['harmony.outOfKey'])}.`,
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord',
+      summary: '"pass": the note sounds alone, without harmony.\n"nearest": harmonised as the nearest note of the key.\n"mute": nothing sounds.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.outOfKey("Harmoniser", "nearest")` harmonises a wrong note as the nearest right one.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Sound the played note with its harmony, or only the harmony.',
+    [T, { name: 'keep', type: 'boolean', required: false, summary: 'true: the played note sounds too.\nfalse: only the added notes.\nLeft out: toggles.' }],
+    { example: '`ce.components.harmony.keepPlayed("Harmoniser", false)` plays the harmony without the note played.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'Set the MIDI channel the chords play on.',
+    [T, { name: 'channel', type: 'number', required: true, summary: 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.channel("Harmoniser", 2)` plays the chords on channel 2.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)', `Set how each chord moves from the one before: ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord',
+      summary: '"off": each chord as `inversion()` sets it.\n"closest": the notes move as little as they can, all together.\n"smooth": the top note moves as little as it can.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.voiceLeading("Harmoniser", "closest")` keeps the chords close together.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the notes of each chord out in time, as a strum.',
+    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Milliseconds from the first note to the last.\n0: all together.\nRange: 0 ↔ 400.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.strum("Harmoniser", 60)` strums each chord over 60 ms.', notes: ['Up or down: set in the inspector.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Play a chord of your own on one step of the key.',
+    [T, { name: 'degree', type: 'number', required: true, kind: 'componentIndex', summary: 'Step of the scale, counted from 1.\nA fraction: rounded.\nNot a step of the scale: rejected with a console error.' },
+     { name: 'chord', type: 'string', required: true, kind: 'componentWord', summary: 'Semitones above the step\'s note, such as {0, 5, 7}, -36 to 36 each, 6 at most.\n"clear": the key\'s own chord again.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.degree("Harmoniser", 6, {0, 5, 7})` plays a sus4 on the sixth step.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
 
   // --- Setlist ---
   // These move the INDEX; the recall follows from the index changing, so a scripted step and a
-  // footswitch step are indistinguishable downstream.
-  panelVerb('setlistNext', 'setlistNext(target)', 'Advance to the next enabled scene.', [T]),
-  panelVerb('setlistPrev', 'setlistPrev(target)', 'Go back to the previous enabled scene.', [T]),
-  panelVerb('setlistGoto', 'setlistGoto(target, scene)', 'Jump to a scene by index or name.',
-    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex' }]),
-  panelVerb('setlistEnable', 'setlistEnable(target, scene, enabled)', 'Include or skip a scene in the walk order.',
-    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
-  panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Wrap from the last scene back to the first.',
-    [T, { name: 'wrap', type: 'boolean', required: false }]),
-  panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
-    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
+  // footswitch step are indistinguishable downstream. Done in one pass at the owner's word
+  // (docs/design/api-descriptions-handoff.md, "ce.components.setlist").
+  panelVerb('setlistNext', 'setlistNext(target)', 'Go to the next scene it plays.', [T],
+    { example: '`ce.components.setlist.next("Setlist")` recalls the next scene.',
+      notes: ['Scenes switched off with `enable()` are passed over.', 'At the last: to the first while `wrap()` is on; else rejected with a console error.', 'Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('setlistPrev', 'setlistPrev(target)', 'Go back to the scene before.', [T],
+    { example: '`ce.components.setlist.prev("Setlist")` recalls the scene before.',
+      notes: ['Scenes switched off with `enable()` are passed over.', 'At the first: to the last while `wrap()` is on; else rejected with a console error.', 'Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('setlistGoto', 'setlistGoto(target, scene)', 'Go to a scene by its number or name.',
+    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex', summary: 'Its number, counted from 1, or its name, as written.\nNot a scene: rejected with a console error naming them.' }],
+    { example: '`ce.components.setlist.jump("Setlist", "Ballad")` recalls the scene called Ballad.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('setlistEnable', 'setlistEnable(target, scene, enabled)', 'Play a scene in the set, or pass over it.',
+    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex', summary: 'Its number, counted from 1, or its name, as written.\nNot a scene: rejected with a console error naming them.' },
+     { name: 'enabled', type: 'boolean', required: true, summary: 'true: played.\nfalse: passed over by `next()` and `prev()`.\nLeft out: played.' }],
+    { example: '`ce.components.setlist.enable("Setlist", 2, false)` skips scene 2 tonight.', notes: ['`jump()` still goes to it.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Go round from the last scene to the first, or stop at the ends.',
+    [T, { name: 'wrap', type: 'boolean', required: false, summary: 'true: round.\nfalse: stops at the ends.\nLeft out: toggles.' }],
+    { example: '`ce.components.setlist.wrap("Setlist", true)` goes from the last scene to the first.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Set how long a scene\'s values take to fade in.',
+    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Milliseconds.\n0: at once.\nRange: 0 ↔ 10000.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.setlist.crossfade("Setlist", 800)` fades each scene in over 0.8 s.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
 
   /* --- Reading the five (design doc §44) ---
      Every component member in the API was a WRITE. The twenty-three spec-driven families now read
@@ -4318,25 +4456,23 @@ export const PANEL_COMMANDS = [
      spec and have no such map, so they read by the MODEL field name — which is the name their own
      summaries already use. `read(target)` with no field is the whole section either way, so the
      one shape a script is most likely to want is the same across all twenty-eight. */
-  panelVerb('splitRead', 'splitRead(target [, field])',
-    'Read the Zone Splitter\'s settings — the whole section, or one field by name (`zones`, `preset`). '
-    + 'Fields are addressed by model field name, not by verb name.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('phraseRead', 'phraseRead(target [, field])',
-    'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
+  panelVerb('splitRead', 'splitRead(target [, field])', 'Read the Zone Splitter\'s settings.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "zones" or "lowNote".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.split.read("Split", "zones")` gives the zones, each { label, lowNote, highNote, channel, transpose, enabled, … }.', notes: ['Returns the value.'] }),
+  panelVerb('phraseRead', 'phraseRead(target [, field])', 'Read the Phrase Sequencer\'s settings.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "key" or "pattern".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.phrase.read("Phrase", "key")` gives the key, 0 being C.', notes: ['Returns the value.'] }),
   panelVerb('recorderRead', 'recorderRead(target [, field])', 'Read the Phrase Recorder\'s settings and take.',
     [T, { name: 'field', type: 'string', required: false, kind: 'componentWord',
       summary: 'A setting\'s name, in any case, such as "state" or "take".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
     { example: '`ce.components.recorder.read("Recorder", "state")` gives "idle", "armed", "recording" or "overdub".',
       notes: ['"take": { events }, each note { t, note, velocity, dur, pass }, `t` and `dur` as parts of the loop.', 'Returns the value.'] }),
-  panelVerb('harmonyRead', 'harmonyRead(target [, field])',
-    'Read the Harmoniser\'s settings — the whole section, or one field by name.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('setlistRead', 'setlistRead(target [, field])',
-    'Read the Setlist — the whole section, or one field by name. `scenes` is the scene list; '
-    + '`index` is the current position.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
+  panelVerb('harmonyRead', 'harmonyRead(target [, field])', 'Read the Harmoniser\'s settings.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "mode" or "degreeChords".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.harmony.read("Harmoniser", "mode")` gives "diatonic" or "memory".', notes: ['Returns the value.'] }),
+  panelVerb('setlistRead', 'setlistRead(target [, field])', 'Read the Setlist\'s settings and scenes.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "index" or "scenes".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.setlist.read("Setlist", "index")` gives the scene in front, counted from 0.', notes: ['"scenes": each { name, values, enabled, … }.', 'Returns the value.'] }),
 
   // --- Panel values: snapshot / restore ---
   // The two members of ce.panel that are NOT panel-view only. Creating a control needs a renderer;

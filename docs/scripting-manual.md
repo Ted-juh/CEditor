@@ -607,7 +607,12 @@ them. Choose one in a script's **Runs on** box and define the function of the sa
 
 ### `onPanelLoad()`
 
-Runs first, as soon as the panel is opened and before any controls exist. Use it to set up MIDI or send the synth a start-up message. Do not read or change controls here — they have not been created yet.
+Runs first, when the panel opens, before any control exists.
+
+Good to know:
+
+- Set up MIDI here, or send the synth a start-up message.
+- Controls cannot be read or changed yet.
 
 ```lua
 -- Lua
@@ -624,7 +629,12 @@ function onPanelLoad() {
 
 ### `onPanelBuild()`
 
-Runs after onPanelLoad and before onPanelReady. This is the place to create, copy and arrange controls from a script. Controls made by a script are removed before each run, so this always starts from the panel as you built it.
+Runs after `onPanelLoad`, to create, copy and arrange controls from a script.
+
+Good to know:
+
+- Controls a script made are removed before each run, so it starts from the panel as it was built.
+- Panel view only.
 
 *Panel window only.*
 
@@ -649,7 +659,12 @@ function onPanelBuild() {
 
 ### `onError(info)`
 
-Runs when any script on the panel fails. `info` says which script failed, what it was doing and what the error was. The error is always written to the log as well. If onError itself fails, that error is logged and onError is not called again, so it cannot get stuck in a loop.
+Runs when any script on the panel fails.
+
+Good to know:
+
+- The error is written to the console as well.
+- An error in `onError` itself is written to the console, and `onError` is not called for it, so it cannot loop.
 
 **`info`** holds:
 
@@ -678,7 +693,12 @@ function onError(info) {
 
 ### `onDraw(info)`
 
-Paints on top of the control this script is attached to; `info` gives the control's name and its current size. It runs when the control needs repainting, not on every frame: to animate, call `ce.draw.redraw()` from a timer.
+Paints on top of the control this script is attached to.
+
+Good to know:
+
+- Runs when the control needs painting, not every frame: to animate, call `ce.draw.redraw()` from a timer.
+- Panel view only.
 
 *Panel window only.*
 
@@ -711,7 +731,12 @@ function onDraw(info) {
 
 ### `onPanelReady(info)`
 
-Runs once the controls exist. This is the moment to ask the synth for its current settings and fill the controls. In a plugin it runs again each time the window is reopened, so put one-time work inside `if info.firstTime`.
+Runs once the controls exist.
+
+Good to know:
+
+- Ask the synth for its settings here, and fill the controls.
+- In a plug-in it runs again each time the window opens: put one-time work inside `if info.firstTime`.
 
 **`info`** holds:
 
@@ -738,7 +763,12 @@ function onPanelReady(info) {
 
 ### `onPanelClose()`
 
-Runs when the panel window closes: you stopped the preview, or the plugin window was closed in the DAW. Your scripts keep running after this — timers still tick and MIDI still arrives. To clean up when the scripts themselves are stopped, use onPanelDestroy.
+Runs when the panel window closes.
+
+Good to know:
+
+- The preview stopped, or the plug-in's window was closed in the DAW.
+- The scripts go on running: timers tick and MIDI arrives. `onPanelDestroy` runs when they stop.
 
 ```lua
 -- Lua
@@ -755,7 +785,13 @@ function onPanelClose() {
 
 ### `onPanelDestroy()`
 
-Runs when the scripts are about to be stopped: another panel was opened, the scripts were replaced, or the plugin was removed. It is the last hook to run, and timers, saved state and MIDI still work, so this is the place to restore the synth or send a final dump. It runs exactly once, even if onPanelClose never did.
+Runs when the scripts are about to stop.
+
+Good to know:
+
+- Another panel was opened, the scripts were replaced, or the plug-in was removed.
+- The last hook: timers, saved values and MIDI still work, so restore the synth or send a last dump here.
+- Once, even when `onPanelClose` never ran.
 
 ```lua
 -- Lua
@@ -772,7 +808,13 @@ function onPanelDestroy() {
 
 ### `onDawSaveState(store) -> object`
 
-Runs when the DAW saves the project. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.
+Runs when the DAW saves the project: return what to keep.
+
+Good to know:
+
+- Return a table holding what you want saved.
+- `store` shows what other scripts saved so far; it is to read only, and changing it saves nothing.
+- In an exported plug-in only.
 
 *Exported plugin only — never runs in the editor.*
 
@@ -791,7 +833,12 @@ function onDawSaveState(store) {
 
 ### `onDawRestoreState(store)`
 
-Runs when the DAW reopens the project. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.
+Runs when the DAW opens the project again: read your values back.
+
+Good to know:
+
+- `store` holds what your `onDawSaveState` returned, with every other script's.
+- In an exported plug-in only.
 
 *Exported plugin only — never runs in the editor.*
 
@@ -5340,7 +5387,18 @@ Everything in this chapter needs the panel window. With the window closed these 
 
 #### `ce.ui.notify(message [, opts])`
 
-Show a short pop-up message to the person using the panel, and return its ID. It disappears after 3 seconds unless you set `opts.duration` (in milliseconds); 0 or less keeps it up until it is dismissed. Use it for things the user should know about, not for debugging — that is what `log()` is for. Pass the ID to `ce.ui.update()` to change the message in place, or to `ce.ui.dismiss()` to remove it.
+Show a short message to the person using the panel.
+
+Example: `uiNotify("Patch saved")` shows Patch saved for three seconds.
+
+- `message` (text, required): The text.<br>A number: written as text.<br>Left out, or "": nothing is shown, with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns its id, for `ce.ui.update()` and `ce.ui.dismiss()`.
+- For what the player should know; `log()` is for you.
+- A click on it removes it.
 
 *Short name: `uiNotify`.*
 
@@ -5362,7 +5420,18 @@ ce.ui.notify("Patch loaded");
 
 #### `ce.ui.status([message] [, opts])`
 
-Show a line of text in the status bar. It stays until you replace it; call this with no message to clear it. Use it for an ongoing state, such as "Recording" or "Synced" — for a one-off event, use `ce.ui.notify()`. Read the current status back with `ce.ui.state()`.
+Show a line of text in the status bar, until it is replaced.
+
+Example: `uiStatus("Recording", { kind = "warn" })` shows Recording in the status bar.
+
+- `message` (text, optional): The text.<br>Left out, or "": the status bar is cleared.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- For a state that lasts, such as "Synced"; `ce.ui.notify()` is for an event.
+- `ce.ui.state()` reads it back.
+- Returns true.
 
 *Short name: `uiStatus`.*
 
@@ -5383,7 +5452,18 @@ ce.ui.status("Recording");
 
 #### `ce.ui.dialog(opts [, onChoice]) -> boolean`
 
-Ask a question with buttons. The answer arrives later through `onChoice`, which receives the label of the button that was clicked, or nothing if the dialog was closed without a choice. Only one dialog can be open at a time. The call itself returns true if the dialog appeared; if it returns false, nothing was shown — for example because another dialog is already open — and `onChoice` has already been called with nothing.
+Ask a question with buttons.
+
+Example: `uiDialog({ title = "Overwrite the patch?", buttons = { "Cancel", "Overwrite" } }, fn)` asks, and calls fn with the button clicked.
+
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+- `onChoice` (function, optional): Called later with the label of the button clicked; nothing when it was closed without one.
+
+Good to know:
+
+- One dialog at a time.
+- Returns true if it appeared. Another dialog open: false, and `onChoice` called with nothing; `ce.ui.state()` says so.
+- No title and no message: false, with a console error, and `onChoice` called with nothing.
 
 *Short name: `uiDialog`.*
 
@@ -5416,7 +5496,18 @@ ce.ui.dialog({ title: "Overwrite?", buttons: ["Overwrite", "Cancel"] }, function
 
 #### `ce.ui.prompt(opts [, onAnswer]) -> boolean`
 
-Ask the user to type some text. The answer arrives through `onAnswer`: the text they typed, or nothing if they cancelled. An empty answer (they accepted an empty field) is not the same as no answer. Pressing Enter accepts. Returns true if the dialog appeared; if it returns false, `onAnswer` has already been called with nothing.
+Ask for a line of text.
+
+Example: `uiPrompt({ title = "Name this patch", value = "Init" }, fn)` asks, and calls fn with what was typed.
+
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+- `onAnswer` (function, optional): Called later with the text typed; "" when an empty field was accepted; nothing when it was cancelled.
+
+Good to know:
+
+- Enter accepts.
+- Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.
+- No title and no message: false, with a console error, and `onAnswer` called with nothing.
 
 *Short name: `uiPrompt`.*
 
@@ -5448,7 +5539,18 @@ ce.ui.prompt({ title: "Name this patch", value: get("patchName") }, (name) => {
 
 #### `ce.ui.choose(opts [, onAnswer]) -> boolean`
 
-Ask the user to pick from a list. The answer arrives through `onAnswer`: the chosen item, a list of items if `opts.multiple` is set, or nothing if they cancelled. A long list scrolls rather than making the dialog taller. Returns true if the dialog appeared; if it returns false — for example because `opts.items` is empty — `onAnswer` has already been called with nothing.
+Ask for a choice from a list.
+
+Example: `uiChoose({ title = "Load which bank?", items = { "A", "B", "C" } }, fn)` asks, and calls fn with the bank chosen.
+
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+- `onAnswer` (function, optional): Called later with the item chosen; a list of them with `multiple`; nothing when it was cancelled.
+
+Good to know:
+
+- A long list scrolls.
+- Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.
+- No title and no message, or no items: false, with a console error, and `onAnswer` called with nothing.
 
 *Short name: `uiChoose`.*
 
@@ -5480,7 +5582,15 @@ ce.ui.choose({ title: "Load which preset?", items: names }, (pick) => {
 
 #### `ce.ui.dismiss([id]) -> number`
 
-Remove a message shown with `ce.ui.notify()`; the user can also remove one by clicking it. With no `id`, every message is removed. Returns how many were removed.
+Remove a message `ce.ui.notify()` showed, or every one.
+
+Example: `uiDismiss(id)` removes that message.
+
+- `id` (number, optional): The id `ce.ui.notify()` gave.<br>Left out: every message.<br>Not a number: nothing is removed, with a console error.
+
+Good to know:
+
+- Returns how many were removed.
 
 *Short name: `uiDismiss`.*
 
@@ -5495,7 +5605,19 @@ ce.ui.dismiss(id);
 
 #### `ce.ui.update(id, message [, opts]) -> boolean`
 
-Change the text of a message that is already showing, in place. To show progress, show the first message with an `opts.duration` of 0 so it stays up, then update it as you go. Returns false once the message has gone — for example because the user dismissed it — so you know to stop updating.
+Change the text of a message that is showing.
+
+Example: `uiUpdate(id, "Sending 3 of 8")` changes the message in place.
+
+- `id` (number, required): The id `ce.ui.notify()` gave.
+- `message` (text, required): The new text.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- For progress: show the first with `duration = 0`, so it stays, then change it as you go.
+- Returns true; false once the message has gone, such as when it was clicked away, so you know to stop.
+- No id, or no message: false, with a console error.
 
 *Short name: `uiUpdate`.*
 
@@ -5521,7 +5643,14 @@ ce.ui.update(id, "Working… done");
 
 #### `ce.ui.state() -> table`
 
-Return what is on screen: `status`, `statusKind`, `notifications` (a list, each with `id`, `message`, `kind` and `sticky`) and `dialog`. `dialog` is true while a dialog is open, which tells you why `ce.ui.dialog()` returned false: another dialog was already showing, rather than there being no panel window to show it in.
+Give what is on screen: the status bar, the messages and whether a dialog is open.
+
+Example: `uiState().dialog` gives true while a dialog is open.
+
+Good to know:
+
+- Returns { status, statusKind, notifications, dialog }; each notification { id, message, kind, sticky }.
+- `dialog` true: why `ce.ui.dialog()` gave false, rather than there being no panel window.
 
 *Short name: `uiState`.*
 
@@ -5536,7 +5665,17 @@ if (!ce.ui.state().dialog) {  }
 
 #### `ce.ui.copy(text) -> boolean`
 
-Copy text to the clipboard. The copy happens in the background, and the system may refuse it unless it follows a click by the user, so true means the copy was attempted, not that it worked; a refusal is written to the script console. Scripts cannot read the clipboard.
+Copy text to the clipboard.
+
+Example: `uiCopy(encodeJson(allSettings()))` copies the panel's settings as JSON.
+
+- `text` (text, required): The text.<br>A number: written as text.
+
+Good to know:
+
+- Returns true when it was tried, not that it worked: the system may refuse a copy that does not follow a click, which the console says.
+- Scripts cannot read the clipboard.
+- No text: false, with a console error.
 
 *Short name: `uiCopy`.*
 
@@ -7551,37 +7690,91 @@ A step grid whose rows are the notes of a scale.
 
 ##### `ce.components.phrase.seed(target, seed)`
 
-Fill the grid from a named seed pattern — "clear", "octaves", "arpUp", "riff", "random".
+Fill the grid with a pattern: "clear", "octaves", "arpUp", "riff", "random".
+
+Example: `ce.components.phrase.seed("Phrase", "riff")` fills the grid with a riff.
+
+- `seed` (text, required): "clear": empty.<br>"octaves": the root and the octave above, by turns.<br>"arpUp": the chord walked upward across the bar.<br>"riff": a one-bar line, off the beat, with ties.<br>"random": a note of the scale on each step.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- What the grid held is replaced.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseSeed`.*
 
 ##### `ce.components.phrase.clear(target)`
 
-Clear every step.
+Empty the grid.
+
+Example: `ce.components.phrase.clear("Phrase")` switches every cell off.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseClear`.*
 
 ##### `ce.components.phrase.key(target, key)`
 
-Change the key the degrees resolve against: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.
+Set the key its rows play in.
+
+Example: `ce.components.phrase.key("Phrase", "D")` plays the pattern in D.
+
+- `key` (number, required): The key's note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Row 1 is the key's note; each row up is the next step of the scale.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseKey`.*
 
 ##### `ce.components.phrase.scale(target, scale)`
 
-Change the scale ("major"/"minor"/"dorian"…).
+Set the scale its rows play.
+
+Example: `ce.components.phrase.scale("Phrase", "dorian")` plays the pattern in the dorian mode.
+
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseScale`.*
 
 ##### `ce.components.phrase.transpose(target, semitones)`
 
-Transpose the phrase, leaving the pattern alone.
+Transpose what the pattern plays, leaving the grid as it is.
+
+Example: `ce.components.phrase.transpose("Phrase", 12)` plays the pattern an octave up.
+
+- `semitones` (number, required): Semitones: 12 an octave up.<br>Range: -48 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseTranspose`.*
 
 ##### `ce.components.phrase.direction(target, direction)`
 
-Play direction — "forward", "reverse", "pingpong", "random".
+Set the order it plays the steps in: "forward", "reverse", "pingpong", "random".
+
+Example: `ce.components.phrase.direction("Phrase", "pingpong")` plays forward and back.
+
+- `direction` (text, required): "forward": first to last.<br>"reverse": last to first.<br>"pingpong": forward, then back.<br>"random": a step at random each time.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseDirection`.*
 
@@ -7589,17 +7782,45 @@ Play direction — "forward", "reverse", "pingpong", "random".
 
 Start or stop the sequencer.
 
+Example: `ce.components.phrase.run("Phrase", false)` stops the sequencer.
+
+- `running` (true or false, required): true: it plays.<br>false: it stops.<br>Left out: it plays.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
 *Short name: `phraseRun`.*
 
 ##### `ce.components.phrase.cell(target, step, row, on)`
 
-Switch one grid cell on or off. Steps and rows are counted from 1.
+Switch one cell of the grid on or off.
+
+Example: `ce.components.phrase.cell("Phrase", 1, 3, true)` plays row 3 on the first step.
+
+- `step` (number, required): Step, counted from 1, left to right.<br>A fraction: rounded.<br>Not a step of the grid: rejected with a console error.
+- `row` (number, required): Row, counted from 1, from the bottom: a step of the scale; a semitone in chromatic mode, set in the inspector.<br>A fraction: rounded.<br>Not a row of the grid: rejected with a console error.
+- `on` (true or false, required): true: on.<br>false: off.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `phraseCell`.*
 
 ##### `ce.components.phrase.read(target [, field])`
 
-Read the Phrase Sequencer's settings — the whole section, or one field by name.
+Read the Phrase Sequencer's settings.
+
+Example: `ce.components.phrase.read("Phrase", "key")` gives the key, 0 being C.
+
+- `field` (text, optional): A setting's name, in any case, such as "key" or "pattern".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- Returns the value.
 
 *Short name: `phraseRead`.*
 
@@ -7833,91 +8054,234 @@ Turns one played note into a whole chord.
 
 ##### `ce.components.harmony.mode(target, mode)`
 
-Harmoniser mode — "diatonic", "memory".
+Set how it builds the harmony: "diatonic", "memory".
+
+Example: `ce.components.harmony.mode("Harmoniser", "memory")` plays one chord shape on every note.
+
+- `mode` (text, required): "diatonic": the chord the played note's step of the key has; always in the key.<br>"memory": a fixed shape, `shape()`, on whatever note is played, in the key or not.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyMode`.*
 
 ##### `ce.components.harmony.key(target, key)`
 
-Re-key the harmoniser mid-song: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.
+Set the key it harmonises in.
+
+Example: `ce.components.harmony.key("Harmoniser", "Bb")` harmonises in B♭.
+
+- `key` (number, required): The key's note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyKey`.*
 
 ##### `ce.components.harmony.scale(target, scale)`
 
-Change the scale the harmony follows.
+Set the scale it harmonises in.
+
+Example: `ce.components.harmony.scale("Harmoniser", "minor")` harmonises in the minor key.
+
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyScale`.*
 
 ##### `ce.components.harmony.size(target, size)`
 
-How many voices to add.
+Set how many notes each chord has.
+
+Example: `ce.components.harmony.size("Harmoniser", 4)` plays seventh chords.
+
+- `size` (number, required): Notes: 3 a triad, 4 a seventh chord.<br>Range: 2 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonySize`.*
 
 ##### `ce.components.harmony.shape(target, shape)`
 
-Apply a named chord shape — "major", "minor", "sus4", "maj7", "min7", "fifths", "octaves" — or a list of intervals in semitones.
+Set the chord shape it plays: "major", "minor", "sus4", "maj7", "min7", "fifths", "octaves", or a list of intervals.
+
+Example: `ce.components.harmony.shape("Harmoniser", "min7")` plays a minor seventh on every note.
+
+- `shape` (text, required): A shape by name, case-insensitive; or a list of semitones above the played note, such as {0, 4, 7}, -36 to 36 each, 6 at most.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "memory".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyShape`.*
 
 ##### `ce.components.harmony.voicing(target, voicing)`
 
-Voicing spread — "close", "open", "drop2".
+Set how the notes of each chord are spread: "close", "open", "drop2".
+
+Example: `ce.components.harmony.voicing("Harmoniser", "open")` spreads each chord wider.
+
+- `voicing` (text, required): "close": as close together as they go.<br>"open": the middle note an octave up.<br>"drop2": the second note from the top an octave down.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyVoicing`.*
 
 ##### `ce.components.harmony.inversion(target, inversion)`
 
-Chord inversion.
+Set which note of each chord is lowest.
+
+Example: `ce.components.harmony.inversion("Harmoniser", 1)` puts the third lowest.
+
+- `inversion` (number, required): 0: the root lowest. 1: the third. 2: the fifth. 3: the seventh.<br>Past the chord's notes: the highest inversion it has, 2 for a triad.<br>Range: 0 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyInversion`.*
 
 ##### `ce.components.harmony.octave(target, octave)`
 
-Octave offset for the added voices.
+Move the added notes by whole octaves.
+
+Example: `ce.components.harmony.octave("Harmoniser", -1)` puts the harmony an octave below.
+
+- `octave` (number, required): Octaves: 1 up, -1 down.<br>Range: -3 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- The played note stays where it is.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyOctave`.*
 
 ##### `ce.components.harmony.outOfKey(target, mode)`
 
-What to do with out-of-key notes — "pass", "nearest", "mute".
+Set what a played note outside the key does: "pass", "nearest", "mute".
+
+Example: `ce.components.harmony.outOfKey("Harmoniser", "nearest")` harmonises a wrong note as the nearest right one.
+
+- `mode` (text, required): "pass": the note sounds alone, without harmony.<br>"nearest": harmonised as the nearest note of the key.<br>"mute": nothing sounds.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyOutOfKey`.*
 
 ##### `ce.components.harmony.keepPlayed(target [, keep])`
 
-Keep or drop the note actually played.
+Sound the played note with its harmony, or only the harmony.
+
+Example: `ce.components.harmony.keepPlayed("Harmoniser", false)` plays the harmony without the note played.
+
+- `keep` (true or false, optional): true: the played note sounds too.<br>false: only the added notes.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyKeepPlayed`.*
 
 ##### `ce.components.harmony.channel(target, channel)`
 
-MIDI channel for the harmony voices.
+Set the MIDI channel the chords play on.
+
+Example: `ce.components.harmony.channel("Harmoniser", 2)` plays the chords on channel 2.
+
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyChannel`.*
 
 ##### `ce.components.harmony.voiceLeading(target, mode)`
 
-Voice-leading strategy — "off", "closest", "smooth".
+Set how each chord moves from the one before: "off", "closest", "smooth".
+
+Example: `ce.components.harmony.voiceLeading("Harmoniser", "closest")` keeps the chords close together.
+
+- `mode` (text, required): "off": each chord as `inversion()` sets it.<br>"closest": the notes move as little as they can, all together.<br>"smooth": the top note moves as little as it can.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyVoiceLeading`.*
 
 ##### `ce.components.harmony.strum(target, ms)`
 
-Spread the voices over `ms` milliseconds.
+Spread the notes of each chord out in time, as a strum.
+
+Example: `ce.components.harmony.strum("Harmoniser", 60)` strums each chord over 60 ms.
+
+- `ms` (number, required): Milliseconds from the first note to the last.<br>0: all together.<br>Range: 0 ↔ 400.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Up or down: set in the inspector.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyStrum`.*
 
 ##### `ce.components.harmony.degree(target, degree, chord)`
 
-Override the chord used for one scale degree.
+Play a chord of your own on one step of the key.
+
+Example: `ce.components.harmony.degree("Harmoniser", 6, {0, 5, 7})` plays a sus4 on the sixth step.
+
+- `degree` (number, required): Step of the scale, counted from 1.<br>A fraction: rounded.<br>Not a step of the scale: rejected with a console error.
+- `chord` (text, required): Semitones above the step's note, such as {0, 5, 7}, -36 to 36 each, 6 at most.<br>"clear": the key's own chord again.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `harmonyDegree`.*
 
 ##### `ce.components.harmony.read(target [, field])`
 
-Read the Harmoniser's settings — the whole section, or one field by name.
+Read the Harmoniser's settings.
+
+Example: `ce.components.harmony.read("Harmoniser", "mode")` gives "diatonic" or "memory".
+
+- `field` (text, optional): A setting's name, in any case, such as "mode" or "degreeChords".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- Returns the value.
 
 *Short name: `harmonyRead`.*
 
@@ -10271,21 +10635,23 @@ Good to know:
 
 #### ce.components.matrix: Mod Matrix
 
-Patch the modulation matrix from a script: one cell at a time, or clear the lot.
+Route sources to destinations, each crosspoint with its own amount: one at a time, or all set to 0.
 
 ##### `ce.components.matrix.cell(target, row, col, amount) -> boolean`
 
-Set one crosspoint. Row and column are 1-based, as the grid shows them.
+Set how much one source sends to one destination.
 
-Example: `ce.components.matrix.cell("ModMatrix", 1, 2, 0.5)` sets the cell at row 1, column 2 to 0.5.
+Example: `ce.components.matrix.cell("ModMatrix", 2, 3, -0.5)` sends source 2 to destination 3 at half, upside down.
 
 - `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
 - `row` (number, required): Row, counted from 1.<br>A fraction: rounded.<br>Not a row the grid has: rejected with a console error.
 - `col` (number, required): Column, counted from 1.<br>A fraction: rounded.<br>Not a column the grid has: rejected with a console error.
-- `amount` (number, required): Amount.<br>Range: -1 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `amount` (number, required): Amount: 1 all of it, 0.5 half, 0 none; below 0, upside down.<br>Range: -1 ↔ 1; 0 ↔ 1 while `bipolar()` is off.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The rows are the sources and the columns the destinations, as the grid labels them.
+- Not snapped: `step()` snaps a drag.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10293,9 +10659,9 @@ Good to know:
 
 ##### `ce.components.matrix.clear(target) -> boolean`
 
-Zero every crosspoint.
+Set every crosspoint to 0.
 
-Example: `ce.components.matrix.clear("ModMatrix")` sets every cell to 0.
+Example: `ce.components.matrix.clear("ModMatrix")` routes nothing anywhere.
 
 - `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
 
@@ -10308,15 +10674,17 @@ Good to know:
 
 ##### `ce.components.matrix.bipolar(target [, bipolar]) -> boolean`
 
-Switch the bipolar on or off.
+Let amounts go below 0, or keep them 0 to 1.
 
 Example: `ce.components.matrix.bipolar("ModMatrix")` switches the bipolar on if it is off, and off if it is on.
 
 - `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
-- `bipolar` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `bipolar` (true or false, optional): true: -1 to 1; below 0 sends the source upside down.<br>false: 0 to 1.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Amounts already below 0 are kept as they are.
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10324,15 +10692,17 @@ Good to know:
 
 ##### `ce.components.matrix.step(target, step) -> boolean`
 
-Snap cell amounts to multiples of this. 0 is free.
+Set the step a drag snaps an amount to.
 
-Example: `ce.components.matrix.step("ModMatrix", 0.5)` sets the step to 0.5.
+Example: `ce.components.matrix.step("ModMatrix", 0.25)` snaps a drag to quarters.
 
 - `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
-- `step` (number, required): Step.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `step` (number, required): Amount.<br>0: no snap.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- A drag only: `cell()` is not snapped.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10340,15 +10710,16 @@ Good to know:
 
 ##### `ce.components.matrix.cellStyle(target, cellStyle) -> boolean`
 
-How a crosspoint is drawn: bar, fill or dot.
+Set how each crosspoint shows its amount.
 
-Example: `ce.components.matrix.cellStyle("ModMatrix", "fill")` sets the cell style to "fill".
+Example: `ce.components.matrix.cellStyle("ModMatrix", "dot")` shows each amount as a dot.
 
 - `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
-- `cellStyle` (text, required): One of "bar", "fill" or "dot". Case-insensitive.<br>Invalid: rejected with a console error.
+- `cellStyle` (text, required): "bar": a bar, from the middle while bipolar.<br>"fill": the cell filled.<br>"dot": a dot.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "bar".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10356,15 +10727,16 @@ Good to know:
 
 ##### `ce.components.matrix.editable(target [, editable]) -> boolean`
 
-Allow or lock touch control of the Mod Matrix.
+Let the crosspoints be dragged, or not.
 
 Example: `ce.components.matrix.editable("ModMatrix")` switches the editable on if it is off, and off if it is on.
 
 - `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
-- `editable` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `editable` (true or false, optional): true: a drag up a cell raises its amount.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10372,7 +10744,7 @@ Good to know:
 
 ##### `ce.components.matrix.showLabels(target [, showLabels]) -> boolean`
 
-Show or hide the labels.
+Show or hide the sources' and destinations' names.
 
 Example: `ce.components.matrix.showLabels("ModMatrix")` shows the labels if they are hidden, and hides them if they are shown.
 
@@ -10381,6 +10753,7 @@ Example: `ce.components.matrix.showLabels("ModMatrix")` shows the labels if they
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10388,7 +10761,7 @@ Good to know:
 
 ##### `ce.components.matrix.showValues(target [, showValues]) -> boolean`
 
-Show or hide the values.
+Show or hide each amount, as a number, in its cell.
 
 Example: `ce.components.matrix.showValues("ModMatrix")` shows the values if they are hidden, and hides them if they are shown.
 
@@ -10397,6 +10770,8 @@ Example: `ce.components.matrix.showValues("ModMatrix")` shows the values if they
 
 Good to know:
 
+- Not 0s.
+- Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -11069,37 +11444,92 @@ Splits the keyboard into zones, each with its own channel and transpose.
 
 ##### `ce.components.split.preset(target, preset [, lowNote, highNote])`
 
-Apply a split layout — "whole", "classic", "splitLayer", "threeWay", "velLayer" — optionally bounding the key range.
+Replace every zone with a layout: "whole", "classic", "splitLayer", "threeWay", "velLayer".
+
+Example: `ce.components.split.preset("Split", "classic", "C2", "C6")` splits C2 to C6 in two halves.
+
+- `preset` (text, required): "whole": one zone, channel 1.<br>"classic": the lower half on channel 1, an octave down; the upper half on channel 2.<br>"splitLayer": a bass below; two channels layered above.<br>"threeWay": bass, pad and lead across channels 1 to 3.<br>"velLayer": the same keys, played softly on channel 1 and hard on channel 2.<br>Case-insensitive.<br>Any other: rejected with a console error.
+- `lowNote` (note, optional): The lowest note of the layout.<br>A MIDI note number, or a name such as "C4".<br>Range: 0 ↔ 127.<br>Outside the range: the nearest end.<br>Any other: rejected with a console error.<br>Left out: 36, C2.
+- `highNote` (note, optional): The highest note of the layout.<br>A MIDI note number, or a name such as "C4".<br>Range: 0 ↔ 127.<br>Outside the range: the nearest end.<br>Any other: rejected with a console error.<br>Left out: 96, C7.<br>Below `lowNote`: the two are swapped.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `splitPreset`.*
 
 ##### `ce.components.split.mute(target, zone, enabled)`
 
-Mute or unmute one zone. A zone is its number counted from 1, or its name.
+Let one zone sound, or mute it.
+
+Example: `ce.components.split.mute("Split", "Bass", false)` mutes the zone called Bass.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `enabled` (true or false, required): true: it sounds.<br>false: muted.<br>Left out: it sounds.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `splitMute`.*
 
 ##### `ce.components.split.channel(target, zone, channel)`
 
-Set a zone's MIDI output channel. A zone is its number counted from 1, or its name.
+Set the MIDI channel one zone plays on.
+
+Example: `ce.components.split.channel("Split", 2, 5)` sends zone 2 on channel 5.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `splitChannel`.*
 
 ##### `ce.components.split.transpose(target, zone, semitones)`
 
-Transpose one zone. A zone is its number counted from 1, or its name.
+Transpose one zone.
+
+Example: `ce.components.split.transpose("Split", 1, -12)` plays zone 1 an octave down.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `semitones` (number, required): Semitones: 12 an octave up.<br>Range: -48 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `splitTranspose`.*
 
 ##### `ce.components.split.point(target, zone, note)`
 
-Move the top note of a zone, and with it the bottom of a zone that starts just above it. A zone is its number counted from 1, or its name.
+Move the top note of one zone.
+
+Example: `ce.components.split.point("Split", 1, "B3")` ends zone 1 at B3.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `note` (note, required): Its new top note.<br>A MIDI note number, or a name such as "C4".<br>Range: 0 ↔ 127.<br>Outside the range: the nearest end.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- A zone that starts just above it moves with it, as a drag of the split point does.
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `splitPoint`.*
 
 ##### `ce.components.split.read(target [, field])`
 
-Read the Zone Splitter's settings — the whole section, or one field by name (`zones`, `preset`). Fields are addressed by model field name, not by verb name.
+Read the Zone Splitter's settings.
+
+Example: `ce.components.split.read("Split", "zones")` gives the zones, each { label, lowNote, highNote, channel, transpose, enabled, … }.
+
+- `field` (text, optional): A setting's name, in any case, such as "zones" or "lowNote".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- Returns the value.
 
 *Short name: `splitRead`.*
 
@@ -14148,43 +14578,106 @@ Scenes you step through, for example from a footswitch.
 
 ##### `ce.components.setlist.next(target)`
 
-Advance to the next enabled scene.
+Go to the next scene it plays.
+
+Example: `ce.components.setlist.next("Setlist")` recalls the next scene.
+
+Good to know:
+
+- Scenes switched off with `enable()` are passed over.
+- At the last: to the first while `wrap()` is on; else rejected with a console error.
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `setlistNext`.*
 
 ##### `ce.components.setlist.prev(target)`
 
-Go back to the previous enabled scene.
+Go back to the scene before.
+
+Example: `ce.components.setlist.prev("Setlist")` recalls the scene before.
+
+Good to know:
+
+- Scenes switched off with `enable()` are passed over.
+- At the first: to the last while `wrap()` is on; else rejected with a console error.
+- Returns true. Rejected: false, with a console error.
 
 *Short name: `setlistPrev`.*
 
 ##### `ce.components.setlist.jump(target, scene)`
 
-Jump to a scene by index or name.
+Go to a scene by its number or name.
+
+Example: `ce.components.setlist.jump("Setlist", "Ballad")` recalls the scene called Ballad.
+
+- `scene` (number or text, required): Its number, counted from 1, or its name, as written.<br>Not a scene: rejected with a console error naming them.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `setlistGoto`.*
 
 ##### `ce.components.setlist.enable(target, scene, enabled)`
 
-Include or skip a scene in the walk order.
+Play a scene in the set, or pass over it.
+
+Example: `ce.components.setlist.enable("Setlist", 2, false)` skips scene 2 tonight.
+
+- `scene` (number or text, required): Its number, counted from 1, or its name, as written.<br>Not a scene: rejected with a console error naming them.
+- `enabled` (true or false, required): true: played.<br>false: passed over by `next()` and `prev()`.<br>Left out: played.
+
+Good to know:
+
+- `jump()` still goes to it.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `setlistEnable`.*
 
 ##### `ce.components.setlist.wrap(target [, wrap])`
 
-Wrap from the last scene back to the first.
+Go round from the last scene to the first, or stop at the ends.
+
+Example: `ce.components.setlist.wrap("Setlist", true)` goes from the last scene to the first.
+
+- `wrap` (true or false, optional): true: round.<br>false: stops at the ends.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `setlistWrap`.*
 
 ##### `ce.components.setlist.crossfade(target, ms)`
 
-Crossfade scene values over `ms` milliseconds.
+Set how long a scene's values take to fade in.
+
+Example: `ce.components.setlist.crossfade("Setlist", 800)` fades each scene in over 0.8 s.
+
+- `ms` (number, required): Milliseconds.<br>0: at once.<br>Range: 0 ↔ 10000.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
 
 *Short name: `setlistCrossfade`.*
 
 ##### `ce.components.setlist.read(target [, field])`
 
-Read the Setlist — the whole section, or one field by name. `scenes` is the scene list; `index` is the current position.
+Read the Setlist's settings and scenes.
+
+Example: `ce.components.setlist.read("Setlist", "index")` gives the scene in front, counted from 0.
+
+- `field` (text, optional): A setting's name, in any case, such as "index" or "scenes".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- "scenes": each { name, values, enabled, … }.
+- Returns the value.
 
 *Short name: `setlistRead`.*
 

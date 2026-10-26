@@ -314,6 +314,14 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   layer or no Text section; `ce.image.asset()`, `ce.text.font()` and `ce.image.load()` with nothing
   to look up, and `ce.image.set` with neither a picture nor an option, say so; and
   `ce.image.assets` and `ce.text.fonts` apply both of their filters together.
+- The Zone Splitter, Phrase Sequencer, Harmoniser and Setlist commands refuse a number that is not
+  one, and say what they take: a Zone Splitter transpose of "x" was -48 and a split point of "x" its
+  lowest note. A preset's notes are read as notes ("C2") and put lowest first. The Phrase and the
+  Harmoniser take a key by its name ("D"), and the Phrase's commands answer true when they work.
+- `ce.components.matrix.cell` takes 0 to 1 while the matrix is not bipolar, as a drag does; -0.5
+  was stored and sent.
+- `ce.ui` says what it did not do: a message, an id, a question or text to copy left out is refused
+  with a console error, and a kind or a duration that is not one is the default, said once.
 
 ## What you get
 

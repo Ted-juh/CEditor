@@ -3318,7 +3318,7 @@ function splitAction(path, action, args) {
   const current = getValue(zonesPath);
   if (!Array.isArray(current)) {
     addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
-    return;
+    return false;
   }
   // A zone that is not one, or a preset there is none of, is refused, and says which there are
   // (handWrittenVerbs.js). The zone was logged as though it had been set, and nothing changed; the
@@ -3354,7 +3354,7 @@ function phraseAction(path, action, args) {
   const cfg = getValue(`${target}.Phrase`);
   if (!cfg || typeof cfg !== 'object') {
     addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
-    return;
+    return false;
   }
   // A cell off the grid, a seed or a direction there is none of, and a key that is not a pitch
   // class are refused, and say what there is (handWrittenVerbs.js). They said "nothing to change".
@@ -3366,14 +3366,16 @@ function phraseAction(path, action, args) {
   // A script counts steps and rows from 1; the reducer indexes them from 0.
   const patch = phraseScriptPatch(cfg, action, reducerArgs('phrase', action, cfg, args), () => Math.random());
   const keys = Object.keys(patch);
+  // What reaches here is a request the Phrase can take, so an empty patch is one already met (a cell
+  // already on, the key it has). It answered nothing either way; it answers true, as the other
+  // components do (the Phrase Sequencer's review).
   if (keys.length === 0) {
-    // Not an error — an unknown seed or an out-of-grid cell is a no-op by
-    // design. But silence would look like the footswitch was dead.
-    addScriptTrace('log', '', `phrase ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
-    return;
+    addScriptTrace('log', '', `phrase ${target}: ${action} — already that way`);
+    return true;
   }
   for (const key of keys) setValue(`${target}.Phrase.${key}`, patch[key]);
   addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
+  return true;
 }
 const phraseApi = {
   phraseSeed: (target, seed) => phraseAction(target, 'seed', HAND_WRITTEN.phraseSeed.args(seed)),
@@ -5200,33 +5202,70 @@ export function stopAllAnimations() {
 // notify() returns its ID, not merely true. The id was always computed and then thrown away, and
 // without it nothing else here is addressable: a message you cannot name is a message you cannot
 // take back or replace, which is why "Sending dump… 40%" used to mean ten stacked toasts.
+// ce.ui's review (docs/design/api-descriptions-handoff.md): a message left out, an id that is not
+// one, and a dialog that asks nothing did nothing without a word; a kind or a duration that is not
+// one was used as the default without one. Each is now said, a default the first time only.
+const UI_KINDS = ['info', 'warn', 'error'];
+function uiKind(verb, kind) {
+  if (kind === undefined || kind === null) return undefined;
+  const word = listWord(UI_KINDS, String(kind));
+  if (!word) uiSaid(`${verb}: "${kind}" is not a kind, so "info" was used. One of: ${UI_KINDS.join(', ')}.`);
+  return word ?? 'info';
+}
+function uiDuration(verb, duration) {
+  if (duration === undefined || duration === null) return undefined;
+  const ms = realNumber(duration);
+  if (ms === undefined) uiSaid(`${verb}: the duration ${shownValue(duration)} is not a number of milliseconds, so 3000 was used.`);
+  return ms ?? 3000;
+}
+const uiWarned = new Set();
+function uiSaid(said) {
+  if (uiWarned.has(said)) return;
+  uiWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+
 function uiNotifyImpl(message, opts) {
   const text = String(message ?? '').trim();
-  if (!text) return undefined;
+  if (!text) {
+    addScriptTrace('error', '', 'ce.ui.notify: no message was given, so nothing was shown.');
+    return undefined;
+  }
   return uiNotifyStore(text, {
-    kind: opts?.kind,
-    duration: opts?.duration != null ? Number(opts.duration) : undefined,
+    kind: uiKind('ce.ui.notify', opts?.kind),
+    duration: uiDuration('ce.ui.notify', opts?.duration),
   }) ?? undefined;
 }
 
 /** Take a message back. No id clears every one — "stop saying things" is a real request, and making
  *  a script remember six ids to make it would be busywork. Returns how many went. */
 function uiDismissImpl(id) {
+  if (id != null && realNumber(id) === undefined) {
+    addScriptTrace('error', '', `ce.ui.dismiss: ${shownValue(id)} is not a message's id, so nothing was removed.`);
+    return 0;
+  }
   return uiDismissStore(id == null ? null : Number(id));
 }
 
 /** Replace a live message in place. Returns false when it has already gone, which is how a script
  *  learns its progress message was dismissed by hand and it should stop updating one. */
 function uiUpdateImpl(id, message, opts) {
-  if (id == null) return false;
+  if (id == null || realNumber(id) === undefined) {
+    addScriptTrace('error', '', `ce.ui.update: ${id == null ? 'no id was given' : `${shownValue(id)} is not a message's id`}, so nothing was changed.`);
+    return false;
+  }
+  if (!String(message ?? '').trim()) {
+    addScriptTrace('error', '', 'ce.ui.update: no message was given, so nothing was changed.');
+    return false;
+  }
   return uiUpdateStore(Number(id), message, {
-    kind: opts?.kind,
-    duration: opts?.duration != null ? Number(opts.duration) : undefined,
+    kind: uiKind('ce.ui.update', opts?.kind),
+    duration: uiDuration('ce.ui.update', opts?.duration),
   });
 }
 
 function uiStatusImpl(message, opts) {
-  uiStatusStore(message ?? '', { kind: opts?.kind });
+  uiStatusStore(message ?? '', { kind: uiKind('ce.ui.status', opts?.kind) });
   return true;
 }
 
@@ -5246,7 +5285,7 @@ function uiStateImpl() {
  */
 function uiCopyImpl(scriptId, text) {
   const value = text == null ? '' : String(text);
-  if (!value) return false;
+  if (!value) { addScriptTrace('error', scriptId ?? '', 'ce.ui.copy: no text was given, so nothing was copied.'); return false; }
   const clip = typeof navigator !== 'undefined' ? navigator.clipboard : null;
   if (!clip || typeof clip.writeText !== 'function') {
     addScriptTrace('log', scriptId ?? '',
@@ -5278,7 +5317,19 @@ function uiDialogImpl(scriptId, opts, onChoice) {
     catch (e) { reportScriptError(scriptId, e); }
   };
   const id = uiDialogStore(opts, answer);
-  if (id == null) { answer(undefined); return false; }
+  if (id == null) {
+    // Another dialog open is a reason ce.ui.state() reports; a dialog that asks nothing is a mistake.
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const verb = o.ask === 'text' ? 'ce.ui.prompt' : o.ask === 'list' ? 'ce.ui.choose' : 'ce.ui.dialog';
+    const items = (Array.isArray(o.items) ? o.items : []).filter((i) => String(i ?? '').trim());
+    if (!String(o.title ?? '').trim() && !String(o.message ?? '').trim()) {
+      addScriptTrace('error', '', `${verb}: no title and no message were given, so nothing was asked.`);
+    } else if (o.ask === 'list' && !items.length && !uiStateImpl().dialog) {
+      addScriptTrace('error', '', `${verb}: no items were given, so there is nothing to choose.`);
+    }
+    answer(undefined);
+    return false;
+  }
   return true;
 }
 
@@ -10391,6 +10442,7 @@ function resetScriptState() {
   musicWarned.clear();
   drawWarned.clear();
   panelWarned.clear();
+  uiWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});

@@ -1052,10 +1052,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Mod_Matrix_matrix_Patch_the_modulation_matrix_from_a_script_one_cell_at_a_time_or_clear_the_lot_","id":"qa_group_12","controlType":"Label"},
+        "Core": {"name":"group_Mod_Matrix_matrix_Route_sources_to_destinations_each_crosspoint_with_its_own_amount_one_at_a_time_or_all_set_to_0_","id":"qa_group_12","controlType":"Label"},
         "Transform": {"x":28,"y":3492,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Mod Matrix — matrix.*  (Patch the modulation matrix from a script: one cell at a time, or clear the lot.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Mod Matrix — matrix.*  (Route sources to destinations, each crosspoint with its own amount: one at a time, or all set to 0.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"

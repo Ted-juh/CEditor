@@ -1049,17 +1049,33 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.matrix"): what matrixLayout.js and MatrixRenderer do with each.
     id: 'matrix', section: 'Matrix', prefix: 'matrix', label: 'Mod Matrix',
-    summary: 'Patch the modulation matrix from a script: one cell at a time, or clear the lot.',
+    summary: 'Route sources to destinations, each crosspoint with its own amount: one at a time, or all set to 0.',
     verbs: [
-      v('cell', 'amounts', CELL, { min: -1, max: 1, grid: true,
-        doc: 'Set one crosspoint. Row and column are 1-based, as the grid shows them.' }),
-      v('clear', 'amounts', CELL, { clear: true, doc: 'Zero every crosspoint.' }),
-      v('bipolar', 'bipolar', BOOL, { toggle: true }),
+      // 0 to 1 while unipolar, as a drag keeps it (matrixSetAmount): -0.5 was stored, and sent.
+      v('cell', 'amounts', CELL, { min: -1, max: 1, grid: true, rangeFrom: (c) => (c.bipolar === false ? { min: 0 } : {}),
+        doc: 'Set how much one source sends to one destination.', ex: ['2, 3, -0.5', 'sends source 2 to destination 3 at half, upside down'],
+        argDocs: { amount: 'Amount: 1 all of it, 0.5 half, 0 none; below 0, upside down.\nRange: -1 ↔ 1; 0 ↔ 1 while `bipolar()` is off.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The rows are the sources and the columns the destinations, as the grid labels them.', 'Not snapped: `step()` snaps a drag.'] }),
+      v('clear', 'amounts', CELL, { clear: true, doc: 'Set every crosspoint to 0.', ex: ['', 'routes nothing anywhere'] }),
+      v('bipolar', 'bipolar', BOOL, { toggle: true, doc: 'Let amounts go below 0, or keep them 0 to 1.',
+        argDocs: { bipolar: `true: -1 to 1; below 0 sends the source upside down.\nfalse: 0 to 1.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Amounts already below 0 are kept as they are.', 'Default: true.'] }),
       // A step in amount units, as the inspector's Snap writes it: 0.25 snaps every cell to quarters.
       // This was an integer 0..64, so a script could set no snap but 0 or 1.
-      v('step', 'step', NUM, { ...FIELD('Matrix', 'step'), doc: 'Snap cell amounts to multiples of this. 0 is free.' }),
-      v('cellStyle', 'cellStyle', ENUM, { doc: 'How a crosspoint is drawn: bar, fill or dot.' }),
+      v('step', 'step', NUM, { ...FIELD('Matrix', 'step'), doc: 'Set the step a drag snaps an amount to.', ex: ['0.25', 'snaps a drag to quarters'],
+        argDocs: { step: 'Amount.\n0: no snap.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['A drag only: `cell()` is not snapped.', 'Default: 0.'] }),
+      v('cellStyle', 'cellStyle', ENUM, { doc: 'Set how each crosspoint shows its amount.', ex: ['"dot"', 'shows each amount as a dot'],
+        argDocs: { cellStyle: '"bar": a bar, from the middle while bipolar.\n"fill": the cell filled.\n"dot": a dot.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Default: "bar".'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the crosspoints be dragged, or not.',
+        argDocs: { editable: `true: a drag up a cell raises its amount.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showLabels', 'showLabels', BOOL, { toggle: true, doc: 'Show or hide the sources\' and destinations\' names.', notes: ['Default: shown.'] }),
+      v('showValues', 'showValues', BOOL, { toggle: true, doc: 'Show or hide each amount, as a number, in its cell.', notes: ['Not 0s.', 'Default: hidden.'] }),
     ],
   },
   {
@@ -2112,7 +2128,7 @@ export function componentScriptPatch(verb, cfg, args = []) {
         if (at === null) return {};
         value = b;
       }
-      const next = clampNum(value, verb);
+      const next = clampNum(value, verb.rangeFrom ? { ...verb, ...verb.rangeFrom(c) } : verb);
       if (next === null || next === list[at]) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? next : x)) };
     }

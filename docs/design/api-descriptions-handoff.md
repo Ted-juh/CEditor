@@ -1269,8 +1269,8 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.music | 13 | 5, all done |
 | ce.core, ce.storage, ce.components.recorder, timbre, joystick | 15, 10, 15, 15, 16 | 4 each, all done |
 | ce.image, ce.text, ce.components.macro, constraint | 8, 7, 16, 11 | 3 each, all done |
-| ce.ui, ce.components.matrix | 9, 11 | 2 each |
-| lifecycle hooks, ce.components.harmony, phrase, setlist, split | 9, 15, 9, 7, 6 | 1 each |
+| ce.ui, ce.components.matrix | 9, 11 | 2 each, all done |
+| lifecycle hooks, ce.components.harmony, phrase, setlist, split | 9, 15, 9, 7, 6 | 1 each, all done |
 
 After the commands: the module descriptions (41, the picker's group headings) and the event
 descriptions (38), with the same rules. Parameter and option descriptions only where they are
@@ -1997,6 +1997,41 @@ defined is ignored, with a console error, which the text now says.
 - **`imageSet`'s picture** is a file's path or address, or a data URL, not an image's id or name
   (`imageIcon` takes those); its text said both.
 - **Texts** for all 15 in the form; the option fields keep their prose, which was already full.
+
+### `ce.components.split`, `phrase`, `harmony` and `setlist`
+
+The four older hand-written components, panel view only. Their texts were one line each; each
+command now has the form, its words and their meanings, and its ranges. Decided by the rules:
+
+- **A number that is not one is refused, with why.** The Zone Splitter took a transpose of "x" as
+  -48, a split point of "x" as the zone's lowest note, a channel of "x" as 1; a preset's notes were
+  stored as given ("x" as no note, 200 past the keyboard). Its notes are now read as notes (a number,
+  or a name such as "C4"), held to the keyboard and put lowest first. Every hand-written family's
+  refusal of a number or a scale now says what it takes (`NUMBER_ARGS` in `handWrittenVerbs.js`);
+  they said "refused, nothing changed" and no more.
+- **A key by its name**, in any case, or a number round the octave, as the arp's (its item 8), the
+  Chord Pad's and the Recorder's: the Phrase and the Harmoniser refused "D".
+- **The Phrase answers true**, as the other components do: it answered nothing, refused or not,
+  and an unknown scale or a transpose of "x" did nothing without a word.
+- **The Setlist says why** `next()` and `prev()` did nothing at an end of the set with `wrap()` off.
+
+### `ce.components.matrix`
+
+- **A cell takes 0 ↔ 1 while the matrix is not bipolar**, as a drag keeps it (`matrixSetAmount`):
+  -0.5 was stored, and sent to the bound parameter. A CELL verb now takes `rangeFrom`.
+- **Texts** for all 8.
+
+### `ce.ui`
+
+Panel view only, so its silences were decided rather than left: a message, an id, a question or
+the text to copy left out is refused with a console error (each answered nothing, or false, without
+a word); a `kind` that is not "info", "warn" or "error", and a `duration` that is not a number,
+are the default with a warning the first time. Another dialog open stays a reason without a word,
+as a query with no answer: `ce.ui.state()` reports it. Texts for all 9.
+
+### The lifecycle hooks
+
+Their texts are one sentence each now, the rest in notes, as the commands'.
 
 ## Checking each batch
 

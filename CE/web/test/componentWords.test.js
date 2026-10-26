@@ -54,7 +54,8 @@ test('a hand-written verb refuses a word it has none of, and names the words', (
     [(api) => api.splitPreset('Split', 'single'), 'split Split: preset {"preset":"single"} — refused, nothing changed. One of: whole, classic, splitLayer, threeWay, velLayer.'],
     [(api) => api.phraseSeed('Phr', 'nope'), 'phrase Phr: seed {"seed":"nope"} — refused, nothing changed. One of: clear, octaves, arpUp, riff, random.'],
     [(api) => api.phraseDirection('Phr', 'sideways'), 'phrase Phr: direction {"direction":"sideways"} — refused, nothing changed. One of: forward, reverse, pingpong, random.'],
-    [(api) => api.phraseKey('Phr', 'D'), 'phrase Phr: key {"key":"D"} — refused, nothing changed. A key is a pitch class, a number from 0 to 11 where 0 is C.'],
+    // A key's name is read, as the arp's (its review, item 8); a word that is no note is refused.
+    [(api) => api.phraseKey('Phr', 'H'), 'phrase Phr: key {"key":"H"} — refused, nothing changed. A key is a note\'s name, such as "F#", in any case, or a number round the octave, 0 being C.'],
     [(api) => api.recorderSource('Rec', 'mic'), 'recorder Rec: source {"source":"mic"} — refused, nothing changed. One of: input, panel, both.'],
     [(api) => api.harmonyMode('Harm', 'chordz'), 'harmoniser Harm: mode {"mode":"chordz"} — refused, nothing changed. One of: diatonic, memory.'],
     [(api) => api.harmonyShape('Harm', 'blob'), 'harmoniser Harm: shape {"shape":"blob","preset":"blob"} — refused, nothing changed. One of: major, minor, sus4, maj7, min7, fifths, octaves, or a list of intervals in semitones.'],
@@ -180,4 +181,43 @@ test('the rows offer the words, and say the refusal in the console\'s words', ()
     ['harmonyRead("Harm", "mode")', 'field'], ['ce.panel.distribute({"K"}, "hSpacing")', 'what']]) {
     assert.equal(rowNamed(src, name).problem, null, src);
   }
+});
+
+/* ------------------------------------------------- the hand-written families' reviews (group 22) */
+
+test('the Zone Splitter reads its notes and numbers, and refuses what is not one', () => {
+  // A transpose of "x" was -48 and a split point of "x" the zone's lowest note, without a word; a
+  // preset's notes were stored as given, "x" as no note and 200 past the keyboard.
+  const { result, lines, controls } = run((api) => [
+    api.ce.components.split.transpose('Split', 1, 'x'), api.ce.components.split.point('Split', 1, 'x'),
+    api.ce.components.split.preset('Split', 'whole', 'C6', 'C2'), api.ce.components.split.channel('Split', 1, '5')]);
+  assert.deepEqual(result, [false, false, true, true]);
+  assert.match(lines[0], /A transpose is a number of semitones/);
+  assert.match(lines[1], /A note is a MIDI number from 0 to 127, or a name such as "C4"/);
+  const zone = controls.find((c) => c._children.Core.name === 'Split')._children.SplitZone.zones[0];
+  assert.deepEqual([zone.lowNote, zone.highNote, zone.channel], [36, 84, 5], 'names read, lowest first');
+});
+
+test('the Phrase and the Harmoniser take a key by its name, and the Phrase answers true', () => {
+  const { result, lines } = run((api) => [
+    api.ce.components.phrase.key('Phr', 'd'), api.ce.components.harmony.key('Harm', 'Bb'),
+    api.ce.components.phrase.scale('Phr', 'nope'), api.ce.components.harmony.strum('Harm', 'x'),
+    api.ce.components.phrase.run('Phr', true)]);
+  assert.deepEqual(result, [true, true, false, false, true]);
+  assert.match(lines[0], /^phrase Phr: scale .* One of: major, minor/);
+  assert.match(lines[1], /A time is a number of milliseconds\.$/);
+});
+
+test('the Setlist says why next and prev did nothing at an end of the set', () => {
+  const { result, lines } = run((api) => [api.ce.components.setlist.prev('Songs')]);
+  assert.deepEqual(result, [false]);
+  assert.match(lines[0], /It is at the first scene it plays, and `wrap\(\)` is off\.$/);
+});
+
+test('a Mod Matrix cell takes 0 to 1 while it is not bipolar, as a drag does', () => {
+  const { controls } = run((api) => {
+    api.ce.components.matrix.bipolar('Mat', false);
+    return api.ce.components.matrix.cell('Mat', 1, 1, -0.5);
+  });
+  assert.equal(controls.find((c) => c._children.Core.name === 'Mat')._children.Matrix.amounts[0], 0);
 });
