@@ -16,18 +16,20 @@
 # suites: pluginval for the VST3 and the LV2, clap-validator for the CLAP. docs/plugin-validation.md
 # has what the first runs found. The installer is packaged by hand, in release-checks.yml.
 #
-# THREE JOBS, SIDE BY SIDE. Until October 2026 all of this was one job, and a run took thirty minutes:
+# FOUR JOBS, SIDE BY SIDE. Until October 2026 all of this was one job, and a run took thirty minutes:
 # the web tests (9.5 min) and the browser checks (8 min) ran one after the other before the C++ build
 # started, though neither uses anything the build makes, nor the build anything of theirs. Each now
 # has a runner of its own (standard runners cost nothing on a public repository; CLAUDE.md), and a
-# run takes as long as the longest of the three. Measured on the first run (39043706780), with a warm
+# run takes as long as the longest of them. Measured on the first run (39043706780), with a warm
 # compiler cache, against 30 min before:
 #   web-tests       10.5 min  the node suite and the script-export validation
 #   browser-checks   7 min    the web bundle, and Playwright over it
 #   windows         12 min    the web bundle again (CMake embeds it), the C++ build with every engine
 #                             on, CTest, the native handlers end to end, and the plug-in through the
 #                             validators; 1.3 min of it fetching those, which later runs restore
-# All three run on Windows, as the one job did, so nothing that was checked there moved off it. The
+# A fourth joined them on 2026-10-26, at the owner's word, and is now the longest:
+#   component-behavior        the component acceptance harness, 95 cases (17-18 min of them here)
+# All of them run on Windows, as the one job did, so nothing that was checked there moved off it. The
 # bundle is built by both jobs that use it rather than handed from one to the other: under a minute
 # each, in parallel, where an artifact would make one job wait on the other.
 #
@@ -140,6 +142,46 @@ jobs:
           "Browser checks run in $browser"
           $env:CHROMIUM_PATH = $browser
           npm run test:browser
+
+  # The component acceptance harness, browser-checks/componentBehavior.mjs: 95 cases, each a control
+  # edited through the real inspector and driven by the pointer and the keys, saved, reloaded and
+  # checked again. About seventeen minutes, which the browser-checks job has not the time for (it
+  # stops at thirty), so it has a runner of its own. No bundle: it runs the editor in a Vite dev
+  # server, which compiles the modules as they are asked for. What a failing case saw (a screenshot
+  # each, and results.json) is kept as an artifact.
+  component-behavior:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: CE/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: CE/web
+        run: npm ci
+
+      - name: Component behaviour (Playwright over the editor)
+        working-directory: CE/web
+        run: |
+          $browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $browser) { throw "Neither Chrome nor Edge is installed on this runner." }
+          "Component behaviour runs in $browser"
+          $env:CHROMIUM_PATH = $browser
+          $env:CEDITOR_BEHAVIOR_OUT = "$env:RUNNER_TEMP\component-behavior"
+          npm run test:component-behavior
+
+      - name: Keep what the failing cases saw
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: component-behavior
+          path: ${{ runner.temp }}/component-behavior/
+          if-no-files-found: ignore
 
   windows:
     runs-on: windows-latest

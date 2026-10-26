@@ -105,10 +105,10 @@ Every module in the table under [The branch](#the-branch) is done, and so are th
 descriptions and the deferred items: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass)
 and [The deferred items](#the-deferred-items), which record each decision for the owner's review.
 The four lines noticed and not changed are done too, at the owner's word: see [The noticed
-items](#the-noticed-items). So are `browser-checks/componentBehavior.mjs` in CI and its twenty-one
-failing cases: see [componentBehavior in CI](#componentbehavior-in-ci) and [The twenty-one,
-fixed](#the-twenty-one-fixed). What is left is the owner's: whether the whole of that file runs in
-CI, which needs a job of its own or a longer one.
+items](#the-noticed-items). So are `browser-checks/componentBehavior.mjs` in CI, its twenty-one
+failing cases, and the whole file in CI: see [componentBehavior in CI](#componentbehavior-in-ci),
+[The twenty-one, fixed](#the-twenty-one-fixed) and [The whole file in CI](#the-whole-file-in-ci).
+Nothing of this branch's is left.
 
 ---
 
@@ -1889,8 +1889,8 @@ once, as a commit:
   nor a Router or a Turing Machine, which send on their own clock.
 
 `browser-checks/componentBehavior.mjs` ("A script write to a source reaches its bound parameter
-once") checks it on a Crossfader: it fails without the effect. That case runs in CI, from
-`runAll.mjs`; the rest of the file is run by hand ([componentBehavior in CI](#componentbehavior-in-ci)).
+once") checks it on a Crossfader: it fails without the effect. CI runs the file, every case of it
+([componentBehavior in CI](#componentbehavior-in-ci)).
 
 ### `ce.components.panic`
 
@@ -2166,15 +2166,28 @@ two the app:
 - **The reload in `reopen()`** gets the first load's allowance, not the 6 s default: one whole run
   had a reload take longer, in a case that passes otherwise.
 
-`runAll.mjs` runs the two app fixes' cases beside the script-write one (`CASES`, under a minute):
 `CEDITOR_BEHAVIOR_CASE` takes several names separated by `|`, and each must match a case.
 
-**The whole file in CI is the owner's call.** It takes about seventeen minutes (996 s here). The
-browser-checks job ran its 40 checks in 11.1 minutes on the last run and stops at thirty, so the
-whole file does not fit in it. It would need its own job on `windows-latest`: about nineteen
-minutes, so a run would take that long instead of about thirteen. Or the job's `timeout-minutes`
-raised, and a run of about thirty minutes. CLAUDE.md's rule 6 leaves a new job, or a longer one,
-to the owner.
+### The whole file in CI
+
+At the owner's word on 2026-10-26 ("As recommended, add the whole file to CI too"). The file takes
+seventeen to eighteen minutes here (996 s and 1086 s for the two whole runs above). The
+browser-checks job ran its 40 checks in 11.1 minutes on its last run and stops at thirty, so the
+file did not fit in it; raising that job's limit would have made a run about thirty minutes. It has
+a job of its own instead, `component-behavior` on `windows-latest` beside the other three, with a
+limit of forty minutes: a run takes as long as that job, about twenty minutes, where it took about
+thirteen.
+
+- No bundle: the harness runs the editor in a Vite dev server, which compiles the modules as they
+  are asked for, so the job is checkout, `npm ci` and the cases.
+- The browser is the one the browser-checks job finds, Chrome or else Edge, by `CHROMIUM_PATH`.
+- A failing case's screenshot and `results.json` are kept as the run's `component-behavior`
+  artifact.
+- The three cases `runAll.mjs` ran (`CASES`) are gone from it: the job runs them with the rest, and
+  `npm run test:browser` is the 39 checks it was.
+
+CLAUDE.md's "twelve minutes" a run, said five times, is "twenty" now, and its local-verification
+section names the job and how to run a few cases.
 
 ## Checking each batch
 
@@ -2205,8 +2218,8 @@ item-by-item reviews of the LCD, the arp and the pixel, then every other module,
 descriptions, the items once deferred and the lines once noticed, each in one pass at the owner's
 word ("The remaining modules, in one pass", "The deferred items" and "The noticed items" in this
 file record each decision for review), and the script-write case of
-browser-checks/componentBehavior.mjs runs in CI ("componentBehavior in CI"), and all 95 of that
-file's cases pass ("The twenty-one, fixed"). What is left is the owner's: whether the whole file runs
-in CI. It takes about seventeen minutes and does not fit in the browser-checks job. Say what each
-way would cost a pull request, and wait for the owner's answer before changing the workflow.
+browser-checks/componentBehavior.mjs's 95 cases pass ("The twenty-one, fixed") and run in CI in a
+job of their own ("The whole file in CI"). Nothing of this work is left. A change to a control's
+renderer, the inspector or the preview's input handling is checked by that job; run the cases it
+touches locally first (CEDITOR_BEHAVIOR_CASE, several separated by "|").
 ```

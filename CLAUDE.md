@@ -40,18 +40,18 @@ metered.
 ### The rules that survive, and what actually justifies them
 
 Most of the old rules were right for the wrong reason. A CI run costs no money and still costs
-twelve minutes of somebody's attention (three jobs side by side; `ci.yml`'s header has the timings)
+twenty minutes of somebody's attention (four jobs side by side; `ci.yml`'s header has the timings)
 and a main branch that may be broken while they wait.
 
 1. **Verify locally, then push.** Unchanged, and it was never really about minutes: a red run is
-   twelve minutes of *your* wall clock before you learn anything, and everything except the
+   twenty minutes of *your* wall clock before you learn anything, and everything except the
    Windows-only targets runs on this machine — see [Local verification](#local-verification).
 2. **Batch your commits.** Commit locally as often as you like. Push when the change is *finished
    and locally green*. One push per completed change keeps the run history a record of changes
    rather than of keystrokes.
 3. **Do not iterate against the runner.** `concurrency: cancel-in-progress` is set, so a second
    push kills the first run mid-flight. Pushing three speculative fixes does not get you three
-   answers — it gets you one, twelve minutes later, and you will not know which fix produced it.
+   answers — it gets you one, twenty minutes later, and you will not know which fix produced it.
 4. **Use `[skip ci]` for changes that cannot affect the build.** Markdown and docs, comments,
    `.gitignore`, `LICENSE`, review notes. Not a saving any more — a signal-to-noise one. A run
    history where every entry means something is a history somebody reads.
@@ -68,7 +68,7 @@ and a main branch that may be broken while they wait.
 5. **When CI is red, reproduce it locally before pushing a fix.** Read the job log, make the
    failure happen here, fix everything you can see, then push once. You may now push a second time
    without it costing anything, which is exactly why the discipline has to come from somewhere
-   else: a fix you have not reproduced is a guess, and guessing at twelve minutes a turn is slow
+   else: a fix you have not reproduced is a guess, and guessing at twenty minutes a turn is slow
    however free it is.
 6. **Do not widen CI without asking.** Kept, with a different justification — not cost, but that
    the shape of the project's automation is the owner's call, and every job added is time on
@@ -115,7 +115,7 @@ of work here as an excuse not to check anything at all off it.
 
 So a change to `CE/src/**` that never gets compiled locally is a choice, not a limitation. Compile
 it first; the run then confirms the two things above rather than telling you something a local
-build would have told you twelve minutes sooner.
+build would have told you twenty minutes sooner.
 
 ---
 
@@ -139,12 +139,16 @@ The node suite takes about three and a half minutes here. `validate-script-expor
 failure, but do not read a run full of skips as coverage.
 
 `npm run test:browser` additionally drives Playwright over the built bundle and the editor's dev
-server: 40 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
+server: 39 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
 first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows, in a job of
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
-docks, the player inbound path or the learn chips. One of the forty is three cases of
-`componentBehavior.mjs`, the component acceptance harness (`CASES` in `runAll.mjs`); the whole of it,
-95 cases, is run by hand with `npm run test:component-behavior` and takes about seventeen minutes.
+docks, the player inbound path or the learn chips.
+
+`npm run test:component-behavior` runs the component acceptance harness, `componentBehavior.mjs`:
+95 cases, each a control edited through the inspector, driven by the pointer and the keys, saved
+and reopened. About seventeen minutes here, and CI's longest job, `component-behavior`. Run it when
+you touch a control's renderer, the inspector or the preview's input handling;
+`CEDITOR_BEHAVIOR_CASE="Meter|Crossfader"` runs the cases whose names contain either.
 
 ### C++ *on* Windows: use a Developer shell, or you will get MinGW
 

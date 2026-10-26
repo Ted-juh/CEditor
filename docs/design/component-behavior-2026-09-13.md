@@ -229,9 +229,9 @@ slashes; fixed separator handling. No generated C++ source changed.
 Run the new scenarios with `npm run test:component-behavior` from CE/web. Windows uses installed
 Edge; `CHROMIUM_PATH` can select an executable elsewhere. `CEDITOR_BEHAVIOR_OUT` selects the
 evidence directory; `CEDITOR_BEHAVIOR_CASE` filters by scenario-name substring, several separated
-by `|`, and fails when one matches none. Keep source files stable while running: a Vite hot reload deliberately resets the
-application being measured. Since 2026-10-26 the browser checks, and so CI, run the cases named in
-`CASES` in `browser-checks/runAll.mjs`; the whole file is still run by hand.
+by `|`, and fails when one matches none. Keep source files stable while running: a Vite hot reload
+deliberately resets the application being measured. Since 2026-10-26 CI runs every scenario, in a
+job of its own (`component-behavior` in `.github/workflows/ci.yml`).
 
 Still to execute: remaining component-specific properties, conditional settings, shared
 appearance combinations, routing and script consumers, custom package behavior (Claude), and
@@ -299,7 +299,6 @@ added). Nineteen were the fixture, two the app:
 - **The reload in `reopen()`** gets the first load's allowance rather than the 6 s default: one
   whole run had a reload take longer, in a case that passes otherwise.
 
-`browser-checks/runAll.mjs`, and so CI, runs the cases that hold a fix to the app: B74, B75 and the
-branch's script write to a source (`CASES`). `CEDITOR_BEHAVIOR_CASE` takes several names separated
-by `|`, and a name that matches no case fails. The whole file takes about seventeen minutes and is
-still run by hand.
+`CEDITOR_BEHAVIOR_CASE` takes several names separated by `|`, and a name that matches no case
+fails. The whole file takes seventeen to eighteen minutes here (996 s and 1086 s), and CI runs it in
+a job of its own on every pull request, `component-behavior`, at the owner's word.

@@ -18,7 +18,7 @@ const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
 page.setDefaultTimeout(6000);
 const errors = [], results = [];
 // CEDITOR_BEHAVIOR_CASE runs only the cases whose names contain it; several, separated by "|",
-// run each one's (browser-checks/runAll.mjs names the cases CI runs this way).
+// run each one's. CI runs every case (the component-behavior job in .github/workflows/ci.yml).
 const onlyCases = String(process.env.CEDITOR_BEHAVIOR_CASE ?? '').split('|').map(n => n.trim()).filter(Boolean);
 const matchedCases = new Set();
 page.on('pageerror', e => errors.push(String(e)));
@@ -1002,5 +1002,5 @@ try {
   await browser.close(); await server.close();
 }
 if(results.some(r=>r.status==='fail')) process.exitCode=1;
-// A case name that matches nothing (one renamed under runAll.mjs) would otherwise pass having run nothing.
+// A case name that matches nothing (mistyped, or a case renamed) would otherwise pass having run nothing.
 for(const n of onlyCases.filter(n=>!matchedCases.has(n))){console.error(`FAIL no case matches CEDITOR_BEHAVIOR_CASE "${n}"`);process.exitCode=1;}
