@@ -3519,12 +3519,12 @@ function componentVerbAction(verb, target, args) {
   const cfg = isLcdText(verb) ? withLayoutShowing(path, stored) : stored;
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
   if (verb.seek) return componentSeekAction(verb, path, cfg, args, shown);
-  // zoneSource is given a control's name and stores its id, as the zone table's picker does
+  // zoneSource (and pixel.source) is given a control's name and stores its id, as the picker does
   // (lcdPositions.js). A zone that is not there is said by the reducer's own refusal, below.
   let given = args;
   if (verb.k === ELEM_KIND && verb.link) {
     const selfId = findControlByName(path)?._children?.Core?.id;
-    const { id, refusal } = lcdZoneSourceFor(activePanel()?.controls ?? [], args[1], selfId);
+    const { id, refusal } = lcdZoneSourceFor(activePanel()?.controls ?? [], args[1], selfId, verb.list === 'zones' ? 'zone' : 'element');
     if (refusal && elementSites(cfg, args[0], verb.list).length) {
       addScriptTrace('error', '', `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed. ${refusal}`);
       return false;

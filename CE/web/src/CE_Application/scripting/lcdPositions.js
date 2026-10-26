@@ -351,9 +351,10 @@ const ACTIVE_FILTERS = ['value', 'switch', 'choice'];
  * What zoneSource stores for what a script gave: { id, refusal }. A control is named and stored by
  * its id, as the zone table's picker stores it; "" unlinks. The picker's other two entries are
  * taken as it writes them: "@active" (the control last touched, "@active#value" and the like for
- * one kind of control) and "@edit" (the display's editable field).
+ * one kind of control) and "@edit" (the display's editable field). A Pixel Display's element is
+ * linked the same way (pixel.source), and its refusal says "element" (`noun`).
  */
-export function lcdZoneSourceFor(controls, given, selfId = '') {
+export function lcdZoneSourceFor(controls, given, selfId = '', noun = 'zone') {
   if (given === undefined || given === null) return { id: null, refusal: 'No control was given: a control\'s name, or "" to unlink.' };
   const wanted = String(given).trim();
   if (!wanted) return { id: '', refusal: null };
@@ -368,7 +369,7 @@ export function lcdZoneSourceFor(controls, given, selfId = '') {
   }
   const found = sourceByName(controls, wanted);
   if (!found) return { id: null, refusal: `There is no control called ${shownValue(wanted)} on this panel.` };
-  if (!sourceAccepts('any', found, selfId)) return { id: null, refusal: 'A display cannot show itself in a zone.' };
+  if (!sourceAccepts('any', found, selfId)) return { id: null, refusal: `A display cannot show itself in ${noun === 'element' ? 'an' : 'a'} ${noun}.` };
   return { id: String(found._children?.Core?.id ?? ''), refusal: null };
 }
 

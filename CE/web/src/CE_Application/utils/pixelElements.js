@@ -30,6 +30,13 @@
 // construction, and they are the same title. Writing one and leaving the others is not a behaviour
 // anybody wants, and choosing between them by position would put the index back.
 
+// THE KINDS an element can be, in the inspector's order: the ones that draw text, the bars and
+// sliders, then the rest. The inspector's kind list and ce.components.pixel.kind both read these,
+// so a script is offered what the inspector is (item 4 of the owner's review of the pixel).
+export const PIXEL_TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit', 'icon', 'clock'];
+export const PIXEL_BAR_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
+export const PIXEL_ELEMENT_KINDS = [...PIXEL_TEXT_KINDS, ...PIXEL_BAR_KINDS, 'wave', 'scope', 'adsr', 'anim', 'bitmap'];
+
 /** Case-insensitive and trimmed, the way a control name is matched. */
 const key = (value) => String(value ?? '').trim().toLowerCase();
 

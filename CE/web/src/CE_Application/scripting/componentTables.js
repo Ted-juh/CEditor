@@ -43,6 +43,7 @@ import { SPLIT_PRESETS } from '../utils/splitZoneLayout.js';
 import { PHRASE_SEEDS, PHRASE_DIRECTIONS } from '../utils/phraseLayout.js';
 import { RECORDER_SOURCES } from '../utils/noteRecorderLayout.js';
 import { ZONE_SHOW_KINDS } from '../utils/lcdZones.js';
+import { PIXEL_ELEMENT_KINDS } from '../utils/pixelElements.js';
 
 /* The LCD and the Pixel display have no layout module of their own — their behaviour lives in the
  * renderer and the editor. Declared here rather than invented into a new module, and held to the
@@ -104,6 +105,8 @@ export const VERB_VALUES = {
   // What a zone shows: the zone table's own picker reads the same list.
   'lcd.zoneKind': ZONE_SHOW_KINDS,
   'pixel.layoutTransition': PIXEL_LAYOUT_TRANSITIONS,
+  // What an element is: the inspector's kind list reads the same one.
+  'pixel.kind': PIXEL_ELEMENT_KINDS,
   // One table for all four corners: they offer the same vocabulary, and a corner that offered a
   // different set from its neighbour would be a surprise rather than a feature.
   ...Object.fromEntries(['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight']

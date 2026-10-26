@@ -45,7 +45,7 @@ import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
   drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
 } from '../utils/drumPadLayout.js';
-import { elementSites, elementAt, elementsPatch, elementsUpdate, elementNames } from '../utils/pixelElements.js';
+import { elementSites, elementAt, elementsPatch, elementsUpdate, elementNames, PIXEL_TEXT_KINDS } from '../utils/pixelElements.js';
 import { shownValue } from './shownValue.js';
 import { listWord } from '../utils/wordLists.js';
 import { glyphBitsRefusal } from '../utils/lcdUserGlyphs.js';
@@ -57,11 +57,17 @@ const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const OFF_WORDS = new Set(['', 'false', 'off', '0']);
 const isOff = (value) => value === false || value === 0 || (typeof value === 'string' && OFF_WORDS.has(value.trim().toLowerCase()));
 const OFF_RULE = '0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.';
+// What a display's zone or element is linked to (lcd.zoneSource, pixel.source): a control by name, or
+// one of the picker's other entries (lcdPositions.lcdZoneSourceFor).
+const SOURCE_BY_NAME = ['The control\'s name. Case-insensitive.', '"": unlinked.',
+  '"@active": the control last touched.', '"@active#value", "@active#switch" or "@active#choice": the last of that kind.',
+  '"@edit": the display\'s editable field.', 'This display, or not on this panel: rejected with a console error.',
+  'Left out: rejected with a console error.'].join('\n');
 // A Pixel Display element's position and size (item 2 of the owner's review of the pixel).
 const PIXEL_RANGE = (min) => `Range: ${min} ↔ 4096, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.`;
 const PIXEL_OFF_SCREEN = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
 const PIXEL_NO_GLYPH = 'A character the font cannot draw: a blank.';
-const PIXEL_TEXT_KINDS = 'The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".';
+const PIXEL_TEXT_KINDS_NOTE = `The text kinds: ${PIXEL_TEXT_KINDS.slice(0, -1).map((k) => `"${k}"`).join(', ')} and "${PIXEL_TEXT_KINDS.at(-1)}".`;
 // The Arpeggiator's own chord (item 8 of the owner's review of the arp): what its key, scale, degree,
 // chord type and octave set, and only while it plays that chord.
 const OWN_CHORD = 'Its own chord only.';
@@ -917,10 +923,7 @@ export const COMPONENT_FAMILIES = [
           'A range past the display: to its last column.', 'Not on the display: rejected with a console error.'].join('\n') } }),
       v('zoneSource', 'layouts', ELEM, { list: 'zones', item: 'sourceId', arg: 'control', kind: STR, link: true, doc: 'Link a zone to another control, by its name.',
         ex: ['"Cutoff", "Resonance"', 'makes the zone called Cutoff show the control called Resonance'],
-        argDocs: { control: ['The control\'s name. Case-insensitive.', '"": unlinked.',
-          '"@active": the control last touched.', '"@active#value", "@active#switch" or "@active#choice": the last of that kind.',
-          '"@edit": the display\'s editable field.', 'This display, or not on this panel: rejected with a console error.',
-          'Left out: rejected with a console error.'].join('\n') },
+        argDocs: { control: SOURCE_BY_NAME },
         notes: ['`read(target, "zoneSource", "Cutoff")` gives the control\'s name.'] }),
       v('zoneKind', 'layouts', ELEM, { list: 'zones', item: 'show', arg: 'kind', kind: ENUM, doc: 'Set what a zone shows, by its name.',
         ex: ['"Cutoff", "bar"', 'makes the zone called Cutoff show its control as a bar'] }),
@@ -994,16 +997,25 @@ export const COMPONENT_FAMILIES = [
         ex: ['"Title", 64', 'makes the element called Title 64 pixels wide'],
         argDocs: { w: ['Pixels of the grid.', 'A text kind: the box its text is aligned and cut in; 0: as wide as the text.',
           'Any other kind: its width; drawn at least 1 wide, 4 for "anim".', PIXEL_RANGE(0)].join('\n') },
-        notes: [PIXEL_TEXT_KINDS, 'A text kind 0 wide is not wrapped or scrolled.'] }),
+        notes: [PIXEL_TEXT_KINDS_NOTE, 'A text kind 0 wide is not wrapped or scrolled.'] }),
       v('h', 'elements', ELEM, { item: 'h', kind: INT, min: 0, max: 4096, doc: 'Set an element\'s height, by its name.',
         ex: ['"Title", 16', 'draws the text of the element called Title at twice the size'],
         argDocs: { h: ['Pixels of the grid.', 'A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.',
           'Any other kind: its height; drawn at least 1 high, 4 for "anim".', PIXEL_RANGE(0)].join('\n') },
-        notes: [PIXEL_TEXT_KINDS] }),
-      // Three element properties are STILL NOT HERE, each for a reason rather than by omission.
-      // `kind` and `sourceId` are authoring choices — what an element IS and what drives it — and
-      // rewriting those mid-song is a different panel, not a performance. `colour` is styling,
-      // which this file does not cross.
+        notes: [PIXEL_TEXT_KINDS_NOTE] }),
+      // What an element is and what drives it, as the LCD's zoneKind and zoneSource (item 4 of the
+      // owner's review of the pixel). They were left out as authoring choices; the LCD's zones got
+      // both by name, and the two displays should not differ. `colour` stays out: styling, which
+      // this file does not cross. So do "wave"'s and "adsr"'s further sources.
+      v('kind', 'elements', ELEM, { item: 'kind', kind: ENUM, doc: 'Set what an element is, by its name.',
+        ex: ['"Cutoff", "vbar"', 'makes the element called Cutoff a vertical bar'],
+        notes: ['Its other settings are kept: its place, size, text and source.'] }),
+      v('source', 'elements', ELEM, { item: 'sourceId', arg: 'control', kind: STR, link: true, doc: 'Link an element to a control, by its name.',
+        ex: ['"Cutoff", "Resonance"', 'makes the element called Cutoff show the control called Resonance'],
+        argDocs: { control: SOURCE_BY_NAME },
+        notes: ['Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"\'s level and "scope". Not used by "adsr", "anim" or "bitmap".',
+          '"wave"\'s cutoff, resonance, LFO and pitch, and "adsr"\'s four: set in the inspector.',
+          '`read(target, "source", "Cutoff")` gives the control\'s name.'] }),
 
       // The on-screen editable field, as on the LCD: the buffer an `edit` element bound to '@edit'
       // shows. It was reachable by typing at the screen and by a device binding, and by nothing

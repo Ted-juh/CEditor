@@ -257,6 +257,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.pixel.x`, `y`, `w` and `h` say in the console when a number past their range was
   used as its nearest end, and why a call was refused (`"big" is not a number.`), as every other
   number command does; both were silent.
+- `ce.components.pixel.kind` and `ce.components.pixel.source` set what an element is and which
+  control it shows, by the element's name, as `lcd.zoneKind` and `lcd.zoneSource` do for a zone:
+  `pixel.source("Screen", "Cutoff", "Resonance")`. Only the inspector could set either.
 
 ## What you get
 

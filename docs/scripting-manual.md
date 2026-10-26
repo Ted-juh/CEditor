@@ -11885,6 +11885,44 @@ Good to know:
 
 *Short name: `pixelH`.*
 
+##### `ce.components.pixel.kind(target, name, kind) -> boolean`
+
+Set what an element is, by its name.
+
+Example: `ce.components.pixel.kind("PixelDisplay", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `kind` (text, required): One of "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon", "clock", "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope", "adsr", "anim" or "bitmap". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its other settings are kept: its place, size, text and source.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelKind`.*
+
+##### `ce.components.pixel.source(target, name, control) -> boolean`
+
+Link an element to a control, by its name.
+
+Example: `ce.components.pixel.source("PixelDisplay", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `control` (text, required): The control's name. Case-insensitive.<br>"": unlinked.<br>"@active": the control last touched.<br>"@active#value", "@active#switch" or "@active#choice": the last of that kind.<br>"@edit": the display's editable field.<br>This display, or not on this panel: rejected with a console error.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"'s level and "scope". Not used by "adsr", "anim" or "bitmap".
+- "wave"'s cutoff, resonance, LFO and pitch, and "adsr"'s four: set in the inspector.
+- `read(target, "source", "Cutoff")` gives the control's name.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelSource`.*
+
 ##### `ce.components.pixel.editText(target, editText) -> boolean`
 
 The screen's editable text field (a patch name). Reads back what is in it.

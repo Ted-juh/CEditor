@@ -5,6 +5,7 @@
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { lcdDesignLayoutIds, setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   import { pixelElementSelection, pixelSelectionKey, pixelElementId, selectPixelElement } from '../stores/pixelElementSelection.js';
+  import { PIXEL_TEXT_KINDS, PIXEL_BAR_KINDS, PIXEL_ELEMENT_KINDS } from '../utils/pixelElements.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -42,13 +43,13 @@
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
-  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit', 'icon', 'clock'];
-  const WIDGET_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
+  const TEXT_KINDS = PIXEL_TEXT_KINDS;
+  const WIDGET_KINDS = PIXEL_BAR_KINDS;
   // 'anim' is a placeable animation (GIF/sprite/preset) inside its own rect —
   // part of the layout, so switching layouts switches animations.
   // 'wave' = synthesized waveform driven by MIDI values (shape + cutoff/reso/
   // LFO/freq sources); 'scope' = rolling history trace of the bound source.
-  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'adsr', 'anim', 'bitmap'];
+  const ELEMENT_KINDS = PIXEL_ELEMENT_KINDS;   // ce.components.pixel.kind takes the same list
   const PAINT_MAX = 576; // cap the on-screen paint grid (24×24) to keep the DOM light
 
   let { control = null, dockGroup = '' } = $props();

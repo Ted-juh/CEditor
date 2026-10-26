@@ -534,6 +534,25 @@ test('read answers shown and steady for an element that stores neither, as it is
   });
 });
 
+test('an element\'s kind and source are set by name, as the LCD\'s zones\' are', () => {
+  // Item 4 of the owner's review of the pixel: what an element is and what it shows, on every page.
+  withPixelScene((api) => {
+    assert.equal(api.pixelKind('pixel', 'title', 'VBAR'), true, 'any case');
+    assert.equal(api.pixelRead('pixel', 'kind', 'title'), 'vbar');
+    assert.equal(api.get('pixel.Pixel.layouts')[0].elements[0].kind, 'vbar', 'on the page too');
+    assert.equal(api.pixelKind('pixel', 'title', 'blob'), false);
+    assert.equal(api.pixelSource('pixel', 'title', 'METER'), true, 'a control by name, in any case');
+    assert.equal(api.pixelRead('pixel', 'source', 'title'), 'meter', 'read gives the name back');
+    assert.match(api.get('pixel.Pixel.elements')[0].sourceId, /^ctrl_|^[a-z0-9_]+$/i, 'stored by id, as the picker stores it');
+    assert.notEqual(api.get('pixel.Pixel.elements')[0].sourceId, 'meter');
+    assert.equal(api.pixelSource('pixel', 'title', '@active#value'), true);
+    assert.equal(api.pixelRead('pixel', 'source', 'title'), '@active#value');
+    assert.equal(api.pixelSource('pixel', 'title', 'pixel'), false, 'not itself');
+    assert.equal(api.pixelSource('pixel', 'title', ''), true, 'unlinked');
+    assert.equal(api.pixelRead('pixel', 'source', 'title'), '');
+  });
+});
+
 test('the scene verbs clamp like every other number verb', () => {
   withPixelScene((api) => {
     assert.equal(api.pixelX('pixel', 'title', 999999), true);

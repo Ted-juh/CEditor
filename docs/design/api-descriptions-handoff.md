@@ -1566,7 +1566,7 @@ against the renderer (`PixelDisplayRenderer.svelte`, `LcdGraphicCanvas.svelte`) 
 1. `show`, `blink`, and the `name` all eight element commands take: done, below.
 2. `x`, `y`, `w`, `h`: done, below.
 3. `text`, `label`: done, below.
-4. Parity with the LCD's zones: an element's `kind` and `source`.
+4. Parity with the LCD's zones: an element's `kind` and `source`: done, below.
 5. `brightness`, `contrast`.
 6. `gamma`.
 7. `glow`.
@@ -1632,6 +1632,25 @@ A text on a kind that does not draw it is stored, as there. A test holds the lis
 | --- | --- | --- |
 | `text` | Set the text of a "static" element, by its name. · `text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title. | The text. / Shown by "static", between its prefix and suffix. / Shown by "name" while it has no label and no control, and by "edit" while its control has no text. / "\n": a new line while the element wraps; a blank otherwise. / A character the font cannot draw: a blank. The built-in font has none for $ & ^ \` { \| } ~ and letters with accents. / A number: written as text. / Left out: rejected with a console error. |
 | `label` | Set an element's caption, or the name a "name" element shows, by its name. · `label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff. | The text. / "name": shown in place of its control's name; "": the control's name. / "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none. / Other kinds: not shown. / A character the font cannot draw: a blank. / A number: written as text. / Left out: rejected with a console error. |
+
+Each ends with the two notes every command has.
+
+**Item 4, `kind` and `source`: done.** Neither existed: the spec left them out as authoring
+choices ("what an element IS and what drives it"), and the LCD's zones have had `zoneKind` and
+`zoneSource` since "Zones by name". At the owner's word ("As recommended") an element has both,
+by its name on every layout, as a zone does. The 21 kinds moved from the inspector into
+`utils/pixelElements.js` (`PIXEL_ELEMENT_KINDS`, with `PIXEL_TEXT_KINDS` and `PIXEL_BAR_KINDS`),
+which the inspector's kind list and `componentTables`' `pixel.kind` both read; `w`'s and `h`'s
+text-kinds note is built from the same list. `source` takes what the element's picker offers and
+`zoneSource` takes, through the same resolver (`lcdZoneSourceFor`, whose refusal now says "in an
+element" for one), is stored by id, and `read` gives the control's name; both share the parameter
+text (`SOURCE_BY_NAME`). `colour` stays out as styling, and so do "wave"'s cutoff, resonance, LFO
+and pitch sources and "adsr"'s four.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `kind` | Set what an element is, by its name. · `kind("PixelDisplay", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar. | One of the 21, the inspector's. Case-insensitive. / Invalid: rejected with a console error. | Its other settings are kept: its place, size, text and source. |
+| `source` | Link an element to a control, by its name. · `source("PixelDisplay", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance. | As `lcd.zoneSource`'s `control`. | Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"'s level and "scope". Not used by "adsr", "anim" or "bitmap". / "wave"'s cutoff, resonance, LFO and pitch, and "adsr"'s four: set in the inspector. / `read(target, "source", "Cutoff")` gives the control's name. |
 
 Each ends with the two notes every command has.
 

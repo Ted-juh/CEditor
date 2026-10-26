@@ -17,6 +17,7 @@ import {
 import { apiSurfaceNames as runtimeNames } from '../src/CE_Application/scripting/panelRuntime.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { glyphRows } from '../src/CE_Application/utils/pixelFont.js';
+import { PIXEL_ELEMENT_KINDS } from '../src/CE_Application/utils/pixelElements.js';
 
 const byId = (id) => COMPONENT_VERB_BY_ID[id];
 
@@ -336,7 +337,7 @@ test('every verb either changes something or explains why it cannot', () => {
       case 'elem': {
         // Addressed by NAME, and the element the probe carries answers to "probe".
         if (verb.place) return ['probe', { row: 2, col: [3, 6] }];
-        if (verb.kind === 'enum') return ['probe', verb.values.find((x) => x !== PROBE_ZONE[verb.item])];
+        if (verb.kind === 'enum') return ['probe', verb.values.find((x) => x !== (verb.list === 'zones' ? PROBE_ZONE : PROBE_ELEMENT)[verb.item])];
         if (verb.list === 'zones' && verb.kind === 'bool') return ['probe', false];
         if (verb.kind === 'bool') return ['probe', !(PROBE_ELEMENT[verb.item] === true)];
         if (verb.kind === 'str') return ['probe', 'spec-probe'];
@@ -972,6 +973,22 @@ test('the Pixel Display\'s verbs say what each setting does, as the owner approv
     'Other kinds: not shown.', 'A character the font cannot draw: a blank.', 'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
   const lacking = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).filter((c) => !glyphRows(c));
   assert.deepEqual(lacking, ['$', '&', '^', '`', '{', '|', '}', '~'], 'the printable ASCII the built-in font has no glyph for, as the text names it');
+  // Item 4: kind and source, as the LCD's zones have them; the kinds are the inspector's.
+  assert.equal(MEMBER_BY_ID.pixelKind.summary, 'Set what an element is, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelKind.example, '`ce.components.pixel.kind("PixelDisplay", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.');
+  assert.equal(text('pixelKind', 'kind'), 'One of "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon", "clock", "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope", "adsr", "anim" or "bitmap". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.pixelKind.notes[0], 'Its other settings are kept: its place, size, text and source.');
+  assert.deepEqual(byId('pixelKind').values, PIXEL_ELEMENT_KINDS);
+  assert.equal(MEMBER_BY_ID.pixelSource.summary, 'Link an element to a control, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelSource.example, '`ce.components.pixel.source("PixelDisplay", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.');
+  assert.equal(text('pixelSource', 'control'), text('lcdZoneSource', 'control'));
+  assert.equal(text('pixelSource', 'control'), ['The control\'s name. Case-insensitive.', '"": unlinked.', '"@active": the control last touched.',
+    '"@active#value", "@active#switch" or "@active#choice": the last of that kind.', '"@edit": the display\'s editable field.',
+    'This display, or not on this panel: rejected with a console error.', 'Left out: rejected with a console error.'].join('\n'));
+  assert.deepEqual(MEMBER_BY_ID.pixelSource.notes.slice(0, 3), [
+    'Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"\'s level and "scope". Not used by "adsr", "anim" or "bitmap".',
+    '"wave"\'s cutoff, resonance, LFO and pitch, and "adsr"\'s four: set in the inspector.',
+    '`read(target, "source", "Cutoff")` gives the control\'s name.']);
   // …and a number past the range is said, one that is not a number refused with why.
   const cfg = pixelCfg();
   assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['title', -3], cfg), 'pixel Px: w("title", -3) — the w -3 is outside 0 to 4096, so 0 was used.');
