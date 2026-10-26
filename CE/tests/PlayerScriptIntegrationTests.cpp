@@ -1207,6 +1207,30 @@ int main()
                "a colour left out is refused in a colour's words (got " + setLogs.joinIntoString (" | ") + ")");
     }
 
+    // A bound control's value as its host parameter takes it (scriptParameterValue, which the
+    // plug-in's set() reads it through), in the editor's words: a choice by its name in any case, a
+    // switch by on or off, text that is a number as one; anything else refused, where `(float) value`
+    // sent it as 0.
+    {
+        const juce::StringArray filters { "LP", "HP", "BP" };
+        const auto hp = scriptParameterValue ("choice", filters, juce::var ("hp"));
+        const auto two = scriptParameterValue ("choice", filters, juce::var (2));
+        const auto notch = scriptParameterValue ("choice", filters, juce::var ("Notch"));
+        const auto on = scriptParameterValue ("bool", {}, juce::var ("On"));
+        const auto enabled = scriptParameterValue ("bool", {}, juce::var ("enabled"));
+        const auto yes = scriptParameterValue ("float", {}, juce::var (true));
+        const auto text = scriptParameterValue ("float", {}, juce::var (" 64 "));
+        const auto x = scriptParameterValue ("float", {}, juce::var ("x"));
+        check (hp.ok && hp.value == 1.0f && two.ok && two.value == 2.0f && on.ok && on.value == 1.0f
+                   && yes.ok && yes.value == 1.0f && text.ok && text.value == 64.0f,
+               "a bound control takes a choice by its name, a switch by its word, true as 1 and text that is a number");
+        check (! notch.ok && notch.refused == "\"Notch\" is not one of its choices, so nothing was sent. "
+                                              "The choices are \"LP\", \"HP\" and \"BP\"."
+                   && ! enabled.ok && enabled.refused.startsWith ("\"enabled\" is not on or off, so nothing was sent. ")
+                   && ! x.ok && x.refused == "\"x\" is not a number, so nothing was sent.",
+               "…and refuses the rest in the editor's words (got " + notch.refused + " | " + enabled.refused + " | " + x.refused + ")");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

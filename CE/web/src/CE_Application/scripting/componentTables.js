@@ -27,6 +27,7 @@ import {
   PAD_MAPS, PAD_MODES, PAD_ORIGINS, PAD_VELOCITY_SOURCES, PAD_ZONE_ACTIONS,
 } from '../utils/drumPadLayout.js';
 import { CONSTELLATION_MODES } from '../utils/constellationLayout.js';
+import { ORBIT_OUTPUTS } from '../utils/orbitLayout.js';
 import { ROUTER_INPUT_SOURCES } from '../utils/routerLayout.js';
 import { POLY_PRESSURE_MODES } from '../utils/midiNoteInput.js';
 import { MACRO_CURVES } from '../utils/macroLayout.js';
@@ -116,6 +117,8 @@ export const VERB_VALUES = {
     .map((c) => [`drumpads.corner${c}`, PAD_ZONE_ACTIONS])),
   'turing.division': DIVISION_IDS,
   'constellation.mode': CONSTELLATION_MODES,
+  // What a satellite sends: the engine's own list, which the inspector's select offers too.
+  'orbit.nodeOutput': ORBIT_OUTPUTS,
   'router.source': ROUTER_INPUT_SOURCES.map((s) => String(s?.id ?? s)),
   'router.poly': POLY_PRESSURE_MODES,
   'macro.slotCurve': MACRO_CURVES,

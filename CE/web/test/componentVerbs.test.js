@@ -18,6 +18,8 @@ import { apiSurfaceNames as runtimeNames } from '../src/CE_Application/scripting
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { glyphRows } from '../src/CE_Application/utils/pixelFont.js';
 import { PIXEL_ELEMENT_KINDS } from '../src/CE_Application/utils/pixelElements.js';
+import { ORBIT_OUTPUTS, nodeOutput } from '../src/CE_Application/utils/orbitLayout.js';
+import { VERB_VALUES } from '../src/CE_Application/scripting/componentTables.js';
 
 const byId = (id) => COMPONENT_VERB_BY_ID[id];
 
@@ -692,8 +694,8 @@ test('a verb that rewrites a list of colours reads every colour in it, and names
     meter._children.Meter.zones[1].colour = 'redd';
     clearScriptTrace();
     assert.equal(api.meterZoneAt('M', 1, 0.1), false);
-    assert.deepEqual(lines(), ['error: ce.components.meter.zoneAt("M"): in zone 2, "redd" is not a colour the panel '
-      + 'can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
+    assert.deepEqual(lines(), ['error: meter M: zoneAt(1, 0.1) — refused, nothing changed. In zone 2, "redd" is not a '
+      + 'colour the panel can read. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
       + 'or "#RGB", a CSS colour name, rgb() or hsl().']);
     assert.equal(meter._children.Meter.zones[0].from, 0, 'nothing was written');
   } finally {
@@ -1232,6 +1234,25 @@ test('the Orbit\'s phase is a seek, and its bars and depth take what it plays', 
   const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
   assert.equal(text('orbitNodeRatio', 'ratio').split('\n')[1], 'Above 0: counter-clockwise. Below 0: clockwise.');
   assert.equal(MEMBER_BY_ID.orbitShowValues.summary, 'Show or hide each satellite\'s value, as a percentage, above it.');
+});
+
+// What a node sends and whether it is turned upside down had no verbs, only the inspector's
+// Satellites rows (the noticed items, at the owner's word). One list for the engine, the inspector's
+// select and the verb.
+test('the Orbit sets what a node sends, and turns it upside down, as the inspector does', () => {
+  assert.deepEqual(VERB_VALUES['orbit.nodeOutput'], ORBIT_OUTPUTS);
+  assert.deepEqual(ORBIT_OUTPUTS, ['y', 'x', 'sine', 'radius']);
+  const cfg = { ...SECTION_DEFAULTS.Orbit };
+  const output = componentScriptPatch(byId('orbitNodeOutput'), cfg, [1, 'SINE']).nodes;
+  assert.deepEqual([output[0].output, output[1].output], ['sine', cfg.nodes[1].output], 'one node, in any case');
+  assert.equal(componentRequestLegal(byId('orbitNodeOutput'), cfg, [1, 'wobble']), false);
+  const before = cfg.nodes[0].invert === true;
+  assert.equal(componentScriptPatch(byId('orbitNodeInvert'), cfg, [1]).nodes[0].invert, !before, 'left out: toggles');
+  assert.equal(componentScriptPatch(byId('orbitNodeInvert'), cfg, [1, 'off']).nodes?.[0]?.invert ?? false, false);
+  // What it sends then, as nodeOutput (the engine) plays it.
+  const node = { ...cfg.nodes[0], output: 'radius', radius: 0.4, depth: 1 };
+  assert.equal(nodeOutput(node, 0), 0.4);
+  assert.ok(Math.abs(nodeOutput({ ...node, invert: true }, 0) - 0.6) < 1e-9);
 });
 
 // ce.components.looper, done in one pass at the owner's word.

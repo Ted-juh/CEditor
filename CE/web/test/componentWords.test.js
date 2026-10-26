@@ -51,17 +51,17 @@ test.after(() => resetScriptStateForTesting());
 
 test('a hand-written verb refuses a word it has none of, and names the words', () => {
   const cases = [
-    [(api) => api.splitPreset('Split', 'single'), 'split Split: preset {"preset":"single"} — refused, nothing changed. One of: whole, classic, splitLayer, threeWay, velLayer.'],
-    [(api) => api.phraseSeed('Phr', 'nope'), 'phrase Phr: seed {"seed":"nope"} — refused, nothing changed. One of: clear, octaves, arpUp, riff, random.'],
-    [(api) => api.phraseDirection('Phr', 'sideways'), 'phrase Phr: direction {"direction":"sideways"} — refused, nothing changed. One of: forward, reverse, pingpong, random.'],
+    [(api) => api.splitPreset('Split', 'single'), 'split Split: preset("single") — refused, nothing changed. One of: whole, classic, splitLayer, threeWay, velLayer.'],
+    [(api) => api.phraseSeed('Phr', 'nope'), 'phrase Phr: seed("nope") — refused, nothing changed. One of: clear, octaves, arpUp, riff, random.'],
+    [(api) => api.phraseDirection('Phr', 'sideways'), 'phrase Phr: direction("sideways") — refused, nothing changed. One of: forward, reverse, pingpong, random.'],
     // A key's name is read, as the arp's (its review, item 8); a word that is no note is refused.
-    [(api) => api.phraseKey('Phr', 'H'), 'phrase Phr: key {"key":"H"} — refused, nothing changed. A key is a note\'s name, such as "F#", in any case, or a number round the octave, 0 being C.'],
-    [(api) => api.recorderSource('Rec', 'mic'), 'recorder Rec: source {"source":"mic"} — refused, nothing changed. One of: input, panel, both.'],
-    [(api) => api.harmonyMode('Harm', 'chordz'), 'harmoniser Harm: mode {"mode":"chordz"} — refused, nothing changed. One of: diatonic, memory.'],
-    [(api) => api.harmonyShape('Harm', 'blob'), 'harmoniser Harm: shape {"shape":"blob","preset":"blob"} — refused, nothing changed. One of: major, minor, sus4, maj7, min7, fifths, octaves, or a list of intervals in semitones.'],
-    [(api) => api.harmonyOutOfKey('Harm', 'skip'), 'harmoniser Harm: outOfKey {"outOfKey":"skip"} — refused, nothing changed. One of: pass, nearest, mute.'],
-    [(api) => api.harmonyDegree('Harm', 9, [0, 4, 7]), 'harmoniser Harm: degree {"degree":9,"chord":[0,4,7]} — refused, nothing changed. There is no degree 9: the scale has 7, 1 to 7.'],
-    [(api) => api.setlistGoto('Songs', 'Encore'), 'setlist Songs: goto {"scene":"Encore"} — refused, nothing changed. There is no scene "Encore": a scene is its number from 1 to 3, or its name, "Opener", "Ballad", "Closer".'],
+    [(api) => api.phraseKey('Phr', 'H'), 'phrase Phr: key("H") — refused, nothing changed. A key is a note\'s name, such as "F#", in any case, or a number round the octave, 0 being C.'],
+    [(api) => api.recorderSource('Rec', 'mic'), 'recorder Rec: source("mic") — refused, nothing changed. One of: input, panel, both.'],
+    [(api) => api.harmonyMode('Harm', 'chordz'), 'harmoniser Harm: mode("chordz") — refused, nothing changed. One of: diatonic, memory.'],
+    [(api) => api.harmonyShape('Harm', 'blob'), 'harmoniser Harm: shape("blob") — refused, nothing changed. One of: major, minor, sus4, maj7, min7, fifths, octaves, or a list of intervals in semitones.'],
+    [(api) => api.harmonyOutOfKey('Harm', 'skip'), 'harmoniser Harm: outOfKey("skip") — refused, nothing changed. One of: pass, nearest, mute.'],
+    [(api) => api.harmonyDegree('Harm', 9, [0, 4, 7]), 'harmoniser Harm: degree(9, [0,4,7]) — refused, nothing changed. There is no degree 9: the scale has 7, 1 to 7.'],
+    [(api) => api.setlistGoto('Songs', 'Encore'), 'setlist Songs: jump("Encore") — refused, nothing changed. There is no scene "Encore": a scene is its number from 1 to 3, or its name, "Opener", "Ballad", "Closer".'],
   ];
   for (const [call, said] of cases) {
     const { result, lines } = run(call);
@@ -204,7 +204,7 @@ test('the Phrase and the Harmoniser take a key by its name, and the Phrase answe
     api.ce.components.phrase.scale('Phr', 'nope'), api.ce.components.harmony.strum('Harm', 'x'),
     api.ce.components.phrase.run('Phr', true)]);
   assert.deepEqual(result, [true, true, false, false, true]);
-  assert.match(lines[0], /^phrase Phr: scale .* One of: major, minor/);
+  assert.match(lines[0], /^phrase Phr: scale\("nope"\) .* One of: major, minor/);
   assert.match(lines[1], /A time is a number of milliseconds\.$/);
 });
 

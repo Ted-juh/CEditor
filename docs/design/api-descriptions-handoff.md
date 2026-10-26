@@ -104,10 +104,9 @@ above, and [The deferred items](#the-deferred-items) records what each one does 
 Every module in the table under [The branch](#the-branch) is done, and so are the module and event
 descriptions and the deferred items: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass)
 and [The deferred items](#the-deferred-items), which record each decision for the owner's review.
-What is left is the owner's: the four "noticed, not changed" lines in the records (the Drum Pads'
-colour refusal, the Orbit's node verbs, the hand-written components' refusal form, and the plug-in
-sending a bound control's text value as 0), and whether `browser-checks/componentBehavior.mjs` runs
-in CI.
+The four lines noticed and not changed are done too, at the owner's word: see [The noticed
+items](#the-noticed-items). What is left is the owner's: whether `browser-checks/componentBehavior.mjs`
+runs in CI, which CLAUDE.md leaves to the owner, since every job added is time on every pull request.
 
 ---
 
@@ -1734,10 +1733,10 @@ listed here per module, for review; the texts themselves are in `componentVerbs.
   `ghostVelocity()`.
 - **`gate` takes 5 ↔ 2000**, whole, as `drumGateMs` plays it and the inspector offers it (it took 1
   to 5000); `rollDelay` and `flamMs` are whole milliseconds, as the engine rounds them.
-- **Noticed, not changed**: a colour `colour()` cannot read is refused by the shared colour writer
-  (`writeComponentFields`), whose console line names the call differently from the other refusals
-  (`ce.components.drumpads.colour("Kit"): in pad 2, … so nothing was set.`). It is the line `set()`
-  writes too, so changing it belongs with `ce.panel`.
+- **Noticed, then done** ([The noticed items](#the-noticed-items)): a colour `colour()` cannot read
+  is refused by the shared colour writer (`writeComponentFields`), whose console line named the call
+  differently from the other refusals (`ce.components.drumpads.colour("Kit"): in pad 2, … so nothing
+  was set.`), as `set()`'s line does.
 
 ### `ce.components.transport`
 
@@ -1854,9 +1853,9 @@ has them done). The option fields of
   and sent 0).
 - **Kept**: `nodeRatio` -16 ↔ 16 and `nodeAngle` -360 ↔ 360, wider than the inspector's, since the
   engine plays any; the texts say where the inspector stops.
-- **Noticed, not changed**: what a node sends (its height, its place across, a sine of its angle,
-  or its radius) and whether it is turned upside down have no verbs; the depth note says they are
-  set in the inspector.
+- **Noticed, then done** ([The noticed items](#the-noticed-items)): what a node sends (its height,
+  its place across, a sine of its angle, or its radius) and whether it is turned upside down had no
+  verbs; the depth note said they are set in the inspector.
 
 ### `ce.components.looper`
 
@@ -1958,9 +1957,9 @@ defined is ignored, with a console error, which the text now says.
 - **Texts were wrong in four places**: `stop` stops recording, not playback; `transpose` changes
   what is played, not the take (`shift` changes the take); `nudge` moves by a part of the loop, not
   by ticks; `quantize`'s strength left out is the inspector's, 0 unless set, which moves nothing.
-- **Noticed, not changed**: a refused hand-written component command writes its arguments as JSON
-  (`quantize {"grid":16} — refused, nothing changed. …`), as the Phrase, Harmoniser, Setlist and
-  Split do; a change of form for all five.
+- **Noticed, then done** ([The noticed items](#the-noticed-items)): a refused hand-written component
+  command wrote its arguments as JSON (`quantize {"grid":16} — refused, nothing changed. …`), as the
+  Phrase, Harmoniser, Setlist and Split did; a change of form for all five.
 
 ### `ce.image` and `ce.text`
 
@@ -2060,10 +2059,9 @@ plug-in's own `set()` and the Lua bindings.
   binding reads the value, and in the editor takes a choice by its name ("LP") and says what it
   cannot read. Other properties are not held to a type: their types are not modelled, and colours
   are read by their own rule; a colour left out is said in a colour's words, as it was.
-  **Noticed, not changed**: in the plug-in a bound control's value goes to its host parameter as
-  `(float) value`, so a choice's name, or "x", is sent as 0 (`PluginProcessor.h`, `cb.setValue`);
-  reading a choice there by its name, as the editor does, is a change to the plug-in's parameter
-  write, left for the owner. `on`,
+  **Noticed, then done** ([The noticed items](#the-noticed-items)): in the plug-in a bound control's
+  value went to its host parameter as `(float) value`, so a choice's name, or "x", was sent as 0
+  (`PluginProcessor.h`, `cb.setValue`). `on`,
   `watch`, `compute`, `intercept` and `defineAction` refuse an event, path or name left out, or a
   function that is not one. In Lua those five are the host's bindings, so the prelude wraps them; a
   name left out there stopped the script in sol2's words. `on`'s target left out is `"*"`, as its
@@ -2081,6 +2079,33 @@ plug-in's own `set()` and the Lua bindings.
 - **`ce.time`**: kept as it is. A required number left out is refused, the rule above; the old
   defaults would be `optional: true` on those arguments in `timeWords.js` and the three
   `__TIME_NUMBERS` tables, if the owner ever wants them back.
+
+### The noticed items
+
+At the owner's word on 2026-10-26 ("As recommended, do the noticed items too"), the four lines the
+records above left as noticed and not changed, done by the rules:
+
+- **A component verb's refused colour** is said in the form of the verb's other refusals, the call
+  as the script wrote it and then why: `drumpads Kit: colour(3, "redd") — refused, nothing changed.
+  In pad 3, "redd" is not a colour the panel can read. A colour is …`. `writeComponentFields` asks
+  the shared colour reader for the line in that form (`readColours`'s `say`) while a script's call
+  is running (`componentCall`, set by the verbs' dispatcher); `set()`, `ce.panel.patch` and the
+  others keep theirs.
+- **The five hand-written families' refusals** (the Zone Splitter, Phrase Sequencer, Recorder,
+  Harmoniser and Setlist) name the call as the script wrote it, its short name and its arguments,
+  `recorder Rec: store(9)`, where they printed the reducer's action and arguments as JSON, `store
+  {"slot":9}`: `sectionRefusalLine`, which the Values tab uses too. Each API wrapper is run with the
+  call it was given (`shownCalls`).
+- **The Orbit's node output and invert** have verbs, `nodeOutput` and `nodeInvert`, beside the
+  other node verbs; the outputs are one list, `ORBIT_OUTPUTS` in `utils/orbitLayout.js`, which the
+  engine plays, the inspector's select offers and the verb takes.
+- **The plug-in's write to a bound control's host parameter** reads the value as the editor does
+  (`scriptParameterValue` in `BridgeScriptHost.h`, from `deviceDefinitions.js`'s `numberFor`): a
+  number is the parameter's own value, and text that is one is read as one; a choice parameter takes a
+  choice by its label, in any case, as its index; a switch takes "on", "off", "true" or "false"; other
+  text is refused in the editor's words, where `(float) value` sent it as 0. A parameter exported as
+  a number takes numbers only: its choices, if the synth has any, are the profile's, which the
+  plug-in does not read here. The control's mirror is written as the editor writes the control.
 
 ## Checking each batch
 
@@ -2106,12 +2131,11 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md. Every module's descriptions are done, the module and
-event descriptions too, and so are the items once deferred: the owner's item-by-item reviews of the
-LCD, the arp and the pixel, then every other module and the deferred items in one pass at the
-owner's word ("The remaining modules, in one pass" and "The deferred items" in this file record each
-decision for review). What is left is the owner's: the four "noticed, not changed" lines in the
-records, and whether browser-checks/componentBehavior.mjs runs in CI. Take one at a time:
-say what it does now and what the rules would make it do, and wait for the owner's answer before
-changing anything.
+Read docs/design/api-descriptions-handoff.md. Every module's descriptions are done: the owner's
+item-by-item reviews of the LCD, the arp and the pixel, then every other module, the module and event
+descriptions, the items once deferred and the lines once noticed, each in one pass at the owner's
+word ("The remaining modules, in one pass", "The deferred items" and "The noticed items" in this
+file record each decision for review). What is left is the owner's: whether
+browser-checks/componentBehavior.mjs runs in CI. Say what it would cost each pull request and what
+it would catch, and wait for the owner's answer before changing anything.
 ```

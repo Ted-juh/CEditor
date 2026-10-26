@@ -16,7 +16,7 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 457 verbs",
+  "description": "QA-05 — 23 verb families, 459 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -115,7 +115,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 457 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 459 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -800,7 +800,7 @@
         "Core": {"name":"caption_qa_cap_13","id":"qa_cap_13","controlType":"Label"},
         "Transform": {"x":252,"y":1816,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
-        "Text": {"content":"20 verbs","_children":{"Font":{"size":11}}},
+        "Text": {"content":"22 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
@@ -808,9 +808,9 @@
     {
       "_children": {
         "Core": {"name":"verbs_orbit","id":"qa05_orbit_verbs","controlType":"Label"},
-        "Transform": {"x":252,"y":1838,"width":470,"height":146},
+        "Transform": {"x":252,"y":1838,"width":470,"height":159},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"orbit.run[on]                 orbit.editable[on]\norbit.rate(num)               orbit.showTrails[on]\norbit.bars(num)               orbit.showSpokes[on]\norbit.sync[on]                orbit.showRings[on]\norbit.phase(num)              orbit.showValues[on]\norbit.node(item)              orbit.read(read)\norbit.nodeRadius(item)        orbit.size(size)\norbit.nodeAngle(item)         orbit.fill(fill)\norbit.nodeRatio(item)         orbit.insert(insert)\norbit.nodeDepth(item)         orbit.remove(remove)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"orbit.run[on]                 orbit.nodeInvert(item)\norbit.rate(num)               orbit.editable[on]\norbit.bars(num)               orbit.showTrails[on]\norbit.sync[on]                orbit.showSpokes[on]\norbit.phase(num)              orbit.showRings[on]\norbit.node(item)              orbit.showValues[on]\norbit.nodeRadius(item)        orbit.read(read)\norbit.nodeAngle(item)         orbit.size(size)\norbit.nodeRatio(item)         orbit.fill(fill)\norbit.nodeDepth(item)         orbit.insert(insert)\norbit.nodeOutput(item)        orbit.remove(remove)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"

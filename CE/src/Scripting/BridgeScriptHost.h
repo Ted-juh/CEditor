@@ -125,6 +125,55 @@ inline DeviceOverrideValue deviceOverrideValue (const juce::String& label, const
     return out;
 }
 
+/** A script's value for a control bound to a host parameter, as the parameter takes it, or why it
+ *  cannot, in the editor's words (deviceDefinitions.js, numberFor): a number is the parameter's own
+ *  value, text that is one is read as one, and true and false are 1 and 0; a choice is also matched
+ *  by its name, in any case, as its index; a switch reads "on", "off", "true" or "false" too.
+ *  `refused` follows `set("…"): `. The plug-in sent a bound control's text as 0, a choice's name
+ *  included (the noticed items, at the owner's word). `kind` and `choices` are PanelParameter's
+ *  valueKind and choiceLabels. */
+struct ScriptParameterValue { bool ok = false; float value = 0.0f; juce::String refused; };
+inline ScriptParameterValue scriptParameterValue (const juce::String& kind, const juce::StringArray& choices,
+                                                  const juce::var& v)
+{
+    ScriptParameterValue out;
+    const auto take = [&out] (double d) { out.ok = true; out.value = static_cast<float> (d); return out; };
+    double d = 0.0;
+    const bool number = (v.isInt() || v.isInt64() || v.isDouble()) ? std::isfinite (d = static_cast<double> (v))
+                                                                   : v.isString() && decimalTextValue (v.toString(), d);
+    if (v.isBool()) return take (static_cast<bool> (v) ? 1.0 : 0.0);
+    if (kind == "bool")
+    {
+        if (number) return take (d != 0.0 ? 1.0 : 0.0);
+        const auto word = v.isString() ? v.toString().toLowerCase() : juce::String();
+        if (word == "on" || word == "true") return take (1.0);
+        if (word == "off" || word == "false") return take (0.0);
+        out.refused = shownScriptValue (v) + " is not on or off, so nothing was sent. Write true or false, a number "
+                      "(0 is off, any other number is on), or \"on\", \"off\", \"true\" or \"false\".";
+        return out;
+    }
+    if (kind == "choice" && v.isString() && ! number)
+    {
+        auto at = choices.indexOf (v.toString());
+        if (at < 0) at = choices.indexOf (v.toString(), true);
+        if (at >= 0) return take (at);
+        juce::StringArray quoted;
+        for (const auto& c : choices) quoted.add ("\"" + c + "\"");
+        const auto list = quoted.isEmpty() ? juce::String ("It has no choices.")
+                        : quoted.size() == 1 ? "The only choice is " + quoted[0] + "."
+                        : "The choices are " + quoted.joinIntoString (", ", 0, quoted.size() - 1) + " and "
+                              + quoted[quoted.size() - 1] + ".";
+        out.refused = shownScriptValue (v) + " is not one of its choices, so nothing was sent. " + list;
+        return out;
+    }
+    if (! number)
+    {
+        out.refused = shownScriptValue (v) + " is not a number, so nothing was sent.";
+        return out;
+    }
+    return take (d);
+}
+
 /** One item of a script's list of bytes: a whole number from 0 to 255, or text that is one hex
  *  byte. -1 when it is neither. */
 inline int scriptListByte (const juce::var& v)

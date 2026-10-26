@@ -291,7 +291,12 @@ export function sectionFieldRefusal(label, cfg, field) {
   return `${label}.read: "${field}" is not a field of this component. One of: ${sectionFields(cfg).join(', ')}.`;
 }
 
-/** A hand-written verb's refusal line, as the runtime writes it: the call, then why. */
-export function sectionRefusalLine(family, target, action, args, reason) {
-  return `${family} ${target}: ${action} ${JSON.stringify(args ?? {})} — refused, nothing changed${reason ? `. ${reason}` : ''}`;
+/** A hand-written verb's refusal line, as the runtime writes it: the call as the script wrote it,
+ *  its short name and the arguments after the target, then why. The generated verbs' form
+ *  (componentRefusalLine); it named the reducer's action and its arguments as JSON. */
+export function sectionRefusalLine(family, target, verb, args, reason) {
+  const list = Array.isArray(args) ? [...args] : [];
+  while (list.length && list[list.length - 1] === undefined) list.pop();
+  const shown = list.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  return `${family} ${target}: ${verb}(${shown}) — refused, nothing changed${reason ? `. ${reason}` : ''}`;
 }

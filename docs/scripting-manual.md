@@ -9073,11 +9073,48 @@ Example: `ce.components.orbit.nodeDepth("Orbit", 2, 0.5)` sends half of node 2's
 
 Good to know:
 
-- What a node sends, and whether it is turned upside down, is set in the inspector, under Satellites.
+- What it sends: `nodeOutput()`. Turned upside down: `nodeInvert()`, before the depth is taken.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
 *Short name: `orbitNodeDepth`.*
+
+##### `ce.components.orbit.nodeOutput(target, index, output) -> boolean`
+
+Set what one node sends, by its number.
+
+Example: `ce.components.orbit.nodeOutput("Orbit", 2, "sine")` makes node 2 send a sine of its angle.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `output` (text, required): "y": its height: 0.5 level with the centre, 1 at the top of a ring of radius 1.<br>"x": its place across, the same way: 1 at the right.<br>"sine": a sine of its angle: 0 to 1, whatever its radius.<br>"radius": its distance from the centre, which stays the same as it turns.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "y".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeOutput`.*
+
+##### `ce.components.orbit.nodeInvert(target, index [, invert]) -> boolean`
+
+Turn what one node sends upside down, or back, by its number.
+
+Example: `ce.components.orbit.nodeInvert("Orbit", 3, true)` makes node 3 send 1 where it would send 0.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `invert` (true or false, optional): true: upside down: 1 less what it would send.<br>false: as it is.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Turned before `nodeDepth()` takes its part.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeInvert`.*
 
 ##### `ce.components.orbit.editable(target [, editable]) -> boolean`
 

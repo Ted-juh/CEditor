@@ -25,7 +25,7 @@ import { listWord } from '../utils/wordLists.js';
 import { envelopePointParts, envelopeRefusal } from './animEnvelope.js';
 import { checksumAlgorithm, checksumNames, computeChecksum } from '../utils/checksums.js';
 import { defineParameter, encodeParameter } from './deviceDefinitions.js';
-import { ALL_EVENTS, EVENT_BY_ID } from './panelApi.js';
+import { ALL_EVENTS, EVENT_BY_ID, MEMBER_MODULE } from './panelApi.js';
 import { dashPattern, strokeEnd, STROKE_ENDS } from './drawDash.js';
 import { timeNumber } from './timeWords.js';
 import { LAYOUT_WORDS, layoutWord } from './layoutWords.js';
@@ -1394,7 +1394,7 @@ export function readComponentIndex(value, { memberId, at, args, target, control 
   const refused = handWrittenRefusal(spec.family, spec.action, cfg, built);
   // Only what this argument is: a phrase cell's row says nothing of its step.
   const problem = refused && refused.at === at
-    ? { severity: 'error', message: literal ? sectionRefusalLine(spec.family, target, spec.action, built, refused.reason) : refused.reason } : null;
+    ? { severity: 'error', message: literal ? sectionRefusalLine(spec.family, target, MEMBER_MODULE[memberId]?.name ?? spec.action, args, refused.reason) : refused.reason } : null;
   if (spec.kinds[at] === 'word') {
     if (spec.action === 'key' && !problem && Number.isFinite(Number(value))) {
       const pc = ((Math.round(Number(value)) % 12) + 12) % 12;

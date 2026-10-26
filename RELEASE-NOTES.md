@@ -349,6 +349,16 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   where it stored one that nothing reads, and takes a name in any case; and in the plug-in a name left
   out of `setTiming` or `setVariable` is refused, where "nil" was stored. `bind` to an id nothing
   knows yet is a warning in the console, where it was a plain line.
+- A component command that refuses a colour says so as its other refusals do, the call as written:
+  `drumpads Kit: colour(3, "redd") — refused, nothing changed. In pad 3, "redd" is not a colour …`,
+  where it named the call as `set()` does. The Zone Splitter, Phrase Sequencer, Recorder, Harmoniser
+  and Setlist name a refused call as written too, `recorder Rec: store(9)`, where they printed their
+  own arguments as JSON (`store {"slot":9}`).
+- `ce.components.orbit.nodeOutput` sets what a satellite sends, its height, its place across, a sine
+  of its angle or its radius, and `nodeInvert` turns it upside down; only the inspector could.
+- In the plug-in, a control bound to a host parameter takes a choice by its name, in any case, and a
+  switch by "on" or "off", as the editor does; other text is refused in the console, where it was
+  sent as 0.
 
 ## What you get
 

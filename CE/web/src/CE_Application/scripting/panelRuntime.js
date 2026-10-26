@@ -691,9 +691,9 @@ function valueBindingFor(control) {
  * it ("at colour"); `wholePath` for a call whose own arguments do not already say which property it
  * was; componentPlace for a component verb, which counts list positions from 1.
  */
-function colourWrites(call, outcome, root, path, value, place = belowPath) {
+function colourWrites(call, outcome, root, path, value, place = belowPath, say = null) {
   return readColours(call, outcome, path, place,
-    (colour) => mapColourWrites(root, path, value, colour));
+    (colour) => mapColourWrites(root, path, value, colour), say);
 }
 
 /** The same for a write to the panel document itself, `path` below the panel: the panel's own
@@ -704,7 +704,9 @@ function panelColourWrites(call, outcome, path, value) {
     (colour) => mapPanelColourWrites(path, value, colour));
 }
 
-function readColours(call, outcome, path, place, map) {
+/** `say`, where given, writes the line from where the colour is, why it is refused and the advice:
+ *  a component verb's, in the form its other refusals take. */
+function readColours(call, outcome, path, place, map, say = null) {
   // Asked only of a control-set reference, so an ordinary write does not look the set up.
   const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
   let refused = false;
@@ -712,7 +714,8 @@ function readColours(call, outcome, path, place, map) {
     const read = panelColour(written, field, resolves);
     if (!read.why) return read.colour;
     refused = true;
-    addScriptTrace('error', '', `${call}: ${place(at, path)}${read.why}, so ${outcome}. ${read.advice}`);
+    addScriptTrace('error', '', say ? say(place(at, path), read.why, read.advice)
+      : `${call}: ${place(at, path)}${read.why}, so ${outcome}. ${read.advice}`);
     return written;
   });
   return refused ? null : { value: stored };
@@ -3506,6 +3509,24 @@ function wrongTargetMessage(path, section, label) {
   return `"${path}" is ${/^[AEIOU]/i.test(type) ? 'an' : 'a'} ${type}, not ${article} ${label}. ${instead}`;
 }
 
+// The call a hand-written verb was given, as the script wrote it: its short name and the arguments
+// after the target. Its refusal line named the reducer's action and that action's arguments as JSON
+// (`quantize {"grid":16}`), where every generated verb names the call (`rate(200)`); both name the
+// call now (sectionRefusalLine). Set around each call by shownCalls, below.
+let handWrittenCall = null;
+function shownCalls(api) {
+  for (const [id, fn] of Object.entries(api)) {
+    api[id] = (target, ...args) => {
+      const outer = handWrittenCall;
+      handWrittenCall = { verb: MEMBER_MODULE[id]?.name ?? id, args };
+      try { return fn(target, ...args); } finally { handWrittenCall = outer; }
+    };
+  }
+  return api;
+}
+const handWrittenRefusalLine = (family, target, action, reason) =>
+  sectionRefusalLine(family, target, handWrittenCall?.verb ?? action, handWrittenCall?.args ?? [], reason);
+
 function splitAction(path, action, args) {
   const target = String(path ?? '');
   const zonesPath = `${target}.SplitZone.zones`;
@@ -3519,7 +3540,7 @@ function splitAction(path, action, args) {
   // preset replaced every zone with one whole-keyboard zone.
   const refused = handWrittenRefusal('split', action, { zones: current }, args ?? {});
   if (refused) {
-    addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, refused.reason));
+    addScriptTrace('error', '', handWrittenRefusalLine('split', target, action, refused.reason));
     return false;
   }
   // A script counts zones from 1, as the panel labels them; the reducer indexes them from 0.
@@ -3528,7 +3549,7 @@ function splitAction(path, action, args) {
   addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
   return true;
 }
-const splitApi = {
+const splitApi = shownCalls({
   // Their arguments are built where the Values tab builds them (handWrittenVerbs.js).
   splitPreset: (target, preset, lowNote, highNote) => splitAction(target, 'preset', HAND_WRITTEN.splitPreset.args(preset, lowNote, highNote)),
   splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN.splitMute.args(zone, enabled)),
@@ -3536,7 +3557,7 @@ const splitApi = {
   splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN.splitTranspose.args(zone, semitones)),
   splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN.splitPoint.args(zone, note)),
   splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
-};
+});
 
 // --- Phrase Sequencer --------------------------------------------------------
 // Same idea, one level up: the reducer patches the whole config rather than one
@@ -3554,7 +3575,7 @@ function phraseAction(path, action, args) {
   // class are refused, and say what there is (handWrittenVerbs.js). They said "nothing to change".
   const refused = handWrittenRefusal('phrase', action, cfg, args ?? {});
   if (refused) {
-    addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, refused.reason));
+    addScriptTrace('error', '', handWrittenRefusalLine('phrase', target, action, refused.reason));
     return false;
   }
   // A script counts steps and rows from 1; the reducer indexes them from 0.
@@ -3571,7 +3592,7 @@ function phraseAction(path, action, args) {
   addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
   return true;
 }
-const phraseApi = {
+const phraseApi = shownCalls({
   phraseSeed: (target, seed) => phraseAction(target, 'seed', HAND_WRITTEN.phraseSeed.args(seed)),
   phraseClear: (target) => phraseAction(target, 'clear', {}),
   phraseKey: (target, key) => phraseAction(target, 'key', HAND_WRITTEN.phraseKey.args(key)),
@@ -3581,7 +3602,7 @@ const phraseApi = {
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
   phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN.phraseCell.args(step, row, on)),
   phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
-};
+});
 
 // --- Recorder / Harmoniser / Setlist -----------------------------------------
 // All three follow the Phrase Sequencer's shape exactly: read the section, hand
@@ -3617,7 +3638,7 @@ function sectionAction(path, section, reducer, action, args) {
     // a scene name that does not exist is a typo somebody needs to see.
     // With why (handWrittenVerbs.js): the words there are, a slot that holds no take, the scenes.
     const family = section.toLowerCase();
-    addScriptTrace('error', '', sectionRefusalLine(family, target, action, args, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
+    addScriptTrace('error', '', handWrittenRefusalLine(family, target, action, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
     return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
@@ -3625,7 +3646,7 @@ function sectionAction(path, section, reducer, action, args) {
   return true;
 }
 const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
-const recorderApi = {
+const recorderApi = shownCalls({
   recorderRecord: (target, on) => recAction(target, 'record', on === undefined ? {} : { on: on !== false }),
   recorderStop: (target) => recAction(target, 'stop', {}),
   recorderPlay: (target, playing) => recAction(target, 'play', playing === undefined ? {} : { playing: playing !== false }),
@@ -3634,7 +3655,7 @@ const recorderApi = {
   recorderQuantize: (target, grid, strength, scale, key) => {
     const read = recorderQuantizeArgs({ grid, strength, scale, key });
     if (read.reason) {
-      addScriptTrace('error', '', sectionRefusalLine('recorder', String(target ?? ''), 'quantize', { grid, strength, scale, key }, read.reason));
+      addScriptTrace('error', '', handWrittenRefusalLine('recorder', String(target ?? ''), 'quantize', read.reason));
       return false;
     }
     return recAction(target, 'quantize', read.args);
@@ -3648,10 +3669,10 @@ const recorderApi = {
   recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN.recorderLoad.args(slot)),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
   recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
-};
+});
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
-const harmoniserApi = {
+const harmoniserApi = shownCalls({
   harmonyMode: (target, mode) => harmAction(target, 'mode', HAND_WRITTEN.harmonyMode.args(mode)),
   harmonyKey: (target, key) => harmAction(target, 'key', HAND_WRITTEN.harmonyKey.args(key)),
   harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
@@ -3667,7 +3688,7 @@ const harmoniserApi = {
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
   harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', HAND_WRITTEN.harmonyDegree.args(degree, chord)),
   harmonyRead: (target, field) => sectionRead(target, 'Harmoniser', 'harmony', field),
-};
+});
 
 // --- The other twenty-three families (phase 7) -------------------------------
 // Same shape as everything above — read the section, reduce, write back only what changed — but
@@ -3705,11 +3726,17 @@ function componentPlace(at, path) {
 function writeComponentFields(verb, path, patch) {
   const control = findControlByName(path);
   const call = `${memberPath(verb.id)}("${path}")`;
+  // A colour refused in a verb the script called is said as the verb's other refusals are, the call
+  // as written and then why: it named the call as set()'s line does, `ce.components.drumpads.
+  // colour("Kit"): in pad 2, …`, the one refusal of a component verb in another form.
+  const asked = componentCall && componentCall.verb === verb ? componentCall : null;
+  const say = asked ? (place, why, advice) => `${verb.family} ${path}: ${verb.v}(${asked.shown}) — refused, nothing changed. `
+    + `${place ? place.charAt(0).toUpperCase() + place.slice(1) : ''}${why}.${advice ? ` ${advice}` : ''}` : null;
   const written = [];
   let refused = false;
   for (const [field, value] of Object.entries(patch)) {
     const at = `${verb.section}.${field}`;
-    const colours = colourWrites(call, 'nothing was set', control, at, value, componentPlace);
+    const colours = colourWrites(call, 'nothing was set', control, at, value, componentPlace, say);
     if (colours) written.push([field, colours.value]);
     else refused = true;
   }
@@ -3733,6 +3760,9 @@ function withLayoutShowing(path, section) {
 }
 
 const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
+// The verb a script called and its arguments as shown, while it runs, for writeComponentFields to
+// say a refused colour in the verb's own form. Set by componentVerbApi, below.
+let componentCall = null;
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
   const stored = getValue(`${path}.${verb.section}`);
@@ -4314,9 +4344,13 @@ const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
   // named them would have to be generated per kind for no gain. `target` is always first.
   (target, ...rest) => {
     const special = COMPONENT_KIND_ACTION[verb.k];
-    return special
-      ? special(verb, String(target ?? ''), rest)
-      : componentVerbAction(verb, target, rest);
+    const outer = componentCall;
+    componentCall = { verb, shown: rest.map((x) => JSON.stringify(x) ?? 'nil').join(', ') };
+    try {
+      return special
+        ? special(verb, String(target ?? ''), rest)
+        : componentVerbAction(verb, target, rest);
+    } finally { componentCall = outer; }
   },
 ]));
 
@@ -4350,7 +4384,7 @@ function sectionRead(path, section, label, field) {
 }
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
-const setlistApi = {
+const setlistApi = shownCalls({
   // These move the INDEX. The recall follows from the index changing, so a
   // scripted step and a footswitch step are the same event downstream.
   setlistNext: (target) => setAction(target, 'next', {}),
@@ -4360,7 +4394,7 @@ const setlistApi = {
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
   setlistRead: (target, field) => sectionRead(target, 'Setlist', 'setlist', field),
-};
+});
 
 /* -------------------------------------------------------------- flow: on / emit / run */
 // These three were `() => {}` until the API audit: a script could register a listener, announce an

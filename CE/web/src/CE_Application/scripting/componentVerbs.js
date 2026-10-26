@@ -837,7 +837,18 @@ export const COMPONENT_FAMILIES = [
       // The engine's range (orbitNodes clamps depth to 0..1): -1 to 0 was taken and sent 0.
       v('nodeDepth', 'nodes', ITEM, { item: 'depth', kind: NUM, ...UNIT, doc: 'Set how much of its value one node sends, by its number.', ex: ['2, 0.5', 'sends half of node 2\'s value'],
         argDocs: { depth: 'Part of the value: 1 all of it, 0.5 half.\n0: nothing.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
-        notes: ['What a node sends, and whether it is turned upside down, is set in the inspector, under Satellites.'] }),
+        notes: ['What it sends: `nodeOutput()`. Turned upside down: `nodeInvert()`, before the depth is taken.'] }),
+      // What a node sends and whether it is turned upside down had no verbs: only the inspector, under
+      // Satellites, could set them (the noticed items, at the owner's word). nodeProjection's cases.
+      v('nodeOutput', 'nodes', ITEM, { item: 'output', kind: ENUM, doc: 'Set what one node sends, by its number.', ex: ['2, "sine"', 'makes node 2 send a sine of its angle'],
+        argDocs: { output: ['"y": its height: 0.5 level with the centre, 1 at the top of a ring of radius 1.',
+          '"x": its place across, the same way: 1 at the right.', '"sine": a sine of its angle: 0 to 1, whatever its radius.',
+          '"radius": its distance from the centre, which stays the same as it turns.', 'Case-insensitive.',
+          'Invalid: rejected with a console error.'].join('\n') },
+        notes: ['Default: "y".'] }),
+      v('nodeInvert', 'nodes', ITEM, { item: 'invert', kind: BOOL, doc: 'Turn what one node sends upside down, or back, by its number.', ex: ['3, true', 'makes node 3 send 1 where it would send 0'],
+        argDocs: { invert: `true: upside down: 1 less what it would send.\nfalse: as it is.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: false.', 'Turned before `nodeDepth()` takes its part.'] }),
       v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the satellites be dragged, or not.',
         argDocs: { editable: `true: a drag moves a satellite to a new radius and angle.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
         notes: ['Default: true.'] }),
