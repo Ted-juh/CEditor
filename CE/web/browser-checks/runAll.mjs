@@ -7,6 +7,7 @@
 //
 // Run:  node browser-checks/runAll.mjs [name ...]   (names, without .mjs, run just those)
 import { spawnSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,8 +20,18 @@ export const CHECKS = [
   'releaseWorkflow', 'numberCellSelection', 'displayGapReview', 'ctrl49Screen', 'noteModules',
   'hostWorkspace', 'performanceTools', 'soundsPage', 'stageScreen', 'pluginPresets', 'songsPage',
   'templateLabels', 'macroSetKnob', 'setSwatches', 'anatomyForms', 'panelFile', 'valuesSidebar',
-  'valueCompletion',
+  'valueCompletion', 'componentBehavior',
 ];
+
+// componentBehavior.mjs is the component acceptance harness, and only one of its cases runs here: a
+// script's write to a source reaches its bound parameter once, and a drag is not sent twice
+// (half a minute). The whole file takes sixteen, and on 2026-10-26 twenty-one of its ninety-five
+// cases failed, every one of them already failing before that case was added (the Meter's geometry
+// and readouts, the Slider's and Knob's readouts and drags, and others), so the rest is still run
+// by hand. Its screenshots and results go to a temporary folder rather than work/.
+const CASES = {
+  componentBehavior: 'A script write to a source reaches its bound parameter',
+};
 
 // A check that hangs (a browser that never answers) fails rather than holding the run forever.
 const PER_CHECK_MS = 15 * 60 * 1000;
@@ -32,8 +43,13 @@ const started = Date.now();
 
 for (const name of chosen) {
   const t0 = Date.now();
+  const env = CASES[name] ? {
+    ...process.env,
+    CEDITOR_BEHAVIOR_CASE: CASES[name],
+    CEDITOR_BEHAVIOR_OUT: path.join(os.tmpdir(), 'ceditor-component-behavior'),
+  } : process.env;
   const run = spawnSync(process.execPath, [path.join(HERE, `${name}.mjs`)], {
-    cwd: path.resolve(HERE, '..'), encoding: 'utf8', timeout: PER_CHECK_MS, maxBuffer: 64 * 1024 * 1024,
+    cwd: path.resolve(HERE, '..'), env, encoding: 'utf8', timeout: PER_CHECK_MS, maxBuffer: 64 * 1024 * 1024,
   });
   const seconds = ((Date.now() - t0) / 1000).toFixed(0);
   const output = `${run.stdout ?? ''}${run.stderr ?? ''}`.trimEnd();

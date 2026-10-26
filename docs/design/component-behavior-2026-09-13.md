@@ -228,8 +228,10 @@ slashes; fixed separator handling. No generated C++ source changed.
 
 Run the new scenarios with `npm run test:component-behavior` from CE/web. Windows uses installed
 Edge; `CHROMIUM_PATH` can select an executable elsewhere. `CEDITOR_BEHAVIOR_OUT` selects the
-evidence directory; `CEDITOR_BEHAVIOR_CASE` filters by scenario-name substring. Keep source files
-stable while running: a Vite hot reload deliberately resets the application being measured.
+evidence directory; `CEDITOR_BEHAVIOR_CASE` filters by scenario-name substring, and fails when it
+matches none. Keep source files stable while running: a Vite hot reload deliberately resets the
+application being measured. Since 2026-10-26 the browser checks, and so CI, run the cases named in
+`CASES` in `browser-checks/runAll.mjs`; the whole file is still run by hand.
 
 Still to execute: remaining component-specific properties, conditional settings, shared
 appearance combinations, routing and script consumers, custom package behavior (Claude), and

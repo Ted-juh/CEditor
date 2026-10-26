@@ -105,8 +105,9 @@ Every module in the table under [The branch](#the-branch) is done, and so are th
 descriptions and the deferred items: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass)
 and [The deferred items](#the-deferred-items), which record each decision for the owner's review.
 The four lines noticed and not changed are done too, at the owner's word: see [The noticed
-items](#the-noticed-items). What is left is the owner's: whether `browser-checks/componentBehavior.mjs`
-runs in CI, which CLAUDE.md leaves to the owner, since every job added is time on every pull request.
+items](#the-noticed-items). So is the last item, whether `browser-checks/componentBehavior.mjs` runs
+in CI: its case for this branch does, and the twenty-one cases of it that fail on `main` too are
+named in [componentBehavior in CI](#componentbehavior-in-ci). Nothing of this branch's is left.
 
 ---
 
@@ -1887,8 +1888,8 @@ once, as a commit:
   nor a Router or a Turing Machine, which send on their own clock.
 
 `browser-checks/componentBehavior.mjs` ("A script write to a source reaches its bound parameter
-once") checks it on a Crossfader: it fails without the effect. That file is run by hand, not by
-`runAll.mjs`; adding it to CI is the owner's call.
+once") checks it on a Crossfader: it fails without the effect. That case runs in CI, from
+`runAll.mjs`; the rest of the file is run by hand ([componentBehavior in CI](#componentbehavior-in-ci)).
 
 ### `ce.components.panic`
 
@@ -2107,6 +2108,40 @@ records above left as noticed and not changed, done by the rules:
   a number takes numbers only: its choices, if the synth has any, are the profile's, which the
   plug-in does not read here. The control's mirror is written as the editor writes the control.
 
+### componentBehavior in CI
+
+At the owner's word on 2026-10-26 ("As recommended, add componentBehavior to CI too"). The whole of
+`browser-checks/componentBehavior.mjs` was run first, here and on `main`, to see what CI would get:
+
+| | Cases | Pass | Fail | Time |
+| --- | --- | --- | --- | --- |
+| this branch | 95 | 74 | 21 | 944 s |
+| `main` | 94 | 73 | 21 | 922 s |
+
+The twenty-one are the same twenty-one, so none of them is this branch's. Eleven wait six seconds
+for a part of the control the case expects and do not find it (`.meter-track`, `.meter-readout`,
+`.slider-readout` and the like); ten find a different answer from the one the case expects (a
+detent that does not catch, a round dot with a painted corner). Which of the two is wrong, the
+renderer or the case, was not looked into. They are: Meter bar thickness, segmented readout, orientations, arc sweep,
+segmented gradient and linked source peak; Route into Meter; Nested Meter; Crossfader laws and
+detent, and its set-value return; Slider and Knob readout, and typed display values; Macro curves;
+ProgressBar; Number and Range Display mode; Slider fractional steps, reversed mouse, and rotary and
+knob drag; Pixel appearance dots and Reset appearance; LCD soft key grouped target.
+
+The whole file would have made the browser-checks job red on every pull request and added sixteen
+minutes to a job that takes about ten and stops at thirty. So `runAll.mjs` runs the one case that
+holds this branch's change, "A script write to a source reaches its bound parameter once, and a drag
+is not sent twice" (about half a minute), by the harness's own case filter (`CASES` in
+`runAll.mjs`), with its screenshots in a temporary folder rather than `work/`. The rest stays run by
+hand: `npm run test:component-behavior`. With it:
+
+- A case filter that matches no case fails, where it passed having run nothing; a renamed case
+  cannot quietly drop out of CI.
+- The page's first load waits as long as the other dev-server checks' (`DEV_SERVER_FIRST_LOAD_MS`),
+  where it had 60 s: a cold runner compiles the editor's modules on that request.
+
+A case fixed later can join it by its name in `CASES`, and the whole file once the twenty-one pass.
+
 ## Checking each batch
 
 From `CE/web`:
@@ -2135,7 +2170,9 @@ Read docs/design/api-descriptions-handoff.md. Every module's descriptions are do
 item-by-item reviews of the LCD, the arp and the pixel, then every other module, the module and event
 descriptions, the items once deferred and the lines once noticed, each in one pass at the owner's
 word ("The remaining modules, in one pass", "The deferred items" and "The noticed items" in this
-file record each decision for review). What is left is the owner's: whether
-browser-checks/componentBehavior.mjs runs in CI. Say what it would cost each pull request and what
-it would catch, and wait for the owner's answer before changing anything.
+file record each decision for review), and the script-write case of
+browser-checks/componentBehavior.mjs runs in CI ("componentBehavior in CI"). Nothing of this work is
+left. The twenty-one cases of that file that fail on main too are listed there: if the owner asks
+for them, take them one at a time, find whether the renderer or the case is wrong, and add each one
+that passes to CASES in browser-checks/runAll.mjs.
 ```

@@ -2,7 +2,7 @@
 // Fixtures use real document loading. Property edits and gestures use the actual App UI.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -102,7 +102,7 @@ async function paintedPixels(id, points, padding = 0) {
   },{data:png.toString('base64'),points});
 }
 try {
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, {waitUntil:'networkidle',timeout:60000});
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, {waitUntil:'networkidle',timeout:DEV_SERVER_FIRST_LOAD_MS});
   await page.waitForSelector('.app');
   await check('Meter bar thickness controls the visible bar after reopening',async()=>{
     const id=await fixture('Meter',{Meter:{value:0.5}}); await tab('Meter'); await number('Thick',12);
@@ -991,3 +991,5 @@ try {
   await browser.close(); await server.close();
 }
 if(results.some(r=>r.status==='fail')) process.exitCode=1;
+// A case name that matches nothing (one renamed under runAll.mjs) would otherwise pass having run nothing.
+if(process.env.CEDITOR_BEHAVIOR_CASE&&!results.length){console.error(`FAIL no case matches CEDITOR_BEHAVIOR_CASE "${process.env.CEDITOR_BEHAVIOR_CASE}"`);process.exitCode=1;}
