@@ -122,17 +122,12 @@ is the table of wording the owner rejected and what replaced it; read it before 
 
 ### Left
 
-The table under [The branch](#the-branch): 580 descriptions in the modules not yet done, of which
-154 need the most work by the 2026-10-21 measure (every component verb already has the generated
-form; see [`ce.components.lcd`: done](#cecomponentslcd-done-and-the-component-generator-with-it)). The `ce.components.*` modules are the bulk
-(roughly 400 descriptions over 20 components); they are panel-window only, so their runtime is
-`panelRuntime.js` and the C++ engines define them as explaining stubs: no prelude work, and the
-sidebar's `readDrawShape`-style readers do not apply. Then `ce.panel`, `ce.device`, `ce.music`,
-`ce.core`, `ce.storage`, `ce.image`, `ce.text`, `ce.ui` and the lifecycle hooks. After the
-commands: the module descriptions (41, the picker's group headings) and the event descriptions
-(38), with the same rules. Next by the table: `ce.components.arp` (30 descriptions, 15 that need
-the most work), once the owner's review of `ce.components.lcd` is finished: it was merged without
-the owner seeing each item, and [its queue](#the-owners-review-one-item-at-a-time) says what is left.
+Every module in the table under [The branch](#the-branch) is done, and so are the module and event
+descriptions: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass), which
+records each decision for the owner's review. What is left is the owner's: the items under
+[Deferred, for the owner to decide](#deferred-for-the-owner-to-decide) (silences in the modules
+that run in four runtimes, and the older `ce.midi` helpers), and the "noticed, not changed" lines
+in the per-module records.
 
 ---
 
@@ -2033,6 +2028,17 @@ as a query with no answer: `ce.ui.state()` reports it. Texts for all 9.
 
 Their texts are one sentence each now, the rest in notes, as the commands'.
 
+### The module and event descriptions
+
+- **The 41 module descriptions**, the picker's group headings, are one sentence each, in a
+  musician's words, where they were lists with dashes and asides ("Values, flow and logging — the
+  commands every script uses. Never namespaced."). Each component module is its family's summary
+  and "Panel view only."; the five older ones had their name alone ("Setlist. Panel view only.").
+- **The 38 event descriptions** say what happened first, then the fields, without brackets or
+  "Note that"; the component events name the components that raise them in the first sentence.
+
+With these, every module in the table above is done.
+
 ## Checking each batch
 
 From `CE/web`:
@@ -2057,20 +2063,12 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
-on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
-ce.anim, ce.draw, ce.time and ce.components.lcd are done; the LCD's item-by-item review is done
-too ("The owner's review, one item at a time", and "The LCD's script model", which changed what a
-script can address), and so is its "line" wording. So are the LCD's script commands for a layout's
-zones, by name as a Pixel Display's elements are ("Zones by name" in this file), and so is
-ce.components.arp ("ce.components.arp: the owner's review" in this file, all fifteen items).
-ce.components.pixel is done too ("ce.components.pixel: the owner's review" in this file). The
-owner then said to continue through the modules and finish them without showing each item: take
-each recommendation, record it here, and carry on with the next module by the table,
-technical English, schematic, one rule per line, with ranges, as its table says, showing every
-parameter and option of the command in its item. The component texts are generated from
-componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check
-each command at its edges in the runtime first, and put what is silent or wrong to me as a decision.
-Show me one item at a time, its text now and every field as proposed, and wait for my answer before
-the next.
+Read docs/design/api-descriptions-handoff.md. Every module's descriptions are done, and so are the
+module and event descriptions: the owner's item-by-item reviews of the LCD, the arp and the pixel,
+then every other module in one pass at the owner's word ("The remaining modules, in one pass" in
+this file, which records each decision for review). What is left is the owner's to decide: the
+section "Deferred, for the owner to decide" (silences in ce.core, ce.storage, ce.device and ce.music,
+which each run in four runtimes, and the older ce.midi helpers), and the "noticed, not changed"
+lines in the per-module records. Take one at a time: say what it does now and what the rules would
+make it do, and wait for the owner's answer before changing anything.
 ```

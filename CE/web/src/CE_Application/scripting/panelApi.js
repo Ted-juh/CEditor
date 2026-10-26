@@ -591,18 +591,18 @@ export const LIFECYCLE_HOOKS = [
 // names passed directly (Q4): one obvious datum directly, several fields as one object.
 
 export const CONTROL_EVENTS = [
-  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.' },
-  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.' },
-  { id: 'activeHandleChanged', fn: 'onActiveHandleChanged', payload: 'info', summary: 'A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end".' },
+  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Runs again and again while the value moves, as a knob is dragged: for what on screen follows the control.' },
+  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Runs once, when the value settles, as a knob is let go: the moment to tell the synth.' },
+  { id: 'activeHandleChanged', fn: 'onActiveHandleChanged', payload: 'info', summary: 'A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end".' },
   { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.' },
   { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'The control was double-clicked. `mouse.x` and `mouse.y` say where.' },
-  { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.' },
+  { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held.' },
   { id: 'pointerMove', fn: 'onPointerMove', payload: 'mouse', summary: 'The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.' },
   { id: 'pointerUp', fn: 'onPointerUp', payload: 'mouse', summary: 'The mouse button was released.' },
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'The mouse pointer moved onto the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'The mouse pointer left the control.' },
   { id: 'wheel', fn: 'onWheel', payload: 'wheel', summary: 'The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.' },
-  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The control\'s look-state changed. `state` is one word: "normal", "hover", "pressed" or "disabled".' },
+  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The control\'s look changed. `state` is "normal", "hover", "pressed" or "disabled".' },
 ];
 
 // `panelStateChanged` used to be declared here. There is no panel-state feature in the model —
@@ -610,7 +610,7 @@ export const CONTROL_EVENTS = [
 // not fire in any runtime. Declaring an event no runtime raises is the same defect as declaring
 // a command no runtime implements; it comes back when panel states do.
 export const PANEL_EVENTS = [
-  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control on the panel changed. `info.target` is the control\'s name and `info.value` its new value. Use it to react to many controls in one place.' },
+  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'A control on the panel changed. `info.target` is its name and `info.value` its new value: one handler for many controls.' },
   { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.' },
 ];
 
@@ -621,33 +621,33 @@ export const PANEL_EVENTS = [
 // is 500ms, so the event lands within a frame of it, which is right for lighting an LED, advancing
 // a setlist or stepping a sequencer. It is NOT sample-accurate and must never be used to time audio.
 export const TIME_EVENTS = [
-  { id: 'beat', fn: 'onBeat', payload: 'time', summary: 'A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.' },
-  { id: 'bar', fn: 'onBar', payload: 'time', summary: 'A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature\'s beats per bar. It fires on the downbeat, together with onBeat.' },
-  { id: 'transport', fn: 'onTransport', payload: 'time', summary: 'The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.' },
+  { id: 'beat', fn: 'onBeat', payload: 'time', summary: 'A beat went by while the transport plays. `time.bar` and `time.beat` give where, `time.beats` the beats so far, and `time.bpm` the tempo. Within a thirtieth of a second: right for a light or a display, not for timing sound.' },
+  { id: 'bar', fn: 'onBar', payload: 'time', summary: 'A bar began, on the downbeat, with onBeat. `time.bar` is its number, `time.beats` the beats so far, and `time.beatsPerBar` the beats in a bar.' },
+  { id: 'transport', fn: 'onTransport', payload: 'time', summary: 'The transport started, stopped or changed tempo. `time.playing` says whether it runs, `time.bpm` gives the tempo and `time.source` what drives it.' },
 ];
 
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
-  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter\'s id and `info.value` its value, in the parameter\'s own units.' },
-  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from.' },
+  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'The synth sent a parameter\'s value, read through its profile. `info.parameter` is the parameter\'s id and `info.value` its value, in the parameter\'s own units.' },
+  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A dump from the synth arrived and was read; the controls bound to it are filled in already. `dump.values` holds each value by parameter id, `dump.kind` names the dump, such as "patch", and `dump.role` the synth it came from.' },
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
-  { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset.' },
+  { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe it; `preset.source` is "device" when the synth sent a Program Change, "panel" when the panel called recallPreset.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.' },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
   // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
   { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
-    summary: 'A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead.' },
+    summary: 'A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn.' },
   { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
-    summary: 'A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.' },
-  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.' },
-  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.' },
-  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.' },
+    summary: 'A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0.' },
+  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'A SysEx message arrived. `bytes` holds it as a list of numbers.' },
+  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A synth was connected and is ready. `device.role` names it and `device.profileId` its profile.' },
+  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A synth is no longer connected and ready. `device.role` names it, and `device.message` may say why.' },
 ];
 
 /* Components (design doc §45).
@@ -668,27 +668,27 @@ export const DEVICE_EVENTS = [
  */
 export const COMPONENT_EVENTS = [
   { id: 'step', fn: 'onStep', payload: 'step', runtime: RUNTIME_WEBVIEW,
-    summary: 'A sequencer moved to its next step. `step.target` is the component\'s name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.' },
+    summary: 'A sequencer moved to its next step: an Arpeggiator, Turing Machine, Phrase Sequencer or Looper. `step.target` is its name, `step.index` the step, counted from 1, `step.of` how many there are, and `step.notes` the notes it plays.' },
   { id: 'cycle', fn: 'onCycle', payload: 'cycle', runtime: RUNTIME_WEBVIEW,
-    summary: 'A sequence or loop came back round to its start. `cycle.target` is the component\'s name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.' },
+    summary: 'A sequence or loop came round to its start: an Arpeggiator, Turing Machine, Looper or Orbit. `cycle.target` is its name and `cycle.count` how many times it has come round since the panel opened.' },
   { id: 'hit', fn: 'onHit', payload: 'hit', runtime: RUNTIME_WEBVIEW,
-    summary: 'A pad, key or ribbon was struck. `hit.target` is the component\'s name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.' },
+    summary: 'A pad, key or strip was struck: a Chord Pad, Drum Pads or Note Ribbon. `hit.target` is its name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard.' },
   { id: 'release', fn: 'onRelease', payload: 'release', runtime: RUNTIME_WEBVIEW,
-    summary: 'A pad, key or ribbon was let go. `release.target` is the component\'s name, `release.id` which pad or key, and `release.note` the note.' },
+    summary: 'A pad, key or strip was let go. `release.target` is its name, `release.id` which pad or key, and `release.note` the note.' },
   { id: 'scene', fn: 'onScene', payload: 'scene', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Setlist switched to a scene. `scene.target` is the component\'s name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.' },
+    summary: 'The Setlist moved to a scene, however it was chosen. `scene.target` is its name, `scene.index` the scene, counted from 1, and `scene.name` its name.' },
   { id: 'stage', fn: 'onStage', payload: 'stage', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component moved into a new stage. `stage.target` is the component\'s name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports "idle", "armed", "recording" and "overdub"; the Envelope reports "sustain", "release" and "end". This is not the same as onStateChanged, which is about hover and press.' },
+    summary: 'A Recorder or an Envelope moved to a new stage. `stage.target` is its name, `stage.stage` the new stage and `stage.previous` the old one: the Recorder\'s "idle", "armed", "recording" and "overdub", the Envelope\'s "sustain", "release" and "end". Not onStateChanged, which is hover and press.' },
   { id: 'settled', fn: 'onSettled', payload: 'settled', runtime: RUNTIME_WEBVIEW,
-    summary: 'A spring-loaded control finished gliding back to its rest position. `settled.target` is the component\'s name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.' },
+    summary: 'A Ribbon, Crossfader or Vector Joystick finished going back to its rest. `settled.target` is its name and `settled.value` where it came to rest.' },
   { id: 'bounce', fn: 'onBounce', payload: 'bounce', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Kinetic ball hit a wall. `bounce.target` is the component\'s name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.' },
+    summary: 'The Kinetic ball hit a wall. `bounce.target` is its name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.' },
   { id: 'recall', fn: 'onRecall', payload: 'recall', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Constellation snapped to one of its presets. `recall.target` is the component\'s name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.' },
+    summary: 'The Constellation, in snap mode, moved to another preset. `recall.target` is its name, `recall.id` the preset and `recall.label` its label.' },
   { id: 'zone', fn: 'onZone', payload: 'zone', runtime: RUNTIME_WEBVIEW,
-    summary: 'A Meter\'s reading crossed into a different zone, such as from green into red. `zone.target` is the component\'s name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.' },
+    summary: 'A Meter\'s reading crossed into another zone, such as from green into red. `zone.target` is its name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.' },
   { id: 'voiced', fn: 'onVoiced', payload: 'voiced', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component turned one played note into other notes. `voiced.target` is the component\'s name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.' },
+    summary: 'A Zone Splitter or Harmoniser turned a played note into other notes. `voiced.target` is its name, `voiced.note` and `voiced.velocity` the note played, and `voiced.out` the notes it made.' },
 ];
 
 export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS, component: COMPONENT_EVENTS };
@@ -5672,7 +5672,7 @@ export const COMPONENT_GROUPS = [
 
 export const MODULES = [
   { id: 'ce.core', version: '1.1', requires: [], runtime: RUNTIME_ANY, global: true,
-    summary: 'Values, flow and logging — the commands every script uses. Never namespaced.' },
+    summary: 'Read and change values, listen for events, and print to the console: the commands every script uses.' },
   // requires ce.music because sendNote/sendAftertouch accept a note NAME, and resolving it is
   // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
   // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
@@ -5681,7 +5681,7 @@ export const MODULES = [
   // note off with after(). The prelude-dependency test caught it the moment the call appeared, which
   // is exactly the drift that rule exists to stop.
   { id: 'ce.midi', version: '1.3', requires: ['ce.core', 'ce.music', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'MIDI in and out — notes (with an optional duration), programs, bend, aftertouch, clock, '
+    summary: 'Send and receive MIDI: notes, controllers, programs, bend, clock and SysEx, with filters, routing, panic, checksums and the byte encoders synths use.'
       + 'CC/NRPN/Sysex — plus wire filters, injection, routing, panic, checksums and the 7-bit/nibble/ASCII encoders.' },
   // MIXED, and for the same honest reason ce.panel is: declaring a parameter or a dump layout is
   // data plus a codec and works window-closed, but binding a control to one needs a control model
@@ -5691,58 +5691,58 @@ export const MODULES = [
   // which is precisely the hanging this closed. The prelude-dependency test caught it the moment
   // the call appeared, which is the drift that rule exists to stop.
   { id: 'ce.device', version: '1.3', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'The connected synth: identity, parameters, reading and setting them, and bulk dumps — plus declaring parameters, dump layouts and bindings for a synth the app has no profile for, and enumerating available ports. Needs the device host.' },
+    summary: 'Talk to the connected synth: its parameters, reading and setting them, and its dumps; and describe a synth the app has no profile for. Needs a synth connected.' },
   // requires ce.core because curve() now REPORTS a shape it does not know instead of silently
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic: wrapping, curves, list snapping, decibels, colour, and seeded random. Pure — no host involved.' },
+    summary: 'Work with numbers: ranges, curves, snapping, decibels, colours and random numbers.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Note names and numbers, scales, chords, snapping a note to a key, key spelling, scale degrees and degree chords, chord naming, voice leading, and arpeggio expansion and ordering.' },
+    summary: 'Work with notes and keys: note names, scales, chords, snapping to a key, chord names, voice leading and arpeggio orders.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Musical time: tempo, transport position, beat/bar events, timers (plain, one-shot or beat-synced), note divisions, bar/beat at any position, steps between readings, swing, cycles, loop folding, tempo from taps or clock pulses, and a monotonic clock.' },
+    summary: 'Work in musical time: the tempo, the song position, beats and bars, timers, note lengths, swing and tap tempo.' },
   // requires ce.math because envelope() drives the value through ce.math.map — one lookup, shared
   // with the Envelope component — and ce.time because `beats` and `sync` are the transport's.
   { id: 'ce.anim', version: '1.1', requires: ['ce.core', 'ce.math', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'Move a value over time: to a destination, with a spring, or through a drawn shape — delayed, staggered, repeating, tempo-synced, with completion callbacks. Cross-runtime: works with the panel shut.' },
+    summary: 'Move a value over time: to a target, with a spring, or along a drawn shape, in time with the tempo or not. Works with the panel window shut.' },
   { id: 'ce.ui', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Notifications (show, retract, replace), questions — a choice, a line of text, or a pick from a list — and the clipboard. Panel view only.' },
+    summary: 'Talk to the person playing: messages, the status bar, questions and the clipboard. Panel view only.' },
   { id: 'ce.draw', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Draw on top of any control: shapes, gradients, dashes, opacity and transforms, plus the panel\'s own LCD font and text measurement. Panel view only.' },
+    summary: 'Draw on top of any control: shapes, gradients and text in the LCD font, and measure it. Panel view only.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
   { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each command says so. snapshot/restore work anywhere.' },
+    summary: 'Create, copy, find and arrange controls. Panel view only, but for snapshot and restore, which work anywhere.' },
   { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON encode/decode.' },
+    summary: 'Keep values: for the script while it runs, or saved with the panel, for one script or on this computer; and read and write JSON.' },
   // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the
   // measuring is done on a canvas. A player host has neither, and a typography verb that answered
   // from a guess would be worse than one that says it is not there.
   // Panel view only, for the same reason ce.text is: the icon library and the file cache are the
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they draw from. Background layers composite; text layers are exclusive. Reports which image sources survive an export.' },
+    summary: 'Put pictures on controls, from files or the icon library, and keep them in the panel for an export. Panel view only.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Typography: which fonts exist and what they support, style writes that keep weight consistent, variable axes, and measuring a control\'s text in its own font to fit it to its box.' },
+    summary: 'Set a control\'s typography, list the fonts there are, and measure text to fit its box. Panel view only.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
+    summary: 'Split the keyboard into zones, each with its own channel and transpose. Panel view only.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Phrase Sequencer. Panel view only.' },
+    summary: 'Drive the Phrase Sequencer: its pattern, key, scale, direction and cells. Panel view only.' },
   { id: 'ce.components.recorder', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Phrase Recorder. Panel view only.' },
+    summary: 'Record, play and edit takes on the Phrase Recorder, and keep them in slots. Panel view only.' },
   { id: 'ce.components.harmony', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Harmoniser. Panel view only.' },
+    summary: 'Set how the Harmoniser turns each played note into a chord. Panel view only.' },
   { id: 'ce.components.setlist', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Setlist. Panel view only.' },
+    summary: 'Move through the Setlist\'s scenes, and set which it plays. Panel view only.' },
   // …and one per remaining family, expanded from the same spec the verbs come from. One module
   // per family rather than one for all of them: a panel with an Arpeggiator should not pay for the
   // LCD, the Matrix and the Orbit, and the cost report is per module.
   ...COMPONENT_FAMILIES.map((fam) => ({
     id: moduleIdFor(fam.id), version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: `${fam.summary} Panel view only — the component is modelled there.`,
+    summary: `${fam.summary} Panel view only.`,
   })),
 ];
 

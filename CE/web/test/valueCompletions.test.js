@@ -142,7 +142,7 @@ test('an event, in Lua, JavaScript, Python and C++ handler code: the handler nam
     const r = forced(src, lang, src.indexOf('ValueChanged'));
     assert.deepEqual(labels(r), HANDLERS, lang);
     assert.equal(selectedLabel(r), 'onValueChanged', lang);
-    assert.match(r.options[r.selected].detail, /^now · Fires once, when the value has settled/, lang);
+    assert.match(r.options[r.selected].detail, /^now · Runs once, when the value settles/, lang);
     assert.equal(accept(src, r, 'onClick'), src.replace('"onValueChanged"', '"onClick"'), lang);
   }
   // An event written by its id ("valueChanged") is the same event: listed as written in its

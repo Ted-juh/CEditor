@@ -867,24 +867,24 @@ Raised by the control the script belongs to.
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onValueChange(value)` | Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control. |
-| `onValueChanged(value)` | Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth. |
-| `onActiveHandleChanged(info)` | A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
+| `onValueChange(value)` | Runs again and again while the value moves, as a knob is dragged: for what on screen follows the control. |
+| `onValueChanged(value)` | Runs once, when the value settles, as a knob is let go: the moment to tell the synth. |
+| `onActiveHandleChanged(info)` | A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
 | `onClick(mouse)` | The control was clicked. `mouse.x` and `mouse.y` say where, inside the control. |
 | `onDoubleClick(mouse)` | The control was double-clicked. `mouse.x` and `mouse.y` say where. |
-| `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held. |
+| `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held. |
 | `onPointerMove(mouse)` | The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position. |
 | `onPointerUp(mouse)` | The mouse button was released. |
 | `onHoverStart()` | The mouse pointer moved onto the control. |
 | `onHoverEnd()` | The mouse pointer left the control. |
 | `onWheel(wheel)` | The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction. |
-| `onStateChanged(state)` | The control's look-state changed. `state` is one word: "normal", "hover", "pressed" or "disabled". |
+| `onStateChanged(state)` | The control's look changed. `state` is "normal", "hover", "pressed" or "disabled". |
 
 ### Panel events
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onControlChanged(info)` | Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place. |
+| `onControlChanged(info)` | A control on the panel changed. `info.target` is its name and `info.value` its new value: one handler for many controls. |
 | `onTimer(info)` | A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`. |
 
 ### Time events
@@ -894,9 +894,9 @@ displays, not for timing audio.
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onBeat(time)` | A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound. |
-| `onBar(time)` | A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat. |
-| `onTransport(time)` | The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it. |
+| `onBeat(time)` | A beat went by while the transport plays. `time.bar` and `time.beat` give where, `time.beats` the beats so far, and `time.bpm` the tempo. Within a thirtieth of a second: right for a light or a display, not for timing sound. |
+| `onBar(time)` | A bar began, on the downbeat, with onBeat. `time.bar` is its number, `time.beats` the beats so far, and `time.beatsPerBar` the beats in a bar. |
+| `onTransport(time)` | The transport started, stopped or changed tempo. `time.playing` says whether it runs, `time.bpm` gives the tempo and `time.source` what drives it. |
 
 ### Synth and MIDI events
 
@@ -905,16 +905,16 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
-| `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
-| `onPresetChange(preset)` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
-| `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
-| `onCcIn(cc)` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. |
-| `onNoteIn(note)` | A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. |
-| `onNoteOffIn(note)` | A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. |
-| `onSysexIn(bytes)` | A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers. |
-| `onDeviceConnected(device)` | A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile. |
-| `onDeviceDisconnected(device)` | A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why. |
+| `onParameterReceived(info)` | The synth sent a parameter's value, read through its profile. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
+| `onDumpReceived(dump)` | A dump from the synth arrived and was read; the controls bound to it are filled in already. `dump.values` holds each value by parameter id, `dump.kind` names the dump, such as "patch", and `dump.role` the synth it came from. |
+| `onPresetChange(preset)` | The preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe it; `preset.source` is "device" when the synth sent a Program Change, "panel" when the panel called recallPreset. |
+| `onMidiIn(midi)` | A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
+| `onCcIn(cc)` | A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16. |
+| `onNoteIn(note)` | A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn. |
+| `onNoteOffIn(note)` | A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0. |
+| `onSysexIn(bytes)` | A SysEx message arrived. `bytes` holds it as a list of numbers. |
+| `onDeviceConnected(device)` | A synth was connected and is ready. `device.role` names it and `device.profileId` its profile. |
+| `onDeviceDisconnected(device)` | A synth is no longer connected and ready. `device.role` names it, and `device.message` may say why. |
 
 ### Component events
 
@@ -923,17 +923,17 @@ component, or put the component's name in place of `"*"`. These need the panel w
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onStep(step)` | A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper. |
-| `onCycle(cycle)` | A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit. |
-| `onHit(hit)` | A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon. |
-| `onRelease(release)` | A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note. |
-| `onScene(scene)` | The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch. |
-| `onStage(stage)` | A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports "idle", "armed", "recording" and "overdub"; the Envelope reports "sustain", "release" and "end". This is not the same as onStateChanged, which is about hover and press. |
-| `onSettled(settled)` | A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick. |
-| `onBounce(bounce)` | The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down. |
-| `onRecall(recall)` | The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode. |
-| `onZone(zone)` | A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading. |
-| `onVoiced(voiced)` | A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser. |
+| `onStep(step)` | A sequencer moved to its next step: an Arpeggiator, Turing Machine, Phrase Sequencer or Looper. `step.target` is its name, `step.index` the step, counted from 1, `step.of` how many there are, and `step.notes` the notes it plays. |
+| `onCycle(cycle)` | A sequence or loop came round to its start: an Arpeggiator, Turing Machine, Looper or Orbit. `cycle.target` is its name and `cycle.count` how many times it has come round since the panel opened. |
+| `onHit(hit)` | A pad, key or strip was struck: a Chord Pad, Drum Pads or Note Ribbon. `hit.target` is its name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. |
+| `onRelease(release)` | A pad, key or strip was let go. `release.target` is its name, `release.id` which pad or key, and `release.note` the note. |
+| `onScene(scene)` | The Setlist moved to a scene, however it was chosen. `scene.target` is its name, `scene.index` the scene, counted from 1, and `scene.name` its name. |
+| `onStage(stage)` | A Recorder or an Envelope moved to a new stage. `stage.target` is its name, `stage.stage` the new stage and `stage.previous` the old one: the Recorder's "idle", "armed", "recording" and "overdub", the Envelope's "sustain", "release" and "end". Not onStateChanged, which is hover and press. |
+| `onSettled(settled)` | A Ribbon, Crossfader or Vector Joystick finished going back to its rest. `settled.target` is its name and `settled.value` where it came to rest. |
+| `onBounce(bounce)` | The Kinetic ball hit a wall. `bounce.target` is its name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down. |
+| `onRecall(recall)` | The Constellation, in snap mode, moved to another preset. `recall.target` is its name, `recall.id` the preset and `recall.label` its label. |
+| `onZone(zone)` | A Meter's reading crossed into another zone, such as from green into red. `zone.target` is its name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading. |
+| `onVoiced(voiced)` | A Zone Splitter or Harmoniser turned a played note into other notes. `voiced.target` is its name, `voiced.note` and `voiced.velocity` the note played, and `voiced.out` the notes it made. |
 
 ## Commands: The basics
 
