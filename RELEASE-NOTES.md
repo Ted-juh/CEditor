@@ -359,6 +359,13 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - In the plug-in, a control bound to a host parameter takes a choice by its name, in any case, and a
   switch by "on" or "off", as the editor does; other text is refused in the console, where it was
   sent as 0.
+- A script's `onZone` hears a Meter's reading cross from one colour band to the next when a route
+  or a linked control moves it. The event was raised while the Preview was drawing, where the panel
+  runtime may not write its state: the page logged an error and the handler was never called. The
+  Envelope's `onStage` and the Constellation's `onRecall` were raised the same way and are fixed
+  with it.
+- A Number or Range set to Display ignores the arrow, Home, End and Page keys in its value field, as
+  it already ignored typing. ArrowUp moved the number and sent it.
 
 ## What you get
 

@@ -23,14 +23,18 @@ export const CHECKS = [
   'valueCompletion', 'componentBehavior',
 ];
 
-// componentBehavior.mjs is the component acceptance harness, and only one of its cases runs here: a
-// script's write to a source reaches its bound parameter once, and a drag is not sent twice
-// (half a minute). The whole file takes sixteen, and on 2026-10-26 twenty-one of its ninety-five
-// cases failed, every one of them already failing before that case was added (the Meter's geometry
-// and readouts, the Slider's and Knob's readouts and drags, and others), so the rest is still run
-// by hand. Its screenshots and results go to a temporary folder rather than work/.
+// componentBehavior.mjs is the component acceptance harness. The whole file takes seventeen minutes,
+// which this job has not the time for, so it runs here the cases that hold a fix to the app: a
+// script's write to a source sent once, a route into a Meter that no longer stops its drawing, and
+// a Number or Range display whose field takes no keys (under a minute). The rest is run by hand,
+// `npm run test:component-behavior`. Its screenshots and results go to a temporary folder rather
+// than work/. Each name must match a case: one that matches none fails.
 const CASES = {
-  componentBehavior: 'A script write to a source reaches its bound parameter',
+  componentBehavior: [
+    'A script write to a source reaches its bound parameter',
+    'Route into Meter moves its visible reading',
+    'Number and Range Display mode blocks native input edits',
+  ],
 };
 
 // A check that hangs (a browser that never answers) fails rather than holding the run forever.
@@ -45,7 +49,7 @@ for (const name of chosen) {
   const t0 = Date.now();
   const env = CASES[name] ? {
     ...process.env,
-    CEDITOR_BEHAVIOR_CASE: CASES[name],
+    CEDITOR_BEHAVIOR_CASE: CASES[name].join('|'),
     CEDITOR_BEHAVIOR_OUT: path.join(os.tmpdir(), 'ceditor-component-behavior'),
   } : process.env;
   const run = spawnSync(process.execPath, [path.join(HERE, `${name}.mjs`)], {

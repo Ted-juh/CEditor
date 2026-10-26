@@ -595,6 +595,15 @@
       { target: componentTargetName(control), ...payload });
   }
 
+  /** What a value source notices (a meter's band, an envelope's stage, a constellation's star) it
+   *  notices while the preview is drawn: resolvedPreviewFor runs in the template. A dispatch writes
+   *  state (the runtime's execution status, and whatever a handler sets), which Svelte refuses
+   *  inside a derivation: state_unsafe_mutation stopped the drawing of a meter a route moved
+   *  across a band. So those are raised once the drawing is done, in the order they were seen. */
+  function afterDraw(raise) {
+    queueMicrotask(raise);
+  }
+
   /** Raise onCycle when a 0..1 phase has just wrapped. The tickers all advance phase with `% 1`,
    *  so a phase that went DOWN is a wrap — the same test each ticker already makes to decide
    *  whether to re-baseline. */
@@ -1738,7 +1747,7 @@
       const previous = componentLastZone[id];
       componentLastZone[id] = zone;
       if (previous !== undefined && previous !== zone) {
-        raiseComponent(control, 'onZone', { zone: zone + 1, previous: previous + 1, value });
+        afterDraw(() => raiseComponent(control, 'onZone', { zone: zone + 1, previous: previous + 1, value }));
       }
     }
 
@@ -1949,7 +1958,7 @@
       const at = nextEnv.__phase;
       const stage = at >= 1 ? 'end'
         : (sustainX !== null && at >= sustainX ? 'release' : (at <= 0 ? 'start' : 'attack'));
-      raiseComponentStage(control, stage);
+      afterDraw(() => raiseComponentStage(control, stage));
     }
     return { ...resolved, control: { ...base, _children: { ...base._children, Envelope: nextEnv } } };
   }
@@ -3300,7 +3309,7 @@
       const nowId = String(near?.id ?? '');
       componentLastPreset[id] = nowId;
       if (previous !== undefined && previous !== nowId && nowId) {
-        raiseComponent(control, 'onRecall', { id: nowId, label: String(near?.label ?? '') });
+        afterDraw(() => raiseComponent(control, 'onRecall', { id: nowId, label: String(near?.label ?? '') }));
       }
     }
     return { ...resolved, control: { ...base, _children: { ...base._children, Constellation: next } } };
@@ -6502,7 +6511,7 @@
   }
 
   function commitSpinnerField(control, role) {
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -6529,7 +6538,7 @@
 
   function handleSpinnerFieldInput(control, role, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
@@ -7302,7 +7311,7 @@
   }
 
   function commitRangeFieldInput(control) {
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const controlId = getControlId(control);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -7323,7 +7332,7 @@
 
   function handleRangeFieldInput(control, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
       valueInputActive: true,
@@ -7472,7 +7481,9 @@
   }
 
   function adjustRangeFromKey(control, key) {
-    if (!isRangeControl(control)) return;
+    // A display's value field is readonly to the browser, which stops typing and not this: ArrowUp
+    // in a Number display's field walked its value up, and a Range display's handles with it.
+    if (!isRangeControl(control) || isReadOnly(control)) return;
 
     const behavior = getBehavior(control);
     if (behavior.keyboardEnabled === false) return;

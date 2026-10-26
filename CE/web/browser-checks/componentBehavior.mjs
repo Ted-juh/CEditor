@@ -17,6 +17,10 @@ const browser = await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' 
 const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
 page.setDefaultTimeout(6000);
 const errors = [], results = [];
+// CEDITOR_BEHAVIOR_CASE runs only the cases whose names contain it; several, separated by "|",
+// run each one's (browser-checks/runAll.mjs names the cases CI runs this way).
+const onlyCases = String(process.env.CEDITOR_BEHAVIOR_CASE ?? '').split('|').map(n => n.trim()).filter(Boolean);
+const matchedCases = new Set();
 page.on('pageerror', e => errors.push(String(e)));
 const settle = () => page.waitForTimeout(120);
 const props = page.locator('.properties-panel');
@@ -28,7 +32,10 @@ async function fixture(type, sections = {}, children = [], siblings = []) {
     const { createControl } = await import('/src/CE_Application/models/componentTypes.js');
     const { createPanel, serializePanel, deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
     const stores = await import('/src/CE_Application/stores/panels.js');
-    const p = createPanel(`Behavior ${type}`); p.width = 900; p.height = 600;
+    // On plain Graphite, as screenDock.mjs is: a new panel starts on the designed Graphite, whose
+    // forms draw a Meter, a Knob or a ProgressBar in place of the control's own renderer, and whose
+    // Pixel Display has square dots. These cases are of each control's own properties.
+    const p = createPanel(`Behavior ${type}`); p.width = 900; p.height = 600; p.controlSet = { id: 'graphite' }; p.controlSets = [];
     const c = createControl(type);
     Object.assign(c._children.Transform, {x:50,y:50,width:300,height:160});
     for (const [key,value] of Object.entries(sections)) Object.assign(c._children[key] ??= {}, value);
@@ -68,8 +75,10 @@ async function reopen(id) {
     return serializePanel(get(activePanel));
   });
   await writeFile(join(out, `${id}.cepanel`), text);
-  // A fresh browser document discards all in-memory runtime/renderer state.
-  await page.reload(); await page.waitForSelector('.app');
+  // A fresh browser document discards all in-memory runtime/renderer state. It is a page load, not
+  // a step in the UI, so it gets the first load's allowance rather than the 6 s default: a busy
+  // machine took a reload past 6 s in a case that passes otherwise.
+  await page.reload({timeout:DEV_SERVER_FIRST_LOAD_MS}); await page.waitForSelector('.app',{timeout:DEV_SERVER_FIRST_LOAD_MS});
   await page.evaluate(async ({text,id}) => {
     const {deserializePanel} = await import('/src/CE_Application/stores/panelModel.js');
     const {addPanel,selectedComponentIds} = await import('/src/CE_Application/stores/panels.js');
@@ -78,7 +87,9 @@ async function reopen(id) {
   await settle();
 }
 async function check(name,fn) {
-  if (process.env.CEDITOR_BEHAVIOR_CASE && !name.includes(process.env.CEDITOR_BEHAVIOR_CASE)) return;
+  const wanted = onlyCases.filter(n => name.includes(n));
+  if (onlyCases.length && !wanted.length) return;
+  for (const n of wanted) matchedCases.add(n);
   const before=errors.length;
   try { await fn(); assert.deepEqual(errors.slice(before),[]); results.push({name,status:'pass'}); console.log('PASS',name); }
   catch(e) { results.push({name,status:'fail',error:String(e)}); console.error('FAIL',name,String(e)); await page.screenshot({path:join(out,`${name.replace(/[^a-z0-9]/gi,'-')}.png`)}); }
@@ -992,4 +1003,4 @@ try {
 }
 if(results.some(r=>r.status==='fail')) process.exitCode=1;
 // A case name that matches nothing (one renamed under runAll.mjs) would otherwise pass having run nothing.
-if(process.env.CEDITOR_BEHAVIOR_CASE&&!results.length){console.error(`FAIL no case matches CEDITOR_BEHAVIOR_CASE "${process.env.CEDITOR_BEHAVIOR_CASE}"`);process.exitCode=1;}
+for(const n of onlyCases.filter(n=>!matchedCases.has(n))){console.error(`FAIL no case matches CEDITOR_BEHAVIOR_CASE "${n}"`);process.exitCode=1;}

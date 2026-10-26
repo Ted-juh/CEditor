@@ -142,10 +142,9 @@ failure, but do not read a run full of skips as coverage.
 server: 40 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
 first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows, in a job of
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
-docks, the player inbound path or the learn chips. One of the forty is a single case of
-`componentBehavior.mjs`, the component acceptance harness (`CASES` in `runAll.mjs`); the whole of it
-is run by hand, `npm run test:component-behavior`, sixteen minutes with twenty-one cases that fail
-on `main` too ([the list](docs/design/api-descriptions-handoff.md#componentbehavior-in-ci)).
+docks, the player inbound path or the learn chips. One of the forty is three cases of
+`componentBehavior.mjs`, the component acceptance harness (`CASES` in `runAll.mjs`); the whole of it,
+95 cases, is run by hand with `npm run test:component-behavior` and takes about seventeen minutes.
 
 ### C++ *on* Windows: use a Developer shell, or you will get MinGW
 

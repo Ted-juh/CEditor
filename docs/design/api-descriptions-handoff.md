@@ -105,9 +105,10 @@ Every module in the table under [The branch](#the-branch) is done, and so are th
 descriptions and the deferred items: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass)
 and [The deferred items](#the-deferred-items), which record each decision for the owner's review.
 The four lines noticed and not changed are done too, at the owner's word: see [The noticed
-items](#the-noticed-items). So is the last item, whether `browser-checks/componentBehavior.mjs` runs
-in CI: its case for this branch does, and the twenty-one cases of it that fail on `main` too are
-named in [componentBehavior in CI](#componentbehavior-in-ci). Nothing of this branch's is left.
+items](#the-noticed-items). So are `browser-checks/componentBehavior.mjs` in CI and its twenty-one
+failing cases: see [componentBehavior in CI](#componentbehavior-in-ci) and [The twenty-one,
+fixed](#the-twenty-one-fixed). What is left is the owner's: whether the whole of that file runs in
+CI, which needs a job of its own or a longer one.
 
 ---
 
@@ -2142,6 +2143,39 @@ hand: `npm run test:component-behavior`. With it:
 
 A case fixed later can join it by its name in `CASES`, and the whole file once the twenty-one pass.
 
+### The twenty-one, fixed
+
+At the owner's word on 2026-10-26 ("As recommended, fix the 21 componentBehavior failures too").
+All 95 cases pass together; `docs/design/component-behavior-2026-09-13.md` ("2026-10-26: 95
+scenarios pass together again") is the harness's own record of it. Nineteen were the fixture and
+two the app:
+
+- **Nineteen: the fixture.** Since 8 October a new panel starts on the designed Graphite, whose forms
+  draw a Meter, a Knob and a ProgressBar in place of the control's own renderer, and whose Pixel
+  Display has square dots, so the cases found nothing to measure or measured the set's drawing. The
+  fixture's panel is on plain Graphite, as `screenDock.mjs`'s has been since then: the cases are of
+  each control's own properties. They pass with no other change.
+- **Route into Meter: an event raised while drawing.** The Meter's `onZone`, the Envelope's
+  `onStage` and the Constellation's `onRecall` were raised from the value sources, inside the
+  Preview's drawing, where the panel runtime's write of its execution status is refused
+  (`state_unsafe_mutation`): a page error, and the handler never ran. `afterDraw` in
+  `PanelPreviewSurface.svelte` raises them once the drawing is done, in order.
+- **Number and Range Display: keys in a display's field.** The field is `readonly`, which stops
+  typing and not the key handler: ArrowUp took a display from 40 to 41 and sent it. The shared
+  `adjustRangeFromKey`, and the fields' input and commit, refuse a display.
+- **The reload in `reopen()`** gets the first load's allowance, not the 6 s default: one whole run
+  had a reload take longer, in a case that passes otherwise.
+
+`runAll.mjs` runs the two app fixes' cases beside the script-write one (`CASES`, under a minute):
+`CEDITOR_BEHAVIOR_CASE` takes several names separated by `|`, and each must match a case.
+
+**The whole file in CI is the owner's call.** It takes about seventeen minutes (996 s here). The
+browser-checks job ran its 40 checks in 11.1 minutes on the last run and stops at thirty, so the
+whole file does not fit in it. It would need its own job on `windows-latest`: about nineteen
+minutes, so a run would take that long instead of about thirteen. Or the job's `timeout-minutes`
+raised, and a run of about thirty minutes. CLAUDE.md's rule 6 leaves a new job, or a longer one,
+to the owner.
+
 ## Checking each batch
 
 From `CE/web`:
@@ -2171,8 +2205,8 @@ item-by-item reviews of the LCD, the arp and the pixel, then every other module,
 descriptions, the items once deferred and the lines once noticed, each in one pass at the owner's
 word ("The remaining modules, in one pass", "The deferred items" and "The noticed items" in this
 file record each decision for review), and the script-write case of
-browser-checks/componentBehavior.mjs runs in CI ("componentBehavior in CI"). Nothing of this work is
-left. The twenty-one cases of that file that fail on main too are listed there: if the owner asks
-for them, take them one at a time, find whether the renderer or the case is wrong, and add each one
-that passes to CASES in browser-checks/runAll.mjs.
+browser-checks/componentBehavior.mjs runs in CI ("componentBehavior in CI"), and all 95 of that
+file's cases pass ("The twenty-one, fixed"). What is left is the owner's: whether the whole file runs
+in CI. It takes about seventeen minutes and does not fit in the browser-checks job. Say what each
+way would cost a pull request, and wait for the owner's answer before changing the workflow.
 ```
