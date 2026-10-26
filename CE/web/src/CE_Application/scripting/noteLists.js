@@ -76,10 +76,14 @@ export function voiceLeadMode(mode) {
   return { how: 'closest', said: `ce.music.lead: ${shown(mode)} is not a mode, so "closest" was used. One of: ${VOICE_LEAD_MODES.join(', ')}.` };
 }
 
-/** arpOrder's pattern as it reads it: `which`, and `said` for one it has none of. */
+/**
+ * arpOrder's pattern as it reads it: `which`, `said` for one it has none of, and `refused` for none
+ * at all. Left out, it was "up" with a warning; a value a call cannot do without, left out, is
+ * refused, as everywhere.
+ */
 export function arpOrderPattern(pattern) {
   if (pattern === undefined || pattern === null) {
-    return { which: 'up', said: `ce.music.arp: no pattern was given, so "up" was used. One of: ${ARP_ORDER_PATTERNS.join(', ')}.` };
+    return { which: null, said: null, refused: `ce.music.arp: no pattern was given, so the answer is an empty list. One of: ${ARP_ORDER_PATTERNS.join(', ')}.` };
   }
   const which = listWord(ARP_ORDER_PATTERNS, String(pattern));   // in any case: "UP" is "up"
   if (which) return { which, said: null };

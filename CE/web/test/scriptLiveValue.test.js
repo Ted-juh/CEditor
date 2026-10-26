@@ -244,3 +244,45 @@ for (const withHost of [false, true]) {
     } finally { setRuntimeHost(null); panels.set([]); panelPreviewSessions.set({}); }
   });
 }
+
+/* ------------------------------------------- a value left out, or one a range cannot hold */
+
+// A value left out was written as nothing, and a knob's value of "x" was written as given. Each is
+// refused now, in the words the plug-in's host uses (BridgeScriptHost::setValue,
+// PlayerScriptIntegrationTests.cpp), and text that is a number is read as one. A knob bound to a
+// device parameter is its binding's to read (deviceStructure.test.js: a choice by its name).
+test('set() refuses a value left out, and a range control\'s value that is not a number', () => {
+  try {
+    const { id } = panelWith('Knob');
+    const api = scriptApiForTesting('', 'editor-refusals');
+    api.set('Cutoff.value', 64);
+    clearScriptTrace();
+
+    api.set('Cutoff.value');
+    api.set('Cutoff.value', 'x');
+    api.set('Cutoff.value', true);
+    api.set('Cutoff.normalizedValue', 'half');
+    assert.equal(traced(), [
+      '[error] set("Cutoff.value"): no value was given, so nothing was set.',
+      '[error] set("Cutoff.value"): "x" is not a number, so nothing was set.',
+      '[error] set("Cutoff.value"): true is not a number, so nothing was set.',
+      '[error] set("Cutoff.normalizedValue"): "half" is not a number, so nothing was set.',
+    ].join('\n'));
+    assert.equal(get(panelPreviewSessions)[id]?.valueOverride, 64, 'none of them moved the knob');
+
+    clearScriptTrace();
+    api.set('Cutoff.value', '100');
+    assert.equal(traced(), '');
+    assert.equal(get(panelPreviewSessions)[id]?.valueOverride, 100, 'text that is a number is read as one');
+  } finally { panels.set([]); panelPreviewSessions.set({}); }
+});
+
+test('a button\'s value is not held to numbers', () => {
+  try {
+    const { id } = panelWith('Button', 'Mode');
+    const api = scriptApiForTesting('', 'editor-button');
+    api.set('Mode.value', true);
+    assert.equal(traced(), '', 'a button is not a range: its value is not held to numbers');
+    assert.equal(get(panelPreviewSessions)[id]?.valueOverride, true);
+  } finally { panels.set([]); panelPreviewSessions.set({}); }
+});

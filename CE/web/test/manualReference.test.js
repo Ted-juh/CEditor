@@ -243,7 +243,7 @@ test('the contract\'s own type names are not shown', () => {
 test('the manual names each parameter with its type and whether it is required', () => {
   const manual = generateManual();
   assert.match(manual, /`v` \(number, required\): The value to move\./);
-  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make\./);
+  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make, from 1 to 4\./);
 });
 
 /* -------------------------------------------------------------------- the tree */

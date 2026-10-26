@@ -719,7 +719,7 @@ export const COMMANDS = [
 
     params: [
       { name: 'path', type: 'path', required: true, summary: 'A control\'s name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.\n"panel." and a property: the panel\'s own, such as "panel.width".\n".normalizedValue" at the end: its position, 0 to 1, in place of the value.\nNot a control on the panel, or a property it does not have: nothing is written, with a console error.' },
-      { name: 'value', type: 'value', required: true, summary: 'The new value.\nA colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".\nA colour in any other form: nothing is written, with a console error.\nA gradient stop: RRGGBB, without alpha.', at: 'path' },
+      { name: 'value', type: 'value', required: true, summary: 'The new value.\nA Knob\'s, a Slider\'s, a Number\'s or a Range\'s value, and a position: a number. Text that is a number: read as one.\nA colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".\nA gradient stop: RRGGBB, without alpha.\nLeft out, a number in any other form, or a colour in any other form: nothing is written, with a console error.', at: 'path' },
       { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'transmit', type: 'true or false', default: 'decided by where the write came from',
           summary: 'Whether the change is sent to the synth: true sent, false not.\nLeft out: sent, except while a handler answers MIDI from the synth.' },
@@ -786,8 +786,8 @@ export const COMMANDS = [
 
     params: [
       { name: 'target', type: 'targetRef', required: true, summary: 'What the event comes from: a control\'s name, in any case, or "*" for anything.\nLeft out: "*".' },
-      { name: 'event', type: 'eventName', required: true, summary: 'The event: a handler\'s name, such as "onValueChanged", or a name `emit()` announces.' },
-      { name: 'fn', type: 'function', required: true, summary: 'Called with the event\'s information.' },
+      { name: 'event', type: 'eventName', required: true, summary: 'The event: a handler\'s name, such as "onValueChanged", or a name `emit()` announces.\nLeft out: nothing is set up, with a console error.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the event\'s information.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -830,8 +830,8 @@ export const COMMANDS = [
     example: '`watch("Cutoff", function(value, previous) log(value) end)` logs Cutoff\'s value each time it changes.',
 
     params: [
-      { name: 'path', type: 'string', required: true, summary: 'What to watch: a path, as `set()` takes it.', kind: 'path' },
-      { name: 'fn', type: 'function', required: true, summary: 'Called with the new value and the one before.' },
+      { name: 'path', type: 'string', required: true, summary: 'What to watch: a path, as `set()` takes it.\nLeft out: nothing is set up, with a console error.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the new value and the one before.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -850,8 +850,8 @@ export const COMMANDS = [
     example: '`compute("Readout.Text.content", function() return get("Cutoff") .. " Hz" end)` keeps Readout showing Cutoff\'s value.',
 
     params: [
-      { name: 'path', type: 'string', required: true, summary: 'The property to write: a path, as `set()` takes it.', kind: 'path' },
-      { name: 'fn', type: 'function', required: true, summary: 'Returns the value to write.' },
+      { name: 'path', type: 'string', required: true, summary: 'The property to write: a path, as `set()` takes it.\nLeft out: nothing is set up, with a console error.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Returns the value to write.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -869,8 +869,8 @@ export const COMMANDS = [
     example: '`intercept("Cutoff", function(value) return math.floor(value) end)` keeps Cutoff whole.',
 
     params: [
-      { name: 'path', type: 'string', required: true, summary: 'The property: a path, as `set()` takes it.', kind: 'path' },
-      { name: 'fn', type: 'function', required: true, summary: 'Called with the value and the one before.\nA value returned: written in its place.\nfalse: the change is refused.\nNothing: written as it is.' },
+      { name: 'path', type: 'string', required: true, summary: 'The property: a path, as `set()` takes it.\nLeft out: nothing is set up, with a console error.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the value and the one before.\nA value returned: written in its place.\nfalse: the change is refused.\nNothing: written as it is.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -889,8 +889,8 @@ export const COMMANDS = [
     example: '`defineAction("randomize", fn)` lets any script call fn with `run("randomize")`.',
 
     params: [
-      { name: 'name', type: 'string', required: true, summary: 'The action\'s name, in any case.', kind: 'sharedName' },
-      { name: 'fn', type: 'function', required: true, summary: 'Called with what `run()` passes; what it returns goes back.' },
+      { name: 'name', type: 'string', required: true, summary: 'The action\'s name, in any case.\nLeft out: nothing is set up, with a console error.', kind: 'sharedName' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with what `run()` passes; what it returns goes back.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -3281,7 +3281,7 @@ export const COMMANDS = [
       'Returns a list of { id, name, group, type, min, max, access }; none to show: an empty list.',
     ],
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, summary: 'The options below, every one of which must match.\nLeft out: every parameter.\nNot a table: an empty list, without a word.', fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'The options below, every one of which must match.\nLeft out: every parameter.\nNot a table: an empty list, with a console error.', fields: optionFields([
       'role',
       { name: 'query', type: 'text', sample: '"cutoff"',
         summary: 'Keep only parameters whose name or id contains this.' },
@@ -3311,7 +3311,7 @@ export const COMMANDS = [
     ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it.\nNot one of its parameters, or left out: no result, without a word.', kind: 'deviceParameter' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it.\nNot one of its parameters: no result, without a word.\nLeft out: no result, with a console error.', kind: 'deviceParameter' },
       { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
@@ -3332,7 +3332,7 @@ export const COMMANDS = [
     ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id.\nNever reported, or left out: no result, without a word; not 0.', kind: 'deviceParameter' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id.\nNever reported: no result, without a word; not 0.\nLeft out: no result, with a console error.', kind: 'deviceParameter' },
       { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
@@ -3550,7 +3550,7 @@ export const COMMANDS = [
     ],
     params: [
       { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
-      { name: 'parameterId', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it.\nNot checked against the profile.', kind: 'deviceParameter' },
+      { name: 'parameterId', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it or `deviceDefineParameter()` declares it.\nNot one either knows yet: bound all the same, with a console warning; it works if the parameter arrives.', kind: 'deviceParameter' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.', fields: optionFields([
         'role',
         { name: 'port', type: 'text', default: '"value"',
@@ -3592,9 +3592,9 @@ export const COMMANDS = [
       '`hardware` is false for the two the app always shows, "No MIDI Input" and "Preview Only"; `role` names the device using the port, or is "".',
     ],
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, summary: 'The option below.\nLeft out: every port.', fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'The option below.\nLeft out: every port.\nNot a table: an empty list, with a console error.', fields: optionFields([
       { name: 'direction', type: 'text', values: ['in', 'out'],
-        summary: '"in": only the ports that receive.\n"out": only the ones that send.\nAnything else: every port, without a word.' },
+        summary: '"in": only the ports that receive.\n"out": only the ones that send.\nCase-insensitive.\nAnything else: every port, with a console warning the first time.' },
     ]) }],
     scopes: 'any',
     snippet: {
@@ -3664,7 +3664,7 @@ export const COMMANDS = [
     ],
     requiresDeviceHost: true,
     params: [
-      { name: 'name', type: 'string', required: true, summary: 'The setting\'s name, as `deviceTiming()` lists it.\nNot checked against them.' },
+      { name: 'name', type: 'string', required: true, summary: 'The setting\'s name, as `deviceTiming()` lists it. Case-insensitive.\nNot one of them, or left out: nothing is changed, with a console error.' },
       { name: 'ms', type: 'number', required: true, summary: 'Milliseconds.\nRange: 0 ↔ 60000, whole.\nA fraction: rounded.\nOutside the range: the nearest end, with a console warning the first time.' },
       { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
@@ -4002,8 +4002,8 @@ export const COMMANDS = [
       'Returns true; false when it could not be saved, such as where storage is not available.',
     ],
     params: [
-      { name: 'key', type: 'string', required: true, summary: 'A name you choose, matched as written.\nA number: used as text.', kind: 'sharedName' },
-      { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.' },
+      { name: 'key', type: 'string', required: true, summary: 'A name you choose, matched as written.\nA number: used as text.\nLeft out, or anything else: nothing is saved, with a console error.', kind: 'sharedName' },
+      { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.\nLeft out: nothing is saved, with a console error. `ce.storage.forget()` deletes a setting.' },
       { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ],
     scopes: 'any',
@@ -4018,7 +4018,7 @@ export const COMMANDS = [
       'Each scope keeps its own: the same name in two scopes is two values.',
     ],
     params: [
-      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.', kind: 'sharedName' },
+      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.\nA number: used as text.\nLeft out, or anything else: the fallback, with a console error.', kind: 'sharedName' },
       { name: 'fallback', type: 'value', required: false, summary: 'Given back when nothing is saved under the name.\nLeft out: no result.' },
       { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ],
@@ -4047,7 +4047,7 @@ export const COMMANDS = [
       'Returns true if there was one to delete; false if not.',
     ],
     params: [
-      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.', kind: 'sharedName' },
+      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.\nA number: used as text.\nLeft out, or anything else: false, with a console error.', kind: 'sharedName' },
       { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ], scopes: 'any',
     snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },
@@ -4117,7 +4117,7 @@ export const COMMANDS = [
       { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.' },
       { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'indent', type: 'number', default: '0',
-          summary: 'Spaces to indent each level, laid out over several lines.\n0: one line.\nRange: 0 ↔ 10.\nA fraction: rounded down.\nAbove 10: 10. Below 0, or not a number: one line.' },
+          summary: 'Spaces to indent each level, laid out over several lines.\n0: one line.\nRange: 0 ↔ 10.\nA fraction: rounded down.\nAbove 10: 10, with a console warning the first time.\nBelow 0, or not a number: one line, with a console warning the first time.' },
       ]) },
     ],
     scopes: 'any',
@@ -4128,10 +4128,10 @@ export const COMMANDS = [
     summary: 'Read JSON text back into a value.',
     example: '`decodeJson("[1, 2]")` gives {1, 2}.',
     notes: [
-      'Returns the value. Text that is not JSON, or left out: no result, without a word.',
+      'Returns the value.',
       'A JSON null is nothing: {"a":1,"b":null} gives a table with a only, and [1,null,2] a list of two.',
     ],
-    params: [{ name: 'text', type: 'string', required: true, summary: 'JSON text.' }],
+    params: [{ name: 'text', type: 'string', required: true, summary: 'JSON text.\nText that is not JSON, not text, or left out: no result, with a console error.' }],
     scopes: 'any',
   },
 
@@ -5275,8 +5275,8 @@ export const HELPERS = [
     params: [
       { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave places the chord.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
       { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
-      { name: 'degree', type: 'number', required: false, summary: 'Step, counted from 1: 1 the root, 5 the fifth.\nPast the last step: on into the octave above; 8 is the root an octave up.\n0 and below: the octave below; 0 is the last step.\nA fraction: rounded down.\nNot a number, or left out: 1.' },
-      { name: 'size', type: 'number', required: false, summary: 'Notes: 3 a triad, 4 a seventh chord.\nBelow 2: 2.\nA fraction: rounded down.\nNot a number, or left out: 3.' },
+      { name: 'degree', type: 'number', required: false, summary: 'Step, counted from 1: 1 the root, 5 the fifth.\nPast the last step: on into the octave above; 8 is the root an octave up.\n0 and below: the octave below; 0 is the last step.\nA fraction: rounded down.\nLeft out: 1.\nNot a number: 1, with a console warning the first time.' },
+      { name: 'size', type: 'number', required: false, summary: 'Notes: 3 a triad, 4 a seventh chord.\nBelow 2: 2.\nA fraction: rounded down.\nLeft out: 3.\nNot a number: 3, with a console warning the first time.' },
     ],
   },
   {
@@ -5330,7 +5330,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
-      { name: 'pattern', type: 'string', required: true, summary: '"up": in the order given.\n"down": the order given, reversed.\n"updown": up, then down, not playing the top or the bottom twice.\n"downup": down, then up, the same way.\n"asPlayed": in the order given.\n"random": in the order given; the Arpeggiator picks each step as it plays.\n"chord": every note at once, in one step.\nCase-insensitive.\nAny other, or left out: "up", with a console warning the first time.', values: ARP_ORDER_PATTERNS },
+      { name: 'pattern', type: 'string', required: true, summary: '"up": in the order given.\n"down": the order given, reversed.\n"updown": up, then down, not playing the top or the bottom twice.\n"downup": down, then up, the same way.\n"asPlayed": in the order given.\n"random": in the order given; the Arpeggiator picks each step as it plays.\n"chord": every note at once, in one step.\nCase-insensitive.\nAny other: "up", with a console warning the first time.\nLeft out: an empty list, with a console error.', values: ARP_ORDER_PATTERNS },
     ],
   },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
@@ -5338,19 +5338,21 @@ export const HELPERS = [
     id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)',
     summary: 'Split a number into SysEx bytes.',
     example: '`to7bit(1000, 2)` gives {7, 104}.',
+    notes: ['Returns a list of bytes, each from 0 to 127.', 'from7bit joins them back.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455.' },
-      { name: 'count', type: 'number', required: false, summary: 'How many bytes of 7 bits to make. Two when it is left out.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive.' },
+      { name: 'v', type: 'number', required: true, summary: 'The number to split, from 0. Two bytes hold up to 16383, three up to 2097151, four up to 268435455.\nA fraction: rounded down.\nOne that does not fit in the bytes, not a number, or left out: no result, with a console error.' },
+      { name: 'count', type: 'number', required: false, summary: 'How many bytes of 7 bits to make, from 1 to 4.\nLeft out: 2.\nAny other: no result, with a console error.' },
+      { name: 'order', type: 'text', required: false, summary: '"msb": the high byte first.\n"lsb": the low byte first.\nCase-insensitive.\nLeft out: "msb".\nAny other: no result, with a console error.' },
     ],
   },
   {
     id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)',
     summary: 'Join SysEx bytes back into one number.',
     example: '`from7bit({7, 104})` gives 1000.',
+    notes: ['Returns a number.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The 7-bit bytes, as a list of numbers.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: '1 to 4 bytes, each from 0 to 127, as a list or as hex text.\nMore or fewer, a byte above 127, not a list of bytes, or left out: no result, with a console error.' },
+      { name: 'order', type: 'text', required: false, summary: '"msb": the high byte first.\n"lsb": the low byte first.\nCase-insensitive.\nLeft out: "msb".\nAny other: no result, with a console error.' },
     ],
   },
   // `to14Bit` is the spelling the WebView runtime shipped with before the contract was
@@ -5360,8 +5362,9 @@ export const HELPERS = [
     id: 'to14bit', category: 'MIDI encoding', signature: 'to14bit(v)',
     summary: 'Split a number into two 7-bit halves, msb and lsb.',
     example: '`to14bit(8192)` gives msb 64 and lsb 0.',
+    notes: ['Returns { msb, lsb }, each from 0 to 127.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The number, from 0 to 16383.' },
+      { name: 'v', type: 'number', required: true, summary: 'The number, from 0 to 16383.\nA fraction: rounded down.\nOutside 0 to 16383, not a number, or left out: no result, with a console error.' },
     ],
     aliases: ['to14Bit'],
   },
@@ -5369,98 +5372,106 @@ export const HELPERS = [
     id: 'from14bit', category: 'MIDI encoding', signature: 'from14bit(msb, lsb)',
     summary: 'Join two 7-bit halves into one number.',
     example: '`from14bit(64, 0)` gives 8192.',
+    notes: ['Returns a number from 0 to 16383.'],
     params: [
-      { name: 'msb', type: 'number', required: true, summary: 'The high half, from 0 to 127.' },
-      { name: 'lsb', type: 'number', required: true, summary: 'The low half, from 0 to 127.' },
+      { name: 'msb', type: 'number', required: true, summary: 'The high half, a whole number from 0 to 127.\nAny other, or left out: no result, with a console error.' },
+      { name: 'lsb', type: 'number', required: true, summary: 'The low half, a whole number from 0 to 127.\nAny other, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toNibbles', category: 'MIDI encoding', signature: 'toNibbles(byte)',
-    summary: 'Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way.',
+    summary: 'Split a byte into its two 4-bit halves, its nibbles.',
     example: '`toNibbles(0x4A)` gives hi 0x4 and lo 0xA.',
+    notes: ['Returns { hi, lo }, each from 0 to 15.', 'Some synths send every byte this way.'],
     params: [
-      { name: 'byte', type: 'number', required: true, summary: 'A byte, from 0 to 255.' },
+      { name: 'byte', type: 'number', required: true, summary: 'A byte, from 0 to 255.\nA fraction: rounded down.\nOutside 0 to 255, not a number, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'fromNibbles', category: 'MIDI encoding', signature: 'fromNibbles(hi, lo)',
     summary: 'Join two 4-bit halves back into one byte.',
     example: '`fromNibbles(0x4, 0xA)` gives 0x4A.',
+    notes: ['Returns a byte, from 0 to 255.'],
     params: [
-      { name: 'hi', type: 'number', required: true, summary: 'The high half, from 0 to 15.' },
-      { name: 'lo', type: 'number', required: true, summary: 'The low half, from 0 to 15.' },
+      { name: 'hi', type: 'number', required: true, summary: 'The high half, a whole number from 0 to 15.\nAny other, or left out: no result, with a console error.' },
+      { name: 'lo', type: 'number', required: true, summary: 'The low half, a whole number from 0 to 15.\nAny other, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'nibblize', category: 'MIDI encoding', signature: 'nibblize(bytes)',
     summary: 'Split every byte in a list into two 4-bit halves.',
     example: '`nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}.',
-    notes: ['The high half comes first, so the list comes back twice as long.'],
+    notes: ['Returns a list twice as long, the high half of each byte first.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The bytes, as a list.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The bytes, each from 0 to 255, as a list or as hex text.\nNot a list of bytes, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'denibblize', category: 'MIDI encoding', signature: 'denibblize(bytes)',
     summary: 'Join a list of 4-bit halves back into bytes.',
     example: '`denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}.',
+    notes: ['Returns a list half as long.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'Pairs of 4-bit halves, the high half first. The list comes back half as long.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: 'Pairs of halves, the high half first, each from 0 to 15, as a list or as hex text.\nAn odd count, a half above 15, not a list of bytes, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toAscii', category: 'MIDI encoding', signature: 'toAscii(str, length)',
     summary: 'Turn text, such as a patch name, into character codes.',
     example: '`toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}.',
+    notes: ['Returns a list of codes, each from 0 to 127.', 'fromAscii turns them back into text.'],
     params: [
-      { name: 'str', type: 'text', required: true, summary: 'The text to turn into codes.' },
-      { name: 'length', type: 'number', required: false, summary: 'The length to fill out to with spaces. Longer text is not cut.' },
+      { name: 'str', type: 'text', required: true, summary: 'The text, in ASCII: letters without accents, digits, spaces and the signs on an English keyboard.\nA character outside ASCII, not text, or left out: no result, with a console error.' },
+      { name: 'length', type: 'number', required: false, summary: 'The length of the field, from 1.\nShorter text: filled out with spaces.\nLonger text: cut to the length, with a console warning the first time.\nLeft out: the text as it is.\nAny other: the text as it is, with a console warning the first time.' },
     ],
   },
   {
     id: 'fromAscii', category: 'MIDI encoding', signature: 'fromAscii(bytes)',
     summary: 'Turn character codes back into text, such as a patch name read from a dump.',
     example: '`fromAscii({76, 101, 97, 100})` gives "Lead".',
+    notes: ['Returns the text.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The character codes, as a list.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The character codes, each from 0 to 127, as a list or as hex text.\nA code above 127, not a list of bytes, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toOffset', category: 'MIDI encoding', signature: 'toOffset(v, center)',
     summary: 'Add a centre to a value that can go below zero, so it fits in a MIDI byte.',
     example: '`toOffset(-10, 64)` gives 54.',
+    notes: ['Returns the value plus the centre, not held to 0 to 127.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The value, which may be negative.' },
-      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.' },
+      { name: 'v', type: 'number', required: true, summary: 'The value, which may be negative.\nNot a number, or left out: no result, with a console error.' },
+      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.\nNot a number, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'fromOffset', category: 'MIDI encoding', signature: 'fromOffset(b, center)',
     summary: 'Take the centre off a MIDI byte, to get back a value that can go below zero.',
     example: '`fromOffset(54, 64)` gives -10.',
+    notes: ['Returns the byte minus the centre.'],
     params: [
-      { name: 'b', type: 'number', required: true, summary: 'The byte, as the synth sends it.' },
-      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.' },
+      { name: 'b', type: 'number', required: true, summary: 'The byte, as the synth sends it.\nNot a number, or left out: no result, with a console error.' },
+      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.\nNot a number, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toSigned', category: 'MIDI encoding', signature: 'toSigned(v, bits)',
     summary: 'Turn a negative number into the bits a synth stores it as.',
     example: '`toSigned(-1, 8)` gives 255.',
-    notes: ['This is called two\'s complement. fromSigned reads it back.'],
+    notes: ['This is called two\'s complement. fromSigned reads it back.', 'Returns a number from 0 below 2 to the power of bits: 0 to 255 for 8 bits.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The number. A positive number comes back unchanged.' },
-      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, such as 7 or 8.' },
+      { name: 'v', type: 'number', required: true, summary: 'The number: -128 to 127 for 8 bits, -64 to 63 for 7.\nFrom 0: comes back unchanged.\nA fraction: rounded down.\nOutside the range, not a number, or left out: no result, with a console error.' },
+      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, from 1 to 32, such as 7 or 8.\nAny other, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'fromSigned', category: 'MIDI encoding', signature: 'fromSigned(b, bits)',
     summary: 'Read a negative number from the bits a synth stores it as.',
     example: '`fromSigned(255, 8)` gives -1.',
-    notes: ['This reads two\'s complement, as toSigned writes it.'],
+    notes: ['This reads two\'s complement, as toSigned writes it.', 'Returns a number: -128 to 127 for 8 bits.'],
     params: [
-      { name: 'b', type: 'number', required: true, summary: 'The stored value, as the synth sends it.' },
-      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, such as 7 or 8.' },
+      { name: 'b', type: 'number', required: true, summary: 'The stored value, as the synth sends it: a whole number from 0 below 2 to the power of bits, 0 to 255 for 8 bits.\nAny other, or left out: no result, with a console error.' },
+      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, from 1 to 32, such as 7 or 8.\nAny other, or left out: no result, with a console error.' },
     ],
   },
 

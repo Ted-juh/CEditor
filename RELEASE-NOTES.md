@@ -322,6 +322,33 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   was stored and sent.
 - `ce.ui` says what it did not do: a message, an id, a question or text to copy left out is refused
   with a console error, and a kind or a duration that is not one is the default, said once.
+- `ce.midi`'s encoding helpers, `to7bit` to `fromSigned`, answer nothing and say why for a value
+  that does not fit, where they gave a wrong number without a word: `to14bit(20000)` gave msb 28 and
+  lsb 32, `nibblize({300})` split 300, `toSigned(-200, 8)` gave 56, `denibblize` took an odd count of
+  halves, and `to7bit` read any order but "msb" as "lsb". A number may be text that is one, and
+  `from7bit` reads hex text. `toAscii` refuses a character outside ASCII, and cuts text longer than
+  its length to it, saying so once.
+- `ce.music.degreeChord` says once when its step or size is not a number and the default was used,
+  in every language; `null` was step 0 in JavaScript and 1 in Lua. `ce.music.arp` with no pattern is
+  refused with an empty list, where it played "up" with a warning.
+- `ce.storage.saveSetting` refuses a name or a value left out, where it saved under "" or saved
+  nothing and answered true; `loadSetting` and `forget` refuse a name left out. `decodeJson` says when
+  text is not JSON (Python read NaN and Infinity, which no other language does), and `encodeJson`
+  says once when it cannot use an indent: one that is not a number, or is below 0, is one line, and
+  one above 10 is 10, in every language.
+- `set()` refuses a value left out, and a Knob's, a Slider's, a Number's or a Range's value, or a
+  `.normalizedValue`, that is not a number; text that is a number is read as one. A knob set to "x"
+  stored "x". A control bound to a device parameter is read by its binding, as before, which takes a
+  choice by its name. A colour property left out says so in a colour's words, as it did.
+- `on`, `watch`, `compute`, `intercept` and `defineAction` say so when the event, path or name, or
+  the function, is left out, where they set nothing up without a word; in Lua they stopped the
+  script. `on` with no target listens to every control in the plug-in's JavaScript too.
+- `ce.device.parameter` and `read` say when no id is given; `parameters` and `ports` refuse a value
+  that is not a table of options, where `ports("in")` listed every port; `ports` says once of a
+  direction that is not "in" or "out"; `setTiming` refuses a name the profile has no timing for,
+  where it stored one that nothing reads, and takes a name in any case; and in the plug-in a name left
+  out of `setTiming` or `setVariable` is refused, where "nil" was stored. `bind` to an id nothing
+  knows yet is a warning in the console, where it was a plain line.
 
 ## What you get
 

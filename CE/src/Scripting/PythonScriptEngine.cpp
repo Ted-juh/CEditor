@@ -588,7 +588,21 @@ import ceditor as __api
 # on()/off() first: the prelude's own sections register listeners at load (onTransport, onTimer), and
 # with these defined further down every Python script stopped at load with "name 'on' is not
 # defined" from 23 September until it was found.
-def on(target, event, fn):        return __api.on(target, event, fn)
+# Why on(), watch(), compute(), intercept() or defineAction() sets nothing up: the event, path or
+# name left out, or a function that is not one, each of which set nothing up without a word. The
+# WebView runtime's hookRefusal, word for word. A target left out is "*", as the editor reads it.
+def __hookRefused(verb, what, name, fn):
+    why = ""
+    if name is None or (isinstance(name, str) and not name.strip()):
+        why = verb + ": no " + what + " was given, so nothing was set up."
+    elif not callable(fn):
+        why = (verb + ": no function was given, so nothing was set up.") if fn is None \
+            else (verb + ": " + __shownValue(fn) + " is not a function, so nothing was set up.")
+    if why: logError(why)
+    return why != ""
+def on(target=None, event=None, fn=None):
+    if __hookRefused("ce.core.on", "event", event, fn): return None
+    return __api.on("*" if target is None else target, event, fn)
 def off(target, event):           return __api.off(target, event)
 
 # @module ce.core
@@ -618,13 +632,19 @@ def __putRule(lst, rule):
             return
     lst.append(rule)
 
-def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(__read(path)), "prev": None})
-def compute(path, fn):   __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
-def intercept(path, fn): __putRule(__filters, {"path": path, "fn": fn})
+def watch(path=None, fn=None):
+    if __hookRefused("ce.core.watch", "path", path, fn): return
+    __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(__read(path)), "prev": None})
+def compute(path=None, fn=None):
+    if __hookRefused("ce.core.compute", "path", path, fn): return
+    __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
+def intercept(path=None, fn=None):
+    if __hookRefused("ce.core.intercept", "path", path, fn): return
+    __putRule(__filters, {"path": path, "fn": fn})
 
-def defineAction(name, fn):
-    key = str(name or "").strip()
-    if not key or not callable(fn): return
+def defineAction(name=None, fn=None):
+    if __hookRefused("ce.core.action", "name", name, fn): return
+    key = str(name).strip()
     __actions[key.lower()] = {"name": key, "fn": fn}
 
 def __actionNames(): return [a["name"] for a in __actions.values()]
@@ -2578,15 +2598,16 @@ def __musicSaid(text):
     logWarn(text + " This is said only the first time.")
 __VOICE_LEAD_MODES = ["closest", "smooth", "off"]
 __ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"]
-# A count argument that is not a finite number falls back to its default. Written out rather than
-# leaning on falsiness, because `0 or 3` is 3 in Python and JavaScript and 0 in Lua.
-def __count(v, fallback):
+# degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+# anything else the default, said once. The WebView runtime's musicStep, word for word. Written out
+# rather than leaning on falsiness, because `0 or 3` is 3 in Python and JavaScript and 0 in Lua.
+def __musicStep(what, v, fallback):
     import math
-    if isinstance(v, bool) or not isinstance(v, (int, float)):
-        try: v = float(v)
-        except (TypeError, ValueError): return fallback
-    if v != v or v in (float("inf"), float("-inf")): return fallback
-    return math.floor(v)
+    if v is None: return fallback
+    n = __realNumber(v)
+    if n is not None: return math.floor(n)
+    __musicSaid("ce.music.degreeChord: " + what + " is " + __shownValue(v) + ", which is not a number, so " + str(fallback) + " was used.")
+    return fallback
 # Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 # chordNotes, in the vocabulary the Chord Pad labels with.
 def chordQuality(notes):
@@ -2628,15 +2649,15 @@ def __roman(rootSemitone, quality):
     return acc + r
 # The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 # scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
-def degreeChord(root, scale, degree, size=None):
+def degreeChord(root=None, scale=None, degree=None, size=None):
     import math
     nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     s = __setOf("ce.music.degreeChord", "scale", scale)
     if not s: return None
     if __pitchOf("ce.music.degreeChord", root) is None: return None
     n = len(s)
-    d = __count(degree, 1) - 1
-    sz = max(2, __count(size, 3))
+    d = __musicStep("degree", degree, 1) - 1
+    sz = max(2, __musicStep("size", size, 3))
     offsets = []
     for k in range(sz):
         idx = d + k * 2
@@ -2714,12 +2735,12 @@ def expandOctaves(notes, octaves=None):
 # step, everything at once) has the same shape as the rest. Notes are taken in the order given,
 # which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 # panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
-def arpOrder(notes, pattern=None):
+def arpOrder(notes=None, pattern=None):
     asc = __noteList("arpOrder", "notes", notes)
     if asc is None: return []
     if pattern is None:
-        __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
-        p = "up"
+        logError('ce.music.arp: no pattern was given, so the answer is an empty list. One of: up, down, updown, downup, asPlayed, random, chord.')
+        return []
     elif __word(__ARP_ORDER_PATTERNS, str(pattern)) is None:
         __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
         p = "up"
@@ -2737,40 +2758,6 @@ def arpOrder(notes, pattern=None):
         seq = list(asc)
     return [[x] for x in seq]
 # @module ce.midi
-def to14bit(v):
-    import math; v = math.floor(v); return { "msb": math.floor(v / 128) % 128, "lsb": v % 128 }
-def from14bit(msb, lsb): return msb * 128 + lsb
-def to7bit(v, count=2, order="msb"):
-    import math; v = math.floor(v); out = []
-    for _ in range(count): out.append(v % 128); v = math.floor(v / 128)
-    return list(reversed(out)) if str(order).strip().lower() == "msb" else out
-def from7bit(b, order="msb"):
-    v = 0; seq = b if str(order).strip().lower() == "msb" else list(reversed(b))
-    for x in seq: v = v * 128 + x
-    return v
-def toNibbles(b):
-    import math; b = math.floor(b); return { "hi": math.floor(b / 16) % 16, "lo": b % 16 }
-def fromNibbles(hi, lo): return hi * 16 + lo
-def nibblize(b):
-    o = []
-    for x in b: n = toNibbles(x); o.append(n["hi"]); o.append(n["lo"])
-    return o
-def denibblize(b):
-    o = []
-    for i in range(0, len(b), 2): o.append(fromNibbles(b[i], b[i + 1] if i + 1 < len(b) else 0))
-    return o
-def toAscii(s, length=None):
-    o = [ord(c) for c in s]
-    if length:
-        while len(o) < length: o.append(32)
-    return o
-def fromAscii(b): return "".join(chr(x) for x in b)
-def toOffset(v, center): return v + center
-def fromOffset(b, center): return b - center
-def toSigned(v, bits):
-    m = 2 ** bits; return v + m if v < 0 else v
-def fromSigned(b, bits):
-    m = 2 ** bits; return b - m if b >= m / 2 else b
 
 # checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 # plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
@@ -2946,6 +2933,162 @@ def __doesNotFit(v, bits):
     if not __whole(v): return __shownValue(v) + " is not a whole number"
     if v < 0 or v >= 2 ** bits: return __shown(v) + " does not fit in " + __plural(bits, "bit")
     return None
+# The older encoding helpers, to7bit to fromSigned, held to the byte lists' rule: a value that does
+# not fit, a number that is not one and a list that is not bytes answer None and say why. The
+# WebView runtime's "older encoding helpers", rule for rule and message for message. A value to
+# split is rounded down first, as it always was; a part to join must be whole.
+def __packNumber(verb, what, v):
+    n = __realNumber(v)
+    if n is not None:
+        return int(n) if isinstance(v, str) and float(n).is_integer() else n
+    if v is None: return __refuse(verb, what + " is a number, and none was given")
+    return __refuse(verb, what + " is a number, and " + __shownValue(v) + " is not")
+def __packRange(verb, what, n, bits, room, roundDown=False):
+    import math
+    m = math.floor(n) if roundDown else n
+    if m != math.floor(m): return __refuse(verb, what + " is " + __shown(n) + ", which is not a whole number")
+    if m < 0 or m >= 2 ** bits: return __refuse(verb, what + " is " + __shown(n) + ", which does not fit in " + room)
+    return int(m)
+def __packFit(verb, what, v, bits, room, roundDown=False):
+    n = __packNumber(verb, what, v)
+    if n is None: return None
+    return __packRange(verb, what, n, bits, room, roundDown)
+def __packSetting(verb, what, v, lo, hi, fallback=None):
+    import math
+    if v is None and fallback is not None: return fallback
+    n = __realNumber(v)
+    if n is None or n != math.floor(n) or n < lo or n > hi:
+        return __refuse(verb, what + " must be a whole number from " + str(lo) + " to " + str(hi))
+    return int(n)
+def __packOrder(verb, order):
+    o = "msb" if order is None else (order.strip().lower() if isinstance(order, str) else order)
+    if isinstance(o, str) and (o == "msb" or o == "lsb"): return o
+    return __refuse(verb, 'order must be "msb" or "lsb"')
+def __packList(verb, data, bits, why):
+    lst = __bytesIn(verb, data)
+    if lst is None: return None
+    for i, b in enumerate(lst):
+        if b >= 2 ** bits: return __refuse(verb, str(b) + " at position " + str(i) + " " + why)
+    return lst
+def to14bit(v=None):
+    n = __packFit("ce.midi.to14bit", "v", v, 14, "14 bits", True)
+    if n is None: return None
+    return { "msb": n // 128, "lsb": n % 128 }
+def from14bit(msb=None, lsb=None):
+    verb = "ce.midi.from14bit"
+    hi = __packFit(verb, "msb", msb, 7, "7 bits")
+    if hi is None: return None
+    lo = __packFit(verb, "lsb", lsb, 7, "7 bits")
+    if lo is None: return None
+    return hi * 128 + lo
+def to7bit(v=None, count=None, order=None):
+    verb = "ce.midi.to7bit"
+    n = __packNumber(verb, "v", v)
+    if n is None: return None
+    k = __packSetting(verb, "count", count, 1, 4, 2)
+    if k is None: return None
+    o = __packOrder(verb, order)
+    if o is None: return None
+    x = __packRange(verb, "v", n, 7 * k, __plural(k, "byte") + " of 7 bits", True)
+    if x is None: return None
+    out = []
+    for _ in range(k): out.append(x % 128); x = x // 128
+    return list(reversed(out)) if o == "msb" else out
+def from7bit(b=None, order=None):
+    verb = "ce.midi.from7bit"
+    lst = __packList(verb, b, 7, "does not fit in 7 bits")
+    if lst is None: return None
+    if len(lst) < 1 or len(lst) > 4: return __refuse(verb, "it joins 1 to 4 bytes, and " + str(len(lst)) + " were given")
+    o = __packOrder(verb, order)
+    if o is None: return None
+    v = 0
+    for x in (lst if o == "msb" else list(reversed(lst))): v = v * 128 + x
+    return v
+def toNibbles(b=None):
+    n = __packFit("ce.midi.toNibbles", "byte", b, 8, "8 bits", True)
+    if n is None: return None
+    return { "hi": n // 16, "lo": n % 16 }
+def fromNibbles(hi=None, lo=None):
+    verb = "ce.midi.fromNibbles"
+    h = __packFit(verb, "hi", hi, 4, "4 bits")
+    if h is None: return None
+    l = __packFit(verb, "lo", lo, 4, "4 bits")
+    if l is None: return None
+    return h * 16 + l
+def nibblize(b=None):
+    lst = __bytesIn("ce.midi.nibblize", b)
+    if lst is None: return None
+    out = []
+    for x in lst: out.append(x // 16); out.append(x % 16)
+    return out
+def denibblize(b=None):
+    verb = "ce.midi.denibblize"
+    lst = __packList(verb, b, 4, "does not fit in 4 bits")
+    if lst is None: return None
+    if len(lst) % 2 == 1: return __refuse(verb, "the halves come in pairs, and " + str(len(lst)) + " is an odd count")
+    return [lst[i] * 16 + lst[i + 1] for i in range(0, len(lst), 2)]
+# Text longer than the length is cut to it, and a length that is not one is no length; each said once.
+__packWarned = {}
+def __packSaid(key, text):
+    if key in __packWarned: return
+    __packWarned[key] = True
+    logWarn(text + " This is said only the first time.")
+def toAscii(s=None, length=None):
+    import math
+    verb = "ce.midi.toAscii"
+    if not isinstance(s, str):
+        if s is None: return __refuse(verb, "str is text, and none was given")
+        return __refuse(verb, "str is text, and " + __shownValue(s) + " is not")
+    out = []
+    for c in s:
+        if ord(c) > 127: return __refuse(verb, "the text has a character outside ASCII")
+        out.append(ord(c))
+    if length is None: return out
+    n = __realNumber(length)
+    if n is None or n != math.floor(n) or n < 1:
+        __packSaid("toAscii length", verb + ": length is " + __shownValue(length)
+                   + ", which is not a whole number from 1, so the text was neither filled out nor cut.")
+        return out
+    n = int(n)
+    if len(out) > n:
+        __packSaid("toAscii cut", verb + ': "' + s + '" is longer than ' + __plural(n, "character") + ", so it was cut to " + str(n) + ".")
+        out = out[:n]
+    while len(out) < n: out.append(32)
+    return out
+def fromAscii(b=None):
+    lst = __packList("ce.midi.fromAscii", b, 7, "is not an ASCII character")
+    if lst is None: return None
+    return "".join(chr(x) for x in lst)
+def __packOffset(verb, what, v, center, sign):
+    n = __packNumber(verb, what, v)
+    if n is None: return None
+    c = __packNumber(verb, "center", center)
+    if c is None: return None
+    return n + sign * c
+def toOffset(v=None, center=None): return __packOffset("ce.midi.toOffset", "v", v, center, 1)
+def fromOffset(b=None, center=None): return __packOffset("ce.midi.fromOffset", "b", b, center, -1)
+def toSigned(v=None, bits=None):
+    import math
+    verb = "ce.midi.toSigned"
+    n = __packNumber(verb, "v", v)
+    if n is None: return None
+    k = __packSetting(verb, "bits", bits, 1, 32)
+    if k is None: return None
+    m = math.floor(n)
+    half = 1 << (k - 1)
+    if m < -half or m >= half:
+        return __refuse(verb, "v is " + __shown(n) + ", and in " + __plural(k, "bit") + " a signed number is from "
+                        + str(-half) + " to " + str(half - 1))
+    return m + (1 << k) if m < 0 else m
+def fromSigned(b=None, bits=None):
+    verb = "ce.midi.fromSigned"
+    n = __packNumber(verb, "b", b)
+    if n is None: return None
+    k = __packSetting(verb, "bits", bits, 1, 32)
+    if k is None: return None
+    m = __packRange(verb, "b", n, k, __plural(k, "bit"))
+    if m is None: return None
+    return m - (1 << k) if m >= (1 << (k - 1)) else m
 def __shape(verb, opts):
     bits, order = 7, "msb"
     if isinstance(opts, dict):
@@ -3589,7 +3732,20 @@ def deviceProfile(role=None):
 # read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
 # query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
 # profile and sends; it returns whether the message went out, not whether the synth accepted it.
-def deviceRead(id, role=None):
+# An id left out, or blank, is refused, where it answered nothing without a word; parameters() and
+# ports() take a table of options or nothing; ports() says once of a direction that is not one; and
+# setTiming takes a timing the profile has, in any case, written in its spelling. The WebView
+# runtime's words (deviceWords.js).
+def __deviceIdMissing(id):
+    return id is None or (isinstance(id, str) and not id.strip())
+def __deviceNotOptions(verb, opts):
+    if opts is None or isinstance(opts, dict): return False
+    logError("ce.device." + verb + ": " + __shownValue(opts) + " is not a table of options, so the answer is an empty list.")
+    return True
+__devicePortsWarned = {}
+def deviceRead(id=None, role=None):
+    if __deviceIdMissing(id):
+        logError("ce.device.read: no parameter id was given, so there is no answer."); return None
     return __deviceQuery("read", { "role": __role(role), "id": str(id) })
 def deviceWrite(id, value, role=None):
     return __api.deviceWrite(str(id), value, __role(role)) is True
@@ -3618,27 +3774,57 @@ def deviceRecipes(role=None):
 def deviceRequests(role=None):
     return __deviceQuery("requests", { "role": __role(role) }) or []
 # The two writes. They land on THIS PROJECT's override, never on the shared profile.
-def deviceSetVariable(name, value, role=None):
-    return __deviceSet("variable", str(name), value, __role(role)) is True
-def deviceSetTiming(name, ms, role=None):
-    return __deviceSet("timing", str(name), ms, __role(role)) is True
+# A name left out reaches the host as "", which says a name is required; it was "None", and stored.
+def deviceSetVariable(name=None, value=None, role=None):
+    return __deviceSet("variable", "" if name is None else str(name), value, __role(role)) is True
+def deviceSetTiming(name=None, ms=None, role=None):
+    r = __role(role)
+    key = "" if name is None else str(name).strip()
+    if key != "":
+        timing = __deviceQuery("timing", { "role": r })
+        if isinstance(timing, dict):
+            names = [str(k) for k in timing.keys()]
+            known = None
+            for n in names:
+                if n.lower() == key.lower(): known = n
+            if known is None:
+                names.sort()
+                logError("ce.device.setTiming: the profile for " + r + ' has no timing called "' + key + '", so nothing was changed. '
+                         + (("Its timings: " + ", ".join(names) + ".") if names else "It has none."))
+                return False
+            key = known
+    return __deviceSet("timing", key, ms, r) is True
 
 def deviceParameters(opts=None):
+    if __deviceNotOptions("parameters", opts): return []
     opts = opts or {}
     r = __deviceQuery("parameters", { "role": __role(opts.get("role")), "query": opts.get("query"),
                                       "group": opts.get("group"), "type": opts.get("type"),
                                       "access": opts.get("access"), "limit": opts.get("limit") })
     return r if r is not None else []
 
-def deviceParameter(id, role=None):
+def deviceParameter(id=None, role=None):
+    if __deviceIdMissing(id):
+        logError("ce.device.parameter: no parameter id was given, so there is no answer."); return None
     return __deviceQuery("parameter", { "role": __role(role), "id": str(id) })
 
 # ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
 # configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
 # device that showed up.
 def devicePorts(opts=None):
+    if __deviceNotOptions("ports", opts): return []
     opts = opts or {}
-    r = __deviceQuery("ports", { "direction": opts.get("direction") })
+    q = {}
+    if opts.get("direction") is not None:
+        raw = opts.get("direction")
+        d = raw.strip().lower() if isinstance(raw, str) else ""
+        if d in ("in", "input", "out", "output"): q["direction"] = d
+        else:
+            said = "ce.device.ports: direction is " + __shownValue(raw) + ', which is not "in" or "out", so every port was listed.'
+            if said not in __devicePortsWarned:
+                __devicePortsWarned[said] = True
+                logWarn(said + " This is said only the first time.")
+    r = __deviceQuery("ports", q)
     return r if r is not None else []
 
 # defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
@@ -3775,23 +3961,46 @@ def __storageKeyFrom(scope, stored):
     # A panel listing hides other scripts' private keys rather than showing an unusable spelling.
     return None if stored.startswith(__CE_SCRIPT_PREFIX) else stored
 
-def saveSetting(key, value, opts=None):
-    scope = __storageScope(opts, "ce.storage.saveSetting")
+# A setting's name: text, or a number used as text. Left out, or anything else, is refused. The
+# WebView runtime's storageName, word for word.
+def __storageName(verb, key, outcome):
+    import math
+    if isinstance(key, str): return key
+    if isinstance(key, (int, float)) and not isinstance(key, bool) and math.isfinite(key): return __shown(key)
+    if key is None:
+        logError(verb + ": no name was given, so " + outcome + ".")
+    else:
+        logError(verb + ": " + __shownValue(key) + " is not a name, so " + outcome + ". A name is text, or a number used as text.")
+    return None
+
+def saveSetting(key=None, value=None, opts=None):
+    verb = "ce.storage.saveSetting"
+    name = __storageName(verb, key, "nothing was saved")
+    if name is None:
+        return False
+    # Nothing to save is no value, where it answered true and saved nothing: a Lua table cannot hold nil.
+    if value is None:
+        logError(verb + ': no value was given for "' + name + '", so nothing was saved. ce.storage.forget() deletes a setting.')
+        return False
+    scope = __storageScope(opts, verb)
     if scope is None:
         return False
     store = __storageStore(scope)
     if __api.settingsAvailable(store) is not True:
         logError('saveSetting("%s"): the %s store is unavailable here, so nothing was saved. '
-                 'ce.storage.info() says which stores are available.' % (key, scope))
+                 'ce.storage.info() says which stores are available.' % (name, scope))
         return False
-    __api.saveSetting(__storageKeyFor(scope, key), value, store)
+    __api.saveSetting(__storageKeyFor(scope, name), value, store)
     return True
 
-def loadSetting(key, fallback=None, opts=None):
+def loadSetting(key=None, fallback=None, opts=None):
+    name = __storageName("ce.storage.loadSetting", key, "the fallback was given back")
+    if name is None:
+        return fallback
     scope = __storageScope(opts, "ce.storage.loadSetting")
     if scope is None:
         return fallback
-    v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
+    v = __api.loadSetting(__storageKeyFor(scope, name), __storageStore(scope))
     return fallback if v is None else v
 
 # settings() lists every saved key; forget() deletes one and says whether there was one.
@@ -3806,11 +4015,14 @@ def listSettings(opts=None):
             out.append(k)
     return out
 
-def forgetSetting(key, opts=None):
+def forgetSetting(key=None, opts=None):
+    name = __storageName("ce.storage.forget", key, "nothing was deleted")
+    if name is None:
+        return False
     scope = __storageScope(opts, "ce.storage.forget")
     if scope is None:
         return False
-    return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) is True
+    return __api.forgetSetting(__storageKeyFor(scope, name), __storageStore(scope)) is True
 
 # Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 # one was the only way before.
@@ -3952,15 +4164,31 @@ def __jsonEnc(v, indent, depth, seen):
         return "{}"
     return "{" + nl + ("," + nl).join(parts) + nl + pad + "}"
 
-def encodeJson(value, opts=None):
-    indent = 0
-    if isinstance(opts, dict):
-        try:
-            n = int(opts.get("indent") or 0)
-            if n > 0:
-                indent = n
-        except (TypeError, ValueError):
-            indent = 0
+# encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+# and held to 0 to 10; anything else one line. Each value it cannot use as written is said once.
+# The WebView runtime's jsonIndent, word for word.
+__storageWarned = {}
+def __storageSaid(text):
+    if text in __storageWarned: return
+    __storageWarned[text] = True
+    logWarn(text + " This is said only the first time.")
+def __jsonIndent(opts):
+    import math
+    if not isinstance(opts, dict) or opts.get("indent") is None: return 0
+    raw = opts.get("indent")
+    n = __realNumber(raw)
+    def said(why, used):
+        __storageSaid("ce.storage.encode: indent is " + __shownValue(raw) + ", which is " + why + ", so " + used + ".")
+    if n is None:
+        said("not a number", "the text is on one line"); return 0
+    if n < 0:
+        said("below 0", "the text is on one line"); return 0
+    if n > 10:
+        said("above 10", "10 was used"); return 10
+    return math.floor(n)
+
+def encodeJson(value=None, opts=None):
+    indent = __jsonIndent(opts)
     try:
         return __jsonEnc(value, indent, 0, frozenset())
     except (TypeError, ValueError, RecursionError):
@@ -3978,12 +4206,23 @@ def __jsonStripNulls(v):
         return { k: __jsonStripNulls(x) for k, x in v.items() if x is not None }
     return v
 
-def decodeJson(text):
-    # json.loads for the reading: it is the same strict grammar JSON.parse accepts, which is what
-    # the hand-written Lua reader had to be written to match.
+# Text that is not JSON answers nothing and says so; nothing given, or a value that is not text, is
+# refused the same way. The WebView runtime's decodeJson, word for word.
+def __jsonNoConstant(name):
+    raise ValueError(name)
+def decodeJson(text=None):
+    verb = "ce.storage.decode"
+    if text is None:
+        logError(verb + ": no text was given, so there is no answer."); return None
+    if not isinstance(text, str):
+        logError(verb + ": " + __shownValue(text) + " is not text, so there is no answer."); return None
+    # json.loads for the reading: the same strict grammar JSON.parse accepts, which is what the
+    # hand-written Lua reader had to be written to match, but for NaN and Infinity, which it reads
+    # and the other three refuse.
     try:
-        v = __ce_json.loads("" if text is None else str(text))
+        v = __ce_json.loads(text, parse_constant=__jsonNoConstant)
     except (ValueError, TypeError):
+        logError(verb + ": the text is not JSON, so there is no answer.")
         return None
     return None if v is None else __jsonStripNulls(v)
 

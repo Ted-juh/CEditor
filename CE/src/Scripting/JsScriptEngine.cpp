@@ -165,7 +165,24 @@ function __ceIn(id, name, args) {
   try { return __ceGlobal[name].apply(undefined, args || []); } finally { __ceCur = prev; }
 }
 
-function on(target, event, fn) { __listeners.push({ t: target, e: event, fn: fn }); }
+// Why on(), watch(), compute(), intercept() or defineAction() sets nothing up: the event, path or
+// name left out, or a function that is not one, each of which set nothing up without a word. The
+// WebView runtime's hookRefusal, word for word. A target left out is "*", as the editor reads it.
+function __hookRefused(verb, what, name, fn) {
+  var why = "";
+  if (name === undefined || name === null || (typeof name === "string" && !/\S/.test(name))) {
+    why = verb + ": no " + what + " was given, so nothing was set up.";
+  } else if (typeof fn !== "function") {
+    why = fn === undefined || fn === null ? verb + ": no function was given, so nothing was set up."
+      : verb + ": " + __shownValue(fn) + " is not a function, so nothing was set up.";
+  }
+  if (why) logError(why);
+  return why !== "";
+}
+function on(target, event, fn) {
+  if (__hookRefused("ce.core.on", "event", event, fn)) return;
+  __listeners.push({ t: target === undefined || target === null ? "*" : target, e: event, fn: fn });
+}
 // off(target, event) — __listeners is the calling script's own list (__CE_OWN), so filtering here
 // is already scoped to it.
 function off(target, event) {
@@ -196,12 +213,21 @@ function __putRule(list, rule) {
   for (var i = 0; i < list.length; i++) if (list[i].path === rule.path) { list[i] = rule; return; }
   list.push(rule);
 }
-function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(__read(path)), prev: undefined }); }
-function compute(path, fn) { __putRule(__computeds, { path: path, fn: fn, failed: false }); }
-function intercept(path, fn) { __putRule(__filters, { path: path, fn: fn }); }
+function watch(path, fn) {
+  if (__hookRefused("ce.core.watch", "path", path, fn)) return;
+  __putRule(__watchers, { path: path, fn: fn, last: __sig(__read(path)), prev: undefined });
+}
+function compute(path, fn) {
+  if (__hookRefused("ce.core.compute", "path", path, fn)) return;
+  __putRule(__computeds, { path: path, fn: fn, failed: false });
+}
+function intercept(path, fn) {
+  if (__hookRefused("ce.core.intercept", "path", path, fn)) return;
+  __putRule(__filters, { path: path, fn: fn });
+}
 function defineAction(name, fn) {
-  var id = String(name == null ? "" : name).replace(/^\s+|\s+$/g, "");
-  if (!id || typeof fn !== "function") return;
+  if (__hookRefused("ce.core.action", "name", name, fn)) return;
+  var id = String(name).replace(/^\s+|\s+$/g, "");
   __actions[id.toLowerCase()] = { name: id, fn: fn };
 }
 function __actionNames() { var out = []; for (var k in __actions) out.push(__actions[k].name); return out; }
@@ -1534,8 +1560,8 @@ function degreeChord(root, scale, degree, size) {
   if (!s || !s.length) return undefined;
   if (__pitchOf("ce.music.degreeChord", root) === undefined) return undefined;
   var n = s.length;
-  var d = __count(degree, 1) - 1;
-  var sz = Math.max(2, __count(size, 3));
+  var d = __musicStep("degree", degree, 1) - 1;
+  var sz = Math.max(2, __musicStep("size", size, 3));
   var offsets = [];
   for (var k = 0; k < sz; k++) {
     var idx = d + k * 2;
@@ -1553,9 +1579,16 @@ function degreeChord(root, scale, degree, size) {
     offsets: offsets, notes: notes, names: names
   };
 }
-// A count argument that is not a finite number falls back to its default. Written out rather than
-// leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
-function __count(v, fallback) { var n = Number(v); return isFinite(n) ? Math.floor(n) : fallback; }
+// degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+// anything else the default, said once. The WebView runtime's musicStep, word for word. Written out
+// rather than leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
+function __musicStep(what, v, fallback) {
+  if (v === undefined || v === null) return fallback;
+  var n = __realNumber(v);
+  if (n !== undefined) return Math.floor(n);
+  __musicSaid("ce.music.degreeChord: " + what + " is " + __shownValue(v) + ", which is not a number, so " + fallback + " was used.");
+  return fallback;
+}
 // ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
 // or text that is a number, and one that is neither refuses the call, saying where it is. They were
 // read with Number(), so a chord written by name was an empty one, and true was a note. null for a
@@ -1682,8 +1715,8 @@ function arpOrder(notes, pattern) {
   if (!asc) return [];
   var p, seq, i;
   if (pattern === undefined || pattern === null) {
-    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
-    p = "up";
+    logError('ce.music.arp: no pattern was given, so the answer is an empty list. One of: up, down, updown, downup, asPlayed, random, chord.');
+    return [];
   } else if (__word(__ARP_ORDER_PATTERNS, String(pattern)) === undefined) {
     __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
     p = "up";
@@ -1699,20 +1732,6 @@ function arpOrder(notes, pattern) {
   return out;
 }
 // @module ce.midi
-function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
-function from14bit(msb, lsb) { return msb * 128 + lsb; }
-function to7bit(v, count, order) { count = count || 2; order = String(order || "msb").trim().toLowerCase(); v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
-function from7bit(bytes, order) { order = String(order || "msb").trim().toLowerCase(); var v = 0; var b = order === "msb" ? bytes : bytes.slice().reverse(); for (var i = 0; i < b.length; i++) v = v * 128 + b[i]; return v; }
-function toNibbles(b) { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; }
-function fromNibbles(hi, lo) { return hi * 16 + lo; }
-function nibblize(bytes) { var o = []; for (var i = 0; i < bytes.length; i++) { var n = toNibbles(bytes[i]); o.push(n.hi, n.lo); } return o; }
-function denibblize(bytes) { var o = []; for (var i = 0; i < bytes.length; i += 2) o.push(fromNibbles(bytes[i], bytes[i + 1] || 0)); return o; }
-function toAscii(str, length) { var o = []; for (var i = 0; i < str.length; i++) o.push(str.charCodeAt(i)); if (length) while (o.length < length) o.push(32); return o; }
-function fromAscii(bytes) { var s = ""; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return s; }
-function toOffset(v, center) { return v + center; }
-function fromOffset(b, center) { return b - center; }
-function toSigned(v, bits) { var m = Math.pow(2, bits); return v < 0 ? v + m : v; }
-function fromSigned(b, bits) { var m = Math.pow(2, bits); return b >= m / 2 ? b - m : b; }
 
 // checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 // plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
@@ -1887,6 +1906,180 @@ function __doesNotFit(v, bits) {
   if (v === undefined || v === null) return "the value to write is missing";
   if (!__whole(v)) return __shownValue(v) + " is not a whole number";
   return v < 0 || v >= Math.pow(2, bits) ? v + " does not fit in " + __plural(bits, "bit") : "";
+}
+// The older encoding helpers, to7bit to fromSigned, held to the byte lists' rule: a value that does
+// not fit, a number that is not one and a list that is not bytes answer undefined and say why. The
+// WebView runtime's "older encoding helpers", rule for rule and message for message. A value to
+// split is rounded down first, as it always was; a part to join must be whole.
+function __packNumber(verb, what, v) {
+  var n = __realNumber(v);
+  if (n !== undefined) return n;
+  return __refuse(verb, what + " is a number, and " + (v === undefined || v === null ? "none was given" : __shownValue(v) + " is not"));
+}
+function __packRange(verb, what, n, bits, room, roundDown) {
+  var m = roundDown ? Math.floor(n) : n;
+  if (Math.floor(m) !== m) return __refuse(verb, what + " is " + String(n) + ", which is not a whole number");
+  if (m < 0 || m >= Math.pow(2, bits)) return __refuse(verb, what + " is " + String(n) + ", which does not fit in " + room);
+  return m;
+}
+function __packFit(verb, what, v, bits, room, roundDown) {
+  var n = __packNumber(verb, what, v);
+  return n === undefined ? undefined : __packRange(verb, what, n, bits, room, roundDown);
+}
+function __packSetting(verb, what, v, lo, hi, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  var n = __realNumber(v);
+  if (n === undefined || Math.floor(n) !== n || n < lo || n > hi) {
+    return __refuse(verb, what + " must be a whole number from " + lo + " to " + hi);
+  }
+  return n;
+}
+function __packOrder(verb, order) {
+  var o = order === undefined || order === null ? "msb" : typeof order === "string" ? order.trim().toLowerCase() : order;
+  return o === "msb" || o === "lsb" ? o : __refuse(verb, 'order must be "msb" or "lsb"');
+}
+function __packList(verb, input, bits, why) {
+  var list = __bytesIn(verb, input);
+  if (!list) return undefined;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] >= Math.pow(2, bits)) return __refuse(verb, list[i] + " at position " + i + " " + why);
+  }
+  return list;
+}
+function to14bit(v) {
+  var n = __packFit("ce.midi.to14bit", "v", v, 14, "14 bits", true);
+  return n === undefined ? undefined : { msb: Math.floor(n / 128), lsb: n % 128 };
+}
+function from14bit(msb, lsb) {
+  var verb = "ce.midi.from14bit";
+  var hi = __packFit(verb, "msb", msb, 7, "7 bits");
+  if (hi === undefined) return undefined;
+  var lo = __packFit(verb, "lsb", lsb, 7, "7 bits");
+  return lo === undefined ? undefined : hi * 128 + lo;
+}
+function to7bit(v, count, order) {
+  var verb = "ce.midi.to7bit";
+  var n = __packNumber(verb, "v", v);
+  if (n === undefined) return undefined;
+  var k = __packSetting(verb, "count", count, 1, 4, 2);
+  if (k === undefined) return undefined;
+  var o = __packOrder(verb, order);
+  if (o === undefined) return undefined;
+  var x = __packRange(verb, "v", n, 7 * k, __plural(k, "byte") + " of 7 bits", true);
+  if (x === undefined) return undefined;
+  var out = [];
+  for (var i = 0; i < k; i++) { out.push(x % 128); x = Math.floor(x / 128); }
+  return o === "msb" ? out.reverse() : out;
+}
+function from7bit(bytes, order) {
+  var verb = "ce.midi.from7bit";
+  var list = __packList(verb, bytes, 7, "does not fit in 7 bits");
+  if (!list) return undefined;
+  if (list.length < 1 || list.length > 4) return __refuse(verb, "it joins 1 to 4 bytes, and " + list.length + " were given");
+  var o = __packOrder(verb, order);
+  if (o === undefined) return undefined;
+  var b = o === "msb" ? list : list.slice().reverse();
+  var v = 0;
+  for (var i = 0; i < b.length; i++) v = v * 128 + b[i];
+  return v;
+}
+function toNibbles(b) {
+  var n = __packFit("ce.midi.toNibbles", "byte", b, 8, "8 bits", true);
+  return n === undefined ? undefined : { hi: Math.floor(n / 16), lo: n % 16 };
+}
+function fromNibbles(hi, lo) {
+  var verb = "ce.midi.fromNibbles";
+  var h = __packFit(verb, "hi", hi, 4, "4 bits");
+  if (h === undefined) return undefined;
+  var l = __packFit(verb, "lo", lo, 4, "4 bits");
+  return l === undefined ? undefined : h * 16 + l;
+}
+function nibblize(bytes) {
+  var list = __bytesIn("ce.midi.nibblize", bytes);
+  if (!list) return undefined;
+  var out = [];
+  for (var i = 0; i < list.length; i++) out.push(Math.floor(list[i] / 16), list[i] % 16);
+  return out;
+}
+function denibblize(bytes) {
+  var verb = "ce.midi.denibblize";
+  var list = __packList(verb, bytes, 4, "does not fit in 4 bits");
+  if (!list) return undefined;
+  if (list.length % 2 === 1) return __refuse(verb, "the halves come in pairs, and " + list.length + " is an odd count");
+  var out = [];
+  for (var i = 0; i < list.length; i += 2) out.push(list[i] * 16 + list[i + 1]);
+  return out;
+}
+// Text longer than the length is cut to it, and a length that is not one is no length; each said once.
+var __packWarned = {};
+function __packSaid(key, text) {
+  if (__packWarned[key]) return;
+  __packWarned[key] = true;
+  logWarn(text + " This is said only the first time.");
+}
+function toAscii(str, length) {
+  var verb = "ce.midi.toAscii";
+  if (typeof str !== "string") {
+    return __refuse(verb, "str is text, and " + (str === undefined || str === null ? "none was given" : __shownValue(str) + " is not"));
+  }
+  var out = [];
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    if (c > 127) return __refuse(verb, "the text has a character outside ASCII");
+    out.push(c);
+  }
+  if (length === undefined || length === null) return out;
+  var n = __realNumber(length);
+  if (n === undefined || Math.floor(n) !== n || n < 1) {
+    __packSaid("toAscii length", verb + ": length is " + __shownValue(length)
+      + ", which is not a whole number from 1, so the text was neither filled out nor cut.");
+    return out;
+  }
+  if (out.length > n) {
+    __packSaid("toAscii cut", verb + ': "' + str + '" is longer than ' + __plural(n, "character") + ", so it was cut to " + n + ".");
+    out.length = n;
+  }
+  while (out.length < n) out.push(32);
+  return out;
+}
+function fromAscii(bytes) {
+  var list = __packList("ce.midi.fromAscii", bytes, 7, "is not an ASCII character");
+  if (!list) return undefined;
+  var s = "";
+  for (var i = 0; i < list.length; i++) s += String.fromCharCode(list[i]);
+  return s;
+}
+function __packOffset(verb, what, v, center, sign) {
+  var n = __packNumber(verb, what, v);
+  if (n === undefined) return undefined;
+  var c = __packNumber(verb, "center", center);
+  return c === undefined ? undefined : n + sign * c;
+}
+function toOffset(v, center) { return __packOffset("ce.midi.toOffset", "v", v, center, 1); }
+function fromOffset(b, center) { return __packOffset("ce.midi.fromOffset", "b", b, center, -1); }
+function toSigned(v, bits) {
+  var verb = "ce.midi.toSigned";
+  var n = __packNumber(verb, "v", v);
+  if (n === undefined) return undefined;
+  var k = __packSetting(verb, "bits", bits, 1, 32);
+  if (k === undefined) return undefined;
+  var m = Math.floor(n);
+  var half = Math.pow(2, k - 1);
+  if (m < -half || m >= half) {
+    return __refuse(verb, "v is " + String(n) + ", and in " + __plural(k, "bit") + " a signed number is from "
+      + (-half) + " to " + (half - 1));
+  }
+  return m < 0 ? m + Math.pow(2, k) : m;
+}
+function fromSigned(b, bits) {
+  var verb = "ce.midi.fromSigned";
+  var n = __packNumber(verb, "b", b);
+  if (n === undefined) return undefined;
+  var k = __packSetting(verb, "bits", bits, 1, 32);
+  if (k === undefined) return undefined;
+  var m = __packRange(verb, "b", n, k, __plural(k, "bit"));
+  if (m === undefined) return undefined;
+  return m >= Math.pow(2, k - 1) ? m - Math.pow(2, k) : m;
 }
 function __shape(verb, opts) {
   var bits = 7, order = "msb";
@@ -3048,7 +3241,21 @@ function deviceProfile(role) { return __deviceQuery("profile", { role: __role(ro
 // read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
 // query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
 // profile and sends; it returns whether the message went out, not whether the synth accepted it.
-function deviceRead(id, role) { return __deviceQuery("read", { role: __role(role), id: String(id) }); }
+// An id left out, or blank, is refused, where it answered nothing without a word; parameters() and
+// ports() take a table of options or nothing; ports() says once of a direction that is not one; and
+// setTiming takes a timing the profile has, in any case, written in its spelling. The WebView
+// runtime's words (deviceWords.js).
+function __deviceIdMissing(id) { return id === undefined || id === null || (typeof id === "string" && !/\S/.test(id)); }
+function __deviceNotOptions(verb, opts) {
+  if (opts === undefined || opts === null || (typeof opts === "object" && !Array.isArray(opts))) return false;
+  logError("ce.device." + verb + ": " + __shownValue(opts) + " is not a table of options, so the answer is an empty list.");
+  return true;
+}
+var __devicePortsWarned = {};
+function deviceRead(id, role) {
+  if (__deviceIdMissing(id)) { logError("ce.device.read: no parameter id was given, so there is no answer."); return undefined; }
+  return __deviceQuery("read", { role: __role(role), id: String(id) });
+}
 function deviceWrite(id, value, role) { return __api.deviceWrite(String(id), value, __role(role)) === true; }
 function deviceConnected(role) { return __deviceQuery("connected", { role: __role(role) }) === true; }
 // Preset recall, through the profile's own action — a Program Change, a Bank Select pair plus one,
@@ -3067,11 +3274,28 @@ function deviceCoverage(feature, role) {
 function deviceRecipes(role) { return __deviceQuery("recipes", { role: __role(role) }) || []; }
 function deviceRequests(role) { return __deviceQuery("requests", { role: __role(role) }) || []; }
 // The two writes. They land on THIS PROJECT's override, never on the shared profile.
+// A name left out reaches the host as "", which says a name is required; it was "undefined", and stored.
 function deviceSetVariable(name, value, role) {
-  return __deviceSet("variable", String(name), value, __role(role)) === true;
+  return __deviceSet("variable", name === undefined || name === null ? "" : String(name), value, __role(role)) === true;
 }
 function deviceSetTiming(name, ms, role) {
-  return __deviceSet("timing", String(name), ms, __role(role)) === true;
+  var r = __role(role);
+  var key = name === undefined || name === null ? "" : String(name).replace(/^\s+|\s+$/g, "");
+  if (key !== "") {
+    var timing = __deviceQuery("timing", { role: r });
+    if (timing && typeof timing === "object") {
+      var names = Object.keys(timing), known;
+      for (var i = 0; i < names.length; i++) if (names[i].toLowerCase() === key.toLowerCase()) known = names[i];
+      if (known === undefined) {
+        names.sort();
+        logError("ce.device.setTiming: the profile for " + r + " has no timing called \"" + key + "\", so nothing was changed. "
+          + (names.length ? "Its timings: " + names.join(", ") + "." : "It has none."));
+        return false;
+      }
+      key = known;
+    }
+  }
+  return __deviceSet("timing", key, ms, r) === true;
 }
 // An undefined property must not be SENT. juce::var::undefined() stringifies to "undefined", so
 // an omitted filter reached the host as the literal filter value "undefined" and matched nothing,
@@ -3086,20 +3310,30 @@ function __devOpts(role, opts) {
   return q;
 }
 function deviceParameters(opts) {
+  if (__deviceNotOptions("parameters", opts)) return [];
   opts = opts || {};
   var r = __deviceQuery("parameters", __devOpts(opts.role, opts));
   return r || [];
 }
 function deviceParameter(id, role) {
+  if (__deviceIdMissing(id)) { logError("ce.device.parameter: no parameter id was given, so there is no answer."); return undefined; }
   return __deviceQuery("parameter", { role: __role(role), id: String(id) });
 }
 // ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
 // configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
 // device that showed up.
 function devicePorts(opts) {
+  if (__deviceNotOptions("ports", opts)) return [];
   opts = opts || {};
   var q = {};
-  if (opts.direction !== undefined && opts.direction !== null) q.direction = opts.direction;
+  if (opts.direction !== undefined && opts.direction !== null) {
+    var d = typeof opts.direction === "string" ? opts.direction.replace(/^\s+|\s+$/g, "").toLowerCase() : "";
+    if (d === "in" || d === "input" || d === "out" || d === "output") q.direction = d;
+    else {
+      var said = "ce.device.ports: direction is " + __shownValue(opts.direction) + ", which is not \"in\" or \"out\", so every port was listed.";
+      if (!__devicePortsWarned[said]) { __devicePortsWarned[said] = true; logWarn(said + " This is said only the first time."); }
+    }
+  }
   return __deviceQuery("ports", q) || [];
 }
 // defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
@@ -3222,22 +3456,41 @@ function __storageKeyFrom(scope, stored) {
   return stored.indexOf("\u0001script:") === 0 ? undefined : stored;
 }
 
+// A setting's name: text, or a number used as text. Left out, or anything else, is refused. The
+// WebView runtime's storageName, word for word.
+function __storageName(verb, key, outcome) {
+  if (typeof key === "string") return key;
+  if (typeof key === "number" && isFinite(key)) return String(key);
+  logError(key === undefined || key === null ? verb + ": no name was given, so " + outcome + "."
+    : verb + ": " + __shownValue(key) + " is not a name, so " + outcome + ". A name is text, or a number used as text.");
+  return undefined;
+}
 function saveSetting(key, value, opts) {
-  var scope = __storageScope(opts, "ce.storage.saveSetting");
+  var verb = "ce.storage.saveSetting";
+  var name = __storageName(verb, key, "nothing was saved");
+  if (name === undefined) return false;
+  // Nothing to save is no value, where it answered true and saved nothing: a Lua table cannot hold nil.
+  if (value === undefined || value === null) {
+    logError(verb + ': no value was given for "' + name + '", so nothing was saved. ce.storage.forget() deletes a setting.');
+    return false;
+  }
+  var scope = __storageScope(opts, verb);
   if (!scope) return false;
   var store = __storageStore(scope);
   if (__api.settingsAvailable(store) !== true) {
-    logError('saveSetting("' + key + '"): the ' + scope + ' store is unavailable here, so nothing '
+    logError('saveSetting("' + name + '"): the ' + scope + ' store is unavailable here, so nothing '
              + "was saved. ce.storage.info() says which stores are available.");
     return false;
   }
-  __api.saveSetting(__storageKeyFor(scope, key), value, store);
+  __api.saveSetting(__storageKeyFor(scope, name), value, store);
   return true;
 }
 function loadSetting(key, fallback, opts) {
+  var name = __storageName("ce.storage.loadSetting", key, "the fallback was given back");
+  if (name === undefined) return fallback;
   var scope = __storageScope(opts, "ce.storage.loadSetting");
   if (!scope) return fallback;
-  var v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope));
+  var v = __api.loadSetting(__storageKeyFor(scope, name), __storageStore(scope));
   return (v === undefined || v === null) ? fallback : v;
 }
 // settings() lists every saved key; forget() deletes one and says whether there was one.
@@ -3253,9 +3506,11 @@ function listSettings(opts) {
   return out;
 }
 function forgetSetting(key, opts) {
+  var name = __storageName("ce.storage.forget", key, "nothing was deleted");
+  if (name === undefined) return false;
   var scope = __storageScope(opts, "ce.storage.forget");
   if (!scope) return false;
-  return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) === true;
+  return __api.forgetSetting(__storageKeyFor(scope, name), __storageStore(scope)) === true;
 }
 // Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 // one was the only way before.
@@ -3316,12 +3571,31 @@ function __jsonKeys(value, out, seen) {
   }
   return out;
 }
+// encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+// and held to 0 to 10; anything else one line. Each value it cannot use as written is said once.
+// The WebView runtime's jsonIndent, word for word.
+var __storageWarned = {};
+function __storageSaid(text) {
+  if (__storageWarned[text]) return;
+  __storageWarned[text] = true;
+  logWarn(text + " This is said only the first time.");
+}
+function __jsonIndent(opts) {
+  if (!opts || typeof opts !== "object" || Array.isArray(opts) || opts.indent === undefined || opts.indent === null) return 0;
+  var raw = opts.indent, n = __realNumber(raw);
+  function said(why, used) {
+    __storageSaid("ce.storage.encode: indent is " + __shownValue(raw) + ", which is " + why + ", so " + used + ".");
+  }
+  if (n === undefined) { said("not a number", "the text is on one line"); return 0; }
+  if (n < 0) { said("below 0", "the text is on one line"); return 0; }
+  if (n > 10) { said("above 10", "10 was used"); return 10; }
+  return Math.floor(n);
+}
 function encodeJson(value, opts) {
+  var indent = __jsonIndent(opts);
   try {
-    var indent = opts ? Number(opts.indent) : NaN;
     var keys = __jsonKeys(value, [], []).sort();
-    return JSON.stringify(value, keys.length ? keys : undefined,
-                          (isFinite(indent) && indent > 0) ? indent : undefined);
+    return JSON.stringify(value, keys.length ? keys : undefined, indent > 0 ? indent : undefined);
   } catch (e) {
     // A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
     // value — the same rule every "cannot read that" in this API follows.
@@ -3344,11 +3618,18 @@ function __jsonStripNulls(v) {
   }
   return v;
 }
+// Text that is not JSON answers nothing and says so; nothing given, or a value that is not text, is
+// refused the same way. The WebView runtime's decodeJson, word for word.
 function decodeJson(text) {
-  try {
-    var v = JSON.parse(String(text === undefined || text === null ? "" : text));
-    return v === null ? undefined : __jsonStripNulls(v);
-  } catch (e) { return undefined; }
+  var verb = "ce.storage.decode";
+  if (text === undefined || text === null) { logError(verb + ": no text was given, so there is no answer."); return undefined; }
+  if (typeof text !== "string") { logError(verb + ": " + __shownValue(text) + " is not text, so there is no answer."); return undefined; }
+  var v;
+  try { v = JSON.parse(text); } catch (e) {
+    logError(verb + ": the text is not JSON, so there is no answer.");
+    return undefined;
+  }
+  return v === null ? undefined : __jsonStripNulls(v);
 }
 
 // @module -

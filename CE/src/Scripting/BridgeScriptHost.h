@@ -184,6 +184,9 @@ public:
         // Whether a path names a control the panel does not have, which ce.anim refuses to move
         // (namesMissingControl). Unset: none does, as before.
         std::function<bool (const juce::String& path)> namesMissingControl;
+        // Whether a write to a path has to be a number: a range control's own value, or a
+        // .normalizedValue (PanelValueModel::writeNeedsNumber). Unset: none has, as before.
+        std::function<bool (const juce::String& path, const juce::String& form)> writeNeedsNumber;
         // Whether a transmitting write to `path` would reach the synth at all — the path is bound to
         // a device parameter. Only those writes spend the MIDI flood budget. Unset: every
         // transmitting write counts, which is how every set() was counted before this existed.
@@ -363,6 +366,16 @@ public:
     // set("cutoff.normalizedValue", 0.5). Text was dropped here, so that spelling wrote 0.5 as it was.
     void setValue (const juce::String& path, const juce::var& value, const juce::var& options) override
     {
+        // A value left out is refused, where it was written as nothing: set("Cutoff.value") cleared
+        // the knob's value. The editor's set() says the same (scriptSet in panelRuntime.js). A colour
+        // property says it in its own words, with the forms a colour takes (colourWrites, below).
+        if ((value.isVoid() || value.isUndefined())
+            && ! (callbacks.isColourProperty
+                  && callbacks.isColourProperty (splitAccessor (path, options.isString() ? options.toString() : juce::String()).first)))
+        {
+            logAt ("error", "set(\"" + path + "\"): no value was given, so nothing was set.", juce::var());
+            return;
+        }
         const auto form = options.isString() ? options.toString() : juce::String();
         if (const auto refusal = formRefusal ("set(\"" + path + "\")", "nothing was set", form); refusal.isNotEmpty())
         {
@@ -403,6 +416,29 @@ public:
                 return;
             }
             toWrite = read.value;
+        }
+
+        // A range control's value and a .normalizedValue are numbers: text that is one is read as
+        // one, and anything else is refused, where "x" was written as given. One bound to a device
+        // parameter is the binding's to read. The editor's set() says the same (setNumber in
+        // panelRuntime.js).
+        if (callbacks.writeNeedsNumber && callbacks.writeNeedsNumber (addressed.first, addressed.second))
+        {
+            double d = 0.0;
+            const bool number = (toWrite.isInt() || toWrite.isInt64() || toWrite.isDouble())
+                                    ? std::isfinite (d = static_cast<double> (toWrite))
+                                    : toWrite.isString() && decimalTextValue (toWrite.toString(), d);
+            if (! number)
+            {
+                logAt ("error", "set(\"" + path + "\"): " + shownScriptValue (toWrite) + " is not a number, so nothing was set.",
+                       juce::var());
+                return;
+            }
+            // Stored as a whole number where it is one, as a script's own 100 is, so a Lua get() reads
+            // 100 back and not 100.0.
+            if (toWrite.isString())
+                toWrite = (d == std::floor (d) && std::abs (d) < 9007199254740992.0) ? juce::var (static_cast<juce::int64> (d))
+                                                                                     : juce::var (d);
         }
 
         bool transmit = runtime ? runtime->defaultTransmit() : true;

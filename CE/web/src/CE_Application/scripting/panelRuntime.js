@@ -87,7 +87,7 @@ import { profileSources } from '../stores/deviceProfileStores.js';
 import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
 import {
   deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, DEVICE_OVERRIDES, deviceOverrideValue,
-  deviceSetNoNameWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
+  deviceSetNoNameWords, deviceTimingUnknownWords, deviceNoIdWords, deviceNotOptionsWords, devicePortsDirectionWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
 } from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
@@ -731,6 +731,27 @@ function wholePath(at) {
 // The third argument carries two different things, as the contract's own signature does:
 // set(path, value, opts) with { transmit }, and the second-argument spelling of the value form.
 // A string is a form, an object is opts.
+// The value of a range control (a Knob, a Slider, a Number, a Range) and any .normalizedValue are
+// numbers: text that is one is read as one, and anything else is refused, where "x" was written as
+// given. One bound to a device parameter is read by the binding instead. BridgeScriptHost::setValue
+// says the same.
+function setNumber(path, value) {
+  const n = realNumber(value);
+  if (n === undefined) addScriptTrace('error', '', `set("${path}"): ${shownValue(value)} is not a number, so nothing was set.`);
+  return n;
+}
+
+// A script's set(): a value left out is refused, where it was written as nothing. The plug-in's host
+// says the same (BridgeScriptHost::setValue). A colour property says it in its own words, with the
+// forms a colour takes (colourWrites). The runtime's own writes go to setValue directly.
+function scriptSet(path, value, form) {
+  if ((value === undefined || value === null) && !isColourPath(splitAccessor(String(path), typeof form === 'string' ? form : '').path)) {
+    addScriptTrace('error', '', `set("${path}"): no value was given, so nothing was set.`);
+    return;
+  }
+  setValue(path, value, typeof form === 'string' || isOptionsTable(form) ? form : '');
+}
+
 function setValue(path, value, formOrOpts = '') {
   const form = typeof formOrOpts === 'string' ? formOrOpts : '';
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
@@ -749,9 +770,11 @@ function setValue(path, value, formOrOpts = '') {
       addScriptTrace('error', '', `set: "${name}" has no numeric range (Behavior.min/max), so .normalizedValue means nothing here`);
       return;
     }
+    const position = setNumber(path, value);
+    if (position === undefined) return;
     // Clamp: a 0–1 position outside 0–1 is a bug in the caller's maths, and letting it through
     // would drive the control past its own limits.
-    const t = Math.max(0, Math.min(1, Number(value)));
+    const t = Math.max(0, Math.min(1, position));
     // Boolean controls must keep their raw value type after a normalized write.
     const valueType = String(control?._children?.Behavior?.valueType ?? "").toLowerCase();
     value = valueType === "bool" || valueType === "boolean"
@@ -786,6 +809,14 @@ function setValue(path, value, formOrOpts = '') {
   const colours = colourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value);
   if (!colours) return;
   value = colours.value;
+  // A control bound to a device parameter is read by its binding, which takes a choice by its name
+  // ("LP") and says what it cannot read.
+  if (isLiveValuePath(modelPath) && String(control?._children?.Behavior?.family ?? '').trim().toLowerCase() === 'range'
+      && !valueBindingFor(control)) {
+    const n = setNumber(path, value);
+    if (n === undefined) return;
+    value = n;
+  }
 
   // A write that goes nowhere used to VANISH. The contract's own headline (Q1) is that coverage is
   // total and you can never pick wrong, so a path that resolves to nothing has to say so — without
@@ -1234,10 +1265,19 @@ function musicSaid(said) {
   musicWarned.add(said);
   addScriptTrace('warn', '', `${said} This is said only the first time.`);
 }
-// A count argument that is not a finite number falls back to its default. Written out rather than
-// leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree
-// or a size differing by one between runtimes is a chord differing by a third.
-const musicCount = (v, fallback) => (Number.isFinite(Number(v)) ? Math.floor(Number(v)) : fallback);
+// degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+// anything else the default, said once. Written out rather than leaning on falsiness, because
+// `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree or a size differing by one
+// between runtimes is a chord differing by a third. They were read with each language's own
+// conversion, so "x" was the default without a word, null was step 0 here and 1 in Lua, and "0x10"
+// was 16 in two runtimes and the default in the third.
+function musicStep(what, v, fallback) {
+  if (v === undefined || v === null) return fallback;
+  const n = realNumber(v);
+  if (n !== undefined) return Math.floor(n);
+  musicSaid(`ce.music.degreeChord: ${what} is ${shownValue(v)}, which is not a number, so ${fallback} was used.`);
+  return fallback;
+}
 
 // Stack scale thirds from a 0-based degree — the Chord Pad's `stackedChord`, offsets from the
 // TONIC. Wrapping past the top of the scale adds an octave, so degree 8 of a seven-note scale is
@@ -1245,7 +1285,7 @@ const musicCount = (v, fallback) => (Number.isFinite(Number(v)) ? Math.floor(Num
 const musicStack = (steps, degree, size) => {
   const n = steps.length;
   const out = [];
-  for (let k = 0; k < Math.max(2, musicCount(size, 3)); k += 1) {
+  for (let k = 0; k < Math.max(2, size); k += 1) {
     const idx = degree + k * 2;
     out.push(steps[((idx % n) + n) % n] + Math.floor(idx / n) * 12);
   }
@@ -2185,8 +2225,8 @@ const helpers = {
     const name = scale == null ? 'major' : String(scale);
     const base = musicPitchOf('ce.music.degreeChord', root);
     if (base === undefined) return undefined;
-    const d = musicCount(degree, 1) - 1;
-    const offsets = musicStack(steps, d, size);
+    const d = musicStep('degree', degree, 1) - 1;
+    const offsets = musicStack(steps, d, musicStep('size', size, 3));
     const quality = helpers.chordQuality(offsets);
     const flats = helpers.noteSpelling(root, name);
     const spell = (n) => (flats ? NOTE_FLAT : NOTE_SHARP)[musicMod12(n)];
@@ -2274,7 +2314,8 @@ const helpers = {
   arpOrder: (notes, pattern) => {
     const asc = musicNoteList('arpOrder', 'notes', notes);
     if (!asc) return [];
-    const { which, said } = arpOrderPattern(pattern);
+    const { which, said, refused } = arpOrderPattern(pattern);
+    if (refused) { addScriptTrace('error', '', refused); return []; }
     musicSaid(said);
     if (!asc.length) return [];
     switch (which) {
@@ -2424,44 +2465,22 @@ const helpers = {
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
   // doesn't model. Ported byte-for-byte from the Lua/JS/Python preludes in CE/src/Scripting so a
   // script packs a value identically whether it runs here or in the shipped plugin.
-  to14bit: (v) => { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; },
-  from14bit: (msb, lsb) => msb * 128 + lsb,
-  // The order in any case, as every word from a list is read: "MSB" is "msb".
-  to7bit: (v, count = 2, order = 'msb') => {
-    v = Math.floor(v);
-    const out = [];
-    for (let i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); }
-    return String(order).trim().toLowerCase() === 'msb' ? out.reverse() : out;
-  },
-  from7bit: (bytes, order = 'msb') => {
-    const b = String(order).trim().toLowerCase() === 'msb' ? bytes : [...bytes].reverse();
-    let v = 0;
-    for (const x of b) v = v * 128 + x;
-    return v;
-  },
-  toNibbles: (b) => { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; },
-  fromNibbles: (hi, lo) => hi * 16 + lo,
-  nibblize: (bytes) => {
-    const o = [];
-    for (const x of bytes) { const n = { hi: Math.floor(x / 16) % 16, lo: x % 16 }; o.push(n.hi, n.lo); }
-    return o;
-  },
-  denibblize: (bytes) => {
-    const o = [];
-    for (let i = 0; i < bytes.length; i += 2) o.push(bytes[i] * 16 + (bytes[i + 1] ?? 0));
-    return o;
-  },
-  toAscii: (str, length) => {
-    const o = [];
-    for (let i = 0; i < String(str).length; i++) o.push(String(str).charCodeAt(i));
-    if (length) while (o.length < length) o.push(32);
-    return o;
-  },
-  fromAscii: (bytes) => { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return s; },
-  toOffset: (v, center) => v + center,
-  fromOffset: (b, center) => b - center,
-  toSigned: (v, bits) => { const m = 2 ** bits; return v < 0 ? v + m : v; },
-  fromSigned: (b, bits) => { const m = 2 ** bits; return b >= m / 2 ? b - m : b; },
+  // Each answers nothing and says why for a value that does not fit, as the byte lists below do
+  // ("the older encoding helpers").
+  to14bit: (v) => packTo14bit(v),
+  from14bit: (msb, lsb) => packFrom14bit(msb, lsb),
+  to7bit: (v, count, order) => packTo7bit(v, count, order),
+  from7bit: (bytes, order) => packFrom7bit(bytes, order),
+  toNibbles: (b) => packToNibbles(b),
+  fromNibbles: (hi, lo) => packFromNibbles(hi, lo),
+  nibblize: (bytes) => packNibblize(bytes),
+  denibblize: (bytes) => packDenibblize(bytes),
+  toAscii: (str, length) => packToAscii(str, length),
+  fromAscii: (bytes) => packFromAscii(bytes),
+  toOffset: (v, center) => packOffset('ce.midi.toOffset', 'v', v, center, 1),
+  fromOffset: (b, center) => packOffset('ce.midi.fromOffset', 'b', b, center, -1),
+  toSigned: (v, bits) => packToSigned(v, bits),
+  fromSigned: (b, bits) => packFromSigned(b, bits),
   // Byte lists — see "byte lists" below, and docs/design/script-bytes.md for why lists.
   getBits: (value, start, count) => bytesGetBits(value, start, count),
   setBits: (value, start, count, bits) => bytesSetBits(value, start, count, bits),
@@ -2782,6 +2801,181 @@ function bytesFromBase64(text) {
     if (pad < 1) out.push(n % 256);
   }
   return out;
+}
+/* ------------------------------------------------------------- the older encoding helpers */
+// to7bit to fromSigned, held to the byte lists' rule: a value that does not fit, a number that is
+// not one and a list that is not bytes answer nothing and say why. They answered a wrong number
+// without a word: to14bit(20000) wrapped to 3616, nibblize({300}) split 300, toSigned(-200, 8) gave
+// 56, denibblize joined an odd half with 0. A value to split is rounded down first, as it always
+// was; a part to join must be whole. The same words in every prelude, which
+// scriptPreludeAgreement.test.js checks.
+// A number, or text that is one; undefined after the error.
+function packNumber(verb, what, v) {
+  const n = realNumber(v);
+  if (n !== undefined) return n;
+  return bytesRefuse(verb, `${what} is a number, and ${v === undefined || v === null ? 'none was given' : `${shownValue(v)} is not`}`);
+}
+// A number already read, as a whole number from 0 below 2 ** bits; undefined after the error.
+function packRange(verb, what, n, bits, room, roundDown) {
+  const m = roundDown ? Math.floor(n) : n;
+  if (!Number.isInteger(m)) return bytesRefuse(verb, `${what} is ${String(n)}, which is not a whole number`);
+  if (m < 0 || m >= 2 ** bits) return bytesRefuse(verb, `${what} is ${String(n)}, which does not fit in ${room}`);
+  return m;
+}
+function packFit(verb, what, v, bits, room, roundDown) {
+  const n = packNumber(verb, what, v);
+  return n === undefined ? undefined : packRange(verb, what, n, bits, room, roundDown);
+}
+// A whole-number setting from lo to hi: to7bit's count, the bits of a signed number. Left out, the
+// fallback when there is one.
+function packSetting(verb, what, v, lo, hi, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  const n = realNumber(v);
+  if (n === undefined || !Number.isInteger(n) || n < lo || n > hi) {
+    return bytesRefuse(verb, `${what} must be a whole number from ${lo} to ${hi}`);
+  }
+  return n;
+}
+// "msb" or "lsb", in any case; left out, "msb". Anything else was read as "lsb".
+function packOrder(verb, order) {
+  const o = order === undefined || order === null ? 'msb' : typeof order === 'string' ? order.trim().toLowerCase() : order;
+  return o === 'msb' || o === 'lsb' ? o : bytesRefuse(verb, 'order must be "msb" or "lsb"');
+}
+// A list of bytes whose every item is below 2 ** bits; `why` says what one that is not is.
+function packList(verb, input, bits, why) {
+  const list = bytesIn(verb, input);
+  if (!list) return undefined;
+  const at = list.findIndex((b) => b >= 2 ** bits);
+  return at < 0 ? list : bytesRefuse(verb, `${list[at]} at position ${at} ${why}`);
+}
+function packTo14bit(v) {
+  const n = packFit('ce.midi.to14bit', 'v', v, 14, '14 bits', true);
+  return n === undefined ? undefined : { msb: Math.floor(n / 128), lsb: n % 128 };
+}
+function packFrom14bit(msb, lsb) {
+  const verb = 'ce.midi.from14bit';
+  const hi = packFit(verb, 'msb', msb, 7, '7 bits');
+  if (hi === undefined) return undefined;
+  const lo = packFit(verb, 'lsb', lsb, 7, '7 bits');
+  return lo === undefined ? undefined : hi * 128 + lo;
+}
+function packTo7bit(v, count, order) {
+  const verb = 'ce.midi.to7bit';
+  const n = packNumber(verb, 'v', v);
+  if (n === undefined) return undefined;
+  const k = packSetting(verb, 'count', count, 1, 4, 2);
+  if (k === undefined) return undefined;
+  const o = packOrder(verb, order);
+  if (o === undefined) return undefined;
+  let x = packRange(verb, 'v', n, 7 * k, `${plural(k, 'byte')} of 7 bits`, true);
+  if (x === undefined) return undefined;
+  const out = [];
+  for (let i = 0; i < k; i += 1) { out.push(x % 128); x = Math.floor(x / 128); }
+  return o === 'msb' ? out.reverse() : out;
+}
+function packFrom7bit(bytes, order) {
+  const verb = 'ce.midi.from7bit';
+  const list = packList(verb, bytes, 7, 'does not fit in 7 bits');
+  if (!list) return undefined;
+  if (list.length < 1 || list.length > 4) return bytesRefuse(verb, `it joins 1 to 4 bytes, and ${list.length} were given`);
+  const o = packOrder(verb, order);
+  if (o === undefined) return undefined;
+  let v = 0;
+  for (const b of o === 'msb' ? list : list.slice().reverse()) v = v * 128 + b;
+  return v;
+}
+function packToNibbles(b) {
+  const n = packFit('ce.midi.toNibbles', 'byte', b, 8, '8 bits', true);
+  return n === undefined ? undefined : { hi: Math.floor(n / 16), lo: n % 16 };
+}
+function packFromNibbles(hi, lo) {
+  const verb = 'ce.midi.fromNibbles';
+  const h = packFit(verb, 'hi', hi, 4, '4 bits');
+  if (h === undefined) return undefined;
+  const l = packFit(verb, 'lo', lo, 4, '4 bits');
+  return l === undefined ? undefined : h * 16 + l;
+}
+function packNibblize(bytes) {
+  const list = bytesIn('ce.midi.nibblize', bytes);
+  if (!list) return undefined;
+  const out = [];
+  for (const b of list) out.push(Math.floor(b / 16), b % 16);
+  return out;
+}
+function packDenibblize(bytes) {
+  const verb = 'ce.midi.denibblize';
+  const list = packList(verb, bytes, 4, 'does not fit in 4 bits');
+  if (!list) return undefined;
+  if (list.length % 2 === 1) return bytesRefuse(verb, `the halves come in pairs, and ${list.length} is an odd count`);
+  const out = [];
+  for (let i = 0; i < list.length; i += 2) out.push(list[i] * 16 + list[i + 1]);
+  return out;
+}
+// Text longer than the length is cut to it, and a length that is not one is no length; each said
+// once. The text went out whole, past the field a patch name has in a dump, and a length of "x"
+// or 0 filled nothing without a word.
+const packWarned = new Set();
+function packSaid(key, said) {
+  if (packWarned.has(key)) return;
+  packWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+function packToAscii(str, length) {
+  const verb = 'ce.midi.toAscii';
+  if (typeof str !== 'string') {
+    return bytesRefuse(verb, `str is text, and ${str === undefined || str === null ? 'none was given' : `${shownValue(str)} is not`}`);
+  }
+  const out = [];
+  for (let i = 0; i < str.length; i += 1) {
+    const c = str.charCodeAt(i);
+    if (c > 127) return bytesRefuse(verb, 'the text has a character outside ASCII');
+    out.push(c);
+  }
+  if (length === undefined || length === null) return out;
+  const n = realNumber(length);
+  if (n === undefined || !Number.isInteger(n) || n < 1) {
+    packSaid('toAscii length', `${verb}: length is ${shownValue(length)}, which is not a whole number from 1, so the text was neither filled out nor cut.`);
+    return out;
+  }
+  if (out.length > n) {
+    packSaid('toAscii cut', `${verb}: "${str}" is longer than ${plural(n, 'character')}, so it was cut to ${n}.`);
+    out.length = n;
+  }
+  while (out.length < n) out.push(32);
+  return out;
+}
+function packFromAscii(bytes) {
+  const list = packList('ce.midi.fromAscii', bytes, 7, 'is not an ASCII character');
+  return list ? list.map((b) => String.fromCharCode(b)).join('') : undefined;
+}
+function packOffset(verb, what, v, center, sign) {
+  const n = packNumber(verb, what, v);
+  if (n === undefined) return undefined;
+  const c = packNumber(verb, 'center', center);
+  return c === undefined ? undefined : n + sign * c;
+}
+function packToSigned(v, bits) {
+  const verb = 'ce.midi.toSigned';
+  const n = packNumber(verb, 'v', v);
+  if (n === undefined) return undefined;
+  const k = packSetting(verb, 'bits', bits, 1, 32);
+  if (k === undefined) return undefined;
+  const m = Math.floor(n);
+  const half = 2 ** (k - 1);
+  if (m < -half || m >= half) {
+    return bytesRefuse(verb, `v is ${String(n)}, and in ${plural(k, 'bit')} a signed number is from ${-half} to ${half - 1}`);
+  }
+  return m < 0 ? m + 2 ** k : m;
+}
+function packFromSigned(b, bits) {
+  const verb = 'ce.midi.fromSigned';
+  const n = packNumber(verb, 'b', b);
+  if (n === undefined) return undefined;
+  const k = packSetting(verb, 'bits', bits, 1, 32);
+  if (k === undefined) return undefined;
+  const m = packRange(verb, 'b', n, k, plural(k, 'bit'));
+  if (m === undefined) return undefined;
+  return m >= 2 ** (k - 1) ? m - 2 ** k : m;
 }
 // checksum(kind, bytes). "roland"/"yamaha" are the same two's-complement 7-bit sum — Roland
 // documents it as (128 - sum) & 0x7F and Yamaha as (0 - sum) & 0x7F, which are the same number —
@@ -4195,8 +4389,26 @@ function listenerEventName(event) {
   return EVENT_BY_ID[name]?.fn ?? name;
 }
 
+/** Why on(), watch(), compute(), intercept() or defineAction() sets nothing up, or '' when it does:
+ *  the event, path or name left out, or a function that is not one. Each set nothing up without a
+ *  word. The preludes say the same (__hookRefusal). */
+function hookRefusal(verb, what, name, fn) {
+  if (name === undefined || name === null || (typeof name === 'string' && !name.trim())) {
+    return `${verb}: no ${what} was given, so nothing was set up.`;
+  }
+  if (typeof fn === 'function') return '';
+  return fn === undefined || fn === null
+    ? `${verb}: no function was given, so nothing was set up.`
+    : `${verb}: ${shownValue(fn)} is not a function, so nothing was set up.`;
+}
+function hookRefused(scriptId, verb, what, name, fn) {
+  const why = hookRefusal(verb, what, name, fn);
+  if (why) addScriptTrace('error', scriptId, why);
+  return Boolean(why);
+}
+
 function addListener(scriptId, target, event, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.on', 'event', event, fn)) return;
   listeners.push({ scriptId, target: String(target ?? '*'), event: listenerEventName(event), fn });
 }
 
@@ -4254,7 +4466,7 @@ function putRule(list, rule) {
 }
 
 function addWatch(scriptId, path, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.watch', 'path', path, fn)) return;
   // Seeded with the CURRENT value, not undefined: a watcher must not fire once on registration
   // just because it has never seen the value before. It reports changes, not existence.
   const value = readWatch(path);
@@ -4262,18 +4474,18 @@ function addWatch(scriptId, path, fn) {
 }
 
 function addCompute(scriptId, path, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.compute', 'path', path, fn)) return;
   putRule(computeds, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn, failed: false });
 }
 
 function addIntercept(scriptId, path, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.intercept', 'path', path, fn)) return;
   putRule(filters, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn });
 }
 
 function defineActionImpl(scriptId, name, fn) {
-  const id = String(name ?? '').trim();
-  if (!id || typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.action', 'name', name, fn)) return;
+  const id = String(name).trim();
   const existing = actions.get(id.toLowerCase());
   if (existing && existing.scriptId !== scriptId) {
     // Reported, not silently overwritten: two scripts claiming one name is a real conflict, and
@@ -4705,19 +4917,20 @@ function animationTarget(verb, target) {
   return undefined;
 }
 
+/** Whether `path` is a colour property, a control's or the panel's own (panel.bgColour). */
+function isColourPath(path) {
+  const { name, segs } = splitScriptPath(String(path));
+  if (!segs.length) return false;
+  if (isPanelTarget(name)) return Boolean(panelColourFieldAt(segs.join('.')));
+  const control = findControlByName(name);
+  return Boolean(control && colourFieldAt(control, resolveModelPath(control, segs)));
+}
+
 /** True, after saying so, when `path` is a colour property, a control's or the panel's own
  *  (panel.bgColour): ce.anim moves numbers, and every tick would write one into the colour (set()
  *  refuses each, sixty times a second). */
 function animatesColour(verb, path) {
-  const { name, segs } = splitScriptPath(String(path));
-  if (!segs.length) return false;
-  let colour;
-  if (isPanelTarget(name)) colour = panelColourFieldAt(segs.join('.'));
-  else {
-    const control = findControlByName(name);
-    colour = control ? colourFieldAt(control, resolveModelPath(control, segs)) : null;
-  }
-  if (!colour) return false;
+  if (!isColourPath(path)) return false;
   addScriptTrace('error', '', `${verb}: "${path}" is a colour, and ce.anim moves numbers, so nothing was started.`);
   return true;
 }
@@ -8005,7 +8218,7 @@ function deviceTimingRead(role = DEFAULT_ROLE) {
 const deviceOverrideWarned = new Set();   // label, role and name of each override that has said so; resetScriptState clears it
 function deviceOverrideWrite(kind, name, value, role) {
   const { label, min, max } = DEVICE_OVERRIDES[kind];
-  const key = String(name ?? '').trim();
+  let key = String(name ?? '').trim();
   if (!key) {
     addScriptTrace('error', '', deviceSetNoNameWords(label));
     return false;
@@ -8014,6 +8227,17 @@ function deviceOverrideWrite(kind, name, value, role) {
   if (!mapping?.profileId) {
     addScriptTrace('error', '', deviceSetNoProfileWords(label, role));
     return false;
+  }
+  // A timing is one the profile has, read in any case and written in its spelling: a name it has
+  // not was stored and never read. A variable may be the script's own, for a recipe it declared.
+  if (kind === 'timingOverrides') {
+    const names = Object.keys(deviceTimingRead(role) ?? {});
+    const known = names.find((n) => n.toLowerCase() === key.toLowerCase());
+    if (known === undefined) {
+      addScriptTrace('error', '', deviceTimingUnknownWords(key, role, names));
+      return false;
+    }
+    key = known;
   }
   const { n: next, refused, said } = deviceOverrideValue(label, key, value, min, max);
   if (refused) {
@@ -8098,9 +8322,11 @@ function deviceConnectedRead(role = DEFAULT_ROLE) {
  * asynchronous and this verb is not — and nothing comes back when the device has never reported it,
  * which a script must be able to tell apart from zero.
  */
+// An id left out, or blank, is refused, where it answered nothing without a word.
+const deviceIdMissing = (id) => id === undefined || id === null || (typeof id === 'string' && !id.trim());
 function deviceValueRead(id, role) {
-  const key = String(id ?? '');
-  if (!key) return undefined;
+  if (deviceIdMissing(id)) { addScriptTrace('error', '', deviceNoIdWords('read')); return undefined; }
+  const key = String(id);
   const forRole = (get(deviceRuntimeState) ?? {})[role];
   if (!forRole || typeof forRole !== 'object') return undefined;
   const v = forRole[key];
@@ -8216,8 +8442,8 @@ function deviceParametersRead(opts = {}) {
 }
 
 function deviceParameterRead(id, role = DEFAULT_ROLE) {
-  const wanted = String(id ?? '');
-  if (!wanted) return null;
+  if (deviceIdMissing(id)) { addScriptTrace('error', '', deviceNoIdWords('parameter')); return null; }
+  const wanted = String(id);
   // A declared parameter answers without touching the profile cache, so `parameter()` on a synth
   // with no profile is a plain lookup rather than a cold-cache notice about a table that will
   // never arrive.
@@ -8306,7 +8532,8 @@ function deviceBindImpl(controlName, parameterId, opts = {}) {
   const table = profileId ? parameterTable(profileId) : null;
   if (profileId && !table) requestParameterTable(profileId, role);
   const known = hasDefinedParameter(role, key) || Boolean(table?.some((p) => String(p?.id ?? '') === key));
-  if (!known) addScriptTrace('log', '', deviceBindUnknownWords(name, key));
+  // A warning, not a plain line: the binding is made, and may never do anything.
+  if (!known) addScriptTrace('warn', '', deviceBindUnknownWords(name, key));
 
   const port = String(opts?.port ?? 'value');
   const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)
@@ -8348,8 +8575,26 @@ function deviceUnbindImpl(controlName, port = 'value') {
  * `role` on a port is the role currently using it, or "" — which is what makes "is anything using
  * this?" a field rather than a cross-reference the script has to build itself.
  */
+// parameters() and ports() take a table of options or nothing: a number or a text was read as no
+// options at all, so ports("in") listed every port without a word.
+function deviceOptionsRefused(verb, opts) {
+  if (opts === undefined || opts === null || isOptionsTable(opts)) return false;
+  addScriptTrace('error', '', deviceNotOptionsWords(verb, shownValue(opts)));
+  return true;
+}
+const devicePortsWarned = new Set();   // each direction that was not one, said once; resetScriptState clears it
 function devicePortsRead(opts = {}) {
-  const direction = String(opts?.direction ?? '').toLowerCase();
+  // In any case, as every word from a list is read; one that is not "in" or "out" (or "input",
+  // "output") lists every port, as it did, and now says so once.
+  let direction = typeof opts?.direction === 'string' ? opts.direction.trim().toLowerCase() : '';
+  if (opts?.direction !== undefined && opts?.direction !== null && !['in', 'input', 'out', 'output'].includes(direction)) {
+    const said = devicePortsDirectionWords(shownValue(opts.direction));
+    if (!devicePortsWarned.has(said)) {
+      devicePortsWarned.add(said);
+      addScriptTrace('warn', '', `${said} This is said only the first time.`);
+    }
+    direction = '';
+  }
   const mappings = get(deviceRoleMappings) ?? {};
 
   const roleUsing = (portId, which) => {
@@ -8739,10 +8984,32 @@ function localWrite(map) {
   catch { return false; }         // quota, private browsing — reported by the caller, never thrown
 }
 
+/** A setting's name: text, or a number used as text. Left out, or anything else, is refused,
+ *  `outcome` finishing "so …"; left out, it was saved under "" or read from there without a word.
+ *  "" itself is text, and a name: clear() and all() reach what an older script saved there. */
+function storageName(verb, key, scriptId, outcome) {
+  if (typeof key === 'string') return key;
+  if (typeof key === 'number' && Number.isFinite(key)) return String(key);
+  addScriptTrace('error', scriptId ?? '', key === undefined || key === null
+    ? `${verb}: no name was given, so ${outcome}.`
+    : `${verb}: ${shownValue(key)} is not a name, so ${outcome}. A name is text, or a number used as text.`);
+  return undefined;
+}
+
 function saveSetting(key, value, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId, 'ce.storage.saveSetting');
+  const verb = 'ce.storage.saveSetting';
+  const name = storageName(verb, key, scriptId, 'nothing was saved');
+  if (name === undefined) return false;
+  // Nothing to save is no value, where it answered true and saved nothing: a Lua table cannot hold
+  // nil, so no runtime could keep one.
+  if (value === undefined || value === null) {
+    addScriptTrace('error', scriptId ?? '', `${verb}: no value was given for "${name}", so nothing was saved. `
+      + 'ce.storage.forget() deletes a setting.');
+    return false;
+  }
+  const scope = storageScopeOf(opts, scriptId, verb);
   if (!scope) return false;
-  const stored = storageKeyFor(scope, key, scriptId);
+  const stored = storageKeyFor(scope, name, scriptId);
   // In the player, both scopes are the instance's, and every write goes back to it.
   if (host?.storage) return host.storage.write(scope === 'local' ? 'local' : 'panel', stored, value);
   if (scope === 'local') {
@@ -8768,9 +9035,11 @@ function saveSetting(key, value, opts, scriptId) {
 }
 
 function loadSetting(key, fallback, opts, scriptId) {
+  const name = storageName('ce.storage.loadSetting', key, scriptId, 'the fallback was given back');
+  if (name === undefined) return fallback;
   const scope = storageScopeOf(opts, scriptId, 'ce.storage.loadSetting');
   if (!scope) return fallback;
-  const stored = storageKeyFor(scope, key, scriptId);
+  const stored = storageKeyFor(scope, name, scriptId);
   const source = scope === 'local' ? localRead() : settingsStore();
   const v = source?.[stored];
   return v === undefined ? fallback : v;
@@ -8804,9 +9073,11 @@ function allSettings(opts, scriptId) {
 /** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing
  *  there" — the distinction the whole module keeps. */
 function forgetSetting(key, opts, scriptId) {
+  const name = storageName('ce.storage.forget', key, scriptId, 'nothing was deleted');
+  if (name === undefined) return false;
   const scope = storageScopeOf(opts, scriptId, 'ce.storage.forget');
   if (!scope) return false;
-  const stored = storageKeyFor(scope, key, scriptId);
+  const stored = storageKeyFor(scope, name, scriptId);
   if (host?.storage) return host.storage.forget(scope === 'local' ? 'local' : 'panel', stored);
   if (scope === 'local') {
     const map = localRead();
@@ -8883,12 +9154,32 @@ function jsonKeysOf(value, out, seen) {
   return out;
 }
 
+// encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+// and held to 0 to 10; anything else one line. Each value it cannot use as written is said once,
+// where it was used without a word, and differently in each runtime ("2" was one line in Python and
+// two spaces elsewhere, 20 was 20 spaces in Lua and Python and 10 here).
+const storageWarned = new Set();
+function storageSaid(said) {
+  if (storageWarned.has(said)) return;
+  storageWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+function jsonIndent(opts) {
+  const raw = isOptionsTable(opts) ? opts.indent : undefined;
+  if (raw === undefined || raw === null) return 0;
+  const n = realNumber(raw);
+  const said = (why, used) => storageSaid(`ce.storage.encode: indent is ${shownValue(raw)}, which is ${why}, so ${used}.`);
+  if (n === undefined) { said('not a number', 'the text is on one line'); return 0; }
+  if (n < 0) { said('below 0', 'the text is on one line'); return 0; }
+  if (n > 10) { said('above 10', '10 was used'); return 10; }
+  return Math.floor(n);
+}
+
 function encodeJson(value, opts) {
+  const indent = jsonIndent(opts);
   try {
-    const indent = Number(opts?.indent);
     const keys = [...jsonKeysOf(value, new Set(), new Set())].sort();
-    return JSON.stringify(value, keys.length ? keys : undefined,
-      Number.isFinite(indent) && indent > 0 ? indent : undefined);
+    return JSON.stringify(value, keys.length ? keys : undefined, indent > 0 ? indent : undefined);
   } catch {
     // A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
     // value — which is the same rule every "cannot read that" in this API follows.
@@ -8912,11 +9203,26 @@ function stripJsonNulls(v) {
   return v;
 }
 
+// Text that is not JSON answers nothing and says so: telling a bad config from an empty one is the
+// point of answering nothing, and the script was told neither. Nothing given, or a value that is not
+// text, is refused the same way; a number was read as its own text.
 function decodeJson(text) {
+  const verb = 'ce.storage.decode';
+  if (text === undefined || text === null) {
+    addScriptTrace('error', '', `${verb}: no text was given, so there is no answer.`);
+    return undefined;
+  }
+  if (typeof text !== 'string') {
+    addScriptTrace('error', '', `${verb}: ${shownValue(text)} is not text, so there is no answer.`);
+    return undefined;
+  }
   try {
-    const v = JSON.parse(String(text ?? ''));
+    const v = JSON.parse(text);
     return v === null ? undefined : stripJsonNulls(v);
-  } catch { return undefined; }
+  } catch {
+    addScriptTrace('error', '', `${verb}: the text is not JSON, so there is no answer.`);
+    return undefined;
+  }
 }
 
 /* --------------------------------------------------------- reading what a script passed */
@@ -9042,8 +9348,7 @@ export function optionCheckedMembersForTesting() {
 // @module -
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const self = {
-    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
-      typeof form === 'string' || isOptionsTable(form) ? form : ''),
+    set: (p, v, form) => scriptSet(ownerName ? `${ownerName}.${p}` : p, v, form),
     get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form, true),
   };
   const api = {
@@ -9051,7 +9356,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // object: setValue reads a string as a form and an object as opts. This passed '' for an
     // object, so set(path, v, { transmit = false }) was accepted and its `transmit` never reached
     // the write, in the editor only: the player's host has always read it.
-    set: (path, value, form) => setValue(path, value, typeof form === 'string' || isOptionsTable(form) ? form : ''),
+    set: (path, value, form) => scriptSet(path, value, form),
     get: (path, form) => getValue(path, form, true),
     log: (msg, val) => scriptPrint('log', scriptId, msg, val),
     // Levels the console already renders differently — the runtime uses the distinction constantly
@@ -9447,7 +9752,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     runningTimers: () => runningTimersRead(),
     // ce.device — reads
     deviceProfile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
-    deviceParameters: (opts) => deviceParametersRead(opts ?? {}),
+    deviceParameters: (opts) => (deviceOptionsRefused('parameters', opts) ? [] : deviceParametersRead(opts ?? {})),
     deviceParameter: (id, role) => deviceParameterRead(id, role || DEFAULT_ROLE),
     deviceConnected: (role) => deviceConnectedRead(role || DEFAULT_ROLE),
     deviceRead: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
@@ -9457,7 +9762,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     deviceDefineDump: (kind, spec, role) => deviceDefineDumpImpl(kind, spec, role || DEFAULT_ROLE),
     deviceBind: (control, parameterId, opts) => deviceBindImpl(control, parameterId, opts ?? {}),
     deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
-    devicePorts: (opts) => devicePortsRead(opts ?? {}),
+    devicePorts: (opts) => (deviceOptionsRefused('ports', opts) ? [] : devicePortsRead(opts ?? {})),
     deviceVariables: (role) => deviceVariablesRead(role || DEFAULT_ROLE),
     deviceSetVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
     deviceTiming: (role) => deviceTimingRead(role || DEFAULT_ROLE),
@@ -10440,6 +10745,9 @@ function resetScriptState() {
   textAxisWarned.clear();
   deviceOverrideWarned.clear();
   musicWarned.clear();
+  packWarned.clear();
+  storageWarned.clear();
+  devicePortsWarned.clear();
   drawWarned.clear();
   panelWarned.clear();
   uiWarned.clear();

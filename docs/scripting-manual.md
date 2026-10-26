@@ -950,7 +950,7 @@ Change a value on the panel: a control's value, or any property a path reaches.
 Example: `set("Cutoff", 64)` turns the control called Cutoff to 64.
 
 - `path` (path, required): A control's name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.<br>"panel." and a property: the panel's own, such as "panel.width".<br>".normalizedValue" at the end: its position, 0 to 1, in place of the value.<br>Not a control on the panel, or a property it does not have: nothing is written, with a console error.
-- `value` (any value, required): The new value.<br>A colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".<br>A colour in any other form: nothing is written, with a console error.<br>A gradient stop: RRGGBB, without alpha.
+- `value` (any value, required): The new value.<br>A Knob's, a Slider's, a Number's or a Range's value, and a position: a number. Text that is a number: read as one.<br>A colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".<br>A gradient stop: RRGGBB, without alpha.<br>Left out, a number in any other form, or a colour in any other form: nothing is written, with a console error.
 - `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
 
 Good to know:
@@ -1046,8 +1046,8 @@ Call a function whenever an event happens.
 Example: `on("*", "patchLoaded", fn)` calls fn each time any script emits patchLoaded.
 
 - `target` (control name, required): What the event comes from: a control's name, in any case, or "*" for anything.<br>Left out: "*".
-- `event` (event name, required): The event: a handler's name, such as "onValueChanged", or a name `emit()` announces.
-- `fn` (function, required): Called with the event's information.
+- `event` (event name, required): The event: a handler's name, such as "onValueChanged", or a name `emit()` announces.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with the event's information.<br>Not a function, or left out: nothing is set up, with a console error.
 
 Good to know:
 
@@ -1092,8 +1092,8 @@ Call a function whenever a value on the panel changes.
 
 Example: `watch("Cutoff", function(value, previous) log(value) end)` logs Cutoff's value each time it changes.
 
-- `path` (text, required): What to watch: a path, as `set()` takes it.
-- `fn` (function, required): Called with the new value and the one before.
+- `path` (text, required): What to watch: a path, as `set()` takes it.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with the new value and the one before.<br>Not a function, or left out: nothing is set up, with a console error.
 
 Good to know:
 
@@ -1120,8 +1120,8 @@ Make a property follow a formula.
 
 Example: `compute("Readout.Text.content", function() return get("Cutoff") .. " Hz" end)` keeps Readout showing Cutoff's value.
 
-- `path` (text, required): The property to write: a path, as `set()` takes it.
-- `fn` (function, required): Returns the value to write.
+- `path` (text, required): The property to write: a path, as `set()` takes it.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Returns the value to write.<br>Not a function, or left out: nothing is set up, with a console error.
 
 Good to know:
 
@@ -1148,8 +1148,8 @@ Check or change every value written to a property before it lands.
 
 Example: `intercept("Cutoff", function(value) return math.floor(value) end)` keeps Cutoff whole.
 
-- `path` (text, required): The property: a path, as `set()` takes it.
-- `fn` (function, required): Called with the value and the one before.<br>A value returned: written in its place.<br>false: the change is refused.<br>Nothing: written as it is.
+- `path` (text, required): The property: a path, as `set()` takes it.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with the value and the one before.<br>A value returned: written in its place.<br>false: the change is refused.<br>Nothing: written as it is.<br>Not a function, or left out: nothing is set up, with a console error.
 
 Good to know:
 
@@ -1175,8 +1175,8 @@ Name a function, so other scripts and the panel can call it.
 
 Example: `defineAction("randomize", fn)` lets any script call fn with `run("randomize")`.
 
-- `name` (text, required): The action's name, in any case.
-- `fn` (function, required): Called with what `run()` passes; what it returns goes back.
+- `name` (text, required): The action's name, in any case.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with what `run()` passes; what it returns goes back.<br>Not a function, or left out: nothing is set up, with a console error.
 
 Good to know:
 
@@ -1716,20 +1716,20 @@ ce.midi.panic()
 
 | Function | What it does |
 |---|---|
-| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count` (number, optional): How many bytes of 7 bits to make. Two when it is left out. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive. Short name: `to7bit`. |
-| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): The 7-bit bytes, as a list of numbers. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Case-insensitive. Short name: `from7bit`. |
-| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v` (number, required): The number, from 0 to 16383. Short name: `to14bit`. |
-| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb` (number, required): The high half, from 0 to 127. `lsb` (number, required): The low half, from 0 to 127. Short name: `from14bit`. |
-| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte` (number, required): A byte, from 0 to 255. Short name: `toNibbles`. |
-| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi` (number, required): The high half, from 0 to 15. `lo` (number, required): The low half, from 0 to 15. Short name: `fromNibbles`. |
-| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes` (list of bytes, required): The bytes, as a list. The high half comes first, so the list comes back twice as long. Short name: `nibblize`. |
-| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes` (list of bytes, required): Pairs of 4-bit halves, the high half first. The list comes back half as long. Short name: `denibblize`. |
-| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str` (text, required): The text to turn into codes. `length` (number, optional): The length to fill out to with spaces. Longer text is not cut. Short name: `toAscii`. |
-| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes` (list of bytes, required): The character codes, as a list. Short name: `fromAscii`. |
-| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v` (number, required): The value, which may be negative. `center` (number, required): The number that stands for zero, often 64. Short name: `toOffset`. |
-| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b` (number, required): The byte, as the synth sends it. `center` (number, required): The number that stands for zero, often 64. Short name: `fromOffset`. |
-| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v` (number, required): The number. A positive number comes back unchanged. `bits` (number, required): How many bits the synth uses for it, such as 7 or 8. This is called two's complement. fromSigned reads it back. Short name: `toSigned`. |
-| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b` (number, required): The stored value, as the synth sends it. `bits` (number, required): How many bits the synth uses for it, such as 7 or 8. This reads two's complement, as toSigned writes it. Short name: `fromSigned`. |
+| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split, from 0. Two bytes hold up to 16383, three up to 2097151, four up to 268435455.<br>A fraction: rounded down.<br>One that does not fit in the bytes, not a number, or left out: no result, with a console error. `count` (number, optional): How many bytes of 7 bits to make, from 1 to 4.<br>Left out: 2.<br>Any other: no result, with a console error. `order` (text, optional): "msb": the high byte first.<br>"lsb": the low byte first.<br>Case-insensitive.<br>Left out: "msb".<br>Any other: no result, with a console error. Returns a list of bytes, each from 0 to 127. from7bit joins them back. Short name: `to7bit`. |
+| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): 1 to 4 bytes, each from 0 to 127, as a list or as hex text.<br>More or fewer, a byte above 127, not a list of bytes, or left out: no result, with a console error. `order` (text, optional): "msb": the high byte first.<br>"lsb": the low byte first.<br>Case-insensitive.<br>Left out: "msb".<br>Any other: no result, with a console error. Returns a number. Short name: `from7bit`. |
+| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v` (number, required): The number, from 0 to 16383.<br>A fraction: rounded down.<br>Outside 0 to 16383, not a number, or left out: no result, with a console error. Returns { msb, lsb }, each from 0 to 127. Short name: `to14bit`. |
+| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb` (number, required): The high half, a whole number from 0 to 127.<br>Any other, or left out: no result, with a console error. `lsb` (number, required): The low half, a whole number from 0 to 127.<br>Any other, or left out: no result, with a console error. Returns a number from 0 to 16383. Short name: `from14bit`. |
+| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves, its nibbles. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte` (number, required): A byte, from 0 to 255.<br>A fraction: rounded down.<br>Outside 0 to 255, not a number, or left out: no result, with a console error. Returns { hi, lo }, each from 0 to 15. Some synths send every byte this way. Short name: `toNibbles`. |
+| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi` (number, required): The high half, a whole number from 0 to 15.<br>Any other, or left out: no result, with a console error. `lo` (number, required): The low half, a whole number from 0 to 15.<br>Any other, or left out: no result, with a console error. Returns a byte, from 0 to 255. Short name: `fromNibbles`. |
+| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes` (list of bytes, required): The bytes, each from 0 to 255, as a list or as hex text.<br>Not a list of bytes, or left out: no result, with a console error. Returns a list twice as long, the high half of each byte first. Short name: `nibblize`. |
+| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes` (list of bytes, required): Pairs of halves, the high half first, each from 0 to 15, as a list or as hex text.<br>An odd count, a half above 15, not a list of bytes, or left out: no result, with a console error. Returns a list half as long. Short name: `denibblize`. |
+| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str` (text, required): The text, in ASCII: letters without accents, digits, spaces and the signs on an English keyboard.<br>A character outside ASCII, not text, or left out: no result, with a console error. `length` (number, optional): The length of the field, from 1.<br>Shorter text: filled out with spaces.<br>Longer text: cut to the length, with a console warning the first time.<br>Left out: the text as it is.<br>Any other: the text as it is, with a console warning the first time. Returns a list of codes, each from 0 to 127. fromAscii turns them back into text. Short name: `toAscii`. |
+| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes` (list of bytes, required): The character codes, each from 0 to 127, as a list or as hex text.<br>A code above 127, not a list of bytes, or left out: no result, with a console error. Returns the text. Short name: `fromAscii`. |
+| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v` (number, required): The value, which may be negative.<br>Not a number, or left out: no result, with a console error. `center` (number, required): The number that stands for zero, often 64.<br>Not a number, or left out: no result, with a console error. Returns the value plus the centre, not held to 0 to 127. Short name: `toOffset`. |
+| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b` (number, required): The byte, as the synth sends it.<br>Not a number, or left out: no result, with a console error. `center` (number, required): The number that stands for zero, often 64.<br>Not a number, or left out: no result, with a console error. Returns the byte minus the centre. Short name: `fromOffset`. |
+| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v` (number, required): The number: -128 to 127 for 8 bits, -64 to 63 for 7.<br>From 0: comes back unchanged.<br>A fraction: rounded down.<br>Outside the range, not a number, or left out: no result, with a console error. `bits` (number, required): How many bits the synth uses for it, from 1 to 32, such as 7 or 8.<br>Any other, or left out: no result, with a console error. This is called two's complement. fromSigned reads it back. Returns a number from 0 below 2 to the power of bits: 0 to 255 for 8 bits. Short name: `toSigned`. |
+| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b` (number, required): The stored value, as the synth sends it: a whole number from 0 below 2 to the power of bits, 0 to 255 for 8 bits.<br>Any other, or left out: no result, with a console error. `bits` (number, required): How many bits the synth uses for it, from 1 to 32, such as 7 or 8.<br>Any other, or left out: no result, with a console error. This reads two's complement, as toSigned writes it. Returns a number: -128 to 127 for 8 bits. Short name: `fromSigned`. |
 | `ce.midi.getBits(value, start, count) -> number` | Read a setting from a byte. Example: `getBits(0xB4, 4, 3)` gives 3. `value` (number, required): A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message. `start` (number, required): The first bit of the setting, counted from 0 at the right, the lowest bit. `count` (number, required): How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0. Short name: `getBits`. |
 | `ce.midi.setBits(value, start, count, bits) -> number\|list` | Change a setting in a byte. Example: `setBits(0xB4, 4, 3, 5)` gives 0xD4. `value` (number, required): A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed. `start` (number, required): The first bit of the setting, counted from 0 at the right, the lowest bit. `count` (number, required): How many bits the setting has, from 1 to 32. `bits` (number, required): The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit. Short name: `setBits`. |
 | `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read a number from a SysEx message. Example: `bytesRead(msg, 6, 2)` reads bytes 6 and 7. `bytes` (bytes, required): The message, as a list of bytes or as hex text. `offset` (number, required): Where the number starts, counted from 0. `count` (number, required): How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. By default the bytes are SysEx's 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise. Short name: `bytesRead`. |
@@ -1923,7 +1923,7 @@ List the synth's parameters, as the device profile describes them.
 
 Example: `deviceParameters({ group = "Filter" })` lists the filter's parameters.
 
-- `opts` (options, optional): The options below, every one of which must match.<br>Left out: every parameter.<br>Not a table: an empty list, without a word.
+- `opts` (options, optional): The options below, every one of which must match.<br>Left out: every parameter.<br>Not a table: an empty list, with a console error.
 
 Good to know:
 
@@ -1959,7 +1959,7 @@ Describe one of the synth's parameters, by its id.
 
 Example: `deviceParameter("cutoff").max` gives the highest value cutoff takes.
 
-- `id` (text, required): The parameter's id, as the device profile names it.<br>Not one of its parameters, or left out: no result, without a word.
+- `id` (text, required): The parameter's id, as the device profile names it.<br>Not one of its parameters: no result, without a word.<br>Left out: no result, with a console error.
 - `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
 
 Good to know:
@@ -1986,7 +1986,7 @@ Read the last value the synth reported for a parameter.
 
 Example: `deviceRead("cutoff")` gives the cutoff the synth last sent.
 
-- `id` (text, required): The parameter's id.<br>Never reported, or left out: no result, without a word; not 0.
+- `id` (text, required): The parameter's id.<br>Never reported: no result, without a word; not 0.<br>Left out: no result, with a console error.
 - `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
 
 Good to know:
@@ -2164,7 +2164,7 @@ Connect a control to a synth parameter, so moving the control changes it.
 Example: `deviceBind("Cutoff", "cutoff")` makes the control Cutoff send the synth's cutoff.
 
 - `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
-- `parameterId` (text, required): The parameter's id, as the device profile names it.<br>Not checked against the profile.
+- `parameterId` (text, required): The parameter's id, as the device profile names it or `deviceDefineParameter()` declares it.<br>Not one either knows yet: bound all the same, with a console warning; it works if the parameter arrives.
 - `opts` (options, optional): The options below.
 
 Good to know:
@@ -2220,7 +2220,7 @@ List the MIDI ports.
 
 Example: `devicePorts({ direction = "out" })` lists the ports that send.
 
-- `opts` (options, optional): The option below.<br>Left out: every port.
+- `opts` (options, optional): The option below.<br>Left out: every port.<br>Not a table: an empty list, with a console error.
 
 Good to know:
 
@@ -2233,7 +2233,7 @@ Good to know:
 
 | Name | Type | What it is |
 |---|---|---|
-| `direction` | text | "in": only the ports that receive.<br>"out": only the ones that send.<br>Anything else: every port, without a word. |
+| `direction` | text | "in": only the ports that receive.<br>"out": only the ones that send.<br>Case-insensitive.<br>Anything else: every port, with a console warning the first time. |
 
 ```lua
 -- Lua
@@ -2324,7 +2324,7 @@ Change one timing setting, for this project.
 
 Example: `deviceSetTiming("minDelayBetweenMessagesMs", 20)` leaves at least 20 ms between messages.
 
-- `name` (text, required): The setting's name, as `deviceTiming()` lists it.<br>Not checked against them.
+- `name` (text, required): The setting's name, as `deviceTiming()` lists it. Case-insensitive.<br>Not one of them, or left out: nothing is changed, with a console error.
 - `ms` (number, required): Milliseconds.<br>Range: 0 ↔ 60000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end, with a console warning the first time.
 - `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
 
@@ -2431,11 +2431,11 @@ Helper functions for notes and harmony: note names and numbers, scales, chords, 
 | `ce.music.spelling(root [, scale]) -> boolean` | Tell whether a key is spelled with flats. Example: `ce.music.spelling("F4")` gives true. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns true for the keys of F, B♭, E♭, A♭, D♭ and G♭; false for the others. A minor-type scale ("minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "locrian", "pentatonicMin") is judged by the key a minor third above its root, as the Chord Pad judges it: C minor is spelled as E♭ major. Pass it to `ce.music.name()` to spell as the panel does. Short name: `noteSpelling`. |
 | `ce.music.inScale(note, root [, scale]) -> boolean` | Tell whether a note is in a key. Example: `ce.music.inScale(66, "C4")` gives false. `note` (note, required): The note.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns true or false. In any octave: C2 is in the key of C5. Short name: `inScale`. |
 | `ce.music.degree(note, root [, scale]) -> number` | Give which step of a key a note is. Example: `ce.music.degree("G4", "C4")` gives 5. `note` (note, required): The note, in any octave.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns the step, counted from 1: 1 the root, 5 the fifth. A note not in the key: no result, without a word. `ce.music.quantize()` moves it into the key first. Short name: `scaleDegree`. |
-| `ce.music.degreeChord(root [, scale [, degree [, size]]]) -> table` | Give the chord a key builds on one of its steps. Example: `ce.music.degreeChord("C4", "major", 5).name` gives "G". `root` (note, required): The key's note; its octave places the chord.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. `degree` (number, optional): Step, counted from 1: 1 the root, 5 the fifth.<br>Past the last step: on into the octave above; 8 is the root an octave up.<br>0 and below: the octave below; 0 is the last step.<br>A fraction: rounded down.<br>Not a number, or left out: 1. `size` (number, optional): Notes: 3 a triad, 4 a seventh chord.<br>Below 2: 2.<br>A fraction: rounded down.<br>Not a number, or left out: 3. Returns { notes, names, name, quality, roman, degree, rootNote, offsets }: the notes; their names without the octave, and the chord's ("E♭m7"), spelled as the key is; its quality, as `ce.music.quality()` names it; its roman numeral ("V", "vii°"); the step; its lowest note; the notes as semitones above the root. Built from every other note of the scale, as the Chord Pad builds it. Named from its first four notes: a chord of 5 or more is named as its seventh chord. A chord of a type: `ce.music.chord()`. Short name: `degreeChord`. |
+| `ce.music.degreeChord(root [, scale [, degree [, size]]]) -> table` | Give the chord a key builds on one of its steps. Example: `ce.music.degreeChord("C4", "major", 5).name` gives "G". `root` (note, required): The key's note; its octave places the chord.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. `degree` (number, optional): Step, counted from 1: 1 the root, 5 the fifth.<br>Past the last step: on into the octave above; 8 is the root an octave up.<br>0 and below: the octave below; 0 is the last step.<br>A fraction: rounded down.<br>Left out: 1.<br>Not a number: 1, with a console warning the first time. `size` (number, optional): Notes: 3 a triad, 4 a seventh chord.<br>Below 2: 2.<br>A fraction: rounded down.<br>Left out: 3.<br>Not a number: 3, with a console warning the first time. Returns { notes, names, name, quality, roman, degree, rootNote, offsets }: the notes; their names without the octave, and the chord's ("E♭m7"), spelled as the key is; its quality, as `ce.music.quality()` names it; its roman numeral ("V", "vii°"); the step; its lowest note; the notes as semitones above the root. Built from every other note of the scale, as the Chord Pad builds it. Named from its first four notes: a chord of 5 or more is named as its seventh chord. A chord of a type: `ce.music.chord()`. Short name: `degreeChord`. |
 | `ce.music.quality(notes) -> string` | Name a chord from its notes. Example: `ce.music.quality({60, 63, 67, 70})` gives "min7". `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: no result, with a console error that says where. Returns one of "maj", "min", "dim", "aug", "sus2", "sus4", "maj7", "dom7", "min7", "minMaj7", "dim7" and "m7b5", as the Chord Pad names chords. Named from the lowest note: an inverted chord is named from its bass. A chord it cannot place, such as a bare fifth or one note: "maj". An empty list: no result, without a word. Short name: `chordQuality`. |
 | `ce.music.lead(notes [, previous [, mode]]) -> list` | Rearrange a chord so its notes move as little as they can from the chord before. Example: `ce.music.lead({72, 76, 79}, {60, 64, 67})` gives {60, 64, 67}. `notes` (list of notes, required): The chord to rearrange: MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `previous` (list of notes, optional): The chord before, as `notes`.<br>Left out, or empty: the notes sorted, low to high.<br>Not a list, or a list with anything else in it: an empty list, with a console error. `mode` (text, optional): "closest": all the notes together move as little as they can.<br>"smooth": the top note moves as little as it can; the others may jump.<br>"off": the notes sorted, low to high.<br>Case-insensitive.<br>Left out: "closest".<br>Any other: "closest", with a console warning the first time. Returns the notes as numbers. As the Harmoniser leads its voices. Short name: `voiceLead`. |
 | `ce.music.octaves(notes [, octaves]) -> list` | Repeat notes in the octaves above, as an Arpeggiator spreads them. Example: `ce.music.octaves({60, 64}, 2)` gives {60, 64, 72, 76}. `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `octaves` (number, optional): Octaves, counting the notes' own.<br>Range: 1 ↔ 4, whole.<br>Outside the range: the nearest end, with a console warning the first time.<br>A fraction: rounded down, with a console warning the first time.<br>Not a number: 1, with a console warning the first time.<br>Left out: 1. Returns the notes sorted, low to high, then again an octave up for each octave more. A note that would pass 127 is left out. The step before `ce.music.arp()`. Short name: `expandOctaves`. |
-| `ce.music.arp(notes, pattern) -> list` | Give the order an arpeggiator pattern plays notes in. Example: `ce.music.arp({60, 64, 67}, "updown")` gives {{60}, {64}, {67}, {64}}. `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `pattern` (text, required): "up": in the order given.<br>"down": the order given, reversed.<br>"updown": up, then down, not playing the top or the bottom twice.<br>"downup": down, then up, the same way.<br>"asPlayed": in the order given.<br>"random": in the order given; the Arpeggiator picks each step as it plays.<br>"chord": every note at once, in one step.<br>Case-insensitive.<br>Any other, or left out: "up", with a console warning the first time. Returns a list of steps, each a list of notes. Sort the notes first for a rising run; `ce.music.octaves()` sorts them. Shuffled: `ce.math.shuffle()`. Short name: `arpOrder`. |
+| `ce.music.arp(notes, pattern) -> list` | Give the order an arpeggiator pattern plays notes in. Example: `ce.music.arp({60, 64, 67}, "updown")` gives {{60}, {64}, {67}, {64}}. `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `pattern` (text, required): "up": in the order given.<br>"down": the order given, reversed.<br>"updown": up, then down, not playing the top or the bottom twice.<br>"downup": down, then up, the same way.<br>"asPlayed": in the order given.<br>"random": in the order given; the Arpeggiator picks each step as it plays.<br>"chord": every note at once, in one step.<br>Case-insensitive.<br>Any other: "up", with a console warning the first time.<br>Left out: an empty list, with a console error. Returns a list of steps, each a list of notes. Sort the notes first for a rising run; `ce.music.octaves()` sorts them. Shuffled: `ce.math.shuffle()`. Short name: `arpOrder`. |
 
 ### ce.time: timers and musical time
 
@@ -4134,8 +4134,8 @@ Save a value under a name, to keep it when the script loads again.
 
 Example: `saveSetting("lastPatch", 12)` keeps 12 under lastPatch.
 
-- `key` (text, required): A name you choose, matched as written.<br>A number: used as text.
-- `value` (any value, required): Numbers, text, true or false, lists and tables.
+- `key` (text, required): A name you choose, matched as written.<br>A number: used as text.<br>Left out, or anything else: nothing is saved, with a console error.
+- `value` (any value, required): Numbers, text, true or false, lists and tables.<br>Left out: nothing is saved, with a console error. `ce.storage.forget()` deletes a setting.
 - `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
 
 Good to know:
@@ -4161,7 +4161,7 @@ Read a value saved with `ce.storage.saveSetting()`.
 
 Example: `loadSetting("lastPatch", 1)` gives the saved patch, or 1 if none was saved.
 
-- `key` (text, required): The name it was saved under, matched as written.
+- `key` (text, required): The name it was saved under, matched as written.<br>A number: used as text.<br>Left out, or anything else: the fallback, with a console error.
 - `fallback` (any value, optional): Given back when nothing is saved under the name.<br>Left out: no result.
 - `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
 
@@ -4223,7 +4223,7 @@ Delete one saved value.
 
 Example: `forgetSetting("lastPatch")` deletes lastPatch.
 
-- `key` (text, required): The name it was saved under, matched as written.
+- `key` (text, required): The name it was saved under, matched as written.<br>A number: used as text.<br>Left out, or anything else: false, with a console error.
 - `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
 
 Good to know:
@@ -4342,7 +4342,7 @@ Good to know:
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `indent` | number | 0 | Spaces to indent each level, laid out over several lines.<br>0: one line.<br>Range: 0 ↔ 10.<br>A fraction: rounded down.<br>Above 10: 10. Below 0, or not a number: one line. |
+| `indent` | number | 0 | Spaces to indent each level, laid out over several lines.<br>0: one line.<br>Range: 0 ↔ 10.<br>A fraction: rounded down.<br>Above 10: 10, with a console warning the first time.<br>Below 0, or not a number: one line, with a console warning the first time. |
 
 ```lua
 -- Lua
@@ -4359,11 +4359,11 @@ Read JSON text back into a value.
 
 Example: `decodeJson("[1, 2]")` gives {1, 2}.
 
-- `text` (text, required): JSON text.
+- `text` (text, required): JSON text.<br>Text that is not JSON, not text, or left out: no result, with a console error.
 
 Good to know:
 
-- Returns the value. Text that is not JSON, or left out: no result, without a word.
+- Returns the value.
 - A JSON null is nothing: {"a":1,"b":null} gives a table with a only, and [1,null,2] a list of two.
 
 *Short name: `decodeJson`.*

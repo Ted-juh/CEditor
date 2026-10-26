@@ -233,6 +233,9 @@ test('bind and parameters() read the whole table', () => {
     const unknown = said(() => api.ce.device.bind('Cutoff', 'cutof'));
     assert.equal(unknown.result, true, 'bound anyway: the parameter may still arrive');
     assert.deepEqual(unknown.lines, [deviceBindUnknownWords('Cutoff', 'cutof')]);
+    // A warning, where it was a plain line: the binding is made, and may never do anything.
+    assert.deepEqual(get(scriptTrace).filter((t) => t.message === deviceBindUnknownWords('Cutoff', 'cutof')).map((t) => t.kind),
+      ['warn']);
     assert.deepEqual(api.ce.device.parameters().map((p) => p.id), ['cutoff', 'resonance']);
     assert.equal(api.ce.device.parameter('resonance')?.name, 'Resonance');
     // A binding to a role nothing is mapped to is sent to no profile, so nothing knows its id but a

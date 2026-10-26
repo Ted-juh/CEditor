@@ -91,43 +91,23 @@ is the table of wording the owner rejected and what replaced it; read it before 
   edge to the module's test file, regenerate, run the full suite, one commit per module, push,
   pull request, merge when green, rebuild the branch from `main`.
 
-### Deferred, for the owner to decide
+### Deferred, then decided
 
-- `ce.midi`'s older helpers answer outside their range without a word: `to7bit(20000, 2)`,
-  `to14bit(20000)`, `fromNibbles(16, 0)`, `nibblize({300})`, `denibblize` with an odd count,
-  `toSigned(-200, 8)`, `from7bit("02 2C")`, `toAscii` not cutting long text. Their parameters say
-  the ranges, not that a value outside them goes unnoticed. Rejecting them is the rule above; it
-  was left for the owner since it is behaviour older scripts may lean on.
-- `ce.time`'s helpers took a required number left out as its default (bar 1, 0 ms) by an earlier
-  session's decision; `ce.time` reversed it under the rule above. If the owner prefers the old
-  behaviour for the transport helpers, it is `optional: true` on those arguments in `timeWords.js`
-  and the three `__TIME_NUMBERS` tables.
-
-- `ce.device`, which runs in four runtimes, answers without a word: `deviceParameter()` and
-  `deviceRead()` with no id give nothing, `deviceParameters(5)` an empty list, `devicePorts` with a
-  `direction` that is not "in" or "out" every port, `deviceSetTiming` with a name the profile does
-  not have stores it, and `deviceBind` binds to a parameter the profile does not have. The rules say
-  a required value left out, or a wrong option, is refused or said; each would be a change in the
-  panel runtime, `ScriptRuntime.cpp` and the three preludes, so they are left for the owner. The
-  texts say what each does now.
-- `ce.core`, in four runtimes: `set()` with a value left out, or of a type the property does not
-  take, writes it as given in the panel window (a knob's value of "x"), without a word; `on()`, `watch()`, `compute()`,
-  `intercept()` and `defineAction()` with no function, or no name, set nothing up without a word.
-- `ce.storage`, in four runtimes: `saveSetting()` with no name or no value saves under "" or saves
-  nothing, and answers true; `decodeJson()` of text that is not JSON answers nothing without a word;
-  `encodeJson`'s indent below 0 or not a number is one line, and above 10 is 10, without a word.
-- `ce.music`, also in four runtimes: `degreeChord`'s step and size that are not numbers are 1 and 3
-  without a word, where the rule says the default with a warning; `arp`'s pattern left out is "up"
-  with a warning, where a required value left out is refused.
+Six items were left here for the owner: silences in `ce.core`, `ce.storage`, `ce.device` and
+`ce.music`, each a change in four runtimes, the older `ce.midi` helpers that answered outside their
+range, and whether `ce.time`'s transport helpers should go back to their old defaults. The owner
+answered on 2026-10-26: "As recommended, do the deferred items too". Each was done by the rules
+above, and [The deferred items](#the-deferred-items) records what each one does now.
 
 ### Left
 
 Every module in the table under [The branch](#the-branch) is done, and so are the module and event
-descriptions: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass), which
-records each decision for the owner's review. What is left is the owner's: the items under
-[Deferred, for the owner to decide](#deferred-for-the-owner-to-decide) (silences in the modules
-that run in four runtimes, and the older `ce.midi` helpers), and the "noticed, not changed" lines
-in the per-module records.
+descriptions and the deferred items: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass)
+and [The deferred items](#the-deferred-items), which record each decision for the owner's review.
+What is left is the owner's: the four "noticed, not changed" lines in the records (the Drum Pads'
+colour refusal, the Orbit's node verbs, the hand-written components' refusal form, and the plug-in
+sending a bound control's text value as 0), and whether `browser-checks/componentBehavior.mjs` runs
+in CI.
 
 ---
 
@@ -394,7 +374,8 @@ table. `ce.midi` is finished. Decided with it, and to follow in the modules afte
 - **A helper with only a signature gets a parameter list**, type `value`, as `to7bit`'s, so its
   parameters can be described. Thirteen in `ce.midi` had none.
 
-Found on the way and left for the owner, since it is behaviour: the older helpers give an answer
+Found on the way and left for the owner, since it is behaviour (done since, at the owner's word: [The
+deferred items](#the-deferred-items)): the older helpers give an answer
 without a message where the byte-list helpers refuse. `to7bit(20000, 2)`, `to14bit(20000)`,
 `from14bit(128, 0)` and `fromNibbles(16, 0)` answer outside their range, `nibblize({300})` gives
 `{2, 12}`, `denibblize` drops an odd last half, `toSigned(-200, 8)` gives 56, `from7bit("02 2C")`
@@ -1831,8 +1812,9 @@ options (`controlName` and the rest) and every option field likewise. Decided by
 ### `ce.device`
 
 Runs in the panel window (`panelRuntime.js`) and in the plug-in (`ScriptRuntime.cpp` and the three
-preludes), so its texts were rewritten to the form and say what each does now, and its silences are
-left for the owner, below, since each one is a change in four runtimes. The option fields of
+preludes), so its texts were rewritten to the form and say what each does now, and its silences were
+left for the owner, since each one is a change in four runtimes ([The deferred items](#the-deferred-items)
+has them done). The option fields of
 `deviceDefineParameter` and `deviceDefineDump` keep their prose, which was already full.
 
 ### `ce.components.router`
@@ -1958,8 +1940,8 @@ Runs in the panel window (`panelRuntime.js`) and in the plug-in's three engines 
 ### `ce.core` and `ce.storage`
 
 Both run in the panel window and the plug-in's three engines, so their texts were rewritten to the
-form and say what each does now; their silences are left for the owner, below, as `ce.device`'s
-were. `ce.storage`'s scope option and `set`'s transmit option are rewritten too; the other options
+form and say what each does now; their silences were left for the owner, as `ce.device`'s were
+([The deferred items](#the-deferred-items) has them done). `ce.storage`'s scope option and `set`'s transmit option are rewritten too; the other options
 keep their prose. `defineAction`'s text said a name defined again is replaced; one another script
 defined is ignored, with a console error, which the text now says.
 
@@ -2039,6 +2021,67 @@ Their texts are one sentence each now, the rest in notes, as the commands'.
 
 With these, every module in the table above is done.
 
+### The deferred items
+
+At the owner's word on 2026-10-26 ("As recommended, do the deferred items too"), each item that was
+left under [Deferred, then decided](#deferred-then-decided), done by the rules: a required value
+left out, or of the wrong type, is refused with an error; a word or number with a wrong value is
+its fallback, said once; a value outside its range is refused where the answer would mean nothing.
+Every runtime says the same words: `scriptPreludeAgreement.test.js` runs the Lua, JavaScript and
+Python preludes against the panel window's answers, and `PlayerScriptIntegrationTests.cpp` runs the
+plug-in's own `set()` and the Lua bindings.
+
+- **`ce.midi`'s encoding helpers**, `to7bit` to `fromSigned`, refuse what does not fit, by the byte
+  lists' rule ("…, so there is no answer."): a value to split past its bytes or below 0, a part to
+  join past its bits or not whole, an odd count of halves, a byte past 7 bits where a 7-bit byte is
+  joined, a number that is not one, a list that is not bytes. A value to split is rounded down, as
+  it always was. `to7bit`'s count is 1 to 4 and its order "msb" or "lsb" (anything else was "lsb");
+  `toSigned`'s value is held to the signed range of its bits, -128 to 127 for 8, and its bits to 1 to
+  32. A number may be text that is one, and `from7bit` reads hex text as the byte lists do.
+  `toAscii` refuses a character outside ASCII (the four runtimes gave four answers for "é") and cuts
+  text longer than its length to it, said once; a length that is not a whole number from 1 is no
+  length, said once. `toOffset` and `fromOffset` refuse a number that is not one and keep their sum
+  unheld, as their notes say.
+- **`ce.music`**: `degreeChord`'s step and size are their defaults, said once, when they are not a
+  number, and a number written as text is one; `null` was step 0 in two runtimes and 1 in Lua, and
+  "0x10" 16 in two and the default in one. `arp`'s pattern left out is refused with an empty list,
+  in the words its notes are refused in.
+- **`ce.storage`**: `saveSetting` refuses a name or a value left out (a table cannot hold nil, so no
+  runtime could keep one); `loadSetting` and `forget` refuse a name left out; a name is text, or a
+  number used as text, and `""` stays a name, so `clear()` and `all()` reach what an older script
+  saved there. `decodeJson` refuses text that is not JSON, nothing, and a value that is not text,
+  and Python's reader now refuses NaN and Infinity as the other three do. `encodeJson`'s indent is
+  read as a number, held to 10 and said once, or one line, said once, where each runtime read it
+  its own way.
+- **`ce.core`**: `set()` refuses a value left out, and a Knob's, a Slider's, a Number's or a Range's
+  value, or any `.normalizedValue`, that is not a number; text that is a number is stored as one. The
+  plug-in's host asks `PanelValueModel::writeNeedsNumber` and says the same words
+  (`BridgeScriptHost::setValue`). A control bound to a device parameter is not held to numbers: its
+  binding reads the value, and in the editor takes a choice by its name ("LP") and says what it
+  cannot read. Other properties are not held to a type: their types are not modelled, and colours
+  are read by their own rule; a colour left out is said in a colour's words, as it was.
+  **Noticed, not changed**: in the plug-in a bound control's value goes to its host parameter as
+  `(float) value`, so a choice's name, or "x", is sent as 0 (`PluginProcessor.h`, `cb.setValue`);
+  reading a choice there by its name, as the editor does, is a change to the plug-in's parameter
+  write, left for the owner. `on`,
+  `watch`, `compute`, `intercept` and `defineAction` refuse an event, path or name left out, or a
+  function that is not one. In Lua those five are the host's bindings, so the prelude wraps them; a
+  name left out there stopped the script in sol2's words. `on`'s target left out is `"*"`, as its
+  text says, which the plug-in's JavaScript did not do.
+- **`ce.device`**: `parameter` and `read` refuse an id left out; `parameters` and `ports` refuse
+  something that is not a table of options (`ports("in")` listed every port); `ports` says once of a
+  direction that is not "in" or "out", and reads one in any case; `setTiming` refuses a name the
+  profile has no timing for, listing the ones it has, and takes a name in any case, written in the
+  profile's spelling so the override is read; and the preludes send a name left out of `setTiming`
+  or `setVariable` as `""`, which the host refuses, where "nil", "undefined" or "None" was stored.
+  `bind` to an id neither the profile nor a declaration knows was already said, as a plain line, and
+  bound anyway, since a script may bind before it declares and a profile's table can still be
+  loading; refusing would break both, so it stays bound and the line is a warning. A variable is
+  not checked against the profile's: a recipe a script declares may use its own.
+- **`ce.time`**: kept as it is. A required number left out is refused, the rule above; the old
+  defaults would be `optional: true` on those arguments in `timeWords.js` and the three
+  `__TIME_NUMBERS` tables, if the owner ever wants them back.
+
 ## Checking each batch
 
 From `CE/web`:
@@ -2063,12 +2106,12 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md. Every module's descriptions are done, and so are the
-module and event descriptions: the owner's item-by-item reviews of the LCD, the arp and the pixel,
-then every other module in one pass at the owner's word ("The remaining modules, in one pass" in
-this file, which records each decision for review). What is left is the owner's to decide: the
-section "Deferred, for the owner to decide" (silences in ce.core, ce.storage, ce.device and ce.music,
-which each run in four runtimes, and the older ce.midi helpers), and the "noticed, not changed"
-lines in the per-module records. Take one at a time: say what it does now and what the rules would
-make it do, and wait for the owner's answer before changing anything.
+Read docs/design/api-descriptions-handoff.md. Every module's descriptions are done, the module and
+event descriptions too, and so are the items once deferred: the owner's item-by-item reviews of the
+LCD, the arp and the pixel, then every other module and the deferred items in one pass at the
+owner's word ("The remaining modules, in one pass" and "The deferred items" in this file record each
+decision for review). What is left is the owner's: the four "noticed, not changed" lines in the
+records, and whether browser-checks/componentBehavior.mjs runs in CI. Take one at a time:
+say what it does now and what the rules would make it do, and wait for the owner's answer before
+changing anything.
 ```
