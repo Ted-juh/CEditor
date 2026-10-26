@@ -303,6 +303,17 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   with a console error, in the panel window and the plug-in alike. A name given to `name` stopped a
   Lua or Python script with an error and gave "undefinedNaN" in JavaScript; `number` gave nothing
   without a word.
+- `ce.components.constraint.member` keeps the Constraint's rule, as a drag does: the other members
+  move. It set the one member and left the others, so members that should add up to 1 did not.
+  `ce.components.timbre.power` takes 0.5 to 16, as the pad blends it.
+- `ce.components.recorder.store` refuses a slot past 8, where it answered true and stored nothing;
+  `quantize` reads a key by its name ("F#") and a scale in any case, and refuses a grid written as
+  text, where "1/16" was one division of the loop and a key's name was C; and its take commands say
+  why they did nothing when there is no take, or while it records.
+- `ce.image` and `ce.text` tell a name that is no control so, where they said it had no image
+  layer or no Text section; `ce.image.asset()`, `ce.text.font()` and `ce.image.load()` with nothing
+  to look up, and `ce.image.set` with neither a picture nor an option, say so; and
+  `ce.image.assets` and `ce.text.fonts` apply both of their filters together.
 
 ## What you get
 

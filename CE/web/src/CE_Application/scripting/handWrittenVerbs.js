@@ -24,6 +24,8 @@ import { MIN_STEPS, MAX_STEPS, MIN_ROWS, MAX_ROWS, PHRASE_SEEDS, PHRASE_DIRECTIO
 import { HARMONY_MODES, VOICINGS, OUT_OF_KEY, VOICE_LEADING, MEMORY_PRESETS } from '../utils/harmoniserLayout.js';
 import { setlistScenes } from '../utils/setlistLayout.js';
 import { SCALES } from '../utils/chordPadLayout.js';
+import { SCALE_NAMES, pitchClassOf } from './musicTheory.js';
+import { realNumber } from './scriptColours.js';
 import { shownValue } from './shownValue.js';
 import { listWord } from '../utils/wordLists.js';
 
@@ -127,6 +129,28 @@ function recorderSlotRefusal(cfg, action, slot) {
     : `There is no take in slot ${shownValue(slot)}: ${held ? `slots 1 to ${held} hold takes` : 'no slot holds one yet'}.`;
 }
 
+// The take-editing actions refuse while recording (the live take is committed when it stops) and
+// with no take to edit; they said "refused, nothing changed" and not why.
+const TAKE_ACTIONS = ['clear', 'undo', 'quantize', 'nudge', 'shift'];
+function recorderTakeRefusal(cfg) {
+  if (isRecordingState(String(cfg.state))) return 'It is recording; the take can be changed once it stops.';
+  const events = Array.isArray(cfg.take?.events) ? cfg.take.events : [];
+  return events.length ? null : 'It has no take: record one first.';
+}
+
+/** recorder.quantize's grid, scale and key, read; or why not. A grid as text ("1/16") was 1 division,
+ *  a scale it does not have no scale, and a key's name C, each without a word. */
+export function recorderQuantizeArgs({ grid, strength, scale, key }) {
+  const g = grid === undefined || grid === null ? undefined : realNumberOf(grid);
+  if (g === null) return { reason: 'A grid is a number of divisions per loop, from 1 to 64: 16 over one bar is sixteenth notes.' };
+  const word = scale === undefined || scale === null ? undefined : (listWord(SCALE_NAMES, String(scale)) ?? null);
+  if (word === null) return { reason: `One of: ${SCALE_NAMES.join(', ')}.` };
+  const pc = key === undefined || key === null ? undefined : pitchClassOf(key);
+  if (pc === null) return { reason: 'A key is a note\'s name, such as "F#", in any case, or a number round the octave, 0 being C.' };
+  return { args: { grid: g, strength, scale: word, key: pc } };
+}
+const realNumberOf = (v) => (typeof v === 'boolean' ? null : (realNumber(v) ?? null));
+
 function sceneRefusal(cfg, scene) {
   const scenes = setlistScenes({ _children: { Setlist: cfg } });
   if (!scenes.length) return 'It has no scenes.';
@@ -155,6 +179,10 @@ export function handWrittenRefusal(family, action, cfg, args) {
   }
   if (family === 'split') { const r = splitZoneRefusal(c.zones, a.zone); return r ? { at: 0, reason: r } : null; }
   if (family === 'phrase' && action === 'cell') return phraseCellRefusal(c, a.step, a.row);
+  if (family === 'recorder' && TAKE_ACTIONS.includes(action)) {
+    const r = recorderTakeRefusal(c);
+    return r ? { at: 0, reason: r } : null;
+  }
   if (family === 'recorder' && (action === 'store' || action === 'load')) {
     const r = recorderSlotRefusal(c, action, a.slot);
     return r ? { at: 0, reason: r } : null;

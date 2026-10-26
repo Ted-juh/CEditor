@@ -1260,6 +1260,30 @@ test('the Panic\'s verbs say what a press sends', () => {
   assert.equal(MEMBER_BY_ID.panicSetShowSummary.notes[0], 'Drawn only on a button 46 pixels tall or more.');
 });
 
+// ce.components.timbre, macro, constraint and joystick, done in one pass at the owner's word.
+test('a Constraint\'s member keeps its rule, as a drag keeps it', () => {
+  // The verb wrote the one value and left the others: "sum" members added up to 1.3.
+  const cfg = { ...SECTION_DEFAULTS.Constraint };
+  const sum = componentScriptPatch(byId('constraintMember'), cfg, [1, 0.8]).members.map((m) => m.value);
+  assert.deepEqual(sum.map((x) => Math.round(x * 1000) / 1000), [0.8, 0.12, 0.08]);
+  const order = componentScriptPatch(byId('constraintMember'), { ...cfg, mode: 'order', minGap: 0.1 }, [2, 0.9]).members.map((m) => m.value);
+  assert.ok(order[2] >= 1 - 1e-9 && order[0] <= order[1], `order is kept: ${order}`);
+  const free = componentScriptPatch(byId('constraintMember'), { ...cfg, mode: 'free' }, [1, 0.8]).members.map((m) => m.value);
+  assert.deepEqual(free, [0.8, 0.3, 0.2], 'free moves the one');
+});
+
+test('the Timbre Pad, Macro and Vector Joystick say what each sends, and the blend takes what it plays', () => {
+  assert.equal(byId('timbrePower').min, 0.5, 'anchorWeights takes a power of 0.5 at least');
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(text('macroSlotDepth', 'depth').split('\n')[1], 'Below 0: it goes down as the knob turns up.');
+  assert.equal(MEMBER_BY_ID.macroValue.notes[0], 'Every slot that is on is sent its value from there.');
+  // The corners by number, as joystickCornerLabels orders them: the third is the bottom left.
+  assert.deepEqual(MEMBER_BY_ID.joystickCornerLabel.params.map((p) => p.name), ['target', 'index', 'text']);
+  assert.equal(text('joystickCornerLabel', 'index').split('\n')[0], 'Corner: 1 the top left, 2 the top right, 3 the bottom left, 4 the bottom right.');
+  assert.equal(text('joystickReturnValue', 'returnValue').split('\n')[1], 'Range: 0 ↔ 1.');
+  assert.equal(text('joystickReturnTime', 'returnTime').split('\n')[2], 'Range: 0 ↔ 5000.');
+});
+
 test('a number counted from 1 is rounded, and every such parameter says so', () => {
   // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
   const lines = { lines: ['A', 'B'] };

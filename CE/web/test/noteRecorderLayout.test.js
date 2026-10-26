@@ -15,6 +15,7 @@ import {
 } from '../src/CE_Application/utils/noteRecorderLayout.js';
 import { noteOutputFromBytes } from '../src/CE_Application/stores/noteOutput.js';
 import { applyNoteEvent, EMPTY_NOTE_STATE } from '../src/CE_Application/utils/midiNoteInput.js';
+import { recorderQuantizeArgs, handWrittenRefusal } from '../src/CE_Application/scripting/handWrittenVerbs.js';
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 function rc(c) { return { _children: { Core: { controlType: 'Recorder' }, Recorder: c } }; }
@@ -433,4 +434,24 @@ test('a slot is a copy in each direction', () => {
   assert.equal(storeSlot([], 99, take).length, 0, 'out of range stores nothing');
   assert.equal(slotIndex(rc({ slots: [{}, {}], slot: 5 })), 1);
   assert.equal(slotIndex(rc({})), -1);
+});
+
+/* ------------------------------------------------------------ the review of ce.components.recorder */
+
+
+test('a slot past the last is refused, and a take action on no take says why', () => {
+  // storeSlot left the list as it was, which the runtime read as "already that way" and true.
+  assert.deepEqual(recorderScriptPatch({ slots: [] }, 'store', { slot: 9 }), {});
+  assert.equal(handWrittenRefusal('recorder', 'store', {}, { slot: 9 }).reason, 'There is no slot 9: the slots are 1 to 8.');
+  assert.equal(handWrittenRefusal('recorder', 'clear', { take: { events: [] } }, {}).reason, 'It has no take: record one first.');
+  assert.equal(handWrittenRefusal('recorder', 'nudge', { state: 'recording', take: { events: [{ t: 0, note: 60 }] } }, {}).reason,
+    'It is recording; the take can be changed once it stops.');
+});
+
+test('quantize reads a key by its name and a scale in any case, and refuses a grid written as text', () => {
+  // A grid of "1/16" was one division, a scale it has not none, and a key's name C, each without a word.
+  assert.deepEqual(recorderQuantizeArgs({ grid: 16, strength: 1, scale: 'DORIAN', key: 'f#' }).args, { grid: 16, strength: 1, scale: 'dorian', key: 6 });
+  assert.match(recorderQuantizeArgs({ grid: '1/16' }).reason, /^A grid is a number of divisions per loop/);
+  assert.match(recorderQuantizeArgs({ grid: 16, scale: 'nope' }).reason, /^One of: major, minor/);
+  assert.match(recorderQuantizeArgs({ grid: 16, key: 'H' }).reason, /^A key is a note's name/);
 });

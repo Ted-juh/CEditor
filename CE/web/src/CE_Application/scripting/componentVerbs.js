@@ -40,6 +40,7 @@ import { VERB_VALUES } from './componentTables.js';
 import { pitchClassOf } from './musicTheory.js';
 import { envelopePreset } from '../utils/envelopeLayout.js';
 import { SCALES as CHORD_SCALES } from '../utils/chordPadLayout.js';
+import { applyConstraint } from '../utils/constraintLayout.js';
 import { DIVISION_IDS, MIN_BPM, MAX_BPM, MIN_BARS as LOOP_MIN_BARS, MAX_BARS as LOOP_MAX_BARS, MAX_LOOP_BAR, MAX_COUNT_IN_BARS } from '../utils/transportLayout.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { SOURCE_KINDS } from '../utils/controlSources.js';
@@ -91,16 +92,18 @@ function curvePointRange(points, at) {
 // Where a control goes when it is let go (returnToRest.js), as the Crossfader, the Ribbon and the
 // Vector Joystick share it: four verbs with the same rules, worded for each control's own range.
 function returnVerbs(section, words) {
+  // The ranges are the inspector's field set's, or given where it has none (the Vector Joystick).
+  const range = (field) => words.ranges?.[field] ?? FIELD(section, field);
   return [
     v('returnMode', 'returnMode', ENUM, { doc: 'Set where it goes when it is let go.', ex: ['"center"', `springs back to ${words.centre} when let go`],
       argDocs: { returnMode: [`"none": it stays where it is let go.`, `"center": back to ${words.centre}.`, `"min": back to ${words.min}.`,
         `"max": back to ${words.max}.`, '"rest": back to `returnValue()`.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n') },
       notes: ['On letting go of a drag: a script\'s value stays.', 'Default: "none".'] }),
-    v('returnValue', 'returnValue', NUM, { ...FIELD(section, 'returnValue'), doc: `Set ${words.rest} it goes back to with \`returnMode()\` "rest".`, ex: ['0.25', 'goes back to a quarter of the way'],
-      argDocs: { returnValue: `${words.restLines}\nRange: ${FIELD(section, 'returnValue').min} ↔ ${FIELD(section, 'returnValue').max}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+    v('returnValue', 'returnValue', NUM, { ...range('returnValue'), doc: `Set ${words.rest} it goes back to with \`returnMode()\` "rest".`, ex: ['0.25', 'goes back to a quarter of the way'],
+      argDocs: { returnValue: `${words.restLines}\nRange: ${range('returnValue').min} ↔ ${range('returnValue').max}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
       notes: ['Only while `returnMode()` is "rest".'] }),
-    v('returnTime', 'returnTime', NUM, { ...FIELD(section, 'returnTime'), doc: 'Set how long it takes to go back when let go.', ex: ['500', 'takes half a second to go back'],
-      argDocs: { returnTime: `Milliseconds for the whole way back.\n0: at once.\nRange: ${FIELD(section, 'returnTime').min} ↔ ${FIELD(section, 'returnTime').max}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
+    v('returnTime', 'returnTime', NUM, { ...range('returnTime'), doc: 'Set how long it takes to go back when let go.', ex: ['500', 'takes half a second to go back'],
+      argDocs: { returnTime: `Milliseconds for the whole way back.\n0: at once.\nRange: ${range('returnTime').min} ↔ ${range('returnTime').max}.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.` },
       notes: ['Only while `returnMode()` is not "none".'] }),
     v('returnCurve', 'returnCurve', ENUM, { doc: 'Set how it moves on the way back.', ex: ['"exp"', 'springs back fast, then settles'],
       argDocs: { returnCurve: '"linear": at one speed.\n"exp": fast, then settling, as a spring.\n"ease": slow, fast, slow.\nCase-insensitive.\nInvalid: rejected with a console error.' },
@@ -929,15 +932,35 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.timbre"): what timbreLayout.js and TimbreRenderer do with each.
     id: 'timbre', section: 'Timbre', prefix: 'timbre', label: 'Timbre Pad',
-    summary: 'Move the Timbre puck and change how sharply it favours the nearest anchor.',
+    summary: 'Move a puck over anchors, each a patch with a value for every target, and send their values blended by how near it is: the puck, the blend and each anchor.',
     verbs: [
-      v('move', '', XY, { fx: 'x', fy: 'y', ...UNIT, flat: true }),
-      v('power', 'power', NUM, { min: 0.1, max: 16 }),
-      v('anchorX', 'anchors', ITEM, { item: 'x', kind: NUM, ...UNIT }),
-      v('anchorY', 'anchors', ITEM, { item: 'y', kind: NUM, ...UNIT }),
-      v('axisX', 'axisX', STR, { doc: 'What the horizontal axis is called — it is a label, and a performer reads it.' }),
-      v('axisY', 'axisY', STR),
+      v('move', '', XY, { fx: 'x', fy: 'y', ...UNIT, flat: true, doc: 'Move the puck to a point on the pad.', ex: ['0.8, 0.8', 'moves the puck to the upper right'],
+        argDocs: { x: 'Across the pad: 0 the left, 1 the right.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.',
+          y: 'Up the pad: 0 the bottom, 1 the top.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.' },
+        notes: ['Every target is sent a mix of the anchors\' values, the nearer the more.', 'Default: 0.5, 0.5.'] }),
+      // The engine's floor (anchorWeights takes 0.5 at least): 0.1 to 0.5 was taken and blended as 0.5.
+      v('power', 'power', NUM, { min: 0.5, max: 16, doc: 'Set how strongly the nearer anchors win the blend.', ex: ['6', 'lets the nearest anchor take over sooner'],
+        argDocs: { power: 'Power of the distance.\nLow: an even mix. High: the nearest anchor wins.\nRange: 0.5 ↔ 16.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['The inspector takes 1 to 6.', 'Default: 2.'] }),
+      v('anchorX', 'anchors', ITEM, { item: 'x', kind: NUM, ...UNIT, doc: 'Move one anchor across the pad, by its number.', ex: ['2, 0.9', 'moves anchor 2 to the right edge'],
+        argDocs: { x: 'Across the pad: 0 the left, 1 the right.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('anchorY', 'anchors', ITEM, { item: 'y', kind: NUM, ...UNIT, doc: 'Move one anchor up or down the pad, by its number.', ex: ['2, 0.1', 'moves anchor 2 near the bottom'],
+        argDocs: { y: 'Up the pad: 0 the bottom, 1 the top.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('axisX', 'axisX', STR, { doc: 'Set the name written along the bottom, for what the pad changes from left to right.', ex: ['"dark → bright"', 'writes dark → bright along the bottom'],
+        argDocs: { axisX: 'The name.\n"": none.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Default: "dark → bright".'] }),
+      v('axisY', 'axisY', STR, { doc: 'Set the name written up the left side, for what the pad changes from bottom to top.', ex: ['"soft → aggressive"', 'writes soft → aggressive up the left side'],
+        argDocs: { axisY: 'The name.\n"": none.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Default: "soft → aggressive".'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the puck and the anchors be dragged, or not.',
+        argDocs: { editable: `true: a drag on an anchor moves it; anywhere else, it moves the puck.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showField', 'showField', BOOL, { toggle: true, doc: 'Show or hide the coloured glow round each anchor.', notes: ['Default: shown.'] }),
+      v('showAnchors', 'showAnchors', BOOL, { toggle: true, doc: 'Show or hide the anchors and their names.', notes: ['Hidden, they still blend.', 'Default: shown.'] }),
+      v('showReadout', 'showReadout', BOOL, { toggle: true, doc: 'Show or hide how many targets are bound to a parameter, as "2/3 MIDI" at the top right.', notes: ['Default: shown.'] }),
     ],
   },
 
@@ -995,16 +1018,34 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.macro"): what macroLayout.js and MacroRenderer do with each.
     id: 'macro', section: 'Macro', prefix: 'macro', label: 'Macro',
-    summary: 'Turn the Macro, and re-weight what it drives.',
+    summary: 'Turn one knob that drives several parameters, each slot with its own depth, curve and range.',
     verbs: [
-      v('value', 'value', NUM, UNIT),
-      v('slot', 'slots', ITEM, { item: 'enabled', kind: BOOL }),
-      v('slotDepth', 'slots', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1 }),
-      v('slotCurve', 'slots', ITEM, { item: 'curve', kind: ENUM }),
-      v('slotMin', 'slots', ITEM, { item: 'min', kind: NUM, ...UNIT }),
-      v('slotMax', 'slots', ITEM, { item: 'max', kind: NUM, ...UNIT }),
-      v('label', 'label', STR),
+      v('value', 'value', NUM, { ...UNIT, doc: 'Turn the knob.', ex: ['0.75', 'turns the knob three quarters of the way'],
+        argDocs: { value: 'Position: 0 fully left, 1 fully right.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Every slot that is on is sent its value from there.', 'Default: 0.28.'] }),
+      v('slot', 'slots', ITEM, { item: 'enabled', kind: BOOL, doc: 'Switch one slot on or off, by its number.', ex: ['2, false', 'stops slot 2 following the knob'],
+        argDocs: { enabled: `true: it follows the knob.\nfalse: it sends 0.\nLeft out: toggles.\n${OFF_RULE}` } }),
+      v('slotDepth', 'slots', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1, doc: 'Set how much of the knob\'s turn one slot follows, by its number.', ex: ['3, -0.5', 'makes slot 3 fall half as far as the knob turns'],
+        argDocs: { depth: 'Part of the turn: 1 all of it, 0.5 half.\nBelow 0: it goes down as the knob turns up.\n0: it stays at `slotMin()`.\nRange: -1 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('slotCurve', 'slots', ITEM, { item: 'curve', kind: ENUM, doc: 'Set how one slot follows the turn, by its number.', ex: ['1, "exp"', 'makes slot 1 change slowly at first'],
+        argDocs: { curve: '"linear": evenly.\n"exp": slowly, then fast.\n"log": fast, then slowly.\n"scurve": slowly at both ends.\nCase-insensitive.\nInvalid: rejected with a console error.' } }),
+      v('slotMin', 'slots', ITEM, { item: 'min', kind: NUM, ...UNIT, doc: 'Set the value one slot sends with the knob at 0, by its number.', ex: ['1, 0.2', 'keeps slot 1 at 0.2 or more'],
+        argDocs: { min: 'Value.\nAbove `slotMax()`: the slot runs the other way.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('slotMax', 'slots', ITEM, { item: 'max', kind: NUM, ...UNIT, doc: 'Set the value one slot sends with the knob at 1, by its number.', ex: ['1, 0.8', 'keeps slot 1 at 0.8 or less'],
+        argDocs: { max: 'Value.\nBelow `slotMin()`: the slot runs the other way.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' } }),
+      v('label', 'label', STR, { doc: 'Set the caption above the knob.', ex: ['"TONE"', 'captions the knob TONE'],
+        argDocs: { label: 'The caption, drawn in capitals.\n"": none.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Default: "Macro".'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the knob be turned by dragging, or not.',
+        argDocs: { editable: `true: a drag up turns it up.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showLanes', 'showLanes', BOOL, { toggle: true, doc: 'Show or hide a lane for each slot beside the knob.', notes: ['Hidden, the knob fills the control.', 'Default: shown.'] }),
+      v('showValues', 'showValues', BOOL, { toggle: true, doc: 'Show or hide the knob\'s value and each slot\'s.', notes: ['Default: shown.'] }),
+      v('showDivisions', 'showDivisions', BOOL, { toggle: true, doc: 'Show or hide the level lines along each slot\'s lane.',
+        notes: ['How many: set in the inspector, under Major and Minor.', 'Default: hidden.'] }),
     ],
   },
   {
@@ -1022,12 +1063,31 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.constraint"): what constraintLayout.js and the preview's drag do with each.
     id: 'constraint', section: 'Constraint', prefix: 'constraint', label: 'Constraint',
-    summary: 'Move one member of a Constraint group — the others rebalance around it.',
+    summary: 'Keep several values to a rule as one of them moves: adding up to 1, in order, in proportion, or mirrored.',
     verbs: [
-      v('mode', 'mode', ENUM),
-      v('gap', 'minGap', NUM, UNIT),
-      v('member', 'members', ITEM, { item: 'value', kind: NUM, ...UNIT }),
+      v('mode', 'mode', ENUM, { doc: 'Set the rule the members keep.', ex: ['"order"', 'keeps each member at or above the one before'],
+        argDocs: { mode: '"sum": they add up to 1; the others share what is left, as they stood.\n"order": each at or above the one before, by `gap()` at least.\n"ratio": all scaled together, keeping their proportions.\n"mirror": member 2 is 1 minus member 1; the others are free.\n"free": no rule.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Kept from the next move on: the values are not changed now.', 'Default: "sum".'] }),
+      v('gap', 'minGap', NUM, { ...UNIT, doc: 'Set the least space between members, while `mode()` is "order".', ex: ['0.1', 'keeps each member 0.1 above the one before'],
+        argDocs: { gap: 'Space.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['Only while `mode()` is "order".', 'Default: 0.'] }),
+      // The rule, as a drag keeps it (applyConstraint): the verb wrote the one value and left the
+      // others, so "sum" members added up to 1.3.
+      v('member', 'members', ITEM, { item: 'value', kind: NUM, ...UNIT, doc: 'Move one member, by its number; the others move to keep the rule.', ex: ['1, 0.8', 'sets member 1 to 0.8, and the others share 0.2 under "sum"'],
+        solve: (list, c, at, value) => {
+          const values = applyConstraint((Array.isArray(c.members) ? c.members : []).map((m) => m?.value), c.mode ?? 'sum', at, value, { minGap: c.minGap });
+          return list.map((m, i) => ({ ...m, value: values[i] }));
+        },
+        argDocs: { value: 'Value.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
+        notes: ['As a drag moves it: under "ratio", a member at 0 moves alone.', '`fill(target, "member", …)` writes every value as given, without the rule.'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the members be dragged, or not.',
+        argDocs: { editable: `true: a drag on a bar moves that member, and the others keep the rule.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showValues', 'showValues', BOOL, { toggle: true, doc: 'Show or hide each member\'s value.', notes: ['Default: shown.'] }),
+      v('showBadge', 'showBadge', BOOL, { toggle: true, doc: 'Show or hide the rule\'s sign, such as "Σ = 100%".', notes: ['Default: shown.'] }),
     ],
   },
   {
@@ -1177,20 +1237,37 @@ export const COMPONENT_FAMILIES = [
     ],
   },
   {
+    // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+    // "ce.components.joystick"): what joystickLayout.js and returnToRest.js do with each.
     id: 'joystick', section: 'Joystick', prefix: 'joystick', label: 'Vector Joystick',
-    summary: 'Move a Vector Joystick puck, and change what it does when released.',
+    summary: 'Move a puck over a square, sending where it is on each axis and how near it is to each corner, and where it goes when let go.',
     verbs: [
-      v('move', '', XY, { fx: 'x', fy: 'y', ...UNIT, flat: true }),
-      v('bipolar', 'bipolar', BOOL, { toggle: true }),
-      v('returnMode', 'returnMode', ENUM, { doc: 'none | center | min | max | rest.' }),
-      v('returnValue', 'returnValue', NUM, { min: 0, max: 1 }),
-      v('returnAxes', 'returnAxes', ENUM, { doc: 'both | x | y — which axes spring back.' }),
-      // The unified spring's fields. `returnRate` was this component's own word for it and is
-      // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
-      // writing a field nothing reads back is a verb that appears to work.
-      v('returnTime', 'returnTime', NUM, { min: 0, max: 5000, doc: 'Milliseconds for the whole travel. 0 snaps.' }),
-      v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
-      v('cornerLabel', 'cornerLabels', LINE, { doc: 'Name one corner, 1-based, clockwise from the top left.' }),
+      v('move', '', XY, { fx: 'x', fy: 'y', ...UNIT, flat: true, doc: 'Move the puck to a point.', ex: ['0.25, 0.75', 'moves the puck to the upper left'],
+        argDocs: { x: 'Across: 0 the left, 1 the right.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.',
+          y: 'Up: 0 the bottom, 1 the top.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.' },
+        notes: ['Sends x and y as `bipolar()` says, and each corner how near the puck is to it: 0 to 1, the four adding up to 1.', 'Default: 0.5, 0.5.'] }),
+      v('bipolar', 'bipolar', BOOL, { toggle: true, doc: 'Send x and y as -1 to 1, or as 0 to 1.',
+        argDocs: { bipolar: `true: -1 at the left or bottom, 0 in the middle, 1 at the right or top.\nfalse: 0 to 1.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['The corners send 0 to 1 either way.', 'Default: true.'] }),
+      ...returnVerbs('Joystick', { rest: 'the position', restLines: 'Position on each axis that goes back: 0 the left or bottom, 1 the right or top.',
+        min: '0 on each axis that goes back', max: '1 on each axis that goes back', centre: 'the middle',
+        ranges: { returnValue: { min: 0, max: 1 }, returnTime: { min: 0, max: 5000 } } }),
+      v('returnAxes', 'returnAxes', ENUM, { doc: 'Set which axes go back when the puck is let go.', ex: ['"x"', 'sends the puck back across, and leaves its height'],
+        argDocs: { returnAxes: '"both": both, in a straight line.\n"x": across only.\n"y": up and down only.\nCase-insensitive.\nInvalid: rejected with a console error.' },
+        notes: ['Only while `returnMode()` is not "none".', 'Default: "both".'] }),
+      // A corner by number, as joystickCornerLabels orders them: the text said "clockwise from the top
+      // left", and the third is the bottom LEFT.
+      v('cornerLabel', 'cornerLabels', LINE, { doc: 'Name one corner, by its number.', ex: ['4, "Brass"', 'names the bottom right corner Brass'],
+        argDocs: { index: 'Corner: 1 the top left, 2 the top right, 3 the bottom left, 4 the bottom right.\nA fraction: rounded.\nNot one of the corners: rejected with a console error.',
+          text: 'The name.\n"": none.\nA number: written as text.\nLeft out: rejected with a console error.' },
+        notes: ['Drawn while `showCorners()` is on.', 'Default: "A", "B", "C" and "D".'] }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Let the puck be dragged, or not.',
+        argDocs: { editable: `true: a drag moves it.\nfalse: drags do nothing.\nLeft out: toggles.\n${OFF_RULE}` },
+        notes: ['Default: true.'] }),
+      v('showGrid', 'showGrid', BOOL, { toggle: true, doc: 'Show or hide the grid behind the puck.', notes: ['How many lines: set in the inspector, under Divisions.', 'Default: shown.'] }),
+      v('showCrosshair', 'showCrosshair', BOOL, { toggle: true, doc: 'Show or hide the lines through the puck.', notes: ['Default: shown.'] }),
+      v('showCorners', 'showCorners', BOOL, { toggle: true, doc: 'Show or hide the corners\' marks and names.', notes: ['Default: shown.'] }),
+      v('showTrail', 'showTrail', BOOL, { toggle: true, doc: 'Show or hide the fading trail behind the puck.', notes: ['Default: hidden.'] }),
     ],
   },
   {
@@ -1983,7 +2060,9 @@ export function componentScriptPatch(verb, cfg, args = []) {
       const next = coerce(verb.kind, b, itemSpec(verb, c, at), current);
       // A value the component cannot use as written (a glyph it cannot draw) is refused, not stored.
       if (next === null || next === current || verb.refuseValue?.(next)) return {};
-      return { [verb.f]: list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x)) };
+      const written = list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x));
+      // What else the change moves, as a drag moves it: a Constraint's other members keep its rule.
+      return { [verb.f]: verb.solve ? verb.solve(written, c, at, next) : written };
     }
 
     case ELEM: {
@@ -2186,7 +2265,7 @@ export function verbIndexArgs(verb) {
     case ITEM: case INDEXSET: return ['index'];
     case ELEM: return ['name'];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col'] : ['index']);
-    case LINE: return lcdLines(verb) ? ['at'] : (verb.clear ? [] : ['row']);
+    case LINE: return lcdLines(verb) ? ['at'] : (verb.clear ? [] : ['index']);
     case LAYOUT: return ['layout'];
     default: return [];
   }
@@ -2417,7 +2496,7 @@ export function verbArgs(verb) {
     case ITEM: return ['index', verb.item];
     case ELEM: return ['name', verb.arg ?? verb.item];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col', 'amount'] : ['index', 'value']);
-    case LINE: return lcdLines(verb) ? (verb.clear ? ['at'] : ['at', 'text']) : (verb.clear ? [] : ['row', 'text']);
+    case LINE: return lcdLines(verb) ? (verb.clear ? ['at'] : ['at', 'text']) : (verb.clear ? [] : ['index', 'text']);
     case INDEXSET: return ['index', 'on'];
     case BOOL: return [verb.v];
     // The five every family gets. Their optional arguments are rendered in verbSignature, which is
@@ -2732,6 +2811,7 @@ export function verbParamSummary(verb, name, kind) {
         'Left out: unchanged.', 'Invalid: rejected with a console error.', 'Both left out: rejected with a console error.'].join('\n');
     }
     case LINE:
+      if (name === 'index') return indexLines(noun, `${noun}s`);
       if (name === 'row') return `Row, counted from 1.\nA fraction: rounded.\nNot a row the display has: rejected with a console error.`;
       if (name === 'at' && verb.clear) {
         return ['Row, counted from 1, of the layout showing.',

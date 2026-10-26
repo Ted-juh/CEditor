@@ -279,11 +279,7 @@ const SHARED_OPTION_FIELDS = {
   /* --- persistence ------------------------------------------------------- */
   scope: {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
-    summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
-      + 'it; "script" is private to this one; "local" stays on this machine and is never written '
-      + 'into the panel document. Case-insensitive. A scope that is not one of these is refused, and so is an options '
-      + 'table with any other key, such as a misspelled `scop`: nothing is saved or read, and a '
-      + 'message says why, because falling back to "panel" would share a private setting.',
+    summary: '"panel": every script on the panel; kept with the panel.\n"script": this script only.\n"local": this computer only, never written into the panel; in an exported plug-in, this instance only.\nCase-insensitive.\nLeft out: "panel".\nAny other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value.',
   },
 
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
@@ -675,15 +671,20 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A gradient stop is stored as RRGGBB and takes no alpha. The change is sent to the synth, except while your script reacts to MIDI from the synth, so it does not hear its own value echoed back.',
+    summary: 'Change a value on the panel: a control\'s value, or any property a path reaches.',
+    notes: [
+      'Sent to the synth, except while a handler answers MIDI from the synth, so a value is not echoed back; `opts.transmit` decides otherwise.',
+      'A new property on a section with a fixed shape: written, with a console warning that nothing reads it.',
+      'Returns nothing.',
+    ],
+    example: '`set("Cutoff", 64)` turns the control called Cutoff to 64.',
+
     params: [
-      { name: 'path', type: 'path', required: true },
-      { name: 'value', type: 'value', required: true, at: 'path' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'path', type: 'path', required: true, summary: 'A control\'s name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.\n"panel." and a property: the panel\'s own, such as "panel.width".\n".normalizedValue" at the end: its position, 0 to 1, in place of the value.\nNot a control on the panel, or a property it does not have: nothing is written, with a console error.' },
+      { name: 'value', type: 'value', required: true, summary: 'The new value.\nA colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".\nA colour in any other form: nothing is written, with a console error.\nA gradient stop: RRGGBB, without alpha.', at: 'path' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'transmit', type: 'true or false', default: 'decided by where the write came from',
-          summary: 'Whether to send the change to the synth. Left out, a write made while handling '
-            + 'something the synth sent stays silent and any other write is sent. Set it only when '
-            + 'you need to override that.' },
+          summary: 'Whether the change is sent to the synth: true sent, false not.\nLeft out: sent, except while a handler answers MIDI from the synth.' },
       ]) },
     ],
     scopes: 'any',
@@ -691,10 +692,15 @@ export const COMMANDS = [
   },
   {
     id: 'get', category: 'Values', signature: 'get(path [, form])',
-    summary: 'Read a value from the panel. A control\'s value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form\'s name as `form`. A `form` that is not one of the three is refused with a message that names them, and the one you meant when it is one written another way ("normalisedValue" is answered with "Write normalizedValue."), and nothing comes back. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.',
+    summary: 'Read a value from the panel.',
+    notes: [
+      'Returns the value; a colour written out, as `set()` stores it.',
+    ],
+    example: '`get("Cutoff")` gives the value of the control called Cutoff.',
+
     params: [
-      { name: 'path', type: 'path', required: true },
-      { name: 'form', type: 'string', required: false, values: VALUE_ACCESSOR_IDS },
+      { name: 'path', type: 'path', required: true, summary: 'A control\'s name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.\n"panel." and a property: the panel\'s own, such as "panel.width".\nNot a control on the panel, or a property it does not have: no result, with a console error.\nA property with no value yet: no result, without a word.' },
+      { name: 'form', type: 'string', required: false, summary: '"value": the control\'s value.\n"normalizedValue": its position, 0 to 1.\n"midiValue": the number the synth is sent; only where the synth\'s profile is attached.\nCase-insensitive.\nLeft out: "value", or the form the path ends with.\nAny other: no result, with a console error naming the forms.', values: VALUE_ACCESSOR_IDS },
     ],
     scopes: 'any',
     snippet: { lua: 'get("${1:path}")$0', javascript: 'get("${1:path}")$0' },
@@ -703,15 +709,28 @@ export const COMMANDS = [
   /* --- Transmit control (Q2, Family A) --- */
   {
     id: 'noTransmit', category: 'Transmit', signature: 'noTransmit(fn)',
-    summary: 'Run a block of code that changes controls without sending anything to the synth — for example an Init Patch button that resets twenty controls at once. Sending switches back on by itself when the block ends.',
-    params: [{ name: 'fn', type: 'function', required: true }],
+    summary: 'Change controls without sending anything to the synth.',
+    notes: [
+      'For an Init Patch button that resets many controls at once.',
+      'Sending is back on when the function ends; an error in it is printed in the console.',
+      'Returns nothing.',
+    ],
+    example: '`noTransmit(function() set("Cutoff", 0) set("Reso", 0) end)` resets both, silently.',
+
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The changes to make.\nNot a function: a console error.' }],
     scopes: 'any',
     snippet: { lua: 'noTransmit(function()\n  $0\nend)', javascript: 'noTransmit(() => {\n  $0\n})' },
   },
   {
     id: 'transmit', category: 'Transmit', signature: 'transmit(fn)',
-    summary: 'Run a block of code whose changes are sent to the synth even while your script is reacting to MIDI from the synth, when they would normally stay silent.',
-    params: [{ name: 'fn', type: 'function', required: true }],
+    summary: 'Send changes to the synth even while a handler answers MIDI from it.',
+    notes: [
+      'Outside such a handler changes are sent anyway.',
+      'Returns nothing.',
+    ],
+    example: '`transmit(function() set("Cutoff", 64) end)` sends 64 from inside a MIDI handler.',
+
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The changes to send.' }],
     scopes: 'any',
     snippet: { lua: 'transmit(function()\n  $0\nend)', javascript: 'transmit(() => {\n  $0\n})' },
   },
@@ -719,11 +738,18 @@ export const COMMANDS = [
   /* --- Events & Flow (Q3, Q6) --- */
   {
     id: 'on', category: 'Events & Flow', signature: 'on(target, event, fn)',
-    summary: 'Listen for an event from any script: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the handler name, such as "onValueChanged", and `fn` the function to call. Put it at the top of a script, outside any function, so it is set up once when the script loads. A script also answers the one event in its Runs on setting without this.',
+    summary: 'Call a function whenever an event happens.',
+    notes: [
+      'Put it at the top of a script, outside any function: it is set up once, when the script loads; running the script again replaces it.',
+      'A script answers the event its Runs on setting names without it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`on("*", "patchLoaded", fn)` calls fn each time any script emits patchLoaded.',
+
     params: [
-      { name: 'target', type: 'targetRef', required: true },
-      { name: 'event', type: 'eventName', required: true },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'target', type: 'targetRef', required: true, summary: 'What the event comes from: a control\'s name, in any case, or "*" for anything.\nLeft out: "*".' },
+      { name: 'event', type: 'eventName', required: true, summary: 'The event: a handler\'s name, such as "onValueChanged", or a name `emit()` announces.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the event\'s information.' },
     ],
     scopes: 'any',
     snippet: {
@@ -733,10 +759,16 @@ export const COMMANDS = [
   },
   {
     id: 'off', category: 'Events & Flow', signature: 'off(target, event)',
-    summary: 'Stop listening to an event you started listening to with on. It removes this script\'s listeners for that target and event; other scripts\' listeners are left alone. Naming something you were not listening to does nothing.',
+    summary: 'Stop calling the functions `on()` set up for an event.',
+    notes: [
+      'This script\'s only; other scripts\' go on.',
+      'Returns nothing. One that was not set up: nothing, without a word.',
+    ],
+    example: '`off("Cutoff", "onValueChanged")` stops this script\'s calls for Cutoff\'s value changes.',
+
     params: [
-      { name: 'target', type: 'targetRef', required: true },
-      { name: 'event', type: 'eventName', required: true },
+      { name: 'target', type: 'targetRef', required: true, summary: 'As `on()` was given it.\nLeft out: "*".' },
+      { name: 'event', type: 'eventName', required: true, summary: 'As `on()` was given it.' },
     ],
     scopes: 'any',
     snippet: { lua: 'off("${1:target}", "${2:event}")$0', javascript: 'off("${1:target}", "${2:event}")$0' },
@@ -751,10 +783,17 @@ export const COMMANDS = [
    * named action the panel can be built out of. */
   {
     id: 'watch', category: 'Events & Flow', signature: 'watch(path, fn)',
-    summary: 'Call `fn(value, previous)` whenever a path on the panel changes — a control\'s value, a colour, a setting deep inside a section. It fires whatever made the change: a script, the user, or MIDI from the synth.',
+    summary: 'Call a function whenever a value on the panel changes.',
+    notes: [
+      'Whatever made the change: a script, a drag, MIDI from the synth.',
+      'Running the script again replaces it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`watch("Cutoff", function(value, previous) log(value) end)` logs Cutoff\'s value each time it changes.',
+
     params: [
-      { name: 'path', type: 'string', required: true, kind: 'path' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'path', type: 'string', required: true, summary: 'What to watch: a path, as `set()` takes it.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the new value and the one before.' },
     ],
     scopes: 'any',
     snippet: {
@@ -764,10 +803,17 @@ export const COMMANDS = [
   },
   {
     id: 'compute', category: 'Events & Flow', signature: 'compute(path, fn)',
-    summary: 'Turn a property into a formula. `fn` is worked out again whenever anything on the panel changes, and its result is written to `path` — for example a label that always shows the cutoff frequency.',
+    summary: 'Make a property follow a formula.',
+    notes: [
+      'Worked out again whenever anything on the panel changes, and written to the path.',
+      'Running the script again replaces it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`compute("Readout.Text.content", function() return get("Cutoff") .. " Hz" end)` keeps Readout showing Cutoff\'s value.',
+
     params: [
-      { name: 'path', type: 'string', required: true, kind: 'path' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'path', type: 'string', required: true, summary: 'The property to write: a path, as `set()` takes it.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Returns the value to write.' },
     ],
     scopes: 'any',
     snippet: {
@@ -777,10 +823,16 @@ export const COMMANDS = [
   },
   {
     id: 'intercept', category: 'Events & Flow', signature: 'intercept(path, fn)',
-    summary: 'Check or change every value written to `path` before it lands. `fn(value, previous)` can return a different value to use instead (to clamp, round or snap it), return false to refuse the change, or return nothing to let it through unchanged.',
+    summary: 'Check or change every value written to a property before it lands.',
+    notes: [
+      'Running the script again replaces it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`intercept("Cutoff", function(value) return math.floor(value) end)` keeps Cutoff whole.',
+
     params: [
-      { name: 'path', type: 'string', required: true, kind: 'path' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'path', type: 'string', required: true, summary: 'The property: a path, as `set()` takes it.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the value and the one before.\nA value returned: written in its place.\nfalse: the change is refused.\nNothing: written as it is.' },
     ],
     scopes: 'any',
     snippet: {
@@ -790,10 +842,17 @@ export const COMMANDS = [
   },
   {
     id: 'defineAction', category: 'Events & Flow', signature: 'defineAction(name, fn)',
-    summary: 'Give a function a name so other scripts can call it. Any script, in any language, can then run it with run("name"), and the panel offers it wherever controls can be set to trigger an action.',
+    summary: 'Name a function, so other scripts and the panel can call it.',
+    notes: [
+      'The panel offers it wherever a control can trigger an action.',
+      'A name this script defined: replaced. One another script defined: this one is ignored, with a console error.',
+      'Returns nothing. A name or a function left out: nothing is defined, without a word.',
+    ],
+    example: '`defineAction("randomize", fn)` lets any script call fn with `run("randomize")`.',
+
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'name', type: 'string', required: true, summary: 'The action\'s name, in any case.', kind: 'sharedName' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with what `run()` passes; what it returns goes back.' },
     ],
     scopes: 'any',
     snippet: {
@@ -803,20 +862,33 @@ export const COMMANDS = [
   },
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
-    summary: 'Announce a custom event by name, optionally with some data. Every script listening for it with on("*", name, fn) is called. The announcing script does not wait for an answer; use run when you need one.',
+    summary: 'Announce an event of your own, with data.',
+    notes: [
+      'It does not wait for an answer: `run()` gives one.',
+      'An emit inside an emit, 16 deep: dropped, with a console error.',
+      'Returns nothing.',
+    ],
+    example: '`emit("patchLoaded", { name = "Init" })` calls every function `on("*", "patchLoaded", fn)` set up.',
+
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'data', type: 'value', required: false },
+      { name: 'name', type: 'string', required: true, summary: 'The event\'s name, as `on()` listens for it.', kind: 'sharedName' },
+      { name: 'data', type: 'value', required: false, summary: 'Passed to each function.\nLeft out: nothing.' },
     ],
     scopes: 'any',
     snippet: { lua: 'emit("${1:name}", ${2:data})$0', javascript: 'emit("${1:name}", ${2:data})$0' },
   },
   {
     id: 'run', category: 'Events & Flow', signature: 'run(target.action [, args])',
-    summary: 'Call an action that another script has defined, and get its result back. Name it as "action", or as "control.action" to call the function of that name in a particular control\'s script. It works across languages, so only plain data — numbers, text, true/false, lists and tables — can be passed in and returned.',
+    summary: 'Call an action another script defined, and give back what it returns.',
+    notes: [
+      'Works across languages: only numbers, text, true or false, lists and tables pass in and out.',
+      'Returns what the action returns. No script defines it: no result, with a console error.',
+    ],
+    example: '`run("randomize")` calls the action randomize and gives its result.',
+
     params: [
-      { name: 'action', type: 'scriptRef', required: true, kind: 'sharedName' },
-      { name: 'args', type: 'value', required: false },
+      { name: 'action', type: 'scriptRef', required: true, summary: 'The action\'s name, as `defineAction()` gave it; or "Control.action" for the function of that name in a control\'s script.', kind: 'sharedName' },
+      { name: 'args', type: 'value', required: false, summary: 'Passed to the action.\nLeft out: nothing.' },
     ],
     scopes: 'any',
     snippet: { lua: 'run("${1:target.action}")$0', javascript: 'run("${1:target.action}")$0' },
@@ -1951,9 +2023,16 @@ export const COMMANDS = [
   },
   {
     id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
-    summary: 'List the images in your icon library, then any icons the panel carries with it. Each entry is { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `source` is "panel" for a carried icon, and `portable` says whether the picture is already in the panel: true for those, false for your library\'s. Sharing or exporting copies a library icon into the panel if a control shows it or a script names it in quotes, but not one whose name a script builds while it runs. `embeddable` says whether the entry has image data that can be copied into the panel.',
+    summary: 'List the images a control can show: the icon library\'s, then the panel\'s own.',
+    example: '`imageAssets({ vector = true })` gives the vector icons.',
+    notes: [
+      'Returns a list of { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }.',
+      '`source` "panel": carried with the panel. `portable`: in the panel already; true for those, false for the library\'s.',
+      'A library icon is copied into the panel on sharing or export when a control shows it or a script names it in quotes; not one whose name a script builds as it runs.',
+      '`embeddable`: it has image data that `ce.image.embed()` can copy into the panel.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
       { name: 'vector', type: 'true or false',
         summary: 'Set true to list only vector icons, which stay sharp at any size.' },
       { name: 'embeddable', type: 'true or false',
@@ -1964,19 +2043,30 @@ export const COMMANDS = [
   },
   {
     id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
-    summary: 'Look up one image in the icon library or among the icons the panel carries, by id first and then by name (capitals do not matter), the same way the panel finds an icon when it draws one. Returns the entry, in the same form as `ce.image.assets()`, or nothing if there is no such image, so check with it before pointing a control at an asset. Be aware that a name which happens to match is returned just as an id match would be.',
+    summary: 'Find one image by its id or name.',
+    example: '`imageAsset("Logo")` gives the image called Logo.',
+    notes: [
+      'Returns the entry, as `ce.image.assets()` gives each.',
+      'By id first, then by name, as the panel finds an icon to draw.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'idOrName', type: 'string', required: true, kind: 'image' }],
+    params: [{ name: 'idOrName', type: 'string', required: true, summary: 'The image\'s id or name; a name in any case.\nNot an image: no result, without a word.\nLeft out: no result, with a console error.', kind: 'image' }],
     scopes: 'any',
   },
   {
     id: 'imageSet', category: 'Images', signature: 'imageSet(target, src [, opts]) -> boolean',
-    summary: 'Put a picture on one of a control\'s four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option it does not take at all refuses the whole call; one the chosen layer does not have is refused with a message. Either way the command returns false.',
+    summary: 'Put a picture on one of a control\'s image layers, and switch the layer on.',
+    example: '`imageSet("Pad", "textures/metal.png", { opacity = 60 })` shows the picture behind Pad at 60%.',
+    notes: [
+      'The picture and the switch are set together: a layer is never on with nothing in it.',
+      'A text layer replaces the text\'s fill.',
+      'Returns true. An option the layer does not have: refused, with a console error, and false.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'src', type: 'string', required: true, kind: 'image' },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'src', type: 'string', required: true, summary: 'The picture: a file\'s path or address, or a data URL ("data:image/png;base64,…").\nOnly a data URL survives an export; `ce.image.embed()` copies a file in.\nLeft out: the picture is kept; only the options are set.\n"": the layer is emptied and switched off.\nLeft out, with no option: nothing is set, with a console error.', kind: 'image' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           { name: 'layer', type: 'text', default: '"image"', values: IMAGE_LAYER_IDS,
             summary: 'Which of the control\'s four image layers to write. The first two are '
@@ -2031,34 +2121,53 @@ export const COMMANDS = [
   },
   {
     id: 'imageClear', category: 'Images', signature: 'imageClear(target [, layer]) -> boolean',
-    summary: 'Switch an image layer off and empty it in one step. `layer` is "image" unless you name another. Clearing "textImage" or "textTexture" also sets the text fill back to "solid", because a text fill with no picture would show nothing.',
+    summary: 'Switch an image layer off and empty it.',
+    example: '`imageClear("Pad", "overlay")` takes the overlay away.',
+    notes: [
+      'A text layer sets the text\'s fill back to "solid": a text fill with no picture shows nothing.',
+      'Returns true; false with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'layer', type: 'string', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'layer', type: 'string', required: false, summary: '"image" or "overlay": the background layers, which stack.\n"textImage" or "textTexture": the text\'s fill.\nCase-insensitive.\nLeft out: "image".\nAny other: rejected with a console error.',
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
     scopes: 'any',
   },
   {
     id: 'imageRead', category: 'Images', signature: 'imageRead(target [, layer]) -> table',
-    summary: 'Read all the settings of one image layer (`layer` is "image" unless you name another), plus three extra fields. `active` says whether the layer will actually be drawn; for a text layer that depends on the text\'s fill mode, not on its Enabled switch. `source` is "data", "file" or "none". `portable` says whether the image survives an export, which only embedded image data does.',
+    summary: 'Read every setting of one image layer.',
+    example: '`imageRead("Pad").source` gives "data", "file" or "none".',
+    notes: [
+      'Returns the layer\'s settings, with three more:',
+      '`active`: whether it is drawn; a text layer\'s by the text\'s fill, not its switch.',
+      '`source`: "data", "file" or "none".',
+      '`portable`: whether it survives an export; only embedded data does.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'layer', type: 'string', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'layer', type: 'string', required: false, summary: '"image" or "overlay": the background layers, which stack.\n"textImage" or "textTexture": the text\'s fill.\nCase-insensitive.\nLeft out: "image".\nAny other: rejected with a console error.',
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
     scopes: 'any',
   },
   {
     id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
-    summary: 'Show an image from the icon library (or one the panel carries) in a control\'s Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. A control that shows only its text is switched to show the icon beside it (or alone, when there is no text). Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset\'s id and name together, so the control finds exactly that image.',
+    summary: 'Show an image in a control\'s Icon section, by its id or name.',
+    example: '`imageIcon("Play", "play-circle", { size = 24 })` shows the play-circle icon on Play.',
+    notes: [
+      'A control showing only its text is switched to show the icon beside it, or alone with no text.',
+      'Write the id or name in quotes: sharing and exporting find the icon that way, and copy it into the panel.',
+      'Use it rather than `set()`: it writes the asset\'s id and name together.',
+      'Returns true; false with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'idOrName', type: 'string', required: true, kind: 'image' },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'idOrName', type: 'string', required: true, summary: 'The image\'s id or name; a name in any case.\nNot an image: rejected with a console error.', kind: 'image' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           { name: 'size', type: 'number', default: '16', unit: 'pixels',
             summary: 'How big the icon is drawn.' },
@@ -2071,27 +2180,44 @@ export const COMMANDS = [
   },
   {
     id: 'imageEmbed', category: 'Images', signature: 'imageEmbed(target [, layer]) -> boolean',
-    summary: 'Copy a layer\'s image into the panel itself, in place of a file path that only exists on this computer, so the image survives export. If the layer already holds embedded image data, it returns true and changes nothing. If the file has not been read yet, it returns false and starts reading it; call it again once the file has loaded and it will succeed.',
+    summary: 'Copy a layer\'s picture into the panel, so it survives an export.',
+    example: '`imageEmbed("Pad")` copies Pad\'s background picture into the panel.',
+    notes: [
+      'Returns true; the picture already in the panel: true, changing nothing.',
+      'A file not read yet: false, and its reading starts; call it again once it has loaded.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'layer', type: 'string', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'layer', type: 'string', required: false, summary: '"image" or "overlay": the background layers, which stack.\n"textImage" or "textTexture": the text\'s fill.\nCase-insensitive.\nLeft out: "image".\nAny other: rejected with a console error.',
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
     scopes: 'any',
   },
   {
     id: 'imageLoad', category: 'Images', signature: 'imageLoad(path) -> boolean',
-    summary: 'Start reading an image file and report whether it is ready. A layer that points at a file shows nothing until the file has been read, and reading happens in the background, so this returns false the first time and true once the image has arrived. A data URL needs no reading and returns true straight away.',
+    summary: 'Start reading an image file, and say whether it is ready.',
+    example: '`imageLoad("textures/metal.png")` gives false at first, then true once the file is read.',
+    notes: [
+      'A layer that points at a file shows nothing until it is read, which happens in the background.',
+      'Returns true when it is ready; a data URL at once.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'path', type: 'string', required: true }],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The file\'s path, or a data URL.\nLeft out, or "": false, with a console error.' }],
     scopes: 'any',
   },
   {
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
-    summary: 'List every font the panel can use, with what each one supports: the built-in fonts, your font library, and any font the panel carries with it (`source` "panel"). `portable` says whether a font is already there wherever the panel goes: true for the built-in fonts and the carried ones, false for your library\'s. Sharing or exporting packs a library font into the panel if a control uses it or a script names it in quotes. `featuresKnown` says whether the font\'s typographic features have actually been checked; when it is false, an empty `features` list means they are unknown, not that there are none.',
+    summary: 'List every font the panel can use, and what each supports.',
+    example: '`textFonts({ variable = true })` gives the variable fonts.',
+    notes: [
+      'Returns a list: the built-in fonts, the font library\'s, and the panel\'s own, `source` "panel".',
+      '`portable`: there wherever the panel goes; true for the built-in fonts and the panel\'s own, false for the library\'s.',
+      'A library font is copied into the panel on sharing or export when a control uses it or a script names it in quotes.',
+      '`featuresKnown` false: an empty `features` list means they are not known, not that there are none.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
       { name: 'portable', type: 'true or false',
         summary: 'Set true to list only fonts that are already there wherever the panel goes: the '
           + 'built-in fonts and the ones the panel carries. A font from your font library is packed '
@@ -2104,18 +2230,29 @@ export const COMMANDS = [
   },
   {
     id: 'textFont', category: 'Typography', signature: 'textFont(family) -> table|nil',
-    summary: 'Look up one font by family name. Returns its description, with the same fields as `ce.text.fonts()`, or nothing if no such font is available. Capitals do not matter, and the font\'s display name works too, just as in the Properties panel. Use it to check that a font exists before you set it, or to see which variable axes it has.',
+    summary: 'Find one font by its family name.',
+    example: '`textFont("Inter").variable` gives true for a variable Inter.',
+    notes: [
+      'Returns its description, as `ce.text.fonts()` gives each.',
+      'Use it to see that a font is there before setting it, or which axes it has.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'family', type: 'string', required: true, kind: 'font' }],
+    params: [{ name: 'family', type: 'string', required: true, summary: 'The family, or its display name, as the Properties panel shows it, in any case.\nNot a font the panel has: no result, without a word.\nLeft out: no result, with a console error.', kind: 'font' }],
     scopes: 'any',
   },
   {
     id: 'textStyle', category: 'Typography', signature: 'textStyle(target, opts) -> boolean',
-    summary: 'Set a control\'s typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. An option it does not take refuses the whole call. A font that is not available, or a typographic feature the font does not have, is refused with a message while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.',
+    summary: 'Set a control\'s typography in one call: font, size, weight, spacing, alignment and the rest.',
+    example: '`textStyle("Title", { family = "Inter", size = 18, weight = "Bold" })` sets Title in 18-point Inter Bold.',
+    notes: [
+      'Use it rather than `set()` for the weight: it is two fields that must agree, and this writes both.',
+      'Name the font in quotes: sharing and exporting find a library font that way, and copy it into the panel.',
+      'Returns true. A font the panel has not, or a feature the font has not: refused, with a console error, the other options set, and false.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'opts', type: 'object', required: true,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         // The declared list used to name 17 fields while the implementation accepted 27: the four
         // paddings and five of the six OpenType switches were missing, so the only way to learn
         // that `tabularFigures` was allowed was to read textStyle.js. The feature switches come
@@ -2172,42 +2309,64 @@ export const COMMANDS = [
   },
   {
     id: 'textAxis', category: 'Typography', signature: 'textAxis(target, tag, value) -> boolean',
-    summary: 'Set one axis of a variable font by its four-letter tag, such as "wght" for weight. The value is kept within the range the font allows, and an axis the font does not have is refused rather than stored. Setting "wght" also updates the control\'s weight, as the Properties panel\'s own axis slider does; otherwise the text would still be drawn at its old weight.',
+    summary: 'Set one axis of a variable font, by its four-letter tag.',
+    example: '`textAxis("Title", "wght", 650)` sets Title\'s weight axis to 650.',
+    notes: [
+      '"wght" sets the control\'s weight too, as the Properties panel\'s slider does.',
+      'Returns true; false with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'tag', type: 'string', required: true, kind: 'fontAxis' },
-      { name: 'value', type: 'number', required: true, kind: 'fontAxis' },
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'tag', type: 'string', required: true, summary: 'The axis\'s tag, such as "wght" or "wdth".\nNot one the font has: rejected with a console error.', kind: 'fontAxis' },
+      { name: 'value', type: 'number', required: true, summary: 'The axis\'s value.\nOutside the font\'s range: the nearest end.', kind: 'fontAxis' },
     ],
     scopes: 'any',
   },
   {
     id: 'textRead', category: 'Typography', signature: 'textRead(target [, name]) -> value|table',
-    summary: 'Read one text setting by name, such as "size" or "lineHeight", without having to know which part of the Text section (Font, Multiline or Position) holds it. With no name, returns everything as { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the text is actually drawn at, worked out from the two stored weight fields.',
+    summary: 'Read one text setting by name, or every one.',
+    example: '`textRead("Title", "size")` gives Title\'s text size.',
+    notes: [
+      'Returns the value; left out, { content, resolvedWeight, font, multiline, position }.',
+      '`resolvedWeight`: the weight the text is drawn at, from its two weight fields.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'name', type: 'string', required: false },
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'name', type: 'string', required: false, summary: 'A setting\'s name, such as "size" or "lineHeight", wherever in the Text section it is.\nLeft out: every setting, as a table.\nNot a setting: no result, with a console error.' },
     ],
     scopes: 'any',
   },
   {
     id: 'textMeasure', category: 'Typography', signature: 'textMeasure(target [, text]) -> table',
-    summary: 'Measure how much room a control\'s text takes up in its own font. Returns { width, height, lines, truncated, exact }, where `truncated` says whether some of the text is cut off. It lays the text out exactly as the panel does, so spacing, wrapping and line limits all count. Pass `text` to measure something the control does not hold yet. `exact` is false when the text could not actually be measured and the answer is an estimate.',
+    summary: 'Measure how much room a control\'s text takes, in its own font.',
+    example: '`textMeasure("Title").truncated` gives true when some of the text is cut off.',
+    notes: [
+      'Returns { width, height, lines, truncated, exact }.',
+      'Laid out as the panel lays it out: spacing, wrapping and the line limit count.',
+      '`exact` false: it could not be measured, and the answer is an estimate.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'text', type: 'string', required: false },
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'text', type: 'string', required: false, summary: 'Text to measure in the control\'s font.\nLeft out: the control\'s own.' },
     ],
     scopes: 'any',
   },
   {
     id: 'textFit', category: 'Typography', signature: 'textFit(target [, opts]) -> table',
-    summary: 'Find the largest text size at which a control\'s text fits inside its box, write that size to the control, and return { size, fits, changed, exact }. It tries whole-number sizes from `opts.max` (the current size) down to `opts.min` (6). Setting Text.Multiline.fitMode to "shrink" only shrinks the text as it is drawn and never changes the stored size; this writes the size, so other code can read it and line things up with it. If even `opts.min` overflows, `fits` is false and the size is set to `opts.min`; the call still succeeds.',
+    summary: 'Find the largest text size at which a control\'s text fits, and set it.',
+    example: '`textFit("Title", { min = 8 })` makes Title\'s text as large as fits, and 8 at least.',
+    notes: [
+      'Returns { size, fits, changed, exact }.',
+      'Tries whole sizes from `max` down to `min`. Even `min` too large: set to `min`, `fits` false.',
+      'Unlike Text.Multiline.fitMode "shrink", which only draws the text smaller, this writes the size.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'min', type: 'number', default: '6', unit: 'pixels',
           summary: 'The smallest size to shrink to. If the text still overflows at this size, the '
             + 'result has fits = false; the call still succeeds.' },
@@ -3735,29 +3894,44 @@ export const COMMANDS = [
   // the first one already, but nothing said so, which made it undefined behaviour people relied on.
   {
     id: 'state', category: 'Storage', signature: 'state',
-    summary: 'A table your script can keep its own values in from one handler call to the next. Only this script can see it. It is emptied when the script reloads, so use `ce.storage.saveSetting()` for anything that must last longer.',
+    summary: 'A table the script keeps its own values in between handler calls.',
+    example: '`state.count = (state.count or 0) + 1` counts the calls.',
+    notes: [
+      'This script\'s only.',
+      'Emptied when the script loads again; `ce.storage.saveSetting()` keeps a value longer.',
+    ],
     params: [],
     scopes: 'any',
     snippet: { lua: 'state.${1:count} = (state.${1:count} or 0) + 1$0', javascript: 'state.${1:count} = (state.${1:count} ?? 0) + 1;$0' },
   },
   {
     id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
-    summary: 'Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel; in an exported plugin, only this instance of it). Returns false if the value could not be saved, for example because storage is not available.',
+    summary: 'Save a value under a name, to keep it when the script loads again.',
+    example: '`saveSetting("lastPatch", 12)` keeps 12 under lastPatch.',
+    notes: [
+      'Kept with the panel; in an exported plug-in, in the DAW project.',
+      'Returns true; false when it could not be saved, such as where storage is not available.',
+    ],
     params: [
-      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
+      { name: 'key', type: 'string', required: true, summary: 'A name you choose, matched as written.\nA number: used as text.', kind: 'sharedName' },
+      { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ],
     scopes: 'any',
     snippet: { lua: 'saveSetting("${1:key}", ${2:value})$0', javascript: 'saveSetting("${1:key}", ${2:value})$0' },
   },
   {
     id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback [, opts]])',
-    summary: 'Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if nothing has been saved under `key` (or nothing, if you did not give a fallback). `opts.scope` must match the scope the value was saved in — the same key in two scopes holds two separate values.',
+    summary: 'Read a value saved with `ce.storage.saveSetting()`.',
+    example: '`loadSetting("lastPatch", 1)` gives the saved patch, or 1 if none was saved.',
+    notes: [
+      'Returns the value.',
+      'Each scope keeps its own: the same name in two scopes is two values.',
+    ],
     params: [
-      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'fallback', type: 'value', required: false },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
+      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.', kind: 'sharedName' },
+      { name: 'fallback', type: 'value', required: false, summary: 'Given back when nothing is saved under the name.\nLeft out: no result.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ],
     scopes: 'any',
     snippet: { lua: 'local ${1:v} = loadSetting("${2:key}", ${3:default})$0', javascript: 'const ${1:v} = loadSetting("${2:key}", ${3:default});$0' },
@@ -3767,16 +3941,25 @@ export const COMMANDS = [
   // after itself and could not show somebody what it had kept.
   {
     id: 'listSettings', category: 'Storage', signature: 'listSettings([opts]) -> list',
-    summary: 'List the keys saved in one scope, in no particular order. An empty list only means nothing has been saved yet; to check whether storage is working at all, use `ce.storage.info()`. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`. The "panel" scope leaves out every script\'s private keys, including this script\'s own.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }], scopes: 'any',
+    summary: 'List the names saved in one scope.',
+    example: '`listSettings()` gives the names saved for the panel.',
+    notes: [
+      'Returns a list of names, in no order. An empty list: nothing saved yet; `ce.storage.info()` says whether storage works.',
+      'The "panel" scope leaves out every script\'s own.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }], scopes: 'any',
     snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
   },
   {
     id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key [, opts]) -> boolean',
-    summary: 'Delete a saved setting. Returns true if there was a value to delete and false if there was not. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`.',
+    summary: 'Delete one saved value.',
+    example: '`forgetSetting("lastPatch")` deletes lastPatch.',
+    notes: [
+      'Returns true if there was one to delete; false if not.',
+    ],
     params: [
-      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
+      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.', kind: 'sharedName' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ], scopes: 'any',
     snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },
   },
@@ -3795,8 +3978,13 @@ export const COMMANDS = [
      value somewhere the caller did not ask for is how a private setting becomes a shared one. */
   {
     id: 'allSettings', category: 'Storage', signature: 'allSettings([opts]) -> table',
-    summary: 'Return every setting in one scope as a table of keys and values. `opts.scope` is "panel" (the default), "script" or "local". The "panel" scope leaves out every script\'s private settings, including this script\'s own.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
+    summary: 'Give every value saved in one scope, by name.',
+    example: '`allSettings().lastPatch` gives the saved lastPatch.',
+    notes: [
+      'Returns a table of names and values.',
+      'The "panel" scope leaves out every script\'s own.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }],
     scopes: 'any',
     snippet: {
       lua: 'for k, v in pairs(ce.storage.all()) do log(k, v) end$0',
@@ -3805,25 +3993,42 @@ export const COMMANDS = [
   },
   {
     id: 'clearSettings', category: 'Storage', signature: 'clearSettings([opts]) -> number',
-    summary: 'Delete every setting in one scope and return how many were deleted. Clearing the "panel" scope does not touch any script\'s private settings.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
+    summary: 'Delete every value saved in one scope.',
+    example: '`clearSettings({ scope = "script" })` deletes this script\'s own.',
+    notes: [
+      'Returns how many were deleted.',
+      'Clearing "panel" leaves every script\'s own.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'storageInfo', category: 'Storage', signature: 'storageInfo([opts]) -> table',
-    summary: 'Describe where one scope\'s settings are kept: `scope`, `backing`, `available`, `count` (how many settings) and `bytes` (their size as JSON text). `backing` is "panel" (stored with the panel, in the editor), "project" (in the DAW project, in an exported plugin) or "machine" (on this computer only). If `available` is false, nothing you save in this scope will be kept.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
+    summary: 'Tell where one scope\'s values are kept, and whether they will last.',
+    example: '`storageInfo().available` gives true where saved values are kept.',
+    notes: [
+      'Returns { scope, backing, available, count, bytes }.',
+      '`backing`: "panel", with the panel, in the editor; "project", in the DAW project, in an exported plug-in; "machine", on this computer.',
+      '`available` false: nothing saved there is kept.',
+      '`count`: how many; `bytes`: their size as JSON text.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'encodeJson', category: 'Storage', signature: 'encodeJson(value [, opts]) -> string',
-    summary: 'Turn a value — a table, a list, a number, some text — into JSON text, for example to keep a structure in a setting or copy it to the clipboard. `opts.indent` lays it out over several lines, indented by that many spaces. Keys are always written in sorted order, so the same data always gives the same text. Returns nothing for a value that has no JSON form, such as a function or a table that contains itself. It works the same in every scripting language, including Lua, which has no JSON support of its own.',
+    summary: 'Write a value as JSON text.',
+    example: '`encodeJson({ b = 1, a = 2 })` gives {"a":2,"b":1}.',
+    notes: [
+      'Returns the text, the keys sorted, so the same data gives the same text.',
+      'A value with no JSON form, such as a function or a table inside itself, or left out: no result, without a word.',
+      'The same in every language; Lua has no JSON of its own.',
+    ],
     params: [
-      { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'indent', type: 'number', default: '0',
-          summary: 'Lay the JSON out over several lines, indented by this many spaces. 0 keeps it '
-            + 'on one line.' },
+          summary: 'Spaces to indent each level, laid out over several lines.\n0: one line.\nRange: 0 ↔ 10.\nA fraction: rounded down.\nAbove 10: 10. Below 0, or not a number: one line.' },
       ]) },
     ],
     scopes: 'any',
@@ -3831,18 +4036,29 @@ export const COMMANDS = [
   },
   {
     id: 'decodeJson', category: 'Storage', signature: 'decodeJson(text) -> value',
-    summary: 'Turn JSON text back into a value. Text that is not valid JSON returns nothing. A JSON null also reads back as nothing: `{"a":1,"b":null}` comes back with only the key `a`, and `[1,null,2]` as a list of two items. So encoding and then decoding is not a full round trip when nulls are involved.',
-    params: [{ name: 'text', type: 'string', required: true }],
+    summary: 'Read JSON text back into a value.',
+    example: '`decodeJson("[1, 2]")` gives {1, 2}.',
+    notes: [
+      'Returns the value. Text that is not JSON, or left out: no result, without a word.',
+      'A JSON null is nothing: {"a":1,"b":null} gives a table with a only, and [1,null,2] a list of two.',
+    ],
+    params: [{ name: 'text', type: 'string', required: true, summary: 'JSON text.' }],
     scopes: 'any',
   },
 
   /* --- Debug --- */
   {
     id: 'log', category: 'Debug', signature: 'log(message [, value])',
-    summary: 'Print a message to the script console, optionally followed by a value. It changes nothing on the panel.',
+    summary: 'Print a message to the script console.',
+    notes: [
+      'Changes nothing on the panel.',
+      'Returns nothing.',
+    ],
+    example: '`log("cutoff", 64)` prints cutoff 64.',
+
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'value', type: 'value', required: false },
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number or a table: written as text.' },
+      { name: 'value', type: 'value', required: false, summary: 'Printed after the message, with a space; a table written out.\nLeft out: the message alone.' },
     ],
     scopes: 'any',
     snippet: { lua: 'log("${1:message}", ${2:value})$0', javascript: 'log("${1:message}", ${2:value})$0' },
@@ -3852,20 +4068,32 @@ export const COMMANDS = [
   // so a real failure read exactly like a debug print.
   {
     id: 'logWarn', category: 'Debug', signature: 'logWarn(message [, value])',
-    summary: 'Print a warning to the script console: something is not right, but the panel carries on. Warnings stand out from ordinary log lines.',
+    summary: 'Print a warning to the script console.',
+    notes: [
+      'Shown as a warning; the handler goes on.',
+      'Returns nothing.',
+    ],
+    example: '`logWarn("no tempo yet")` prints no tempo yet as a warning.',
+
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'value', type: 'value', required: false },
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number or a table: written as text.' },
+      { name: 'value', type: 'value', required: false, summary: 'Printed after the message, with a space; a table written out.\nLeft out: the message alone.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.core.warn("${1:message}")$0', javascript: 'ce.core.warn("${1:message}")$0' },
   },
   {
     id: 'logError', category: 'Debug', signature: 'logError(message [, value])',
-    summary: 'Print an error to the script console: something the panel could not do. It only prints — your handler keeps running. To stop the handler, use your language\'s own way of raising an error (error() in Lua, throw in JavaScript).',
+    summary: 'Print an error to the script console.',
+    notes: [
+      'It only prints: the handler goes on. To stop it, raise an error your language\'s way: error() in Lua, throw in JavaScript, raise in Python.',
+      'Returns nothing.',
+    ],
+    example: '`logError("patch not found")` prints patch not found as an error.',
+
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'value', type: 'value', required: false },
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number or a table: written as text.' },
+      { name: 'value', type: 'value', required: false, summary: 'Printed after the message, with a space; a table written out.\nLeft out: the message alone.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.core.error("${1:message}")$0', javascript: 'ce.core.error("${1:message}")$0' },
@@ -3969,34 +4197,72 @@ export const PANEL_COMMANDS = [
      { name: 'on', type: 'boolean', required: true }]),
 
   // --- Phrase Recorder ---
-  panelVerb('recorderRecord', 'recorderRecord(target [, on])', 'Arm / disarm recording (no argument toggles).',
-    [T, { name: 'on', type: 'boolean', required: false }]),
-  panelVerb('recorderStop', 'recorderStop(target)', 'Stop recording and playback.', [T]),
-  panelVerb('recorderPlay', 'recorderPlay(target [, playing])', 'Start / stop playback (no argument toggles).',
-    [T, { name: 'playing', type: 'boolean', required: false }]),
-  panelVerb('recorderClear', 'recorderClear(target)', 'Erase the take.', [T]),
-  panelVerb('recorderUndo', 'recorderUndo(target)', 'Undo the last recorded pass.', [T]),
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.recorder"): what noteRecorderLayout.js's recorderScriptPatch and the preview do.
+  panelVerb('recorderRecord', 'recorderRecord(target [, on])', 'Arm the recorder, or stop it.',
+    [T, { name: 'on', type: 'boolean', required: false,
+      summary: 'true: armed; it records from the top of the next loop, after `countIn()`.\nfalse: stopped.\nLeft out: armed if stopped, stopped if armed or recording.' }],
+    { example: '`ce.components.recorder.record("Recorder")` arms it, or stops it if it is armed or recording.',
+      notes: ['A take that has notes is recorded over: layered on, until it is stopped.', 'Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderStop', 'recorderStop(target)', 'Stop recording, or arming.', [T],
+    { example: '`ce.components.recorder.stop("Recorder")` stops recording; the loop goes on playing.',
+      notes: ['The take plays on: `play(target, false)` stops it.', 'Returns true. Already stopped: true, with a console line.'] }),
+  panelVerb('recorderPlay', 'recorderPlay(target [, playing])', 'Start or stop playing the take.',
+    [T, { name: 'playing', type: 'boolean', required: false, summary: 'true: it plays.\nfalse: it is silent.\nLeft out: toggles.' }],
+    { example: '`ce.components.recorder.play("Recorder", false)` silences the take.',
+      notes: ['Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderClear', 'recorderClear(target)', 'Delete the take.', [T],
+    { example: '`ce.components.recorder.clear("Recorder")` empties the take.',
+      notes: ['The stored slots are kept.', 'Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderUndo', 'recorderUndo(target)', 'Delete the last pass recorded over the take.', [T],
+    { example: '`ce.components.recorder.undo("Recorder")` takes away what the last pass added.',
+      notes: ['Returns true. Recording, or no take: false, with a console error.'] }),
   panelVerb('recorderQuantize', 'recorderQuantize(target, grid [, strength, scale, key])',
-    'Quantise the take to a grid; strength 0–1, optional pitch repair to a scale/key.',
-    [T, { name: 'grid', type: 'string', required: true }, { name: 'strength', type: 'number', required: false },
-     { name: 'scale', type: 'string', required: false, kind: 'scale' }, { name: 'key', type: 'string', required: false }]),
-  panelVerb('recorderTranspose', 'recorderTranspose(target, semitones)', 'Transpose the take.',
-    [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set the loop length in bars.',
-    [T, { name: 'bars', type: 'number', required: true }]),
-  panelVerb('recorderSource', 'recorderSource(target, source)',
-    `Choose what gets recorded — ${oneOf(HAND_WRITTEN_VALUES['recorder.source'])}.`,
-    [T, { name: 'source', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Shift the take in time by `by` ticks.',
-    [T, { name: 'by', type: 'number', required: true }]),
-  panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Shift the take in pitch without re-quantising.',
-    [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Save the take into a slot, 1 to 8.',
-    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex' }, { name: 'name', type: 'string', required: false }]),
-  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Load a take from a slot, counted from 1.',
-    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex' }]),
-  panelVerb('recorderCountIn', 'recorderCountIn(target, bars)', 'Set the count-in length in bars (0 = none).',
-    [T, { name: 'bars', type: 'number', required: true }]),
+    'Move the take\'s notes toward a grid, and into a key.',
+    [T, { name: 'grid', type: 'number', required: true,
+      summary: 'Divisions of the loop: 16 over one bar is sixteenth notes.\nRange: 1 ↔ 64, whole.\nOutside the range: the nearest end.\nText, such as "1/16": rejected with a console error.' },
+     { name: 'strength', type: 'number', required: false,
+       summary: 'How far each note moves: 1 onto the grid, 0.5 halfway, 0 not at all.\nRange: 0 ↔ 1.\nLeft out: the inspector\'s Strength, 0 unless it is set, which moves nothing.' },
+     { name: 'scale', type: 'string', required: false, kind: 'scale',
+       summary: 'With `key`, notes outside the key are moved to the nearest in it, ties down.\nOne of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out, with `key` given: the inspector\'s scale.\nAny other: rejected with a console error.' },
+     { name: 'key', type: 'string', required: false,
+       summary: 'The key\'s note: a name, such as "F#", in any case, or a number round the octave, 0 being C.\nLeft out, with `scale` given: the inspector\'s key.\nBoth left out: the pitches are kept.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.recorder.quantize("Recorder", 16, 1)` puts every note on a sixteenth of the loop.',
+      notes: ['The lengths are kept.', 'Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderTranspose', 'recorderTranspose(target, semitones)', 'Transpose what the take plays, leaving the take as recorded.',
+    [T, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nRange: -48 ↔ 48, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.transpose("Recorder", -12)` plays the take an octave down.',
+      notes: ['`shift()` changes the notes of the take itself.', 'Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set how many bars the loop is, while it follows the Transport.',
+    [T, { name: 'bars', type: 'number', required: true, summary: 'Bars.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.bars("Recorder", 4)` makes the loop four bars long.',
+      notes: ['Following the Transport is set in the inspector; otherwise the loop is a length in seconds.', 'Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderSource', 'recorderSource(target, source)', `Set where the notes it records come from: ${oneOf(HAND_WRITTEN_VALUES['recorder.source'])}.`,
+    [T, { name: 'source', type: 'string', required: true, kind: 'componentWord',
+      summary: '"input": the MIDI input.\n"panel": the panel\'s own note controls, such as a Chord Pad.\n"both": either.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.recorder.source("Recorder", "input")` records only the keyboard played into it.',
+      notes: ['Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Move every note of the take earlier or later.',
+    [T, { name: 'by', type: 'number', required: true, summary: 'Part of the loop: 0.01 is a hundredth later; below 0, earlier.\nPast the end of the loop: round to its start.\n0, or not a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.nudge("Recorder", -0.005)` moves a late take a little earlier.',
+      notes: ['Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Transpose the notes of the take itself.',
+    [T, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nA fraction: rounded.\nA note that would pass 0 or 127: deleted.\n0, or not a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.shift("Recorder", 7)` moves the take up a fifth.',
+      notes: ['Its timing is kept: nothing is quantized.', '`transpose()` changes only what it plays.', 'Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Keep a copy of the take in a slot.',
+    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex', summary: 'Slot, counted from 1.\nRange: 1 ↔ 8.\nA fraction: rounded.\nAny other: rejected with a console error.' },
+     { name: 'name', type: 'string', required: false, summary: 'The slot\'s name.\nLeft out: its name as it was; a new slot is "Take" and its number.' }],
+    { example: '`ce.components.recorder.store("Recorder", 2, "Verse")` keeps the take in slot 2, called Verse.',
+      notes: ['A slot that holds a take: replaced.', 'Returns true. Recording: false, with a console error.'] }),
+  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Make a stored take the take.',
+    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex', summary: 'Slot, counted from 1.\nA fraction: rounded.\nA slot that holds no take: rejected with a console error.' }],
+    { example: '`ce.components.recorder.load("Recorder", 2)` plays the take stored in slot 2.',
+      notes: ['A copy: the slot is kept as it was.', 'Returns true. Recording: false, with a console error.'] }),
+  panelVerb('recorderCountIn', 'recorderCountIn(target, bars)', 'Set how many bars it waits, once armed, before it records.',
+    [T, { name: 'bars', type: 'number', required: true, summary: 'Bars.\n0: none; it records from the top of the next loop.\nRange: 0 ↔ 4, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.countIn("Recorder", 1)` waits a bar before recording.',
+      notes: ['Counted in whole loops: a loop longer than the count-in waits one loop.', 'Returns true. Already that way: true, with a console line.'] }),
 
   // --- Harmoniser ---
   panelVerb('harmonyMode', 'harmonyMode(target, mode)',
@@ -4059,10 +4325,11 @@ export const PANEL_COMMANDS = [
   panelVerb('phraseRead', 'phraseRead(target [, field])',
     'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
     [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('recorderRead', 'recorderRead(target [, field])',
-    'Read the Phrase Recorder\'s state — the whole section, or one field by name. Includes '
-    + 'recording status and the take contents.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
+  panelVerb('recorderRead', 'recorderRead(target [, field])', 'Read the Phrase Recorder\'s settings and take.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord',
+      summary: 'A setting\'s name, in any case, such as "state" or "take".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.recorder.read("Recorder", "state")` gives "idle", "armed", "recording" or "overdub".',
+      notes: ['"take": { events }, each note { t, note, velocity, dur, pass }, `t` and `dur` as parts of the loop.', 'Returns the value.'] }),
   panelVerb('harmonyRead', 'harmonyRead(target [, field])',
     'Read the Harmoniser\'s settings — the whole section, or one field by name.',
     [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),

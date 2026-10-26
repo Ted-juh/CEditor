@@ -911,10 +911,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Timbre_Pad_timbre_Move_the_Timbre_puck_and_change_how_sharply_it_favours_the_nearest_anchor_","id":"qa_group_9","controlType":"Label"},
+        "Core": {"name":"group_Timbre_Pad_timbre_Move_a_puck_over_anchors_each_a_patch_with_a_value_for_every_target_and_send_their_values_blended_by_how_near_it_is_the_puck_the_blend_and_each_anchor_","id":"qa_group_9","controlType":"Label"},
         "Transform": {"x":28,"y":2656,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Timbre Pad — timbre.*  (Move the Timbre puck and change how sharply it favours the nearest anchor.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Timbre Pad — timbre.*  (Move a puck over anchors, each a patch with a value for every target, and send their values blended by how near it is: the puck, the blend and each anchor.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1005,10 +1005,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Macro_macro_Turn_the_Macro_and_re_weight_what_it_drives_","id":"qa_group_11","controlType":"Label"},
+        "Core": {"name":"group_Macro_macro_Turn_one_knob_that_drives_several_parameters_each_slot_with_its_own_depth_curve_and_range_","id":"qa_group_11","controlType":"Label"},
         "Transform": {"x":28,"y":3250,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Macro — macro.*  (Turn the Macro, and re-weight what it drives.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Macro — macro.*  (Turn one knob that drives several parameters, each slot with its own depth, curve and range.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1099,10 +1099,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Constraint_constraint_Move_one_member_of_a_Constraint_group_the_others_rebalance_around_it_","id":"qa_group_13","controlType":"Label"},
+        "Core": {"name":"group_Constraint_constraint_Keep_several_values_to_a_rule_as_one_of_them_moves_adding_up_to_1_in_order_in_proportion_or_mirrored_","id":"qa_group_13","controlType":"Label"},
         "Transform": {"x":28,"y":3754,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Constraint — constraint.*  (Move one member of a Constraint group — the others rebalance around it.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Constraint — constraint.*  (Keep several values to a rule as one of them moves: adding up to 1, in order, in proportion, or mirrored.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1287,10 +1287,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Vector_Joystick_joystick_Move_a_Vector_Joystick_puck_and_change_what_it_does_when_released_","id":"qa_group_17","controlType":"Label"},
+        "Core": {"name":"group_Vector_Joystick_joystick_Move_a_puck_over_a_square_sending_where_it_is_on_each_axis_and_how_near_it_is_to_each_corner_and_where_it_goes_when_let_go_","id":"qa_group_17","controlType":"Label"},
         "Transform": {"x":28,"y":4704,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Vector Joystick — joystick.*  (Move a Vector Joystick puck, and change what it does when released.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Vector Joystick — joystick.*  (Move a puck over a square, sending where it is on each axis and how near it is to each corner, and where it goes when let go.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1327,7 +1327,7 @@
         "Core": {"name":"verbs_joystick","id":"qa05_joystick_verbs","controlType":"Label"},
         "Transform": {"x":212,"y":4762,"width":470,"height":120},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"joystick.move(xy)             joystick.editable[on]\njoystick.bipolar[on]          joystick.showGrid[on]\njoystick.returnMode(enum)     joystick.showCrosshair[on]\njoystick.returnValue(num)     joystick.showCorners[on]\njoystick.returnAxes(enum)     joystick.showTrail[on]\njoystick.returnTime(num)      joystick.read(read)\njoystick.returnCurve(enum)    joystick.size(size)\njoystick.cornerLabel(line)    joystick.fill(fill)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"joystick.move(xy)             joystick.editable[on]\njoystick.bipolar[on]          joystick.showGrid[on]\njoystick.returnMode(enum)     joystick.showCrosshair[on]\njoystick.returnValue(num)     joystick.showCorners[on]\njoystick.returnTime(num)      joystick.showTrail[on]\njoystick.returnCurve(enum)    joystick.read(read)\njoystick.returnAxes(enum)     joystick.size(size)\njoystick.cornerLabel(line)    joystick.fill(fill)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"

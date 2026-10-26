@@ -490,3 +490,23 @@ test('imageLayer defaults to the background image layer', () => {
   assert.equal(imageLayer('OVERLAY').id, 'overlay');
   assert.equal(imageLayer('nope'), null);
 });
+
+/* ------------------------------------------------------------ the review of ce.image and ce.text */
+
+test('a name that is no control, a lookup with no name and a set with nothing to set say so', () => {
+  withControls((api) => {
+    const errors = (fn) => { clearScriptTrace(); fn(); return storeGet(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message); };
+    // It was told it had no Background.Fill, or no Text section.
+    assert.deepEqual(errors(() => api.imageSet('Nobody', PNG)), ['ce.image.set("Nobody"): this panel has no control by that name.']);
+    assert.deepEqual(errors(() => api.textRead('Nobody')), ['ce.text.read("Nobody"): this panel has no control by that name.']);
+    assert.match(errors(() => api.textRead('K'))[0], /has no Text section/, 'a control without one still says so');
+    // A name left out found nothing without a word; a name that matches nothing is a query with no answer.
+    assert.deepEqual(errors(() => api.imageAsset()), ['ce.image.asset: no id or name was given, so there is no answer.']);
+    assert.deepEqual(errors(() => api.imageAsset('nope')), []);
+    assert.deepEqual(errors(() => api.textFont()), ['ce.text.font: no family was given, so there is no answer.']);
+    assert.deepEqual(errors(() => api.imageLoad()), ['ce.image.load: no path was given, so nothing is read.']);
+    assert.deepEqual(errors(() => api.imageSet('L')), ['ce.image.set("L"): no picture and no option were given, so nothing was set.']);
+    // Both filters at once: the first one given was the only one applied.
+    assert.ok(api.textFonts({ portable: true, variable: true }).every((f) => f.portable && f.variable));
+  });
+});

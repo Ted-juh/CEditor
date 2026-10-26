@@ -542,7 +542,8 @@ export function recorderScriptPatch(cfg, action, args = {}) {
     case 'store': {
       if (busy) return {};
       const i = Number(a.slot);
-      if (!Number.isFinite(i)) return {};
+      // Past the last slot: refused. storeSlot left the list as it was, which read as "already that way".
+      if (!Number.isFinite(i) || Math.round(i) < 1 || Math.round(i) > MAX_SLOTS) return {};
       const slots = storeSlot(c.slots, Math.round(i) - 1, take, a.name ? String(a.name) : null);
       return slots.length ? { slots } : {};
     }

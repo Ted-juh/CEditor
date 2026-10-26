@@ -2292,8 +2292,8 @@ local WEBVIEW_ONLY = {
   "crossfaderLabelA","crossfaderLabelB","crossfaderEditable","crossfaderShowLabels",
   "crossfaderShowGains","crossfaderRead",
 -- @module ce.components.joystick
-  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnAxes",
-  "joystickReturnTime","joystickReturnCurve","joystickCornerLabel","joystickEditable",
+  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnTime",
+  "joystickReturnCurve","joystickReturnAxes","joystickCornerLabel","joystickEditable",
   "joystickShowGrid","joystickShowCrosshair","joystickShowCorners","joystickShowTrail",
   "joystickRead","joystickSize","joystickFill",
 -- @module ce.components.meter

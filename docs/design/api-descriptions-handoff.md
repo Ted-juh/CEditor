@@ -110,6 +110,12 @@ is the table of wording the owner rejected and what replaced it; read it before 
   a required value left out, or a wrong option, is refused or said; each would be a change in the
   panel runtime, `ScriptRuntime.cpp` and the three preludes, so they are left for the owner. The
   texts say what each does now.
+- `ce.core`, in four runtimes: `set()` with a value left out, or of a type the property does not
+  take, writes it as given in the panel window (a knob's value of "x"), without a word; `on()`, `watch()`, `compute()`,
+  `intercept()` and `defineAction()` with no function, or no name, set nothing up without a word.
+- `ce.storage`, in four runtimes: `saveSetting()` with no name or no value saves under "" or saves
+  nothing, and answers true; `decodeJson()` of text that is not JSON answers nothing without a word;
+  `encodeJson`'s indent below 0 or not a number is one line, and above 10 is 10, without a word.
 - `ce.music`, also in four runtimes: `degreeChord`'s step and size that are not numbers are 1 and 3
   without a word, where the rule says the default with a warning; `arp`'s pattern left out is "up"
   with a warning, where a required value left out is refused.
@@ -1261,8 +1267,8 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.components.kinetic | 12 | 7, all done |
 | ce.components.orbit, looper, constellation, panic | 20, 17, 13, 9 | 6 each, all done |
 | ce.music | 13 | 5, all done |
-| ce.core, ce.storage, ce.components.recorder, timbre, joystick | 15, 10, 15, 15, 16 | 4 each |
-| ce.image, ce.text, ce.components.macro, constraint | 8, 7, 16, 11 | 3 each |
+| ce.core, ce.storage, ce.components.recorder, timbre, joystick | 15, 10, 15, 15, 16 | 4 each, all done |
+| ce.image, ce.text, ce.components.macro, constraint | 8, 7, 16, 11 | 3 each, all done |
 | ce.ui, ce.components.matrix | 9, 11 | 2 each |
 | lifecycle hooks, ce.components.harmony, phrase, setlist, split | 9, 15, 9, 7, 6 | 1 each |
 
@@ -1936,6 +1942,61 @@ Runs in the panel window (`panelRuntime.js`) and in the plug-in's three engines 
   `lead`'s previous chord (the notes sorted). The signatures say so.
 - **Kept**: `scale()` and `chord()` give notes past 127 as they are, and `name()` names a number
   outside 0 to 127 ("B-2" for -1): both are arithmetic a script may go on with; the texts say so.
+
+### `ce.components.timbre`, `macro`, `constraint` and `joystick`
+
+- **A Constraint's `member()` keeps the rule**, as a drag does (`applyConstraint`): it wrote the one
+  value and left the others, so "sum" members added up to 1.3. A verb hook, `solve(list, c, at,
+  value)`, gives an item verb what else the change moves. `fill()` still writes every value as
+  given; the note says so.
+- **The Timbre Pad's `power` takes 0.5 ↔ 16**, as `anchorWeights` plays it, as the
+  Constellation's blend does.
+- **The Vector Joystick's corners**: `cornerLabel` said "clockwise from the top left", and the
+  third is the bottom left (`joystickCornerLabels`: top left, top right, bottom left, bottom right).
+  Its arguments were a display's ("row", "longer than the display"): a list of text outside a
+  display now has `index` and `text`, and the corner's own words. The return-spring verbs are the
+  Crossfader's `returnVerbs`, given the joystick's ranges, which have no inspector field set.
+- **Texts** for all: the Macro's depth below 0 turns a slot down as the knob turns up, its min
+  above its max runs the other way, its caption is drawn in capitals; the Timbre Pad's axis names
+  are where they are drawn; the Constraint's rules, one a line.
+
+### `ce.core` and `ce.storage`
+
+Both run in the panel window and the plug-in's three engines, so their texts were rewritten to the
+form and say what each does now; their silences are left for the owner, below, as `ce.device`'s
+were. `ce.storage`'s scope option and `set`'s transmit option are rewritten too; the other options
+keep their prose. `defineAction`'s text said a name defined again is replaced; one another script
+defined is ignored, with a console error, which the text now says.
+
+### `ce.components.recorder`
+
+- **A slot past 8 is refused**: `store(target, 9)` answered true and stored nothing (`storeSlot`
+  left the list as it was, which read as "already that way").
+- **The take-editing commands say why they did nothing**: `clear`, `undo`, `quantize`, `nudge` and
+  `shift` with no take, or while recording, said "refused, nothing changed" and no more.
+- **`quantize` reads what it is given or refuses it**: a grid written as text ("1/16") was one
+  division of the loop, a scale it has not was no scale, and a key's name was C, each without a
+  word. The key reads as the arp's (a note's name in any case, or a number round the octave), the
+  scale in any case.
+- **Texts were wrong in four places**: `stop` stops recording, not playback; `transpose` changes
+  what is played, not the take (`shift` changes the take); `nudge` moves by a part of the loop, not
+  by ticks; `quantize`'s strength left out is the inspector's, 0 unless set, which moves nothing.
+- **Noticed, not changed**: a refused hand-written component command writes its arguments as JSON
+  (`quantize {"grid":16} — refused, nothing changed. …`), as the Phrase, Harmoniser, Setlist and
+  Split do; a change of form for all five.
+
+### `ce.image` and `ce.text`
+
+- **A name that is no control** was told "this control has no Background.Fill" or "no Text
+  section"; it is now told the panel has no control by that name.
+- **A lookup with nothing to look up** (`asset()`, `font()`, `load()`) answered nothing without a
+  word; a set with neither a picture nor an option (`imageSet("Pad")`) answered false without one.
+  Each now says so. A name that matches nothing is still a query with no answer.
+- **Both filters at once**: `assets({ vector = true, embeddable = true })` and `fonts({ portable =
+  true, variable = true })` applied the first only.
+- **`imageSet`'s picture** is a file's path or address, or a data URL, not an image's id or name
+  (`imageIcon` takes those); its text said both.
+- **Texts** for all 15 in the form; the option fields keep their prose, which was already full.
 
 ## Checking each batch
 

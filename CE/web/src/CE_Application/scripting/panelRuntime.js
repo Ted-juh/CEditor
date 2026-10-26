@@ -40,7 +40,7 @@ import {
 import { dashPattern, strokeEnd } from './drawDash.js';
 import { listWord } from '../utils/wordLists.js';
 import { timeNumber } from './timeWords.js';
-import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
+import { HAND_WRITTEN, handWrittenRefusal, recorderQuantizeArgs, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import {
@@ -3435,8 +3435,14 @@ const recorderApi = {
   recorderPlay: (target, playing) => recAction(target, 'play', playing === undefined ? {} : { playing: playing !== false }),
   recorderClear: (target) => recAction(target, 'clear', {}),
   recorderUndo: (target) => recAction(target, 'undo', {}),
-  recorderQuantize: (target, grid, strength, scale, key) =>
-    recAction(target, 'quantize', { grid, strength, scale, key }),
+  recorderQuantize: (target, grid, strength, scale, key) => {
+    const read = recorderQuantizeArgs({ grid, strength, scale, key });
+    if (read.reason) {
+      addScriptTrace('error', '', sectionRefusalLine('recorder', String(target ?? ''), 'quantize', { grid, strength, scale, key }, read.reason));
+      return false;
+    }
+    return recAction(target, 'quantize', read.args);
+  },
   recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
   recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
   recorderSource: (target, source) => recAction(target, 'source', HAND_WRITTEN.recorderSource.args(source)),
@@ -5771,6 +5777,14 @@ function drawMeasureImpl(text, opts) {
  */
 
 /** The font catalogue as descriptors, from the app's own availableFonts store. */
+/** A lookup's name given, or why not (ce.image's and ce.text's reviews): a name left out found
+    nothing without a word, where a name that matches nothing is a query with no answer. */
+function lookupNamed(verb, what, name) {
+  if (name !== undefined && name !== null && String(name).trim() !== '') return true;
+  addScriptTrace('error', '', `${verb}: no ${what} was given, so there is no answer.`);
+  return false;
+}
+
 function textCatalogue() {
   return fontCatalogue(get(availableFonts), currentDocumentFonts());
 }
@@ -5783,9 +5797,11 @@ function textFontNode(name) {
 
 /** Report the same way for every ce.text verb that needs a Text section and did not find one. */
 function textNeedsTextSection(verb, name) {
-  addScriptTrace('error', '',
-    `ce.text.${verb}("${name}"): this control has no Text section, so it has no typography. `
-    + 'ce.panel.info() reports the type; a Knob or a Meter draws its own labels.');
+  // A name that is no control was told it had no Text section (ce.text's review).
+  addScriptTrace('error', '', findControlByName(name)
+    ? `ce.text.${verb}("${name}"): this control has no Text section, so it has no typography. `
+      + 'ce.panel.info() reports the type; a Knob or a Meter draws its own labels.'
+    : `ce.text.${verb}("${name}"): this panel has no control by that name.`);
   return undefined;
 }
 
@@ -5833,9 +5849,11 @@ function imageNode(name, layer) {
 }
 
 function imageNeedsNode(verb, name, layer) {
-  addScriptTrace('error', '',
-    `ce.image.${verb}("${name}"): this control has no ${layer.node}, so it has no ${layer.label}. `
-    + 'ce.panel.info() reports the type.');
+  // A name that is no control was told it had no such layer (ce.image's review).
+  addScriptTrace('error', '', findControlByName(name)
+    ? `ce.image.${verb}("${name}"): this control has no ${layer.node}, so it has no ${layer.label}. `
+      + 'ce.panel.info() reports the type.'
+    : `ce.image.${verb}("${name}"): this panel has no control by that name.`);
   return undefined;
 }
 
@@ -5888,6 +5906,10 @@ function imageSetImpl(target, src, opts) {
       `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
   }
   for (const warning of warnings) addScriptTrace('warn', '', `ce.image.set("${name}"): ${warning}`);
+  // Neither a picture nor an option: it did nothing without a word (ce.image's review).
+  if (!writes.length && !refused.length) {
+    addScriptTrace('error', '', `ce.image.set("${name}"): no picture and no option were given, so nothing was set.`);
+  }
   if (!writes.length) return false;
 
   let all = true;
@@ -9259,13 +9281,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
 
     /* ce.image (§50). assets/asset answer from the icon library and the icons the panel carries; the
        rest work on one control. */
-    imageAssets: (opts) => {
-      const all = imageCatalogue();
-      if (opts?.embeddable === true) return all.filter((a) => a.embeddable);
-      if (opts?.vector === true) return all.filter((a) => a.vector);
-      return all;
-    },
-    imageAsset: (idOrName) => findAsset(imageCatalogue(), idOrName) ?? undefined,
+    // Both filters at once, where the first one given used to be the only one applied.
+    imageAssets: (opts) => imageCatalogue()
+      .filter((a) => (opts?.embeddable !== true || a.embeddable) && (opts?.vector !== true || a.vector)),
+    imageAsset: (idOrName) => (lookupNamed('ce.image.asset', 'id or name', idOrName)
+      ? findAsset(imageCatalogue(), idOrName) ?? undefined : undefined),
     imageSet: (target, src, opts) => imageSetImpl(target, src, opts),
     imageClear: (target, layer) => imageClearImpl(target, layer),
     imageRead: (target, layer) => imageReadImpl(target, layer),
@@ -9273,20 +9293,17 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     imageEmbed: (target, layer) => imageEmbedImpl(target, layer),
     imageLoad: (path) => {
       const p = String(path ?? '');
-      if (!p) return false;
+      if (!p) { addScriptTrace('error', '', 'ce.image.load: no path was given, so nothing is read.'); return false; }
       if (sourceKind(p) !== 'file') return true;    // a data URL needs no loading
       loadFile(p);
       return String(get(fileCache)[p] ?? '').startsWith('data:');
     },
 
     // ce.text (§46). fonts/font answer from the catalogue; the rest work on one control's Text.
-    textFonts: (opts) => {
-      const all = textCatalogue();
-      if (opts?.portable === true) return all.filter((f) => f.portable);
-      if (opts?.variable === true) return all.filter((f) => f.variable);
-      return all;
-    },
-    textFont: (family) => findFont(textCatalogue(), family) ?? undefined,
+    textFonts: (opts) => textCatalogue()
+      .filter((f) => (opts?.portable !== true || f.portable) && (opts?.variable !== true || f.variable)),
+    textFont: (family) => (lookupNamed('ce.text.font', 'family', family)
+      ? findFont(textCatalogue(), family) ?? undefined : undefined),
     textStyle: (target, opts) => textStyleImpl(target, opts),
     textAxis: (target, tag, value) => textAxisImpl(target, tag, value),
     textRead: (target, field) => textReadImpl(target, field),
