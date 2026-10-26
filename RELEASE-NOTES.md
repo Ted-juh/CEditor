@@ -263,6 +263,18 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.pixel.gamma` takes 0.2 to 4 and `transitionMs` 0 to 2000, as the inspector does:
   a gamma of 0.1 was stored and drawn as 0.2, and a transition up to 5000 ms could be set that the
   inspector could not show.
+- `ce.components.meter.labelPosition` sets where a Meter's caption sits, "above", "below" or
+  "none"; a caption is drawn only there, so `label()` on a new meter showed nothing.
+- `ce.components.chordpad.key` takes a note's name, `key("ChordPad", "Eb")`, and a number goes round
+  the octave, 14 is D, as the Arpeggiator's does; 12 and above were stored as 11, B.
+- `ce.components.noteribbon.key` reads the same way, and `bendRange` takes whole semitones, as the
+  strip plays it; a fraction was stored and played rounded.
+- `ce.components.drumpads.gate` takes 5 to 2000 ms, whole, as the pads play it and the inspector
+  offers it; 1 was played as 5 and 5000 as 2000. `rollDelay` and `flamMs` take whole milliseconds.
+- `ce.components.transport` takes the clock's own ranges: a tempo of 20 to 300, a swing of 0 to 1,
+  a loop from bar 1 to 999 and 0.25 to 64 bars long, a count-in of 0 to 8 bars. A script could set
+  400, a negative swing, 9999 bars and a 16-bar count-in, and the clock played 300, straight, 999,
+  64 and 8; `loopBars` took whole bars only, where the inspector takes quarters.
 
 ## What you get
 

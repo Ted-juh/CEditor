@@ -5274,19 +5274,21 @@ Good to know:
 
 #### ce.components.chordpad: Chord Pad
 
-Re-key, re-voice and re-channel the Chord Pad without touching the layout.
+Play a chord, or a note of the scale, from each pad: the key and scale they are built from, their voicing, and what they send.
 
 ##### `ce.components.chordpad.mode(target, mode) -> boolean`
 
-Set the mode.
+Set what a pad plays: a chord, or one note of the scale.
 
-Example: `ce.components.chordpad.mode("ChordPad", "notes")` sets the mode to "notes".
+Example: `ce.components.chordpad.mode("ChordPad", "notes")` gives each pad one note of the scale.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `mode` (text, required): One of "chords" or "notes". Case-insensitive.<br>Invalid: rejected with a console error.
+- `mode` (text, required): "chords": one chord per step of the scale.<br>"notes": one note of the scale per pad, over `noteSpan()` octaves.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- With `layout()` "wheel": chords either way.
+- Default: "chords".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5294,15 +5296,17 @@ Good to know:
 
 ##### `ce.components.chordpad.key(target, key) -> boolean`
 
-Set the key.
+Set the key the pads are built in.
 
-Example: `ce.components.chordpad.key("ChordPad", 6)` sets the key to 6.
+Example: `ce.components.chordpad.key("ChordPad", "F#")` builds the pads in F♯.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `key` (number, required): Key.<br>Range: 0 ↔ 11, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Following the panel's key: replaced at its next change.
+- Default: 0 (C).
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5310,15 +5314,17 @@ Good to know:
 
 ##### `ce.components.chordpad.scale(target, scale) -> boolean`
 
-Set the scale.
+Set the scale the pads are built from.
 
-Example: `ce.components.chordpad.scale("ChordPad", "minor")` sets the scale to "minor".
+Example: `ce.components.chordpad.scale("ChordPad", "dorian")` builds the pads from the Dorian scale.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
 - `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Following the panel's key: replaced at its next change.
+- Default: "major".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5326,15 +5332,16 @@ Good to know:
 
 ##### `ce.components.chordpad.followPanelKey(target [, followPanelKey]) -> boolean`
 
-Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise.
+Follow the panel's key and scale, or keep its own.
 
-Example: `ce.components.chordpad.followPanelKey("ChordPad")` switches the follow panel key on if it is off, and off if it is on.
+Example: `ce.components.chordpad.followPanelKey("ChordPad", true)` takes the panel's key and scale, and changes with them.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `followPanelKey` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5342,15 +5349,17 @@ Good to know:
 
 ##### `ce.components.chordpad.chordType(target, chordType) -> boolean`
 
-Set the chord type.
+Set how many notes each chord has.
 
-Example: `ce.components.chordpad.chordType("ChordPad", "seventh")` sets the chord type to "seventh".
+Example: `ce.components.chordpad.chordType("ChordPad", "seventh")` adds the seventh: four notes.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `chordType` (text, required): One of "triad" or "seventh". Case-insensitive.<br>Invalid: rejected with a console error.
+- `chordType` (text, required): "triad": three notes.<br>"seventh": four, the seventh added.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only in "chords" mode.
+- Default: "triad".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5358,15 +5367,18 @@ Good to know:
 
 ##### `ce.components.chordpad.voicing(target, voicing) -> boolean`
 
-Set the voicing.
+Set how each chord's notes are spread.
 
-Example: `ce.components.chordpad.voicing("ChordPad", "spread")` sets the voicing to "spread".
+Example: `ce.components.chordpad.voicing("ChordPad", "drop2")` drops each chord's second note from the top an octave.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `voicing` (text, required): One of "close", "spread" or "drop2". Case-insensitive.<br>Invalid: rejected with a console error.
+- `voicing` (text, required): "close": stacked as built.<br>"spread": every second note an octave up.<br>"drop2": the second note from the top an octave down.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only in "chords" mode.
+- Applied after `inversion()`.
+- Default: "close".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5374,15 +5386,17 @@ Good to know:
 
 ##### `ce.components.chordpad.inversion(target, inversion) -> boolean`
 
-Set the inversion.
+Set how many of each chord's lowest notes move up an octave.
 
-Example: `ce.components.chordpad.inversion("ChordPad", 2)` sets the inversion to 2.
+Example: `ce.components.chordpad.inversion("ChordPad", 1)` plays each chord in first inversion.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `inversion` (number, required): Inversion.<br>Range: 0 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `inversion` (number, required): Inversions: each moves the lowest note up an octave.<br>0: root position.<br>Range: 0 ↔ 3, whole; a triad stops at 2.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only in "chords" mode.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5390,15 +5404,18 @@ Good to know:
 
 ##### `ce.components.chordpad.octave(target, octave) -> boolean`
 
-Set the octave.
+Transpose every pad by whole octaves.
 
-Example: `ce.components.chordpad.octave("ChordPad", 0)` sets the octave to 0.
+Example: `ce.components.chordpad.octave("ChordPad", -1)` plays every pad an octave lower.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `octave` (number, required): Octave.<br>Range: -3 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `octave` (number, required): Octaves, up or down from `baseOctave()`.<br>Range: -3 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- With `baseOctave()`, stops at octaves -1 and 8.
+- A note past the MIDI range sounds at its end, 0 or 127.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5406,15 +5423,17 @@ Good to know:
 
 ##### `ce.components.chordpad.velocity(target, velocity) -> boolean`
 
-Set the velocity.
+Set how hard every note is struck.
 
-Example: `ce.components.chordpad.velocity("ChordPad", 64)` sets the velocity to 64.
+Example: `ce.components.chordpad.velocity("ChordPad", 110)` plays every note at velocity 110.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `velocity` (number, required): Velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While an Arp plays its chords (`arp.link()`), the pads sound nothing themselves.
+- Default: 96.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5422,15 +5441,17 @@ Good to know:
 
 ##### `ce.components.chordpad.channel(target, channel) -> boolean`
 
-Set the channel.
+Set which MIDI channel the pads play on.
 
-Example: `ce.components.chordpad.channel("ChordPad", 9)` sets the channel to 9.
+Example: `ce.components.chordpad.channel("ChordPad", 10)` plays the pads on channel 10.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `channel` (number, required): Channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While an Arp plays its chords (`arp.link()`), the pads sound nothing themselves.
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5438,15 +5459,17 @@ Good to know:
 
 ##### `ce.components.chordpad.strum(target, strum) -> boolean`
 
-Spread the chord over this many milliseconds.
+Set the time between a chord's notes, lowest first.
 
-Example: `ce.components.chordpad.strum("ChordPad", 1000)` sets the strum ms to 1000.
+Example: `ce.components.chordpad.strum("ChordPad", 30)` plays each chord's notes 30 ms apart, from the lowest.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `strum` (number, required): Strum ms.<br>Range: 0 ↔ 2000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `strum` (number, required): Milliseconds from one note to the next.<br>0: all at once.<br>Range: 0 ↔ 2000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The inspector stops at 200.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5454,15 +5477,16 @@ Good to know:
 
 ##### `ce.components.chordpad.latch(target [, latch]) -> boolean`
 
-Switch the latch on or off.
+Keep a pad sounding after it is let go, until it is tapped again.
 
 Example: `ce.components.chordpad.latch("ChordPad")` switches the latch on if it is off, and off if it is on.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `latch` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `latch` (true or false, optional): true: a tap starts a pad, the next tap stops it.<br>false: a pad sounds while it is held.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5470,15 +5494,16 @@ Good to know:
 
 ##### `ce.components.chordpad.layout(target, layout) -> boolean`
 
-Wheel or grid.
+Set how the pads are laid out: a circle of fifths, or a grid.
 
-Example: `ce.components.chordpad.layout("ChordPad", "grid")` sets the layout to "grid".
+Example: `ce.components.chordpad.layout("ChordPad", "grid")` lays the pads out in rows.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `layout` (text, required): One of "wheel" or "grid". Case-insensitive.<br>Invalid: rejected with a console error.
+- `layout` (text, required): "wheel": the circle of fifths, each major chord with its relative minor inside; the chords in the key lit.<br>"grid": one pad per chord or note of the key, `gridCols()` to a row.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "wheel".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5486,15 +5511,17 @@ Good to know:
 
 ##### `ce.components.chordpad.baseOctave(target, baseOctave) -> boolean`
 
-Set the base octave.
+Set the octave the key's root is in.
 
-Example: `ce.components.chordpad.baseOctave("ChordPad", 4)` sets the base octave to 4.
+Example: `ce.components.chordpad.baseOctave("ChordPad", 3)` puts the key's root in octave 3, as in C3.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `baseOctave` (number, required): Base octave.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `baseOctave` (number, required): The root's octave, as in C4: middle C.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- `octave()` moves the pads from here.
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5502,15 +5529,17 @@ Good to know:
 
 ##### `ce.components.chordpad.noteSpan(target, noteSpan) -> boolean`
 
-How many octaves the pads cover.
+Set how many octaves of the scale the pads cover.
 
-Example: `ce.components.chordpad.noteSpan("ChordPad", 2)` sets the note span to 2.
+Example: `ce.components.chordpad.noteSpan("ChordPad", 3)` lays out three octaves of the scale.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `noteSpan` (number, required): Note span.<br>Range: 1 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `noteSpan` (number, required): Octaves.<br>Range: 1 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only in "notes" mode.
+- Default: 2.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5518,15 +5547,18 @@ Good to know:
 
 ##### `ce.components.chordpad.gridCols(target, gridCols) -> boolean`
 
-Columns, while the layout is a grid.
+Set how many pads a row of the grid has.
 
-Example: `ce.components.chordpad.gridCols("ChordPad", 7)` sets the grid cols to 7.
+Example: `ce.components.chordpad.gridCols("ChordPad", 7)` puts seven pads in a row.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `gridCols` (number, required): Grid cols.<br>Range: 1 ↔ 12, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `gridCols` (number, required): Pads to a row.<br>Range: 1 ↔ 12, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `layout()` is "grid".
+- The inspector stops at 8.
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5534,15 +5566,16 @@ Good to know:
 
 ##### `ce.components.chordpad.echo(target [, echo]) -> boolean`
 
-Light the pads from incoming MIDI as well as from taps.
+Light the pads from the notes held on the MIDI input, as well as from taps.
 
 Example: `ce.components.chordpad.echo("ChordPad")` switches the echo on if it is off, and off if it is on.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `echo` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `echo` (true or false, optional): true: a pad is ringed while its notes are held on the input.<br>false: only taps light it.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5550,15 +5583,17 @@ Good to know:
 
 ##### `ce.components.chordpad.echoChannel(target, echoChannel) -> boolean`
 
-Which channel the echo listens to. 0 means omni.
+Set which MIDI channel the echo listens to.
 
-Example: `ce.components.chordpad.echoChannel("ChordPad", 8)` sets the echo channel to 8.
+Example: `ce.components.chordpad.echoChannel("ChordPad", 2)` lights the pads from channel 2 only.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `echoChannel` (number, required): Echo channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `echoChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `echo()` is on.
+- Default: 0, any channel.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5566,15 +5601,16 @@ Good to know:
 
 ##### `ce.components.chordpad.editable(target [, editable]) -> boolean`
 
-Allow or lock touch control of the Chord Pad.
+Let the pads be played by touch, or not.
 
 Example: `ce.components.chordpad.editable("ChordPad")` switches the editable on if it is off, and off if it is on.
 
 - `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
-- `editable` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `editable` (true or false, optional): true: a tap plays a pad.<br>false: taps do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5582,7 +5618,7 @@ Good to know:
 
 ##### `ce.components.chordpad.showPiano(target [, showPiano]) -> boolean`
 
-Show or hide the piano.
+Show or hide the keyboard strip of the notes sounding.
 
 Example: `ce.components.chordpad.showPiano("ChordPad")` shows the piano if it is hidden, and hides it if it is shown.
 
@@ -5591,6 +5627,7 @@ Example: `ce.components.chordpad.showPiano("ChordPad")` shows the piano if it is
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5598,7 +5635,7 @@ Good to know:
 
 ##### `ce.components.chordpad.showRomans(target [, showRomans]) -> boolean`
 
-Show or hide the romans.
+Show or hide the roman numerals on the pads, such as "I", "ii" and "♭VII".
 
 Example: `ce.components.chordpad.showRomans("ChordPad")` shows the romans if they are hidden, and hides them if they are shown.
 
@@ -5607,6 +5644,7 @@ Example: `ce.components.chordpad.showRomans("ChordPad")` shows the romans if the
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5632,19 +5670,20 @@ Good to know:
 
 #### ce.components.noteribbon: Note Ribbon
 
-Re-key and re-range the Note Ribbon: scale, span, bend depth, channel.
+Play notes, or glide between them, along a strip: its key and range, how it is touched, and what it sends.
 
 ##### `ce.components.noteribbon.mode(target, mode) -> boolean`
 
-Set the mode.
+Set how the strip plays: the notes of the scale, every semitone, or a gliding pitch.
 
-Example: `ce.components.noteribbon.mode("NoteRibbon", "chromatic")` sets the mode to "chromatic".
+Example: `ce.components.noteribbon.mode("NoteRibbon", "glide")` bends the pitch as the finger moves.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `mode` (text, required): One of "snap", "chromatic" or "glide". Case-insensitive.<br>Invalid: rejected with a console error.
+- `mode` (text, required): "snap": the notes of the scale only, one zone each.<br>"chromatic": every semitone, one zone each.<br>"glide": the pitch follows the finger, by pitch bend; past `bendRange()` the note starts again from a new one.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "snap".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5652,15 +5691,18 @@ Good to know:
 
 ##### `ce.components.noteribbon.key(target, key) -> boolean`
 
-Set the key.
+Set the key whose scale is in key on the strip.
 
-Example: `ce.components.noteribbon.key("NoteRibbon", 6)` sets the key to 6.
+Example: `ce.components.noteribbon.key("NoteRibbon", "F#")` puts the strip in F♯.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `key` (number, required): Key.<br>Range: 0 ↔ 11, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The notes in key: the zones of "snap", the marked ones otherwise.
+- Following the panel's key: replaced at its next change.
+- Default: 0 (C).
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5668,15 +5710,17 @@ Good to know:
 
 ##### `ce.components.noteribbon.scale(target, scale) -> boolean`
 
-Set the scale.
+Set the scale whose notes are in key.
 
-Example: `ce.components.noteribbon.scale("NoteRibbon", "minor")` sets the scale to "minor".
+Example: `ce.components.noteribbon.scale("NoteRibbon", "dorian")` puts the Dorian scale's notes in key.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
 - `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Following the panel's key: replaced at its next change.
+- Default: "major".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5684,15 +5728,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.followPanelKey(target [, followPanelKey]) -> boolean`
 
-Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise.
+Follow the panel's key and scale, or keep its own.
 
-Example: `ce.components.noteribbon.followPanelKey("NoteRibbon")` switches the follow panel key on if it is off, and off if it is on.
+Example: `ce.components.noteribbon.followPanelKey("NoteRibbon", true)` takes the panel's key and scale, and changes with them.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `followPanelKey` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5700,15 +5745,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.baseNote(target, baseNote) -> boolean`
 
-Set the base note.
+Set the note at the low end of the strip.
 
-Example: `ce.components.noteribbon.baseNote("NoteRibbon", 64)` sets the base note to 64.
+Example: `ce.components.noteribbon.baseNote("NoteRibbon", 60)` starts the strip at middle C.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `baseNote` (number, required): Base note.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `baseNote` (number, required): MIDI note: 60 is middle C.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 48 (C3).
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5716,15 +5762,17 @@ Good to know:
 
 ##### `ce.components.noteribbon.octaves(target, octaves) -> boolean`
 
-Set the octaves.
+Set how many octaves the strip covers, up from `baseNote()`.
 
-Example: `ce.components.noteribbon.octaves("NoteRibbon", 3)` sets the octaves to 3.
+Example: `ce.components.noteribbon.octaves("NoteRibbon", 3)` spreads three octaves along the strip.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
 - `octaves` (number, required): Octaves.<br>Range: 1 ↔ 5, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The strip stops at note 127.
+- Default: 2.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5732,15 +5780,17 @@ Good to know:
 
 ##### `ce.components.noteribbon.bendRange(target, bendRange) -> boolean`
 
-Set the bend range.
+Set the synth's pitch-bend range, which "glide" bends within.
 
-Example: `ce.components.noteribbon.bendRange("NoteRibbon", 24.5)` sets the bend range to 24.5.
+Example: `ce.components.noteribbon.bendRange("NoteRibbon", 12)` bends up to an octave either way before a new note.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `bendRange` (number, required): Bend range.<br>Range: 1 ↔ 48.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `bendRange` (number, required): Semitones: the synth's own bend range. Set to match it, or the glide is the wrong distance.<br>Range: 1 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only in "glide" mode.
+- Default: 2.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5748,15 +5798,17 @@ Good to know:
 
 ##### `ce.components.noteribbon.velocity(target, velocity) -> boolean`
 
-Set the velocity.
+Set how hard every note is struck.
 
-Example: `ce.components.noteribbon.velocity("NoteRibbon", 64)` sets the velocity to 64.
+Example: `ce.components.noteribbon.velocity("NoteRibbon", 110)` plays every note at velocity 110.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `velocity` (number, required): Velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While `velocityFrom()` is "position": not used.
+- Default: 96.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5764,15 +5816,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.channel(target, channel) -> boolean`
 
-Set the channel.
+Set which MIDI channel the notes, the bend and the CC go out on.
 
-Example: `ce.components.noteribbon.channel("NoteRibbon", 9)` sets the channel to 9.
+Example: `ce.components.noteribbon.channel("NoteRibbon", 2)` plays on channel 2.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `channel` (number, required): Channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5780,15 +5833,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.latch(target [, latch]) -> boolean`
 
-Switch the latch on or off.
+Keep the note sounding after the finger lifts, until the strip is touched again.
 
 Example: `ce.components.noteribbon.latch("NoteRibbon")` switches the latch on if it is off, and off if it is on.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `latch` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `latch` (true or false, optional): true: it keeps sounding; the next touch silences it.<br>false: it stops when the finger lifts.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5796,15 +5850,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.orientation(target, orientation) -> boolean`
 
-Set the orientation.
+Set which way the strip runs.
 
-Example: `ce.components.noteribbon.orientation("NoteRibbon", "vertical")` sets the orientation to "vertical".
+Example: `ce.components.noteribbon.orientation("NoteRibbon", "vertical")` runs the strip from low at the bottom to high at the top.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `orientation` (text, required): One of "horizontal" or "vertical". Case-insensitive.<br>Invalid: rejected with a console error.
+- `orientation` (text, required): "horizontal": low at the left.<br>"vertical": low at the bottom.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "horizontal".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5812,15 +5867,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.velocityFrom(target, velocityFrom) -> boolean`
 
-Fixed, or from where along the ribbon the touch landed.
+Set where each note's velocity comes from: fixed, or where across the strip it is touched.
 
-Example: `ce.components.noteribbon.velocityFrom("NoteRibbon", "position")` sets the velocity from to "position".
+Example: `ce.components.noteribbon.velocityFrom("NoteRibbon", "position")` plays harder the nearer the top edge it is touched.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `velocityFrom` (text, required): One of "fixed" or "position". Case-insensitive.<br>Invalid: rejected with a console error.
+- `velocityFrom` (text, required): "fixed": `velocity()`.<br>"position": 8 at the bottom edge to 127 at the top; a vertical strip's left edge to its right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "fixed".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5828,15 +5884,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.modAxis(target, modAxis) -> boolean`
 
-What the cross-axis of a touch sends: nothing, or a CC.
+Set what a touch across the strip sends: nothing, or a CC.
 
-Example: `ce.components.noteribbon.modAxis("NoteRibbon", "cc")` sets the mod axis to "cc".
+Example: `ce.components.noteribbon.modAxis("NoteRibbon", "cc")` sends `modCc()` from where across the strip it is touched.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `modAxis` (text, required): One of "none" or "cc". Case-insensitive.<br>Invalid: rejected with a console error.
+- `modAxis` (text, required): "none": nothing.<br>"cc": `modCc()`, 0 at the bottom edge to 127 at the top; a vertical strip's left edge to its right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "none".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5844,15 +5901,17 @@ Good to know:
 
 ##### `ce.components.noteribbon.modCc(target, modCc) -> boolean`
 
-Which CC the cross-axis sends.
+Set which CC a touch across the strip sends.
 
-Example: `ce.components.noteribbon.modCc("NoteRibbon", 64)` sets the mod cc to 64.
+Example: `ce.components.noteribbon.modCc("NoteRibbon", 74)` sends CC 74, often a synth's filter.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `modCc` (number, required): Mod cc.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `modCc` (number, required): Controller number: 1 is the mod wheel.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `modAxis()` is "cc".
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5860,15 +5919,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.echo(target [, echo]) -> boolean`
 
-Switch the echo on or off.
+Outline the zones of the notes held on the MIDI input.
 
 Example: `ce.components.noteribbon.echo("NoteRibbon")` switches the echo on if it is off, and off if it is on.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `echo` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `echo` (true or false, optional): true: a zone is outlined while its note is held on the input.<br>false: not.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5876,15 +5936,17 @@ Good to know:
 
 ##### `ce.components.noteribbon.echoChannel(target, echoChannel) -> boolean`
 
-0 means omni.
+Set which MIDI channel the echo listens to.
 
-Example: `ce.components.noteribbon.echoChannel("NoteRibbon", 8)` sets the echo channel to 8.
+Example: `ce.components.noteribbon.echoChannel("NoteRibbon", 2)` outlines the notes held on channel 2 only.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `echoChannel` (number, required): Echo channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `echoChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `echo()` is on.
+- Default: 0, any channel.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5892,15 +5954,16 @@ Good to know:
 
 ##### `ce.components.noteribbon.editable(target [, editable]) -> boolean`
 
-Allow or lock touch control of the Note Ribbon.
+Let the strip be played by touch, or not.
 
 Example: `ce.components.noteribbon.editable("NoteRibbon")` switches the editable on if it is off, and off if it is on.
 
 - `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
-- `editable` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `editable` (true or false, optional): true: a touch plays it.<br>false: touches do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5908,7 +5971,7 @@ Good to know:
 
 ##### `ce.components.noteribbon.showNames(target [, showNames]) -> boolean`
 
-Show or hide the names.
+Show or hide the note names on the zones.
 
 Example: `ce.components.noteribbon.showNames("NoteRibbon")` shows the names if they are hidden, and hides them if they are shown.
 
@@ -5917,6 +5980,8 @@ Example: `ce.components.noteribbon.showNames("NoteRibbon")` shows the names if t
 
 Good to know:
 
+- A zone too narrow for its name shows none either way.
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5924,7 +5989,7 @@ Good to know:
 
 ##### `ce.components.noteribbon.showHeader(target [, showHeader]) -> boolean`
 
-Show or hide the header.
+Show or hide the strip above the zones: the key, the mode and the note playing.
 
 Example: `ce.components.noteribbon.showHeader("NoteRibbon")` shows the header if it is hidden, and hides it if it is shown.
 
@@ -5933,6 +5998,7 @@ Example: `ce.components.noteribbon.showHeader("NoteRibbon")` shows the header if
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5958,19 +6024,21 @@ Good to know:
 
 #### ce.components.drumpads: Drum Pads
 
-Re-map the Drum Pads — the grid, the kit, and each pad's own note, name and choke group.
+Play a fixed note from each pad of a grid: the notes and their names, how a hit is struck, rolls, and what the corners of a pad do.
 
 ##### `ce.components.drumpads.map(target, map) -> boolean`
 
-Set the map.
+Set how the pads are named, and whether the hi-hats choke each other.
 
-Example: `ce.components.drumpads.map("DrumPads", "chromatic")` sets the map to "chromatic".
+Example: `ce.components.drumpads.map("DrumPads", "chromatic")` names the pads by pitch.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `map` (text, required): One of "gm", "chromatic" or "custom". Case-insensitive.<br>Invalid: rejected with a console error.
+- `map` (text, required): "gm": General MIDI drum names; the closed, pedal and open hi-hats choke each other.<br>"chromatic": named by pitch.<br>"custom": named as "gm", no choke groups.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- In every map pad 1 plays `baseNote()` and each pad after it a semitone higher; `note()`, `label()` and `choke()` change one pad.
+- Default: "gm".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5978,15 +6046,17 @@ Good to know:
 
 ##### `ce.components.drumpads.baseNote(target, baseNote) -> boolean`
 
-Set the base note.
+Set the note pad 1 plays; each pad after it plays a semitone higher.
 
-Example: `ce.components.drumpads.baseNote("DrumPads", 64)` sets the base note to 64.
+Example: `ce.components.drumpads.baseNote("DrumPads", 36)` starts the pads at 36, the GM bass drum.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `baseNote` (number, required): Base note.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `baseNote` (number, required): MIDI note: 36 is the GM bass drum.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- A pad past 127 plays 127.
+- Default: 36.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -5994,15 +6064,16 @@ Good to know:
 
 ##### `ce.components.drumpads.mode(target, mode) -> boolean`
 
-Set the mode.
+Set how long a hit sounds.
 
-Example: `ce.components.drumpads.mode("DrumPads", "oneShot")` sets the mode to "oneShot".
+Example: `ce.components.drumpads.mode("DrumPads", "toggle")` keeps a pad sounding until it is hit again.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `mode` (text, required): One of "momentary", "oneShot" or "toggle". Case-insensitive.<br>Invalid: rejected with a console error.
+- `mode` (text, required): "momentary": while the pad is held.<br>"oneShot": for `gate()` milliseconds.<br>"toggle": until the pad is hit again.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "momentary".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6010,15 +6081,17 @@ Good to know:
 
 ##### `ce.components.drumpads.gate(target, gate) -> boolean`
 
-Set the gate ms.
+Set how long a one-shot hit sounds.
 
-Example: `ce.components.drumpads.gate("DrumPads", 2500.5)` sets the gate ms to 2500.5.
+Example: `ce.components.drumpads.gate("DrumPads", 200)` holds each one-shot note for 200 ms.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `gate` (number, required): Gate ms.<br>Range: 1 ↔ 5000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `gate` (number, required): Milliseconds from the note-on to the note-off.<br>Range: 5 ↔ 2000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `mode()` is "oneShot".
+- Default: 60.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6026,15 +6099,17 @@ Good to know:
 
 ##### `ce.components.drumpads.velocity(target, velocity) -> boolean`
 
-Set the velocity.
+Set how hard a hit is struck.
 
-Example: `ce.components.drumpads.velocity("DrumPads", 64)` sets the velocity to 64.
+Example: `ce.components.drumpads.velocity("DrumPads", 110)` strikes every pad at velocity 110.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `velocity` (number, required): Velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- With `velocityFrom()` "position": not used; with "centre": a hit in the middle of a pad.
+- Default: 100.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6042,15 +6117,16 @@ Good to know:
 
 ##### `ce.components.drumpads.channel(target, channel) -> boolean`
 
-Set the channel.
+Set which MIDI channel the pads play on.
 
-Example: `ce.components.drumpads.channel("DrumPads", 9)` sets the channel to 9.
+Example: `ce.components.drumpads.channel("DrumPads", 10)` plays the pads on channel 10, the GM drum channel.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `channel` (number, required): Channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 10.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6058,15 +6134,17 @@ Good to know:
 
 ##### `ce.components.drumpads.rows(target, rows) -> boolean`
 
-Set the rows.
+Set how many rows of pads the grid has.
 
-Example: `ce.components.drumpads.rows("DrumPads", 5)` sets the rows to 5.
+Example: `ce.components.drumpads.rows("DrumPads", 2)` makes the grid two rows high.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `rows` (number, required): Rows.<br>Range: 1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Pads beyond the grid keep what `note()` and the others set for them.
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6074,15 +6152,16 @@ Good to know:
 
 ##### `ce.components.drumpads.cols(target, cols) -> boolean`
 
-Set the cols.
+Set how many pads a row has.
 
-Example: `ce.components.drumpads.cols("DrumPads", 5)` sets the cols to 5.
+Example: `ce.components.drumpads.cols("DrumPads", 8)` puts eight pads in a row.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `cols` (number, required): Cols.<br>Range: 1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `cols` (number, required): Pads to a row.<br>Range: 1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6090,15 +6169,16 @@ Good to know:
 
 ##### `ce.components.drumpads.origin(target, origin) -> boolean`
 
-Which corner pad 1 sits in. Hardware grids number from the bottom-left.
+Set which corner of the grid pad 1 sits in.
 
-Example: `ce.components.drumpads.origin("DrumPads", "topLeft")` sets the origin to "topLeft".
+Example: `ce.components.drumpads.origin("DrumPads", "topLeft")` numbers the pads in reading order.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `origin` (text, required): One of "bottomLeft" or "topLeft". Case-insensitive.<br>Invalid: rejected with a console error.
+- `origin` (text, required): "bottomLeft": as hardware grids, row 1 at the bottom.<br>"topLeft": in reading order.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "bottomLeft".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6106,15 +6186,16 @@ Good to know:
 
 ##### `ce.components.drumpads.velocityFrom(target, velocityFrom) -> boolean`
 
-Where a hit's velocity comes from: the fixed `velocity`, or how high up the pad it landed.
+Set where a hit's velocity comes from.
 
-Example: `ce.components.drumpads.velocityFrom("DrumPads", "position")` sets the velocity from to "position".
+Example: `ce.components.drumpads.velocityFrom("DrumPads", "centre")` strikes hardest in the middle of a pad.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `velocityFrom` (text, required): One of "fixed", "position" or "centre". Case-insensitive.<br>Invalid: rejected with a console error.
+- `velocityFrom` (text, required): "fixed": `velocity()`.<br>"position": how high up the pad it lands, 10 at the bottom to 127 at the top.<br>"centre": `velocity()` in the middle, down to 28% of it at the edges.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "fixed".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6122,15 +6203,16 @@ Good to know:
 
 ##### `ce.components.drumpads.echo(target [, echo]) -> boolean`
 
-Light the pads from incoming MIDI as well as from hits.
+Outline the pads of the notes held on the MIDI input.
 
 Example: `ce.components.drumpads.echo("DrumPads")` switches the echo on if it is off, and off if it is on.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `echo` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `echo` (true or false, optional): true: a pad is outlined while its note is held on the input.<br>false: not.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6138,15 +6220,17 @@ Good to know:
 
 ##### `ce.components.drumpads.echoChannel(target, echoChannel) -> boolean`
 
-Which channel the echo listens to. 0 means omni.
+Set which MIDI channel the echo listens to.
 
-Example: `ce.components.drumpads.echoChannel("DrumPads", 8)` sets the echo channel to 8.
+Example: `ce.components.drumpads.echoChannel("DrumPads", 10)` outlines the notes held on channel 10 only.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `echoChannel` (number, required): Echo channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `echoChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `echo()` is on.
+- Default: 0, any channel.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6154,16 +6238,17 @@ Good to know:
 
 ##### `ce.components.drumpads.note(target, index, note) -> boolean`
 
-Re-point one pad, 1-based. Reads back what the pad plays, generated map included.
+Set the note one pad plays, by its number.
 
-Example: `ce.components.drumpads.note("DrumPads", 1, 64)` sets the note of pad 1.
+Example: `ce.components.drumpads.note("DrumPads", 3, 38)` makes pad 3 play 38, the GM snare.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
-- `note` (number, required): Note.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `note` (number, required): MIDI note.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- `read(target, "note", 3)` gives the note pad 3 plays, from the map when none is set.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6171,13 +6256,13 @@ Good to know:
 
 ##### `ce.components.drumpads.label(target, index, label) -> boolean`
 
-Rename one pad, 1-based. Empty restores the name the map gives it.
+Set the name one pad shows, by its number.
 
-Example: `ce.components.drumpads.label("DrumPads", 1, "text")` sets the label of pad 1.
+Example: `ce.components.drumpads.label("DrumPads", 3, "SNARE")` names pad 3 SNARE.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
-- `label` (text, required): Label.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `label` (text, required): The name.<br>"": the name the map gives it.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
@@ -6188,16 +6273,17 @@ Good to know:
 
 ##### `ce.components.drumpads.choke(target, index, choke) -> boolean`
 
-Put one pad in a choke group, 1-based — pads sharing a non-zero group cut each other. 0 is none.
+Put one pad in a choke group, by its number.
 
-Example: `ce.components.drumpads.choke("DrumPads", 1, 4)` sets the choke of pad 1.
+Example: `ce.components.drumpads.choke("DrumPads", 3, 1)` puts pad 3 in choke group 1.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
-- `choke` (number, required): Choke.<br>Range: 0 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `choke` (number, required): Choke group: a hit silences the other pads in the same group.<br>0: none.<br>Range: 0 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- With `map()` "gm", the hi-hats start in group 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6205,13 +6291,13 @@ Good to know:
 
 ##### `ce.components.drumpads.colour(target, index, colour) -> boolean`
 
-Tint one pad, 1-based. The colour is stored as `set()` stores one ("red" as "#FF0000"), and one it would refuse changes nothing and answers false. "" returns the pad to the section accent.
+Set the colour of one pad, by its number.
 
-Example: `ce.components.drumpads.colour("DrumPads", 1, "text")` sets the colour of pad 1.
+Example: `ce.components.drumpads.colour("DrumPads", 3, "red")` colours pad 3 red.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
-- `colour` (colour, required): Colour.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `colour` (colour, required): A colour, as `set()` takes one: a name, or "RRGGBB" or "AARRGGBB", with or without "#".<br>"": the grid's accent.<br>Not a colour: rejected with a console error.<br>Left out: rejected with a console error.
 
 Good to know:
 
@@ -6222,16 +6308,17 @@ Good to know:
 
 ##### `ce.components.drumpads.roll(target, index [, roll]) -> boolean`
 
-Make one pad roll, 1-based — it restrikes for as long as it is held or latched.
+Make one pad roll, by its number: it strikes again and again while it is on.
 
-Example: `ce.components.drumpads.roll("DrumPads", 1)` switches roll of pad 1 on or off.
+Example: `ce.components.drumpads.roll("DrumPads", 2, true)` makes pad 2 roll.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
-- `roll` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `roll` (true or false, optional): true: it rolls while held, or while toggled on.<br>false: one strike.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Not in "oneShot" mode: the pad stops at its gate.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6239,15 +6326,17 @@ Good to know:
 
 ##### `ce.components.drumpads.rollRate(target, rollRate) -> boolean`
 
-How fast a rolling pad restrikes, as a note value against the panel transport.
+Set how fast a rolling pad strikes, as a note value against the Transport.
 
-Example: `ce.components.drumpads.rollRate("DrumPads", "1/2")` sets the roll rate to "1/2".
+Example: `ce.components.drumpads.rollRate("DrumPads", "1/32")` rolls in 32nd notes.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
 - `rollRate` (text, required): One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While `rollSync()` is on and the Transport has a tempo; otherwise `rollHz()`.
+- Default: "1/16".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6255,15 +6344,17 @@ Good to know:
 
 ##### `ce.components.drumpads.rollSync(target [, rollSync]) -> boolean`
 
-Follow the transport. Off runs the roll at `rollHz` instead.
+Roll in time with the Transport, or at a fixed speed.
 
 Example: `ce.components.drumpads.rollSync("DrumPads")` switches the roll sync on if it is off, and off if it is on.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `rollSync` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `rollSync` (true or false, optional): true: at `rollRate()` against the Transport's tempo.<br>false: at `rollHz()`.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- With no tempo to follow: `rollHz()` either way.
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6271,15 +6362,16 @@ Good to know:
 
 ##### `ce.components.drumpads.rollHz(target, rollHz) -> boolean`
 
-Free-running roll speed, in strikes per second.
+Set how fast a rolling pad strikes while it is not synced.
 
-Example: `ce.components.drumpads.rollHz("DrumPads", 25.3)` sets the roll hz to 25.3.
+Example: `ce.components.drumpads.rollHz("DrumPads", 12)` rolls at 12 strikes a second.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `rollHz` (number, required): Roll hz.<br>Range: 0.5 ↔ 50.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `rollHz` (number, required): Strikes per second.<br>Range: 0.5 ↔ 50.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 8.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6287,15 +6379,16 @@ Good to know:
 
 ##### `ce.components.drumpads.rollDelay(target, rollDelay) -> boolean`
 
-How long a pad is held before its roll begins, in ms. 0 rolls from the first strike.
+Set how long a pad is held before its roll begins.
 
-Example: `ce.components.drumpads.rollDelay("DrumPads", 2000)` sets the roll delay to 2000.
+Example: `ce.components.drumpads.rollDelay("DrumPads", 250)` starts the roll after a quarter of a second.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `rollDelay` (number, required): Roll delay.<br>Range: 0 ↔ 4000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `rollDelay` (number, required): Milliseconds.<br>0: it rolls from the first strike.<br>Range: 0 ↔ 4000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6303,15 +6396,16 @@ Good to know:
 
 ##### `ce.components.drumpads.rollVelocity(target, rollVelocity) -> boolean`
 
-Repeats strike at this fraction of the opening hit, so the first one is an accent.
+Set how hard a roll strikes after the first hit.
 
-Example: `ce.components.drumpads.rollVelocity("DrumPads", 0.5)` sets the roll velocity to 0.5.
+Example: `ce.components.drumpads.rollVelocity("DrumPads", 0.5)` strikes the repeats at half the first hit's velocity.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `rollVelocity` (number, required): Roll velocity.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `rollVelocity` (number, required): Part of the first hit's velocity.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.75.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6319,15 +6413,16 @@ Good to know:
 
 ##### `ce.components.drumpads.zones(target [, zones]) -> boolean`
 
-Let the corners of a pad carry their own actions.
+Let the corners of every pad do their own actions.
 
 Example: `ce.components.drumpads.zones("DrumPads")` switches the zones on if they are off, and off if they are on.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `zones` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `zones` (true or false, optional): true: a hit in a corner does what its corner command says.<br>false: every hit is a plain hit.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6335,15 +6430,16 @@ Good to know:
 
 ##### `ce.components.drumpads.cornerSize(target, cornerSize) -> boolean`
 
-How much of a pad each corner claims, from both edges.
+Set how much of a pad each corner covers.
 
-Example: `ce.components.drumpads.cornerSize("DrumPads", 0.3)` sets the corner size to 0.3.
+Example: `ce.components.drumpads.cornerSize("DrumPads", 0.2)` makes each corner a fifth of the pad each way.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `cornerSize` (number, required): Corner size.<br>Range: 0.05 ↔ 0.45.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `cornerSize` (number, required): Part of the pad's width and of its height, in from the corner.<br>Range: 0.05 ↔ 0.45: the middle is always a plain hit.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.28.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6351,15 +6447,17 @@ Good to know:
 
 ##### `ce.components.drumpads.cornerTopLeft(target, cornerTopLeft) -> boolean`
 
-What a strike in the top left corner of a pad does.
+Set what a hit in the top left corner of a pad does.
 
-Example: `ce.components.drumpads.cornerTopLeft("DrumPads", "roll")` sets the corner top left to "roll".
+Example: `ce.components.drumpads.cornerTopLeft("DrumPads", "flam")` plays a flam from the top left corner.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `cornerTopLeft` (text, required): One of "none", "roll", "flam", "choke", "accent" or "ghost". Case-insensitive.<br>Invalid: rejected with a console error.
+- `cornerTopLeft` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `zones()` is on.
+- Default: "none".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6367,15 +6465,17 @@ Good to know:
 
 ##### `ce.components.drumpads.cornerTopRight(target, cornerTopRight) -> boolean`
 
-What a strike in the top right corner of a pad does.
+Set what a hit in the top right corner of a pad does.
 
-Example: `ce.components.drumpads.cornerTopRight("DrumPads", "roll")` sets the corner top right to "roll".
+Example: `ce.components.drumpads.cornerTopRight("DrumPads", "flam")` plays a flam from the top right corner.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `cornerTopRight` (text, required): One of "none", "roll", "flam", "choke", "accent" or "ghost". Case-insensitive.<br>Invalid: rejected with a console error.
+- `cornerTopRight` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `zones()` is on.
+- Default: "none".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6383,15 +6483,17 @@ Good to know:
 
 ##### `ce.components.drumpads.cornerBottomLeft(target, cornerBottomLeft) -> boolean`
 
-What a strike in the bottom left corner of a pad does.
+Set what a hit in the bottom left corner of a pad does.
 
-Example: `ce.components.drumpads.cornerBottomLeft("DrumPads", "roll")` sets the corner bottom left to "roll".
+Example: `ce.components.drumpads.cornerBottomLeft("DrumPads", "flam")` plays a flam from the bottom left corner.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `cornerBottomLeft` (text, required): One of "none", "roll", "flam", "choke", "accent" or "ghost". Case-insensitive.<br>Invalid: rejected with a console error.
+- `cornerBottomLeft` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `zones()` is on.
+- Default: "none".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6399,15 +6501,17 @@ Good to know:
 
 ##### `ce.components.drumpads.cornerBottomRight(target, cornerBottomRight) -> boolean`
 
-What a strike in the bottom right corner of a pad does.
+Set what a hit in the bottom right corner of a pad does.
 
-Example: `ce.components.drumpads.cornerBottomRight("DrumPads", "roll")` sets the corner bottom right to "roll".
+Example: `ce.components.drumpads.cornerBottomRight("DrumPads", "flam")` plays a flam from the bottom right corner.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `cornerBottomRight` (text, required): One of "none", "roll", "flam", "choke", "accent" or "ghost". Case-insensitive.<br>Invalid: rejected with a console error.
+- `cornerBottomRight` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `zones()` is on.
+- Default: "none".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6415,15 +6519,16 @@ Good to know:
 
 ##### `ce.components.drumpads.flamMs(target, flamMs) -> boolean`
 
-How early a flam's grace note lands, in ms.
+Set how long before the main hit a flam's grace note lands.
 
-Example: `ce.components.drumpads.flamMs("DrumPads", 250.5)` sets the flam ms to 250.5.
+Example: `ce.components.drumpads.flamMs("DrumPads", 30)` lands the grace note 30 ms early.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `flamMs` (number, required): Flam ms.<br>Range: 1 ↔ 500.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `flamMs` (number, required): Milliseconds.<br>Range: 1 ↔ 500, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 22.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6431,15 +6536,16 @@ Good to know:
 
 ##### `ce.components.drumpads.ghostVelocity(target, ghostVelocity) -> boolean`
 
-A ghost strike's velocity, as a fraction of the hit it replaces.
+Set how hard a ghost hit, and a flam's grace note, is struck.
 
-Example: `ce.components.drumpads.ghostVelocity("DrumPads", 0.5)` sets the ghost velocity to 0.5.
+Example: `ce.components.drumpads.ghostVelocity("DrumPads", 0.2)` strikes ghost notes at a fifth of the velocity.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `ghostVelocity` (number, required): Ghost velocity.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `ghostVelocity` (number, required): Part of the velocity the hit would have had.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.35.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6447,15 +6553,16 @@ Good to know:
 
 ##### `ce.components.drumpads.editable(target [, editable]) -> boolean`
 
-Allow or lock touch control of the Drum Pads.
+Let the pads be struck by touch, or not.
 
 Example: `ce.components.drumpads.editable("DrumPads")` switches the editable on if it is off, and off if it is on.
 
 - `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
-- `editable` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `editable` (true or false, optional): true: a hit plays a pad; a drag across the grid rolls through them.<br>false: hits do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6463,7 +6570,7 @@ Good to know:
 
 ##### `ce.components.drumpads.showNotes(target [, showNotes]) -> boolean`
 
-Show or hide the notes.
+Show or hide the MIDI note number on each pad.
 
 Example: `ce.components.drumpads.showNotes("DrumPads")` shows the notes if they are hidden, and hides them if they are shown.
 
@@ -6472,6 +6579,7 @@ Example: `ce.components.drumpads.showNotes("DrumPads")` shows the notes if they 
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6479,7 +6587,7 @@ Good to know:
 
 ##### `ce.components.drumpads.showLabels(target [, showLabels]) -> boolean`
 
-Show or hide the labels.
+Show or hide the name on each pad.
 
 Example: `ce.components.drumpads.showLabels("DrumPads")` shows the labels if they are hidden, and hides them if they are shown.
 
@@ -6488,6 +6596,8 @@ Example: `ce.components.drumpads.showLabels("DrumPads")` shows the labels if the
 
 Good to know:
 
+- A pad too small for its name shows none either way.
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -6495,7 +6605,7 @@ Good to know:
 
 ##### `ce.components.drumpads.showHeader(target [, showHeader]) -> boolean`
 
-Show or hide the header.
+Show or hide the strip above the pads: the map, the grid and the last hit.
 
 Example: `ce.components.drumpads.showHeader("DrumPads")` shows the header if it is hidden, and hides it if it is shown.
 
@@ -6504,6 +6614,7 @@ Example: `ce.components.drumpads.showHeader("DrumPads")` shows the header if it 
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10576,19 +10687,20 @@ Good to know:
 
 #### ce.components.meter: Meter
 
-Drive a Meter from a script — a level a panel computes itself has nowhere else to go.
+Show a level on a bar or an arc: its value and range, scale, colour zones, peak marker, caption and readout.
 
 ##### `ce.components.meter.value(target, value) -> boolean`
 
-In the meter's own units, between valueMin and valueMax.
+Set the level shown, in the meter's own units.
 
-Example: `ce.components.meter.value("Meter", 64)` sets the value to 64.
+Example: `ce.components.meter.value("Meter", 0.5)` fills the meter halfway while its range is 0 to 1.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `value` (number, required): Value.<br>Invalid: rejected with a console error.
+- `value` (number, required): The level, between `valueMin()` and `valueMax()`.<br>Outside them: drawn at the nearest end; the readout shows it as it is.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While `source()` links a control, that control sets the value and its range.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10596,15 +10708,16 @@ Good to know:
 
 ##### `ce.components.meter.scale(target, scale) -> boolean`
 
-Set the scale.
+Set how the level is placed along the meter: in proportion, or in decibels.
 
-Example: `ce.components.meter.scale("Meter", "db")` sets the scale to "db".
+Example: `ce.components.meter.scale("Meter", "db")` places the level in decibels.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `scale` (text, required): One of "linear" or "db". Case-insensitive.<br>Invalid: rejected with a console error.
+- `scale` (text, required): "linear": in proportion to the value.<br>"db": the value's part of its range as a level in decibels, the top of the range being 0 dB, placed between `dbFloor()` and `dbCeil()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "linear".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10612,15 +10725,16 @@ Good to know:
 
 ##### `ce.components.meter.peakHold(target [, peakHold]) -> boolean`
 
-Switch the peak hold on or off.
+Show or hide the peak marker: a line at the highest recent level.
 
 Example: `ce.components.meter.peakHold("Meter")` switches the peak hold on if it is off, and off if it is on.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `peakHold` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `peakHold` (true or false, optional): true: shown; it holds for `holdMs()`, then falls at `decay()`.<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10628,15 +10742,16 @@ Good to know:
 
 ##### `ce.components.meter.holdMs(target, holdMs) -> boolean`
 
-Set the peak hold ms.
+Set how long the peak marker holds before it falls.
 
-Example: `ce.components.meter.holdMs("Meter", 30000)` sets the peak hold ms to 30000.
+Example: `ce.components.meter.holdMs("Meter", 2000)` holds the peak for two seconds.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `holdMs` (number, required): Peak hold ms.<br>Range: 0 ↔ 60000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `holdMs` (number, required): Milliseconds.<br>0: it falls at once.<br>Range: 0 ↔ 60000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 1200.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10644,15 +10759,16 @@ Good to know:
 
 ##### `ce.components.meter.decay(target, decay) -> boolean`
 
-Set the peak decay per sec.
+Set how fast the peak marker falls.
 
-Example: `ce.components.meter.decay("Meter", 50)` sets the peak decay per sec to 50.
+Example: `ce.components.meter.decay("Meter", 1)` drops the peak the meter's whole length in a second.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `decay` (number, required): Peak decay per sec.<br>Range: 0 ↔ 100.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `decay` (number, required): Lengths of the meter per second.<br>0: it does not fall.<br>Range: 0 ↔ 100.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 0.4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10660,15 +10776,17 @@ Good to know:
 
 ##### `ce.components.meter.valueMin(target, valueMin) -> boolean`
 
-Set the value min.
+Set the value at which the meter is empty.
 
-Example: `ce.components.meter.valueMin("Meter", 64)` sets the value min to 64.
+Example: `ce.components.meter.valueMin("Meter", -1)` empties the meter at -1.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `valueMin` (number, required): Value min.<br>Invalid: rejected with a console error.
+- `valueMin` (number, required): The value at the empty end.<br>Equal to `valueMax()`: the meter stays empty.<br>Above it: the meter fills the other way.<br>Range: -1000000000 ↔ 1000000000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While `source()` links a control, that control sets the value and its range.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10676,15 +10794,17 @@ Good to know:
 
 ##### `ce.components.meter.valueMax(target, valueMax) -> boolean`
 
-Set the value max.
+Set the value at which the meter is full.
 
-Example: `ce.components.meter.valueMax("Meter", 64)` sets the value max to 64.
+Example: `ce.components.meter.valueMax("Meter", 127)` fills the meter at 127.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `valueMax` (number, required): Value max.<br>Invalid: rejected with a console error.
+- `valueMax` (number, required): The value at the full end.<br>Equal to `valueMin()`: the meter stays empty.<br>Below it: the meter fills the other way.<br>Range: -1000000000 ↔ 1000000000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- While `source()` links a control, that control sets the value and its range.
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10692,15 +10812,17 @@ Good to know:
 
 ##### `ce.components.meter.dbFloor(target, dbFloor) -> boolean`
 
-The dB the bottom of the scale means.
+Set the level in decibels at which the meter is empty, on a dB scale.
 
-Example: `ce.components.meter.dbFloor("Meter", -100)` sets the db floor to -100.
+Example: `ce.components.meter.dbFloor("Meter", -48)` empties the meter at -48 dB.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `dbFloor` (number, required): Db floor.<br>Range: -200 ↔ 0.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `dbFloor` (number, required): Decibels.<br>Range: -200 ↔ 0.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `scale()` is "db".
+- Default: -60.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10708,15 +10830,17 @@ Good to know:
 
 ##### `ce.components.meter.dbCeil(target, dbCeil) -> boolean`
 
-The dB the top of the scale means.
+Set the level in decibels at which the meter is full, on a dB scale.
 
-Example: `ce.components.meter.dbCeil("Meter", -70)` sets the db ceil to -70.
+Example: `ce.components.meter.dbCeil("Meter", 0)` fills the meter at 0 dB, the top of the value's range.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `dbCeil` (number, required): Db ceil.<br>Range: -200 ↔ 60.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `dbCeil` (number, required): Decibels.<br>Above 0: the meter is not full at the top of the value's range.<br>Equal to `dbFloor()`: the meter stays empty; below it: the meter fills the other way.<br>Range: -200 ↔ 60.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Only while `scale()` is "db".
+- Default: 6.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10724,15 +10848,16 @@ Good to know:
 
 ##### `ce.components.meter.orientation(target, orientation) -> boolean`
 
-Horizontal, vertical, or an arc.
+Set which way the meter runs: across, up, or round an arc.
 
-Example: `ce.components.meter.orientation("Meter", "vertical")` sets the orientation to "vertical".
+Example: `ce.components.meter.orientation("Meter", "vertical")` fills the meter from the bottom up.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `orientation` (text, required): One of "horizontal", "vertical" or "arc". Case-insensitive.<br>Invalid: rejected with a console error.
+- `orientation` (text, required): "horizontal": left to right.<br>"vertical": bottom to top.<br>"arc": clockwise round an arc; its angles are set in the inspector, under Arc.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "horizontal".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10740,15 +10865,16 @@ Good to know:
 
 ##### `ce.components.meter.gradient(target [, gradient]) -> boolean`
 
-Switch the gradient on or off.
+Blend the zone colours into each other, or step from one to the next.
 
 Example: `ce.components.meter.gradient("Meter")` switches the gradient on if it is off, and off if it is on.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `gradient` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `gradient` (true or false, optional): true: blended.<br>false: each zone in its own colour.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: on; a Progress Bar's: off.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10756,12 +10882,12 @@ Good to know:
 
 ##### `ce.components.meter.label(target, label) -> boolean`
 
-Set the label.
+Set the caption shown with the meter.
 
-Example: `ce.components.meter.label("Meter", "text")` sets the label to text.
+Example: `ce.components.meter.label("Meter", "OUT")` captions the meter OUT.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `label` (text, required): Label.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `label` (text, required): The caption.<br>Shown above or below the meter, as `labelPosition()` says.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
@@ -10770,17 +10896,36 @@ Good to know:
 
 *Short name: `meterLabel`.*
 
-##### `ce.components.meter.valuePrecision(target, valuePrecision) -> boolean`
+##### `ce.components.meter.labelPosition(target, labelPosition) -> boolean`
 
-Set the value precision.
+Set where the caption sits.
 
-Example: `ce.components.meter.valuePrecision("Meter", 3)` sets the value precision to 3.
+Example: `ce.components.meter.labelPosition("Meter", "below")` puts the caption under the meter.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `valuePrecision` (number, required): Value precision.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `labelPosition` (text, required): "none": hidden.<br>"above": above the meter.<br>"below": below it.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterLabelPosition`.*
+
+##### `ce.components.meter.valuePrecision(target, valuePrecision) -> boolean`
+
+Set how many decimal places the readout shows.
+
+Example: `ce.components.meter.valuePrecision("Meter", 2)` shows the readout with two decimal places.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `valuePrecision` (number, required): Decimal places.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The readout shows while `showValue()` is on.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10788,12 +10933,12 @@ Good to know:
 
 ##### `ce.components.meter.valuePrefix(target, valuePrefix) -> boolean`
 
-Set the value prefix.
+Set the text before the number in the readout and the scale labels.
 
-Example: `ce.components.meter.valuePrefix("Meter", "text")` sets the value prefix to text.
+Example: `ce.components.meter.valuePrefix("Meter", "Gain ")` shows the readout as Gain 1.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `valuePrefix` (text, required): Value prefix.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `valuePrefix` (text, required): The text.<br>On a dB scale, the scale labels say "dB" instead.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
@@ -10804,12 +10949,12 @@ Good to know:
 
 ##### `ce.components.meter.valueSuffix(target, valueSuffix) -> boolean`
 
-What follows the number — "dB", "%", "ms".
+Set the text after the number in the readout and the scale labels.
 
-Example: `ce.components.meter.valueSuffix("Meter", "text")` sets the value suffix to text.
+Example: `ce.components.meter.valueSuffix("Meter", " ms")` writes ms after the number.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `valueSuffix` (text, required): Value suffix.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `valueSuffix` (text, required): The text.<br>On a dB scale, the scale labels say "dB" instead.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
@@ -10820,16 +10965,18 @@ Good to know:
 
 ##### `ce.components.meter.zoneAt(target, index, from) -> boolean`
 
-Where one colour zone starts, 0..1, 1-based.
+Set where a colour zone starts along the meter, by its number.
 
-Example: `ce.components.meter.zoneAt("Meter", 1, 0.5)` sets the from of zone 1.
+Example: `ce.components.meter.zoneAt("Meter", 2, 0.8)` starts zone 2 at 80% of the meter.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
 - `index` (number, required): Zone number, counted from 1.<br>A fraction: rounded.<br>Not one of the zones: rejected with a console error.
-- `from` (number, required): From.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `from` (number, required): Part of the meter's length: 0 the empty end, 1 the full end.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- A zone colours the fill from its start up to the next zone's; the lowest also from 0.
+- Their colours are set in the inspector, under Zones.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10837,12 +10984,12 @@ Good to know:
 
 ##### `ce.components.meter.source(target [, name]) -> boolean`
 
-Name the control that drives the value.
+Name the control that drives the level.
 
-Example: `ce.components.meter.source("Meter", "Cutoff")` makes the control called Cutoff drive the value.
+Example: `ce.components.meter.source("Meter", "Volume")` makes the control called Volume drive the meter.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Its value and range are the meter's.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
 
 Good to know:
 
@@ -10854,7 +11001,7 @@ Good to know:
 
 ##### `ce.components.meter.showTicks(target [, showTicks]) -> boolean`
 
-Show or hide the ticks.
+Show or hide the tick marks along the meter.
 
 Example: `ce.components.meter.showTicks("Meter")` shows the ticks if they are hidden, and hides them if they are shown.
 
@@ -10863,6 +11010,8 @@ Example: `ce.components.meter.showTicks("Meter")` shows the ticks if they are hi
 
 Good to know:
 
+- How many divisions: set in the inspector, under Scale & readout. Default: 4.
+- Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10870,7 +11019,7 @@ Good to know:
 
 ##### `ce.components.meter.showScaleLabels(target [, showScaleLabels]) -> boolean`
 
-Show or hide the scale labels.
+Show or hide the values at the tick marks.
 
 Example: `ce.components.meter.showScaleLabels("Meter")` shows the scale labels if they are hidden, and hides them if they are shown.
 
@@ -10879,6 +11028,8 @@ Example: `ce.components.meter.showScaleLabels("Meter")` shows the scale labels i
 
 Good to know:
 
+- On a dB scale in decibels; otherwise with `valuePrefix()` and `valueSuffix()`.
+- Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -10886,7 +11037,7 @@ Good to know:
 
 ##### `ce.components.meter.showValue(target [, showValue]) -> boolean`
 
-Show or hide the value.
+Show or hide the readout: the value as a number.
 
 Example: `ce.components.meter.showValue("Meter")` shows the value if it is hidden, and hides it if it is shown.
 
@@ -10895,6 +11046,8 @@ Example: `ce.components.meter.showValue("Meter")` shows the value if it is hidde
 
 Good to know:
 
+- Written with `valuePrecision()`, `valuePrefix()` and `valueSuffix()`, as the value is: not in decibels.
+- Default: hidden; a Progress Bar's: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12301,19 +12454,22 @@ Components that act on the whole panel rather than one value.
 
 #### ce.components.transport: Transport
 
-Set the panel Transport: tempo, swing, time signature, loop. Reading it is ce.time.
+Set the panel's clock: its tempo, swing, time signature, loop and count-in, where it follows, and its MIDI clock out. Reading it is ce.time.
 
 ##### `ce.components.transport.bpm(target, bpm) -> boolean`
 
-Set the bpm.
+Set the tempo.
 
-Example: `ce.components.transport.bpm("Transport", 210)` sets the bpm to 210.
+Example: `ce.components.transport.bpm("Transport", 128)` sets the tempo to 128 beats a minute.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `bpm` (number, required): Bpm.<br>Range: 20 ↔ 400.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `bpm` (number, required): Beats a minute; a beat is a quarter note.<br>Range: 20 ↔ 300.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- The position does not jump: only what comes after the current beat speeds up or slows down.
+- While `source()` is "external" or "host": not used.
+- Default: 120.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12321,15 +12477,17 @@ Good to know:
 
 ##### `ce.components.transport.swing(target, swing) -> boolean`
 
-Set the swing.
+Set how far every second step is delayed, for every component following the clock.
 
-Example: `ce.components.transport.swing("Transport", 0)` sets the swing to 0.
+Example: `ce.components.transport.swing("Transport", 0.5)` delays every second step by a quarter of a step.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `swing` (number, required): Swing.<br>Range: -1 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `swing` (number, required): Part of half a step: 1 delays every second step by half a step.<br>0: straight.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- An Arp with `swingSource()` "own" plays its own instead.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12337,15 +12495,17 @@ Good to know:
 
 ##### `ce.components.transport.source(target, source) -> boolean`
 
-Set the source.
+Set which clock the panel follows: its own, a MIDI clock, or the host.
 
-Example: `ce.components.transport.source("Transport", "external")` sets the source to "external".
+Example: `ce.components.transport.source("Transport", "host")` follows the DAW's playhead.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `source` (text, required): One of "internal", "external" or "host". Case-insensitive.<br>Invalid: rejected with a console error.
+- `source` (text, required): "internal": its own, at `bpm()`.<br>"external": a MIDI clock arriving on the input.<br>"host": the DAW's playhead, in a plug-in.<br>Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Following, `bpm()` is ignored, tapping sets nothing and no clock is sent.
+- Default: "internal".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12353,15 +12513,17 @@ Good to know:
 
 ##### `ce.components.transport.beatsPerBar(target, beatsPerBar) -> boolean`
 
-Set the beats per bar.
+Set how many beats a bar has: the time signature's upper number.
 
-Example: `ce.components.transport.beatsPerBar("Transport", 17)` sets the beats per bar to 17.
+Example: `ce.components.transport.beatsPerBar("Transport", 3)` makes each bar three beats long.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `beatsPerBar` (number, required): Beats per bar.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `beatsPerBar` (number, required): Beats.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Sets the bar for the position, the loop and the count-in, and where the downbeat falls.
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12369,15 +12531,17 @@ Good to know:
 
 ##### `ce.components.transport.beatUnit(target, beatUnit) -> boolean`
 
-Set the beat unit.
+Set the time signature's lower number.
 
-Example: `ce.components.transport.beatUnit("Transport", 17)` sets the beat unit to 17.
+Example: `ce.components.transport.beatUnit("Transport", 8)` shows the time signature over 8.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `beatUnit` (number, required): Beat unit.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `beatUnit` (number, required): The note value of a beat in the time signature: 4 a quarter, 8 an eighth.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Shown only: a beat is a quarter note whatever it says.
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12385,15 +12549,17 @@ Good to know:
 
 ##### `ce.components.transport.loop(target [, loop]) -> boolean`
 
-Switch the loop enabled on or off.
+Switch the loop on or off.
 
 Example: `ce.components.transport.loop("Transport")` switches the loop enabled on if it is off, and off if it is on.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `loop` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `loop` (true or false, optional): true: the position runs from `loopStart()` for `loopBars()` and back, over and over.<br>false: it runs on.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Before the loop's first bar, the position runs into it.
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12401,15 +12567,16 @@ Good to know:
 
 ##### `ce.components.transport.loopStart(target, loopStart) -> boolean`
 
-Set the loop start bar.
+Set the bar the loop starts on.
 
-Example: `ce.components.transport.loopStart("Transport", 5000)` sets the loop start bar to 5000.
+Example: `ce.components.transport.loopStart("Transport", 5)` starts the loop at bar 5.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `loopStart` (number, required): Loop start bar.<br>Range: 1 ↔ 9999, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `loopStart` (number, required): Bar, counted from 1.<br>Range: 1 ↔ 999, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 1.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12417,15 +12584,16 @@ Good to know:
 
 ##### `ce.components.transport.loopBars(target, loopBars) -> boolean`
 
-Set the loop length bars.
+Set how long the loop is.
 
-Example: `ce.components.transport.loopBars("Transport", 5000)` sets the loop length bars to 5000.
+Example: `ce.components.transport.loopBars("Transport", 0.5)` loops half a bar.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `loopBars` (number, required): Loop length bars.<br>Range: 1 ↔ 9999, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `loopBars` (number, required): Bars: 0.25 is one beat in 4/4.<br>Range: 0.25 ↔ 64.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Default: 4.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12433,15 +12601,17 @@ Good to know:
 
 ##### `ce.components.transport.countIn(target, countIn) -> boolean`
 
-Set the count in bars.
+Set how many bars of silence come before the clock runs.
 
-Example: `ce.components.transport.countIn("Transport", 8)` sets the count in bars to 8.
+Example: `ce.components.transport.countIn("Transport", 1)` counts one bar in.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `countIn` (number, required): Count in bars.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+- `countIn` (number, required): Bars.<br>0: none.<br>Range: 0 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
+- Every component following the clock holds and is quiet until it ends.
+- Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12449,15 +12619,17 @@ Good to know:
 
 ##### `ce.components.transport.clockOut(target [, clockOut]) -> boolean`
 
-Switch the clock out on or off.
+Send MIDI clock, start, stop and song position, so hardware follows the panel.
 
 Example: `ce.components.transport.clockOut("Transport")` switches the clock out on if it is off, and off if it is on.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `clockOut` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `clockOut` (true or false, optional): true: sent to `clockDevice()`, 24 clocks a quarter note.<br>false: not sent.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- While `source()` is "external" or "host": not used.
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12465,15 +12637,16 @@ Good to know:
 
 ##### `ce.components.transport.clockDevice(target, clockDevice) -> boolean`
 
-Which device receives clock, start, stop and song position. Empty uses the panel's own device when it names exactly one.
+Set which device the MIDI clock is sent to.
 
-Example: `ce.components.transport.clockDevice("Transport", "text")` sets the clock device to text.
+Example: `ce.components.transport.clockDevice("Transport", "Drum Machine")` sends the clock to the device called Drum Machine.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `clockDevice` (text, required): Clock device.<br>A number: written as text.<br>Left out: rejected with a console error.
+- `clockDevice` (text, required): The device's name, as the panel's devices list it.<br>"": the panel's own device, when it has exactly one; otherwise none.<br>A number: written as text.<br>Left out: rejected with a console error.
 
 Good to know:
 
+- Default: "".
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12481,15 +12654,16 @@ Good to know:
 
 ##### `ce.components.transport.runOnLoad(target [, runOnLoad]) -> boolean`
 
-Start the transport as soon as the panel loads.
+Start the clock as soon as the panel opens.
 
 Example: `ce.components.transport.runOnLoad("Transport")` switches the run on load on if it is off, and off if it is on.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `runOnLoad` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `runOnLoad` (true or false, optional): true: running from the start, as an exported plug-in is.<br>false: stopped until played.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: false.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12497,15 +12671,16 @@ Good to know:
 
 ##### `ce.components.transport.editable(target [, editable]) -> boolean`
 
-Allow or lock touch control of the Transport.
+Let the Transport be played and tapped by touch, or not.
 
 Example: `ce.components.transport.editable("Transport")` switches the editable on if it is off, and off if it is on.
 
 - `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
-- `editable` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+- `editable` (true or false, optional): true: its play button and tap tempo work.<br>false: touches do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
 
 Good to know:
 
+- Default: true.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12513,7 +12688,7 @@ Good to know:
 
 ##### `ce.components.transport.showPosition(target [, showPosition]) -> boolean`
 
-Show or hide the position.
+Show or hide the position, as bar.beat.tick, and the beat pulse.
 
 Example: `ce.components.transport.showPosition("Transport")` shows the position if it is hidden, and hides it if it is shown.
 
@@ -12522,6 +12697,7 @@ Example: `ce.components.transport.showPosition("Transport")` shows the position 
 
 Good to know:
 
+- Default: shown.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 
@@ -12529,7 +12705,7 @@ Good to know:
 
 ##### `ce.components.transport.showTap(target [, showTap]) -> boolean`
 
-Show or hide the tap.
+Let a tap on the face set the tempo, or not.
 
 Example: `ce.components.transport.showTap("Transport")` shows the tap if it is hidden, and hides it if it is shown.
 
@@ -12538,6 +12714,8 @@ Example: `ce.components.transport.showTap("Transport")` shows the tap if it is h
 
 Good to know:
 
+- Not while following another clock.
+- Default: on.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
 

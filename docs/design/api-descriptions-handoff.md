@@ -1683,6 +1683,80 @@ taken, as item 5 was shown, and recorded here for review. The texts say what the
 
 Defaults are given in each note ("Default: 55."), as the arp's are.
 
+## The remaining modules, in one pass
+
+At the owner's word on 2026-10-26 ("I think you know what to do, could you just continue through the
+modules and finish it?"), each module after the pixel is done in one pass: its texts read against
+its renderer, layout engine and inspector, each command probed at its edges in the runtime (a probe
+that calls every verb of a family with nothing, a word, numbers past both ends, a fraction, its
+range's ends and a number as text), every silence or wrong answer decided by the rules above with
+the recommendation taken, and the texts pinned in `componentVerbs.test.js`. What was decided is
+listed here per module, for review; the texts themselves are in `componentVerbs.js` and the manual.
+
+### `ce.components.meter`
+
+- **Texts** for all 26: what `MeterRenderer.svelte` and `utils/meterLayout.js` draw. "db" places the
+  value's part of its range as decibels, the top of the range being 0 dB, between `dbFloor()` and
+  `dbCeil()` (so a ceiling above 0 leaves headroom); `decay()` is in lengths of the meter per
+  second; the readout shows the value as it is, never in decibels; a zone colours from its start to
+  the next, and the lowest from 0; a linked `source()` sets the value and its range.
+- **`labelPosition`, new.** The caption is drawn only above or below (`labelPosition`, "none" by
+  default), and only the inspector could set where, so `label()` on a new meter showed nothing.
+  `componentTables.METER_LABEL_POSITIONS`, which the inspector's select now names as its table.
+- **Kept**: `valueMin` above `valueMax` fills the other way, and `dbFloor` above `dbCeil` too, as
+  the LCD's value range was kept; the texts say so. The styling fields (segments, thickness, arc
+  angles, colours, tick count) stay the inspector's, as styling does.
+- **Defaults** differ by type: a Progress Bar has no gradient and shows its readout; the notes say
+  both.
+
+### `ce.components.chordpad`
+
+- **Texts** for all 22, from `utils/chordPadLayout.js`, `ChordPadRenderer.svelte` and the preview's
+  `chordNoteOn`. The wheel always plays chords, whatever `mode()` says; `inversion()` stops at 2 on
+  a triad; a voicing is applied after the inversion; a note past the MIDI range sounds at 0 or 127
+  (`chordNotes` clamps, it does not leave the note out); while an Arp takes the pad's chords
+  (`arp.link()`) the pads sound nothing themselves.
+- **`strum`'s text was wrong**: it said the chord is spread over this many milliseconds, and it is
+  the time from one note to the next, lowest first. The inspector's hint had it right.
+- **`key` reads as the arp's** (its item 8): a note's name, in any case, or a number round the
+  octave, where 12 and above were stored as 11. Its texts and the arp's now share `KEY_NOTE` and
+  `FOLLOW_PANEL_KEY`, and velocity, channel and the echo channel share theirs.
+
+### `ce.components.noteribbon`
+
+- **Texts** for all 20, from `utils/noteRibbonLayout.js` and the preview: "snap" has a zone per note
+  of the scale, "chromatic" per semitone, "glide" bends and starts a new note past `bendRange()`;
+  across the strip (velocity from position, the CC) runs from the bottom edge to the top, or a
+  vertical strip's left to its right; the strip stops at note 127.
+- **`key`** reads as the arp's and the Chord Pad's; **`bendRange`** is whole semitones, as
+  `ribbonBendRange` and the inspector read it (a fraction was stored).
+
+### `ce.components.drumpads`
+
+- **Texts** for all 37, from `utils/drumPadLayout.js` and the preview's `drumStrike`. Every map
+  plays pad 1 = `baseNote()` and a semitone a pad (`resolveDrumPads`); the maps differ in the names
+  and the choke groups the pads start with ("gm" chokes the hi-hats, "custom" names as "gm" and
+  chokes nothing). "centre" velocity falls to 28% at the edges; "accent" strikes at `velocity()`
+  wherever the pad is hit; "choke" silences the group and plays nothing; a flam's grace note is at
+  `ghostVelocity()`.
+- **`gate` takes 5 ↔ 2000**, whole, as `drumGateMs` plays it and the inspector offers it (it took 1
+  to 5000); `rollDelay` and `flamMs` are whole milliseconds, as the engine rounds them.
+- **Noticed, not changed**: a colour `colour()` cannot read is refused by the shared colour writer
+  (`writeComponentFields`), whose console line names the call differently from the other refusals
+  (`ce.components.drumpads.colour("Kit"): in pad 2, … so nothing was set.`). It is the line `set()`
+  writes too, so changing it belongs with `ce.panel`.
+
+### `ce.components.transport`
+
+- **The ranges are the clock's own**, imported from `utils/transportLayout.js` (`MIN_BPM`,
+  `MAX_BPM`, `MIN_BARS`, `MAX_BARS`, `MAX_LOOP_BAR`, `MAX_COUNT_IN_BARS`): the tempo 20 ↔ 300 (it
+  took 400), the swing 0 ↔ 1 (below 0 played straight), the loop's start 1 ↔ 999 (9999), its length
+  0.25 ↔ 64 bars in any fraction (whole bars 1 to 9999, where the inspector takes quarters), the
+  count-in 0 ↔ 8 (16).
+- **Texts** for all 16: a beat is a quarter note whatever `beatUnit()` says, which is shown only;
+  following an external clock or the host, the tempo, tapping and clock out are not used; a count-in
+  holds every follower quiet; `clockDevice("")` is the panel's own device when it names exactly one.
+
 ## Checking each batch
 
 From `CE/web`:

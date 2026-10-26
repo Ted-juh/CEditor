@@ -1040,6 +1040,108 @@ test('an element without `visible` is shown and one without `blink` steady, so a
   assert.deepEqual(componentScriptPatch(blink, cfg, ['title', false]), {}, 'steady already');
 });
 
+// ce.components.meter, done in one pass at the owner's word (docs/design/api-descriptions-handoff.md).
+test('the Meter\'s verbs say what MeterRenderer draws for each', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  const summaries = {
+    meterValue: 'Set the level shown, in the meter\'s own units.',
+    meterScale: 'Set how the level is placed along the meter: in proportion, or in decibels.',
+    meterPeakHold: 'Show or hide the peak marker: a line at the highest recent level.',
+    meterHoldMs: 'Set how long the peak marker holds before it falls.',
+    meterDecay: 'Set how fast the peak marker falls.',
+    meterValueMin: 'Set the value at which the meter is empty.',
+    meterValueMax: 'Set the value at which the meter is full.',
+    meterDbFloor: 'Set the level in decibels at which the meter is empty, on a dB scale.',
+    meterDbCeil: 'Set the level in decibels at which the meter is full, on a dB scale.',
+    meterOrientation: 'Set which way the meter runs: across, up, or round an arc.',
+    meterGradient: 'Blend the zone colours into each other, or step from one to the next.',
+    meterLabel: 'Set the caption shown with the meter.',
+    meterLabelPosition: 'Set where the caption sits.',
+    meterValuePrecision: 'Set how many decimal places the readout shows.',
+    meterZoneAt: 'Set where a colour zone starts along the meter, by its number.',
+    meterSource: 'Name the control that drives the level.',
+    meterShowValue: 'Show or hide the readout: the value as a number.',
+  };
+  for (const [id, summary] of Object.entries(summaries)) assert.equal(MEMBER_BY_ID[id].summary, summary, id);
+  assert.equal(MEMBER_BY_ID.meterValue.example, '`ce.components.meter.value("Meter", 0.5)` fills the meter halfway while its range is 0 to 1.');
+  assert.equal(text('meterScale', 'scale'), '"linear": in proportion to the value.\n"db": the value\'s part of its range as a level in decibels, the top of the range being 0 dB, placed between `dbFloor()` and `dbCeil()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('meterDecay', 'decay'), 'Lengths of the meter per second.\n0: it does not fall.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.meterValue.notes[0], 'While `source()` links a control, that control sets the value and its range.');
+  assert.deepEqual(MEMBER_BY_ID.meterGradient.notes.slice(0, 1), ['Default: on; a Progress Bar\'s: off.']);
+  // The caption's position is new: the caption is drawn only where it says, and only the inspector could.
+  assert.deepEqual(byId('meterLabelPosition').values, ['none', 'above', 'below']);
+  assert.deepEqual(componentScriptPatch(byId('meterLabelPosition'), { labelPosition: 'none' }, ['Below']), { labelPosition: 'below' });
+});
+
+// ce.components.chordpad, done in one pass at the owner's word.
+test('the Chord Pad\'s verbs say what its pads build and play', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  const summaries = {
+    chordPadMode: 'Set what a pad plays: a chord, or one note of the scale.',
+    chordPadKey: 'Set the key the pads are built in.',
+    chordPadVoicing: 'Set how each chord\'s notes are spread.',
+    chordPadInversion: 'Set how many of each chord\'s lowest notes move up an octave.',
+    chordPadStrum: 'Set the time between a chord\'s notes, lowest first.',
+    chordPadLayout: 'Set how the pads are laid out: a circle of fifths, or a grid.',
+    chordPadEcho: 'Light the pads from the notes held on the MIDI input, as well as from taps.',
+    chordPadShowRomans: 'Show or hide the roman numerals on the pads, such as "I", "ii" and "♭VII".',
+  };
+  for (const [id, summary] of Object.entries(summaries)) assert.equal(MEMBER_BY_ID[id].summary, summary, id);
+  assert.equal(MEMBER_BY_ID.chordPadMode.notes[0], 'With `layout()` "wheel": chords either way.');
+  assert.equal(text('chordPadStrum', 'strum'), 'Milliseconds from one note to the next.\n0: all at once.\nRange: 0 ↔ 2000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // The key reads as the arp's: a note's name, or a number round the octave.
+  assert.equal(text('chordPadKey', 'key'), text('arpKey', 'key'));
+  const key = byId('chordPadKey');
+  assert.deepEqual(componentScriptPatch(key, { key: 0 }, ['Eb']), { key: 3 });
+  assert.deepEqual(componentScriptPatch(key, { key: 0 }, [14]), { key: 2 }, '14 is D, round the octave');
+  assert.equal(componentRefusalReason(key, { key: 0 }, ['H']), '"H" is not a note: a name such as "C", "F#" or "Eb", or 0 to 11.');
+  assert.equal(MEMBER_BY_ID.chordPadKey.params.find((p) => p.name === 'key').type, 'number or name');
+});
+
+// ce.components.noteribbon, done in one pass at the owner's word.
+test('the Note Ribbon\'s verbs say what the strip plays and sends', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.noteRibbonMode.summary, 'Set how the strip plays: the notes of the scale, every semitone, or a gliding pitch.');
+  assert.equal(text('noteRibbonMode', 'mode'), '"snap": the notes of the scale only, one zone each.\n"chromatic": every semitone, one zone each.\n"glide": the pitch follows the finger, by pitch bend; past `bendRange()` the note starts again from a new one.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('noteRibbonVelocityFrom', 'velocityFrom'), '"fixed": `velocity()`.\n"position": 8 at the bottom edge to 127 at the top; a vertical strip\'s left edge to its right.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('noteRibbonKey', 'key'), text('arpKey', 'key'));
+  assert.deepEqual(componentScriptPatch(byId('noteRibbonKey'), { key: 0 }, ['bb']), { key: 10 });
+  // Whole semitones, as the engine reads the bend range.
+  assert.deepEqual(componentScriptPatch(byId('noteRibbonBendRange'), { bendRange: 2 }, [2.6]), { bendRange: 3 });
+});
+
+// ce.components.drumpads, done in one pass at the owner's word.
+test('the Drum Pads\' verbs say what drumPadLayout.js resolves and a hit plays', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.drumPadsMap.summary, 'Set how the pads are named, and whether the hi-hats choke each other.');
+  assert.equal(text('drumPadsMap', 'map'), '"gm": General MIDI drum names; the closed, pedal and open hi-hats choke each other.\n"chromatic": named by pitch.\n"custom": named as "gm", no choke groups.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('drumPadsVelocityFrom', 'velocityFrom'), '"fixed": `velocity()`.\n"position": how high up the pad it lands, 10 at the bottom to 127 at the top.\n"centre": `velocity()` in the middle, down to 28% of it at the edges.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.match(text('drumPadsCornerBottomRight', 'cornerBottomRight'), /^"none": a plain hit\.\n"roll": rolls while held/);
+  assert.equal(MEMBER_BY_ID.drumPadsNote.summary, 'Set the note one pad plays, by its number.');
+  // The gate takes what the engine plays and the inspector offers: 5 to 2000 ms, whole.
+  const gate = byId('drumPadsGate');
+  assert.deepEqual([gate.min, gate.max], [5, 2000]);
+  assert.deepEqual(componentScriptPatch(gate, { gateMs: 60 }, [1]), { gateMs: 5 });
+  assert.deepEqual(componentScriptPatch(gate, { gateMs: 60 }, [99.6]), { gateMs: 100 });
+});
+
+// ce.components.transport, done in one pass at the owner's word.
+test('the Transport\'s verbs take the clock\'s own ranges and say what each sets', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  const range = (id) => [byId(id).min, byId(id).max];
+  // The clock's ranges (transportLayout.js), where a script reached past each.
+  assert.deepEqual(range('transportBpm'), [20, 300]);
+  assert.deepEqual(range('transportSwing'), [0, 1]);
+  assert.deepEqual(range('transportLoopStart'), [1, 999]);
+  assert.deepEqual(range('transportLoopBars'), [0.25, 64]);
+  assert.deepEqual(range('transportCountIn'), [0, 8]);
+  assert.deepEqual(componentScriptPatch(byId('transportLoopBars'), { loopLengthBars: 4 }, [0.5]), { loopLengthBars: 0.5 }, 'half a bar, as the inspector takes');
+  assert.deepEqual(componentScriptPatch(byId('transportBpm'), { bpm: 120 }, [400]), { bpm: 300 });
+  assert.equal(MEMBER_BY_ID.transportSource.summary, 'Set which clock the panel follows: its own, a MIDI clock, or the host.');
+  assert.equal(text('transportSwing', 'swing'), 'Part of half a step: 1 delays every second step by half a step.\n0: straight.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.transportBeatUnit.notes[0], 'Shown only: a beat is a quarter note whatever it says.');
+});
+
 test('a number counted from 1 is rounded, and every such parameter says so', () => {
   // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
   const lines = { lines: ['A', 'B'] };

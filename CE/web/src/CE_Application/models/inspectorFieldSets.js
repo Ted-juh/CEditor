@@ -13,7 +13,7 @@
 import { CROSSFADER_LAWS } from '../utils/crossfaderLayout.js';
 import { RETURN_CURVES, RETURN_MODES } from '../utils/returnToRest.js';
 import {
-  CHORDPAD_LAYOUTS, CROSSFADER_ORIENTATIONS, MATRIX_CELL_STYLES, METER_ORIENTATIONS, NOTERIBBON_MOD_AXES, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES,
+  CHORDPAD_LAYOUTS, CROSSFADER_ORIENTATIONS, MATRIX_CELL_STYLES, METER_LABEL_POSITIONS, METER_ORIENTATIONS, NOTERIBBON_MOD_AXES, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES,
   RIBBON_ORIENTATIONS, RIBBON_STYLES,
 } from '../scripting/componentTables.js';
 import { METER_SCALES } from '../utils/meterLayout.js';
@@ -308,7 +308,7 @@ export const METER_READOUT_FIELDS = [
   { slot: 'suffix', when: readout },
   { slot: 'caption' },
   {
-    key: 'labelPosition', kind: 'select', label: 'Position', span: 1, default: 'none',
+    key: 'labelPosition', kind: 'select', label: 'Position', span: 1, default: 'none', table: METER_LABEL_POSITIONS,
     hint: 'Where the caption sits.', options: [['none', 'None'], ['above', 'Above'], ['below', 'Below']],
   },
 ];

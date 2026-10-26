@@ -66,6 +66,8 @@ export const NOTERIBBON_VELOCITY_SOURCES = ['fixed', 'position'];
 export const NOTERIBBON_MOD_AXES = ['none', 'cc'];
 export const CROSSFADER_ORIENTATIONS = ['horizontal', 'vertical'];
 export const METER_ORIENTATIONS = ['horizontal', 'vertical', 'arc'];
+// Where a meter's caption sits: MeterRenderer draws it above or below, and not at all for "none".
+export const METER_LABEL_POSITIONS = ['none', 'above', 'below'];
 export const MATRIX_CELL_STYLES = ['bar', 'fill', 'dot'];
 export const LCD_SCROLL_MODES = ['loop', 'bounce'];
 export const PIXEL_LAYOUT_TRANSITIONS = ['none', 'fade', 'slide'];
@@ -98,6 +100,7 @@ export const VERB_VALUES = {
   'ribbon.style': RIBBON_STYLES,
   'crossfader.orientation': CROSSFADER_ORIENTATIONS,
   'meter.orientation': METER_ORIENTATIONS,
+  'meter.labelPosition': METER_LABEL_POSITIONS,
   'matrix.cellStyle': MATRIX_CELL_STYLES,
   'lcd.anim': PIXEL_ANIM_MODES,
   'lcd.animPreset': ANIM_PRESETS,

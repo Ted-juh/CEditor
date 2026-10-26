@@ -16,7 +16,7 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 456 verbs",
+  "description": "QA-05 — 23 verb families, 457 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -115,7 +115,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 456 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 457 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -535,10 +535,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Chord_Pad_chordPad_Re_key_re_voice_and_re_channel_the_Chord_Pad_without_touching_the_layout_","id":"qa_group_1","controlType":"Label"},
+        "Core": {"name":"group_Chord_Pad_chordPad_Play_a_chord_or_a_note_of_the_scale_from_each_pad_the_key_and_scale_they_are_built_from_their_voicing_and_what_they_send_","id":"qa_group_1","controlType":"Label"},
         "Transform": {"x":28,"y":344,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Chord Pad — chordPad.*  (Re-key, re-voice and re-channel the Chord Pad without touching the layout.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Chord Pad — chordPad.*  (Play a chord, or a note of the scale, from each pad: the key and scale they are built from, their voicing, and what they send.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -582,10 +582,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Note_Ribbon_noteRibbon_Re_key_and_re_range_the_Note_Ribbon_scale_span_bend_depth_channel_","id":"qa_group_2","controlType":"Label"},
+        "Core": {"name":"group_Note_Ribbon_noteRibbon_Play_notes_or_glide_between_them_along_a_strip_its_key_and_range_how_it_is_touched_and_what_it_sends_","id":"qa_group_2","controlType":"Label"},
         "Transform": {"x":28,"y":716,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Note Ribbon — noteRibbon.*  (Re-key and re-range the Note Ribbon: scale, span, bend depth, channel.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Note Ribbon — noteRibbon.*  (Play notes, or glide between them, along a strip: its key and range, how it is touched, and what it sends.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -622,17 +622,17 @@
         "Core": {"name":"verbs_noteribbon","id":"qa05_noteribbon_verbs","controlType":"Label"},
         "Transform": {"x":412,"y":774,"width":470,"height":146},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"noteRibbon.mode(enum)         noteRibbon.orientation(enum)\nnoteRibbon.key(int)           noteRibbon.velocityFrom(enum)\nnoteRibbon.scale(enum)        noteRibbon.modAxis(enum)\nnoteRibbon.followPanelKey[on] noteRibbon.modCc(int)\nnoteRibbon.baseNote(int)      noteRibbon.echo[on]\nnoteRibbon.octaves(int)       noteRibbon.echoChannel(int)\nnoteRibbon.bendRange(num)     noteRibbon.editable[on]\nnoteRibbon.velocity(int)      noteRibbon.showNames[on]\nnoteRibbon.channel(int)       noteRibbon.showHeader[on]\nnoteRibbon.latch[on]          noteRibbon.read(read)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"noteRibbon.mode(enum)         noteRibbon.orientation(enum)\nnoteRibbon.key(int)           noteRibbon.velocityFrom(enum)\nnoteRibbon.scale(enum)        noteRibbon.modAxis(enum)\nnoteRibbon.followPanelKey[on] noteRibbon.modCc(int)\nnoteRibbon.baseNote(int)      noteRibbon.echo[on]\nnoteRibbon.octaves(int)       noteRibbon.echoChannel(int)\nnoteRibbon.bendRange(int)     noteRibbon.editable[on]\nnoteRibbon.velocity(int)      noteRibbon.showNames[on]\nnoteRibbon.channel(int)       noteRibbon.showHeader[on]\nnoteRibbon.latch[on]          noteRibbon.read(read)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"group_Drum_Pads_drumPads_Re_map_the_Drum_Pads_the_grid_the_kit_and_each_pad_s_own_note_name_and_choke_group_","id":"qa_group_3","controlType":"Label"},
+        "Core": {"name":"group_Drum_Pads_drumPads_Play_a_fixed_note_from_each_pad_of_a_grid_the_notes_and_their_names_how_a_hit_is_struck_rolls_and_what_the_corners_of_a_pad_do_","id":"qa_group_3","controlType":"Label"},
         "Transform": {"x":28,"y":954,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Drum Pads — drumPads.*  (Re-map the Drum Pads — the grid, the kit, and each pad's own note, name and choke group.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Drum Pads — drumPads.*  (Play a fixed note from each pad of a grid: the notes and their names, how a hit is struck, rolls, and what the corners of a pad do.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -669,7 +669,7 @@
         "Core": {"name":"verbs_drumpads","id":"qa05_drumpads_verbs","controlType":"Label"},
         "Transform": {"x":312,"y":1012,"width":470,"height":263},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"drumPads.map(enum)            drumPads.rollHz(num)\ndrumPads.baseNote(int)        drumPads.rollDelay(num)\ndrumPads.mode(enum)           drumPads.rollVelocity(num)\ndrumPads.gate(num)            drumPads.zones[on]\ndrumPads.velocity(int)        drumPads.cornerSize(num)\ndrumPads.channel(int)         drumPads.cornerTopLeft(enum)\ndrumPads.rows(int)            drumPads.cornerTopRight(enum)\ndrumPads.cols(int)            drumPads.cornerBottomLeft(enum)\ndrumPads.origin(enum)         drumPads.cornerBottomRight(enum)\ndrumPads.velocityFrom(enum)   drumPads.flamMs(num)\ndrumPads.echo[on]             drumPads.ghostVelocity(num)\ndrumPads.echoChannel(int)     drumPads.editable[on]\ndrumPads.note(item)           drumPads.showNotes[on]\ndrumPads.label(item)          drumPads.showLabels[on]\ndrumPads.choke(item)          drumPads.showHeader[on]\ndrumPads.colour(item)         drumPads.read(read)\ndrumPads.roll(item)           drumPads.size(size)\ndrumPads.rollRate(enum)       drumPads.fill(fill)\ndrumPads.rollSync[on]","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"drumPads.map(enum)            drumPads.rollHz(num)\ndrumPads.baseNote(int)        drumPads.rollDelay(int)\ndrumPads.mode(enum)           drumPads.rollVelocity(num)\ndrumPads.gate(int)            drumPads.zones[on]\ndrumPads.velocity(int)        drumPads.cornerSize(num)\ndrumPads.channel(int)         drumPads.cornerTopLeft(enum)\ndrumPads.rows(int)            drumPads.cornerTopRight(enum)\ndrumPads.cols(int)            drumPads.cornerBottomLeft(enum)\ndrumPads.origin(enum)         drumPads.cornerBottomRight(enum)\ndrumPads.velocityFrom(enum)   drumPads.flamMs(int)\ndrumPads.echo[on]             drumPads.ghostVelocity(num)\ndrumPads.echoChannel(int)     drumPads.editable[on]\ndrumPads.note(item)           drumPads.showNotes[on]\ndrumPads.label(item)          drumPads.showLabels[on]\ndrumPads.choke(item)          drumPads.showHeader[on]\ndrumPads.colour(item)         drumPads.read(read)\ndrumPads.roll(item)           drumPads.size(size)\ndrumPads.rollRate(enum)       drumPads.fill(fill)\ndrumPads.rollSync[on]","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
@@ -1334,10 +1334,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"group_Meter_meter_Drive_a_Meter_from_a_script_a_level_a_panel_computes_itself_has_nowhere_else_to_go_","id":"qa_group_18","controlType":"Label"},
+        "Core": {"name":"group_Meter_meter_Show_a_level_on_a_bar_or_an_arc_its_value_and_range_scale_colour_zones_peak_marker_caption_and_readout_","id":"qa_group_18","controlType":"Label"},
         "Transform": {"x":28,"y":4956,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Meter — meter.*  (Drive a Meter from a script — a level a panel computes itself has nowhere else to go.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Meter — meter.*  (Show a level on a bar or an arc: its value and range, scale, colour zones, peak marker, caption and readout.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1364,7 +1364,7 @@
         "Core": {"name":"caption_qa_cap_37","id":"qa_cap_37","controlType":"Label"},
         "Transform": {"x":272,"y":4992,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
-        "Text": {"content":"25 verbs","_children":{"Font":{"size":11}}},
+        "Text": {"content":"26 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
@@ -1374,17 +1374,17 @@
         "Core": {"name":"verbs_meter","id":"qa05_meter_verbs","controlType":"Label"},
         "Transform": {"x":272,"y":5014,"width":470,"height":185},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"meter.value(num)              meter.valuePrefix(str)\nmeter.scale(enum)             meter.valueSuffix(str)\nmeter.peakHold[on]            meter.zoneAt(item)\nmeter.holdMs(num)             meter.source(link)\nmeter.decay(num)              meter.showTicks[on]\nmeter.valueMin(num)           meter.showScaleLabels[on]\nmeter.valueMax(num)           meter.showValue[on]\nmeter.dbFloor(num)            meter.read(read)\nmeter.dbCeil(num)             meter.size(size)\nmeter.orientation(enum)       meter.fill(fill)\nmeter.gradient[on]            meter.insert(insert)\nmeter.label(str)              meter.remove(remove)\nmeter.valuePrecision(int)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"meter.value(num)              meter.valuePrecision(int)\nmeter.scale(enum)             meter.valuePrefix(str)\nmeter.peakHold[on]            meter.valueSuffix(str)\nmeter.holdMs(num)             meter.zoneAt(item)\nmeter.decay(num)              meter.source(link)\nmeter.valueMin(num)           meter.showTicks[on]\nmeter.valueMax(num)           meter.showScaleLabels[on]\nmeter.dbFloor(num)            meter.showValue[on]\nmeter.dbCeil(num)             meter.read(read)\nmeter.orientation(enum)       meter.size(size)\nmeter.gradient[on]            meter.fill(fill)\nmeter.label(str)              meter.insert(insert)\nmeter.labelPosition(enum)     meter.remove(remove)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"group_Transport_transport_Set_the_panel_Transport_tempo_swing_time_signature_loop_Reading_it_is_ce_time_","id":"qa_group_19","controlType":"Label"},
+        "Core": {"name":"group_Transport_transport_Set_the_panel_s_clock_its_tempo_swing_time_signature_loop_and_count_in_where_it_follows_and_its_MIDI_clock_out_Reading_it_is_ce_time_","id":"qa_group_19","controlType":"Label"},
         "Transform": {"x":28,"y":5233,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"Transport — transport.*  (Set the panel Transport: tempo, swing, time signature, loop. Reading it is ce.time.)","_children":{"Font":{"size":13,"bold":true}}},
+        "Text": {"content":"Transport — transport.*  (Set the panel's clock: its tempo, swing, time signature, loop and count-in, where it follows, and its MIDI clock out. Reading it is ce.time.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
@@ -1421,7 +1421,7 @@
         "Core": {"name":"verbs_transport","id":"qa05_transport_verbs","controlType":"Label"},
         "Transform": {"x":282,"y":5291,"width":470,"height":120},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"transport.bpm(num)            transport.countIn(int)\ntransport.swing(num)          transport.clockOut[on]\ntransport.source(enum)        transport.clockDevice(str)\ntransport.beatsPerBar(int)    transport.runOnLoad[on]\ntransport.beatUnit(int)       transport.editable[on]\ntransport.loop[on]            transport.showPosition[on]\ntransport.loopStart(int)      transport.showTap[on]\ntransport.loopBars(int)       transport.read(read)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"transport.bpm(num)            transport.countIn(int)\ntransport.swing(num)          transport.clockOut[on]\ntransport.source(enum)        transport.clockDevice(str)\ntransport.beatsPerBar(int)    transport.runOnLoad[on]\ntransport.beatUnit(int)       transport.editable[on]\ntransport.loop[on]            transport.showPosition[on]\ntransport.loopStart(int)      transport.showTap[on]\ntransport.loopBars(num)       transport.read(read)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
