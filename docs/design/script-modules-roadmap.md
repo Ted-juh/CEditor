@@ -1,6 +1,6 @@
 # Script modules: what is missing
 
-*Survey, 2026-10-27. Four modules designed and approved (`ce.patch`, `ce.format`, `ce.file`, MIDI input and `ce.mpe`), the rest proposed.* Which
+*Survey, 2026-10-27. Five modules designed and approved (`ce.patch`, `ce.format`, `ce.file`, MIDI input and `ce.mpe`, `ce.daw`), the rest proposed.* Which
 scripting modules the API lacks, why, and in what order to design them. Each module gets its own
 design record when its design is approved; this page keeps the list and the status.
 
@@ -28,8 +28,8 @@ needs new native code is not.
 | 2 | `ce.format` | A value as text and back: Hz, ms, dB, %, pan, note names, ratios, lookup tables; parsing typed input. | everywhere | low: pure functions | **Designed and approved**, [ce-format-module.md](ce-format-module.md). Not built. |
 | 3 | `ce.file` | Librarian files: open and save dialogs for `.syx`, `.mid`, `.json`; a bank `.syx` split into messages; a recorded take written as a MIDI file. | panel view, and the plug-in with its window open | medium: native dialogs exist in the bridge | **Designed and approved**, [ce-file-module.md](ce-file-module.md). Not built. |
 | 4 | MIDI input completed, and MPE | Events for incoming pitch bend, aftertouch, program change and clock (scripts decode raw `midiIn` today); MPE with per-note bend, pressure, timbre and channel allocation. | everywhere | high: every engine, plus the player | **Designed and approved**, [midi-input-and-mpe.md](midi-input-and-mpe.md). Not built. |
-| 5 | `ce.daw` | The exported plug-in's host: expose and rename DAW parameters, automation gestures, react to automation. `RUNTIME_PLAYER` exists and holds only `onDawSaveState` and `onDawRestoreState`. | exported plug-in | high: native | Next to design. |
-| 6 | `ce.verify` | Round-trip checks: send a parameter, ask for a dump, compare, report. The "verifiable" half of the project's aim, which no script can do today. | everywhere | medium: builds on `ce.device` | Proposed. |
+| 5 | `ce.daw` | The exported plug-in's host: expose and rename DAW parameters, automation gestures, react to automation. `RUNTIME_PLAYER` exists and holds only `onDawSaveState` and `onDawRestoreState`. | exported plug-in | high: native | **Designed and approved**, [ce-daw-module.md](ce-daw-module.md). Not built. |
+| 6 | `ce.verify` | Round-trip checks: send a parameter, ask for a dump, compare, report. The "verifiable" half of the project's aim, which no script can do today. | everywhere | medium: builds on `ce.device` | Next to design. |
 | 7 | `ce.keys` | The computer keyboard: key events on the panel, shortcuts, a QWERTY piano. | panel view | low | Proposed. |
 | 8 | `ce.ci` | MIDI-CI discovery and properties for scripts. The app already discovers devices (`midiCiDiscovered`); scripts cannot see it. | everywhere | medium | Proposed. |
 | 9 | `ce.osc` | OSC in and out, for TouchOSC or Max. `juce_osc` is vendored and not linked. | everywhere | high: native, a new transport | Proposed. |
