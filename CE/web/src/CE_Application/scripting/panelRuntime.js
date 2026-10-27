@@ -7821,6 +7821,25 @@ function deviceValueWrite(id, value, role) {
  * id overrides it — which is what lets a script correct one wrong parameter in an otherwise good
  * profile without having to redeclare the rest.
  */
+// The access filter, the same three words the exported plug-in's engines take
+// (descriptorMatches in DeviceProfileServiceInternal.h). This read used to match the text of
+// `access` as a substring — but a profile's access is an object, whose text is "[object Object]",
+// so any value at all filtered every profile parameter out, while the plug-in ignored the
+// "readwrite" the manual's example passed and returned them all.
+const ACCESS_FILTERS = new Set(['writable', 'readonly', 'realtimeWarning']);
+function accessMatches(access, filter) {
+  if (!ACCESS_FILTERS.has(filter)) return true;
+  // A profile gives { canWrite, realtimeSafe }; a declared parameter gives text such as "read" or
+  // "readWrite". Missing means writable and safe, as the engine reads it.
+  const canWrite = typeof access === 'string'
+    ? /write/i.test(access)
+    : access?.canWrite !== false;
+  const realtimeSafe = typeof access === 'string' ? true : access?.realtimeSafe !== false;
+  if (filter === 'writable') return canWrite;
+  if (filter === 'readonly') return !canWrite;
+  return !realtimeSafe;
+}
+
 function deviceParametersRead(opts = {}) {
   const role = opts.role || DEFAULT_ROLE;
   const declared = definedParameters(role);
@@ -7859,9 +7878,15 @@ function deviceParametersRead(opts = {}) {
   for (const p of [...fromProfile, ...declared]) byId.set(String(p?.id ?? ''), p);
 
   const wanted = (field, value) => !value || String(field ?? '').toLowerCase().includes(String(value).toLowerCase());
+  const access = String(opts.access ?? '');
+  if (access && !ACCESS_FILTERS.has(access)) {
+    addScriptTrace('error', '',
+      `deviceParameters(): access "${access}" is not one of "writable", "readonly" or "realtimeWarning"; `
+      + 'the list is not filtered by access.');
+  }
   let out = [...byId.values()].filter((p) => wanted(p?.group, opts.group)
     && wanted(p?.type, opts.type)
-    && wanted(p?.access, opts.access)
+    && accessMatches(p?.access, access)
     && (!opts.query
       || String(p?.id ?? '').toLowerCase().includes(String(opts.query).toLowerCase())
       || String(p?.name ?? '').toLowerCase().includes(String(opts.query).toLowerCase())));

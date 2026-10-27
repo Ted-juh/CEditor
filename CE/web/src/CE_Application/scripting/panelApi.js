@@ -2909,8 +2909,11 @@ export const COMMANDS = [
           + '"Filter" and so on.' },
       { name: 'type', type: 'text', sample: '"number"',
         summary: 'Keep only one kind of parameter, such as "number" or "choice".' },
-      { name: 'access', type: 'text', sample: '"readwrite"',
-        summary: 'Keep only parameters you can read, write, or both.' },
+      { name: 'access', type: 'text', sample: '"writable"',
+        summary: 'Keep only some parameters by what can be done with them: "writable", the ones the '
+          + 'panel can send to the synth; "readonly", the ones the synth only reports; '
+          + '"realtimeWarning", the ones not safe to move while notes are playing.\nAny other '
+          + 'value: not filtered, with a console error.' },
       { name: 'limit', type: 'number', default: 'no limit', sample: '50',
         summary: 'Return at most this many. Useful on a synth with hundreds.' },
     ]) }],

@@ -1665,7 +1665,7 @@ List the synth's parameters as the device profile describes them, each as { id, 
 | `query` | text | — | Keep only parameters whose name or id contains this. |
 | `group` | text | — | Keep only one group, the way the synth itself files them — "Oscillator", "Filter" and so on. |
 | `type` | text | — | Keep only one kind of parameter, such as "number" or "choice". |
-| `access` | text | — | Keep only parameters you can read, write, or both. |
+| `access` | text | — | Keep only some parameters by what can be done with them: "writable", the ones the panel can send to the synth; "readonly", the ones the synth only reports; "realtimeWarning", the ones not safe to move while notes are playing.<br>Any other value: not filtered, with a console error. |
 | `limit` | number | no limit | Return at most this many. Useful on a synth with hundreds. |
 
 ```lua
