@@ -261,6 +261,41 @@ export const WRITTEN = {
     lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
     js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
   },
+  fileOpen: {
+    lua: `ce.file.open({ types = { "syx" }, title = "Import a bank" }, function(file, bytes)\n  if not file then return end\n  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end\nend)`,
+    js: `ce.file.open({ types: ["syx"], title: "Import a bank" }, (file, bytes) => {\n  if (!file) return;\n  for (const message of ce.file.syxSplit(bytes)) ce.midi.sendSysex(message);\n});`,
+  },
+  fileSave: {
+    lua: `ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages), {}, function(file)\n  if file then state.bankFile = file end\nend)`,
+    js: `ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages), {}, (file) => {\n  if (file) state.bankFile = file;\n});`,
+  },
+  fileRead: {
+    lua: `ce.file.read(state.bankFile, function(bytes)\n  if bytes then state.messages = ce.file.syxSplit(bytes) end\nend)`,
+    js: `ce.file.read(state.bankFile, (bytes) => {\n  if (bytes) state.messages = ce.file.syxSplit(bytes);\n});`,
+  },
+  fileWrite: { code: 'ce.file.write(state.bankFile, ce.file.syxJoin(state.messages))' },
+  fileFolder: {
+    lua: `ce.file.folder({ title = "Export the bank to", writable = true }, function(dir)\n  if not dir then return end\n  for slot, bytes in ipairs(state.patches) do\n    ce.file.saveIn(dir, string.format("%03d.syx", slot), bytes)\n  end\nend)`,
+    js: `ce.file.folder({ title: "Export the bank to", writable: true }, (dir) => {\n  if (!dir) return;\n  state.patches.forEach((bytes, i) => ce.file.saveIn(dir, \`\${String(i + 1).padStart(3, "0")}.syx\`, bytes));\n});`,
+  },
+  fileList: {
+    lua: `for row, f in ipairs(ce.file.list(state.dir, { types = { "syx" } })) do\n  ce.components.lcd.text("Files", row, f.name)\nend`,
+    js: `ce.file.list(state.dir, { types: ["syx"] }).forEach((f, i) => ce.components.lcd.text("Files", i + 1, f.name));`,
+  },
+  fileSaveIn: { code: 'ce.file.saveIn(state.dir, "001 Brass.syx", bytes, { replace = true })' },
+  fileSyxSplit: {
+    lua: `local messages = ce.file.syxSplit(bytes, { prefix = { 0xF0, 0x41 } })\nlog(#messages .. " Roland messages")`,
+    js: `const messages = ce.file.syxSplit(bytes, { prefix: [0xF0, 0x41] });\nlog(messages.length + " Roland messages");`,
+  },
+  fileSyxJoin: { code: 'ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))' },
+  fileMidiRead: {
+    lua: `local song = ce.file.midiRead(data)\nfor _, n in ipairs(song.tracks[1].notes) do log(n.note .. " at beat " .. n.beat) end`,
+    js: `const song = ce.file.midiRead(data);\nfor (const n of song.tracks[0].notes) log(\`\${n.note} at beat \${n.beat}\`);`,
+  },
+  fileMidiWrite: {
+    lua: `local bytes = ce.file.midiWrite(ce.components.recorder.read("Recorder"), { name = "Take 1" })\nce.file.save("Take 1.mid", bytes)`,
+    js: `const bytes = ce.file.midiWrite(ce.components.recorder.read("Recorder"), { name: "Take 1" });\nce.file.save("Take 1.mid", bytes);`,
+  },
   verifyCoverage: {
     lua: `local c = ce.verify.coverage()\nlog(c.checkable .. " of " .. c.total .. " parameters can be checked")\nfor _, d in ipairs(c.dumps) do\n  if d.expectedBytes ~= d.layoutBytes then logWarn(d.kind .. ": the length does not add up") end\nend`,
     js: `const c = ce.verify.coverage();\nlog(\`\${c.checkable} of \${c.total} parameters can be checked\`);\nfor (const d of c.dumps) {\n  if (d.expectedBytes !== d.layoutBytes) logWarn(\`\${d.kind}: the length does not add up\`);\n}`,

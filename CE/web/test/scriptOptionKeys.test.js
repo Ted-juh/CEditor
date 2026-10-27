@@ -238,7 +238,7 @@ test('what each checked member answers when it refuses', () => {
   for (const [path, answer] of Object.entries(answers)) (byAnswer[answer] ??= []).push(path);
   for (const list of Object.values(byAnswer)) list.sort();
   assert.deepEqual(byAnswer, {
-    nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform', 'ce.format.clock', 'ce.format.db',
+    nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform', 'ce.file.midiRead', 'ce.file.midiWrite', 'ce.format.clock', 'ce.format.db',
       'ce.format.division', 'ce.format.fit', 'ce.format.hz', 'ce.format.line', 'ce.format.note',
       'ce.format.number', 'ce.format.pan', 'ce.format.parameter', 'ce.format.parse', 'ce.format.percent',
       'ce.format.ratio', 'ce.format.table', 'ce.format.time', 'ce.keys.shortcut', 'ce.midi.checksum',
@@ -248,11 +248,13 @@ test('what each checked member answers when it refuses', () => {
       'ce.text.fit', 'ce.time.syncTimer', 'ce.ui.notify', 'ce.verify.coverage', 'ce.verify.summary', 'set'],
     false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.device.bind', 'ce.device.defineDump',
       'ce.device.defineParameter', 'ce.device.requestDump', 'ce.draw.curve', 'ce.draw.grid', 'ce.draw.image',
-      'ce.draw.polygon', 'ce.draw.text', 'ce.image.icon', 'ce.keys.piano', 'ce.patch.forget',
+      'ce.draw.polygon', 'ce.draw.text', 'ce.file.folder', 'ce.file.open', 'ce.file.save', 'ce.file.saveIn',
+      'ce.image.icon', 'ce.keys.piano', 'ce.patch.forget',
       'ce.patch.read', 'ce.patch.save', 'ce.ui.status', 'ce.ui.update', 'ce.verify.check', 'ce.verify.dump',
       'ce.verify.patch', 'ce.verify.probe', 'ce.verify.write'],
     zero: ['ce.panel.align', 'ce.panel.circle', 'ce.panel.distribute', 'ce.panel.grid', 'ce.panel.match'],
-    'empty list': ['ce.device.parameters', 'ce.device.ports', 'ce.image.assets', 'ce.patch.list', 'ce.text.fonts'],
+    'empty list': ['ce.device.parameters', 'ce.device.ports', 'ce.file.list', 'ce.file.syxSplit', 'ce.image.assets', 'ce.patch.list',
+      'ce.text.fonts'],
     result: ['ce.device.recallPreset', 'ce.patch.apply', 'ce.patch.write'],
     unanswered: ['ce.ui.choose', 'ce.ui.dialog', 'ce.ui.prompt'],
   });

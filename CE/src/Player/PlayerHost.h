@@ -2,6 +2,7 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "DeviceProfile/DeviceProfileService.h"
+#include "ScriptFileDialog.h"
 
 /**
  * Phase B4 — standalone player host.
@@ -125,4 +126,8 @@ private:
     std::unique_ptr<juce::Label> statusLabel;
     juce::String webViewProfileName;
     bool hostWindowShown = true;   // the host's window shows ours (timerCallback, Windows only)
+    // ce.file while the window is open (ScriptFiles.h). Declared last, so it goes first: no dialog
+    // answers into a host that is half gone. The files chosen go with the window.
+    std::shared_ptr<std::unique_ptr<juce::FileChooser>> scriptFileChooser = std::make_shared<std::unique_ptr<juce::FileChooser>>();
+    ceditor::ScriptFiles scriptFiles { ceditor::scriptFileDialog (scriptFileChooser) };
 };

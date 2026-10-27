@@ -2485,6 +2485,193 @@ export const COMMANDS = [
     ],
     scopes: 'any',
   },
+  // file
+  // Librarian files through the person's own dialogs (docs/design/ce-file-module.md). A script never
+  // names a path: every file comes from a dialog the person answered. The dialogs are the panel
+  // view's (scriptFileHost.js, over CE/src/ScriptFiles.h); the four that take files apart work on
+  // bytes and run everywhere (fileCore.js).
+  {
+    id: 'fileOpen', category: 'Files', signature: 'fileOpen(opts, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person for a file, and get its contents.',
+    example: '`ce.file.open({ types = {"syx"} }, function(file, data) … end)` asks for a .syx file and gives its bytes.',
+    notes: [
+      'fn is called as fn(file, data) once the person has chosen, or fn(nil) when they cancel. `data` is bytes for syx and mid, text for txt and csv, and a value for json.',
+      '`file` is a table to keep and pass back: { id, name, type, size, canWrite, isFolder }. It holds no folder: the script never sees where the file is.',
+      'A json file that is not valid JSON: fn(file, nil), with a console error naming the line where it goes wrong.',
+      'Returns true when the dialog opened. Another ce.file dialog already open: the console says so. With the plug-in\'s window shut there is nobody to answer, so nothing is done.',
+      'Files of up to 8 MB.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        { name: 'types', type: 'list of text', default: 'none, needed', sample: '{"syx"}', summary: 'The types the dialog accepts, from syx, mid, json, txt and csv.' },
+        { name: 'title', type: 'text', default: '"Open"', summary: 'The dialog\'s title: say what the file is for, such as "Import a bank".' },
+        { name: 'multiple', type: 'true or false', default: 'false', summary: 'Let the person pick several files: fn is then called once for each.' },
+        { name: 'writable', type: 'true or false', default: 'false', summary: 'Let ce.file.write() write this file again later, as a librarian keeps a bank file open.' },
+        { name: 'read', type: 'true or false', default: 'true', summary: 'Off: give the file value only, and read it later with ce.file.read().' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(file, data), or fn(nil) when the person cancels.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSave', category: 'Files', signature: 'fileSave(name, data [, opts [, fn]]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person where to save, then write the file there.',
+    example: '`ce.file.save("Bank A.syx", bytes)` offers to save the bytes as "Bank A.syx".',
+    notes: [
+      'The extension of `name` sets the type: .syx, .mid, .json, .txt or .csv. Anything else: false, with a console error.',
+      '`data` is bytes for syx and mid, text for txt and csv, and any value for json. The wrong kind for the type: false, with a console error, and nothing written.',
+      'fn is called as fn(file) when it is written, or fn(nil, why) when the person cancels or the write fails. The file value has `canWrite` on, so ce.file.write() can save to it again without asking.',
+      'The dialog asks before writing over a file that is there. The person can change the name; the file keeps the type asked for.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'The name the dialog suggests, with its extension.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'title', type: 'text', default: '"Save"', summary: 'The dialog\'s title.' },
+        { name: 'indent', type: 'number', default: 'none', summary: 'For json: spaces to indent each level, so a person can read the file.' }]) },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(file), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileRead', category: 'Files', signature: 'fileRead(file, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Read a chosen file again, as it is now.',
+    example: '`ce.file.read(state.bank, function(data) … end)` reads the bank file the person opened earlier.',
+    notes: [
+      'fn is called as fn(data), the contents as open gives them, or fn(nil, why) when the file has gone or cannot be read.',
+      'Not a file value from ce.file.open, save or list: false, with a console error.',
+    ],
+    params: [
+      { name: 'file', type: 'table', required: true, summary: 'A file value from open, save or list.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(data), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileWrite', category: 'Files', signature: 'fileWrite(file, data [, fn]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Write a chosen file again, without asking.',
+    example: '`ce.file.write(state.bank, ce.file.syxJoin(state.messages))` saves the edited bank back to its file.',
+    notes: [
+      'Only a file whose `canWrite` is on: one from save, saveIn, or open with `writable`. Anything else: false, with a console error saying the person must save to it first.',
+      'Written whole, through a temporary file, so a write cut short leaves the old file as it was.',
+      'fn is called as fn(true) when written, or fn(false, why) when not.',
+    ],
+    params: [
+      { name: 'file', type: 'table', required: true, summary: 'A file value whose canWrite is on.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write, as save takes it.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(true), or fn(false, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileFolder', category: 'Files', signature: 'fileFolder(opts, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person for a folder.',
+    example: '`ce.file.folder({ title = "Export the bank to", writable = true }, function(dir) … end)` asks where to put a bank\'s files.',
+    notes: [
+      'fn is called as fn(folder) once chosen, or fn(nil) when the person cancels.',
+      'Only this folder: not the folders inside it, and nothing above it.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        { name: 'title', type: 'text', default: '"Choose a folder"', summary: 'The dialog\'s title.' },
+        { name: 'writable', type: 'true or false', default: 'false', summary: 'Let ce.file.saveIn() write into it.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(folder), or fn(nil).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileList', category: 'Files', signature: 'fileList(folder [, opts]) -> list', refusal: 'empty list', runtime: RUNTIME_WEBVIEW,
+    summary: 'The files in a chosen folder, sorted as a person sorts them ("2" before "10").',
+    example: '`ce.file.list(dir, { types = {"syx"} })` gives every .syx file in it.',
+    notes: [
+      'Each is a file value, for ce.file.read(). They can be written only when the folder was chosen writable.',
+      'The files there when the folder was chosen, as saveIn last left them, or when list was last called: a file another program adds shows the next time.',
+    ],
+    params: [
+      { name: 'folder', type: 'table', required: true, summary: 'A folder value from ce.file.folder().' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'types', type: 'list of text', default: 'every type on the list', summary: 'Only these types.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSaveIn', category: 'Files', signature: 'fileSaveIn(folder, name, data [, opts [, fn]]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Write one file into a chosen folder.',
+    example: '`ce.file.saveIn(dir, "001 Brass.syx", bytes)` writes one patch of a bank.',
+    notes: [
+      'Only a folder chosen `writable`. A name with a /, \\ or .. in it, or without a listed extension: false, with a console error.',
+      'A file of that name already there is not written over, and fn gets the reason, unless `replace` is on. The person agreed to a folder, not to losing what was in it.',
+      'fn is called as fn(file) when written, or fn(nil, why) when not.',
+    ],
+    params: [
+      { name: 'folder', type: 'table', required: true, summary: 'A folder value from ce.file.folder(), chosen writable.' },
+      { name: 'name', type: 'text', required: true, summary: 'The file\'s name, with its extension.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write, as save takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'replace', type: 'true or false', default: 'false', summary: 'Write over a file of that name.' },
+        { name: 'indent', type: 'number', default: 'none', summary: 'For json: spaces to indent each level.' }]) },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(file), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSyxSplit', category: 'Files', signature: 'fileSyxSplit(bytes [, opts]) -> list', refusal: 'empty list',
+    summary: 'The SysEx messages in a .syx file, one by one, each from F0 to F7.',
+    example: '`ce.file.syxSplit(bytes)` gives a list of messages.',
+    notes: [
+      'Bytes outside any message are left out, with a console warning saying how many and where. So is a message cut off by the next F0, or with no F7 at the end of the file, unless `partial` is on.',
+      'Works on bytes the script holds, so it runs everywhere, window shut too.',
+    ],
+    params: [
+      { name: 'bytes', type: 'array', required: true, kind: 'bytes', summary: 'The file\'s bytes, a list or hex text.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'partial', type: 'true or false', default: 'false', summary: 'Keep a last message with no F7, so a cut-off file can still be looked at.' },
+        { name: 'prefix', type: 'list', default: 'none', summary: 'Only messages that start with these bytes, such as {0xF0, 0x41} for Roland.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSyxJoin', category: 'Files', signature: 'fileSyxJoin(messages) -> list', refusal: 'nothing',
+    summary: 'Messages as one .syx file\'s bytes, in the order given, nothing added between.',
+    example: '`ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))` saves a bank.',
+    notes: ['A message that does not start with F0 and end with F7: nothing, with a console error naming which.'],
+    params: [{ name: 'messages', type: 'list', required: true, summary: 'Messages, each bytes or hex text.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'fileMidiRead', category: 'Files', signature: 'fileMidiRead(bytes [, opts]) -> table', refusal: 'nothing',
+    summary: 'A MIDI file as tracks of notes: { ticksPerBeat, tempo, tempos, timeSignature, tracks }.',
+    example: '`ce.file.midiRead(data).tracks[1].notes` gives the first track\'s notes.',
+    notes: [
+      'Each track is { name, notes, events }. A note is { beat, note, velocity, length, channel }: `beat` from 0, `length` in beats, `channel` from 1. `events` holds everything else as { beat, bytes }: controllers, program changes, bend, SysEx.',
+      '`tempo` is the tempo at the start, 120 when the file gives none; `tempos` lists every change as { beat, bpm }.',
+      'A note-on with velocity 0 ends the note. A note that never ends lasts to the end of its track, with a console warning naming it.',
+      'Types 0 and 1. A type 2 file, a file timed in SMPTE frames, or one cut short: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'bytes', type: 'array', required: true, kind: 'bytes', summary: 'The file\'s bytes.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'track', type: 'number', default: 'every track', summary: 'Read only this track, counted from 1.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileMidiWrite', category: 'Files', signature: 'fileMidiWrite(song [, opts]) -> list', refusal: 'nothing',
+    summary: 'A MIDI file\'s bytes from a song, a list of notes, or a Phrase Recorder\'s take.',
+    example: '`ce.file.midiWrite(ce.components.recorder.read("Recorder"))` gives the recorder\'s take as a MIDI file.',
+    notes: [
+      '`song` is a song as midiRead gives it, a list of notes { beat, note, velocity, length, channel } written as one track, or a Phrase Recorder\'s section, whose take is written over its bars at the transport\'s beats per bar.',
+      'One track is written as type 0, several as type 1, at 480 ticks per beat unless the song says otherwise.',
+      'Returns the bytes, for ce.file.save(). Anything else as `song`: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'song', type: 'table', required: true, summary: 'A song, a list of notes, or a recorder\'s section.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'tempo', type: 'number', default: 'the song\'s, else the transport\'s, else 120', summary: 'The tempo written at the start, in beats per minute.' },
+        { name: 'name', type: 'text', default: 'none', summary: 'The name written into the first track.' },
+        { name: 'channel', type: 'number', default: '1', summary: 'The channel, 1 to 16, for notes that carry none.' }]) },
+    ],
+    scopes: 'any',
+  },
   // verify
   // Asking the synth whether it holds what was sent (docs/design/ce-verify-module.md). The deciding is
   // verifyCore.js, the same in every runtime; each check ends in one report, handed to its function
@@ -5751,8 +5938,8 @@ export const MODULE_GROUPS = [
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Creating and arranging controls, the computer keyboard, and saving things that outlive the session.',
-    modules: ['ce.panel', 'ce.keys', 'ce.storage'] },
+    blurb: 'Creating and arranging controls, the computer keyboard, saving things that outlive the session, and files.',
+    modules: ['ce.panel', 'ce.keys', 'ce.storage', 'ce.file'] },
   { id: 'appearance', label: 'How it looks',
     blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
@@ -5842,6 +6029,10 @@ export const MODULES = [
   // requires the four whose commands it reads and sends through, so they are there whenever it is.
   { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
     summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
+  // requires ce.time, whose tempo and beats per bar midiWrite uses when a song gives neither. The
+  // dialogs are the panel view's; the byte commands run everywhere.
+  { id: 'ce.file', version: '1.0', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Librarian files through the person\'s own dialogs: open and save a file, read and write it again, a folder of files, and .syx and MIDI files taken apart and put together. A script never names a path; every file comes from a dialog the person answered.' },
   // requires ce.device, whose dumps it asks for, and ce.time, whose after() spaces the asks.
   { id: 'ce.verify', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.time'], runtime: RUNTIME_ANY,
     summary: 'Asking the synth whether it holds what was sent: which parameters can be read back, whether the synth agrees with the panel, whether a value or a whole sound landed, and a parameter tried at its ends. Each check ends in a report that names what matched, what differed and what could not be checked, and why.' },
@@ -6044,6 +6235,10 @@ const MODULE_MEMBERS = {
     random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
     apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
     scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.file': {
+    open: 'fileOpen', save: 'fileSave', read: 'fileRead', write: 'fileWrite', folder: 'fileFolder', list: 'fileList',
+    saveIn: 'fileSaveIn', syxSplit: 'fileSyxSplit', syxJoin: 'fileSyxJoin', midiRead: 'fileMidiRead', midiWrite: 'fileMidiWrite',
   },
   'ce.verify': {
     coverage: 'verifyCoverage', check: 'verifyCheck', dump: 'verifyDump', write: 'verifyWrite', probe: 'verifyProbe',

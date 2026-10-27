@@ -1034,6 +1034,15 @@ target_link_libraries(CEditorNativeFileAccessTests PRIVATE juce::juce_core)
 add_test(NAME NativeFileAccess COMMAND CEditorNativeFileAccessTests)
 ce_configure_test(CEditorNativeFileAccessTests)
 
+# ce.file's native side (ScriptFiles.h): a file only after a dialog, ids that cannot be made up,
+# only the listed types, writing only where the person agreed. The dialog is a function in the test,
+# so it is plain juce_core and needs no window.
+add_executable(CEditorScriptFilesTests "${CE_ROOT}/tests/ScriptFilesTests.cpp")
+target_include_directories(CEditorScriptFilesTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorScriptFilesTests PRIVATE juce::juce_core)
+add_test(NAME ScriptFiles COMMAND CEditorScriptFilesTests)
+ce_configure_test(CEditorScriptFilesTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: docs/design/screen-builder-design.md.

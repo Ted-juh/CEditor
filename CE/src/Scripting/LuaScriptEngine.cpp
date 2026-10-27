@@ -3549,6 +3549,486 @@ function verifyRunning(role) return V.running(role) end
 function verifyCancel(role) return V.cancel(role) end
 end
 
+-- @module ce.file
+-- ce.file's byte commands, ported line for line from fileCore.js (the panel view's; the JavaScript
+-- prelude runs that file itself). Held to the panel view's answers by test/fileParity.test.js and the
+-- scenario in test/support/fileScenario.mjs. The dialogs are the panel view's alone: with the window
+-- shut there is nobody to answer one. ce.file requires ce.time, whose tempo and transport give
+-- midiWrite the tempo and beats per bar when a song carries neither.
+do
+  local DEFAULT_TICKS = 480
+  local INF = math.huge
+
+  local function finite(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function clampInt(v, lo, hi, fallback)
+    if not finite(v) then return fallback end
+    local x = math.floor(v + 0.5)
+    if x < lo then return lo end
+    if x > hi then return hi end
+    return x
+  end
+  -- A number as JavaScript writes it: no ".0" on a whole number, and the shortest digits that read
+  -- back as the same number.
+  local function numText(x)
+    if type(x) ~= "number" then return tostring(x) end
+    if x == math.floor(x) and math.abs(x) < 1e15 then return string.format("%d", math.floor(x)) end
+    for digits = 15, 17 do
+      local s = string.format("%." .. digits .. "g", x)
+      if tonumber(s) == x then return s end
+    end
+    return tostring(x)
+  end
+  local function isList(v)
+    if type(v) ~= "table" then return false end
+    local n = 0
+    for _ in pairs(v) do n = n + 1 end
+    return n == #v
+  end
+
+  local function bytesOf(v)
+    if type(v) == "string" then
+      local text = v:gsub("%s+", "")
+      text = text:gsub("^0[xX]", "")
+      if #text % 2 ~= 0 or text:find("[^0-9a-fA-F]") then return nil end
+      local out = {}
+      for i = 1, #text, 2 do out[#out + 1] = tonumber(text:sub(i, i + 1), 16) end
+      return out
+    end
+    if not isList(v) then return nil end
+    local out = {}
+    for i, b in ipairs(v) do
+      if not finite(b) or b < 0 or b > 255 or math.floor(b) ~= b then return nil end
+      out[i] = math.floor(b)
+    end
+    return out
+  end
+
+  local function startsWith(list, prefix)
+    if #list < #prefix then return false end
+    for i = 1, #prefix do if list[i] ~= prefix[i] then return false end end
+    return true
+  end
+
+  local function syxSplit(bytes, opts, say)
+    local data = bytesOf(bytes)
+    if data == nil then
+      say("error", "ce.file.syxSplit: bytes must be a list of numbers 0 to 255, or hex text, so nothing was split.")
+      return {}
+    end
+    local prefix = {}
+    local givenPrefix = opt(opts, "prefix")
+    if givenPrefix ~= nil then
+      local p = bytesOf(givenPrefix)
+      if p == nil then
+        say("error", "ce.file.syxSplit: prefix must be bytes, a list or hex text, so nothing was split.")
+        return {}
+      end
+      prefix = p
+    end
+    local out = {}
+    local current = nil
+    local start, stray, firstStray = 0, 0, -1
+    for i = 1, #data do
+      local b = data[i]
+      if b == 0xF0 then
+        if current ~= nil then say("warn", "ce.file.syxSplit: the message at byte " .. start .. " has no F7 before the next F0, so it was left out.") end
+        current = { b }
+        start = i - 1
+      elseif current == nil then
+        stray = stray + 1
+        if firstStray < 0 then firstStray = i - 1 end
+      else
+        current[#current + 1] = b
+        if b == 0xF7 then
+          if startsWith(current, prefix) then out[#out + 1] = current end
+          current = nil
+        end
+      end
+    end
+    if current ~= nil then
+      if opt(opts, "partial") == true then
+        if startsWith(current, prefix) then out[#out + 1] = current end
+      else
+        say("warn", "ce.file.syxSplit: the last message, from byte " .. start .. ", has no F7, so it was left out.")
+      end
+    end
+    if stray > 0 then
+      say("warn", "ce.file.syxSplit: " .. stray .. " " .. (stray == 1 and "byte" or "bytes") .. " outside any message "
+        .. (stray == 1 and "was" or "were") .. " left out, the first at byte " .. firstStray .. ".")
+    end
+    return out
+  end
+
+  local function syxJoin(messages, say)
+    if not isList(messages) then
+      say("error", "ce.file.syxJoin: messages must be a list of messages, so nothing was joined.")
+      return nil
+    end
+    local out = {}
+    for i, raw in ipairs(messages) do
+      local m = bytesOf(raw)
+      if m == nil or #m < 2 or m[1] ~= 0xF0 or m[#m] ~= 0xF7 then
+        say("error", "ce.file.syxJoin: message " .. i .. " does not start with F0 and end with F7, so nothing was joined.")
+        return nil
+      end
+      for _, b in ipairs(m) do out[#out + 1] = b end
+    end
+    return out
+  end
+
+  -- d is 1-based; `at` below is a 0-based place in the file, as fileCore.js counts.
+  local function byte(d, at) return d[at + 1] end
+  local function u16(d, at) return byte(d, at) * 256 + byte(d, at + 1) end
+  local function u32(d, at) return ((byte(d, at) * 256 + byte(d, at + 1)) * 256 + byte(d, at + 2)) * 256 + byte(d, at + 3) end
+  local function latin1(d, from, to)
+    local parts = {}
+    for i = from, to - 1 do parts[#parts + 1] = utf8.char(byte(d, i)) end
+    return table.concat(parts)
+  end
+  local function textOf(d, from, to)
+    local parts = {}
+    for i = from, to - 1 do parts[#parts + 1] = string.char(byte(d, i)) end
+    local s = table.concat(parts)
+    if utf8.len(s) == nil then return latin1(d, from, to) end
+    -- Lua's utf8 accepts what UTF-8 does not: surrogates, and longer forms than needed.
+    for _, cp in utf8.codes(s) do if cp >= 0xD800 and cp <= 0xDFFF then return latin1(d, from, to) end end
+    for i = from, to - 1 do
+      local b = byte(d, i)
+      if b == 0xC0 or b == 0xC1 or b >= 0xF5 then return latin1(d, from, to) end
+      if b == 0xE0 and i + 1 < to and byte(d, i + 1) < 0xA0 then return latin1(d, from, to) end
+      if b == 0xF0 and i + 1 < to and byte(d, i + 1) < 0x90 then return latin1(d, from, to) end
+    end
+    return s
+  end
+  local function varLen(d, at, stop)
+    local value, i = 0, at
+    for _ = 1, 4 do
+      if i >= stop then return nil end
+      local b = byte(d, i)
+      i = i + 1
+      value = value * 128 + (b & 0x7F)
+      if (b & 0x80) == 0 then return value, i end
+    end
+    return nil
+  end
+  local function midiRefuse(say, why)
+    say("error", "ce.file.midiRead: " .. why .. ", so nothing was read.")
+    return nil
+  end
+
+  local function readTrack(d, from, to, tpb, index, song, say)
+    local track = { name = "", notes = {}, events = {} }
+    local open, openKeys = {}, {}
+    local at, tick, status, endTick = from, 0, 0, 0
+    while at < to do
+      local delta, nextAt = varLen(d, at, to)
+      if delta == nil then return nil end
+      tick = tick + delta
+      at = nextAt
+      if at >= to then return nil end
+      local b = byte(d, at)
+      if b == 0xFF then
+        if at + 1 >= to then return nil end
+        local kind = byte(d, at + 1)
+        local len, body = varLen(d, at + 2, to)
+        if len == nil or body + len > to then return nil end
+        local bodyEnd = body + len
+        local stop = false
+        if kind == 0x03 and track.name == "" then track.name = textOf(d, body, bodyEnd)
+        elseif kind == 0x51 and len == 3 then
+          local micro = (byte(d, body) * 256 + byte(d, body + 1)) * 256 + byte(d, body + 2)
+          if micro > 0 then song.tempos[#song.tempos + 1] = { beat = tick / tpb, bpm = 60000000 / micro } end
+        elseif kind == 0x58 and len >= 2 and song.timeSignature == nil then
+          song.timeSignature = { byte(d, body), 1 << byte(d, body + 1) }
+        elseif kind == 0x2F then
+          stop = true
+        end
+        at = bodyEnd
+        endTick = tick
+        if stop then break end
+      elseif b == 0xF0 or b == 0xF7 then
+        local len, body = varLen(d, at + 1, to)
+        if len == nil or body + len > to then return nil end
+        local bytes = {}
+        if b == 0xF0 then bytes[1] = 0xF0 end
+        for i = body, body + len - 1 do bytes[#bytes + 1] = byte(d, i) end
+        track.events[#track.events + 1] = { beat = tick / tpb, bytes = bytes }
+        at = body + len
+        endTick = tick
+      else
+        if b < 0x80 then
+          if status == 0 then return nil end
+          b = status
+        else
+          status = b
+          at = at + 1
+        end
+        local kind = b & 0xF0
+        local size = (kind == 0xC0 or kind == 0xD0) and 1 or 2
+        if at + size > to then return nil end
+        local x = byte(d, at)
+        local y = size == 2 and byte(d, at + 1) or 0
+        at = at + size
+        endTick = tick
+        local channel = (b & 0x0F) + 1
+        if kind == 0x90 and y > 0 then
+          local note = { beat = tick / tpb, note = x, velocity = y, length = 0, channel = channel }
+          track.notes[#track.notes + 1] = note
+          local key = channel .. ":" .. x
+          if open[key] == nil then open[key] = {}; openKeys[#openKeys + 1] = key end
+          local list = open[key]
+          list[#list + 1] = { note = note, tick = tick }
+        elseif kind == 0x80 or kind == 0x90 then
+          local list = open[channel .. ":" .. x]
+          if list ~= nil and #list > 0 then
+            local first = table.remove(list, 1)
+            first.note.length = (tick - first.tick) / tpb
+          end
+        else
+          local bytes = size == 2 and { b, x, y } or { b, x }
+          track.events[#track.events + 1] = { beat = tick / tpb, bytes = bytes }
+        end
+      end
+    end
+    table.sort(openKeys)
+    for _, key in ipairs(openKeys) do
+      for _, w in ipairs(open[key]) do
+        w.note.length = (endTick - w.tick) / tpb
+        say("warn", "ce.file.midiRead: note " .. w.note.note .. " on channel " .. w.note.channel .. " at beat "
+          .. numText(w.note.beat) .. " in track " .. index .. " never ends, so it lasts to the end of its track.")
+      end
+    end
+    return track
+  end
+
+  local function midiRead(bytes, opts, say)
+    local d = bytesOf(bytes)
+    if d == nil then return midiRefuse(say, "bytes must be a list of numbers 0 to 255, or hex text") end
+    if #d < 14 or latin1(d, 0, 4) ~= "MThd" then return midiRefuse(say, "that is not a MIDI file (it does not start with \"MThd\")") end
+    local headerLen = u32(d, 4)
+    local format, count, division = u16(d, 8), u16(d, 10), u16(d, 12)
+    if format == 2 then return midiRefuse(say, "it is a type 2 file (separate songs in one file), which is not read") end
+    if format > 2 then return midiRefuse(say, "it says it is a type " .. format .. " file, which does not exist") end
+    if division >= 0x8000 then return midiRefuse(say, "its times are in SMPTE frames, not beats") end
+    if division == 0 then return midiRefuse(say, "it gives 0 ticks per beat") end
+    local only = opt(opts, "track")
+    if only ~= nil and (not finite(only) or math.floor(only) ~= only or only < 1 or only > count) then
+      return midiRefuse(say, "track " .. numText(only) .. " is not a track of the file, which has " .. count)
+    end
+    local song = { ticksPerBeat = division, tempo = 120, tempos = {}, timeSignature = nil, tracks = {} }
+    local at, index = 8 + headerLen, 0
+    while at + 8 <= #d and index < count do
+      local id = latin1(d, at, at + 4)
+      local len = u32(d, at + 4)
+      local from = at + 8
+      local to = math.min(#d, from + len)
+      at = from + len
+      if id == "MTrk" then
+        index = index + 1
+        local track = readTrack(d, from, to, division, index, song, say)
+        if track == nil then return midiRefuse(say, "track " .. index .. " is cut short or damaged") end
+        if only == nil or only == index then song.tracks[#song.tracks + 1] = track end
+      end
+    end
+    -- A stable sort: table.sort is not, so the order a file gives equal beats in is kept by hand.
+    for i = 2, #song.tempos do
+      local j, item = i, song.tempos[i]
+      while j > 1 and song.tempos[j - 1].beat > item.beat do song.tempos[j] = song.tempos[j - 1]; j = j - 1 end
+      song.tempos[j] = item
+    end
+    if #song.tempos > 0 and song.tempos[1].beat == 0 then song.tempo = song.tempos[1].bpm end
+    if song.timeSignature == nil then song.timeSignature = { 4, 4 } end
+    return song
+  end
+
+  local function pushVarLen(out, value)
+    local v = math.max(0, math.floor(value))
+    local groups = { v & 0x7F }
+    v = v // 128
+    while v > 0 do
+      groups[#groups + 1] = (v & 0x7F) | 0x80
+      v = v // 128
+    end
+    for i = #groups, 1, -1 do out[#out + 1] = groups[i] end
+  end
+  local function pushU32(out, v)
+    out[#out + 1] = (v // 16777216) % 256
+    out[#out + 1] = (v // 65536) % 256
+    out[#out + 1] = (v // 256) % 256
+    out[#out + 1] = v % 256
+  end
+
+  local function noteFrom(n, channel, index, say)
+    if type(n) ~= "table" or not finite(n.beat) or n.beat < 0 or not finite(n.note) then
+      say("error", "ce.file.midiWrite: note " .. index .. " needs a beat of 0 or more and a note number, so nothing was written.")
+      return nil
+    end
+    return {
+      beat = n.beat,
+      note = clampInt(n.note, 0, 127, 60),
+      velocity = clampInt(n.velocity, 1, 127, 100),
+      length = (finite(n.length) and n.length > 0) and n.length or 0.25,
+      channel = clampInt(n.channel, 1, 16, channel),
+    }
+  end
+
+  local function songFrom(song, opts, clock, say)
+    local channel = clampInt(opt(opts, "channel"), 1, 16, 1)
+    if isList(song) then
+      local notes = {}
+      for i, raw in ipairs(song) do
+        local n = noteFrom(raw, channel, i, say)
+        if n == nil then return nil end
+        notes[#notes + 1] = n
+      end
+      return { ticksPerBeat = DEFAULT_TICKS, tempo = nil, tempos = {}, timeSignature = nil, tracks = { { name = "", notes = notes, events = {} } } }
+    end
+    if type(song) == "table" and isList(song.tracks) then
+      local tracks = {}
+      for _, t in ipairs(song.tracks) do
+        local notes, events = {}, {}
+        local list = (type(t) == "table" and isList(t.notes)) and t.notes or {}
+        for i, raw in ipairs(list) do
+          local n = noteFrom(raw, channel, i, say)
+          if n == nil then return nil end
+          notes[#notes + 1] = n
+        end
+        for _, e in ipairs((type(t) == "table" and isList(t.events)) and t.events or {}) do
+          local bytes = type(e) == "table" and bytesOf(e.bytes) or nil
+          if bytes == nil or #bytes == 0 or not finite(e.beat) or e.beat < 0 then
+            say("error", "ce.file.midiWrite: an event needs a beat of 0 or more and its bytes, so nothing was written.")
+            return nil
+          end
+          events[#events + 1] = { beat = e.beat, bytes = bytes }
+        end
+        tracks[#tracks + 1] = { name = (type(t) == "table" and type(t.name) == "string") and t.name or "", notes = notes, events = events }
+      end
+      local tpb = clampInt(song.ticksPerBeat, 1, 32767, DEFAULT_TICKS)
+      local sig = (isList(song.timeSignature) and #song.timeSignature >= 2) and song.timeSignature or nil
+      return { ticksPerBeat = tpb, tempo = (finite(song.tempo) and song.tempo > 0) and song.tempo or nil,
+               tempos = isList(song.tempos) and song.tempos or {}, timeSignature = sig, tracks = tracks }
+    end
+    if type(song) == "table" and type(song.take) == "table" and isList(song.take.events) then
+      local perBar = clampInt(clock.beatsPerBar, 1, 32, 4)
+      local loop = clampInt(song.bars, 1, 16, 2) * perBar
+      local notes = {}
+      local own = clampInt(song.channel, 1, 16, channel)
+      for _, e in ipairs(song.take.events) do
+        if type(e) == "table" and finite(e.t) and finite(e.note) then
+          notes[#notes + 1] = {
+            beat = e.t * loop,
+            note = clampInt(e.note, 0, 127, 60),
+            velocity = clampInt(e.velocity, 1, 127, 100),
+            length = ((finite(e.dur) and e.dur > 0) and e.dur or 0.1) * loop,
+            channel = own,
+          }
+        end
+      end
+      return { ticksPerBeat = DEFAULT_TICKS, tempo = nil, tempos = {}, timeSignature = { perBar, 4 }, tracks = { { name = "", notes = notes, events = {} } } }
+    end
+    say("error", "ce.file.midiWrite: song must be a song as midiRead gives it, a list of notes, or a Phrase Recorder's section, so nothing was written.")
+    return nil
+  end
+
+  local function trackChunk(track, tpb, metas)
+    local items = {}
+    local function add(tick, order, bytes)
+      items[#items + 1] = { tick = math.max(0, math.floor(tick + 0.5)), order = order, seq = #items, bytes = bytes }
+    end
+    for _, m in ipairs(metas) do add(m.tick, 0, m.bytes) end
+    if track.name ~= "" then
+      local name = { 0xFF, 0x03 }
+      pushVarLen(name, #track.name)
+      for i = 1, #track.name do name[#name + 1] = string.byte(track.name, i) end
+      add(0, 0, name)
+    end
+    for _, e in ipairs(track.events) do
+      local bytes
+      if e.bytes[1] == 0xF0 then
+        bytes = { 0xF0 }
+        pushVarLen(bytes, #e.bytes - 1)
+        for i = 2, #e.bytes do bytes[#bytes + 1] = e.bytes[i] end
+      else
+        bytes = {}
+        for i, b in ipairs(e.bytes) do bytes[i] = b end
+      end
+      add(e.beat * tpb, 2, bytes)
+    end
+    for _, n in ipairs(track.notes) do
+      add(n.beat * tpb, 3, { 0x90 + n.channel - 1, n.note, n.velocity })
+      add((n.beat + n.length) * tpb, 1, { 0x80 + n.channel - 1, n.note, 0 })
+    end
+    table.sort(items, function(a, b)
+      if a.tick ~= b.tick then return a.tick < b.tick end
+      if a.order ~= b.order then return a.order < b.order end
+      return a.seq < b.seq
+    end)
+    local body = {}
+    local last = 0
+    for _, item in ipairs(items) do
+      pushVarLen(body, item.tick - last)
+      last = item.tick
+      for _, b in ipairs(item.bytes) do body[#body + 1] = b end
+    end
+    for _, b in ipairs({ 0x00, 0xFF, 0x2F, 0x00 }) do body[#body + 1] = b end
+    local out = { 0x4D, 0x54, 0x72, 0x6B }
+    pushU32(out, #body)
+    for _, b in ipairs(body) do out[#out + 1] = b end
+    return out
+  end
+
+  local function tempoMeta(tick, bpm)
+    local micro = math.max(1, math.min(16777215, math.floor(60000000 / bpm + 0.5)))
+    return { tick = tick, bytes = { 0xFF, 0x51, 0x03, (micro // 65536) % 256, (micro // 256) % 256, micro % 256 } }
+  end
+
+  local function midiWrite(song, opts, clock, say)
+    clock = type(clock) == "table" and clock or {}
+    local s = songFrom(song, opts, clock, say)
+    if s == nil then return nil end
+    local given = opt(opts, "tempo")
+    local bpm = 120
+    if finite(given) and given > 0 then bpm = given
+    elseif s.tempo ~= nil then bpm = s.tempo
+    elseif finite(clock.tempo) and clock.tempo > 0 then bpm = clock.tempo end
+    local name = opt(opts, "name")
+    if type(name) == "string" and name ~= "" then s.tracks[1].name = name end
+    local tpb = s.ticksPerBeat
+    local sig = s.timeSignature or { clampInt(clock.beatsPerBar, 1, 32, 4), 4 }
+    local denomPower = 0
+    local denom = clampInt(sig[2], 1, 64, 4)
+    while denom > 1 do denom = denom // 2; denomPower = denomPower + 1 end
+    local metas = { tempoMeta(0, bpm), { tick = 0, bytes = { 0xFF, 0x58, 0x04, clampInt(sig[1], 1, 32, 4), denomPower, 24, 8 } } }
+    for _, t in ipairs(s.tempos) do
+      if type(t) == "table" and finite(t.beat) and t.beat > 0 and finite(t.bpm) and t.bpm > 0 then
+        metas[#metas + 1] = tempoMeta(t.beat * tpb, t.bpm)
+      end
+    end
+    local out = { 0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, #s.tracks > 1 and 1 or 0 }
+    for _, b in ipairs({ (#s.tracks // 256) % 256, #s.tracks % 256, (tpb // 256) % 256, tpb % 256 }) do out[#out + 1] = b end
+    for i, track in ipairs(s.tracks) do
+      for _, b in ipairs(trackChunk(track, tpb, i == 1 and metas or {})) do out[#out + 1] = b end
+    end
+    return out
+  end
+
+  local function say(level, text) if level == "warn" then logWarn(text) else logError(text) end end
+  local function clock()
+    local t = transportInfo()
+    return { tempo = tempo(), beatsPerBar = (type(t) == "table" and t.beatsPerBar) or 4 }
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function fileSyxSplit(bytes, opts) return syxSplit(bytes, opts, say) end
+-- (global; at the line start, where the option check looks for it)
+function fileSyxJoin(messages) return syxJoin(messages, say) end
+-- (global; at the line start, where the option check looks for it)
+function fileMidiRead(bytes, opts) return midiRead(bytes, opts, say) end
+-- (global; at the line start, where the option check looks for it)
+function fileMidiWrite(song, opts) return midiWrite(song, opts, clock(), say) end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -4559,6 +5039,8 @@ local WEBVIEW_ONLY = {
 -- @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+-- @module ce.file
+  "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
 -- @module ce.keys
   "keysShortcut","keysRemove","keysList","keysIsDown","keysHeld","keysPiano","keysPianoInfo",
   "keysFocus","keysFocused",
@@ -6105,6 +6587,9 @@ local __CE_OPTIONS = {
   ["patchList"] = { path = "ce.patch.list", at = 1, refusal = "empty list", names = { "role", "scope" } },
   ["patchForget"] = { path = "ce.patch.forget", at = 2, refusal = "false", names = { "role" } },
   ["patchWrite"] = { path = "ce.patch.write", at = 3, refusal = "result", names = { "role" } },
+  ["fileSyxSplit"] = { path = "ce.file.syxSplit", at = 2, refusal = "empty list", names = { "partial", "prefix" } },
+  ["fileMidiRead"] = { path = "ce.file.midiRead", at = 2, refusal = "nothing", names = { "track" } },
+  ["fileMidiWrite"] = { path = "ce.file.midiWrite", at = 2, refusal = "nothing", names = { "tempo", "name", "channel" } },
   ["verifyCoverage"] = { path = "ce.verify.coverage", at = 1, refusal = "nothing", names = { "role", "ids", "group" } },
   ["verifyCheck"] = { path = "ce.verify.check", at = 1, refusal = "false", names = { "role", "ids", "group" } },
   ["verifyDump"] = { path = "ce.verify.dump", at = 2, refusal = "false", names = { "role", "times", "gapMs" } },
@@ -6231,6 +6716,7 @@ local __CE_MODULES = {
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.file"] = { folder = "fileFolder", list = "fileList", midiRead = "fileMidiRead", midiWrite = "fileMidiWrite", open = "fileOpen", read = "fileRead", save = "fileSave", saveIn = "fileSaveIn", syxJoin = "fileSyxJoin", syxSplit = "fileSyxSplit", write = "fileWrite" },
   ["ce.verify"] = { cancel = "verifyCancel", check = "verifyCheck", coverage = "verifyCoverage", dump = "verifyDump", patch = "verifyPatch", probe = "verifyProbe", running = "verifyRunning", summary = "verifySummary", write = "verifyWrite" },
   ["ce.keys"] = { focus = "keysFocus", focused = "keysFocused", held = "keysHeld", isDown = "keysIsDown", list = "keysList", piano = "keysPiano", pianoInfo = "keysPianoInfo", remove = "keysRemove", shortcut = "keysShortcut" },
   ["ce.text"] = { axis = "textAxis", fit = "textFit", font = "textFont", fonts = "textFonts", measure = "textMeasure", read = "textRead", style = "textStyle" },
@@ -6263,7 +6749,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -6279,6 +6765,7 @@ local __CE_META = {
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.file", version = "1.0", runtime = "any" },
   { id = "ce.verify", version = "1.0", runtime = "any" },
   { id = "ce.keys", version = "1.0", runtime = "webview" },
   { id = "ce.text", version = "1.0", runtime = "webview" },

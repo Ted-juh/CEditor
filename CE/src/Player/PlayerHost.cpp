@@ -225,6 +225,19 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
             onRestoreAnswer (payload.getProperty ("answer", "").toString());
     });
 
+    // ce.file's dialogs and the files the person chose (ScriptFiles.h), answered as "scriptFileResult".
+    options = options.withEventListener ("scriptFile", [safe = juce::Component::SafePointer<PlayerHost> (this)] (const juce::var& payload)
+    {
+        juce::MessageManager::callAsync ([safe, payload]()
+        {
+            if (safe == nullptr) return;
+            safe->scriptFiles.handle (payload, [safe] (const juce::var& result)
+            {
+                if (safe != nullptr) safe->emitToWebView ("scriptFileResult", result);
+            });
+        });
+    });
+
     // A key the page did not use, for the DAW (utils/hostKeys.js, HostKeyForwarding.h).
     options = options.withEventListener ("hostKey", [this] (const juce::var& payload)
     {

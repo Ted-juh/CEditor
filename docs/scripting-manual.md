@@ -3713,7 +3713,7 @@ Good to know:
 
 ## Commands: The panel itself
 
-Creating and arranging controls, the computer keyboard, and saving things that outlive the session.
+Creating and arranging controls, the computer keyboard, saving things that outlive the session, and files.
 
 ### ce.panel: building and arranging the panel
 
@@ -4454,6 +4454,262 @@ sendSysex(toAscii(ce.storage.encode(patch)));
 Turn JSON text back into a value. Text that is not valid JSON returns nothing. A JSON null also reads back as nothing: `{"a":1,"b":null}` comes back with only the key `a`, and `[1,null,2]` as a list of two items. So encoding and then decoding is not a full round trip when nulls are involved.
 
 *Short name: `decodeJson`.*
+
+### ce.file: files, through the person's own dialogs
+
+Librarian files: `.syx` banks, `.mid` files, JSON and text. A script never names a path. Every file comes from a dialog the person answered: `open` or `save` for one file, `folder` for a folder. The script gets a file value back, a table holding the file's `name`, `type`, `size`, `canWrite` and `isFolder` but never its folder, and passes it to `read`, `write`, `list` and `saveIn`.
+
+The rules no option turns off: only the types syx, mid, json, txt and csv; writing only where the person saved, or opened a file or chose a folder `writable`; a folder and nothing above or inside it; up to 8 MB a file; and every file value gone when the panel closes.
+
+The dialogs need the panel window: in the editor, and in an exported plug-in while its window is open. `syxSplit`, `syxJoin`, `midiRead` and `midiWrite` work on bytes the script already holds, and run everywhere.
+
+```lua
+-- Lua: import a bank and send it to the synth, message by message
+ce.file.open({ types = {"syx"}, title = "Import a bank" }, function(file, bytes)
+  if not file then return end
+  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end
+end)
+```
+
+#### `ce.file.open(opts, fn) -> boolean`
+
+Ask the person for a file, and get its contents.
+
+Example: `ce.file.open({ types = {"syx"} }, function(file, data) … end)` asks for a .syx file and gives its bytes.
+
+- `fn` (function, required): Called as fn(file, data), or fn(nil) when the person cancels.
+
+Good to know:
+
+- fn is called as fn(file, data) once the person has chosen, or fn(nil) when they cancel. `data` is bytes for syx and mid, text for txt and csv, and a value for json.
+- `file` is a table to keep and pass back: { id, name, type, size, canWrite, isFolder }. It holds no folder: the script never sees where the file is.
+- A json file that is not valid JSON: fn(file, nil), with a console error naming the line where it goes wrong.
+- Returns true when the dialog opened. Another ce.file dialog already open: the console says so. With the plug-in's window shut there is nobody to answer, so nothing is done.
+- Files of up to 8 MB.
+
+*Short name: `fileOpen` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `types` | list of text | none, needed | The types the dialog accepts, from syx, mid, json, txt and csv. |
+| `title` | text | "Open" | The dialog's title: say what the file is for, such as "Import a bank". |
+| `multiple` | true or false | false | Let the person pick several files: fn is then called once for each. |
+| `writable` | true or false | false | Let ce.file.write() write this file again later, as a librarian keeps a bank file open. |
+| `read` | true or false | true | Off: give the file value only, and read it later with ce.file.read(). |
+
+#### `ce.file.save(name, data [, opts [, fn]]) -> boolean`
+
+Ask the person where to save, then write the file there.
+
+Example: `ce.file.save("Bank A.syx", bytes)` offers to save the bytes as "Bank A.syx".
+
+- `name` (text, required): The name the dialog suggests, with its extension.
+- `data` (any value, required): What to write.
+- `fn` (function, optional): Called as fn(file), or fn(nil, why).
+
+Good to know:
+
+- The extension of `name` sets the type: .syx, .mid, .json, .txt or .csv. Anything else: false, with a console error.
+- `data` is bytes for syx and mid, text for txt and csv, and any value for json. The wrong kind for the type: false, with a console error, and nothing written.
+- fn is called as fn(file) when it is written, or fn(nil, why) when the person cancels or the write fails. The file value has `canWrite` on, so ce.file.write() can save to it again without asking.
+- The dialog asks before writing over a file that is there. The person can change the name; the file keeps the type asked for.
+
+*Short name: `fileSave` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `title` | text | "Save" | The dialog's title. |
+| `indent` | number | none | For json: spaces to indent each level, so a person can read the file. |
+
+#### `ce.file.read(file, fn) -> boolean`
+
+Read a chosen file again, as it is now.
+
+Example: `ce.file.read(state.bank, function(data) … end)` reads the bank file the person opened earlier.
+
+- `file` (table, required): A file value from open, save or list.
+- `fn` (function, required): Called as fn(data), or fn(nil, why).
+
+Good to know:
+
+- fn is called as fn(data), the contents as open gives them, or fn(nil, why) when the file has gone or cannot be read.
+- Not a file value from ce.file.open, save or list: false, with a console error.
+
+*Short name: `fileRead` · Panel window only.*
+
+#### `ce.file.write(file, data [, fn]) -> boolean`
+
+Write a chosen file again, without asking.
+
+Example: `ce.file.write(state.bank, ce.file.syxJoin(state.messages))` saves the edited bank back to its file.
+
+- `file` (table, required): A file value whose canWrite is on.
+- `data` (any value, required): What to write, as save takes it.
+- `fn` (function, optional): Called as fn(true), or fn(false, why).
+
+Good to know:
+
+- Only a file whose `canWrite` is on: one from save, saveIn, or open with `writable`. Anything else: false, with a console error saying the person must save to it first.
+- Written whole, through a temporary file, so a write cut short leaves the old file as it was.
+- fn is called as fn(true) when written, or fn(false, why) when not.
+
+*Short name: `fileWrite` · Panel window only.*
+
+#### `ce.file.folder(opts, fn) -> boolean`
+
+Ask the person for a folder.
+
+Example: `ce.file.folder({ title = "Export the bank to", writable = true }, function(dir) … end)` asks where to put a bank's files.
+
+- `fn` (function, required): Called as fn(folder), or fn(nil).
+
+Good to know:
+
+- fn is called as fn(folder) once chosen, or fn(nil) when the person cancels.
+- Only this folder: not the folders inside it, and nothing above it.
+
+*Short name: `fileFolder` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `title` | text | "Choose a folder" | The dialog's title. |
+| `writable` | true or false | false | Let ce.file.saveIn() write into it. |
+
+#### `ce.file.list(folder [, opts]) -> list`
+
+The files in a chosen folder, sorted as a person sorts them ("2" before "10").
+
+Example: `ce.file.list(dir, { types = {"syx"} })` gives every .syx file in it.
+
+- `folder` (table, required): A folder value from ce.file.folder().
+
+Good to know:
+
+- Each is a file value, for ce.file.read(). They can be written only when the folder was chosen writable.
+- The files there when the folder was chosen, as saveIn last left them, or when list was last called: a file another program adds shows the next time.
+
+*Short name: `fileList` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `types` | list of text | every type on the list | Only these types. |
+
+#### `ce.file.saveIn(folder, name, data [, opts [, fn]]) -> boolean`
+
+Write one file into a chosen folder.
+
+Example: `ce.file.saveIn(dir, "001 Brass.syx", bytes)` writes one patch of a bank.
+
+- `folder` (table, required): A folder value from ce.file.folder(), chosen writable.
+- `name` (text, required): The file's name, with its extension.
+- `data` (any value, required): What to write, as save takes it.
+- `fn` (function, optional): Called as fn(file), or fn(nil, why).
+
+Good to know:
+
+- Only a folder chosen `writable`. A name with a /, \ or .. in it, or without a listed extension: false, with a console error.
+- A file of that name already there is not written over, and fn gets the reason, unless `replace` is on. The person agreed to a folder, not to losing what was in it.
+- fn is called as fn(file) when written, or fn(nil, why) when not.
+
+*Short name: `fileSaveIn` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `replace` | true or false | false | Write over a file of that name. |
+| `indent` | number | none | For json: spaces to indent each level. |
+
+#### `ce.file.syxSplit(bytes [, opts]) -> list`
+
+The SysEx messages in a .syx file, one by one, each from F0 to F7.
+
+Example: `ce.file.syxSplit(bytes)` gives a list of messages.
+
+- `bytes` (bytes, required): The file's bytes, a list or hex text.
+
+Good to know:
+
+- Bytes outside any message are left out, with a console warning saying how many and where. So is a message cut off by the next F0, or with no F7 at the end of the file, unless `partial` is on.
+- Works on bytes the script holds, so it runs everywhere, window shut too.
+
+*Short name: `fileSyxSplit`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `partial` | true or false | false | Keep a last message with no F7, so a cut-off file can still be looked at. |
+| `prefix` | list | none | Only messages that start with these bytes, such as {0xF0, 0x41} for Roland. |
+
+#### `ce.file.syxJoin(messages) -> list`
+
+Messages as one .syx file's bytes, in the order given, nothing added between.
+
+Example: `ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))` saves a bank.
+
+- `messages` (list, required): Messages, each bytes or hex text.
+
+Good to know:
+
+- A message that does not start with F0 and end with F7: nothing, with a console error naming which.
+
+*Short name: `fileSyxJoin`.*
+
+#### `ce.file.midiRead(bytes [, opts]) -> table`
+
+A MIDI file as tracks of notes: { ticksPerBeat, tempo, tempos, timeSignature, tracks }.
+
+Example: `ce.file.midiRead(data).tracks[1].notes` gives the first track's notes.
+
+- `bytes` (bytes, required): The file's bytes.
+
+Good to know:
+
+- Each track is { name, notes, events }. A note is { beat, note, velocity, length, channel }: `beat` from 0, `length` in beats, `channel` from 1. `events` holds everything else as { beat, bytes }: controllers, program changes, bend, SysEx.
+- `tempo` is the tempo at the start, 120 when the file gives none; `tempos` lists every change as { beat, bpm }.
+- A note-on with velocity 0 ends the note. A note that never ends lasts to the end of its track, with a console warning naming it.
+- Types 0 and 1. A type 2 file, a file timed in SMPTE frames, or one cut short: nothing, with a console error.
+
+*Short name: `fileMidiRead`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `track` | number | every track | Read only this track, counted from 1. |
+
+#### `ce.file.midiWrite(song [, opts]) -> list`
+
+A MIDI file's bytes from a song, a list of notes, or a Phrase Recorder's take.
+
+Example: `ce.file.midiWrite(ce.components.recorder.read("Recorder"))` gives the recorder's take as a MIDI file.
+
+- `song` (table, required): A song, a list of notes, or a recorder's section.
+
+Good to know:
+
+- `song` is a song as midiRead gives it, a list of notes { beat, note, velocity, length, channel } written as one track, or a Phrase Recorder's section, whose take is written over its bars at the transport's beats per bar.
+- One track is written as type 0, several as type 1, at 480 ticks per beat unless the song says otherwise.
+- Returns the bytes, for ce.file.save(). Anything else as `song`: nothing, with a console error.
+
+*Short name: `fileMidiWrite`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `tempo` | number | the song's, else the transport's, else 120 | The tempo written at the start, in beats per minute. |
+| `name` | text | none | The name written into the first track. |
+| `channel` | number | 1 | The channel, 1 to 16, for notes that carry none. |
 
 ## Commands: How it looks
 

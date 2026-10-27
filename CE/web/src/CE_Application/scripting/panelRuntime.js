@@ -30,6 +30,8 @@ import {
 } from './scriptKeys.js';
 import { patchCommands } from './patchCore.js';
 import { verifyCommands } from './verifyCore.js';
+import { fileCommands } from './fileCore.js';
+import { createFileDialogs } from './scriptFileHost.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -8347,6 +8349,7 @@ export function clearDeviceRuntimeDefinitions() {
   }
   // A check outliving its panel would never finish, and its device would stay busy.
   for (const role of Object.keys(verifyJobs)) delete verifyJobs[role];
+  forgetChosenFiles();
 }
 
 // @module ce.storage
@@ -8856,7 +8859,52 @@ function verifyHostFor(scriptId) {
   };
 }
 
+/**
+ * ce.file (docs/design/ce-file-module.md). The byte commands are fileCore.js, the same code the
+ * JavaScript prelude runs; the dialogs are scriptFileHost.js over the native side's "scriptFile"
+ * event (CE/src/ScriptFiles.h), one per script so its messages and functions are its own, with the
+ * folders' listings shared, as a folder one script chose is every script's to list.
+ */
+const fileDialogSet = new Set();
+const fileListings = new Map();
+let fileResultsHeard = false;
+
+function fileDialogsFor(scriptId) {
+  if (!fileResultsHeard && isJuceAvailable() && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    fileResultsHeard = true;
+    window.__JUCE__.backend.addEventListener('scriptFileResult', (result) => {
+      for (const dialogs of fileDialogSet) dialogs.receive(result);
+    });
+  }
+  const dialogs = createFileDialogs({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    send: (payload) => {
+      if (!isJuceAvailable()) return false;
+      window.__JUCE__.backend.emitEvent('scriptFile', payload);
+      return true;
+    },
+    call: (fn, ...args) => runScriptCallback(scriptId, 'ce.file', () => fn(...args)),
+    listings: fileListings,
+  });
+  fileDialogSet.add(dialogs);
+  return dialogs;
+}
+
+/** The panel closed: the files the person chose go with it, here and natively. */
+function forgetChosenFiles() {
+  if (fileDialogSet.size === 0 && fileListings.size === 0) return;
+  for (const dialogs of fileDialogSet) dialogs.forget();
+  fileDialogSet.clear();
+  fileListings.clear();
+}
+
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
+  const fileBytes = fileCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    clock: () => { const t = transportSnapshot(); return { tempo: t.bpm, beatsPerBar: t.beatsPerBar }; },
+  });
+  let fileDialogs = null;
+  const dialogs = () => (fileDialogs ??= fileDialogsFor(scriptId));
   const patch = patchCommands(patchHostFor(scriptId));
   const verify = verifyCommands(verifyHostFor(scriptId));
   const self = {
@@ -9224,6 +9272,19 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     verifySummary: (report, opts) => verify.summary(report, opts),
     verifyRunning: (role) => verify.running(role),
     verifyCancel: (role) => verify.cancel(role),
+
+    // ce.file (docs/design/ce-file-module.md): the byte commands run everywhere, the dialogs here.
+    fileOpen: (opts, fn) => dialogs().open(opts, fn),
+    fileSave: (name, data, opts, fn) => dialogs().save(name, data, opts, fn),
+    fileRead: (file, fn) => dialogs().read(file, fn),
+    fileWrite: (file, data, fn) => dialogs().write(file, data, fn),
+    fileFolder: (opts, fn) => dialogs().folder(opts, fn),
+    fileList: (dir, opts) => dialogs().list(dir, opts),
+    fileSaveIn: (dir, name, data, opts, fn) => dialogs().saveIn(dir, name, data, opts, fn),
+    fileSyxSplit: (bytes, opts) => fileBytes.syxSplit(bytes, opts),
+    fileSyxJoin: (messages) => fileBytes.syxJoin(messages),
+    fileMidiRead: (bytes, opts) => fileBytes.midiRead(bytes, opts),
+    fileMidiWrite: (song, opts) => fileBytes.midiWrite(song, opts),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),

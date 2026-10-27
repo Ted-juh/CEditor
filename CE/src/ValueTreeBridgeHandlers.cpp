@@ -672,6 +672,18 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     });
             });
         })
+        // ce.file (ScriptFiles.h): a script's dialogs and the files the person chose with them. The
+        // answer goes back as "scriptFileResult", with the request's id.
+        .withEventListener ("scriptFile", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                scriptFiles.handle (payload, [this] (const juce::var& result)
+                {
+                    if (browser != nullptr) browser->emitEventIfBrowserIsVisible ("scriptFileResult", result);
+                });
+            });
+        })
         .withEventListener ("openPanelPackage", [this] (const juce::var&)
         {
             juce::MessageManager::callAsync ([this]()

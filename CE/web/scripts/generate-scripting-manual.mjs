@@ -71,6 +71,16 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.file': 'Librarian files: `.syx` banks, `.mid` files, JSON and text. A script never names a path. Every file comes from a dialog the person answered: `open` or `save` for one file, `folder` for a folder. The script gets a file value back, a table holding the file\'s `name`, `type`, `size`, `canWrite` and `isFolder` but never its folder, and passes it to `read`, `write`, `list` and `saveIn`.\n\n'
+    + 'The rules no option turns off: only the types syx, mid, json, txt and csv; writing only where the person saved, or opened a file or chose a folder `writable`; a folder and nothing above or inside it; up to 8 MB a file; and every file value gone when the panel closes.\n\n'
+    + 'The dialogs need the panel window: in the editor, and in an exported plug-in while its window is open. `syxSplit`, `syxJoin`, `midiRead` and `midiWrite` work on bytes the script already holds, and run everywhere.\n\n'
+    + '```lua\n'
+    + '-- Lua: import a bank and send it to the synth, message by message\n'
+    + 'ce.file.open({ types = {"syx"}, title = "Import a bank" }, function(file, bytes)\n'
+    + '  if not file then return end\n'
+    + '  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end\n'
+    + 'end)\n'
+    + '```',
   'ce.verify': 'Asking the synth whether it holds what was sent. `coverage` says which parameters can be read back at all, and why not the rest, without sending anything. `check` compares the synth with the panel, `dump` asks for one dump twice to find values the synth changes by itself, and `write`, `probe` and `patch` send first and then read back: one value, one parameter at several values, or the whole sound.\n\n'
     + 'Every check returns at once and calls its function with a report when it is done; the same report is raised as onVerifyDone. A report names every parameter that matched, every one that differed, with both values, and every one that could not be checked, with the reason. The read-back is always a dump the synth sent after the check asked for it, never what the panel last sent.\n\n'
     + 'Only `write`, `probe` and `patch` change the synth, and `probe` puts the old value back. One check runs on a device at a time, and only the main synth can be asked.\n\n'
@@ -183,6 +193,7 @@ const MODULE_TITLES = {
   'ce.storage': 'remembering things',
   'ce.patch': 'the synth\'s sound as a value',
   'ce.verify': 'checking what the synth holds',
+  'ce.file': 'files, through the person\'s own dialogs',
   'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',
   'ce.image': 'images and icons',

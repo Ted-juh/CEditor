@@ -4582,6 +4582,380 @@ def verifyRunning(role=None):
 def verifyCancel(role=None):
     return _VERIFY["cancel"](role)
 
+# @module ce.file
+# ce.file's byte commands, ported line for line from fileCore.js (the panel view's; the JavaScript
+# prelude runs that file itself). Held to the panel view's answers by test/fileParity.test.js and the
+# scenario in test/support/fileScenario.mjs. The dialogs are the panel view's alone: with the window
+# shut there is nobody to answer one. ce.file requires ce.time, whose tempo and transport give
+# midiWrite the tempo and beats per bar when a song carries neither.
+import math as _file_math
+import re as _file_re
+
+_FILE_DEFAULT_TICKS = 480
+_FILE_HEX = _file_re.compile(r"([0-9a-fA-F]{2})*")
+
+def _f_finite(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and _file_math.isfinite(v)
+
+def _f_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _f_clamp(v, lo, hi, fallback):
+    if not _f_finite(v): return fallback
+    x = _file_math.floor(v + 0.5)
+    return lo if x < lo else (hi if x > hi else x)
+
+def _f_num(x):
+    # A number as JavaScript writes it: no ".0" on a whole number.
+    if isinstance(x, bool): return "true" if x else "false"
+    if isinstance(x, float) and x.is_integer() and abs(x) < 1e15: return str(int(x))
+    return str(x) if isinstance(x, (int, float)) else str(x)
+
+def _f_bytes(v):
+    if isinstance(v, str):
+        text = _file_re.sub(r"\s+", "", v)
+        text = _file_re.sub(r"^0[xX]", "", text)
+        if not _FILE_HEX.fullmatch(text): return None
+        return [int(text[i:i + 2], 16) for i in range(0, len(text), 2)]
+    if not isinstance(v, list): return None
+    out = []
+    for b in v:
+        if not _f_finite(b) or b < 0 or b > 255 or _file_math.floor(b) != b: return None
+        out.append(int(b))
+    return out
+
+def _f_starts(lst, prefix):
+    return len(lst) >= len(prefix) and lst[:len(prefix)] == prefix
+
+def _f_syx_split(data_in, opts, say):
+    data = _f_bytes(data_in)
+    if data is None:
+        say("error", "ce.file.syxSplit: bytes must be a list of numbers 0 to 255, or hex text, so nothing was split.")
+        return []
+    prefix = []
+    given = _f_opt(opts, "prefix")
+    if given is not None:
+        p = _f_bytes(given)
+        if p is None:
+            say("error", "ce.file.syxSplit: prefix must be bytes, a list or hex text, so nothing was split.")
+            return []
+        prefix = p
+    out = []
+    current = None
+    start, stray, first_stray = 0, 0, -1
+    for i, b in enumerate(data):
+        if b == 0xF0:
+            if current is not None: say("warn", "ce.file.syxSplit: the message at byte " + str(start) + " has no F7 before the next F0, so it was left out.")
+            current = [b]
+            start = i
+        elif current is None:
+            stray += 1
+            if first_stray < 0: first_stray = i
+        else:
+            current.append(b)
+            if b == 0xF7:
+                if _f_starts(current, prefix): out.append(current)
+                current = None
+    if current is not None:
+        if _f_opt(opts, "partial") is True:
+            if _f_starts(current, prefix): out.append(current)
+        else:
+            say("warn", "ce.file.syxSplit: the last message, from byte " + str(start) + ", has no F7, so it was left out.")
+    if stray > 0:
+        say("warn", "ce.file.syxSplit: " + str(stray) + " " + ("byte" if stray == 1 else "bytes") + " outside any message "
+            + ("was" if stray == 1 else "were") + " left out, the first at byte " + str(first_stray) + ".")
+    return out
+
+def _f_syx_join(messages, say):
+    if not isinstance(messages, list):
+        say("error", "ce.file.syxJoin: messages must be a list of messages, so nothing was joined.")
+        return None
+    out = []
+    for i, raw in enumerate(messages):
+        m = _f_bytes(raw)
+        if m is None or len(m) < 2 or m[0] != 0xF0 or m[-1] != 0xF7:
+            say("error", "ce.file.syxJoin: message " + str(i + 1) + " does not start with F0 and end with F7, so nothing was joined.")
+            return None
+        out.extend(m)
+    return out
+
+def _f_u16(d, at): return d[at] * 256 + d[at + 1]
+def _f_u32(d, at): return ((d[at] * 256 + d[at + 1]) * 256 + d[at + 2]) * 256 + d[at + 3]
+def _f_latin1(d, start, stop): return "".join(chr(b) for b in d[start:stop])
+def _f_text(d, start, stop):
+    try:
+        return bytes(d[start:stop]).decode("utf-8")
+    except UnicodeDecodeError:
+        return _f_latin1(d, start, stop)
+
+def _f_varlen(d, at, stop):
+    value, i = 0, at
+    for _ in range(4):
+        if i >= stop: return None
+        b = d[i]
+        i += 1
+        value = value * 128 + (b & 0x7F)
+        if (b & 0x80) == 0: return (value, i)
+    return None
+
+def _f_midi_refuse(say, why):
+    say("error", "ce.file.midiRead: " + why + ", so nothing was read.")
+    return None
+
+def _f_read_track(d, start, stop, tpb, index, song, say):
+    track = {"name": "", "notes": [], "events": []}
+    opened = {}
+    at, tick, status, end_tick = start, 0, 0, 0
+    while at < stop:
+        delta = _f_varlen(d, at, stop)
+        if delta is None: return None
+        tick += delta[0]
+        at = delta[1]
+        if at >= stop: return None
+        b = d[at]
+        if b == 0xFF:
+            if at + 1 >= stop: return None
+            kind = d[at + 1]
+            ln = _f_varlen(d, at + 2, stop)
+            if ln is None or ln[1] + ln[0] > stop: return None
+            body = ln[1]
+            body_end = body + ln[0]
+            finished = False
+            if kind == 0x03 and track["name"] == "": track["name"] = _f_text(d, body, body_end)
+            elif kind == 0x51 and ln[0] == 3:
+                micro = (d[body] * 256 + d[body + 1]) * 256 + d[body + 2]
+                if micro > 0: song["tempos"].append({"beat": tick / tpb, "bpm": 60000000 / micro})
+            elif kind == 0x58 and ln[0] >= 2 and song["timeSignature"] is None:
+                song["timeSignature"] = [d[body], 2 ** d[body + 1]]
+            elif kind == 0x2F:
+                finished = True
+            at = body_end
+            end_tick = tick
+            if finished: break
+            continue
+        if b == 0xF0 or b == 0xF7:
+            ln = _f_varlen(d, at + 1, stop)
+            if ln is None or ln[1] + ln[0] > stop: return None
+            data = [0xF0] if b == 0xF0 else []
+            data.extend(d[ln[1]:ln[1] + ln[0]])
+            track["events"].append({"beat": tick / tpb, "bytes": data})
+            at = ln[1] + ln[0]
+            end_tick = tick
+            continue
+        if b < 0x80:
+            if status == 0: return None
+            b = status
+        else:
+            status = b
+            at += 1
+        kind = b & 0xF0
+        size = 1 if kind in (0xC0, 0xD0) else 2
+        if at + size > stop: return None
+        x = d[at]
+        y = d[at + 1] if size == 2 else 0
+        at += size
+        end_tick = tick
+        channel = (b & 0x0F) + 1
+        if kind == 0x90 and y > 0:
+            note = {"beat": tick / tpb, "note": x, "velocity": y, "length": 0, "channel": channel}
+            track["notes"].append(note)
+            opened.setdefault(str(channel) + ":" + str(x), []).append({"note": note, "tick": tick})
+        elif kind in (0x80, 0x90):
+            waiting = opened.get(str(channel) + ":" + str(x))
+            if waiting:
+                first = waiting.pop(0)
+                first["note"]["length"] = (tick - first["tick"]) / tpb
+        else:
+            track["events"].append({"beat": tick / tpb, "bytes": [b, x, y] if size == 2 else [b, x]})
+    for key in sorted(opened.keys()):
+        for w in opened[key]:
+            w["note"]["length"] = (end_tick - w["tick"]) / tpb
+            say("warn", "ce.file.midiRead: note " + str(w["note"]["note"]) + " on channel " + str(w["note"]["channel"]) + " at beat "
+                + _f_num(w["note"]["beat"]) + " in track " + str(index) + " never ends, so it lasts to the end of its track.")
+    return track
+
+def _f_midi_read(data_in, opts, say):
+    d = _f_bytes(data_in)
+    if d is None: return _f_midi_refuse(say, "bytes must be a list of numbers 0 to 255, or hex text")
+    if len(d) < 14 or _f_latin1(d, 0, 4) != "MThd": return _f_midi_refuse(say, "that is not a MIDI file (it does not start with \"MThd\")")
+    header_len = _f_u32(d, 4)
+    fmt, count, division = _f_u16(d, 8), _f_u16(d, 10), _f_u16(d, 12)
+    if fmt == 2: return _f_midi_refuse(say, "it is a type 2 file (separate songs in one file), which is not read")
+    if fmt > 2: return _f_midi_refuse(say, "it says it is a type " + str(fmt) + " file, which does not exist")
+    if division >= 0x8000: return _f_midi_refuse(say, "its times are in SMPTE frames, not beats")
+    if division == 0: return _f_midi_refuse(say, "it gives 0 ticks per beat")
+    only = _f_opt(opts, "track")
+    if only is not None and (not _f_finite(only) or _file_math.floor(only) != only or only < 1 or only > count):
+        return _f_midi_refuse(say, "track " + _f_num(only) + " is not a track of the file, which has " + str(count))
+    song = {"ticksPerBeat": division, "tempo": 120, "tempos": [], "timeSignature": None, "tracks": []}
+    at, index = 8 + header_len, 0
+    while at + 8 <= len(d) and index < count:
+        ident = _f_latin1(d, at, at + 4)
+        ln = _f_u32(d, at + 4)
+        start = at + 8
+        stop = min(len(d), start + ln)
+        at = start + ln
+        if ident != "MTrk": continue
+        index += 1
+        track = _f_read_track(d, start, stop, division, index, song, say)
+        if track is None: return _f_midi_refuse(say, "track " + str(index) + " is cut short or damaged")
+        if only is None or only == index: song["tracks"].append(track)
+    song["tempos"].sort(key=lambda t: t["beat"])
+    if len(song["tempos"]) > 0 and song["tempos"][0]["beat"] == 0: song["tempo"] = song["tempos"][0]["bpm"]
+    if song["timeSignature"] is None: song["timeSignature"] = [4, 4]
+    return song
+
+def _f_push_varlen(out, value):
+    v = max(0, _file_math.floor(value))
+    groups = [v & 0x7F]
+    v //= 128
+    while v > 0:
+        groups.append((v & 0x7F) | 0x80)
+        v //= 128
+    out.extend(reversed(groups))
+
+def _f_push_u32(out, v):
+    out.extend([(v // 16777216) % 256, (v // 65536) % 256, (v // 256) % 256, v % 256])
+
+def _f_note(n, channel, index, say):
+    if not isinstance(n, dict) or not _f_finite(n.get("beat")) or n["beat"] < 0 or not _f_finite(n.get("note")):
+        say("error", "ce.file.midiWrite: note " + str(index) + " needs a beat of 0 or more and a note number, so nothing was written.")
+        return None
+    return {
+        "beat": n["beat"],
+        "note": _f_clamp(n["note"], 0, 127, 60),
+        "velocity": _f_clamp(n.get("velocity"), 1, 127, 100),
+        "length": n["length"] if _f_finite(n.get("length")) and n["length"] > 0 else 0.25,
+        "channel": _f_clamp(n.get("channel"), 1, 16, channel),
+    }
+
+def _f_song(song, opts, clock, say):
+    channel = _f_clamp(_f_opt(opts, "channel"), 1, 16, 1)
+    if isinstance(song, list):
+        notes = []
+        for i, raw in enumerate(song):
+            n = _f_note(raw, channel, i + 1, say)
+            if n is None: return None
+            notes.append(n)
+        return {"ticksPerBeat": _FILE_DEFAULT_TICKS, "tempo": None, "tempos": [], "timeSignature": None, "tracks": [{"name": "", "notes": notes, "events": []}]}
+    if isinstance(song, dict) and isinstance(song.get("tracks"), list):
+        tracks = []
+        for t in song["tracks"]:
+            notes, events = [], []
+            lst = t["notes"] if isinstance(t, dict) and isinstance(t.get("notes"), list) else []
+            for i, raw in enumerate(lst):
+                n = _f_note(raw, channel, i + 1, say)
+                if n is None: return None
+                notes.append(n)
+            for e in (t["events"] if isinstance(t, dict) and isinstance(t.get("events"), list) else []):
+                data = _f_bytes(e.get("bytes")) if isinstance(e, dict) else None
+                if data is None or len(data) == 0 or not _f_finite(e.get("beat")) or e["beat"] < 0:
+                    say("error", "ce.file.midiWrite: an event needs a beat of 0 or more and its bytes, so nothing was written.")
+                    return None
+                events.append({"beat": e["beat"], "bytes": data})
+            tracks.append({"name": t["name"] if isinstance(t, dict) and isinstance(t.get("name"), str) else "", "notes": notes, "events": events})
+        tpb = _f_clamp(song.get("ticksPerBeat"), 1, 32767, _FILE_DEFAULT_TICKS)
+        sig = song["timeSignature"] if isinstance(song.get("timeSignature"), list) and len(song["timeSignature"]) >= 2 else None
+        tempo = song["tempo"] if _f_finite(song.get("tempo")) and song["tempo"] > 0 else None
+        return {"ticksPerBeat": tpb, "tempo": tempo, "tempos": song["tempos"] if isinstance(song.get("tempos"), list) else [], "timeSignature": sig, "tracks": tracks}
+    if isinstance(song, dict) and isinstance(song.get("take"), dict) and isinstance(song["take"].get("events"), list):
+        per_bar = _f_clamp(clock.get("beatsPerBar"), 1, 32, 4)
+        loop = _f_clamp(song.get("bars"), 1, 16, 2) * per_bar
+        own = _f_clamp(song.get("channel"), 1, 16, channel)
+        notes = []
+        for e in song["take"]["events"]:
+            if not isinstance(e, dict) or not _f_finite(e.get("t")) or not _f_finite(e.get("note")): continue
+            dur = e["dur"] if _f_finite(e.get("dur")) and e["dur"] > 0 else 0.1
+            notes.append({"beat": e["t"] * loop, "note": _f_clamp(e["note"], 0, 127, 60), "velocity": _f_clamp(e.get("velocity"), 1, 127, 100),
+                          "length": dur * loop, "channel": own})
+        return {"ticksPerBeat": _FILE_DEFAULT_TICKS, "tempo": None, "tempos": [], "timeSignature": [per_bar, 4], "tracks": [{"name": "", "notes": notes, "events": []}]}
+    say("error", "ce.file.midiWrite: song must be a song as midiRead gives it, a list of notes, or a Phrase Recorder's section, so nothing was written.")
+    return None
+
+def _f_track_chunk(track, tpb, metas):
+    items = []
+    def add(tick, order, data):
+        items.append({"tick": max(0, _file_math.floor(tick + 0.5)), "order": order, "seq": len(items), "bytes": data})
+    for m in metas: add(m["tick"], 0, m["bytes"])
+    if track["name"] != "":
+        text = list(track["name"].encode("utf-8"))
+        name = [0xFF, 0x03]
+        _f_push_varlen(name, len(text))
+        name.extend(text)
+        add(0, 0, name)
+    for e in track["events"]:
+        if e["bytes"][0] == 0xF0:
+            data = [0xF0]
+            _f_push_varlen(data, len(e["bytes"]) - 1)
+            data.extend(e["bytes"][1:])
+        else:
+            data = list(e["bytes"])
+        add(e["beat"] * tpb, 2, data)
+    for n in track["notes"]:
+        add(n["beat"] * tpb, 3, [0x90 + n["channel"] - 1, n["note"], n["velocity"]])
+        add((n["beat"] + n["length"]) * tpb, 1, [0x80 + n["channel"] - 1, n["note"], 0])
+    items.sort(key=lambda it: (it["tick"], it["order"], it["seq"]))
+    body = []
+    last = 0
+    for it in items:
+        _f_push_varlen(body, it["tick"] - last)
+        last = it["tick"]
+        body.extend(it["bytes"])
+    body.extend([0x00, 0xFF, 0x2F, 0x00])
+    out = [0x4D, 0x54, 0x72, 0x6B]
+    _f_push_u32(out, len(body))
+    out.extend(body)
+    return out
+
+def _f_tempo_meta(tick, bpm):
+    micro = max(1, min(16777215, _file_math.floor(60000000 / bpm + 0.5)))
+    return {"tick": tick, "bytes": [0xFF, 0x51, 0x03, (micro // 65536) % 256, (micro // 256) % 256, micro % 256]}
+
+def _f_midi_write(song, opts, clock, say):
+    clock = clock if isinstance(clock, dict) else {}
+    s = _f_song(song, opts, clock, say)
+    if s is None: return None
+    given = _f_opt(opts, "tempo")
+    bpm = 120
+    if _f_finite(given) and given > 0: bpm = given
+    elif s["tempo"] is not None: bpm = s["tempo"]
+    elif _f_finite(clock.get("tempo")) and clock["tempo"] > 0: bpm = clock["tempo"]
+    name = _f_opt(opts, "name")
+    if isinstance(name, str) and name != "": s["tracks"][0]["name"] = name
+    tpb = s["ticksPerBeat"]
+    sig = s["timeSignature"] if s["timeSignature"] is not None else [_f_clamp(clock.get("beatsPerBar"), 1, 32, 4), 4]
+    denom_power = 0
+    denom = _f_clamp(sig[1], 1, 64, 4)
+    while denom > 1:
+        denom //= 2
+        denom_power += 1
+    metas = [_f_tempo_meta(0, bpm), {"tick": 0, "bytes": [0xFF, 0x58, 0x04, _f_clamp(sig[0], 1, 32, 4), denom_power, 24, 8]}]
+    for t in s["tempos"]:
+        if isinstance(t, dict) and _f_finite(t.get("beat")) and t["beat"] > 0 and _f_finite(t.get("bpm")) and t["bpm"] > 0:
+            metas.append(_f_tempo_meta(t["beat"] * tpb, t["bpm"]))
+    count = len(s["tracks"])
+    out = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1 if count > 1 else 0, (count // 256) % 256, count % 256, (tpb // 256) % 256, tpb % 256]
+    for i, track in enumerate(s["tracks"]):
+        out.extend(_f_track_chunk(track, tpb, metas if i == 0 else []))
+    return out
+
+def _f_say(level, text):
+    if level == "warn": logWarn(text)
+    else: logError(text)
+
+def _f_clock():
+    t = transportInfo()
+    return {"tempo": tempo(), "beatsPerBar": t.get("beatsPerBar") if isinstance(t, dict) and t.get("beatsPerBar") else 4}
+
+def fileSyxSplit(bytes, opts=None):
+    return _f_syx_split(bytes, opts, _f_say)
+def fileSyxJoin(messages):
+    return _f_syx_join(messages, _f_say)
+def fileMidiRead(bytes, opts=None):
+    return _f_midi_read(bytes, opts, _f_say)
+def fileMidiWrite(song, opts=None):
+    return _f_midi_write(song, opts, _f_clock(), _f_say)
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -5469,6 +5843,8 @@ __WEBVIEW_ONLY = [
 # @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+# @module ce.file
+  "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
 # @module ce.keys
   "keysShortcut","keysRemove","keysList","keysIsDown","keysHeld","keysPiano","keysPianoInfo",
   "keysFocus","keysFocused",
@@ -6328,6 +6704,9 @@ __CE_OPTIONS = {
     "patchList": { "path": "ce.patch.list", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "scope"] },
     "patchForget": { "path": "ce.patch.forget", "at": 1, "param": "opts", "refusal": "false", "names": ["role"] },
     "patchWrite": { "path": "ce.patch.write", "at": 2, "param": "opts", "refusal": "result", "names": ["role"] },
+    "fileSyxSplit": { "path": "ce.file.syxSplit", "at": 1, "param": "opts", "refusal": "empty list", "names": ["partial", "prefix"] },
+    "fileMidiRead": { "path": "ce.file.midiRead", "at": 1, "param": "opts", "refusal": "nothing", "names": ["track"] },
+    "fileMidiWrite": { "path": "ce.file.midiWrite", "at": 1, "param": "opts", "refusal": "nothing", "names": ["tempo", "name", "channel"] },
     "verifyCoverage": { "path": "ce.verify.coverage", "at": 0, "param": "opts", "refusal": "nothing", "names": ["role", "ids", "group"] },
     "verifyCheck": { "path": "ce.verify.check", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "ids", "group"] },
     "verifyDump": { "path": "ce.verify.dump", "at": 1, "param": "opts", "refusal": "false", "names": ["role", "times", "gapMs"] },
@@ -6437,6 +6816,7 @@ __CE_MODULES = {
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
     "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
     "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
     "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
     "ce.text": { "axis": "textAxis", "fit": "textFit", "font": "textFont", "fonts": "textFonts", "measure": "textMeasure", "read": "textRead", "style": "textStyle" },
@@ -6469,7 +6849,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -6485,6 +6865,7 @@ __CE_META = [
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
     { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.file", "version": "1.0", "runtime": "any" },
     { "id": "ce.verify", "version": "1.0", "runtime": "any" },
     { "id": "ce.keys", "version": "1.0", "runtime": "webview" },
     { "id": "ce.text", "version": "1.0", "runtime": "webview" },
