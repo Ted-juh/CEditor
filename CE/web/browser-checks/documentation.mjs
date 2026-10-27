@@ -140,7 +140,7 @@ try {
   await page.evaluate(() => { delete window.__JUCE__; });
 
   const helpUrl = new URL(`help.html?doc=${sent[0].payload.doc}&anchor=${sent[0].payload.anchor}`, page.url()).href;
-  const windowPage = await page.context().newPage();
+  const windowPage = await page.context().browser().newPage();
   await windowPage.setViewportSize({ width: 1000, height: 760 });
   const windowErrors = [];
   windowPage.on('pageerror', (e) => windowErrors.push(String(e).split('\n')[0]));
