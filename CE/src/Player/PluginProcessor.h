@@ -499,6 +499,17 @@ public:
                     pendingScriptStateJson = sx->getAllSubText();
                     pendingScriptStatePresent = true;
                 }
+                // Until the timer hands this to the scripts, a save writes what was just loaded,
+                // not what the scripts held before. A host may save straight after loading (an
+                // undo snapshot, a save as the project opens), and the restore and the refresh
+                // after it wait for the message thread, which is busy while a project loads. The
+                // timer applies the restore before it refreshes, so nothing older replaces these.
+                // Written again as a save writes JSON, not as read: the XML reader turns the
+                // "\r\n" JUCE writes into "\n", and a host may compare the two saves byte by byte.
+                const auto asSaved = [] (const juce::String& json) { return juce::JSON::toString (juce::JSON::parse (json)); };
+                if (pendingScriptSettingsPresent) cachedScriptSettingsJson = asSaved (pendingScriptSettingsJson);
+                if (pendingScriptLocalPresent)    cachedScriptLocalJson    = asSaved (pendingScriptLocalJson);
+                if (pendingScriptStatePresent)    cachedScriptStateJson    = asSaved (pendingScriptStateJson);
             }
             scriptRestorePending.store (true);
            #endif
