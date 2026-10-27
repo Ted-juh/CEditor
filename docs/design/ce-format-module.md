@@ -36,7 +36,7 @@ with a `unit`, 875 leave it empty; the rest are BPM (2), cent, dB, % and semiton
 | `time(ms)` | A duration | `time(850)` → `850 ms`; `time(1200)` → `1.2 s` |
 | `db(v)` | A level | `db(-6)` → `-6.0 dB`; `db(0, { fromGain = true })` → `-inf dB` |
 | `percent(v)` | A share | `percent(0.5)` → `50%` |
-| `pan(v)` | A position left to right | `pan(-0.5)` → `L50`; `pan(0)` → `C` |
+| `pan(v)` | A position left to right | `pan(-0.5)` → `L25`; `pan(0)` → `C` |
 | `ratio(v)` | A ratio | `ratio(4)` → `4:1`; `ratio(2, { style = "x" })` → `x2.00` |
 | `clock(ms)` | A time on a clock | `clock(83450)` → `1:23.4` |
 | `note(n)` | A note name, in the synth's octave numbering | `note(60)` → `C4`; `note(60, { middleC = 3 })` → `C3` |
@@ -79,7 +79,10 @@ Good to know:
 
 - A value that is text where a number is expected, such as `"440"`, is read as the number, as
   `ce.math` reads it.
-- An option a command does not use is ignored, so one `opts` table can be passed to several commands.
+- An option a command does not take refuses the call, as every other module's options do: the
+  command returns its placeholder and the console names the key. A misspelt option is then found at
+  once instead of being quietly ignored. (An earlier draft ignored such keys; that was changed when
+  it was built, to match the rest of the API.)
 
 ## Units
 
@@ -190,14 +193,15 @@ Good to know:
 
 A position from left to right, as a synth's display writes it.
 
-Example: `ce.format.pan(-0.5)` gives "L50"; `ce.format.pan(0)` gives "C".
+Example: `ce.format.pan(-0.5)` gives "L25"; `ce.format.pan(0)` gives "C".
 
 - `v` (number, required): The position, -1 (left) to 1 (right) by default.
 - `opts` (options, optional): The options every command shares, and the ones below.
 
 Good to know:
 
-- With the default range, the number runs from 0 to `steps`: `pan(1)` → "R50".
+- With the default range, the number runs from 0 to `steps`: `pan(1)` → "R50", so halfway left, `pan(-0.5)`, is "L25".
+  (An earlier draft gave "L50" for `pan(-0.5)`, which this rule does not give; the rule stands.)
 - With a range of your own, the number is the distance from the centre as it is, which is what synths show: `pan(v, { min = 0, max = 127, center = 64 })` reads 0 as "L64" and 127 as "R63".
 
 **`opts`** can contain:
@@ -234,6 +238,8 @@ Example: `ce.format.clock(83450)` gives "1:23.4".
 Good to know:
 
 - Hours appear from 60 minutes on: "1:02:03.4".
+- The last digit is cut, not rounded, as a clock does: 83,450 ms is "1:23.4", and 59,999 ms is
+  "0:59.9", never "1:00.0" before the minute has come.
 - For a song position in bars and beats, use `ce.time.barBeatAt`.
 
 ## Music
@@ -418,7 +424,7 @@ Example: `ce.format.parse("1.2k")` gives 1200; `ce.format.parse("C4", { kind = "
 Good to know:
 
 - What it reads with `kind` left out: a number, with `k` for thousands ("1.2k"), and `Hz`, `kHz`, `ms`, `s`, `dB`, `%` as units, each turned into the unit its command takes: "1.2 s" → 1200 (ms), "50%" → 0.5, "-6dB" → -6.
-- With a `kind`, it also reads that kind's own forms: a note name, a division ("1/8T" → 0.333 beats), a pan ("L50" → -0.5), a ratio ("4:1" → 4).
+- With a `kind`, it also reads that kind's own forms: a note name, a division ("1/8T" → 0.333 beats), a pan ("L25" → -0.5), a ratio ("4:1" → 4).
 - "inf" and "-inf" are read as the number, so "-inf dB" gives the floor `db` writes it from.
 - Returns the number. Nothing readable: no result; check for it before using it.
 
