@@ -4029,6 +4029,214 @@ function fileMidiRead(bytes, opts) return midiRead(bytes, opts, say) end
 function fileMidiWrite(song, opts) return midiWrite(song, opts, clock(), say) end
 end
 
+-- @module ce.ci
+-- ce.ci, ported line for line from ciCore.js (the panel view's; the JavaScript prelude runs that file
+-- itself). Held to the panel view's answers by test/ciParity.test.js and the scenario in
+-- test/support/ciScenario.mjs. Every command goes to the device layer's one MIDI-CI session
+-- (__deviceQuery "ci"); the device's answers come back as "__ciReply" events.
+do
+  local INF = math.huge
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function passOn(opts, keys)
+    local out = {}
+    for _, key in ipairs(keys) do
+      local v = opt(opts, key)
+      if v ~= nil then out[key] = v end
+    end
+    return out
+  end
+  -- A whole number as JavaScript writes it, so a token is the same key in every language.
+  local function key(v)
+    if type(v) == "number" and v == math.floor(v) then return string.format("%d", v) end
+    return tostring(v)
+  end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+
+    local function muidOf(verb, muid)
+      local n = toNumber(muid)
+      if finite(n) and n >= 0 and math.floor(n) == n then return math.floor(n) end
+      say("error", "ce.ci." .. verb .. ": muid must be a device's number, as discover or devices give it, so nothing was sent.")
+      return nil
+    end
+    local function needFn(verb, fn)
+      if type(fn) == "function" then return true end
+      say("error", "ce.ci." .. verb .. ": fn must be a function to call with the answer, so nothing was sent.")
+      return false
+    end
+    local function needResource(verb, resource)
+      if type(resource) == "string" and resource ~= "" then return true end
+      say("error", "ce.ci." .. verb .. ": resource must be a resource's name, such as \"ProgramList\", so nothing was sent.")
+      return false
+    end
+    local function start(verb, fields, fn)
+      local answer = host.ask(fields)
+      if type(answer) ~= "table" or answer.ok ~= true or answer.token == nil then
+        local why = "MIDI-CI is not available here"
+        if type(answer) == "table" and type(answer.error) == "string" and answer.error ~= "" then why = answer.error end
+        say("error", "ce.ci." .. verb .. ": " .. why .. ", so nothing was sent.")
+        return false
+      end
+      host.waiters()[key(answer.token)] = { fn = fn }
+      return answer.token
+    end
+
+    local function discover(a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      if not needFn("discover", fn) then return false end
+      local role = opt(opts, "role")
+      local fields = { op = "discover", role = (type(role) == "string" and role ~= "") and role or "mainSynth" }
+      local timeout = toNumber(opt(opts, "timeoutMs"))
+      if finite(timeout) and timeout > 0 then fields.timeoutMs = timeout end
+      return start("discover", fields, fn) ~= false
+    end
+
+    local function devices(role)
+      local fields = { op = "devices" }
+      if type(role) == "string" and role ~= "" then fields.role = role end
+      local list = host.query(fields)
+      if type(list) == "table" then return list end
+      return {}
+    end
+
+    local function get(muid, resource, a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      local m = muidOf("get", muid)
+      if m == nil or not needResource("get", resource) or not needFn("get", fn) then return false end
+      return start("get", { op = "get", muid = m, resource = resource, opts = passOn(opts, { "resId", "offset", "limit", "timeoutMs" }) }, fn) ~= false
+    end
+
+    local function set(muid, resource, body, a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      local m = muidOf("set", muid)
+      if m == nil or not needResource("set", resource) or not needFn("set", fn) then return false end
+      if body == nil then
+        say("error", "ce.ci.set: body must be given: a table, text or bytes, so nothing was sent.")
+        return false
+      end
+      return start("set", { op = "set", muid = m, resource = resource, body = body, opts = passOn(opts, { "resId", "partial", "mediaType", "timeoutMs" }) }, fn) ~= false
+    end
+
+    local function subscribe(muid, resource, a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      local m = muidOf("subscribe", muid)
+      if m == nil or not needResource("subscribe", resource) or not needFn("subscribe", fn) then return nil end
+      local token = start("subscribe", { op = "subscribe", muid = m, resource = resource, opts = passOn(opts, { "resId" }) }, fn)
+      if token == false then return nil end
+      return token
+    end
+
+    local function unsubscribe(id)
+      if id == nil then return false end
+      host.waiters()[key(id)] = nil
+      return host.query({ op = "unsubscribe", id = key(id) }) == true
+    end
+
+    local function profiles(muid, fn)
+      local m = muidOf("profiles", muid)
+      if m == nil then return {} end
+      local list = host.query({ op = "profiles", muid = m })
+      if fn ~= nil then
+        if needFn("profiles", fn) then start("profiles", { op = "profiles", muid = m, ask = true }, fn) end
+      end
+      if type(list) == "table" then return list end
+      return {}
+    end
+
+    local function setProfile(muid, id, on, opts)
+      local m = muidOf("setProfile", muid)
+      if m == nil then return false end
+      if type(id) ~= "string" or id == "" then
+        say("error", "ce.ci.setProfile: id must be a profile, as profiles gives it (\"7E 21 09 01 00\"), so nothing was sent.")
+        return false
+      end
+      if type(on) ~= "boolean" then
+        say("error", "ce.ci.setProfile: on must be true or false, so nothing was sent.")
+        return false
+      end
+      local channel = 0
+      local given = opt(opts, "channel")
+      if given ~= nil then
+        local c = toNumber(given)
+        if not finite(c) or math.floor(c) ~= c or c < 1 or c > 16 then
+          say("error", "ce.ci.setProfile: channel must be 1 to 16, so nothing was sent.")
+          return false
+        end
+        channel = math.floor(c)
+      end
+      local answer = host.query({ op = "setProfile", muid = m, id = id, on = on, channel = channel })
+      if answer == true then return true end
+      local why = "MIDI-CI is not available here"
+      if type(answer) == "table" and type(answer.error) == "string" and answer.error ~= "" then why = answer.error end
+      say("error", "ce.ci.setProfile: " .. why .. ", so nothing was sent.")
+      return false
+    end
+
+    local function receive(reply)
+      if type(reply) ~= "table" or reply.token == nil then return end
+      local waiters = host.waiters()
+      local k = key(reply.token)
+      local w = waiters[k]
+      if w == nil then return end
+      if reply.final == true then waiters[k] = nil end
+      host.call(w.fn, reply.result)
+    end
+
+    return { discover = discover, devices = devices, get = get, set = set, subscribe = subscribe,
+             unsubscribe = unsubscribe, profiles = profiles, setProfile = setProfile, receive = receive }
+  end
+
+  -- One Lua state serves every script on the panel, and a function keeps the script it was made in,
+  -- so one table of waiters serves them all.
+  local waiting = {}
+  local C = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    ask = function(fields) return __deviceQuery("ci", fields) end,
+    query = function(fields) return __deviceQuery("ci", fields) end,
+    waiters = function() return waiting end,
+    call = function(fn, value)
+      local fine, err = pcall(fn, value)
+      if not fine then logError("ce.ci: the function given to it failed: " .. tostring(err)) end
+    end,
+  })
+  on("*", "__ciReply", function(reply) C.receive(reply) end)
+
+-- (global; at the line start, where the option check looks for it)
+function ciDiscover(opts, fn) return C.discover(opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciDevices(role) return C.devices(role) end
+-- (global; at the line start, where the option check looks for it)
+function ciGet(muid, resource, opts, fn) return C.get(muid, resource, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciSet(muid, resource, body, opts, fn) return C.set(muid, resource, body, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciSubscribe(muid, resource, opts, fn) return C.subscribe(muid, resource, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciUnsubscribe(id) return C.unsubscribe(id) end
+-- (global; at the line start, where the option check looks for it)
+function ciProfiles(muid, fn) return C.profiles(muid, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciSetProfile(muid, id, on, opts) return C.setProfile(muid, id, on, opts) end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -5039,6 +5247,8 @@ local WEBVIEW_ONLY = {
 -- @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+-- @module ce.ci
+  "ciDraftProfile",
 -- @module ce.file
   "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
 -- @module ce.keys
@@ -6587,6 +6797,11 @@ local __CE_OPTIONS = {
   ["patchList"] = { path = "ce.patch.list", at = 1, refusal = "empty list", names = { "role", "scope" } },
   ["patchForget"] = { path = "ce.patch.forget", at = 2, refusal = "false", names = { "role" } },
   ["patchWrite"] = { path = "ce.patch.write", at = 3, refusal = "result", names = { "role" } },
+  ["ciDiscover"] = { path = "ce.ci.discover", at = 1, refusal = "false", names = { "role", "timeoutMs" } },
+  ["ciGet"] = { path = "ce.ci.get", at = 3, refusal = "false", names = { "resId", "timeoutMs", "offset", "limit" } },
+  ["ciSet"] = { path = "ce.ci.set", at = 4, refusal = "false", names = { "resId", "timeoutMs", "partial", "mediaType" } },
+  ["ciSubscribe"] = { path = "ce.ci.subscribe", at = 3, refusal = "nothing", names = { "resId" } },
+  ["ciSetProfile"] = { path = "ce.ci.setProfile", at = 4, refusal = "false", names = { "channel" } },
   ["fileSyxSplit"] = { path = "ce.file.syxSplit", at = 2, refusal = "empty list", names = { "partial", "prefix" } },
   ["fileMidiRead"] = { path = "ce.file.midiRead", at = 2, refusal = "nothing", names = { "track" } },
   ["fileMidiWrite"] = { path = "ce.file.midiWrite", at = 2, refusal = "nothing", names = { "tempo", "name", "channel" } },
@@ -6716,6 +6931,7 @@ local __CE_MODULES = {
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.ci"] = { devices = "ciDevices", discover = "ciDiscover", draftProfile = "ciDraftProfile", get = "ciGet", profiles = "ciProfiles", set = "ciSet", setProfile = "ciSetProfile", subscribe = "ciSubscribe", unsubscribe = "ciUnsubscribe" },
   ["ce.file"] = { folder = "fileFolder", list = "fileList", midiRead = "fileMidiRead", midiWrite = "fileMidiWrite", open = "fileOpen", read = "fileRead", save = "fileSave", saveIn = "fileSaveIn", syxJoin = "fileSyxJoin", syxSplit = "fileSyxSplit", write = "fileWrite" },
   ["ce.verify"] = { cancel = "verifyCancel", check = "verifyCheck", coverage = "verifyCoverage", dump = "verifyDump", patch = "verifyPatch", probe = "verifyProbe", running = "verifyRunning", summary = "verifySummary", write = "verifyWrite" },
   ["ce.keys"] = { focus = "keysFocus", focused = "keysFocused", held = "keysHeld", isDown = "keysIsDown", list = "keysList", piano = "keysPiano", pianoInfo = "keysPianoInfo", remove = "keysRemove", shortcut = "keysShortcut" },
@@ -6749,7 +6965,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -6765,6 +6981,7 @@ local __CE_META = {
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.ci", version = "1.0", runtime = "any" },
   { id = "ce.file", version = "1.0", runtime = "any" },
   { id = "ce.verify", version = "1.0", runtime = "any" },
   { id = "ce.keys", version = "1.0", runtime = "webview" },

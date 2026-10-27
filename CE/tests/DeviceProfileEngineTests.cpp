@@ -41,6 +41,7 @@ struct DeviceProfileServiceTestAccess
 
     /** One timer tick's publishing, which these tests have no message loop to run. */
     static void publish (DeviceProfileService& service)  { service.publishPendingRequests(); }
+    static void tick (DeviceProfileService& service)  { service.timerCallback(); }
     static juce::File publishedFile (const DeviceProfileService& service)  { return service.publishedRequestsFile; }
     static juce::File directory()  { return DeviceProfileService::pendingRequestsDirectory(); }
     static const void* engineFor (DeviceProfileService& service, const juce::String& profileId)  { return service.resolveEngine (profileId, {}); }
@@ -3174,6 +3175,361 @@ int runMidiCiTests()
 }
 }
 
+// A responder for ce.ci: resources a script reads, sets and follows, profiles on the device and on a
+// channel, and a property it never answers. Its X-Name is followed by subscription updates.
+struct CiScriptResponder : juce::midi_ci::DeviceMessageHandler,
+                           juce::midi_ci::DeviceListener,
+                           juce::midi_ci::PropertyDelegate,
+                           juce::midi_ci::ProfileDelegate
+{
+    std::function<void (const juce::MidiMessage&)> send;
+    std::optional<juce::midi_ci::Device> device;
+    juce::String name = "Init", text = "hello";
+    std::map<juce::String, std::pair<juce::midi_ci::MUID, juce::String>> subscribers;   // subscribeId -> (muid, resource)
+    static constexpr juce::midi_ci::Profile kBlock { std::byte { 0x7E }, std::byte { 0x21 }, std::byte { 0x09 }, std::byte { 0x01 }, std::byte { 0x00 } };
+    static constexpr juce::midi_ci::Profile kChannel { std::byte { 0x7E }, std::byte { 0x31 }, std::byte { 0x00 }, std::byte { 0x01 }, std::byte { 0x00 } };
+
+    static juce::ump::DeviceInfo testInfo()
+    {
+        return { { std::byte { 0x42 }, std::byte { 0x00 }, std::byte { 0x00 } },
+                 { std::byte { 0x01 }, std::byte { 0x00 } },
+                 { std::byte { 0x02 }, std::byte { 0x00 } },
+                 { std::byte { 0x01 }, std::byte { 0x00 }, std::byte { 0x00 }, std::byte { 0x00 } } };
+    }
+    explicit CiScriptResponder (std::function<void (const juce::MidiMessage&)> s, juce::ump::DeviceInfo info = testInfo()) : send (std::move (s))
+    {
+        namespace ci = juce::midi_ci;
+        juce::Random r;
+        r.setSeedRandomly();
+        device.emplace (ci::DeviceOptions()
+                            .withOutputs ({ this })
+                            .withDeviceInfo (info)
+                            .withFeatures (ci::DeviceFeatures().withPropertyExchangeSupported (true).withProfileConfigurationSupported (true))
+                            .withProductInstanceId (ci::DeviceOptions::makeProductInstanceId (r))
+                            .withPropertyDelegate (this)
+                            .withProfileDelegate (this));
+        device->addListener (*this);
+        if (auto* host = device->getProfileHost())
+        {
+            host->addProfile ({ kBlock, ci::ChannelAddress {}.withChannel (ci::ChannelInGroup::wholeBlock) }, 1);
+            host->setProfileEnablement ({ kBlock, ci::ChannelAddress {}.withChannel (ci::ChannelInGroup::wholeBlock) }, 1);
+            host->addProfile ({ kChannel, ci::ChannelAddress {}.withChannel (ci::ChannelInGroup::channel2) }, 1);
+        }
+    }
+    ~CiScriptResponder() override { if (device.has_value()) device->removeListener (*this); }
+
+    void processMessage (juce::ump::BytesOnGroup msg) override { if (send) send (juce::MidiMessage::createSysExMessage (msg.bytes)); }
+    void feed (const juce::MidiMessage& m) { if (device.has_value() && m.isSysEx()) device->processMessage ({ 0, m.getSysExDataSpan() }); }
+    void pump() { if (device.has_value()) device->sendPendingMessages(); }
+    uint32_t muid() const { return device.has_value() ? device->getMuid().get() : 0; }
+
+    static juce::midi_ci::PropertyReplyData json (const juce::String& s)
+    {
+        juce::midi_ci::PropertyReplyData d;
+        for (const auto c : s) d.body.push_back (static_cast<std::byte> (static_cast<uint8_t> (c)));
+        return d;
+    }
+    juce::midi_ci::PropertyReplyData propertyGetDataRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertyRequestHeader& h) override
+    {
+        if (h.resource == "ResourceList") return json (R"([{"resource":"DeviceInfo"},{"resource":"X-Name","canSet":"full","canSubscribe":true},{"resource":"X-Text"}])");
+        if (h.resource == "DeviceInfo")   return json (R"({"manufacturer":"CEditor Test","family":"SynthFam","model":"TestSynth","version":"1.0"})");
+        if (h.resource == "X-Name")       return json ("{\"name\":\"" + name + "\"}");
+        if (h.resource == "X-Text")
+        {
+            juce::midi_ci::PropertyReplyData d;
+            d.header.mediaType = "text/plain";
+            d.header.mutualEncoding = juce::midi_ci::Encoding::mcoded7;
+            std::vector<std::byte> raw;
+            for (const auto c : text) raw.push_back (static_cast<std::byte> (static_cast<uint8_t> (c)));
+            d.body = juce::midi_ci::Encodings::toMcoded7 (raw);
+            return d;
+        }
+        juce::midi_ci::PropertyReplyData d; d.header.status = 404; d.header.message = "No such resource"; return d;
+    }
+    juce::midi_ci::PropertyReplyHeader propertySetDataRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertyRequestData& data) override
+    {
+        juce::midi_ci::PropertyReplyHeader h;
+        const auto body = juce::midi_ci::Encodings::decode (data.body, data.header.mutualEncoding);
+        if (data.header.resource == "X-Name")
+        {
+            name = juce::midi_ci::Encodings::jsonFrom7BitText (body).getProperty ("name", "").toString();
+            for (const auto& [id, who] : subscribers)
+            {
+                juce::midi_ci::PropertySubscriptionHeader sh;
+                sh.command = juce::midi_ci::PropertySubscriptionCommand::full;
+                sh.subscribeId = id;
+                sh.resource = who.second;
+                const auto update = juce::midi_ci::Encodings::jsonTo7BitText (juce::JSON::parse ("{\"name\":\"" + name + "\"}"));
+                device->getPropertyHost()->sendSubscriptionUpdate (who.first, sh, update, [] (const auto&) {});
+            }
+            return h;
+        }
+        if (data.header.resource == "X-Text" && data.header.mediaType == "text/plain")
+        {
+            text = juce::String::fromUTF8 ((const char*) body.data(), (int) body.size());
+            return h;
+        }
+        h.status = 405; h.message = "Read only"; return h;
+    }
+    bool subscriptionStartRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertySubscriptionHeader& h) override { return h.resource == "X-Name"; }
+    void subscriptionDidStart (juce::midi_ci::MUID m, const juce::String& id, const juce::midi_ci::PropertySubscriptionHeader& h) override { subscribers.insert_or_assign (id, std::make_pair (m, h.resource)); }
+    void subscriptionWillEnd (juce::midi_ci::MUID, const juce::midi_ci::Subscription& sub) override { subscribers.erase (sub.subscribeId); }
+    void profileEnablementRequested (juce::midi_ci::MUID, juce::midi_ci::ProfileAtAddress paa, int numChannels, bool enabled) override
+    {
+        if (auto* host = device.has_value() ? device->getProfileHost() : nullptr)
+            host->setProfileEnablement (paa, enabled ? juce::jmax (1, numChannels) : 0);
+    }
+};
+
+/*  ce.ci's session over a loopback: what a script is told about a device, reads and sets with their
+    statuses, a subscription's updates, a request nobody answers, profiles per channel, and a device
+    that leaves. */
+int runCiScriptTests()
+{
+    using ceditor::device::MidiCiSession;
+    int failures = 0;
+    const auto check = [&failures] (bool ok, const juce::String& label, const juce::var& got = {})
+    {
+        std::cout << (ok ? "[PASS] ce.ci :: " : "[FAIL] ce.ci :: ") << label;
+        if (! ok && ! got.isVoid()) std::cout << " (got " << juce::JSON::toString (got, true) << ")";
+        std::cout << "\n";
+        if (! ok) ++failures;
+    };
+
+    std::deque<juce::MidiMessage> toSession, toDevice;
+    bool deviceListens = true;
+    double now = 1000.0;
+    MidiCiSession session ([&toDevice] (const juce::MidiMessage& m) { toDevice.push_back (m); });
+    session.setClockForTesting ([&now] { return now; });
+    auto device = std::make_unique<CiScriptResponder> ([&toSession] (const juce::MidiMessage& m) { toSession.push_back (m); });
+    std::vector<uint32_t> added, removed;
+    std::vector<juce::String> profileChanges;
+    session.setEvents ({ [&added] (uint32_t m) { added.push_back (m); }, [&removed] (uint32_t m) { removed.push_back (m); },
+                         [&profileChanges] (uint32_t, const juce::String& hex, int channel, bool on)
+                         { profileChanges.push_back (hex + "@" + juce::String (channel) + (on ? " on" : " off")); } });
+    const auto run = [&] (int rounds = 64)
+    {
+        for (int round = 0; round < rounds; ++round)
+        {
+            std::deque<juce::MidiMessage> ds, dd;
+            std::swap (ds, toSession);
+            std::swap (dd, toDevice);
+            for (const auto& m : ds) session.handleIncomingSysex (m);
+            if (device != nullptr && deviceListens) for (const auto& m : dd) device->feed (m);
+            session.tick (now);
+            if (device != nullptr) device->pump();
+            if (toSession.empty() && toDevice.empty()) break;
+        }
+    };
+
+    session.startDiscovery();
+    session.pump();
+    run();
+    const auto muid = device->muid();
+    check (added.size() == 1 && added[0] == muid, "a device that answers is announced");
+    const auto d = session.describe (muid);
+    check (d.getProperty ("manufacturer", "").toString() == "42" && d.getProperty ("family", "").toString() == "01 00"
+           && d.getProperty ("model", "").toString() == "02 00" && d.getProperty ("version", "").toString() == "01 00 00 00",
+           "who it is, as hex text in the form device profiles use", d);
+    check ((bool) d.getProperty ("propertyExchange", false) && (bool) d.getProperty ("profiles", false), "what it supports", d);
+    check (d.getProperty ("names", {}).getProperty ("model", "").toString() == "TestSynth", "its names, from its DeviceInfo", d);
+
+    juce::var got;
+    const auto keep = [&got] (const juce::var& v) { got = v; };
+    check (session.get (muid, "X-Name", {}, keep), "get is sent");
+    run();
+    check ((bool) got.getProperty ("ok", false) && (int) got.getProperty ("status", 0) == 200
+           && got.getProperty ("body", {}).getProperty ("name", "").toString() == "Init"
+           && got.getProperty ("mediaType", "").toString() == "application/json", "a JSON resource comes as a table", got);
+    session.get (muid, "Missing", {}, keep);
+    run();
+    check (! (bool) got.getProperty ("ok", true) && (int) got.getProperty ("status", 0) == 404
+           && got.getProperty ("message", "").toString() == "No such resource", "the device's own refusal, with its status and message", got);
+    session.get (muid, "X-Text", {}, keep);
+    run();
+    check (got.getProperty ("body", {}).toString() == "hello", "a text resource comes as text, Mcoded7 undone", got);
+
+    juce::var updates = juce::Array<juce::var>();
+    const auto id = session.subscribe (muid, "X-Name", {}, [&updates] (const juce::var& u) { updates.getArray()->add (u); });
+    run();
+    check (id > 0, "subscribe gives an id");
+    session.set (muid, "X-Name", juce::JSON::parse ("{\"name\":\"Warm\"}"), {}, keep);
+    run();
+    check ((bool) got.getProperty ("ok", false), "set changes a resource", got);
+    check (updates.size() >= 1 && updates[updates.size() - 1].getProperty ("command", "").toString() == "full"
+           && updates[updates.size() - 1].getProperty ("body", {}).getProperty ("name", "").toString() == "Warm",
+           "the change reaches the subscription", updates);
+    session.set (muid, "ReadOnly", juce::JSON::parse ("{}"), {}, keep);
+    run();
+    check (! (bool) got.getProperty ("ok", true) && (int) got.getProperty ("status", 0) == 405, "a resource the device will not change says 405", got);
+    auto textOpts = new juce::DynamicObject();
+    textOpts->setProperty ("mediaType", "text/plain");
+    session.set (muid, "X-Text", "written", juce::var (textOpts), keep);
+    run();
+    check ((bool) got.getProperty ("ok", false) && device->text == "written", "text is sent as text", got);
+
+    check (session.unsubscribe (id) && ! session.unsubscribe (id), "unsubscribe, once");
+    run();
+    const auto before = updates.size();
+    session.set (muid, "X-Name", juce::JSON::parse ("{\"name\":\"Cold\"}"), {}, keep);
+    run();
+    check (updates.size() == before && device->subscribers.empty(), "after unsubscribe no update comes, and the device was told");
+
+    juce::var profiles;
+    session.inquireProfiles (muid, [&profiles] (const juce::var& v) { profiles = v; });
+    run();
+    const auto profileText = juce::JSON::toString (profiles, true);
+    check (profileText.contains ("\"id\": \"7E 21 09 01 00\", \"address\": \"device\"")
+           && profileText.contains ("\"id\": \"7E 31 00 01 00\", \"address\": 3, \"enabled\": false"),
+           "profiles on the device and on a channel", profiles);
+    session.setProfile (muid, "7E 31 00 01 00", true, 3);
+    run();
+    check (std::find (profileChanges.begin(), profileChanges.end(), juce::String ("7E 31 00 01 00@3 on")) != profileChanges.end(),
+           "a profile turned on for a channel is raised", juce::var (juce::StringArray (profileChanges.data(), (int) profileChanges.size()).joinIntoString (", ")));
+    check (juce::JSON::toString (session.profiles (muid), true).contains ("\"id\": \"7E 31 00 01 00\", \"address\": 3, \"enabled\": true"),
+           "and profiles shows it on", session.profiles (muid));
+
+    deviceListens = false;
+    session.get (muid, "X-Name", {}, keep);
+    got = juce::var();
+    run();
+    check (got.isVoid(), "nothing yet while the device is silent");
+    now += 3001.0;
+    session.tick (now);
+    check (! (bool) got.getProperty ("ok", true) && got.getProperty ("message", "").toString() == "no reply in time", "no reply in time ends the request", got);
+    deviceListens = true;
+
+    session.subscribe (muid, "X-Name", {}, [&updates] (const juce::var& u) { updates.getArray()->add (u); });
+    run();
+    device.reset();      // the device leaves: it invalidates its MUID
+    run();
+    check (removed.size() == 1 && removed[0] == muid, "a device that leaves is announced");
+    check (updates[updates.size() - 1].getProperty ("command", "").toString() == "end", "its subscriptions end with it", updates);
+    check (! session.busy(), "nothing is left waiting");
+    return failures;
+}
+
+/*  ce.ci through the device service, as every runtime reaches it: one command at a time, answers as
+    "ciReply" events under the command's token, a device matched to the role's profile by the codes
+    its Discovery reply carries, and the events a script hears. The MIDI output is a tap here. */
+int runCiServiceTests()
+{
+    using ceditor::device::DeviceProfileService;
+    using ceditor::device::DeviceProfileServiceTestAccess;
+    int failures = 0;
+    const auto check = [&failures] (bool ok, const juce::String& label, const juce::var& got = {})
+    {
+        std::cout << (ok ? "[PASS] ce.ci service :: " : "[FAIL] ce.ci service :: ") << label;
+        if (! ok && ! got.isVoid()) std::cout << " (got " << juce::JSON::toString (got, true) << ")";
+        std::cout << "\n";
+        if (! ok) ++failures;
+    };
+
+    DeviceProfileService service;
+    auto* mapping = new juce::DynamicObject();
+    mapping->setProperty ("role", "mainSynth");
+    mapping->setProperty ("profileId", "test-sysex-synth");
+    auto* output = new juce::DynamicObject();
+    output->setProperty ("type", "hardwareOutput");
+    output->setProperty ("id", "ci-test-out");
+    output->setProperty ("name", "CI test");
+    mapping->setProperty ("midiDestination", juce::var (output));
+    service.setDeviceRoleMapping (juce::var (mapping));
+
+    std::deque<juce::MidiMessage> toDevice, toService;
+    service.rawMidiTapForTesting = [&toDevice] (const juce::String&, const juce::MidiMessage& m) { toDevice.push_back (m); };
+    // The synth test-sysex-synth describes: 7D, family 00 01, model 00 02, version 00 00 00 01.
+    const juce::ump::DeviceInfo identity { { std::byte { 0x7D }, std::byte {}, std::byte {} }, { std::byte {}, std::byte { 0x01 } },
+                                           { std::byte {}, std::byte { 0x02 } }, { std::byte {}, std::byte {}, std::byte {}, std::byte { 0x01 } } };
+    CiScriptResponder device ([&toService] (const juce::MidiMessage& m) { toService.push_back (m); }, identity);
+    std::vector<std::pair<juce::String, juce::var>> events;
+    service.setEventCallback ([&events] (const juce::String& name, const juce::var& payload)
+    {
+        if (name.startsWith ("ci")) events.push_back ({ name, payload });
+    });
+    const auto run = [&]
+    {
+        for (int round = 0; round < 64; ++round)
+        {
+            std::deque<juce::MidiMessage> dd, ds;
+            std::swap (dd, toDevice);
+            std::swap (ds, toService);
+            for (const auto& m : dd) device.feed (m);
+            for (const auto& m : ds)
+            {
+                juce::Array<int> bytes;
+                for (int i = 0; i < m.getRawDataSize(); ++i) bytes.add (m.getRawData()[i]);
+                auto* in = new juce::DynamicObject();
+                in->setProperty ("deviceRole", "mainSynth");
+                in->setProperty ("hex", ceditor::device::DeviceProfileEngine::bytesToHex (bytes));
+                in->setProperty ("messageType", "sysex");
+                service.ingestIncomingMidiMessage (juce::var (in));
+            }
+            device.pump();
+            DeviceProfileServiceTestAccess::tick (service);
+            if (toDevice.empty() && toService.empty()) break;
+        }
+    };
+    const auto command = [&service] (const juce::String& json) { return service.ciCommand (juce::JSON::parse (json)); };
+    const auto reply = [&events] (const juce::var& token) -> juce::var
+    {
+        for (auto it = events.rbegin(); it != events.rend(); ++it)
+            if (it->first == "ciReply" && it->second.getProperty ("token", {}) == token) return it->second;
+        return {};
+    };
+    const auto named = [&events] (const juce::String& name) -> juce::var
+    {
+        for (auto it = events.rbegin(); it != events.rend(); ++it) if (it->first == name) return it->second;
+        return {};
+    };
+
+    const auto refused = command (R"({"op":"discover","role":"nobody"})");
+    check (! (bool) refused.getProperty ("ok", true) && refused.getProperty ("error", "").toString().contains ("no hardware MIDI output"), "a role with no output cannot be asked", refused);
+    const auto started = command (R"({"op":"discover","role":"mainSynth","timeoutMs":100})");
+    check ((bool) started.getProperty ("ok", false) && ! started.getProperty ("token", {}).isVoid(), "discover answers with a token", started);
+    run();
+    const auto found = named ("ciDiscovered");
+    check (found.getProperty ("muid", {}) == juce::var ((juce::int64) device.muid()) && found.getProperty ("role", "").toString() == "mainSynth",
+           "a device that answers is raised as ciDiscovered", found);
+    check ((bool) found.getProperty ("matchesProfile", false), "it is matched to the role's device profile by its Discovery codes", found);
+    check (found.getProperty ("names", {}).getProperty ("model", "").toString() == "TestSynth", "and announced once it has said its names", found);
+    juce::Thread::sleep (150);
+    run();
+    const auto done = reply (started.getProperty ("token", {}));
+    check ((bool) done.getProperty ("final", false) && done.getProperty ("result", {}).size() == 1, "when the time is up, the devices that answered", done);
+    check (command (R"({"op":"devices"})").size() == 1, "devices lists them without asking");
+
+    const auto muid = juce::String ((juce::int64) device.muid());
+    const auto get = command (R"({"op":"get","muid":)" + muid + R"(,"resource":"X-Name"})");
+    run();
+    const auto got = reply (get.getProperty ("token", {}));
+    check (got.getProperty ("result", {}).getProperty ("body", {}).getProperty ("name", "").toString() == "Init", "get answers under its token", got);
+    const auto sub = command (R"({"op":"subscribe","muid":)" + muid + R"(,"resource":"X-Name","token":"page-7"})");
+    run();
+    check (sub.getProperty ("token", "").toString() == "page-7", "a caller's own token is kept", sub);
+    command (R"({"op":"set","muid":)" + muid + R"(,"resource":"X-Name","body":{"name":"Warm"}})");
+    run();
+    const auto update = reply ("page-7");
+    check (update.getProperty ("result", {}).getProperty ("command", "").toString() == "full" && ! (bool) update.getProperty ("final", true),
+           "a subscription's update comes under its token, not final", update);
+    check ((bool) command (R"({"op":"unsubscribe","id":"page-7"})") && ! (bool) command (R"({"op":"unsubscribe","id":"page-7"})"), "unsubscribe, once");
+
+    const auto listed = command (R"({"op":"profiles","muid":)" + muid + "}");
+    check (juce::JSON::toString (listed).contains ("7E 21 09 01 00"), "profiles as last asked, at once", listed);
+    check ((bool) command (R"({"op":"setProfile","muid":)" + muid + R"(,"id":"7E 31 00 01 00","on":true,"channel":3})"), "setProfile is sent");
+    run();
+    const auto changed = named ("ciProfileChanged");
+    check (changed.getProperty ("id", "").toString() == "7E 31 00 01 00" && (int) changed.getProperty ("address", 0) == 3 && (bool) changed.getProperty ("enabled", false),
+           "the device's new state is raised as ciProfileChanged", changed);
+    const auto unknown = command (R"({"op":"get","muid":12345,"resource":"X-Name"})");
+    check (! (bool) unknown.getProperty ("ok", true) && unknown.getProperty ("error", "").toString().contains ("has answered"), "a device nobody found is refused", unknown);
+    // The service says goodbye to the device as it closes (its MUID is invalidated), and the tap
+    // that would hear it goes before the service does.
+    service.setEventCallback (nullptr);
+    service.rawMidiTapForTesting = nullptr;
+    return failures;
+}
+
 /**
  * A profile's display.middleC reaches every parameter's descriptor, unless the parameter has its
  * own, and the profile document itself is left as it was. ce.format.parameter and the value
@@ -3282,6 +3638,8 @@ int main (int argc, char** argv)
     failures += runSharedProfileEngineTests();
     failures += runSharedInputAcrossProcessesTests();
     failures += runMidiCiTests();
+    failures += runCiScriptTests();
+    failures += runCiServiceTests();
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runGaiaNoteChoiceTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));

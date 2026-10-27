@@ -50,7 +50,7 @@ var __ceCur = {
   __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
   __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
   __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
-  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [],
+  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [], __ciWaiters: {},
   __globals: {}
 };
 var __CE_OWN = Object.keys(__ceCur);
@@ -4286,6 +4286,207 @@ function fileMidiRead(bytes, opts) { return __file.midiRead(bytes, opts); }
 function fileMidiWrite(song, opts) { return __file.midiWrite(song, opts); }
 // END GENERATED ce.file
 
+// BEGIN GENERATED ce.ci — tools/scripts/gen-ci-prelude.mjs, from ciCore.js. Do not edit by hand.
+// @module ce.ci
+var __ciCore = (function () {
+  // ce.ci — MIDI-CI for scripts: the part that is the same in every runtime. The session that talks to
+  // the device lives once, in the device layer in C++ (DeviceProfileService::ciCommand, MidiCiSession);
+  // this file checks a script's call, sends it on, and hands the device's answers to the function the
+  // script gave. The JavaScript prelude runs this file itself (tools/scripts/gen-ci-prelude.mjs); the
+  // Lua and Python preludes are ports held to the same answers by test/ciParity.test.js.
+  //
+  // Design record: docs/design/ce-ci-module.md.
+  //
+  // The host: `{ say(level, text), ask(fields) -> { ok, token } or { ok: false, error },
+  // query(fields) -> answer, waiters() -> table, call(fn, value) }`. `ask` starts a command whose
+  // answers come later, `query` one that answers at once; `waiters` is the running script's own table
+  // of token -> { fn }, so an answer reaches the script that asked; `receive` is called with each
+  // "ciReply" { token, final, result }.
+
+  const NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  function toNumber(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && NUMBER_TEXT.test(v.trim())) return Number(v.trim());
+    return NaN;
+  }
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  /** The options a command passes on to the device layer, as numbers and text it can read. */
+  function passOn(opts, keys) {
+    const out = {};
+    for (const key of keys) {
+      const v = opt(opts, key);
+      if (present(v)) out[key] = v;
+    }
+    return out;
+  }
+
+  function __ciCommands(host) {
+    const say = (level, text) => host.say(level, text);
+
+    function muidOf(verb, muid) {
+      const n = toNumber(muid);
+      if (Number.isFinite(n) && n >= 0 && Math.floor(n) === n) return n;
+      say('error', `ce.ci.${verb}: muid must be a device's number, as discover or devices give it, so nothing was sent.`);
+      return null;
+    }
+
+    function needFn(verb, fn) {
+      if (typeof fn === 'function') return true;
+      say('error', `ce.ci.${verb}: fn must be a function to call with the answer, so nothing was sent.`);
+      return false;
+    }
+
+    function needResource(verb, resource) {
+      if (typeof resource === 'string' && resource !== '') return true;
+      say('error', `ce.ci.${verb}: resource must be a resource's name, such as "ProgramList", so nothing was sent.`);
+      return false;
+    }
+
+    /** Start a command; its answers go to fn. The token, or false (said) when it was not sent. */
+    function start(verb, fields, fn) {
+      const answer = host.ask(fields);
+      if (!answer || answer.ok !== true || !present(answer.token)) {
+        const why = answer && typeof answer.error === 'string' && answer.error !== '' ? answer.error : 'MIDI-CI is not available here';
+        say('error', `ce.ci.${verb}: ${why}, so nothing was sent.`);
+        return false;
+      }
+      host.waiters()[String(answer.token)] = { fn };
+      return answer.token;
+    }
+
+    function discover(a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      if (!needFn('discover', fn)) return false;
+      const role = opt(opts, 'role');
+      const fields = { op: 'discover', role: typeof role === 'string' && role !== '' ? role : 'mainSynth' };
+      const timeout = toNumber(opt(opts, 'timeoutMs'));
+      if (Number.isFinite(timeout) && timeout > 0) fields.timeoutMs = timeout;
+      return start('discover', fields, fn) !== false;
+    }
+
+    function devices(role) {
+      const fields = { op: 'devices' };
+      if (typeof role === 'string' && role !== '') fields.role = role;
+      const list = host.query(fields);
+      return Array.isArray(list) ? list : [];
+    }
+
+    function get(muid, resource, a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      const m = muidOf('get', muid);
+      if (m === null || !needResource('get', resource) || !needFn('get', fn)) return false;
+      return start('get', { op: 'get', muid: m, resource, opts: passOn(opts, ['resId', 'offset', 'limit', 'timeoutMs']) }, fn) !== false;
+    }
+
+    function set(muid, resource, body, a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      const m = muidOf('set', muid);
+      if (m === null || !needResource('set', resource) || !needFn('set', fn)) return false;
+      if (!present(body)) {
+        say('error', 'ce.ci.set: body must be given: a table, text or bytes, so nothing was sent.');
+        return false;
+      }
+      return start('set', { op: 'set', muid: m, resource, body, opts: passOn(opts, ['resId', 'partial', 'mediaType', 'timeoutMs']) }, fn) !== false;
+    }
+
+    function subscribe(muid, resource, a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      const m = muidOf('subscribe', muid);
+      if (m === null || !needResource('subscribe', resource) || !needFn('subscribe', fn)) return undefined;
+      const token = start('subscribe', { op: 'subscribe', muid: m, resource, opts: passOn(opts, ['resId']) }, fn);
+      return token === false ? undefined : token;
+    }
+
+    function unsubscribe(id) {
+      if (!present(id)) return false;
+      delete host.waiters()[String(id)];
+      return host.query({ op: 'unsubscribe', id: String(id) }) === true;
+    }
+
+    function profiles(muid, fn) {
+      const m = muidOf('profiles', muid);
+      if (m === null) return [];
+      const list = host.query({ op: 'profiles', muid: m });
+      if (present(fn)) {
+        if (needFn('profiles', fn)) start('profiles', { op: 'profiles', muid: m, ask: true }, fn);
+      }
+      return Array.isArray(list) ? list : [];
+    }
+
+    function setProfile(muid, id, on, opts) {
+      const m = muidOf('setProfile', muid);
+      if (m === null) return false;
+      if (typeof id !== 'string' || id === '') {
+        say('error', 'ce.ci.setProfile: id must be a profile, as profiles gives it ("7E 21 09 01 00"), so nothing was sent.');
+        return false;
+      }
+      if (typeof on !== 'boolean') {
+        say('error', 'ce.ci.setProfile: on must be true or false, so nothing was sent.');
+        return false;
+      }
+      let channel = 0;
+      const given = opt(opts, 'channel');
+      if (present(given)) {
+        const c = toNumber(given);
+        if (!Number.isFinite(c) || Math.floor(c) !== c || c < 1 || c > 16) {
+          say('error', 'ce.ci.setProfile: channel must be 1 to 16, so nothing was sent.');
+          return false;
+        }
+        channel = c;
+      }
+      const answer = host.query({ op: 'setProfile', muid: m, id, on, channel });
+      if (answer === true) return true;
+      const why = answer && typeof answer.error === 'string' && answer.error !== '' ? answer.error : 'MIDI-CI is not available here';
+      say('error', `ce.ci.setProfile: ${why}, so nothing was sent.`);
+      return false;
+    }
+
+    /** A device's answer: to the function that asked, once, or until a subscription ends. */
+    function receive(reply) {
+      if (!reply || typeof reply !== 'object' || !present(reply.token)) return;
+      const waiters = host.waiters();
+      const key = String(reply.token);
+      const w = waiters[key];
+      if (!w) return;
+      if (reply.final === true) delete waiters[key];
+      host.call(w.fn, reply.result);
+    }
+
+    return { discover, devices, get, set, subscribe, unsubscribe, profiles, setProfile, receive };
+  }
+return { ciCommands: __ciCommands };
+})();
+var __ci = __ciCore.ciCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  ask: function (fields) { return __deviceQuery("ci", fields); },
+  query: function (fields) { return __deviceQuery("ci", fields); },
+  waiters: function () { return __ciWaiters; },
+  call: function (fn, value) { try { fn(value); } catch (e) { logError("ce.ci: the function given to it failed: " + e); } }
+});
+on("*", "__ciReply", function (reply) { __ci.receive(reply); });
+function ciDiscover(opts, fn) { return __ci.discover(opts, fn); }
+function ciDevices(role) { return __ci.devices(role); }
+function ciGet(muid, resource, opts, fn) { return __ci.get(muid, resource, opts, fn); }
+function ciSet(muid, resource, body, opts, fn) { return __ci.set(muid, resource, body, opts, fn); }
+function ciSubscribe(muid, resource, opts, fn) { return __ci.subscribe(muid, resource, opts, fn); }
+function ciUnsubscribe(id) { return __ci.unsubscribe(id); }
+function ciProfiles(muid, fn) { return __ci.profiles(muid, fn); }
+function ciSetProfile(muid, id, on, opts) { return __ci.setProfile(muid, id, on, opts); }
+// END GENERATED ce.ci
+
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function __m12(n) { return ((Math.floor(n) % 12) + 12) % 12; }
@@ -5156,6 +5357,8 @@ var __WEBVIEW_ONLY = [
 // @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+// @module ce.ci
+  "ciDraftProfile",
 // @module ce.file
   "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
 // @module ce.keys
@@ -6426,6 +6629,11 @@ var __CE_OPTIONS = {
   "patchList": { path: "ce.patch.list", at: 0, refusal: "empty list", names: ["role", "scope"] },
   "patchForget": { path: "ce.patch.forget", at: 1, refusal: "false", names: ["role"] },
   "patchWrite": { path: "ce.patch.write", at: 2, refusal: "result", names: ["role"] },
+  "ciDiscover": { path: "ce.ci.discover", at: 0, refusal: "false", names: ["role", "timeoutMs"] },
+  "ciGet": { path: "ce.ci.get", at: 2, refusal: "false", names: ["resId", "timeoutMs", "offset", "limit"] },
+  "ciSet": { path: "ce.ci.set", at: 3, refusal: "false", names: ["resId", "timeoutMs", "partial", "mediaType"] },
+  "ciSubscribe": { path: "ce.ci.subscribe", at: 2, refusal: "nothing", names: ["resId"] },
+  "ciSetProfile": { path: "ce.ci.setProfile", at: 3, refusal: "false", names: ["channel"] },
   "fileSyxSplit": { path: "ce.file.syxSplit", at: 1, refusal: "empty list", names: ["partial", "prefix"] },
   "fileMidiRead": { path: "ce.file.midiRead", at: 1, refusal: "nothing", names: ["track"] },
   "fileMidiWrite": { path: "ce.file.midiWrite", at: 1, refusal: "nothing", names: ["tempo", "name", "channel"] },
@@ -6538,6 +6746,7 @@ var __CE_MODULES = {
   "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
   "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+  "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
   "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
   "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
   "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
@@ -6571,8 +6780,8 @@ var __CE_MODULES = {
   "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
   "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

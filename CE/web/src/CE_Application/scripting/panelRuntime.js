@@ -32,6 +32,7 @@ import { patchCommands } from './patchCore.js';
 import { verifyCommands } from './verifyCore.js';
 import { fileCommands } from './fileCore.js';
 import { createFileDialogs } from './scriptFileHost.js';
+import { createCiBridge } from './ciHost.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -8350,6 +8351,7 @@ export function clearDeviceRuntimeDefinitions() {
   // A check outliving its panel would never finish, and its device would stay busy.
   for (const role of Object.keys(verifyJobs)) delete verifyJobs[role];
   forgetChosenFiles();
+  ciBridge.reset();   // …and a device's answer to a panel that is gone reaches nobody
 }
 
 // @module ce.storage
@@ -8890,6 +8892,36 @@ function fileDialogsFor(scriptId) {
   return dialogs;
 }
 
+/**
+ * ce.ci (docs/design/ce-ci-module.md): one bridge to the device layer's MIDI-CI session for the panel,
+ * with what it has heard of devices and profiles; each script gets its own commands over it.
+ */
+const ciBridge = createCiBridge({
+  send: (name, payload) => {
+    if (!isJuceAvailable()) return false;
+    window.__JUCE__.backend.emitEvent(name, payload);
+    return true;
+  },
+  raise: (name, payload) => deliverEmit(name, null, payload),
+});
+let ciHeard = false;
+
+function ciFor(scriptId) {
+  if (!ciHeard && isJuceAvailable() && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    ciHeard = true;
+    for (const name of ['ciCommandAnswered', 'ciReply', 'ciDiscovered', 'ciDeviceRemoved', 'ciProfileChanged']) {
+      window.__JUCE__.backend.addEventListener(name, (payload) => ciBridge.heard(name, payload));
+    }
+  }
+  return ciBridge.forScript({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    call: (fn, value) => runScriptCallback(scriptId, 'ce.ci', () => fn(value)),
+  });
+}
+
+/** Tests stand in for the native side: what it sends back, as it would arrive. */
+export function ciHeardForTesting(name, payload) { ciBridge.heard(name, payload); }
+
 /** The panel closed: the files the person chose go with it, here and natively. */
 function forgetChosenFiles() {
   if (fileDialogSet.size === 0 && fileListings.size === 0) return;
@@ -8905,6 +8937,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
   });
   let fileDialogs = null;
   const dialogs = () => (fileDialogs ??= fileDialogsFor(scriptId));
+  let ciCommandsOwn = null;
+  const ci = () => (ciCommandsOwn ??= ciFor(scriptId));
   const patch = patchCommands(patchHostFor(scriptId));
   const verify = verifyCommands(verifyHostFor(scriptId));
   const self = {
@@ -9285,6 +9319,17 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     fileSyxJoin: (messages) => fileBytes.syxJoin(messages),
     fileMidiRead: (bytes, opts) => fileBytes.midiRead(bytes, opts),
     fileMidiWrite: (song, opts) => fileBytes.midiWrite(song, opts),
+
+    // ce.ci (docs/design/ce-ci-module.md): ciCore.js over the device layer's MIDI-CI session.
+    ciDiscover: (opts, fn) => ci().discover(opts, fn),
+    ciDevices: (role) => ci().devices(role),
+    ciGet: (muid, resource, opts, fn) => ci().get(muid, resource, opts, fn),
+    ciSet: (muid, resource, body, opts, fn) => ci().set(muid, resource, body, opts, fn),
+    ciSubscribe: (muid, resource, opts, fn) => ci().subscribe(muid, resource, opts, fn),
+    ciUnsubscribe: (id) => ci().unsubscribe(id),
+    ciProfiles: (muid, fn) => ci().profiles(muid, fn),
+    ciSetProfile: (muid, id, on, opts) => ci().setProfile(muid, id, on, opts),
+    ciDraftProfile: (muid, fn) => ci().draftProfile(muid, fn),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),

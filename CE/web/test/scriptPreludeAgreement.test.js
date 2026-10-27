@@ -1306,6 +1306,8 @@ const OPTION_ANSWER_CASES = [
   ['verifyCoverage', [{ grop: 'x' }]], ['verifyCheck', [{ idz: ['x'] }, 'fn']], ['verifyDump', ['common', { tims: 2 }, 'fn']],
   ['verifyWrite', ['x', 1, { setleMs: 5 }, 'fn']], ['verifyProbe', ['x', { valus: [1] }, 'fn']],
   ['verifyPatch', [{ vai: 'dump' }, 'fn']], ['verifySummary', [{}, { widht: 8 }]],
+  ['ciDiscover', [{ timeout: 5 }, 'fn']], ['ciGet', [7, 'R', { resid: 'a' }, 'fn']], ['ciSet', [7, 'R', {}, { partal: true }, 'fn']],
+  ['ciSubscribe', [7, 'R', { resid: 'a' }, 'fn']], ['ciSetProfile', [7, 'X', true, { chanel: 1 }]],
   ['fileSyxSplit', [[0xF0, 0xF7], { partal: true }]], ['fileMidiRead', [[1], { trak: 1 }]], ['fileMidiWrite', [[], { tempoo: 90 }]],
 ];
 

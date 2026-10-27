@@ -862,6 +862,9 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 |---|---|
 | `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
 | `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
+| `onCiDiscovered(device)` | A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them. |
+| `onCiDeviceRemoved(device)` | A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel's device it was found on. Its subscriptions have ended. |
+| `onCiProfileChanged(profile)` | A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state. |
 | `onVerifyDone(report)` | A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too. |
 | `onPresetChange(preset)` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
 | `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
@@ -1096,7 +1099,7 @@ ce.core.error("message")
 
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, the connected device, its patches and checking what it holds, music theory, and musical time.
+MIDI in and out, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -1993,6 +1996,216 @@ for _, id in ipairs(ce.device.requests()) do log(id) end
 // JavaScript
 for (const id of ce.device.requests()) log(id);
 ```
+
+### ce.ci: MIDI-CI
+
+MIDI-CI lets a script ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Most synths do not speak MIDI-CI, and say nothing: an empty answer to `discover` is the usual one.
+
+A device is found by `discover`, and named by its `muid`, a number it keeps until it is switched off. `get`, `set` and `subscribe` work on its named resources (property exchange): `DeviceInfo`, `ResourceList`, controller and program lists, and resources of its own whose names start with `X-`. `profiles` and `setProfile` work on its MIDI-CI profiles, agreed ways for a device to behave, which are not CEditor's device profiles.
+
+Nothing waits: every command that talks to a device returns at once and calls its function when the answer comes, or when it does not, after a timeout. The talking is done once, in the device layer, so the editor, the player and an exported plug-in, window open or shut, see the same devices and answers. It goes out on the role's own MIDI ports. Not yet tried against a real MIDI-CI device.
+
+```lua
+-- Lua: find the synth, and show the first four of its program names
+function onPanelReady()
+  ce.ci.discover(function(found)
+    for _, d in ipairs(found) do
+      if d.matchesProfile then
+        ce.ci.get(d.muid, "ProgramList", function(result)
+          if not result.ok then return end
+          for row = 1, 4 do ce.components.lcd.text("Programs", row, result.body[row] and result.body[row].title or "") end
+        end)
+      end
+    end
+  end)
+end
+```
+
+#### `ce.ci.discover([opts,] fn) -> boolean`
+
+Ask which MIDI-CI devices are there, and get the ones that answer.
+
+Example: `ce.ci.discover(function(found) log(#found .. " MIDI-CI devices") end)`.
+
+- `fn` (function, required): Called with the list of devices.
+
+Good to know:
+
+- fn is called once, when the time is up, with a list of devices; none: an empty list. A synth that does not speak MIDI-CI says nothing, so an empty list is the usual answer.
+- A device is { muid, role, manufacturer, family, model, version, names, propertyExchange, profiles, matchesProfile }: `muid` its MIDI-CI number for this session; the codes as hex text, as device profiles write them ("41", "01 00"); `names` the words from its DeviceInfo; `matchesProfile` true when it is the synth the role's device profile describes.
+- A muid changes each time the device is switched on: to find a device again, keep its manufacturer, family and model.
+- Each device is also raised as ciDiscovered as soon as it answers. Returns true when asked; false when the role has no MIDI output.
+
+*Short name: `ciDiscover`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device whose MIDI ports to ask on. |
+| `timeoutMs` | number (milliseconds) | 3000 | How long to listen for answers. |
+
+#### `ce.ci.devices([role]) -> list`
+
+The MIDI-CI devices found so far, without asking again.
+
+Example: `#ce.ci.devices() > 0` is true once a MIDI-CI device has answered.
+
+- `role` (text, optional): Only the devices on this role's ports. Left out: all.
+
+Good to know:
+
+- A device stays in the list until it says it is leaving or its ports close.
+
+*Short name: `ciDevices`.*
+
+#### `ce.ci.get(muid, resource [, opts], fn) -> boolean`
+
+Read a resource from a device: its DeviceInfo, a controller or program list, or one of its own.
+
+Example: `ce.ci.get(state.synth, "ResourceList", fn)` gives the list of resources the device has.
+
+- `muid` (number, required): The device, from discover or devices.
+- `resource` (text, required): The resource's name, as the device names it.
+- `fn` (function, required): Called with the result.
+
+Good to know:
+
+- fn is called with { ok, status, message, body, mediaType }: `status` is the device's own (200 is fine, 404 a resource it does not have); `body` is a table for JSON, text for text, and bytes otherwise. No answer in time: ok false, status 0, "no reply in time".
+- ResourceList first: it says which resources exist, and whether each can be set or followed.
+- Returns true when sent; false, with a console error, for a device without property exchange or one nobody found.
+
+*Short name: `ciGet`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `resId` | text | none | For a resource that holds several items: which one, such as one program. |
+| `timeoutMs` | number (milliseconds) | 3000 | How long to wait for the device's answer. |
+| `offset` | number | 0 | For a long list the device gives in pages: where to start. |
+| `limit` | number | the whole list | For a long list: how many to give. |
+
+#### `ce.ci.set(muid, resource, body [, opts], fn) -> boolean`
+
+Change a resource on a device.
+
+Example: `ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, fn)` renames the patch on a device that has that resource.
+
+- `muid` (number, required): The device.
+- `resource` (text, required): The resource's name.
+- `body` (any value, required): What to set it to.
+- `fn` (function, required): Called with the result.
+
+Good to know:
+
+- A table is sent as JSON, text as text. To send bytes, give `mediaType`, such as "application/octet-stream".
+- fn is called with { ok, status, message }: 405 is a resource the device will not change.
+- Changes the device, as sendSysex can.
+
+*Short name: `ciSet`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `resId` | text | none | For a resource that holds several items: which one, such as one program. |
+| `timeoutMs` | number (milliseconds) | 3000 | How long to wait for the device's answer. |
+| `partial` | true or false | false | Send only the fields that change, for a device that allows it. |
+| `mediaType` | text | as body says | What body is, such as "text/plain"; needed for bytes. |
+
+#### `ce.ci.subscribe(muid, resource [, opts], fn) -> id`
+
+Be told when a resource changes on the device.
+
+Example: `ce.ci.subscribe(state.synth, "ProgramList", fn)` calls fn when the user renames or stores a program on the synth.
+
+- `muid` (number, required): The device.
+- `resource` (text, required): The resource's name.
+- `fn` (function, required): Called with each update.
+
+Good to know:
+
+- fn is called with { command, body } for each change: "full" (the whole resource), "partial" (only what changed) or "notify" (it changed: get it again); and once with "end" when the device, the panel or ce.ci.unsubscribe() ends it, or the device is gone. A device that refuses: "end" with ok false.
+- Returns an id for ce.ci.unsubscribe(); a device without property exchange: nothing, with a console error.
+
+*Short name: `ciSubscribe`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `resId` | text | none | For a resource that holds several items: which one, such as one program. |
+
+#### `ce.ci.unsubscribe(id) -> boolean`
+
+Stop following a resource; the device is told.
+
+Example: `ce.ci.unsubscribe(state.programs)` in onPanelClose.
+
+- `id` (number, required): The id ce.ci.subscribe() gave.
+
+Good to know:
+
+- Returns true when there was one.
+
+*Short name: `ciUnsubscribe`.*
+
+#### `ce.ci.profiles(muid [, fn]) -> list`
+
+A device's MIDI-CI profiles, and which are on.
+
+Example: `ce.ci.profiles(state.synth)` gives what the last inquiry found.
+
+- `muid` (number, required): The device.
+- `fn` (function, optional): Called with the fresh list.
+
+Good to know:
+
+- Each is { id, address, enabled }: `id` the profile's five bytes as hex text ("7E 21 09 01 00"), `address` "device" or a channel, 1 to 16.
+- Without fn: the list as last heard, at once. With fn: the device is asked again, and fn is called with the fresh list.
+- A MIDI-CI profile is an agreed way for a device to behave, such as a drawbar organ. It is not one of CEditor's device profiles.
+
+*Short name: `ciProfiles`.*
+
+#### `ce.ci.setProfile(muid, id, on [, opts]) -> boolean`
+
+Turn a MIDI-CI profile on or off.
+
+Example: `ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)`.
+
+- `muid` (number, required): The device.
+- `id` (text, required): The profile, as profiles gives it.
+- `on` (true or false, required): On or off.
+
+Good to know:
+
+- The device answers with its new state, raised as ciProfileChanged. A device that refuses raises nothing, and profiles keeps the old state.
+
+*Short name: `ciSetProfile`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `channel` | number | the whole device | One channel, 1 to 16, for a profile turned on per channel. |
+
+#### `ce.ci.draftProfile(muid, fn) -> boolean`
+
+Make a draft device profile from what a device reports.
+
+Example: `ce.ci.draftProfile(state.synth, function(draft) log(draft.summary.parameters .. " parameters") end)`.
+
+- `muid` (number, required): The device.
+- `fn` (function, required): Called with the draft.
+
+Good to know:
+
+- Asks for DeviceInfo, AllCtrlList, ChCtrlList and ProgramList, then builds the draft as the Discovery screen does, marked as partial.
+- fn is called with { profile, summary }: `profile` a table ready to save as JSON with ce.file.save(); `summary` counts what it holds, and `missing` lists what the device did not say.
+- A starting point, not a finished profile: MIDI-CI says which controllers a device has, not its SysEx dumps.
+
+*Short name: `ciDraftProfile` · Panel window only.*
 
 ### ce.patch: the synth's sound as a value
 

@@ -286,6 +286,11 @@ const SHARED_OPTION_FIELDS = {
   patchScope: { name: 'scope', type: 'text', default: '"voice"', summary: 'The part of the synth, when the command takes no patch to read it from.' },
   patchSeed: { name: 'seed', type: 'number', default: 'the script\'s random stream', summary: 'Where the random numbers start: the same seed gives the same patch, in every language.' },
 
+  /* --- ce.ci: the options its commands share -------------------------------- */
+  ciRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device whose MIDI ports to ask on.' },
+  ciResId: { name: 'resId', type: 'text', default: 'none', summary: 'For a resource that holds several items: which one, such as one program.' },
+  ciTimeout: { name: 'timeoutMs', type: 'number', default: '3000', unit: 'milliseconds', summary: 'How long to wait for the device\'s answer.' },
+
   /* --- ce.verify: the options its checks share ----------------------------- */
   verifyRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device. Every check but coverage asks the main synth only.' },
   verifyIds: { name: 'ids', type: 'list of text', default: 'every parameter', sample: '{"cutoff", "resonance"}', summary: 'Only these parameters, by id.' },
@@ -632,6 +637,10 @@ export const DEVICE_EVENTS = [
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
+  // ce.ci: a MIDI-CI device answered, left, or had a profile turned on or off (docs/design/ce-ci-module.md).
+  { id: 'ciDiscovered', fn: 'onCiDiscovered', payload: 'device', decoded: true, summary: 'A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them.' },
+  { id: 'ciDeviceRemoved', fn: 'onCiDeviceRemoved', payload: 'device', decoded: true, summary: 'A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel\'s device it was found on. Its subscriptions have ended.' },
+  { id: 'ciProfileChanged', fn: 'onCiProfileChanged', payload: 'profile', decoded: true, summary: 'A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state.' },
   // ce.verify: raised after a check's own function has run, so one script can show what any script checked.
   { id: 'verifyDone', fn: 'onVerifyDone', payload: 'report', decoded: true, summary: 'A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too.' },
   { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset.' },
@@ -2482,6 +2491,142 @@ export const COMMANDS = [
       { name: 'scope', type: 'text', required: true, summary: 'The scope\'s id. An existing one is replaced for this panel.' },
       { name: 'spec', type: 'table', required: true, summary: 'The scope: groups, only, except and dumps, as lists of names.' },
       { name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device.' },
+    ],
+    scopes: 'any',
+  },
+  // ci
+  // MIDI-CI for scripts (docs/design/ce-ci-module.md). The session lives once, in the device layer in
+  // C++ (DeviceProfileService::ciCommand); ciCore.js checks a call and hands back the answers, the same
+  // in every runtime. Not yet tried against a real MIDI-CI device: only against JUCE's own, in a loopback.
+  {
+    id: 'ciDiscover', category: 'MIDI-CI', signature: 'ciDiscover([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Ask which MIDI-CI devices are there, and get the ones that answer.',
+    example: '`ce.ci.discover(function(found) log(#found .. " MIDI-CI devices") end)`.',
+    notes: [
+      'fn is called once, when the time is up, with a list of devices; none: an empty list. A synth that does not speak MIDI-CI says nothing, so an empty list is the usual answer.',
+      'A device is { muid, role, manufacturer, family, model, version, names, propertyExchange, profiles, matchesProfile }: `muid` its MIDI-CI number for this session; the codes as hex text, as device profiles write them ("41", "01 00"); `names` the words from its DeviceInfo; `matchesProfile` true when it is the synth the role\'s device profile describes.',
+      'A muid changes each time the device is switched on: to find a device again, keep its manufacturer, family and model.',
+      'Each device is also raised as ciDiscovered as soon as it answers. Returns true when asked; false when the role has no MIDI output.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciRole',
+        { name: 'timeoutMs', type: 'number', default: '3000', unit: 'milliseconds', summary: 'How long to listen for answers.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the list of devices.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciDevices', category: 'MIDI-CI', signature: 'ciDevices([role]) -> list', refusal: 'empty list',
+    summary: 'The MIDI-CI devices found so far, without asking again.',
+    example: '`#ce.ci.devices() > 0` is true once a MIDI-CI device has answered.',
+    notes: ['A device stays in the list until it says it is leaving or its ports close.'],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'Only the devices on this role\'s ports. Left out: all.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'ciGet', category: 'MIDI-CI', signature: 'ciGet(muid, resource [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Read a resource from a device: its DeviceInfo, a controller or program list, or one of its own.',
+    example: '`ce.ci.get(state.synth, "ResourceList", fn)` gives the list of resources the device has.',
+    notes: [
+      'fn is called with { ok, status, message, body, mediaType }: `status` is the device\'s own (200 is fine, 404 a resource it does not have); `body` is a table for JSON, text for text, and bytes otherwise. No answer in time: ok false, status 0, "no reply in time".',
+      'ResourceList first: it says which resources exist, and whether each can be set or followed.',
+      'Returns true when sent; false, with a console error, for a device without property exchange or one nobody found.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device, from discover or devices.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name, as the device names it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId', 'ciTimeout',
+        { name: 'offset', type: 'number', default: '0', summary: 'For a long list the device gives in pages: where to start.' },
+        { name: 'limit', type: 'number', default: 'the whole list', summary: 'For a long list: how many to give.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the result.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSet', category: 'MIDI-CI', signature: 'ciSet(muid, resource, body [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Change a resource on a device.',
+    example: '`ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, fn)` renames the patch on a device that has that resource.',
+    notes: [
+      'A table is sent as JSON, text as text. To send bytes, give `mediaType`, such as "application/octet-stream".',
+      'fn is called with { ok, status, message }: 405 is a resource the device will not change.',
+      'Changes the device, as sendSysex can.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name.' },
+      { name: 'body', type: 'value', required: true, summary: 'What to set it to.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId', 'ciTimeout',
+        { name: 'partial', type: 'true or false', default: 'false', summary: 'Send only the fields that change, for a device that allows it.' },
+        { name: 'mediaType', type: 'text', default: 'as body says', summary: 'What body is, such as "text/plain"; needed for bytes.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the result.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSubscribe', category: 'MIDI-CI', signature: 'ciSubscribe(muid, resource [, opts], fn) -> id', refusal: 'nothing',
+    summary: 'Be told when a resource changes on the device.',
+    example: '`ce.ci.subscribe(state.synth, "ProgramList", fn)` calls fn when the user renames or stores a program on the synth.',
+    notes: [
+      'fn is called with { command, body } for each change: "full" (the whole resource), "partial" (only what changed) or "notify" (it changed: get it again); and once with "end" when the device, the panel or ce.ci.unsubscribe() ends it, or the device is gone. A device that refuses: "end" with ok false.',
+      'Returns an id for ce.ci.unsubscribe(); a device without property exchange: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with each update.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciUnsubscribe', category: 'MIDI-CI', signature: 'ciUnsubscribe(id) -> boolean', refusal: 'false',
+    summary: 'Stop following a resource; the device is told.',
+    example: '`ce.ci.unsubscribe(state.programs)` in onPanelClose.',
+    notes: ['Returns true when there was one.'],
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id ce.ci.subscribe() gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'ciProfiles', category: 'MIDI-CI', signature: 'ciProfiles(muid [, fn]) -> list', refusal: 'empty list',
+    summary: 'A device\'s MIDI-CI profiles, and which are on.',
+    example: '`ce.ci.profiles(state.synth)` gives what the last inquiry found.',
+    notes: [
+      'Each is { id, address, enabled }: `id` the profile\'s five bytes as hex text ("7E 21 09 01 00"), `address` "device" or a channel, 1 to 16.',
+      'Without fn: the list as last heard, at once. With fn: the device is asked again, and fn is called with the fresh list.',
+      'A MIDI-CI profile is an agreed way for a device to behave, such as a drawbar organ. It is not one of CEditor\'s device profiles.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called with the fresh list.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSetProfile', category: 'MIDI-CI', signature: 'ciSetProfile(muid, id, on [, opts]) -> boolean', refusal: 'false',
+    summary: 'Turn a MIDI-CI profile on or off.',
+    example: '`ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)`.',
+    notes: ['The device answers with its new state, raised as ciProfileChanged. A device that refuses raises nothing, and profiles keeps the old state.'],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'id', type: 'text', required: true, summary: 'The profile, as profiles gives it.' },
+      { name: 'on', type: 'boolean', required: true, summary: 'On or off.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'channel', type: 'number', default: 'the whole device', summary: 'One channel, 1 to 16, for a profile turned on per channel.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciDraftProfile', category: 'MIDI-CI', signature: 'ciDraftProfile(muid, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Make a draft device profile from what a device reports.',
+    example: '`ce.ci.draftProfile(state.synth, function(draft) log(draft.summary.parameters .. " parameters") end)`.',
+    notes: [
+      'Asks for DeviceInfo, AllCtrlList, ChCtrlList and ProgramList, then builds the draft as the Discovery screen does, marked as partial.',
+      'fn is called with { profile, summary }: `profile` a table ready to save as JSON with ce.file.save(); `summary` counts what it holds, and `missing` lists what the device did not say.',
+      'A starting point, not a finished profile: MIDI-CI says which controllers a device has, not its SysEx dumps.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the draft.' },
     ],
     scopes: 'any',
   },
@@ -5932,8 +6077,8 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, the connected device, its patches and checking what it holds, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.device', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.',
+    modules: ['ce.midi', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
@@ -6029,6 +6174,9 @@ export const MODULES = [
   // requires the four whose commands it reads and sends through, so they are there whenever it is.
   { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
     summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
+  // requires ce.device, whose role ports MIDI-CI goes out and comes back on.
+  { id: 'ce.ci', version: '1.0', requires: ['ce.core', 'ce.device'], runtime: RUNTIME_ANY,
+    summary: 'MIDI-CI: ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Not yet tried against a real MIDI-CI device.' },
   // requires ce.time, whose tempo and beats per bar midiWrite uses when a song gives neither. The
   // dialogs are the panel view's; the byte commands run everywhere.
   { id: 'ce.file', version: '1.0', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
@@ -6235,6 +6383,10 @@ const MODULE_MEMBERS = {
     random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
     apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
     scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.ci': {
+    discover: 'ciDiscover', devices: 'ciDevices', get: 'ciGet', set: 'ciSet', subscribe: 'ciSubscribe',
+    unsubscribe: 'ciUnsubscribe', profiles: 'ciProfiles', setProfile: 'ciSetProfile', draftProfile: 'ciDraftProfile',
   },
   'ce.file': {
     open: 'fileOpen', save: 'fileSave', read: 'fileRead', write: 'fileWrite', folder: 'fileFolder', list: 'fileList',

@@ -1692,6 +1692,13 @@ private:
                 return;
             }
 
+            // ce.ci: a device's answers go to the prelude's waiters; who answered, left or turned a
+            // profile on or off is an event any script can handle.
+            if (name == "ciReply") { scriptRuntime->dispatchEvent ("__ciReply", "", payload); return; }
+            if (name == "ciDiscovered") { scriptRuntime->dispatchEvent ("onCiDiscovered", "", payload); return; }
+            if (name == "ciDeviceRemoved") { scriptRuntime->dispatchEvent ("onCiDeviceRemoved", "", payload); return; }
+            if (name == "ciProfileChanged") { scriptRuntime->dispatchEvent ("onCiProfileChanged", "", payload); return; }
+
             if (name != "dumpMessageParsed") return;
             if (o == nullptr) return;
 
@@ -2317,6 +2324,10 @@ private:
                     if (e.name.toString().equalsIgnoreCase (feature)) return e.value;
                 return {};
             }
+
+            // ce.ci: one MIDI-CI command for the device layer's session (DeviceProfileService::ciCommand).
+            // Answers at once; what the device says comes later as the "__ciReply" event.
+            if (kind == "ci") return deviceService.ciCommand (payload);
 
             // ce.patch: the profile's `patch` section, as the author wrote it (which dumps make a
             // patch, how to store a slot). Void when the profile has none, and ce.patch works out the

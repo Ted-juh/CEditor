@@ -71,6 +71,24 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.ci': 'MIDI-CI lets a script ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Most synths do not speak MIDI-CI, and say nothing: an empty answer to `discover` is the usual one.\n\n'
+    + 'A device is found by `discover`, and named by its `muid`, a number it keeps until it is switched off. `get`, `set` and `subscribe` work on its named resources (property exchange): `DeviceInfo`, `ResourceList`, controller and program lists, and resources of its own whose names start with `X-`. `profiles` and `setProfile` work on its MIDI-CI profiles, agreed ways for a device to behave, which are not CEditor\'s device profiles.\n\n'
+    + 'Nothing waits: every command that talks to a device returns at once and calls its function when the answer comes, or when it does not, after a timeout. The talking is done once, in the device layer, so the editor, the player and an exported plug-in, window open or shut, see the same devices and answers. It goes out on the role\'s own MIDI ports. Not yet tried against a real MIDI-CI device.\n\n'
+    + '```lua\n'
+    + '-- Lua: find the synth, and show the first four of its program names\n'
+    + 'function onPanelReady()\n'
+    + '  ce.ci.discover(function(found)\n'
+    + '    for _, d in ipairs(found) do\n'
+    + '      if d.matchesProfile then\n'
+    + '        ce.ci.get(d.muid, "ProgramList", function(result)\n'
+    + '          if not result.ok then return end\n'
+    + '          for row = 1, 4 do ce.components.lcd.text("Programs", row, result.body[row] and result.body[row].title or "") end\n'
+    + '        end)\n'
+    + '      end\n'
+    + '    end\n'
+    + '  end)\n'
+    + 'end\n'
+    + '```',
   'ce.file': 'Librarian files: `.syx` banks, `.mid` files, JSON and text. A script never names a path. Every file comes from a dialog the person answered: `open` or `save` for one file, `folder` for a folder. The script gets a file value back, a table holding the file\'s `name`, `type`, `size`, `canWrite` and `isFolder` but never its folder, and passes it to `read`, `write`, `list` and `saveIn`.\n\n'
     + 'The rules no option turns off: only the types syx, mid, json, txt and csv; writing only where the person saved, or opened a file or chose a folder `writable`; a folder and nothing above or inside it; up to 8 MB a file; and every file value gone when the panel closes.\n\n'
     + 'The dialogs need the panel window: in the editor, and in an exported plug-in while its window is open. `syxSplit`, `syxJoin`, `midiRead` and `midiWrite` work on bytes the script already holds, and run everywhere.\n\n'
@@ -194,6 +212,7 @@ const MODULE_TITLES = {
   'ce.patch': 'the synth\'s sound as a value',
   'ce.verify': 'checking what the synth holds',
   'ce.file': 'files, through the person\'s own dialogs',
+  'ce.ci': 'MIDI-CI',
   'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',
   'ce.image': 'images and icons',

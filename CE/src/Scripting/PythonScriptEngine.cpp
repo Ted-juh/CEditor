@@ -4956,6 +4956,189 @@ def fileMidiRead(bytes, opts=None):
 def fileMidiWrite(song, opts=None):
     return _f_midi_write(song, opts, _f_clock(), _f_say)
 
+# @module ce.ci
+# ce.ci, ported line for line from ciCore.js (the panel view's; the JavaScript prelude runs that file
+# itself). Held to the panel view's answers by test/ciParity.test.js and the scenario in
+# test/support/ciScenario.mjs. Every command goes to the device layer's one MIDI-CI session
+# (__deviceQuery "ci"); the device's answers come back as "__ciReply" events. Every Python script
+# runs this prelude for itself, so its waiters are its own.
+import math as _ci_math
+import re as _ci_re
+
+_CI_NUMBER_TEXT = _ci_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+def _ci_num(v):
+    if isinstance(v, bool): return float("nan")
+    if isinstance(v, (int, float)): return v
+    if isinstance(v, str) and _CI_NUMBER_TEXT.fullmatch(v.strip()): return float(v.strip())
+    return float("nan")
+
+def _ci_finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and _ci_math.isfinite(x)
+
+def _ci_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _ci_pass_on(opts, keys):
+    out = {}
+    for k in keys:
+        v = _ci_opt(opts, k)
+        if v is not None: out[k] = v
+    return out
+
+def _ci_key(v):
+    if isinstance(v, float) and v.is_integer(): return str(int(v))
+    if v is True: return "true"
+    if v is False: return "false"
+    return str(v)
+
+def _ci_commands(host):
+    def say(level, text): host["say"](level, text)
+
+    def muid_of(verb, muid):
+        n = _ci_num(muid)
+        if _ci_finite(n) and n >= 0 and _ci_math.floor(n) == n: return int(n)
+        say("error", "ce.ci." + verb + ": muid must be a device's number, as discover or devices give it, so nothing was sent.")
+        return None
+
+    def need_fn(verb, fn):
+        if callable(fn): return True
+        say("error", "ce.ci." + verb + ": fn must be a function to call with the answer, so nothing was sent.")
+        return False
+
+    def need_resource(verb, resource):
+        if isinstance(resource, str) and resource != "": return True
+        say("error", "ce.ci." + verb + ": resource must be a resource's name, such as \"ProgramList\", so nothing was sent.")
+        return False
+
+    def start(verb, fields, fn):
+        answer = host["ask"](fields)
+        if not isinstance(answer, dict) or answer.get("ok") is not True or answer.get("token") is None:
+            why = answer["error"] if isinstance(answer, dict) and isinstance(answer.get("error"), str) and answer["error"] != "" else "MIDI-CI is not available here"
+            say("error", "ce.ci." + verb + ": " + why + ", so nothing was sent.")
+            return False
+        host["waiters"]()[_ci_key(answer["token"])] = {"fn": fn}
+        return answer["token"]
+
+    def discover(a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        if not need_fn("discover", fn): return False
+        role = _ci_opt(opts, "role")
+        fields = {"op": "discover", "role": role if isinstance(role, str) and role != "" else "mainSynth"}
+        timeout = _ci_num(_ci_opt(opts, "timeoutMs"))
+        if _ci_finite(timeout) and timeout > 0: fields["timeoutMs"] = timeout
+        return start("discover", fields, fn) is not False
+
+    def devices(role=None):
+        fields = {"op": "devices"}
+        if isinstance(role, str) and role != "": fields["role"] = role
+        lst = host["query"](fields)
+        return lst if isinstance(lst, list) else []
+
+    def get(muid, resource, a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        m = muid_of("get", muid)
+        if m is None or not need_resource("get", resource) or not need_fn("get", fn): return False
+        return start("get", {"op": "get", "muid": m, "resource": resource, "opts": _ci_pass_on(opts, ["resId", "offset", "limit", "timeoutMs"])}, fn) is not False
+
+    def set_(muid, resource, body, a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        m = muid_of("set", muid)
+        if m is None or not need_resource("set", resource) or not need_fn("set", fn): return False
+        if body is None:
+            say("error", "ce.ci.set: body must be given: a table, text or bytes, so nothing was sent.")
+            return False
+        return start("set", {"op": "set", "muid": m, "resource": resource, "body": body, "opts": _ci_pass_on(opts, ["resId", "partial", "mediaType", "timeoutMs"])}, fn) is not False
+
+    def subscribe(muid, resource, a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        m = muid_of("subscribe", muid)
+        if m is None or not need_resource("subscribe", resource) or not need_fn("subscribe", fn): return None
+        token = start("subscribe", {"op": "subscribe", "muid": m, "resource": resource, "opts": _ci_pass_on(opts, ["resId"])}, fn)
+        return None if token is False else token
+
+    def unsubscribe(sid):
+        if sid is None: return False
+        host["waiters"]().pop(_ci_key(sid), None)
+        return host["query"]({"op": "unsubscribe", "id": _ci_key(sid)}) is True
+
+    def profiles(muid, fn=None):
+        m = muid_of("profiles", muid)
+        if m is None: return []
+        lst = host["query"]({"op": "profiles", "muid": m})
+        if fn is not None:
+            if need_fn("profiles", fn): start("profiles", {"op": "profiles", "muid": m, "ask": True}, fn)
+        return lst if isinstance(lst, list) else []
+
+    def set_profile(muid, pid, on, opts=None):
+        m = muid_of("setProfile", muid)
+        if m is None: return False
+        if not isinstance(pid, str) or pid == "":
+            say("error", "ce.ci.setProfile: id must be a profile, as profiles gives it (\"7E 21 09 01 00\"), so nothing was sent.")
+            return False
+        if not isinstance(on, bool):
+            say("error", "ce.ci.setProfile: on must be true or false, so nothing was sent.")
+            return False
+        channel = 0
+        given = _ci_opt(opts, "channel")
+        if given is not None:
+            c = _ci_num(given)
+            if not _ci_finite(c) or _ci_math.floor(c) != c or c < 1 or c > 16:
+                say("error", "ce.ci.setProfile: channel must be 1 to 16, so nothing was sent.")
+                return False
+            channel = int(c)
+        answer = host["query"]({"op": "setProfile", "muid": m, "id": pid, "on": on, "channel": channel})
+        if answer is True: return True
+        why = answer["error"] if isinstance(answer, dict) and isinstance(answer.get("error"), str) and answer["error"] != "" else "MIDI-CI is not available here"
+        say("error", "ce.ci.setProfile: " + why + ", so nothing was sent.")
+        return False
+
+    def receive(reply):
+        if not isinstance(reply, dict) or reply.get("token") is None: return
+        waiters = host["waiters"]()
+        k = _ci_key(reply["token"])
+        w = waiters.get(k)
+        if w is None: return
+        if reply.get("final") is True: waiters.pop(k, None)
+        host["call"](w["fn"], reply.get("result"))
+
+    return {"discover": discover, "devices": devices, "get": get, "set": set_, "subscribe": subscribe,
+            "unsubscribe": unsubscribe, "profiles": profiles, "setProfile": set_profile, "receive": receive}
+
+_CI_WAITERS = {}
+
+def _ci_call(fn, value):
+    try:
+        fn(value)
+    except Exception as e:
+        logError("ce.ci: the function given to it failed: " + str(e))
+
+_CI = _ci_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "ask": lambda fields: __deviceQuery("ci", fields),
+    "query": lambda fields: __deviceQuery("ci", fields),
+    "waiters": lambda: _CI_WAITERS,
+    "call": _ci_call,
+})
+on("*", "__ciReply", lambda reply: _CI["receive"](reply))
+
+def ciDiscover(opts=None, fn=None):
+    return _CI["discover"](opts, fn)
+def ciDevices(role=None):
+    return _CI["devices"](role)
+def ciGet(muid, resource, opts=None, fn=None):
+    return _CI["get"](muid, resource, opts, fn)
+def ciSet(muid, resource, body, opts=None, fn=None):
+    return _CI["set"](muid, resource, body, opts, fn)
+def ciSubscribe(muid, resource, opts=None, fn=None):
+    return _CI["subscribe"](muid, resource, opts, fn)
+def ciUnsubscribe(id=None):
+    return _CI["unsubscribe"](id)
+def ciProfiles(muid, fn=None):
+    return _CI["profiles"](muid, fn)
+def ciSetProfile(muid, id, on, opts=None):
+    return _CI["setProfile"](muid, id, on, opts)
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -5843,6 +6026,8 @@ __WEBVIEW_ONLY = [
 # @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+# @module ce.ci
+  "ciDraftProfile",
 # @module ce.file
   "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
 # @module ce.keys
@@ -6704,6 +6889,11 @@ __CE_OPTIONS = {
     "patchList": { "path": "ce.patch.list", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "scope"] },
     "patchForget": { "path": "ce.patch.forget", "at": 1, "param": "opts", "refusal": "false", "names": ["role"] },
     "patchWrite": { "path": "ce.patch.write", "at": 2, "param": "opts", "refusal": "result", "names": ["role"] },
+    "ciDiscover": { "path": "ce.ci.discover", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "timeoutMs"] },
+    "ciGet": { "path": "ce.ci.get", "at": 2, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "offset", "limit"] },
+    "ciSet": { "path": "ce.ci.set", "at": 3, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "partial", "mediaType"] },
+    "ciSubscribe": { "path": "ce.ci.subscribe", "at": 2, "param": "opts", "refusal": "nothing", "names": ["resId"] },
+    "ciSetProfile": { "path": "ce.ci.setProfile", "at": 3, "param": "opts", "refusal": "false", "names": ["channel"] },
     "fileSyxSplit": { "path": "ce.file.syxSplit", "at": 1, "param": "opts", "refusal": "empty list", "names": ["partial", "prefix"] },
     "fileMidiRead": { "path": "ce.file.midiRead", "at": 1, "param": "opts", "refusal": "nothing", "names": ["track"] },
     "fileMidiWrite": { "path": "ce.file.midiWrite", "at": 1, "param": "opts", "refusal": "nothing", "names": ["tempo", "name", "channel"] },
@@ -6816,6 +7006,7 @@ __CE_MODULES = {
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
     "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
     "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
     "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
     "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
@@ -6849,7 +7040,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -6865,6 +7056,7 @@ __CE_META = [
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
     { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.ci", "version": "1.0", "runtime": "any" },
     { "id": "ce.file", "version": "1.0", "runtime": "any" },
     { "id": "ce.verify", "version": "1.0", "runtime": "any" },
     { "id": "ce.keys", "version": "1.0", "runtime": "webview" },

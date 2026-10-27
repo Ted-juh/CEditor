@@ -261,6 +261,39 @@ export const WRITTEN = {
     lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
     js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
   },
+  ciDiscover: {
+    lua: `function onPanelReady()\n  ce.ci.discover(function(found)\n    for _, d in ipairs(found) do\n      if d.matchesProfile then state.synth = d.muid return end\n    end\n    ce.components.lcd.text("Display", 1, "No MIDI-CI")\n  end)\nend`,
+    js: `function onPanelReady() {\n  ce.ci.discover((found) => {\n    const d = found.find((x) => x.matchesProfile);\n    if (d) state.synth = d.muid;\n    else ce.components.lcd.text("Display", 1, "No MIDI-CI");\n  });\n}`,
+  },
+  ciDevices: {
+    lua: `for _, d in ipairs(ce.ci.devices()) do log(d.muid .. ": " .. (d.names and d.names.model or d.model)) end`,
+    js: `for (const d of ce.ci.devices()) log(\`\${d.muid}: \${d.names?.model ?? d.model}\`);`,
+  },
+  ciGet: {
+    lua: `ce.ci.get(state.synth, "ProgramList", function(result)\n  if not result.ok then log("ProgramList: " .. result.status .. " " .. (result.message or "")) return end\n  for row, p in ipairs(result.body) do ce.components.lcd.text("Programs", row, p.title) end\nend)`,
+    js: `ce.ci.get(state.synth, "ProgramList", (result) => {\n  if (!result.ok) return log(\`ProgramList: \${result.status} \${result.message ?? ""}\`);\n  result.body.forEach((p, i) => ce.components.lcd.text("Programs", i + 1, p.title));\n});`,
+  },
+  ciSet: {
+    lua: `ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, function(result)\n  if not result.ok then logWarn("not renamed: " .. result.status) end\nend)`,
+    js: `ce.ci.set(state.synth, "X-PatchName", { name: "Warm Pad" }, (result) => {\n  if (!result.ok) logWarn(\`not renamed: \${result.status}\`);\n});`,
+  },
+  ciSubscribe: {
+    lua: `state.programs = ce.ci.subscribe(state.synth, "ProgramList", function(update)\n  if update.command ~= "end" then ce.ci.get(state.synth, "ProgramList", showPrograms) end\nend)`,
+    js: `state.programs = ce.ci.subscribe(state.synth, "ProgramList", (update) => {\n  if (update.command !== "end") ce.ci.get(state.synth, "ProgramList", showPrograms);\n});`,
+  },
+  ciUnsubscribe: {
+    lua: `function onPanelClose()\n  if state.programs then ce.ci.unsubscribe(state.programs) end\nend`,
+    js: `function onPanelClose() {\n  if (state.programs) ce.ci.unsubscribe(state.programs);\n}`,
+  },
+  ciProfiles: {
+    lua: `for _, p in ipairs(ce.ci.profiles(state.synth)) do log(p.id .. (p.enabled and " on" or " off")) end`,
+    js: `for (const p of ce.ci.profiles(state.synth)) log(p.id + (p.enabled ? " on" : " off"));`,
+  },
+  ciSetProfile: { code: 'ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)' },
+  ciDraftProfile: {
+    lua: `ce.ci.draftProfile(state.synth, function(draft)\n  if draft then ce.file.save("draft.json", draft.profile, { indent = 2 }) end\nend)`,
+    js: `ce.ci.draftProfile(state.synth, (draft) => {\n  if (draft) ce.file.save("draft.json", draft.profile, { indent: 2 });\n});`,
+  },
   fileOpen: {
     lua: `ce.file.open({ types = { "syx" }, title = "Import a bank" }, function(file, bytes)\n  if not file then return end\n  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end\nend)`,
     js: `ce.file.open({ types: ["syx"], title: "Import a bank" }, (file, bytes) => {\n  if (!file) return;\n  for (const message of ce.file.syxSplit(bytes)) ce.midi.sendSysex(message);\n});`,

@@ -76,6 +76,56 @@ public:
     juce::var getProfiles (uint32_t muid) const;
     void setProfileEnabled (uint32_t muid, const juce::String& profileHex, bool enabled);
 
+    // ---- For scripts (ce.ci, docs/design/ce-ci-module.md) ----------------------------------------
+    // The session stays open while the device is connected, so these are heard at any time, not only
+    // in a window after a Discovery. Every answer is a juce::var a script can be handed as it is.
+
+    struct Events
+    {
+        std::function<void (uint32_t muid)> added;      // a device answered a Discovery, or announced itself
+        std::function<void (uint32_t muid)> removed;    // a device said it is leaving, or stopped answering
+        // A profile was turned on or off, by anyone. channel 0 is the whole device, else 1 to 16.
+        std::function<void (uint32_t muid, const juce::String& profileHex, int channel, bool enabled)> profileChanged;
+    };
+    void setEvents (Events events);
+
+    // A discovered device as a script sees it: { muid, manufacturer, family, model, version } as hex
+    // text in the form device profiles use ("41", "00 20 6B"; family and model LSB first), names from
+    // its DeviceInfo when it gave one, and whether it supports property exchange and profiles. Void
+    // for a MUID that has not answered.
+    juce::var describe (uint32_t muid) const;
+
+    // A request's answer: { ok, status, message, body, mediaType }. `body` decoded: JSON as a value,
+    // text as text, anything else as a list of bytes. ok is false for no reply in time (status 0),
+    // the device's own refusal (its status: 404, 405...) or a transaction it cut short.
+    using Answer = std::function<void (const juce::var&)>;
+
+    // Read a resource. opts: resId, offset, limit, timeoutMs (default 3000). False when the device
+    // does not support property exchange, or is not known.
+    bool get (uint32_t muid, const juce::String& resource, const juce::var& opts, Answer done);
+    // Change a resource. body: a table is sent as JSON, text as text, and a list of bytes as they are
+    // when opts.mediaType says what they are. opts: resId, partial, mediaType, timeoutMs.
+    bool set (uint32_t muid, const juce::String& resource, const juce::var& body, const juce::var& opts, Answer done);
+    // Follow a resource: `update` gets { command, body } for each "full", "partial" or "notify", and
+    // { command = "end" } once when it ends (with ok false when the device refused). 0 when not sent.
+    int subscribe (uint32_t muid, const juce::String& resource, const juce::var& opts, Answer update);
+    bool unsubscribe (int id);
+    // A device's profiles on the whole device and every channel: [{ id, address, enabled }], address
+    // "device" or a channel 1 to 16. As last asked; inquireProfiles asks again, and `done` (when given)
+    // gets the fresh list once the device has answered for the whole device.
+    juce::var profiles (uint32_t muid) const;
+    void inquireProfiles (uint32_t muid, Answer done);
+    // Turn a profile on or off, for the whole device (channel 0) or one channel, 1 to 16.
+    void setProfile (uint32_t muid, const juce::String& profileHex, bool on, int channel);
+    // Forget a device: its requests end with no reply, its subscriptions with "end".
+    void forget (uint32_t muid);
+    // Time goes by: requests past their timeout end with no reply, and waiting ones are sent.
+    // True while anything waits, so the owner knows to keep calling.
+    bool tick (double nowMs);
+    bool busy() const;
+    // Tests stand in for the clock that timeouts are read from.
+    void setClockForTesting (std::function<double()> clock);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;
