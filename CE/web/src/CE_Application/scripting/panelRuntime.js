@@ -35,6 +35,8 @@ import { createFileDialogs } from './scriptFileHost.js';
 import { createCiBridge } from './ciHost.js';
 import { createMidiInDecoder } from './midiInDecoder.js';
 import { mpeCommands } from './mpeCore.js';
+import { dawCommands } from './dawCore.js';
+import { collectExportParameters } from '../utils/exportParameters.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -741,6 +743,13 @@ function wholePath(at) {
 // set(path, value, opts) with { transmit }, and the second-argument spelling of the value form.
 // A string is a form, an object is opts.
 function setValue(path, value, formOrOpts = '') {
+  // A write outside any handler (after(), a timer's own callback) raises the value events itself:
+  // origin() then says a script made it, unless whoever called this said otherwise first.
+  if (!dispatchingNow() && panelsOrigin == null) {
+    panelsOrigin = 'script';
+    // A write that changed nothing raises nothing, and must not lend its origin to a later one.
+    queueMicrotask(() => { panelsOrigin = null; });
+  }
   const form = typeof formOrOpts === 'string' ? formOrOpts : '';
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
   const notAForm = formRefusal(`set("${path}")`, 'nothing was set', form);
@@ -8358,6 +8367,8 @@ export function clearDeviceRuntimeDefinitions() {
   ciBridge.reset();   // …and a device's answer to a panel that is gone reaches nobody
   midiInDecode.reset();     // …and a bend half way through its thinning belongs to no panel
   mpeShared = null;         // …and a new panel sets its own zone
+  dawPageGestures.clear();  // …and the plug-in ended the window's gestures with it
+  controlOrigins.clear();
   if (midiInTimer !== null) { clearTimeout(midiInTimer); midiInTimer = null; }
 }
 
@@ -8948,6 +8959,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const ci = () => (ciCommandsOwn ??= ciFor(scriptId));
   const patch = patchCommands(patchHostFor(scriptId));
   const verify = verifyCommands(verifyHostFor(scriptId));
+  const daw = dawCommands(dawHostFor(scriptId));
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
       typeof form === 'string' || isOptionsTable(form) ? form : ''),
@@ -9337,6 +9349,21 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     ciProfiles: (muid, fn) => ci().profiles(muid, fn),
     ciSetProfile: (muid, id, on, opts) => ci().setProfile(muid, id, on, opts),
     ciDraftProfile: (muid, fn) => ci().draftProfile(muid, fn),
+
+    // origin() (docs/design/ce-daw-module.md): who made the change the running handler is for.
+    origin: () => currentOrigin ?? undefined,
+    // ce.daw: dawCore.js, answered from the plug-in's picture with the window open, and from the
+    // panel in the editor, which has no DAW.
+    dawHost: () => daw.host(),
+    dawParameters: () => daw.parameters(),
+    dawParameter: (path) => daw.parameter(path),
+    dawProgram: () => daw.program(),
+    dawPrograms: () => daw.programs(),
+    dawBeginGesture: (path) => daw.beginGesture(path),
+    dawEndGesture: (path) => daw.endGesture(path),
+    dawRename: (path, name) => daw.rename(path, name),
+    dawAssign: (slot, path, opts) => daw.assign(slot, path, opts),
+    dawMarkChanged: () => daw.markChanged(),
 
     // ce.mpe: mpeCore.js, one per panel; reading MPE back in is the input decoder's.
     mpeZone: (opts) => mpeFor(scriptId).zone(opts),
@@ -10718,6 +10745,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
   if (!ensurePanelExecutionApproved()) { resetScriptState(); return answers; }
   const scripts = activeScripts();
   const epoch = executionEpoch;
+  const outerOrigin = currentOrigin;
   live.dispatching = true;
   if (inbound) origin.inboundDepth += 1;
   try {
@@ -10727,6 +10755,9 @@ async function dispatchEvents(events, { inbound = false } = {}) {
     for (let i = 0; i < events.length; i += 1) {
       const ev = events[i];
       if (epoch !== executionEpoch) return answers;
+      // origin(): who made the change this event is for. Inbound events came from the device.
+      currentOrigin = ev.origin ?? (inbound ? 'device' : null);
+      if (ev.event === 'onValueChange' && currentOrigin !== 'host' && currentOrigin !== 'load') dawFollowSpare(ev.controlName, ev.payload);
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
@@ -10744,6 +10775,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       }
     }
   } finally {
+    currentOrigin = outerOrigin;
     if (inbound) origin.inboundDepth -= 1;
     if (epoch === executionEpoch) {
       snapshotValues();          // absorb panels writes our scripts just made
@@ -10806,6 +10838,11 @@ function onPanelsChanged() {
     }
   }
   live.last = next;
+  // Who made the change: a script's set() outside a handler, a spare parameter the DAW moved, or a
+  // hand in the editor's inspector.
+  const why = panelsOrigin ?? 'user';
+  panelsOrigin = null;
+  for (const e of events) e.origin = why;
   // Returned, as the session diff's is, so a test can wait for the handlers; the store subscriber
   // ignores it.
   const dispatched = events.length ? dispatchEvents(events) : null;
@@ -10929,7 +10966,14 @@ function onPreviewSessionsChanged(sessions) {
   const events = [];
   const next = new Map();
   let controlsById = null;
+  // Who moved each control: a hand, unless the plug-in said the DAW or a project did (noteHostValue)
+  // or a dump filled it (sessionsOrigin).
+  const spans = [];
+  const byDefault = sessionsOrigin ?? 'user';
+  sessionsOrigin = null;
   for (const [id, s] of Object.entries(sessions ?? {})) {
+    spans.push({ from: events.length, origin: controlOrigins.get(id) ?? byDefault });
+    controlOrigins.delete(id);
     const prev = live.sessionLast.get(id);
     controlsById ??= new Map(flatControls(livePanel()?.controls ?? []).map((c) => [c?._children?.Core?.id, c]));
     const cur = sessionEntry(s, prev, controlsById.get(id));
@@ -11050,6 +11094,10 @@ function onPreviewSessionsChanged(sessions) {
     }
   }
   live.sessionLast = next;
+  for (let k = 0; k < spans.length; k += 1) {
+    const to = k + 1 < spans.length ? spans[k + 1].from : events.length;
+    for (let i = spans[k].from; i < to; i += 1) events[i].origin = spans[k].origin;
+  }
   const dispatched = events.length ? dispatchEvents(events) : null;
   // The reactive rules settle AFTER the declared events, and run even when there were no
   // events at all: a nested field moving (a colour, a section property) produces no
@@ -11194,7 +11242,10 @@ function onPreviewModeChanged(on) {
 function onDumpParsed(payload) {
   const values = payload?.values ?? payload?.parsed?.values ?? null;
   const role = payload?.deviceRole ?? DEFAULT_ROLE;
-  if (values && typeof values === 'object') syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  if (values && typeof values === 'object') {
+    sessionsOrigin = 'device';
+    syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  }
 
   const events = [{ event: 'onDumpReceived', controlName: null,
     payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role } }];
@@ -11296,6 +11347,172 @@ function mpeFor(scriptId) {
     listen: (role, opts) => midiInDecode.listen(role, opts),
   });
   return mpeShared;
+}
+
+/* ------------------------------------------------------------------ ce.daw and origin() */
+// docs/design/ce-daw-module.md. With the plug-in's window open the page reads the DAW from what the
+// processor pushes (PlayerHost::pushDawInfo), since the bridge cannot answer while a script waits,
+// and sends what a script changes back (dawCommand). In the editor there is no DAW: the questions
+// that need one answer nothing, and parameters gives the list the next export would bake.
+
+let currentOrigin = null;          // what origin() answers inside a handler
+/** Whether handlers are running (setValue has a `live` of its own, so it asks here). */
+function dispatchingNow() { return live.dispatching; }
+let panelsOrigin = null;           // who made the next panel-document change, when not a hand
+let sessionsOrigin = null;         // who made the next preview change, when not a hand: a dump
+const controlOrigins = new Map();  // control id -> "host" | "load", from the plug-in's pushes
+let dawInfo = null;                // the plug-in's picture; null in the editor
+let dawCommandSink = null;         // sends a change to the plug-in
+let dawParamSink = null;           // sends a spare parameter's new position
+const dawPageGestures = new Set(); // paths a script in this window holds a gesture on
+
+/** The plug-in's picture of the DAW, as PlayerHost pushes it. null: the editor. */
+export function setDawInfo(info) {
+  dawInfo = info && typeof info === 'object' ? info : null;
+  if (!dawInfo) dawPageGestures.clear();
+}
+export function setDawCommandSink(fn) { dawCommandSink = typeof fn === 'function' ? fn : null; }
+export function setDawParamSink(fn) { dawParamSink = typeof fn === 'function' ? fn : null; }
+
+/** The plug-in pushed a value for this control: the DAW's move, or a project's ("load"). */
+export function noteHostValue(controlId, why) {
+  if (controlId != null && (why === 'host' || why === 'load')) controlOrigins.set(String(controlId), why);
+}
+
+function dawEntry(id) {
+  return (Array.isArray(dawInfo?.parameters) ? dawInfo.parameters : []).find((p) => p?.id === id) ?? null;
+}
+
+/** The DAW moved parameter `id`: automationIn, after the control's own value events. */
+export function raiseAutomationIn(id, value) {
+  const entry = dawEntry(String(id));
+  if (!entry?.path) return null;
+  const control = entry.control ?? String(entry.path).split('.')[0];
+  return dispatchEvents([{ event: 'onAutomationIn', controlName: null, origin: 'host',
+    payload: { control, path: entry.path, value, id: entry.id } }]);
+}
+
+/** The DAW chose a program, and the plug-in has sent it. */
+export function raiseDawProgramIn(program) {
+  if (!program || typeof program !== 'object') return null;
+  const payload = { index: program.index, number: program.number, name: program.name };
+  if (dawInfo) dawInfo = { ...dawInfo, program: { ...(dawInfo.program ?? {}), ...payload } };
+  return dispatchEvents([{ event: 'onDawProgramIn', controlName: null, origin: 'host', payload }]);
+}
+
+/** A spare parameter moved in the DAW (or arrived with a project): its control moves with it. */
+export function dawSpareMoved(slot, at, why = 'host') {
+  const entry = dawEntry(`spare${slot}`);
+  if (!entry?.path) return;
+  const min = Number(entry.min), max = Number(entry.max);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+  let value = min + Math.max(0, Math.min(1, Number(at) || 0)) * (max - min);
+  if (entry.kind === 'choice') value = Math.round(value);
+  panelsOrigin = why === 'load' ? 'load' : 'host';
+  setValue(entry.path, value);
+  panelsOrigin = null;
+  if (why !== 'load') raiseAutomationIn(entry.id, value);
+}
+
+/** A control on a spare moved, not by the spare: the spare follows, so the DAW sees it. */
+function dawFollowSpare(controlName, value) {
+  if (!dawInfo || !dawParamSink || controlName == null) return;
+  for (const entry of dawInfo.parameters ?? []) {
+    if (!entry?.path || !String(entry.id).startsWith('spare') || entry.control !== controlName) continue;
+    const min = Number(entry.min), max = Number(entry.max);
+    const v = Number(value);
+    if (!Number.isFinite(v) || !(max > min)) continue;
+    dawParamSink(entry.id, Math.max(0, Math.min(1, (v - min) / (max - min))));
+  }
+}
+
+/** The list the next export would bake, as ce.daw.parameters gives it in the editor. */
+function editorDawParameters() {
+  const panel = livePanel();
+  const list = collectExportParameters(panel).map((p) => {
+    const entry = {
+      id: p.id, name: p.label ?? p.id, path: p.path, control: p.controlName ?? String(p.path).split('.')[0],
+      min: p.min, max: p.max, default: p.defaultValue, unit: p.unit ?? '', kind: p.valueKind ?? 'float',
+      value: getValue(p.path),
+    };
+    if (entry.kind === 'choice' && Array.isArray(p.choiceLabels)) entry.choices = [...p.choiceLabels];
+    if (p.group) entry.group = p.group;
+    return entry;
+  });
+  const spares = Math.max(0, Math.min(32, Math.floor(Number(panel?.exportSettings?.spareDawParameters) || 0)));
+  for (let slot = 1; slot <= spares; slot += 1) {
+    list.push({ id: `spare${slot}`, name: `Spare ${slot}`, slot, min: 0, max: 1, default: 0, unit: '', kind: 'float', value: 0 });
+  }
+  return list;
+}
+
+/** What a control on a spare is shown as: its exported parameter's range, else its own. */
+function spareDisplayFor(path) {
+  const name = String(path).split('.')[0];
+  const exported = collectExportParameters(livePanel()).find((p) => p.path === path);
+  if (exported) {
+    const d = { min: exported.min, max: exported.max, unit: exported.unit ?? '' };
+    if (exported.valueKind === 'choice' && Array.isArray(exported.choiceLabels)) d.choices = [...exported.choiceLabels];
+    return d;
+  }
+  const control = findControlByName(name);
+  const range = control ? rangeOf(control) : null;
+  if (!range) return null;
+  const unit = control?._children?.Behavior?.unit;
+  return { min: range.min, max: range.max, unit: typeof unit === 'string' ? unit : '' };
+}
+
+function dawHostFor(scriptId) {
+  const say = (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text);
+  const send = (command) => { if (dawCommandSink) dawCommandSink(command); };
+  return {
+    say,
+    query(op, fields) {
+      if (!dawInfo) {
+        if (op === 'parameters') return editorDawParameters();
+        if (op === 'programs') return [];
+        if (op === 'host' || op === 'program') return undefined;
+        return false;
+      }
+      const params = Array.isArray(dawInfo.parameters) ? dawInfo.parameters : [];
+      const named = (path) => params.find((p) => p?.path === (String(path).includes('.') ? path : `${path}.value`)
+        && !String(p.id).startsWith('spare'));
+      if (op === 'host') return dawInfo.host ? { ...dawInfo.host, editorOpen: true } : undefined;
+      if (op === 'parameters') return params.map((p) => ({ ...p, ...(p.path ? { value: getValue(p.path) } : {}) }));
+      if (op === 'program') return dawInfo.program ?? undefined;
+      if (op === 'programs') return Array.isArray(dawInfo.programs) ? dawInfo.programs : [];
+      if (op === 'beginGesture' || op === 'endGesture') {
+        const p = named(fields.path);
+        if (!p) return false;
+        if (op === 'beginGesture' ? dawPageGestures.has(p.path) : !dawPageGestures.has(p.path)) return false;
+        if (op === 'beginGesture') dawPageGestures.add(p.path); else dawPageGestures.delete(p.path);
+        send({ op, path: p.path });
+        return true;
+      }
+      if (op === 'rename') {
+        const p = named(fields.path);
+        if (!p) return false;
+        send({ op, path: p.path, name: fields.name });
+        return true;
+      }
+      if (op === 'assign') {
+        const count = Math.floor(Number(dawInfo.spares) || 0);
+        if (fields.slot > count) return false;
+        if (fields.path === '') { send({ op, slot: fields.slot, path: '', name: '' }); return true; }
+        const path = String(fields.path).includes('.') ? fields.path : `${fields.path}.value`;
+        const display = spareDisplayFor(path);
+        if (!display) return false;
+        send({ op, slot: fields.slot, path, name: fields.name, display });
+        return true;
+      }
+      if (op === 'markChanged') {
+        send({ op });
+        scheduleDawStateSave();
+        return true;
+      }
+      return undefined;
+    },
+  };
 }
 
 /** Tests feed the decoder through the same door the bridge does, at a time they choose. */

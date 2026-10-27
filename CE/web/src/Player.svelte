@@ -13,7 +13,8 @@
   import { installHostKeyForwarding } from './CE_Application/utils/hostKeys.js';
   import { paramEvents, endOpenGestures } from './CE_Application/utils/playerParamEvents.js';
   import { DEFAULT_PANIC_SHORTCUT, isPanicShortcut } from './CE_Application/utils/panicLayout.js';
-  import { initPanelRuntime, setRuntimeHost, setDawStateSink, setDawRestoreForNextStart, raiseDawRestoreState } from './CE_Application/scripting/panelRuntime.js';
+  import { initPanelRuntime, setRuntimeHost, setDawStateSink, setDawRestoreForNextStart, raiseDawRestoreState,
+    setDawInfo, setDawCommandSink, setDawParamSink, noteHostValue, raiseAutomationIn, raiseDawProgramIn, dawSpareMoved } from './CE_Application/scripting/panelRuntime.js';
   import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
@@ -195,15 +196,25 @@
   // through the surface's patchSession (the same path a user drag uses) so the device binding
   // actually sends MIDI on playback. The lastParamValue guard stops this from echoing back into a
   // recorded value (set BEFORE the patch, so the session watcher sees no change to re-emit).
-  function applyParamSync(parameterId, value) {
-    const m = controlByParam[parameterId];
+  function applyParamSync(parameterId, value, fromHost = true) {
     const v = Number(value);
+    // A spare parameter (ce.daw.assign) stands for whichever control a script put on it.
+    if (/^spare\d+$/.test(String(parameterId)) && Number.isFinite(v)) {
+      const seed = hostSeeds.isSeed(parameterId);
+      if (lastParamValue[parameterId] === v) return;
+      lastParamValue[parameterId] = v;
+      if (seed || fromHost) dawSpareMoved(Number(String(parameterId).slice(5)), v, seed ? 'load' : 'host');
+      return;
+    }
+    const m = controlByParam[parameterId];
     if (!m || !Number.isFinite(v)) return;
     // Marked before the duplicate check: a saved value equal to what the control already shows is
     // still this parameter's seed, and leaving it unmarked would swallow the first real automation.
     const seed = hostSeeds.isSeed(parameterId);
     if (lastParamValue[parameterId] === v) return;
     lastParamValue[parameterId] = v;
+    // origin(): the scripts hear this move as the project's (the seed) or the DAW's, not a hand's.
+    if (seed || fromHost) noteHostValue(m.controlId, seed ? 'load' : 'host');
     // Store-by-name selector: the host index maps back to a choice name to write.
     const writeValue = m.choiceParam ? choiceValueAt(m.choiceParam, v) : v;
     // 1. Move the on-screen control (silent — no echo back into the recorded value). Three
@@ -211,6 +222,7 @@
     //    CustomComponent value channel, or the plain Behavior value.
     const patch = hostValuePatch(m, v, writeValue, get(panelPreviewSessions)?.[m.controlId]);
     updatePanelPreviewSession(m.controlId, patch);
+    if (!seed && fromHost) raiseAutomationIn(parameterId, writeValue);
     // The first value after the panel loads is the saved or current state, pushed so the controls
     // show it. It is not an instruction to the synth: sending it is what used to push a reopened
     // project at the hardware on window open, whatever the restore policy said. The processor's
@@ -618,6 +630,8 @@
     let sysexUnsub = null;
     let sessionsUnsub = null;
     let paramSyncToken = null;
+    let dawInfoToken = null;
+    let dawProgramToken = null;
     let deviceUnsub = null;
     let restoreToken = null;
     let sessionToken = null;
@@ -644,7 +658,12 @@
       // Host parameter <-> control (M2 two-way): user moves a control -> emitChangedParams records
       // automation; DAW automation -> applyParamSync moves the control.
       sessionsUnsub = panelPreviewSessions.subscribe((sessions) => emitChangedParams(sessions, backend));
-      paramSyncToken = backend.addEventListener('paramSync', (p) => applyParamSync(p?.id, p?.value));
+      paramSyncToken = backend.addEventListener('paramSync', (p) => applyParamSync(p?.id, p?.value, p?.host !== false));
+      // ce.daw, window open: the processor's picture of the DAW, and the scripts' changes back to it.
+      dawInfoToken = backend.addEventListener('dawInfo', (info) => setDawInfo(info));
+      dawProgramToken = backend.addEventListener('dawProgram', (program) => raiseDawProgramIn(program));
+      setDawCommandSink((command) => backend.emitEvent('dawCommand', command));
+      setDawParamSink((id, value) => backend.emitEvent('paramChanged', { id, value }));
       loadToken = backend.addEventListener('loadPanel', (payload) => {
         loadPanelDocument(payload?.panel ?? payload?.json ?? payload);
       });
@@ -693,6 +712,11 @@
       if (window.__CE_LOAD_PANEL__ === loadPanel) delete window.__CE_LOAD_PANEL__;
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
+      if (backend && dawInfoToken != null) backend.removeEventListener(dawInfoToken);
+      if (backend && dawProgramToken != null) backend.removeEventListener(dawProgramToken);
+      setDawInfo(null);
+      setDawCommandSink(null);
+      setDawParamSink(null);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
       if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
       if (backend && dawRestoreToken != null) backend.removeEventListener(dawRestoreToken);

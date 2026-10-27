@@ -108,6 +108,11 @@ sol::object varToSol (sol::state_view lua, const juce::var& v)
 }
 
 const char* kPrelude = R"LUA(
+-- @module ce.core
+-- origin(): who made the change the running handler is for ("user", "script", "host", "device",
+-- "load"); nil outside a handler. The plug-in knows, and answers the "origin" device query.
+function origin() return __deviceQuery("origin", {}) end
+
 -- @module ce.math
 -- Pure-math helpers (no host). Keep in sync with the JS prelude + panelApi.js.
 -- A whole number prints as one ("9", not Lua's "9.0" for a float), as it does in the other runtimes.
@@ -4518,6 +4523,110 @@ function mpeNotes() return M.notes() end
 function mpeListen(opts) return M.listen(opts) end
 end
 
+-- @module ce.daw
+-- ce.daw, ported line for line from dawCore.js (the panel view's; the JavaScript prelude runs that
+-- file itself). Held to the panel view's answers by test/dawParity.test.js and the scenario in
+-- test/support/dawScenario.mjs. Everything is asked of the plug-in, as the "daw" device query.
+do
+  local function present(v) return v ~= nil end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local function needPath(verb, path, what)
+      if type(path) == "string" and path ~= "" then return true end
+      say("error", "ce.daw." .. verb .. ": path must be a control's path, such as \"Cutoff.value\", so " .. what .. ".")
+      return false
+    end
+    local function list(op)
+      local answer = host.query(op, {})
+      if type(answer) == "table" then return answer end
+      return {}
+    end
+    local function tbl(op)
+      local answer = host.query(op, {})
+      if type(answer) == "table" then return answer end
+      return nil
+    end
+    local C = {}
+    function C.host() return tbl("host") end
+    function C.parameters() return list("parameters") end
+    function C.parameter(path)
+      if not needPath("parameter", path, "there is nothing to give") then return nil end
+      for _, p in ipairs(C.parameters()) do
+        if type(p) == "table" and p.path == path then return p end
+      end
+      return nil
+    end
+    function C.program() return tbl("program") end
+    function C.programs() return list("programs") end
+    local function gesture(verb, path)
+      if not needPath(verb, path, "nothing was done") then return false end
+      return host.query(verb, { path = path }) == true
+    end
+    function C.beginGesture(path) return gesture("beginGesture", path) end
+    function C.endGesture(path) return gesture("endGesture", path) end
+    function C.rename(path, name)
+      if not needPath("rename", path, "nothing was renamed") then return false end
+      if present(name) and type(name) ~= "string" then
+        say("error", "ce.daw.rename: name must be text, or nothing for the name it was exported with, so nothing was renamed.")
+        return false
+      end
+      return host.query("rename", { path = path, name = name or "" }) == true
+    end
+    function C.assign(slot, path, opts)
+      if type(slot) ~= "number" or slot ~= slot or slot == math.huge or slot == -math.huge
+          or math.floor(slot) ~= slot or slot < 1 then
+        say("error", "ce.daw.assign: slot must be a whole number from 1, so nothing was assigned.")
+        return false
+      end
+      if present(path) and (type(path) ~= "string" or path == "") then
+        say("error", "ce.daw.assign: path must be a control's path, such as \"Cutoff.value\", or nothing to empty the slot, so nothing was assigned.")
+        return false
+      end
+      local name = nil
+      if type(opts) == "table" then name = opts.name end
+      if present(name) and type(name) ~= "string" then
+        say("error", "ce.daw.assign: name must be text, so nothing was assigned.")
+        return false
+      end
+      return host.query("assign", { slot = slot, path = path or "", name = name or "" }) == true
+    end
+    function C.markChanged() return host.query("markChanged", {}) == true end
+    return C
+  end
+
+  local D = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    query = function(op, fields)
+      local q = {}
+      for k, v in pairs(fields) do q[k] = v end
+      q.op = op
+      return __deviceQuery("daw", q)
+    end,
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function dawHost() return D.host() end
+-- (global; at the line start, where the option check looks for it)
+function dawParameters() return D.parameters() end
+-- (global; at the line start, where the option check looks for it)
+function dawParameter(path) return D.parameter(path) end
+-- (global; at the line start, where the option check looks for it)
+function dawProgram() return D.program() end
+-- (global; at the line start, where the option check looks for it)
+function dawPrograms() return D.programs() end
+-- (global; at the line start, where the option check looks for it)
+function dawBeginGesture(path) return D.beginGesture(path) end
+-- (global; at the line start, where the option check looks for it)
+function dawEndGesture(path) return D.endGesture(path) end
+-- (global; at the line start, where the option check looks for it)
+function dawRename(path, name) return D.rename(path, name) end
+-- (global; at the line start, where the option check looks for it)
+function dawAssign(slot, path, opts) return D.assign(slot, path, opts) end
+-- (global; at the line start, where the option check looks for it)
+function dawMarkChanged() return D.markChanged() end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -7083,6 +7192,7 @@ local __CE_OPTIONS = {
   ["ciSet"] = { path = "ce.ci.set", at = 4, refusal = "false", names = { "resId", "timeoutMs", "partial", "mediaType" } },
   ["ciSubscribe"] = { path = "ce.ci.subscribe", at = 3, refusal = "nothing", names = { "resId" } },
   ["ciSetProfile"] = { path = "ce.ci.setProfile", at = 4, refusal = "false", names = { "channel" } },
+  ["dawAssign"] = { path = "ce.daw.assign", at = 3, refusal = "false", names = { "name" } },
   ["mpeZone"] = { path = "ce.mpe.zone", at = 1, refusal = "false", names = { "zone", "members", "bendRange", "managerBendRange", "send", "role" } },
   ["mpeNoteOn"] = { path = "ce.mpe.noteOn", at = 3, refusal = "nothing", names = { "bend", "pressure", "timbre" } },
   ["mpeExpress"] = { path = "ce.mpe.express", at = 2, refusal = "false", names = { "bend", "pressure", "timbre" } },
@@ -7202,7 +7312,7 @@ end
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
-  ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
+  ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", origin = "origin", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromARGB = "colourFromArgb", fromHsl = "hslToHex", fromRGBA = "colourFromRgba", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
@@ -7216,6 +7326,7 @@ local __CE_MODULES = {
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.daw"] = { assign = "dawAssign", beginGesture = "dawBeginGesture", endGesture = "dawEndGesture", host = "dawHost", markChanged = "dawMarkChanged", parameter = "dawParameter", parameters = "dawParameters", program = "dawProgram", programs = "dawPrograms", rename = "dawRename" },
   ["ce.mpe"] = { allOff = "mpeAllOff", express = "mpeExpress", listen = "mpeListen", noteOff = "mpeNoteOff", noteOn = "mpeNoteOn", notes = "mpeNotes", zone = "mpeZone" },
   ["ce.ci"] = { devices = "ciDevices", discover = "ciDiscover", draftProfile = "ciDraftProfile", get = "ciGet", profiles = "ciProfiles", set = "ciSet", setProfile = "ciSetProfile", subscribe = "ciSubscribe", unsubscribe = "ciUnsubscribe" },
   ["ce.file"] = { folder = "fileFolder", list = "fileList", midiRead = "fileMidiRead", midiWrite = "fileMidiWrite", open = "fileOpen", read = "fileRead", save = "fileSave", saveIn = "fileSaveIn", syxJoin = "fileSyxJoin", syxSplit = "fileSyxSplit", write = "fileWrite" },
@@ -7251,7 +7362,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.mpe", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.daw", "ce.mpe", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -7267,6 +7378,7 @@ local __CE_META = {
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.daw", version = "1.0", runtime = "any" },
   { id = "ce.mpe", version = "1.0", runtime = "any" },
   { id = "ce.ci", version = "1.0", runtime = "any" },
   { id = "ce.file", version = "1.0", runtime = "any" },

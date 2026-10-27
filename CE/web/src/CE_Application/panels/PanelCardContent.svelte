@@ -113,6 +113,7 @@
   let effectivePluginName = $derived((exportSettings.pluginName?.trim()) || panel?.name || 'CEditor Panel');
   // 'ask' | 'always' | 'never'. A panel saved before the key existed reads as 'ask', matching
   // Player/RestorePolicy.h's parse so the editor and the plugin cannot disagree about the default.
+  let spareDawParameters = $derived(Math.max(0, Math.min(32, Math.floor(Number(exportSettings.spareDawParameters) || 0))));
   let restoreHardwareMode = $derived(['ask', 'always', 'never'].includes(exportSettings.restoreHardware)
     ? exportSettings.restoreHardware : 'ask');
 
@@ -1052,6 +1053,17 @@
             the answer.
           {/if}
         </span>
+      </PropertyCell>
+    </PropertySection>
+
+    <!-- ce.daw (docs/design/ce-daw-module.md). The list a DAW automates is fixed at export; spare
+         parameters are places in it a script fills later (ce.daw.assign), added at the end so no
+         parameter moves. -->
+    <PropertySection title="DAW Parameters" icon={Scale}>
+      <PropertyCell label="Spare parameters" span={4}
+                    hint="Extra DAW parameters, Spare 1 onwards, that a script puts a control on with ce.daw.assign. For a panel with more controls than it gives the DAW, or one whose page decides what the knobs are. 0 to 32.">
+        <NumberCell value={spareDawParameters} step={1} min={0} max={32}
+                    onchange={(v) => setExportSetting('spareDawParameters', Math.max(0, Math.min(32, Math.floor(Number(v) || 0))))} />
       </PropertyCell>
     </PropertySection>
 

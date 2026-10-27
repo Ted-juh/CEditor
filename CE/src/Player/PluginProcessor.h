@@ -84,7 +84,7 @@ private:
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
         , panelParams (ce::parseExportParameters (panel->doc))
-        , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
+        , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams, ce::readSpareParameterCount (panel->doc)))
 #endif
     {
         const juce::var& panelDocument = panel->doc;
@@ -98,6 +98,7 @@ private:
         // setting existed pushed nothing at all.
         restorePolicy = ce::readPanelRestorePolicy (panelDocument);
         programBank = ce::parseProgramBank (panelDocument);
+        spareCount = ce::readSpareParameterCount (panelDocument);
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -164,6 +165,7 @@ public:
             // end of the scripts, as distinct from the window closing (onPanelClose), which they
             // survive.
             if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
+            endScriptGestures (false, "the plug-in closed");
            #endif
             stopTimer();
            #if CEDITOR_SCRIPTING
@@ -175,7 +177,16 @@ public:
     }
 #endif
 
-    void prepareToPlay (double, int) override {}
+    // Kept for ce.daw.host(): nothing here plays audio, but a script may want to know.
+    void prepareToPlay (double sampleRate, int blockSize) override
+    {
+       #if CEDITOR_VALUE_LAYER
+        hostSampleRate.store (sampleRate);
+        hostBlockSize.store (blockSize);
+       #else
+        juce::ignoreUnused (sampleRate, blockSize);
+       #endif
+    }
     void releaseResources() override {}
     // The plugin PRODUCES MIDI on its output bus; the DAW routes that track to the synth's port (the
     // standard VST3 path — no in-plugin port picker). Drain whatever the panel queued on the message
@@ -397,6 +408,13 @@ public:
         // rides along and the two agree either way.
         if (currentProgram != 0)
             root.createNewChildElement ("CurrentProgram")->addTextElement (juce::String (currentProgram));
+        // ce.daw: the names scripts gave parameters and the controls on the spare parameters, so a
+        // reopened project's automation lands on the control it was written for.
+        {
+            const juce::SpinLock::ScopedLockType lock (dawStateLock);
+            if (dawStateJson.isNotEmpty())
+                root.createNewChildElement ("DawState")->addTextElement (dawStateJson);
+        }
 
         // S3: the whole patch, as bytes, beside the automation list.
         //
@@ -462,6 +480,14 @@ public:
             // whole patch back; a program change on top of it would recall a slot over the top of
             // the patch that was just restored, which is the wrong sound and the wrong order. A
             // change the host asked for before this state arrived goes with the state it preceded.
+            {
+                const juce::SpinLock::ScopedLockType lock (dawStateLock);
+                auto* daw = xml->getChildByName ("DawState");
+                pendingDawStateJson = daw != nullptr ? daw->getAllSubText() : juce::String();
+                dawStateJson = pendingDawStateJson;
+            }
+            dawStateRestorePending.store (true);
+            loadPending.store (true);
             const auto recall = ce::readSessionRecall (*xml, ce::hostProgramCount (programBank));
             setRestoreAnswer (recall.restoreAnswer);
             currentProgram = recall.program;
@@ -522,6 +548,7 @@ public:
             currentProgram = 0;
             programChangePending.store (false);
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            loadPending.store (true);
             markSessionRestored();
         }
         else
@@ -560,12 +587,31 @@ public:
     {
         if (auto* p = apvts.getParameter (parameterId))
         {
-            const auto inGesture = uiGestures.count (parameterId) > 0;
+            // Inside a hand's press, or a gesture a script began (ce.daw.beginGesture): one move.
+            const auto inGesture = uiGestures.count (parameterId) > 0 || scriptGestures.count (parameterId) > 0
+                                || pageScriptGestures.count (parameterId) > 0;
             if (! inGesture) p->beginChangeGesture();
             p->setValueNotifyingHost (p->convertTo0to1 (value));
             if (! inGesture) p->endChangeGesture();
+            // The panel's own value: when the DAW reads it back, it is not the DAW's move.
+            if (auto* raw = apvts.getRawParameterValue (parameterId)) ownValue[parameterId] = raw->load();
         }
     }
+
+    // --- ce.daw, for the window ------------------------------------------------------------------
+    std::function<void()> onDawInfoChanged;                      // the picture changed: push it
+    std::function<void (const juce::var& program)> onDawProgramForPage;
+    juce::var dawInfoNow() const { return dawInfoForPage(); }
+    void applyDawCommandFromPage (const juce::var& command) { dawQuery (command, true); }
+    /** Whether `value` is what the panel itself last set this parameter to: then it is not news. */
+    bool valueIsOwn (const juce::String& parameterId, float value) const
+    {
+        const auto it = ownValue.find (parameterId);
+        return it != ownValue.end() && it->second == value;
+    }
+    int spareParameterCount() const { return spareCount; }
+    /** The gestures a script in the window left open end with the window. */
+    void endPageScriptGestures() { endScriptGestures (true, "the window closed"); }
 
     void beginUiGesture (const juce::String& parameterId)
     {
@@ -731,7 +777,10 @@ private:
     void timerCallback() override
     {
         applyStagedRestore();
+        servicePendingDawState();   // before any value is read, so automation lands where it was written
         const bool windowOpen = getActiveEditor() != nullptr;
+        const bool loading = loadPending.exchange (false);
+        juce::ignoreUnused (loading);
        #if CEDITOR_SCRIPTING
         servicePendingScriptRestore();
         if (scriptRuntime != nullptr)
@@ -780,6 +829,18 @@ private:
             // parameter on close, which pushed a reopened project at the synth after the user had
             // answered "Not now" or "Never" — the restore decision is the only thing that may do that.
             rebaselineSentMidi();
+           #if CEDITOR_SCRIPTING
+            // The window's scripts heard what moved while it was open; the window-shut ones take the
+            // values as they are now, rather than hearing them again as the DAW's.
+            for (const auto& desc : panelParams)
+                if (auto* raw = apvts.getRawParameterValue (desc.id))
+                {
+                    lastScriptValue[desc.id] = raw->load();
+                    if (desc.path.isNotEmpty()) scriptValues.setValue (desc.path, raw->load());
+                }
+            for (int slot = 1; slot <= spareCount; ++slot)
+                if (auto* spare = spareParameter (slot)) lastSpareValue[slot] = spare->position();
+           #endif
             wasWindowOpen = false;
         }
         for (const auto& desc : panelParams)
@@ -807,10 +868,13 @@ private:
         if (scriptRuntime != nullptr)
             scriptRuntime->tickAnimations ((double) juce::Time::getMillisecondCounterHiRes());
         dispatchScriptTimeEvents();
-        // Window-closed value events: when a bound parameter changes (DAW automation), update the
-        // mirror and dispatch onValueChanged so scripts react with the GUI closed (window-open the JS
-        // runtime does this). Change-detected so it fires once per move, not every tick.
+        // Window-closed value events: when a parameter changes, update the mirror and raise the value
+        // events the window raises, with origin() saying who moved it: "host" for the DAW, which
+        // also raises automationIn, and "load" for a project's values arriving. The panel's own
+        // change (a script's set(), a hand while the window was open) is not news, and used to come
+        // back here as if the DAW had made it. Change-detected, so once per move, not every tick.
         if (scriptRuntime != nullptr)
+        {
             for (const auto& desc : panelParams)
             {
                 if (desc.path.isEmpty()) continue;
@@ -821,10 +885,518 @@ private:
                 if (it != lastScriptValue.end() && it->second == v) continue;
                 lastScriptValue[desc.id] = v;
                 scriptValues.setValue (desc.path, v);
-                scriptRuntime->dispatchEvent ("onValueChanged", desc.path.upToFirstOccurrenceOf (".", false, false), juce::var (v));
+                if (! loading && valueIsOwn (desc.id, v)) continue;
+                followSpare (desc.path);
+                dispatchValueEvents (desc.path, juce::var (v), loading ? "load" : "host", desc.id);
             }
+            for (int slot = 1; slot <= spareCount; ++slot)
+            {
+                auto* spare = spareParameter (slot);
+                if (spare == nullptr) continue;
+                const float v = spare->position();
+                const auto it = lastSpareValue.find (slot);
+                if (it != lastSpareValue.end() && it->second == v) continue;
+                lastSpareValue[slot] = v;
+                if (! loading && valueIsOwn (spare->paramID, v)) continue;
+                spareMovedByHost (slot, v, loading ? "load" : "host");
+            }
+        }
        #endif
     }
+
+    // --- ce.daw (docs/design/ce-daw-module.md) ---------------------------------------------------
+    //
+    // What a script sees of the DAW, and the changes it may make to what the DAW sees. Everything
+    // here is the message thread's except what the host reads from its own threads: the names
+    // (the parameters hold them behind a lock of their own), and the saved picture of names and
+    // assignments (dawStateJson, behind dawStateLock).
+
+    std::atomic<double> hostSampleRate { 0.0 };
+    std::atomic<int> hostBlockSize { 0 };
+    int spareCount = 0;
+    std::map<juce::String, float> ownValue;          // id -> the value the panel itself last set it to
+    std::set<juce::String> scriptGestures;           // ids a window-shut script holds a gesture on
+    std::set<juce::String> pageScriptGestures;       // ids a script in the window holds one on
+    std::map<juce::String, juce::String> dawNames;   // id -> the name a script gave it
+    struct SpareAssignment { juce::String path, name; ce::SpareDisplay display; };
+    std::map<int, SpareAssignment> spareAssignments; // slot -> the control on it
+    std::map<int, float> lastSpareValue;
+    juce::SpinLock dawStateLock;
+    juce::String dawStateJson;                       // names and assignments as a save writes them
+    juce::String pendingDawStateJson;                // as a load read them, until the timer applies them
+    std::atomic<bool> dawStateRestorePending { false };
+    std::atomic<bool> loadPending { false };         // a project's values are arriving: origin "load"
+
+    static juce::String controlPath (const juce::String& path)
+    {
+        return path.containsChar ('.') ? path : path + ".value";
+    }
+
+    static juce::String controlNameOf (const juce::String& path)
+    {
+        return path.upToFirstOccurrenceOf (".", false, false);
+    }
+
+    const ce::PanelParameter* descForPath (const juce::String& path) const
+    {
+        const auto wanted = controlPath (path);
+        for (const auto& desc : panelParams)
+            if (desc.path == wanted) return &desc;
+        return nullptr;
+    }
+
+    ce::SpareParameter* spareParameter (int slot) const
+    {
+        return dynamic_cast<ce::SpareParameter*> (apvts.getParameter ("spare" + juce::String (slot)));
+    }
+
+    /** "vst3", "clap", "lv2", "au" or "standalone". The CLAP wrapper leaves JUCE's wrapper type
+        undefined (clap-juce-extensions' README says so), and is the only one here that does. */
+    juce::String pluginFormat() const
+    {
+        switch (wrapperType)
+        {
+            case wrapperType_VST3:        return "vst3";
+            case wrapperType_LV2:         return "lv2";
+            case wrapperType_AudioUnit:
+            case wrapperType_AudioUnitv3: return "au";
+            case wrapperType_Standalone:  return "standalone";
+            case wrapperType_Undefined:   return "clap";
+            default:                      return "other";
+        }
+    }
+
+    juce::var dawHostInfo() const
+    {
+        auto* o = new juce::DynamicObject();
+        const juce::String name (juce::PluginHostType().getHostDescription());
+        o->setProperty ("name", name.isEmpty() ? juce::String ("Unknown") : name);
+        o->setProperty ("format", pluginFormat());
+        if (const auto rate = hostSampleRate.load(); rate > 0.0) o->setProperty ("sampleRate", rate);
+        if (const auto block = hostBlockSize.load(); block > 0) o->setProperty ("blockSize", block);
+        o->setProperty ("editorOpen", getActiveEditor() != nullptr);
+        return juce::var (o);
+    }
+
+    juce::var dawParameterEntry (const ce::PanelParameter& desc) const
+    {
+        auto* o = new juce::DynamicObject();
+        auto* parameter = apvts.getParameter (desc.id);
+        o->setProperty ("id", desc.id);
+        o->setProperty ("name", parameter != nullptr ? parameter->getName (1024) : desc.label);
+        o->setProperty ("path", desc.path);
+        o->setProperty ("control", controlNameOf (desc.path));
+        o->setProperty ("min", desc.min);
+        o->setProperty ("max", desc.max);
+        o->setProperty ("default", desc.defaultValue);
+        o->setProperty ("unit", desc.unit);
+        o->setProperty ("kind", desc.valueKind);
+        if (desc.valueKind == "choice")
+        {
+            juce::Array<juce::var> choices;
+            for (const auto& c : desc.choiceLabels) choices.add (c);
+            o->setProperty ("choices", choices);
+        }
+        if (desc.group.isNotEmpty()) o->setProperty ("group", desc.group);
+        // The value as get() gives it, in the control's own terms; the parameter's when no script
+        // model is built in.
+       #if CEDITOR_SCRIPTING
+        if (const auto value = scriptValues.getValue (desc.path); ! value.isVoid()) o->setProperty ("value", value);
+        else
+       #endif
+        if (auto* raw = apvts.getRawParameterValue (desc.id)) o->setProperty ("value", raw->load());
+        return juce::var (o);
+    }
+
+    juce::var dawSpareEntry (int slot) const
+    {
+        auto* o = new juce::DynamicObject();
+        auto* spare = spareParameter (slot);
+        o->setProperty ("id", "spare" + juce::String (slot));
+        o->setProperty ("name", spare != nullptr ? spare->getName (1024) : "Spare " + juce::String (slot));
+        o->setProperty ("slot", slot);
+        const auto it = spareAssignments.find (slot);
+        const auto raw = spare != nullptr ? spare->position() : 0.0f;
+        if (it == spareAssignments.end())
+        {
+            o->setProperty ("min", 0.0); o->setProperty ("max", 1.0); o->setProperty ("default", 0.0);
+            o->setProperty ("unit", ""); o->setProperty ("kind", "float"); o->setProperty ("value", raw);
+            return juce::var (o);
+        }
+        const auto& d = it->second.display;
+        o->setProperty ("path", it->second.path);
+        o->setProperty ("control", controlNameOf (it->second.path));
+        o->setProperty ("min", d.min); o->setProperty ("max", d.max); o->setProperty ("default", d.min);
+        o->setProperty ("unit", d.unit);
+        o->setProperty ("kind", d.choices.isEmpty() ? "float" : "choice");
+        if (! d.choices.isEmpty())
+        {
+            juce::Array<juce::var> choices;
+            for (const auto& c : d.choices) choices.add (c);
+            o->setProperty ("choices", choices);
+        }
+        o->setProperty ("value", ce::SpareParameter::controlValueAt (d, raw));
+        return juce::var (o);
+    }
+
+    juce::var dawParameterList() const
+    {
+        juce::Array<juce::var> list;
+        for (const auto& desc : panelParams) list.add (dawParameterEntry (desc));
+        for (int slot = 1; slot <= spareCount; ++slot) list.add (dawSpareEntry (slot));
+        return list;
+    }
+
+    juce::var dawProgramInfo() const
+    {
+        const auto* program = ce::programForIndex (programBank, currentProgram);
+        if (program == nullptr) return {};
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("index", currentProgram);
+        o->setProperty ("number", currentProgram + 1);
+        o->setProperty ("name", program->name);
+        o->setProperty ("count", programBank.size());
+        return juce::var (o);
+    }
+
+    juce::var dawProgramList() const
+    {
+        juce::Array<juce::var> list;
+        for (int i = 0; i < programBank.size(); ++i)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("index", i);
+            o->setProperty ("number", i + 1);
+            o->setProperty ("name", programBank.programs.getReference (i).name);
+            list.add (juce::var (o));
+        }
+        return list;
+    }
+
+    /** Everything the window's ce.daw reads, in one push (PlayerHost::pushDawInfo). */
+    juce::var dawInfoForPage() const
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("host", dawHostInfo());
+        o->setProperty ("parameters", dawParameterList());
+        o->setProperty ("program", dawProgramInfo());
+        o->setProperty ("programs", dawProgramList());
+        o->setProperty ("spares", spareCount);
+        return juce::var (o);
+    }
+
+    void dawInfoChanged()
+    {
+        if (onDawInfoChanged != nullptr) onDawInfoChanged();
+    }
+
+    bool dawBeginGesture (const juce::String& path, bool page)
+    {
+        const auto* desc = descForPath (path);
+        if (desc == nullptr) return false;
+        auto* parameter = apvts.getParameter (desc->id);
+        if (parameter == nullptr || scriptGestures.count (desc->id) > 0 || pageScriptGestures.count (desc->id) > 0)
+            return false;
+        (page ? pageScriptGestures : scriptGestures).insert (desc->id);
+        // A hand already holding it holds the DAW's gesture: the script's joins it rather than
+        // beginning a second one inside it.
+        if (uiGestures.count (desc->id) == 0) parameter->beginChangeGesture();
+        return true;
+    }
+
+    bool dawEndGesture (const juce::String& path, bool page)
+    {
+        const auto* desc = descForPath (path);
+        if (desc == nullptr) return false;
+        if ((page ? pageScriptGestures : scriptGestures).erase (desc->id) == 0) return false;
+        if (uiGestures.count (desc->id) == 0)
+            if (auto* parameter = apvts.getParameter (desc->id))
+                parameter->endChangeGesture();
+        return true;
+    }
+
+    /** Every gesture a script left open is closed: its scripts are going, or its window is. */
+    void endScriptGestures (bool page, const juce::String& why)
+    {
+        auto& open = page ? pageScriptGestures : scriptGestures;
+        for (const auto& id : std::vector<juce::String> (open.begin(), open.end()))
+        {
+            open.erase (id);
+            if (uiGestures.count (id) == 0)
+                if (auto* parameter = apvts.getParameter (id))
+                    parameter->endChangeGesture();
+            scriptLogLine ("[ce.daw] the gesture on \"" + id + "\" was still open when " + why + ", so it was ended.");
+        }
+    }
+
+    bool dawRename (const juce::String& path, const juce::String& name)
+    {
+        const auto* desc = descForPath (path);
+        if (desc == nullptr) return false;
+        if (! ce::renameParameter (apvts.getParameter (desc->id), name)) return false;
+        if (name.isEmpty()) dawNames.erase (desc->id); else dawNames[desc->id] = name;
+        saveDawState();
+        updateHostDisplay (ChangeDetails().withParameterInfoChanged (true));
+        dawInfoChanged();
+        return true;
+    }
+
+    /** How the control at `path` is shown on a spare: the exported parameter's range and texts
+        when it is one, else its own range. False for a control with nothing to show. */
+    bool spareDisplayFor (const juce::String& path, ce::SpareDisplay& d) const
+    {
+        d = {};
+        if (const auto* desc = descForPath (path))
+        {
+            d.assigned = true; d.min = desc->min; d.max = desc->max; d.unit = desc->unit;
+            if (desc->valueKind == "choice") d.choices = desc->choiceLabels;
+            return true;
+        }
+       #if CEDITOR_SCRIPTING
+        const auto control = scriptValues.controlByName (controlNameOf (path));
+        double lo = 0.0, hi = 0.0;
+        if (! control.isObject() || ! ceditor::PanelValueModel::rangeOf (control, lo, hi)) return false;
+        d.assigned = true; d.min = (float) lo; d.max = (float) hi;
+        const auto behavior = ceditor::PanelValueModel::readChildValue (control, "Behavior");
+        const auto unit = behavior.getProperty ("unit", juce::var());
+        if (unit.isString()) d.unit = unit.toString();
+        return true;
+       #else
+        return false;
+       #endif
+    }
+
+    /** Put `path` on spare `slot` (empty empties it). `display` is the window's reading of the
+        control when the window asked; the window-shut engines leave it void and it is worked out
+        here. */
+    bool dawAssign (int slot, const juce::String& pathIn, const juce::String& name, const juce::var& display)
+    {
+        auto* spare = spareParameter (slot);
+        if (spare == nullptr) return false;
+        if (pathIn.isEmpty())
+        {
+            spareAssignments.erase (slot);
+            spare->setDisplay ({});
+            spare->setNameOverride ({});
+        }
+        else
+        {
+            const auto path = controlPath (pathIn);
+            ce::SpareDisplay d;
+            if (auto* given = display.getDynamicObject())
+            {
+                d.assigned = true;
+                d.min = (float) (double) given->getProperty ("min");
+                d.max = (float) (double) given->getProperty ("max");
+                d.unit = given->getProperty ("unit").toString();
+                if (auto* choices = given->getProperty ("choices").getArray())
+                    for (const auto& c : *choices) d.choices.add (c.toString());
+                if (d.max <= d.min) return false;
+            }
+            else if (! spareDisplayFor (path, d)) return false;
+            // A control is on one slot at a time: assigning it again moves it.
+            for (auto it = spareAssignments.begin(); it != spareAssignments.end();)
+            {
+                if (it->first != slot && it->second.path == path)
+                {
+                    if (auto* other = spareParameter (it->first)) { other->setDisplay ({}); other->setNameOverride ({}); }
+                    it = spareAssignments.erase (it);
+                }
+                else ++it;
+            }
+            spareAssignments[slot] = { path, name, d };
+            spare->setDisplay (d);
+            spare->setNameOverride (name.isNotEmpty() ? name : controlNameOf (path));
+            followSpare (path);
+        }
+        saveDawState();
+        updateHostDisplay (ChangeDetails().withParameterInfoChanged (true));
+        dawInfoChanged();
+        return true;
+    }
+
+    /** The control on a spare moved, not by the spare: the spare follows, so the DAW shows it. */
+    void followSpare (const juce::String& pathIn)
+    {
+       #if CEDITOR_SCRIPTING
+        const auto path = controlPath (pathIn);
+        for (const auto& [slot, a] : spareAssignments)
+        {
+            if (a.path != path) continue;
+            auto* spare = spareParameter (slot);
+            if (spare == nullptr || a.display.max <= a.display.min) continue;
+            const auto value = scriptValues.getValue (path);
+            if (value.isVoid()) continue;
+            const auto at = juce::jlimit (0.0f, 1.0f, ((float) (double) value - a.display.min) / (a.display.max - a.display.min));
+            if (std::abs (spare->position() - at) < 1.0e-6f) continue;
+            spare->setValueNotifyingHost (at);
+            ownValue[spare->paramID] = spare->position();
+            lastSpareValue[slot] = spare->position();
+        }
+       #else
+        juce::ignoreUnused (pathIn);
+       #endif
+    }
+
+    bool dawMarkChanged()
+    {
+        updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+       #if CEDITOR_SCRIPTING
+        scriptStateDirty.store (true);   // onDawSaveState on the next tick, ready when the DAW asks
+       #endif
+        return true;
+    }
+
+    /** One ce.daw question or change, from a window-shut script ("daw" device query) or from the
+        window's (`page`). */
+    juce::var dawQuery (const juce::var& q, bool page)
+    {
+        const auto op = q.getProperty ("op", "").toString();
+        const auto path = q.getProperty ("path", "").toString();
+        if (op == "host") return dawHostInfo();
+        if (op == "parameters") return dawParameterList();
+        if (op == "program") return dawProgramInfo();
+        if (op == "programs") return dawProgramList();
+        if (op == "beginGesture") return dawBeginGesture (path, page);
+        if (op == "endGesture") return dawEndGesture (path, page);
+        if (op == "rename") return dawRename (path, q.getProperty ("name", "").toString());
+        if (op == "assign")
+            return dawAssign ((int) q.getProperty ("slot", 0), path, q.getProperty ("name", "").toString(),
+                              q.getProperty ("display", juce::var()));
+        if (op == "markChanged") return dawMarkChanged();
+        return {};
+    }
+
+    /** The names and assignments as a save writes them. Rebuilt on the message thread after each
+        change; getStateInformation, on any thread, takes the text. */
+    void saveDawState()
+    {
+        auto* names = new juce::DynamicObject();
+        for (const auto& [id, name] : dawNames) names->setProperty (id, name);
+        juce::Array<juce::var> spares;
+        for (const auto& [slot, a] : spareAssignments)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("slot", slot);
+            o->setProperty ("path", a.path);
+            if (a.name.isNotEmpty()) o->setProperty ("name", a.name);
+            o->setProperty ("min", a.display.min);
+            o->setProperty ("max", a.display.max);
+            if (a.display.unit.isNotEmpty()) o->setProperty ("unit", a.display.unit);
+            if (! a.display.choices.isEmpty())
+            {
+                juce::Array<juce::var> choices;
+                for (const auto& c : a.display.choices) choices.add (c);
+                o->setProperty ("choices", choices);
+            }
+            spares.add (juce::var (o));
+        }
+        juce::String json;
+        if (! dawNames.empty() || ! spares.isEmpty())
+        {
+            auto* state = new juce::DynamicObject();
+            state->setProperty ("names", juce::var (names));
+            state->setProperty ("spares", spares);
+            json = juce::JSON::toString (juce::var (state), true);
+        }
+        else delete names;
+        const juce::SpinLock::ScopedLockType lock (dawStateLock);
+        dawStateJson = json;
+    }
+
+    /** A project's names and assignments, on the message thread, before any of its automation is
+        read: the timer applies them first on the tick after the load. */
+    void servicePendingDawState()
+    {
+        if (! dawStateRestorePending.exchange (false)) return;
+        juce::String json;
+        {
+            const juce::SpinLock::ScopedLockType lock (dawStateLock);
+            json = pendingDawStateJson;
+        }
+        for (const auto& [id, name] : dawNames) ce::renameParameter (apvts.getParameter (id), {});
+        dawNames.clear();
+        for (const auto& [slot, a] : spareAssignments)
+            if (auto* spare = spareParameter (slot)) { spare->setDisplay ({}); spare->setNameOverride ({}); }
+        spareAssignments.clear();
+        const auto state = juce::JSON::parse (json);
+        if (auto* names = state.getProperty ("names", juce::var()).getDynamicObject())
+            for (const auto& entry : names->getProperties())
+                if (ce::renameParameter (apvts.getParameter (entry.name.toString()), entry.value.toString()))
+                    dawNames[entry.name.toString()] = entry.value.toString();
+        if (auto* spares = state.getProperty ("spares", juce::var()).getArray())
+            for (const auto& s : *spares)
+            {
+                // Not dawAssign's followSpare: the spare's value is the project's, restored with it.
+                const auto slot = (int) s.getProperty ("slot", 0);
+                auto* spare = spareParameter (slot);
+                if (spare == nullptr) continue;
+                ce::SpareDisplay d;
+                d.assigned = true;
+                d.min = (float) (double) s.getProperty ("min", 0.0);
+                d.max = (float) (double) s.getProperty ("max", 1.0);
+                d.unit = s.getProperty ("unit", "").toString();
+                if (auto* choices = s.getProperty ("choices", juce::var()).getArray())
+                    for (const auto& c : *choices) d.choices.add (c.toString());
+                if (d.max <= d.min) continue;
+                const auto name = s.getProperty ("name", "").toString();
+                const auto path = s.getProperty ("path", "").toString();
+                spareAssignments[slot] = { path, name, d };
+                spare->setDisplay (d);
+                spare->setNameOverride (name.isNotEmpty() ? name : controlNameOf (path));
+                lastSpareValue[slot] = spare->position();
+            }
+        saveDawState();
+        updateHostDisplay (ChangeDetails().withParameterInfoChanged (true));
+        dawInfoChanged();
+    }
+
+   #if CEDITOR_SCRIPTING
+    /** The value events for a control a change reached, as the window raises them, with origin()
+        saying who made it; and automationIn when it was the DAW. */
+    void dispatchValueEvents (const juce::String& path, const juce::var& value, const juce::String& origin,
+                              const juce::String& parameterId)
+    {
+        if (scriptRuntime == nullptr) return;
+        OriginScope scope (scriptOrigin, origin);
+        const auto control = controlNameOf (path);
+        scriptRuntime->dispatchEvent ("onValueChange", control, value);
+        auto* changed = new juce::DynamicObject();
+        changed->setProperty ("target", control);
+        changed->setProperty ("value", value);
+        scriptRuntime->dispatchEvent ("onControlChanged", "", juce::var (changed));
+        scriptRuntime->dispatchEvent ("onValueChanged", control, value);
+        if (origin != "host") return;
+        auto* move = new juce::DynamicObject();
+        move->setProperty ("control", control);
+        move->setProperty ("path", path);
+        move->setProperty ("value", value);
+        move->setProperty ("id", parameterId);
+        scriptRuntime->dispatchEvent ("onAutomationIn", "", juce::var (move));
+    }
+
+    /** The DAW moved a spare: its control moves, and the control's own parameter with it. */
+    void spareMovedByHost (int slot, float at, const juce::String& origin)
+    {
+        const auto it = spareAssignments.find (slot);
+        if (it == spareAssignments.end()) return;
+        const auto& a = it->second;
+        const auto value = ce::SpareParameter::controlValueAt (a.display, at);
+        scriptValues.setValue (a.path, value);
+        const auto bound = scriptBoundParamByPath.find (a.path);
+        if (bound != scriptBoundParamByPath.end())
+            if (auto* parameter = apvts.getParameter (bound->second))
+            {
+                parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
+                if (auto* raw = apvts.getRawParameterValue (bound->second))
+                {
+                    ownValue[bound->second] = raw->load();
+                    lastScriptValue[bound->second] = raw->load();
+                }
+            }
+        dispatchValueEvents (a.path, value, origin, "spare" + juce::String (slot));
+    }
+   #endif
 
     ce::HostMidiInputQueue hostMidiInput;
     juce::MemoryBlock hostMidiMessage;
@@ -1008,6 +1580,29 @@ private:
      * weaker and honest: it tells the synth which of its own patches to load, and what is in that
      * slot today is the synth's business.
      */
+    /** The DAW chose a program and its MIDI has gone: dawProgramIn, in whichever runtime runs. */
+    void dawProgramChosen()
+    {
+        const auto program = dawProgramInfo();
+        if (! program.isObject()) return;
+        auto* o = new juce::DynamicObject();
+        for (const auto* key : { "index", "number", "name" }) o->setProperty (key, program.getProperty (key, juce::var()));
+        const juce::var payload = juce::var (o);
+        dawInfoChanged();
+        if (getActiveEditor() != nullptr)
+        {
+            if (onDawProgramForPage != nullptr) onDawProgramForPage (payload);
+            return;
+        }
+       #if CEDITOR_SCRIPTING
+        if (scriptRuntime != nullptr)
+        {
+            OriginScope scope (scriptOrigin, "host");
+            scriptRuntime->dispatchEvent ("onDawProgramIn", "", payload);
+        }
+       #endif
+    }
+
     void serviceProgramChange()
     {
         if (! programChangePending.exchange (false)) return;
@@ -1026,6 +1621,7 @@ private:
             sendRawMidiBytes ("program_" + juce::String (program->slot), bytes);
             scriptLogLine ("[program] sent captured patch \"" + program->name + "\" ("
                            + juce::String (bytes.size()) + " bytes)");
+            dawProgramChosen();
             return;
         }
 
@@ -1048,6 +1644,7 @@ private:
             sendRawMidiBytes ("program_recall_" + juce::String (program->slot), message.bytes);
         scriptLogLine ("[program] recalled slot " + juce::String (program->slot) + " (\"" + program->name
                        + "\", " + juce::String (recall.transaction.messages.size()) + " message(s))");
+        dawProgramChosen();
     }
 
     void serviceRestorePush (bool windowOpen)
@@ -1575,6 +2172,7 @@ private:
 
         auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
         const juce::String messageType = o->getProperty ("messageType").toString();
+        OriginScope origin (scriptOrigin, "device");
 
         // interceptMidiIn runs BEFORE any of the three events below, so a filter that transposes or
         // remaps is seen by every handler rather than by whichever one happened to be dispatched
@@ -1736,6 +2334,7 @@ private:
 
         // Inbound: set()s inside these handlers are silent by default.
         ceditor::scripting::InboundScope inbound (*scriptRuntime);
+        OriginScope origin (scriptOrigin, "device");
 
         // onDumpReceived({ values, kind, role }).
         auto* sp = new juce::DynamicObject();
@@ -1801,6 +2400,8 @@ private:
                         parameterValue = parameter->convertFrom0to1 (
                             juce::jlimit (0.0f, 1.0f, parameterValue));
                 setParamFromUi (it->second, parameterValue);
+                // Taken as seen: a script's set() is never raised back to it as the DAW's move.
+                if (auto* raw = apvts.getRawParameterValue (it->second)) lastScriptValue[it->second] = raw->load();
             }
            #else
             juce::ignoreUnused (transmit);
@@ -1813,6 +2414,9 @@ private:
                 scriptLogLine ("[script] set(\"" + path + "\"): nothing was written — that path does "
                                "not lead anywhere on this panel. A state patch key like "
                                "\"Background.Fill.colour\" is ONE map key rather than three path steps.");
+           #if CEDITOR_VALUE_LAYER
+            else if (transmit) followSpare (path);   // a control on a spare parameter: the DAW sees it move
+           #endif
         };
         // Only a control bound to a host parameter sends anything window-closed (setValue above), so
         // only a write to one spends the flood budget.
@@ -2338,6 +2942,13 @@ private:
             // Answers at once; what the device says comes later as the "__ciReply" event.
             if (kind == "ci") return deviceService.ciCommand (payload);
 
+           #if CEDITOR_VALUE_LAYER
+            // ce.daw: what the DAW is and sees, and the changes a script may make to it.
+            if (kind == "daw") return dawQuery (payload, false);
+           #endif
+            // origin(): who made the change the running handler is for; nothing outside one.
+            if (kind == "origin") return scriptOrigin.isEmpty() ? juce::var() : juce::var (scriptOrigin);
+
             // ce.mpe.listen: how the input decoder reads MPE from a role ("" for every input); no
             // opts stops reading it. Answered here, on the thread the decoder is fed on.
             if (kind == "mpeListen")
@@ -2650,6 +3261,16 @@ private:
     }
 
     ceditor::PanelValueModel scriptValues;
+    // origin(): who made the change the handlers dispatched now are for. Set by OriginScope around
+    // each dispatch that has a "who": the DAW, the synth, a project being opened.
+    juce::String scriptOrigin;
+    struct OriginScope
+    {
+        OriginScope (juce::String& slotIn, const juce::String& now) : slot (slotIn), previous (slotIn) { slot = now; }
+        ~OriginScope() { slot = previous; }
+        juce::String& slot;
+        juce::String previous;
+    };
     std::unique_ptr<ceditor::scripting::BridgeScriptHost> scriptHost;
     std::unique_ptr<ceditor::scripting::ScriptRuntime> scriptRuntime;
     // The MIDI a device sends, decoded once for the window-shut scripts (Scripting/MidiInDecoder.h),
@@ -2884,8 +3505,14 @@ public:
         // UI -> host parameter: the user moved a control, so record automation.
         host.onUiParamChange = [&p] (const juce::String& id, float value) { p.setParamFromUi (id, value); };
         host.onUiParamGesture = [&p] (const juce::String& id, bool begin) { if (begin) p.beginUiGesture (id); else p.endUiGesture (id); };
-        // UI is ready -> force a full re-push of current parameter values on the next tick.
-        host.onResyncRequest = [this] { lastPushed.clear(); };
+        // UI is ready -> force a full re-push of current parameter values on the next tick, and of
+        // what ce.daw reads.
+        host.onResyncRequest = [this, &p] { lastPushed.clear(); host.pushDawInfo (p.dawInfoNow()); };
+        // ce.daw, window open: the page's scripts read the DAW from what is pushed, and what they
+        // change comes back here.
+        p.onDawInfoChanged = [this, &p] { host.pushDawInfo (p.dawInfoNow()); };
+        p.onDawProgramForPage = [this] (const juce::var& program) { host.pushDawProgram (program); };
+        host.onDawCommand = [&p] (const juce::var& command) { p.applyDawCommandFromPage (command); };
         // Total Recall S2: the processor decides WHEN to ask, the panel is WHERE the question goes.
         // Both directions are set here rather than in PlayerHost, because the processor is the only
         // thing that outlives the window and the answer has to be remembered by something that does.
@@ -2921,6 +3548,10 @@ public:
         // than a theoretical one. host.onRestoreAnswer needs no such care: it lives on `host`,
         // which is a member and dies here.
         processor.onRestorePrompt = nullptr;
+        processor.onDawInfoChanged = nullptr;      // the same lambda-captures-this hazard
+        processor.onDawProgramForPage = nullptr;
+        // A gesture a script in the window began and never ended must not hold the DAW's parameter.
+        processor.endPageScriptGestures();
        #if CEDITOR_SCRIPTING
         processor.onDawRestoreForPage = nullptr;   // the same lambda-captures-this hazard
        #endif
@@ -2946,19 +3577,23 @@ private:
             seenSessionRestore = generation;
             host.notifySessionRestored();
         }
-        for (const auto& desc : processor.parameterDescriptors())
+        // Each value that moved, saying whether it is the DAW's (ce.daw's automationIn, origin()) or
+        // one the panel set itself; the spare parameters too, which the page maps to their controls.
+        const auto push = [this] (const juce::String& id)
         {
-            if (auto* raw = processor.parameters().getRawParameterValue (desc.id))
+            if (auto* raw = processor.parameters().getRawParameterValue (id))
             {
                 const float value = raw->load();
-                auto it = lastPushed.find (desc.id);
+                auto it = lastPushed.find (id);
                 if (it == lastPushed.end() || it->second != value)
                 {
-                    lastPushed[desc.id] = value;
-                    host.pushParamToUi (desc.id, value);
+                    lastPushed[id] = value;
+                    host.pushParamToUi (id, value, ! processor.valueIsOwn (id, value));
                 }
             }
-        }
+        };
+        for (const auto& desc : processor.parameterDescriptors()) push (desc.id);
+        for (int slot = 1; slot <= processor.spareParameterCount(); ++slot) push ("spare" + juce::String (slot));
        #endif
     }
 

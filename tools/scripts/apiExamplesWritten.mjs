@@ -261,6 +261,47 @@ export const WRITTEN = {
     lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
     js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
   },
+  origin: {
+    lua: `function onValueChanged(value)\n  if origin() ~= "device" then sendCC(1, 74, value) end\nend`,
+    js: `function onValueChanged(value) {\n  if (origin() !== "device") sendCC(1, 74, value);\n}`,
+  },
+  dawHost: {
+    lua: `local host = ce.daw.host()\nif host then ce.components.lcd.text("Display", 1, host.name) end`,
+    js: `const host = ce.daw.host();\nif (host) ce.components.lcd.text("Display", 1, host.name);`,
+  },
+  dawParameters: {
+    lua: `for _, p in ipairs(ce.daw.parameters()) do log(p.id .. ": " .. p.name) end`,
+    js: `for (const p of ce.daw.parameters()) log(\`\${p.id}: \${p.name}\`);`,
+  },
+  dawParameter: {
+    lua: `local p = ce.daw.parameter("Cutoff.value")\nif p then log("the DAW calls it " .. p.name) end`,
+    js: `const p = ce.daw.parameter("Cutoff.value");\nif (p) log(\`the DAW calls it \${p.name}\`);`,
+  },
+  dawProgram: {
+    lua: `local program = ce.daw.program()\nif program then ce.components.lcd.text("Display", 2, program.number .. " " .. program.name) end`,
+    js: `const program = ce.daw.program();\nif (program) ce.components.lcd.text("Display", 2, \`\${program.number} \${program.name}\`);`,
+  },
+  dawPrograms: {
+    lua: `for _, p in ipairs(ce.daw.programs()) do log(p.number .. " " .. p.name) end`,
+    js: `for (const p of ce.daw.programs()) log(\`\${p.number} \${p.name}\`);`,
+  },
+  dawBeginGesture: {
+    lua: `function onClick()\n  state.step = 0\n  ce.daw.beginGesture("Cutoff.value")\n  startTimer("sweep", 20)\nend`,
+    js: `function onClick() {\n  state.step = 0;\n  ce.daw.beginGesture("Cutoff.value");\n  startTimer("sweep", 20);\n}`,
+  },
+  dawEndGesture: { code: 'ce.daw.endGesture("Cutoff.value")' },
+  dawRename: {
+    lua: `function onValueChanged(mode)\n  ce.daw.rename("Osc2Param.value", mode == 1 and "Sync amount" or "Pulse width")\nend`,
+    js: `function onValueChanged(mode) {\n  ce.daw.rename("Osc2Param.value", mode === 1 ? "Sync amount" : "Pulse width");\n}`,
+  },
+  dawAssign: {
+    lua: `ce.daw.assign(1, "LfoRate.value", { name = "LFO rate" })`,
+    js: `ce.daw.assign(1, "LfoRate.value", { name: "LFO rate" });`,
+  },
+  dawMarkChanged: {
+    lua: `state.notes = "verse 2"\nce.daw.markChanged()`,
+    js: `state.notes = "verse 2";\nce.daw.markChanged();`,
+  },
   mpeZone: {
     lua: `function onPanelLoad()\n  ce.mpe.zone({ members = 7, bendRange = 24 })\nend`,
     js: `function onPanelLoad() {\n  ce.mpe.zone({ members: 7, bendRange: 24 });\n}`,

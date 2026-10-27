@@ -1309,7 +1309,7 @@ const OPTION_ANSWER_CASES = [
   ['ciDiscover', [{ timeout: 5 }, 'fn']], ['ciGet', [7, 'R', { resid: 'a' }, 'fn']], ['ciSet', [7, 'R', {}, { partal: true }, 'fn']],
   ['ciSubscribe', [7, 'R', { resid: 'a' }, 'fn']], ['ciSetProfile', [7, 'X', true, { chanel: 1 }]],
   ['mpeZone', [{ membrs: 7 }]], ['mpeNoteOn', [60, 100, { bnd: 1 }]], ['mpeExpress', [1, { presure: 1 }]],
-  ['mpeListen', [{ form: 'controller' }]],
+  ['mpeListen', [{ form: 'controller' }]], ['dawAssign', [1, 'x.value', { nmae: 'x' }]],
   ['fileSyxSplit', [[0xF0, 0xF7], { partal: true }]], ['fileMidiRead', [[1], { trak: 1 }]], ['fileMidiWrite', [[], { tempoo: 90 }]],
 ];
 

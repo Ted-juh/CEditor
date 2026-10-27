@@ -4778,6 +4778,121 @@ function mpeNotes() { return __mpe.notes(); }
 function mpeListen(opts) { return __mpe.listen(opts); }
 // END GENERATED ce.mpe
 
+// BEGIN GENERATED ce.daw — tools/scripts/gen-daw-prelude.mjs, from dawCore.js. Do not edit by hand.
+// @module ce.daw
+var __dawCore = (function () {
+  // ce.daw — the exported plug-in and its DAW: the part that is the same in every runtime. What the DAW
+  // is, its parameters and programs, and the changes a script may make to what it sees, all live in the
+  // plug-in (PluginProcessor.h); this file checks a script's call, asks the host, and hands back the
+  // answer in one shape. In the editor there is no DAW, and the host says so. The JavaScript prelude runs
+  // this file itself (tools/scripts/gen-daw-prelude.mjs); the Lua and Python preludes are ports held to
+  // the same answers by test/dawParity.test.js.
+  //
+  // Design record: docs/design/ce-daw-module.md.
+  //
+  // The host: `{ say(level, text), query(op, fields) -> answer }`. The ops are host, parameters,
+  // program, programs, beginGesture, endGesture, rename, assign and markChanged; an op the host cannot
+  // answer gives nothing.
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  function isTable(v) {
+    return v !== null && typeof v === 'object';
+  }
+
+  function __dawCommands(host) {
+    const say = (level, text) => host.say(level, text);
+
+    function needPath(verb, path, what) {
+      if (typeof path === 'string' && path !== '') return true;
+      say('error', `ce.daw.${verb}: path must be a control's path, such as "Cutoff.value", so ${what}.`);
+      return false;
+    }
+
+    function list(op) {
+      const answer = host.query(op, {});
+      return Array.isArray(answer) ? answer : [];
+    }
+
+    function table(op) {
+      const answer = host.query(op, {});
+      return isTable(answer) && !Array.isArray(answer) ? answer : undefined;
+    }
+
+    function hostInfo() { return table('host'); }
+
+    function parameters() { return list('parameters'); }
+
+    function parameter(path) {
+      if (!needPath('parameter', path, 'there is nothing to give')) return undefined;
+      for (const p of parameters()) if (isTable(p) && p.path === path) return p;
+      return undefined;
+    }
+
+    function program() { return table('program'); }
+
+    function programs() { return list('programs'); }
+
+    function gesture(verb, path) {
+      if (!needPath(verb, path, 'nothing was done')) return false;
+      return host.query(verb, { path }) === true;
+    }
+
+    function rename(path, name) {
+      if (!needPath('rename', path, 'nothing was renamed')) return false;
+      if (present(name) && typeof name !== 'string') {
+        say('error', 'ce.daw.rename: name must be text, or nothing for the name it was exported with, so nothing was renamed.');
+        return false;
+      }
+      return host.query('rename', { path, name: present(name) ? name : '' }) === true;
+    }
+
+    function assign(slot, path, opts) {
+      if (typeof slot !== 'number' || !Number.isFinite(slot) || Math.floor(slot) !== slot || slot < 1) {
+        say('error', 'ce.daw.assign: slot must be a whole number from 1, so nothing was assigned.');
+        return false;
+      }
+      if (present(path) && (typeof path !== 'string' || path === '')) {
+        say('error', 'ce.daw.assign: path must be a control\'s path, such as "Cutoff.value", or nothing to empty the slot, so nothing was assigned.');
+        return false;
+      }
+      const name = isTable(opts) ? opts.name : undefined;
+      if (present(name) && typeof name !== 'string') {
+        say('error', 'ce.daw.assign: name must be text, so nothing was assigned.');
+        return false;
+      }
+      return host.query('assign', { slot, path: present(path) ? path : '', name: present(name) ? name : '' }) === true;
+    }
+
+    function markChanged() { return host.query('markChanged', {}) === true; }
+
+    return {
+      host: hostInfo, parameters, parameter, program, programs,
+      beginGesture: (path) => gesture('beginGesture', path),
+      endGesture: (path) => gesture('endGesture', path),
+      rename, assign, markChanged,
+    };
+  }
+return { dawCommands: __dawCommands };
+})();
+var __daw = __dawCore.dawCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  query: function (op, fields) { var q = {}; for (var k in fields) q[k] = fields[k]; q.op = op; return __deviceQuery("daw", q); }
+});
+function dawHost() { return __daw.host(); }
+function dawParameters() { return __daw.parameters(); }
+function dawParameter(path) { return __daw.parameter(path); }
+function dawProgram() { return __daw.program(); }
+function dawPrograms() { return __daw.programs(); }
+function dawBeginGesture(path) { return __daw.beginGesture(path); }
+function dawEndGesture(path) { return __daw.endGesture(path); }
+function dawRename(path, name) { return __daw.rename(path, name); }
+function dawAssign(slot, path, opts) { return __daw.assign(slot, path, opts); }
+function dawMarkChanged() { return __daw.markChanged(); }
+// END GENERATED ce.daw
+
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function __m12(n) { return ((Math.floor(n) % 12) + 12) % 12; }
@@ -5829,6 +5944,9 @@ __global.uiDialog = function (opts, onChoice) {
 // sibling engine, and the flat names have to be the same in every language.
 function logWarn(message, value) { return __api.logAt("warn", String(message), value); }
 function logError(message, value) { return __api.logAt("error", String(message), value); }
+// origin(): who made the change the running handler is for ("user", "script", "host", "device",
+// "load"); nothing outside a handler. The plug-in knows, and answers the "origin" device query.
+function origin() { var o = __deviceQuery("origin", {}); return (o === null || o === undefined) ? undefined : o; }
 
 // @module ce.midi
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
@@ -6925,6 +7043,7 @@ var __CE_OPTIONS = {
   "ciSet": { path: "ce.ci.set", at: 3, refusal: "false", names: ["resId", "timeoutMs", "partial", "mediaType"] },
   "ciSubscribe": { path: "ce.ci.subscribe", at: 2, refusal: "nothing", names: ["resId"] },
   "ciSetProfile": { path: "ce.ci.setProfile", at: 3, refusal: "false", names: ["channel"] },
+  "dawAssign": { path: "ce.daw.assign", at: 2, refusal: "false", names: ["name"] },
   "mpeZone": { path: "ce.mpe.zone", at: 0, refusal: "false", names: ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
   "mpeNoteOn": { path: "ce.mpe.noteOn", at: 2, refusal: "nothing", names: ["bend", "pressure", "timbre"] },
   "mpeExpress": { path: "ce.mpe.express", at: 1, refusal: "false", names: ["bend", "pressure", "timbre"] },
@@ -7027,7 +7146,7 @@ function __ce_refused(refusal, lines) {
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
-  "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
+  "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "origin": "origin", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
@@ -7041,6 +7160,7 @@ var __CE_MODULES = {
   "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
   "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+  "ce.daw": { "assign": "dawAssign", "beginGesture": "dawBeginGesture", "endGesture": "dawEndGesture", "host": "dawHost", "markChanged": "dawMarkChanged", "parameter": "dawParameter", "parameters": "dawParameters", "program": "dawProgram", "programs": "dawPrograms", "rename": "dawRename" },
   "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
   "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
   "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
@@ -7076,8 +7196,8 @@ var __CE_MODULES = {
   "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
   "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.mpe","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.daw","version":"1.0","runtime":"any"},{"id":"ce.mpe","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

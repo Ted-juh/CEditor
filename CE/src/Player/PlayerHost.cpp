@@ -195,6 +195,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
                               payload.getProperty ("phase", "").toString() == "begin");
     });
 
+    // ce.daw: what a page's script changed in what the DAW sees (PlayerHost.h, onDawCommand).
+    options = options.withEventListener ("dawCommand", [this] (const juce::var& payload)
+    {
+        if (onDawCommand != nullptr) onDawCommand (payload);
+    });
+
     // The JS player finished loading the panel and wants every parameter's current value pushed
     // (so the on-screen controls reflect a restored/automated state on open).
     options = options.withEventListener ("requestParamSync", [this] (const juce::var&)
@@ -351,6 +357,16 @@ void PlayerHost::showRestorePrompt (const juce::String& deviceName)
     emitToWebView ("restorePrompt", juce::var (obj));
 }
 
+void PlayerHost::pushDawInfo (const juce::var& info)
+{
+    emitToWebView ("dawInfo", info);
+}
+
+void PlayerHost::pushDawProgram (const juce::var& program)
+{
+    emitToWebView ("dawProgram", program);
+}
+
 void PlayerHost::pushDawRestoreToPage (const juce::var& state)
 {
     auto* obj = new juce::DynamicObject();
@@ -377,11 +393,12 @@ void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& 
         webView->emitEventIfBrowserIsVisible (eventName, payload);
 }
 
-void PlayerHost::pushParamToUi (const juce::String& parameterId, float value)
+void PlayerHost::pushParamToUi (const juce::String& parameterId, float value, bool fromHost)
 {
     auto* obj = new juce::DynamicObject();
     obj->setProperty ("id", parameterId);
     obj->setProperty ("value", value);
+    obj->setProperty ("host", fromHost);
     emitToWebView ("paramSync", juce::var (obj));
 }
 

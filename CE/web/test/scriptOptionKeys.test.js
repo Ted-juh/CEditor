@@ -246,7 +246,7 @@ test('what each checked member answers when it refuses', () => {
       'ce.patch.blend', 'ce.patch.current', 'ce.patch.diff', 'ce.patch.equal', 'ce.patch.load',
       'ce.patch.merge', 'ce.patch.morph', 'ce.patch.mutate', 'ce.patch.random', 'ce.storage.encode',
       'ce.text.fit', 'ce.time.syncTimer', 'ce.ui.notify', 'ce.verify.coverage', 'ce.verify.summary', 'set'],
-    false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.ci.discover', 'ce.ci.get', 'ce.ci.set', 'ce.ci.setProfile', 'ce.device.bind', 'ce.device.defineDump',
+    false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.ci.discover', 'ce.ci.get', 'ce.ci.set', 'ce.ci.setProfile', 'ce.daw.assign', 'ce.device.bind', 'ce.device.defineDump',
       'ce.device.defineParameter', 'ce.device.requestDump', 'ce.draw.curve', 'ce.draw.grid', 'ce.draw.image',
       'ce.draw.polygon', 'ce.draw.text', 'ce.file.folder', 'ce.file.open', 'ce.file.save', 'ce.file.saveIn',
       'ce.image.icon', 'ce.keys.piano', 'ce.mpe.express', 'ce.mpe.listen', 'ce.mpe.zone', 'ce.patch.forget',

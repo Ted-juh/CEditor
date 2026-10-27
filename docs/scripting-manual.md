@@ -862,6 +862,8 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 |---|---|
 | `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
 | `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
+| `onAutomationIn(move)` | The DAW moved a parameter. `move.control` is the control's name, `move.path` its path, `move.value` the new value in the control's own range and `move.id` the DAW parameter's id. The control's own value events fire too, with origin() giving "host". Never for a change a script or a hand made. |
+| `onDawProgramIn(program)` | The DAW chose a program from the plug-in's bank, and the plug-in has sent it to the synth. `program.index` counts from 0, `program.number` from 1, and `program.name` is its name. |
 | `onCiDiscovered(device)` | A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them. |
 | `onCiDeviceRemoved(device)` | A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel's device it was found on. Its subscriptions have ended. |
 | `onCiProfileChanged(profile)` | A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state. |
@@ -1105,9 +1107,21 @@ Print an error to the script console: something the panel could not do. It only 
 ce.core.error("message")
 ```
 
+#### `origin() -> text`
+
+Who made the change the running handler is for: "user", "script", "host", "device" or "load".
+
+Example: In `onValueChanged`, `origin() == "host"` means the DAW's automation moved the knob.
+
+Good to know:
+
+- "user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "load": the panel, a preset or the project being opened.
+- Outside a handler, and for an event no change caused (a timer, a key): nothing.
+- With the plug-in's window shut, a change a hand made while it was open is not raised again; and a script's set() raises no value events there, as inside a handler with the window open.
+
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.
+MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, and the DAW an exported plug-in runs in.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -3545,6 +3559,186 @@ Good to know:
 - Rejected with a console error: no result.
 
 *Short name: `clockTempo`.*
+
+### ce.daw: The DAW
+
+For a panel exported as a plug-in: what the DAW is, its parameters and programs, and the changes a script may make to what the DAW sees. In the editor there is no DAW; the questions that need one answer nothing, and `parameters` gives the list the next export would bake, so a panel can be tested.
+
+A DAW keys automation by a parameter's id and its place in the list, so the list is fixed at export. A script can rename a parameter, and fill the spare parameters the author reserved in the export settings (`assign`); it cannot add or remove one. A parameter is named by its control's path, such as `"Cutoff.value"`, and its values are the control's own, as `set` and `get` give them.
+
+`origin()`, beside this module, says who made the change a handler is running for: a hand, a script, the DAW, the synth, or a project being opened. `automationIn` is raised when the DAW moved a parameter, and never for a change a script or a hand made.
+
+```lua
+-- Lua: a button starts a two-second sweep, written to the DAW as one move
+function onClick()
+  state.step = 0
+  ce.daw.beginGesture("Cutoff.value")
+  startTimer("sweep", 20)
+end
+
+function onTimer(info)
+  if info.id ~= "sweep" then return end
+  state.step = state.step + 1
+  set("Cutoff.value", state.step * 127 / 100)
+  if state.step == 100 then
+    ce.time.stopTimer("sweep")
+    ce.daw.endGesture("Cutoff.value")
+  end
+end
+```
+
+#### `ce.daw.host() -> table`
+
+What the exported plug-in is running in: the DAW's name, the plug-in format, the sample rate and block size, and whether its window is open.
+
+Example: `ce.daw.host().name` is "Bitwig Studio" in Bitwig.
+
+Good to know:
+
+- Returns { name, format, sampleRate, blockSize, editorOpen }. `name` is the DAW as JUCE knows it, else "Unknown"; `format` is "vst3", "clap", "lv2", "au" or "standalone".
+- `sampleRate` and `blockSize` are nothing until the DAW has started the plug-in. Tempo, position and play state are in ce.time.
+- In the editor: nothing.
+
+*Short name: `dawHost`.*
+
+#### `ce.daw.parameters() -> list`
+
+The plug-in's DAW parameters, in the order the DAW lists them.
+
+Example: `#ce.daw.parameters()` is how many the DAW can automate.
+
+Good to know:
+
+- Each is { id, name, path, control, min, max, default, unit, kind, choices, group, value }: `kind` is "float", "choice" or "bool"; `choices` the texts of a list; `group` the folder the DAW shows it in; `name` the name the DAW shows now; `value` as get() gives it.
+- The spare parameters are at the end, with `path` nothing while empty.
+- In the editor: the list the next export would bake.
+
+*Short name: `dawParameters`.*
+
+#### `ce.daw.parameter(path) -> table`
+
+One DAW parameter, by its control's path.
+
+Example: `ce.daw.parameter("Cutoff.value").name` is the name the DAW shows for the cutoff knob.
+
+- `path` (text, required): The control's path, as set takes it.
+
+Good to know:
+
+- Returns one entry as ce.daw.parameters() gives it; a control that is not a DAW parameter: nothing.
+
+*Short name: `dawParameter`.*
+
+#### `ce.daw.program() -> table`
+
+The program the DAW has chosen from the plug-in's bank.
+
+Example: `ce.daw.program().name` is what the DAW's program menu shows.
+
+Good to know:
+
+- Returns { index, number, name, count }: `index` from 0, `number` from 1, `count` the size of the bank.
+- The bank is the one baked at export from the device profile's presets. A panel without one, and the editor: nothing.
+
+*Short name: `dawProgram`.*
+
+#### `ce.daw.programs() -> list`
+
+The whole bank the DAW chooses from.
+
+Example: `ce.daw.programs()[1].name` is the first program's name.
+
+Good to know:
+
+- Returns a list of { index, number, name }; no bank: an empty list.
+
+*Short name: `dawPrograms`.*
+
+#### `ce.daw.beginGesture(path) -> boolean`
+
+Start one DAW gesture on a parameter: every set on it until endGesture is one move to the DAW.
+
+Example: `ce.daw.beginGesture("Cutoff.value")` before a sweep the script plays.
+
+- `path` (text, required): The control's path.
+
+Good to know:
+
+- Without it, each set is a gesture of its own, and a DAW writing automation in touch or latch mode lets go of the parameter after every value.
+- Only for changes the script makes over time: a morph, a sweep. A drag by a hand is one gesture already.
+- A gesture left open is ended, with a console line, when the window or the plug-in closes.
+- Returns true when started; false when one is already open on it, or the path is not a DAW parameter, and in the editor.
+
+*Short name: `dawBeginGesture`.*
+
+#### `ce.daw.endGesture(path) -> boolean`
+
+End the gesture ce.daw.beginGesture() started.
+
+Example: `ce.daw.endGesture("Cutoff.value")` when the sweep is done.
+
+- `path` (text, required): The control's path.
+
+Good to know:
+
+- Returns true when a gesture was open.
+
+*Short name: `dawEndGesture`.*
+
+#### `ce.daw.rename(path [, name]) -> boolean`
+
+Give a parameter a new name in the DAW.
+
+Example: `ce.daw.rename("Osc2Param.value", "Sync amount")` when the oscillator's mode changes what its knob does.
+
+- `path` (text, required): The control's path.
+- `name` (text, optional): The new name.
+
+Good to know:
+
+- The parameter's id and place stay the same, so automation already written stays on it. The name is saved with the project.
+- Not every DAW shows a new name at once; some only after the project is opened again, and LV2 has no way to say it.
+- Returns true when the name was changed; in the editor, false.
+
+*Short name: `dawRename`.*
+
+#### `ce.daw.assign(slot [, path] [, opts]) -> boolean`
+
+Put a control on one of the panel's spare parameters, so the DAW can automate it.
+
+Example: `ce.daw.assign(1, "LfoRate.value")` puts the LFO rate on spare parameter 1.
+
+- `slot` (number, required): 1 to the number of spare parameters the panel has.
+- `path` (text, optional): The control's path.
+
+Good to know:
+
+- The author reserves spare parameters in the panel's export settings; the script decides what is on them.
+- The spare shows the control's range and text: "440 Hz", not "0.53". Moving one moves the other, both ways.
+- A control is on one slot at a time: assigning it again moves it. The assignment is saved with the project and comes back before its automation plays.
+- Returns true when assigned; false for a slot the panel does not have, a control with no range, and in the editor.
+
+*Short name: `dawAssign`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `name` | string | the control's name | The name the DAW shows for the slot. |
+
+#### `ce.daw.markChanged() -> boolean`
+
+Tell the DAW the project has unsaved changes.
+
+Example: `ce.daw.markChanged()` after a script changed something only onDawSaveState saves.
+
+Good to know:
+
+- Without it a DAW may close the project without asking, and lose what only the script holds. A change to a DAW parameter needs no call.
+- Also runs onDawSaveState on the next tick, so the state is ready when the DAW asks.
+- Returns true when the DAW was told; in the editor, false.
+
+*Short name: `dawMarkChanged`.*
 
 ## Commands: Working out values
 

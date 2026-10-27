@@ -71,6 +71,26 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.daw': 'For a panel exported as a plug-in: what the DAW is, its parameters and programs, and the changes a script may make to what the DAW sees. In the editor there is no DAW; the questions that need one answer nothing, and `parameters` gives the list the next export would bake, so a panel can be tested.\n\n'
+    + 'A DAW keys automation by a parameter\'s id and its place in the list, so the list is fixed at export. A script can rename a parameter, and fill the spare parameters the author reserved in the export settings (`assign`); it cannot add or remove one. A parameter is named by its control\'s path, such as `"Cutoff.value"`, and its values are the control\'s own, as `set` and `get` give them.\n\n'
+    + '`origin()`, beside this module, says who made the change a handler is running for: a hand, a script, the DAW, the synth, or a project being opened. `automationIn` is raised when the DAW moved a parameter, and never for a change a script or a hand made.\n\n'
+    + '```lua\n'
+    + '-- Lua: a button starts a two-second sweep, written to the DAW as one move\n'
+    + 'function onClick()\n'
+    + '  state.step = 0\n'
+    + '  ce.daw.beginGesture("Cutoff.value")\n'
+    + '  startTimer("sweep", 20)\n'
+    + 'end\n\n'
+    + 'function onTimer(info)\n'
+    + '  if info.id ~= "sweep" then return end\n'
+    + '  state.step = state.step + 1\n'
+    + '  set("Cutoff.value", state.step * 127 / 100)\n'
+    + '  if state.step == 100 then\n'
+    + '    ce.time.stopTimer("sweep")\n'
+    + '    ce.daw.endGesture("Cutoff.value")\n'
+    + '  end\n'
+    + 'end\n'
+    + '```',
   'ce.mpe': 'MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself: pitch bend for pitch, channel pressure for pressure, controller 74 for timbre. A zone is one manager channel and the member channels its notes use.\n\n'
     + 'A script plays notes by id: `noteOn` picks a free member channel, sends the note\'s starting bend, timbre and pressure there, and gives back the id; `express` moves one note; `noteOff` ends it and frees its channel. `zone` sets the zone up and tells the synth; without it, the first note sets up a lower zone of 15.\n\n'
     + 'MPE coming in is the other half: `listen` reads an MPE controller\'s notes back, so `noteIn` carries each note\'s id and `expressionIn` says how it moves.\n\n'
@@ -233,6 +253,7 @@ const MODULE_TITLES = {
   'ce.patch': 'the synth\'s sound as a value',
   'ce.verify': 'checking what the synth holds',
   'ce.file': 'files, through the person\'s own dialogs',
+  'ce.daw': 'The DAW',
   'ce.mpe': 'MPE',
   'ce.ci': 'MIDI-CI',
   'ce.keys': 'the computer keyboard',

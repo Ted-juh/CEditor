@@ -12,7 +12,7 @@
 // today; the number is what the panel's scripting surface weighs, and it is the figure the Export
 // tab shows beside the (far larger) Python runtime cost.
 export const MODULE_COST = {
-  "-": { "javascript": 55719, "lua": 45237, "python": 49029, "webview": 214575 },
+  "-": { "javascript": 56172, "lua": 45699, "python": 49523, "webview": 225445 },
   "ce.anim": { "javascript": 8893, "lua": 8526, "python": 8661, "webview": 35532 },
   "ce.ci": { "javascript": 8997, "lua": 9469, "python": 8294, "webview": 0 },
   "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 36818 },
@@ -44,8 +44,9 @@ export const MODULE_COST = {
   "ce.components.timbre": { "javascript": 240, "lua": 240, "python": 240, "webview": 0 },
   "ce.components.transport": { "javascript": 324, "lua": 324, "python": 324, "webview": 0 },
   "ce.components.turing": { "javascript": 250, "lua": 250, "python": 250, "webview": 0 },
-  "ce.core": { "javascript": 5044, "lua": 0, "python": 5024, "webview": 0 },
-  "ce.device": { "javascript": 7755, "lua": 7123, "python": 7475, "webview": 37194 },
+  "ce.core": { "javascript": 5353, "lua": 248, "python": 5266, "webview": 0 },
+  "ce.daw": { "javascript": 4803, "lua": 4777, "python": 4256, "webview": 0 },
+  "ce.device": { "javascript": 7755, "lua": 7123, "python": 7475, "webview": 37306 },
   "ce.draw": { "javascript": 351, "lua": 351, "python": 351, "webview": 50517 },
   "ce.file": { "javascript": 21277, "lua": 20561, "python": 17461, "webview": 0 },
   "ce.format": { "javascript": 27278, "lua": 26387, "python": 24480, "webview": 1597 },
@@ -53,7 +54,7 @@ export const MODULE_COST = {
   "ce.keys": { "javascript": 123, "lua": 123, "python": 123, "webview": 0 },
   "ce.math": { "javascript": 41144, "lua": 48398, "python": 41250, "webview": 44316 },
   "ce.midi": { "javascript": 31981, "lua": 30055, "python": 31066, "webview": 46145 },
-  "ce.mpe": { "javascript": 11319, "lua": 11954, "python": 10939, "webview": 0 },
+  "ce.mpe": { "javascript": 11422, "lua": 11954, "python": 10939, "webview": 0 },
   "ce.music": { "javascript": 20971, "lua": 21215, "python": 20103, "webview": 16356 },
   "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 56117 },
   "ce.patch": { "javascript": 47644, "lua": 44902, "python": 43245, "webview": 0 },

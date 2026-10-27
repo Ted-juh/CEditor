@@ -5387,6 +5387,121 @@ def mpeNotes():
 def mpeListen(opts=None):
     return _MPE["listen"](opts)
 
+# @module ce.daw
+# ce.daw, ported line for line from dawCore.js (the panel view's; the JavaScript prelude runs that
+# file itself). Held to the panel view's answers by test/dawParity.test.js and the scenario in
+# test/support/dawScenario.mjs. Everything is asked of the plug-in, as the "daw" device query.
+def _daw_commands(host):
+    def say(level, text):
+        host["say"](level, text)
+
+    def need_path(verb, path, what):
+        if isinstance(path, str) and path != "":
+            return True
+        say("error", "ce.daw." + verb + ": path must be a control's path, such as \"Cutoff.value\", so " + what + ".")
+        return False
+
+    def as_list(op):
+        answer = host["query"](op, {})
+        return answer if isinstance(answer, list) else []
+
+    def as_table(op):
+        answer = host["query"](op, {})
+        return answer if isinstance(answer, dict) else None
+
+    def parameters():
+        return as_list("parameters")
+
+    def parameter(path):
+        if not need_path("parameter", path, "there is nothing to give"):
+            return None
+        for p in parameters():
+            if isinstance(p, dict) and p.get("path") == path:
+                return p
+        return None
+
+    def gesture(verb, path):
+        if not need_path(verb, path, "nothing was done"):
+            return False
+        return host["query"](verb, {"path": path}) is True
+
+    def rename(path, name=None):
+        if not need_path("rename", path, "nothing was renamed"):
+            return False
+        if name is not None and not isinstance(name, str):
+            say("error", "ce.daw.rename: name must be text, or nothing for the name it was exported with, so nothing was renamed.")
+            return False
+        return host["query"]("rename", {"path": path, "name": name if name is not None else ""}) is True
+
+    def assign(slot, path=None, opts=None):
+        whole = isinstance(slot, (int, float)) and not isinstance(slot, bool) and slot == slot \
+            and slot not in (float("inf"), float("-inf")) and int(slot) == slot and slot >= 1
+        if not whole:
+            say("error", "ce.daw.assign: slot must be a whole number from 1, so nothing was assigned.")
+            return False
+        if path is not None and (not isinstance(path, str) or path == ""):
+            say("error", "ce.daw.assign: path must be a control's path, such as \"Cutoff.value\", or nothing to empty the slot, so nothing was assigned.")
+            return False
+        name = opts.get("name") if isinstance(opts, dict) else None
+        if name is not None and not isinstance(name, str):
+            say("error", "ce.daw.assign: name must be text, so nothing was assigned.")
+            return False
+        return host["query"]("assign", {"slot": slot, "path": path if path is not None else "",
+                                        "name": name if name is not None else ""}) is True
+
+    return {
+        "host": lambda: as_table("host"),
+        "parameters": parameters,
+        "parameter": parameter,
+        "program": lambda: as_table("program"),
+        "programs": lambda: as_list("programs"),
+        "beginGesture": lambda path=None: gesture("beginGesture", path),
+        "endGesture": lambda path=None: gesture("endGesture", path),
+        "rename": rename,
+        "assign": assign,
+        "markChanged": lambda: host["query"]("markChanged", {}) is True,
+    }
+
+def _daw_query(op, fields):
+    q = dict(fields)
+    q["op"] = op
+    return __deviceQuery("daw", q)
+
+_DAW = _daw_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "query": lambda op, fields: _daw_query(op, fields),
+})
+
+def dawHost():
+    return _DAW["host"]()
+
+def dawParameters():
+    return _DAW["parameters"]()
+
+def dawParameter(path=None):
+    return _DAW["parameter"](path)
+
+def dawProgram():
+    return _DAW["program"]()
+
+def dawPrograms():
+    return _DAW["programs"]()
+
+def dawBeginGesture(path=None):
+    return _DAW["beginGesture"](path)
+
+def dawEndGesture(path=None):
+    return _DAW["endGesture"](path)
+
+def dawRename(path=None, name=None):
+    return _DAW["rename"](path, name)
+
+def dawAssign(slot=None, path=None, opts=None):
+    return _DAW["assign"](slot, path, opts)
+
+def dawMarkChanged():
+    return _DAW["markChanged"]()
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -6452,6 +6567,10 @@ def uiDialog(opts=None, onChoice=None):
 # sibling engine, and the flat names have to be the same in every language.
 def logWarn(message, value=None):  return __api.logAt("warn", str(message), value)
 def logError(message, value=None): return __api.logAt("error", str(message), value)
+# origin(): who made the change the running handler is for ("user", "script", "host", "device",
+# "load"); None outside a handler. The plug-in knows, and answers the "origin" device query.
+def origin():
+    return __deviceQuery("origin", {})
 
 # @module ce.midi
 def sendMidi(b):                  return __api.sendMidi(b)
@@ -7142,6 +7261,7 @@ __CE_OPTIONS = {
     "ciSet": { "path": "ce.ci.set", "at": 3, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "partial", "mediaType"] },
     "ciSubscribe": { "path": "ce.ci.subscribe", "at": 2, "param": "opts", "refusal": "nothing", "names": ["resId"] },
     "ciSetProfile": { "path": "ce.ci.setProfile", "at": 3, "param": "opts", "refusal": "false", "names": ["channel"] },
+    "dawAssign": { "path": "ce.daw.assign", "at": 2, "param": "opts", "refusal": "false", "names": ["name"] },
     "mpeZone": { "path": "ce.mpe.zone", "at": 0, "param": "opts", "refusal": "false", "names": ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
     "mpeNoteOn": { "path": "ce.mpe.noteOn", "at": 2, "param": "opts", "refusal": "nothing", "names": ["bend", "pressure", "timbre"] },
     "mpeExpress": { "path": "ce.mpe.express", "at": 1, "param": "values", "refusal": "false", "names": ["bend", "pressure", "timbre"] },
@@ -7244,7 +7364,7 @@ del __ceOptionId
 # discoverability (ce.core.set is the same function as set).
 import types as __ce_types
 __CE_MODULES = {
-    "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
+    "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "origin": "origin", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
@@ -7258,6 +7378,7 @@ __CE_MODULES = {
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
     "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.daw": { "assign": "dawAssign", "beginGesture": "dawBeginGesture", "endGesture": "dawEndGesture", "host": "dawHost", "markChanged": "dawMarkChanged", "parameter": "dawParameter", "parameters": "dawParameters", "program": "dawProgram", "programs": "dawPrograms", "rename": "dawRename" },
     "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
     "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
     "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
@@ -7293,7 +7414,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -7309,6 +7430,7 @@ __CE_META = [
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
     { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.daw", "version": "1.0", "runtime": "any" },
     { "id": "ce.mpe", "version": "1.0", "runtime": "any" },
     { "id": "ce.ci", "version": "1.0", "runtime": "any" },
     { "id": "ce.file", "version": "1.0", "runtime": "any" },

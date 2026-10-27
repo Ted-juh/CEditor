@@ -637,6 +637,12 @@ export const DEVICE_EVENTS = [
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
+  // ce.daw: the DAW moved a parameter, or chose a program (docs/design/ce-daw-module.md). Raised by an
+  // exported plug-in, with its window open or shut; never in the editor, which has no DAW.
+  { id: 'automationIn', fn: 'onAutomationIn', payload: 'move', decoded: false,
+    summary: 'The DAW moved a parameter. `move.control` is the control\'s name, `move.path` its path, `move.value` the new value in the control\'s own range and `move.id` the DAW parameter\'s id. The control\'s own value events fire too, with origin() giving "host". Never for a change a script or a hand made.' },
+  { id: 'dawProgramIn', fn: 'onDawProgramIn', payload: 'program', decoded: false,
+    summary: 'The DAW chose a program from the plug-in\'s bank, and the plug-in has sent it to the synth. `program.index` counts from 0, `program.number` from 1, and `program.name` is its name.' },
   // ce.ci: a MIDI-CI device answered, left, or had a profile turned on or off (docs/design/ce-ci-module.md).
   { id: 'ciDiscovered', fn: 'onCiDiscovered', payload: 'device', decoded: true, summary: 'A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them.' },
   { id: 'ciDeviceRemoved', fn: 'onCiDeviceRemoved', payload: 'device', decoded: true, summary: 'A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel\'s device it was found on. Its subscriptions have ended.' },
@@ -2646,6 +2652,126 @@ export const COMMANDS = [
       { name: 'muid', type: 'number', required: true, summary: 'The device.' },
       { name: 'fn', type: 'function', required: true, summary: 'Called with the draft.' },
     ],
+    scopes: 'any',
+  },
+  // daw
+  // The exported plug-in and its DAW (docs/design/ce-daw-module.md). dawCore.js checks a call and asks
+  // the plug-in, the same in every runtime; in the editor there is no DAW.
+  {
+    id: 'dawHost', category: 'DAW', signature: 'dawHost() -> table', refusal: 'nothing',
+    summary: 'What the exported plug-in is running in: the DAW\'s name, the plug-in format, the sample rate and block size, and whether its window is open.',
+    example: '`ce.daw.host().name` is "Bitwig Studio" in Bitwig.',
+    notes: [
+      'Returns { name, format, sampleRate, blockSize, editorOpen }. `name` is the DAW as JUCE knows it, else "Unknown"; `format` is "vst3", "clap", "lv2", "au" or "standalone".',
+      '`sampleRate` and `blockSize` are nothing until the DAW has started the plug-in. Tempo, position and play state are in ce.time.',
+      'In the editor: nothing.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawParameters', category: 'DAW', signature: 'dawParameters() -> list', refusal: 'empty list',
+    summary: 'The plug-in\'s DAW parameters, in the order the DAW lists them.',
+    example: '`#ce.daw.parameters()` is how many the DAW can automate.',
+    notes: [
+      'Each is { id, name, path, control, min, max, default, unit, kind, choices, group, value }: `kind` is "float", "choice" or "bool"; `choices` the texts of a list; `group` the folder the DAW shows it in; `name` the name the DAW shows now; `value` as get() gives it.',
+      'The spare parameters are at the end, with `path` nothing while empty.',
+      'In the editor: the list the next export would bake.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawParameter', category: 'DAW', signature: 'dawParameter(path) -> table', refusal: 'nothing',
+    summary: 'One DAW parameter, by its control\'s path.',
+    example: '`ce.daw.parameter("Cutoff.value").name` is the name the DAW shows for the cutoff knob.',
+    notes: ['Returns one entry as ce.daw.parameters() gives it; a control that is not a DAW parameter: nothing.'],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path, as set takes it.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawProgram', category: 'DAW', signature: 'dawProgram() -> table', refusal: 'nothing',
+    summary: 'The program the DAW has chosen from the plug-in\'s bank.',
+    example: '`ce.daw.program().name` is what the DAW\'s program menu shows.',
+    notes: [
+      'Returns { index, number, name, count }: `index` from 0, `number` from 1, `count` the size of the bank.',
+      'The bank is the one baked at export from the device profile\'s presets. A panel without one, and the editor: nothing.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawPrograms', category: 'DAW', signature: 'dawPrograms() -> list', refusal: 'empty list',
+    summary: 'The whole bank the DAW chooses from.',
+    example: '`ce.daw.programs()[1].name` is the first program\'s name.',
+    notes: ['Returns a list of { index, number, name }; no bank: an empty list.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawBeginGesture', category: 'DAW', signature: 'dawBeginGesture(path) -> boolean', refusal: 'false',
+    summary: 'Start one DAW gesture on a parameter: every set on it until endGesture is one move to the DAW.',
+    example: '`ce.daw.beginGesture("Cutoff.value")` before a sweep the script plays.',
+    notes: [
+      'Without it, each set is a gesture of its own, and a DAW writing automation in touch or latch mode lets go of the parameter after every value.',
+      'Only for changes the script makes over time: a morph, a sweep. A drag by a hand is one gesture already.',
+      'A gesture left open is ended, with a console line, when the window or the plug-in closes.',
+      'Returns true when started; false when one is already open on it, or the path is not a DAW parameter, and in the editor.',
+    ],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawEndGesture', category: 'DAW', signature: 'dawEndGesture(path) -> boolean', refusal: 'false',
+    summary: 'End the gesture ce.daw.beginGesture() started.',
+    example: '`ce.daw.endGesture("Cutoff.value")` when the sweep is done.',
+    notes: ['Returns true when a gesture was open.'],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawRename', category: 'DAW', signature: 'dawRename(path [, name]) -> boolean', refusal: 'false',
+    summary: 'Give a parameter a new name in the DAW.',
+    example: '`ce.daw.rename("Osc2Param.value", "Sync amount")` when the oscillator\'s mode changes what its knob does.',
+    notes: [
+      'The parameter\'s id and place stay the same, so automation already written stays on it. The name is saved with the project.',
+      'Not every DAW shows a new name at once; some only after the project is opened again, and LV2 has no way to say it.',
+      'Returns true when the name was changed; in the editor, false.',
+    ],
+    params: [
+      { name: 'path', type: 'string', required: true, summary: 'The control\'s path.' },
+      { name: 'name', type: 'string', required: false, default: 'the name it was exported with', summary: 'The new name.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'dawAssign', category: 'DAW', signature: 'dawAssign(slot [, path] [, opts]) -> boolean', refusal: 'false',
+    summary: 'Put a control on one of the panel\'s spare parameters, so the DAW can automate it.',
+    example: '`ce.daw.assign(1, "LfoRate.value")` puts the LFO rate on spare parameter 1.',
+    notes: [
+      'The author reserves spare parameters in the panel\'s export settings; the script decides what is on them.',
+      'The spare shows the control\'s range and text: "440 Hz", not "0.53". Moving one moves the other, both ways.',
+      'A control is on one slot at a time: assigning it again moves it. The assignment is saved with the project and comes back before its automation plays.',
+      'Returns true when assigned; false for a slot the panel does not have, a control with no range, and in the editor.',
+    ],
+    params: [
+      { name: 'slot', type: 'number', required: true, summary: '1 to the number of spare parameters the panel has.' },
+      { name: 'path', type: 'string', required: false, default: 'empty the slot', summary: 'The control\'s path.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'name', type: 'string', default: 'the control\'s name', summary: 'The name the DAW shows for the slot.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'dawMarkChanged', category: 'DAW', signature: 'dawMarkChanged() -> boolean', refusal: 'false',
+    summary: 'Tell the DAW the project has unsaved changes.',
+    example: '`ce.daw.markChanged()` after a script changed something only onDawSaveState saves.',
+    notes: [
+      'Without it a DAW may close the project without asking, and lose what only the script holds. A change to a DAW parameter needs no call.',
+      'Also runs onDawSaveState on the next tick, so the state is ready when the DAW asks.',
+      'Returns true when the DAW was told; in the editor, false.',
+    ],
+    params: [],
     scopes: 'any',
   },
   // mpe
@@ -4683,7 +4809,22 @@ export const COMMANDS = [
     ],
     scopes: 'any',
     snippet: { lua: 'ce.core.error("${1:message}")$0', javascript: 'ce.core.error("${1:message}")$0' },
+  },  // Who made a change (docs/design/ce-daw-module.md). A command and not a field, because
+  // onValueChange(value) is given a plain number, and a second argument would break the typed
+  // languages' handlers.
+  {
+    id: 'origin', category: 'Events', signature: 'origin() -> text', refusal: 'nothing',
+    summary: 'Who made the change the running handler is for: "user", "script", "host", "device" or "load".',
+    example: 'In `onValueChanged`, `origin() == "host"` means the DAW\'s automation moved the knob.',
+    notes: [
+      '"user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "load": the panel, a preset or the project being opened.',
+      'Outside a handler, and for an event no change caused (a timer, a key): nothing.',
+      'With the plug-in\'s window shut, a change a hand made while it was open is not raised again; and a script\'s set() raises no value events there, as inside a handler with the window open.',
+    ],
+    params: [],
+    scopes: 'any',
   },
+
 ];
 
 /* --------------------------------------------------------- panel-component verbs */
@@ -6205,8 +6346,8 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, and the DAW an exported plug-in runs in.',
+    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time', 'ce.daw'] },
   { id: 'numbers', label: 'Working out values',
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
@@ -6302,6 +6443,9 @@ export const MODULES = [
   // requires the four whose commands it reads and sends through, so they are there whenever it is.
   { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
     summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
+  // requires ce.core only: it asks the plug-in, and names controls as set does.
+  { id: 'ce.daw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'The exported plug-in and its DAW: what the DAW is, its parameters and programs, one gesture around a change a script makes over time, new names for parameters, and spare parameters a script puts controls on.' },
   // requires ce.midi, whose sends MPE goes out through and whose note names it reads.
   { id: 'ce.mpe', version: '1.0', requires: ['ce.core', 'ce.midi'], runtime: RUNTIME_ANY,
     summary: 'MPE: play each note on a channel of its own, so each note can bend, swell and change tone by itself, and read an MPE controller\'s notes back in with their expression.' },
@@ -6391,7 +6535,8 @@ const MODULE_MEMBERS = {
   'ce.core': { set: 'set', get: 'get', log: 'log', warn: 'logWarn', error: 'logError',
                on: 'on', off: 'off', emit: 'emit', run: 'run',
                noTransmit: 'noTransmit', transmit: 'transmit',
-               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction' },
+               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction',
+               origin: 'origin' },
   'ce.midi': [
     'sendCC', 'sendNRPN', 'sendRPN', 'sendSysex', 'checksum', 'panic', 'sendSongPosition',
     'sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange', 'sendPitchBend',
@@ -6514,6 +6659,11 @@ const MODULE_MEMBERS = {
     random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
     apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
     scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.daw': {
+    host: 'dawHost', parameters: 'dawParameters', parameter: 'dawParameter', program: 'dawProgram',
+    programs: 'dawPrograms', beginGesture: 'dawBeginGesture', endGesture: 'dawEndGesture', rename: 'dawRename',
+    assign: 'dawAssign', markChanged: 'dawMarkChanged',
   },
   'ce.mpe': {
     zone: 'mpeZone', noteOn: 'mpeNoteOn', express: 'mpeExpress', noteOff: 'mpeNoteOff',
