@@ -21,7 +21,8 @@ function finite(v) {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
-function clamp(x, lo, hi) {
+/** x held to lo..hi (not ce.math.clamp, which this module does not require). */
+function held(x, lo, hi) {
   return x < lo ? lo : (x > hi ? hi : x);
 }
 
@@ -59,12 +60,12 @@ export function mpeCommands(host) {
   }
 
   function bendBytes(channel, semitones) {
-    const v = clamp(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383);
+    const v = held(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383);
     return [0xE0 + channel - 1, v % 128, Math.floor(v / 128)];
   }
 
   function amount7(x) {
-    return clamp(roundHalfAway(clamp(x, 0, 1) * 127), 0, 127);
+    return held(roundHalfAway(held(x, 0, 1) * 127), 0, 127);
   }
 
   function release(n, velocity) {
@@ -176,7 +177,7 @@ export function mpeCommands(host) {
       channel = oldest.channel;
       release(oldest, 64);
     }
-    const bend = clamp(start.bend, -zone.bendRange, zone.bendRange);
+    const bend = held(start.bend, -zone.bendRange, zone.bendRange);
     // As MPE asks: the note's bend and timbre first, so it never starts at the last note's.
     send(bendBytes(channel, bend));
     send([0xB0 + channel - 1, 74, amount7(start.timbre)]);
@@ -184,7 +185,7 @@ export function mpeCommands(host) {
     send([0x90 + channel - 1, n, velocity]);
     const id = nextId;
     nextId += 1;
-    sounding.push({ id, note: n, channel, velocity, bend, pressure: clamp(start.pressure, 0, 1), timbre: clamp(start.timbre, 0, 1) });
+    sounding.push({ id, note: n, channel, velocity, bend, pressure: held(start.pressure, 0, 1), timbre: held(start.timbre, 0, 1) });
     return id;
   }
 
@@ -203,15 +204,15 @@ export function mpeCommands(host) {
     const v = startValues('express', values);
     if (v === null) return false;
     if (present(values.bend)) {
-      n.bend = clamp(values.bend, -zone.bendRange, zone.bendRange);
+      n.bend = held(values.bend, -zone.bendRange, zone.bendRange);
       send(bendBytes(n.channel, n.bend));
     }
     if (present(values.pressure)) {
-      n.pressure = clamp(values.pressure, 0, 1);
+      n.pressure = held(values.pressure, 0, 1);
       send([0xD0 + n.channel - 1, amount7(n.pressure)]);
     }
     if (present(values.timbre)) {
-      n.timbre = clamp(values.timbre, 0, 1);
+      n.timbre = held(values.timbre, 0, 1);
       send([0xB0 + n.channel - 1, 74, amount7(n.timbre)]);
     }
     return true;

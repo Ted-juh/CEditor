@@ -2655,7 +2655,9 @@ private:
     // The MIDI a device sends, decoded once for the window-shut scripts (Scripting/MidiInDecoder.h),
     // and the timer that lets a thinned bend or a lone NRPN coarse half go when its time comes.
     ceditor::scripting::MidiInDecoder midiInDecoder;
-    juce::TimedCallback midiInFlushTimer { [this] { flushMidiIn(); } };
+   #if CEDITOR_VALUE_LAYER
+    juce::TimedCallback midiInFlushTimer { [this] { flushMidiIn(); } };   // flushMidiIn is the value layer's
+   #endif
     // Declared after scriptRuntime so it is destroyed FIRST (stops its juce::Timer before the
     // runtime the fire callback references goes away).
     ceditor::scripting::TimerManager scriptTimers;

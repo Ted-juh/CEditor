@@ -4246,7 +4246,7 @@ do
   local INF = math.huge
   local function finite(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF end
   local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
-  local function clamp(x, lo, hi) if x < lo then return lo end if x > hi then return hi end return x end
+  local function held(x, lo, hi) if x < lo then return lo end if x > hi then return hi end return x end
   local function roundHalfAway(x) if x < 0 then return -math.floor(-x + 0.5) end return math.floor(x + 0.5) end
   local function contains(list, v) for _, x in ipairs(list) do if x == v then return true end end return false end
 
@@ -4271,10 +4271,10 @@ do
       send({ status, 38, 0 }); send({ status, 101, 127 }); send({ status, 100, 127 })
     end
     local function bendBytes(channel, semitones)
-      local v = clamp(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383)
+      local v = held(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383)
       return { 0xE0 + channel - 1, v % 128, v // 128 }
     end
-    local function amount7(x) return clamp(roundHalfAway(clamp(x, 0, 1) * 127), 0, 127) end
+    local function amount7(x) return held(roundHalfAway(held(x, 0, 1) * 127), 0, 127) end
     local function release(n, velocity)
       send({ 0x80 + n.channel - 1, n.note, velocity })
       local keep = {}
@@ -4390,7 +4390,7 @@ do
         channel = oldest.channel
         release(oldest, 64)
       end
-      local bend = clamp(start.bend, -zone.bendRange, zone.bendRange)
+      local bend = held(start.bend, -zone.bendRange, zone.bendRange)
       send(bendBytes(channel, bend))
       send({ 0xB0 + channel - 1, 74, amount7(start.timbre) })
       send({ 0xD0 + channel - 1, amount7(start.pressure) })
@@ -4398,7 +4398,7 @@ do
       local id = nextId
       nextId = nextId + 1
       sounding[#sounding + 1] = { id = id, note = n, channel = channel, velocity = math.floor(velocity), bend = bend,
-                                  pressure = clamp(start.pressure, 0, 1), timbre = clamp(start.timbre, 0, 1) }
+                                  pressure = held(start.pressure, 0, 1), timbre = held(start.timbre, 0, 1) }
       return id
     end
 
@@ -4416,15 +4416,15 @@ do
       end
       if startValues("express", values) == nil then return false end
       if values.bend ~= nil then
-        n.bend = clamp(values.bend, -zone.bendRange, zone.bendRange)
+        n.bend = held(values.bend, -zone.bendRange, zone.bendRange)
         send(bendBytes(n.channel, n.bend))
       end
       if values.pressure ~= nil then
-        n.pressure = clamp(values.pressure, 0, 1)
+        n.pressure = held(values.pressure, 0, 1)
         send({ 0xD0 + n.channel - 1, amount7(n.pressure) })
       end
       if values.timbre ~= nil then
-        n.timbre = clamp(values.timbre, 0, 1)
+        n.timbre = held(values.timbre, 0, 1)
         send({ 0xB0 + n.channel - 1, 74, amount7(n.timbre) })
       end
       return true
