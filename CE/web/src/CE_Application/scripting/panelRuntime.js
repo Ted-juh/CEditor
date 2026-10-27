@@ -22,6 +22,12 @@ import {
   formatNote, formatDivision, formatTable, formatFit, formatLine, formatParse, formatDescribed,
   formatPlaceholderFor,
 } from './formatCore.js';
+import {
+  addShortcut as keysAddShortcut, removeShortcut as keysRemoveShortcut, listShortcuts as keysListShortcuts,
+  isDown as keysIsDownRead, heldKeys as keysHeldRead, setPiano as keysSetPiano, pianoInfo as keysPianoInfoRead,
+  focusControl as keysFocusControl, focusedControl as keysFocusedControl, resetKeys, setShortcutRunner,
+  setKeysPanelResolver,
+} from './scriptKeys.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -9097,6 +9103,18 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textRead: (target, field) => textReadImpl(target, field),
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
+
+    // ce.keys (docs/design/ce-keys-module.md). The keyboard itself, and who gets each key, is
+    // scriptKeys.js's; the preview surface feeds it and plays the piano's notes.
+    keysShortcut: (keys, fn, opts) => keysAddShortcut(scriptId, keys, fn, opts, (level, text) => addScriptTrace(level, scriptId, text)),
+    keysRemove: (id) => keysRemoveShortcut(id),
+    keysList: () => keysListShortcuts(),
+    keysIsDown: (key) => keysIsDownRead(key),
+    keysHeld: () => keysHeldRead(),
+    keysPiano: (opts) => keysSetPiano(opts, (level, text) => addScriptTrace(level, scriptId, text)),
+    keysPianoInfo: () => keysPianoInfoRead(),
+    keysFocus: (control) => keysFocusControl(control),
+    keysFocused: () => keysFocusedControl(),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
@@ -10194,6 +10212,7 @@ function resetScriptState() {
   clearMidiFilters();
   routedRole = null;
   stopAllTimers();
+  resetKeys();           // a script's shortcuts and piano go with it; the keys held stay the user's
   scriptState.clear();   // `state` lives exactly as long as the loaded script does
   resetRandomStreams();
 }
@@ -10213,13 +10232,16 @@ async function invokeHandler(script, hook = null, payload = undefined) {
     // Only the synchronous part belongs to this transaction. If the handler returns a promise,
     // publish before awaiting so UI state is not held hostage by network or timer work. Writes
     // after an await keep their existing immediate semantics unless the script explicitly batches.
-    const result = withDocumentWriteBatch(() =>
+    let result = withDocumentWriteBatch(() =>
       fn(payload !== undefined ? payload : samplePayload(fnName)));
-    if (result && typeof result.then === 'function') await result;
+    if (result && typeof result.then === 'function') result = await result;
     addScriptTrace('log', script.id, `ran ${fnName}() in "${script.name}"`);
+    // What it answered: keyDown keeps a key when a handler returns true.
+    return result;
   } catch (e) {
     reportScriptError(script.id, e);
   }
+  return undefined;
 }
 
 /**
@@ -10446,18 +10468,23 @@ function drainInteractionEvents() {
   const current = [];
   for (const entry of pending) {
     if (live.enabledGlobal && entry.panelId === panelId) current.push(entry);
-    else entry.resolve();
+    else entry.resolve(entry.answer ? false : undefined);
   }
   if (current.length) {
     dispatchEvents(current.map((entry) => entry.event)).then(
-      () => { for (const entry of current) entry.resolve(); },
+      (answers) => { current.forEach((entry, i) => entry.resolve(entry.answer ? answers?.[i] === true : undefined)); },
       (error) => { for (const entry of current) entry.reject(error); });
   }
 }
 
+/**
+ * Run each event's handlers. Answers, per event, whether any handler returned true (keyDown keeps
+ * its key that way; every other event ignores the answer).
+ */
 async function dispatchEvents(events, { inbound = false } = {}) {
-  if (!events.length) return;
-  if (!ensurePanelExecutionApproved()) { resetScriptState(); return; }
+  const answers = events.map(() => false);
+  if (!events.length) return answers;
+  if (!ensurePanelExecutionApproved()) { resetScriptState(); return answers; }
   const scripts = activeScripts();
   const epoch = executionEpoch;
   live.dispatching = true;
@@ -10466,20 +10493,23 @@ async function dispatchEvents(events, { inbound = false } = {}) {
     // Load everything first: a script that only registers on(…) listeners has no `event` of its
     // own, so it would never be loaded by the match loop below and its listeners would never fire.
     await primeHandlers();
-    for (const ev of events) {
-      if (epoch !== executionEpoch) return;
+    for (let i = 0; i < events.length; i += 1) {
+      const ev = events[i];
+      if (epoch !== executionEpoch) return answers;
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
       for (const s of matches) {
-        if (epoch !== executionEpoch) return;
-        await invokeHandler(s, s.event, ev.payload);
+        if (epoch !== executionEpoch) return answers;
+        if (await invokeHandler(s, s.event, ev.payload) === true) answers[i] = true;
       }
-      if (epoch !== executionEpoch) return;
+      if (epoch !== executionEpoch) return answers;
       // …then the explicit on(target, event, fn) listeners for the same event.
       for (const l of [...listeners]) {
         if (l.event !== ev.event || !listenerMatches(l, ev.controlName)) continue;
-        try { withDocumentWriteBatch(() => l.fn(ev.payload)); } catch (e) { reportScriptError(l.scriptId, e); }
+        try {
+          if (withDocumentWriteBatch(() => l.fn(ev.payload)) === true) answers[i] = true;
+        } catch (e) { reportScriptError(l.scriptId, e); }
       }
     }
   } finally {
@@ -10508,6 +10538,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       }
     }
   }
+  return answers;
 }
 
 /* --- source 1: panels store (script-driven value changes) --- */
@@ -11236,5 +11267,38 @@ export function dispatchInteraction(controlId, eventName, payload) {
   }
   // The promise is returned rather than dropped. Callers in the UI ignore it — an interaction is
   // fire-and-forget — but returning it is what lets anything else wait for the handlers to finish.
-  return dispatchEvents([event]);
+  return dispatchEvents([event]).then(() => undefined);
+}
+
+/**
+ * ce.keys: raise keyDown or keyUp ('onKeyDown' / 'onKeyUp') for the panel's scripts. Resolves true
+ * when a handler returned true, which for keyDown keeps the key from the DAW and the editor.
+ */
+export function dispatchKeyEvent(eventName, payload) {
+  if (!live.enabledGlobal) return Promise.resolve(false);
+  const event = { event: eventName, controlName: null, payload };
+  if (live.dispatching) {
+    return new Promise((resolve, reject) => {
+      live.interactions.push({ event, panelId: String(livePanel()?.id ?? live.activePanelId), resolve, reject, answer: true });
+    });
+  }
+  return dispatchEvents([event]).then((answers) => answers[0] === true);
+}
+
+// A shortcut's function is a script's: run it as an on(…) listener is run, so its writes batch and a
+// failure is that script's error rather than the keyboard's.
+setShortcutRunner((shortcut, fields) => {
+  try { withDocumentWriteBatch(() => shortcut.fn(fields)); } catch (e) { reportScriptError(shortcut.scriptId, e); }
+});
+
+// The keyboard belongs to the surface showing the panel these scripts run on.
+setKeysPanelResolver(() => {
+  try { return String(livePanel()?.id ?? live.activePanelId ?? ''); } catch { return ''; }
+});
+
+/** Whether any loaded script hears `eventName` ('onKeyDown'): only then is a key held back for it. */
+export function scriptsHear(eventName) {
+  if (!live.enabledGlobal) return false;
+  return activeScripts().some((s) => s.enabled !== false && s.event === eventName)
+    || listeners.some((l) => l.event === eventName);
 }

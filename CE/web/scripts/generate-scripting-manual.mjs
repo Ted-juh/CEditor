@@ -71,6 +71,17 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.keys': 'The computer keyboard on a panel: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. In the panel view only, the editor\'s preview and an exported plug-in with its window open; with the window shut there is no keyboard.\n\n'
+    + 'Who gets a key, in order; a kept key goes no further: (1) typing into a text box or an LCD keeps every key; (2) the panic key; (3) shortcuts, those with a modifier at once and those without after the focused control; (4) the piano, when it is on; (5) the focused control\'s own keys, the arrows on a knob and Space on a button; (6) keyDown, for any script that listens, which keeps the key by returning true; (7) whatever is around the panel, the DAW or the editor. When the panel loses the keyboard (the window loses focus or is hidden, or the panel closes) every held key gets its keyUp and every piano note its note-off.\n\n'
+    + '```lua\n'
+    + '-- Lua: Ctrl+G picks a random voice; a help LCD shows every key the panel uses\n'
+    + 'function onPanelReady()\n'
+    + '  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })\n'
+    + '  for row, s in ipairs(ce.keys.list()) do\n'
+    + '    ce.components.lcd.text("Help", row, s.keys .. "  " .. (s.description or ""))\n'
+    + '  end\n'
+    + 'end\n'
+    + '```',
   'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.\n\n'
     + '**Colours that every colour command reads**\n'
     + '\n'
@@ -150,6 +161,7 @@ const MODULE_TITLES = {
   'ce.anim': 'smooth movement',
   'ce.panel': 'building and arranging the panel',
   'ce.storage': 'remembering things',
+  'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',
   'ce.image': 'images and icons',
   'ce.text': 'fonts and lettering',

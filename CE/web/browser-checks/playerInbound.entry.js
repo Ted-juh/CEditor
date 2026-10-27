@@ -21,6 +21,7 @@ import Player from '../src/Player.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { profileSources } from '../src/CE_Application/stores/deviceProfileStores.js';
 import { panelPreviewSessions } from '../src/CE_Application/stores/interactionPreview.js';
+import { scriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import gaiaProfile from '../../profiles/test/roland-gaia-sh01.ceditor-device.json';
 
 const listeners = new Map();
@@ -133,6 +134,29 @@ const panelWithScreen = {
   ],
 };
 
+// The same panel with a Keyboard and scripts that use ce.keys (playerKeys.mjs): shortcuts, the piano
+// through the Keyboard, and keyDown keeping Q.
+const keysScript = (id, event, source) => ({ id, name: id, event, source, language: 'javascript', scope: 'panel', target: '*', enabled: true });
+const panelWithKeys = {
+  ...panelDocument,
+  height: 420,
+  controls: [
+    ...panelDocument.controls,
+    createControl('Keyboard', { Core: { id: 'Keys', name: 'Keys' }, Transform: { x: 20, y: 300, width: 360, height: 90 } }),
+  ],
+  scripts: [
+    keysScript('keys-ready', 'onPanelReady', [
+      'function onPanelReady() {',
+      '  ce.keys.shortcut("Ctrl+G", function (k) { log("SHORTCUT " + k.key + " " + (k.control || "-")); }, { description: "g" });',
+      '  ce.keys.shortcut("Up", function () { log("UP"); });',
+      '  log("PIANO " + ce.keys.piano({ target: "Keys" }));',
+      '}',
+    ].join('\n')),
+    keysScript('keys-down', 'onKeyDown', 'function onKeyDown(k) { log("KEYDOWN " + k.key + (k.repeat ? " repeat" : "")); return k.key === "Q"; }'),
+    keysScript('keys-up', 'onKeyUp', 'function onKeyUp(k) { log("KEYUP " + k.key); }'),
+  ],
+};
+
 // What the Player would fetch over the bridge, under the profile id it defaults to.
 profileSources.set({
   'roland-gaia': { profileId: 'roland-gaia', source: JSON.stringify(gaiaProfile), native: true },
@@ -141,7 +165,10 @@ profileSources.set({
 mount(Player, { target: document.getElementById('host') });
 
 window.__player = {
-  load: (variant) => fire('loadPanel', { panel: variant === 'screen' ? panelWithScreen : panelDocument }),
+  load: (variant) => fire('loadPanel', { panel: variant === 'screen' ? panelWithScreen : variant === 'keys' ? panelWithKeys : panelDocument }),
+  // What the panel's scripts said, and a control's preview session (playerKeys.mjs).
+  trace: () => get(scriptTrace).map((t) => t.message),
+  session: (controlId) => get(panelPreviewSessions)?.[controlId] ?? null,
   cc: (hex) => fire('midiInputMessage', { messageType: 'cc', hex }),
   // As the bridge labels anything that is not 0xB0: "midi", not "cc".
   channelMidi: (hex) => fire('midiInputMessage', { messageType: 'midi', hex }),

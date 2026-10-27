@@ -590,6 +590,11 @@ export const CONTROL_EVENTS = [
 export const PANEL_EVENTS = [
   { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control on the panel changed. `info.target` is the control\'s name and `info.value` its new value. Use it to react to many controls in one place.' },
   { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.' },
+  // ce.keys. Panel view only: with the window shut there is no keyboard.
+  { id: 'keyDown', fn: 'onKeyDown', payload: 'key', runtime: RUNTIME_WEBVIEW,
+    summary: 'A key went down that nothing else on the panel kept: not while typing, and not the panic key, a shortcut, a piano key or a key the focused control used. `key.key` is its name as printed ("R", "7", "Space", "Up", "F2"), `key.code` its place, the same on every layout ("KeyR"), `key.ctrl`, `key.shift`, `key.alt` and `key.meta` the modifiers, `key.repeat` true while the system repeats a held key, and `key.control` the control that has the keyboard. Return true to keep the key: it then goes no further, not to the DAW and not to the editor.' },
+  { id: 'keyUp', fn: 'onKeyUp', payload: 'key', runtime: RUNTIME_WEBVIEW,
+    summary: 'A key whose keyDown was raised went up, with the same fields except `repeat`. Also raised for every such key when the panel loses the keyboard while it is held. Its return value is not used.' },
 ];
 
 // Musical time. Raised by whichever runtime is following the clock — the editor's master clock, or
@@ -2206,6 +2211,131 @@ export const COMMANDS = [
             + 'yet.' },
       ]) },
     ],
+    scopes: 'any',
+  },
+  // keys
+  // The computer keyboard on a panel (docs/design/ce-keys-module.md). Panel view only: with the
+  // window shut there is no keyboard. Who gets a key, in order, is scriptKeys.js's header.
+  {
+    id: 'keysShortcut', category: 'Keyboard', signature: 'keysShortcut(keys, fn [, opts]) -> id', refusal: 'nothing',
+    summary: 'Run a function when a key, or a key with modifiers, is pressed anywhere on the panel.',
+    example: '`ce.keys.shortcut("Ctrl+G", randomizeVoice, { description = "Random voice" })` runs randomizeVoice on Ctrl+G.',
+    notes: [
+      'Refused, with a console line saying why: the editor\'s own keys, the keys DAWs and the system take (Ctrl+R, Ctrl+S and the like), the panic key, and a key another shortcut already has. Space is allowed, with a console line: in a DAW it then no longer starts the transport while the plug-in has the keyboard.',
+      'A shortcut without a modifier waits for a focused control that uses that key: with a knob focused, a shortcut on "Up" does not run, and the knob moves. With a modifier it always runs.',
+      'Shortcuts name the key printed on it: "Ctrl+G" is G wherever it sits on a German or French keyboard.',
+      'Nothing runs while the user is typing into a text box or editing an LCD.',
+      'Returns an id for `remove`; refused: nothing. A script\'s shortcuts are removed when it reloads.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'keys', type: 'text', required: true, summary: 'The key and its modifiers joined by +: "Ctrl+G", "Shift+Up", "F2", "Space". Modifiers are Ctrl, Shift, Alt and Meta (the Windows key, or Cmd on a Mac), in any order and any case.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the same fields keyDown gives.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'description', type: 'text', sample: '"Random voice"', summary: 'The words `list` shows for it.' },
+        { name: 'repeat', type: 'true or false', default: 'false', summary: 'On: run again while the key is held and the system repeats it.' },
+      ]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'keysRemove', category: 'Keyboard', signature: 'keysRemove(id) -> boolean',
+    summary: 'Take a shortcut away.',
+    example: '`ce.keys.remove(state.randomKey)` when the page that used it is hidden.',
+    notes: ['Returns true when there was one.'],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id `shortcut` gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysList', category: 'Keyboard', signature: 'keysList() -> list',
+    summary: 'Every key the panel uses, for a help page: a list of { id, keys, description }.',
+    example: '`#ce.keys.list()` is how many keys the panel uses.',
+    notes: [
+      'The panic key comes first (id "panic"), then the shortcuts in the order they were made.',
+      'The piano is one entry while it is on, keys "Piano".',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysIsDown', category: 'Keyboard', signature: 'keysIsDown(key) -> boolean',
+    summary: 'Whether a key is held now.',
+    example: '`ce.keys.isDown("Shift")` in onValueChange, to move a knob in fine steps while Shift is held.',
+    notes: [
+      'Counts keys the panel saw go down, except while typing. False after the panel loses the keyboard.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'key', type: 'text', required: true, summary: 'A name as keyDown gives it ("Shift", "R", "Up"), or a place as its `code` gives it ("KeyR").' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysHeld', category: 'Keyboard', signature: 'keysHeld() -> list',
+    summary: 'The keys held now, by name, in the order they went down.',
+    example: '`ce.keys.held()` while Ctrl and G are held gives { "Ctrl", "G" }.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysPiano', category: 'Keyboard', signature: 'keysPiano([opts]) -> boolean', refusal: 'false',
+    summary: 'Play notes from the letter keys of the computer keyboard.',
+    example: '`ce.keys.piano({ target = "Keys" })` plays through the Keyboard component named "Keys", which lights up as notes play.',
+    notes: [
+      'The layout is the one Ableton Live and Hostage use, by the keys\' place: the middle letter row plays the white keys from C (A, S, D, F, G, H, J, K, L, ;, \'), the row above it the black ones (W, E, T, Y, U, O, P). On a German or French keyboard the same places play the same notes.',
+      'A key held plays one note until it is let go; the system\'s key repeat is ignored. Keys pressed with Ctrl, Alt or Meta are left for shortcuts.',
+      'With a `target`, the notes go through that Keyboard component: its channel, velocity, transpose, octave and scale lock apply, its keys show what is held, and it raises hit and release as for the mouse. Without one, the options below apply and the notes go to the device as sendNote sends them.',
+      'Every note is let go when the panel loses the keyboard, when the piano is turned off, and on the panic key.',
+      'Returns true when on; false when off, or when the panel has nothing to play to.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'on', type: 'true or false', default: 'true', summary: 'Off stops the piano and lets every note go.' },
+        { name: 'target', type: 'text', kind: 'control', sample: '"Keys"', summary: 'A Keyboard component to play through.' },
+        { name: 'octave', type: 'number', default: '4', summary: 'The octave the A key starts: 4 makes it C4, note 60.' },
+        { name: 'velocity', type: 'number', default: '100', summary: 'How hard every note is played, 1 to 127.' },
+        { name: 'channel', type: 'number', default: '1', summary: 'The MIDI channel, 1 to 16, without a `target`.' },
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device, without a `target`.' },
+        { name: 'octaveKeys', type: 'true or false', default: 'true', summary: 'Z and X move the octave down and up.' },
+        { name: 'velocityKeys', type: 'true or false', default: 'true', summary: 'C and V lower and raise the velocity by 20.' },
+      ]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'keysPianoInfo', category: 'Keyboard', signature: 'keysPianoInfo() -> table',
+    summary: 'What the piano is doing: { on, octave, velocity, channel, target, notes }.',
+    example: '`ce.keys.pianoInfo().octave` is the octave Z and X have moved it to.',
+    notes: [
+      '`notes` is a list of { note, key } for the notes held now.',
+      'To react to each note as it is played, give the piano a `target` and listen to that component\'s hit and release.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysFocus', category: 'Keyboard', signature: 'keysFocus([control]) -> boolean',
+    summary: 'Give a control the keyboard, so the arrows and digits move it.',
+    example: '`ce.keys.focus("Cutoff")` after a shortcut that jumps to the filter.',
+    notes: [
+      'The control shows its focus ring, as after Tab.',
+      'Left out: no control has the keyboard, and keys go to shortcuts and keyDown.',
+      'Refused (false) for a control with "Focusable" off or its keys turned off, a hidden control, and outside the preview.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'control', type: 'string', required: false, kind: 'control', summary: 'The control\'s name.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysFocused', category: 'Keyboard', signature: 'keysFocused() -> text',
+    summary: 'The control that has the keyboard, or nothing.',
+    example: '`ce.keys.focused() == "Cutoff"` while the cutoff knob takes the arrows.',
+    notes: ['The same name as keyDown\'s `control`.'],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
     scopes: 'any',
   },
   {
@@ -5210,8 +5340,8 @@ export const MODULE_GROUPS = [
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Creating and arranging controls, and saving things that outlive the session.',
-    modules: ['ce.panel', 'ce.storage'] },
+    blurb: 'Creating and arranging controls, the computer keyboard, and saving things that outlive the session.',
+    modules: ['ce.panel', 'ce.keys', 'ce.storage'] },
   { id: 'appearance', label: 'How it looks',
     blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
@@ -5298,6 +5428,8 @@ export const MODULES = [
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they draw from. Background layers composite; text layers are exclusive. Reports which image sources survive an export.' },
+  { id: 'ce.keys', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'The computer keyboard: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. Key events are keyDown and keyUp. In the panel view only.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Typography: which fonts exist and what they support, style writes that keep weight consistent, variable axes, and measuring a control\'s text in its own font to fit it to its box.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -5490,6 +5622,10 @@ const MODULE_MEMBERS = {
   // §1 once more, and this module is the clearest case of it: every namespaced spelling here is a
   // bare English word, so every flat alias keeps the text prefix. `read`, `style`, `fit` and
   // `measure` as globals would be four collisions waiting to happen.
+  'ce.keys': {
+    shortcut: 'keysShortcut', remove: 'keysRemove', list: 'keysList', isDown: 'keysIsDown', held: 'keysHeld',
+    piano: 'keysPiano', pianoInfo: 'keysPianoInfo', focus: 'keysFocus', focused: 'keysFocused',
+  },
   'ce.text': {
     fonts: 'textFonts', font: 'textFont', style: 'textStyle', axis: 'textAxis',
     read: 'textRead', measure: 'textMeasure', fit: 'textFit',

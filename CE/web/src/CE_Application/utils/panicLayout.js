@@ -155,11 +155,12 @@ export function eventMatchesShortcut(event, binding) {
 }
 
 // --- Is this shortcut a good idea? ----------------------------------------------
-// NOT a conflict check against other panel bindings: there are none. A panel
-// binds exactly one key, this one — the scripting API has no key event and no
-// control carries a shortcut. So the useful warnings are about the things that
-// actually go wrong: a combo the host eats before the panel ever sees it, and a
-// bare key that fires on an ordinary keystroke.
+// NOT a conflict check against other panel bindings. The panic key is the one
+// key a panel sets in the inspector; scripts add theirs with ce.keys.shortcut,
+// which refuses the panic key (scripting/scriptKeys.js), so the two cannot
+// collide. The useful warnings are about the things that actually go wrong: a
+// combo the host eats before the panel ever sees it, and a bare key that fires
+// on an ordinary keystroke.
 //
 // Everything here is advice, never a block. The author knows their rig; the job
 // is to make sure a bad choice is a choice rather than a surprise.
@@ -174,6 +175,10 @@ const HOST_CLAIMED = new Set([
   'ctrl+shift+i', 'ctrl+shift+j', 'ctrl+shift+c', 'alt+F4',
   'F5', 'F11', 'F12',
 ]);
+/** Whether a DAW or the OS commonly takes this key before the page sees it (ce.keys refuses these). */
+export function isHostClaimedShortcut(binding) {
+  return !!binding?.key && HOST_CLAIMED.has(claimKey(binding));
+}
 function claimKey(binding) {
   const parts = [];
   if (binding.ctrl) parts.push('ctrl');

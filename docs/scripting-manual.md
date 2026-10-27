@@ -839,6 +839,8 @@ Raised by the control the script belongs to.
 |---|---|
 | `onControlChanged(info)` | Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place. |
 | `onTimer(info)` | A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`. |
+| `onKeyDown(key)` | A key went down that nothing else on the panel kept: not while typing, and not the panic key, a shortcut, a piano key or a key the focused control used. `key.key` is its name as printed ("R", "7", "Space", "Up", "F2"), `key.code` its place, the same on every layout ("KeyR"), `key.ctrl`, `key.shift`, `key.alt` and `key.meta` the modifiers, `key.repeat` true while the system repeats a held key, and `key.control` the control that has the keyboard. Return true to keep the key: it then goes no further, not to the DAW and not to the editor. |
+| `onKeyUp(key)` | A key whose keyDown was raised went up, with the same fields except `repeat`. Also raised for every such key when the panel loses the keyboard while it is held. Its return value is not used. |
 
 ### Time events
 
@@ -3067,7 +3069,7 @@ Good to know:
 
 ## Commands: The panel itself
 
-Creating and arranging controls, and saving things that outlive the session.
+Creating and arranging controls, the computer keyboard, and saving things that outlive the session.
 
 ### ce.panel: building and arranging the panel
 
@@ -3475,6 +3477,169 @@ ce.panel.restore(before)
 // JavaScript
 ce.panel.restore(before);
 ```
+
+### ce.keys: the computer keyboard
+
+The computer keyboard on a panel: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. In the panel view only, the editor's preview and an exported plug-in with its window open; with the window shut there is no keyboard.
+
+Who gets a key, in order; a kept key goes no further: (1) typing into a text box or an LCD keeps every key; (2) the panic key; (3) shortcuts, those with a modifier at once and those without after the focused control; (4) the piano, when it is on; (5) the focused control's own keys, the arrows on a knob and Space on a button; (6) keyDown, for any script that listens, which keeps the key by returning true; (7) whatever is around the panel, the DAW or the editor. When the panel loses the keyboard (the window loses focus or is hidden, or the panel closes) every held key gets its keyUp and every piano note its note-off.
+
+```lua
+-- Lua: Ctrl+G picks a random voice; a help LCD shows every key the panel uses
+function onPanelReady()
+  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })
+  for row, s in ipairs(ce.keys.list()) do
+    ce.components.lcd.text("Help", row, s.keys .. "  " .. (s.description or ""))
+  end
+end
+```
+
+Everything in this chapter needs the panel window. With the window closed these commands do nothing and write a note to the log.
+
+#### `ce.keys.shortcut(keys, fn [, opts]) -> id`
+
+Run a function when a key, or a key with modifiers, is pressed anywhere on the panel.
+
+Example: `ce.keys.shortcut("Ctrl+G", randomizeVoice, { description = "Random voice" })` runs randomizeVoice on Ctrl+G.
+
+- `keys` (text, required): The key and its modifiers joined by +: "Ctrl+G", "Shift+Up", "F2", "Space". Modifiers are Ctrl, Shift, Alt and Meta (the Windows key, or Cmd on a Mac), in any order and any case.
+- `fn` (function, required): Called with the same fields keyDown gives.
+
+Good to know:
+
+- Refused, with a console line saying why: the editor's own keys, the keys DAWs and the system take (Ctrl+R, Ctrl+S and the like), the panic key, and a key another shortcut already has. Space is allowed, with a console line: in a DAW it then no longer starts the transport while the plug-in has the keyboard.
+- A shortcut without a modifier waits for a focused control that uses that key: with a knob focused, a shortcut on "Up" does not run, and the knob moves. With a modifier it always runs.
+- Shortcuts name the key printed on it: "Ctrl+G" is G wherever it sits on a German or French keyboard.
+- Nothing runs while the user is typing into a text box or editing an LCD.
+- Returns an id for `remove`; refused: nothing. A script's shortcuts are removed when it reloads.
+
+*Short name: `keysShortcut`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `description` | text | — | The words `list` shows for it. |
+| `repeat` | true or false | false | On: run again while the key is held and the system repeats it. |
+
+#### `ce.keys.remove(id) -> boolean`
+
+Take a shortcut away.
+
+Example: `ce.keys.remove(state.randomKey)` when the page that used it is hidden.
+
+- `id` (number, required): The id `shortcut` gave.
+
+Good to know:
+
+- Returns true when there was one.
+
+*Short name: `keysRemove`.*
+
+#### `ce.keys.list() -> list`
+
+Every key the panel uses, for a help page: a list of { id, keys, description }.
+
+Example: `#ce.keys.list()` is how many keys the panel uses.
+
+Good to know:
+
+- The panic key comes first (id "panic"), then the shortcuts in the order they were made.
+- The piano is one entry while it is on, keys "Piano".
+
+*Short name: `keysList`.*
+
+#### `ce.keys.isDown(key) -> boolean`
+
+Whether a key is held now.
+
+Example: `ce.keys.isDown("Shift")` in onValueChange, to move a knob in fine steps while Shift is held.
+
+- `key` (text, required): A name as keyDown gives it ("Shift", "R", "Up"), or a place as its `code` gives it ("KeyR").
+
+Good to know:
+
+- Counts keys the panel saw go down, except while typing. False after the panel loses the keyboard.
+
+*Short name: `keysIsDown`.*
+
+#### `ce.keys.held() -> list`
+
+The keys held now, by name, in the order they went down.
+
+Example: `ce.keys.held()` while Ctrl and G are held gives { "Ctrl", "G" }.
+
+*Short name: `keysHeld`.*
+
+#### `ce.keys.piano([opts]) -> boolean`
+
+Play notes from the letter keys of the computer keyboard.
+
+Example: `ce.keys.piano({ target = "Keys" })` plays through the Keyboard component named "Keys", which lights up as notes play.
+
+Good to know:
+
+- The layout is the one Ableton Live and Hostage use, by the keys' place: the middle letter row plays the white keys from C (A, S, D, F, G, H, J, K, L, ;, '), the row above it the black ones (W, E, T, Y, U, O, P). On a German or French keyboard the same places play the same notes.
+- A key held plays one note until it is let go; the system's key repeat is ignored. Keys pressed with Ctrl, Alt or Meta are left for shortcuts.
+- With a `target`, the notes go through that Keyboard component: its channel, velocity, transpose, octave and scale lock apply, its keys show what is held, and it raises hit and release as for the mouse. Without one, the options below apply and the notes go to the device as sendNote sends them.
+- Every note is let go when the panel loses the keyboard, when the piano is turned off, and on the panic key.
+- Returns true when on; false when off, or when the panel has nothing to play to.
+
+*Short name: `keysPiano`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `on` | true or false | true | Off stops the piano and lets every note go. |
+| `target` | text | — | A Keyboard component to play through. |
+| `octave` | number | 4 | The octave the A key starts: 4 makes it C4, note 60. |
+| `velocity` | number | 100 | How hard every note is played, 1 to 127. |
+| `channel` | number | 1 | The MIDI channel, 1 to 16, without a `target`. |
+| `role` | string | "mainSynth" | The device, without a `target`. |
+| `octaveKeys` | true or false | true | Z and X move the octave down and up. |
+| `velocityKeys` | true or false | true | C and V lower and raise the velocity by 20. |
+
+#### `ce.keys.pianoInfo() -> table`
+
+What the piano is doing: { on, octave, velocity, channel, target, notes }.
+
+Example: `ce.keys.pianoInfo().octave` is the octave Z and X have moved it to.
+
+Good to know:
+
+- `notes` is a list of { note, key } for the notes held now.
+- To react to each note as it is played, give the piano a `target` and listen to that component's hit and release.
+
+*Short name: `keysPianoInfo`.*
+
+#### `ce.keys.focus([control]) -> boolean`
+
+Give a control the keyboard, so the arrows and digits move it.
+
+Example: `ce.keys.focus("Cutoff")` after a shortcut that jumps to the filter.
+
+- `control` (text, optional): The control's name.
+
+Good to know:
+
+- The control shows its focus ring, as after Tab.
+- Left out: no control has the keyboard, and keys go to shortcuts and keyDown.
+- Refused (false) for a control with "Focusable" off or its keys turned off, a hidden control, and outside the preview.
+
+*Short name: `keysFocus`.*
+
+#### `ce.keys.focused() -> text`
+
+The control that has the keyboard, or nothing.
+
+Example: `ce.keys.focused() == "Cutoff"` while the cutoff knob takes the arrows.
+
+Good to know:
+
+- The same name as keyDown's `control`.
+
+*Short name: `keysFocused`.*
 
 ### ce.storage: remembering things
 

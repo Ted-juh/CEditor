@@ -86,6 +86,27 @@ export function hostKeyPayload(event, type) {
   };
 }
 
+// The forwarding installed now, for a key the page held back while its scripts decided (ce.keys:
+// keyDown keeps a key only by returning true, which it can do only after it has run).
+let installed = null;
+
+/**
+ * Hand a key the page held back to the host after all, when forwarding is on and the key is one the
+ * host would have had. `type` is 'down' or 'up'. Returns whether it was sent.
+ */
+export function sendKeyToHostLate(event, type) {
+  if (!installed || !installed.enabled()) return false;
+  if (type === 'down') {
+    const asIfUnused = {
+      key: event?.key, code: event?.code, keyCode: event?.keyCode, isComposing: event?.isComposing,
+      target: event?.target, defaultPrevented: false,
+    };
+    if (!keyIsForTheHost(asIfUnused)) return false;
+  }
+  installed.send(hostKeyPayload(event, type));
+  return true;
+}
+
 /**
  * Listen on `target` (the page's window) and send each key the host should have to `send(payload)`,
  * while `enabled()` says so. `pageKeeps(event)` names a key the page keeps even where it would
@@ -150,11 +171,14 @@ export function installHostKeyForwarding({ target = window, enabled, send, pageK
   const forget = () => { handedOver.clear(); takenEarly.clear(); };
   const onPointerDown = () => { focusByClick = true; };
 
+  const mine = { enabled, send };
+  installed = mine;
   target.addEventListener('keydown', onCapture, true);
   target.addEventListener('keyup', onCapture, true);
   target.addEventListener('pointerdown', onPointerDown, true);
   target.addEventListener('blur', forget);
   return () => {
+    if (installed === mine) installed = null;
     target.removeEventListener('keydown', onCapture, true);
     target.removeEventListener('keyup', onCapture, true);
     target.removeEventListener('pointerdown', onPointerDown, true);

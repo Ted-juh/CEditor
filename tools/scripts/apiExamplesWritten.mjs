@@ -202,6 +202,42 @@ export const WRITTEN = {
     lua: `local p = ce.device.parameter("filter.cutoff")\nif p then set("Cutoff.Behavior.max", p.max) end`,
     js: `const p = ce.device.parameter("filter.cutoff");\nif (p) set("Cutoff.Behavior.max", p.max);`,
   },
+  keysShortcut: {
+    lua: `function onPanelReady()\n  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })\nend`,
+    js: `function onPanelReady() {\n  ce.keys.shortcut("Ctrl+G", () => run("Random.action"), { description: "Random voice" });\n}`,
+  },
+  keysRemove: {
+    lua: `state.randomKey = ce.keys.shortcut("Ctrl+G", randomVoice)\n-- later, when that page is hidden:\nce.keys.remove(state.randomKey)`,
+    js: `state.randomKey = ce.keys.shortcut("Ctrl+G", randomVoice);\n// later, when that page is hidden:\nce.keys.remove(state.randomKey);`,
+  },
+  keysList: {
+    lua: `for row, s in ipairs(ce.keys.list()) do\n  ce.components.lcd.text("Help", row, s.keys .. "  " .. (s.description or ""))\nend`,
+    js: `ce.keys.list().forEach((s, i) => {\n  ce.components.lcd.text("Help", i + 1, \`\${s.keys}  \${s.description ?? ""}\`);\n});`,
+  },
+  keysIsDown: {
+    lua: `function onValueChange(value)\n  if ce.keys.isDown("Shift") then log("fine steps") end\nend`,
+    js: `function onValueChange(value) {\n  if (ce.keys.isDown("Shift")) log("fine steps");\n}`,
+  },
+  keysHeld: {
+    lua: `log(#ce.keys.held() .. " keys held")`,
+    js: `log(ce.keys.held().length + " keys held");`,
+  },
+  keysPiano: {
+    lua: `function onValueChanged(value)\n  ce.keys.piano({ on = value > 0, target = "Keys" })\nend`,
+    js: `function onValueChanged(value) {\n  ce.keys.piano({ on: value > 0, target: "Keys" });\n}`,
+  },
+  keysPianoInfo: {
+    lua: `ce.components.lcd.text("Display", 2, "Octave " .. ce.keys.pianoInfo().octave)`,
+    js: `ce.components.lcd.text("Display", 2, "Octave " + ce.keys.pianoInfo().octave);`,
+  },
+  keysFocus: {
+    lua: `ce.keys.shortcut("Ctrl+Shift+F", function() ce.keys.focus("Cutoff") end, { description = "Go to the filter" })`,
+    js: `ce.keys.shortcut("Ctrl+Shift+F", () => ce.keys.focus("Cutoff"), { description: "Go to the filter" });`,
+  },
+  keysFocused: {
+    lua: `function onKeyDown(key)\n  if ce.keys.focused() == "Cutoff" then log("the cutoff knob has the arrows") end\nend`,
+    js: `function onKeyDown(key) {\n  if (ce.keys.focused() === "Cutoff") log("the cutoff knob has the arrows");\n}`,
+  },
   formatParameter: {
     lua: `local v = ce.device.read("octaveShift")\nce.components.lcd.text("Display", 1, ce.format.line("Octave", ce.format.parameter("octaveShift", v), 16))`,
     js: `const v = ce.device.read("octaveShift");\nce.components.lcd.text("Display", 1, ce.format.line("Octave", ce.format.parameter("octaveShift", v), 16));`,

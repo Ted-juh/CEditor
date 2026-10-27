@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const CHECKS = [
-  'run', 'textPlacement', 'playerInbound', 'playerHostKeys', 'playerIcons', 'learnChips', 'effectsTab', 'assetsTab',
+  'run', 'textPlacement', 'playerInbound', 'playerHostKeys', 'playerKeys', 'playerIcons', 'learnChips', 'effectsTab', 'assetsTab',
   'screenTab', 'apiTab', 'libraryTab', 'sourceLink', 'fromSelection', 'animationTab', 'panelMotion',
   'designerTab', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'panelShot',
   'releaseWorkflow', 'numberCellSelection', 'displayGapReview', 'ctrl49Screen', 'noteModules',

@@ -311,7 +311,13 @@
     sliderControlWheelValue,
   } from '../utils/sliderControlPart.js';
   import { floating } from '../utils/floatingUi.js';
-  import { dispatchInteraction } from '../scripting/panelRuntime.js';
+  import { dispatchInteraction, dispatchKeyEvent, scriptsHear } from '../scripting/panelRuntime.js';
+  import {
+    registerKeysSurface, isLiveSurface, keysCapture, keysBubble, keysUp, letGo as keysLetGo,
+    noteRaised as keysNoteRaised, keyFields, pianoSilence, keyIsTheEditors,
+  } from '../scripting/scriptKeys.js';
+  import { sendKeyToHostLate } from '../utils/hostKeys.js';
+  import { isTextEntryTarget } from '../utils/textEntry.js';
   import { customNumericFields, customNumericPatch, customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { numberOr } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
@@ -5663,6 +5669,7 @@
   // rig is worse than useless.
   function firePanicEmergency({ flashButtons = true } = {}) {
     try { silenceLocalNoteControls(); } catch { /* mid-teardown: the blanket set still covers it */ }
+    if (isLiveSurface(panel?.id)) pianoSilence();   // ce.keys' piano: its notes off, the piano stays on
     for (const bytes of panicMessages(EMERGENCY_PANIC)) sendNoteBytes(bytes, 'panic');
     clearNoteInput();
     sentAnyNote = false;
@@ -5684,10 +5691,152 @@
     // can. A configured non-Escape panic shortcut remains available while an overlay is open.
     if (event.key === 'Escape' && typeof document !== 'undefined'
       && document.querySelector('dialog[open], [role="dialog"], [role="menu"]')) return;
-    if (!isPanicShortcut(event, { shortcut, lcdEditing: lcdEdit.active === true })) return;
+    if (!isPanicShortcut(event, { shortcut, lcdEditing: lcdEdit.active === true })) {
+      routeScriptKey(event);
+      return;
+    }
     event.preventDefault();
     firePanicEmergency();
   }
+
+  // --- ce.keys: the computer keyboard for the panel's scripts --------------------------------
+  // scriptKeys.js decides who gets a key; this feeds it. On the way IN (capture) shortcuts with a
+  // modifier and the piano take their keys before any control; on the way OUT (handleGlobalKeyDown,
+  // after the focused control had its chance) a shortcut without a modifier runs, or scripts hear
+  // keyDown. Only the surface showing the panel the scripts run on takes part: a gallery draws
+  // sample panels with this same component.
+  const keysHeldForHost = new Map();   // code -> the key-down, held back for keyDown, then the DAW's
+
+  function keyTargetControlName(event) {
+    const node = event?.target?.closest?.('.canvas-control[data-control-id]');
+    const id = node?.getAttribute?.('data-control-id');
+    return id ? String(controlById(id)?._children?.Core?.name ?? '') : '';
+  }
+  function keysContext(event) {
+    const target = event?.target;
+    const typing = isTextEntryTarget(target) || lcdEdit.active === true || event?.isComposing === true
+      || event?.keyCode === 229 || (typeof target?.closest === 'function' && target.closest('[data-editing]') !== null);
+    const panic = isPanicShortcut(event, { shortcut: panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT, lcdEditing: lcdEdit.active === true });
+    return { typing, panic, control: keyTargetControlName(event) };
+  }
+  function onKeysCaptureDown(event) {
+    if (!isLiveSurface(panel?.id)) return;
+    if (keysCapture(event, keysContext(event))) { event.preventDefault(); event.stopPropagation(); }
+  }
+  function onKeysCaptureUp(event) {
+    if (!isLiveSurface(panel?.id)) return;
+    const { piano, fields } = keysUp(event, { control: keyTargetControlName(event) });
+    if (piano) { event.preventDefault(); event.stopPropagation(); }
+    if (fields && scriptsHear('onKeyUp')) dispatchKeyEvent('onKeyUp', fields);
+    const heldBack = keysHeldForHost.get(event.code);
+    if (heldBack) {
+      keysHeldForHost.delete(event.code);
+      event.preventDefault();
+      sendKeyToHostLate(event, 'up');
+    }
+  }
+  function routeScriptKey(event) {
+    if (!isLiveSurface(panel?.id)) return;
+    const ctx = keysContext(event);
+    const route = keysBubble(event, ctx);
+    if (route === 'shortcut') { event.preventDefault(); return; }
+    if (route !== 'event') return;
+    const fields = keyFields(event, ctx.control);
+    keysNoteRaised(event, fields);
+    if (!scriptsHear('onKeyDown')) return;
+    // A handler keeps a key by returning true, and it can only say so after it has run. So while a
+    // script listens, the key is held back from the DAW and handed over once no handler kept it.
+    // The editor's own keys are never held back: they go on whatever a script answers.
+    const holdBack = event.key !== 'Tab' && !keyIsTheEditors(event);
+    if (holdBack) event.preventDefault();
+    const down = { key: event.key, code: event.code, keyCode: event.keyCode, repeat: event.repeat,
+      ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
+      isComposing: event.isComposing, target: event.target };
+    dispatchKeyEvent('onKeyDown', fields).then((kept) => {
+      if (!holdBack || kept) return;
+      if (sendKeyToHostLate(down, 'down')) keysHeldForHost.set(down.code, down);
+    });
+  }
+  // The panel lost the keyboard: every held key gets its keyUp, every piano note its note-off.
+  function keysLostKeyboard() {
+    if (!isLiveSurface(panel?.id)) return;
+    const ups = keysLetGo();
+    if (scriptsHear('onKeyUp')) for (const up of ups) dispatchKeyEvent('onKeyUp', up);
+    keysHeldForHost.clear();
+  }
+  function onKeysVisibility() {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') keysLostKeyboard();
+  }
+  function controlByName(name) {
+    const wanted = String(name ?? '');
+    if (!wanted) return null;
+    return allControls.find((c) => String(c?._children?.Core?.name ?? '') === wanted)
+      ?? flatControls(panel?.controls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === wanted) ?? null;
+  }
+  function controlElement(control) {
+    const id = getControlId(control);
+    return surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
+      .find((node) => node.getAttribute('data-control-id') === id) || null;
+  }
+  function sendPianoBytes(bytes, role) {
+    if ((bytes?.[0] & 0xF0) === 0x90) sentAnyNote = true;
+    const deviceRole = role || noteDeviceRole;
+    if (deviceRole) triggerRawMidiAction({ deviceRole, actionId: 'keys_piano', message: bytesToHex(bytes), dryRun: false });
+    const tapped = noteOutputFromBytes(bytes, 'Piano', 'ce.keys');
+    if (tapped) publishNoteOutput(tapped);
+  }
+  const keysHost = {
+    playNote(note, velocity, on, piano) {
+      if (piano.target) {
+        const control = controlByName(piano.target);
+        if (!control || !isKeyboardControl(control)) return;
+        if (on) playKeyboardKey(control, note, false);
+        else releaseKeyboardKey(getControlId(control), note);
+        return;
+      }
+      sendPianoBytes(on ? noteOnBytes(piano.channel, note, velocity) : noteOffBytes(piano.channel, note), piano.role);
+    },
+    isKeyboard: (name) => isKeyboardControl(controlByName(name)),
+    canPlay: (piano) => (piano.target ? isKeyboardControl(controlByName(piano.target)) : !!(piano.role || noteDeviceRole)),
+    focus(name) {
+      if (typeof document === 'undefined') return false;
+      if (!name) {
+        const active = document.activeElement;
+        if (active?.closest?.('.canvas-control')) active.blur?.();
+        keyboardFocusControlId = '';
+        return true;
+      }
+      const control = controlByName(name);
+      if (!control || isDisabled(control) || control?._children?.Core?.visible === false) return false;
+      if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false
+        || getMouse(control)?.focusable === false) return false;
+      const element = controlElement(control);
+      if (!element || element.getClientRects().length === 0) return false;
+      lastInputMode = 'keyboard';
+      element.focus?.();
+      const has = document.activeElement === element || element.contains(document.activeElement);
+      if (has) keyboardFocusControlId = getControlId(control);
+      return has;
+    },
+    focused: () => (keyboardFocusControlId ? String(controlById(keyboardFocusControlId)?._children?.Core?.name ?? '') : ''),
+    panicShortcut: () => panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT,
+  };
+  $effect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const unregister = registerKeysSurface(panel?.id, keysHost);
+    window.addEventListener('keydown', onKeysCaptureDown, true);
+    window.addEventListener('keyup', onKeysCaptureUp, true);
+    window.addEventListener('blur', keysLostKeyboard);
+    document.addEventListener('visibilitychange', onKeysVisibility);
+    return () => {
+      window.removeEventListener('keydown', onKeysCaptureDown, true);
+      window.removeEventListener('keyup', onKeysCaptureUp, true);
+      window.removeEventListener('blur', keysLostKeyboard);
+      document.removeEventListener('visibilitychange', onKeysVisibility);
+      keysLostKeyboard();
+      unregister();
+    };
+  });
 
   // Inject the sounding pads + last hit so the renderer can light up.
   function applyDrumPadsValueSource(control, resolved) {
