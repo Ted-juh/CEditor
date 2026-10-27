@@ -44,6 +44,28 @@ struct DeviceProfileServiceTestAccess
     static juce::File publishedFile (const DeviceProfileService& service)  { return service.publishedRequestsFile; }
     static juce::File directory()  { return DeviceProfileService::pendingRequestsDirectory(); }
     static const void* engineFor (DeviceProfileService& service, const juce::String& profileId)  { return service.resolveEngine (profileId, {}); }
+
+    /** A request already past its timeout, holding what it sent and how many tries it has left. */
+    static void awaitExpired (DeviceProfileService& service, const juce::String& role, const juce::String& dumpId, int retries)
+    {
+        DeviceProfileService::PendingDeviceRequest request;
+        request.correlationId = "expired_" + dumpId;
+        request.deviceRole = role;
+        request.requestId = "request_" + dumpId;
+        request.expectedResponseKind = "dump";
+        request.expectedDumpId = dumpId;
+        MidiMessageSpec message;
+        message.kind = "sysex";
+        message.bytes = { 0xF0, 0x7D, 0x01, 0xF7 };
+        request.transaction.messages.add (message);
+        request.timeoutMs = 10;
+        request.createdAtMs = juce::Time::getMillisecondCounterHiRes() - 100.0;
+        request.timeoutAtMs = request.createdAtMs;
+        request.retriesRemaining = retries;
+        service.addPendingDeviceRequest (request);
+    }
+    static void runTimeouts (DeviceProfileService& service)  { service.processPendingRequestTimeouts(); }
+    static int pendingCount (const DeviceProfileService& service)  { return (int) service.pendingDeviceRequests.size(); }
 };
 } // namespace ceditor::device
 
@@ -1745,6 +1767,58 @@ int runMonitorClearTests()
     return 0;
 }
 
+/*
+ * A request's `retries` is used. The profile's retries were stored on the pending request and never
+ * read: one lost reply was a failed read whatever the profile asked for. Now a request past its
+ * timeout is sent again while tries remain, and the attempt is in the MIDI log. There is no MIDI
+ * output in this test, so what it can show is the attempt and the other half of the rule: a resend
+ * that cannot be sent ends the request, rather than leaving it waiting for ever.
+ */
+int runRequestRetryTests()
+{
+    using Access = ceditor::device::DeviceProfileServiceTestAccess;
+    ceditor::device::DeviceProfileService service;
+    juce::StringArray logged;
+    int timedOut = 0;
+    service.setEventCallback ([&] (const juce::String& name, const juce::var& payload)
+    {
+        if (name == "deviceRequestTimedOut") ++timedOut;
+        if (name == "midiMonitorEvents")
+            if (auto* events = payload.getProperty ("events", {}).getArray())
+                for (const auto& event : *events)
+                    logged.add (event.getProperty ("status", "").toString());
+    });
+
+    Access::awaitExpired (service, "mainSynth", "patch", 0);
+    Access::runTimeouts (service);
+    if (timedOut != 1 || Access::pendingCount (service) != 0 || logged.joinIntoString ("|").contains ("again"))
+    {
+        std::cerr << "[FAIL] a request with no retries times out at once (timed out " << timedOut
+                  << ", pending " << Access::pendingCount (service) << ")\n";
+        return 1;
+    }
+
+    logged.clear();
+    timedOut = 0;
+    Access::awaitExpired (service, "mainSynth", "voice", 2);
+    Access::runTimeouts (service);
+    if (! logged.joinIntoString ("|").contains ("No reply, and it could not be sent again"))
+    {
+        std::cerr << "[FAIL] a request with retries left is tried again; the log says: "
+                  << logged.joinIntoString (" | ") << "\n";
+        return 1;
+    }
+    if (timedOut != 1 || Access::pendingCount (service) != 0)
+    {
+        std::cerr << "[FAIL] a resend that could not be sent still ends the request (timed out " << timedOut
+                  << ", pending " << Access::pendingCount (service) << ")\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] DeviceProfileService :: a request's retries are tried before it times out\n";
+    return 0;
+}
+
 int runRealtimeMonitorTests()
 {
     ceditor::device::DeviceProfileService service;
@@ -3148,6 +3222,7 @@ int main (int argc, char** argv)
     failures += runProfileCacheTests();
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();
+    failures += runRequestRetryTests();
     failures += runServiceRequestTests();
     failures += runSharedInputReplyTests();
     failures += runSharedProfileEngineTests();

@@ -147,8 +147,12 @@ juce::var DeviceProfileService::startPresetListScan (const juce::var& payload)
             pendingRequest.scanId = scanId;
             pendingRequest.slot = slot;
             pendingRequest.createdAtMs = nowMs();
-            pendingRequest.timeoutAtMs = pendingRequest.createdAtMs + juce::jmax (1, request.timeoutMs);
-            pendingRequest.retriesRemaining = request.retries;
+            pendingRequest.timeoutMs = juce::jmax (1, request.timeoutMs);
+            pendingRequest.timeoutAtMs = pendingRequest.createdAtMs + pendingRequest.timeoutMs;
+            pendingRequest.retriesRemaining = juce::jmax (0, request.retries);
+            // A previewed scan sent nothing, so it has nothing to send again.
+            if (direction != "preview")
+                pendingRequest.transaction = request.transaction;
             addPendingDeviceRequest (pendingRequest);
         }
         else if (direction == "out" || direction == "queued")

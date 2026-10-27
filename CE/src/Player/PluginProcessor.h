@@ -2286,6 +2286,26 @@ private:
                 return {};
             }
 
+            // How long requestDump(kind, fn) waits by default: every try the profile allows
+            // (timeoutMs, sent 1 + retries times by the service), and never less than the 3000 ms it
+            // always waited. A fixed 3000 ms timed out an AN1x request whose own timeout is 4000 ms.
+            // The same sum as requestWaitMs in panelRuntime.js. Void for a kind that is no request.
+            if (kind == "answerWaitMs")
+            {
+                const auto wanted = p != nullptr ? p->getProperty ("request").toString() : juce::String();
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    if (auto* arr = docObj->getProperty ("requests").getArray())
+                        for (const auto& item : *arr)
+                            if (auto* o = item.getDynamicObject(); o != nullptr && o->getProperty ("id").toString() == wanted)
+                            {
+                                const auto timeoutMs = o->hasProperty ("timeoutMs") ? juce::jmax (1, (int) o->getProperty ("timeoutMs")) : 2000;
+                                const auto retries = o->hasProperty ("retries") ? juce::jmax (0, (int) o->getProperty ("retries")) : 0;
+                                return juce::var (juce::jmax (3000, timeoutMs * (1 + retries) + 500));
+                            }
+                return {};
+            }
+
             if (kind == "recipes" || kind == "requests")
             {
                 const auto doc = profileDocument();

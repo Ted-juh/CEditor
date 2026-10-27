@@ -3097,7 +3097,9 @@ function __resolveDumps(kind, role, values, err) {
 function requestDump(kind, fn, opts) {
   kind = String(kind === undefined || kind === null ? "" : kind);
   if (typeof fn === "function") {
-    var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout) : 3000;
+    // Left out, the wait the profile's request deserves: its timeout for every try it allows.
+    var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout)
+      : (Number(__deviceQuery("answerWaitMs", { role: "mainSynth", request: kind })) || 3000);
     // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     // so that is what the callback waits for; waiting for the request's own id, it heard only the
     // timeout.

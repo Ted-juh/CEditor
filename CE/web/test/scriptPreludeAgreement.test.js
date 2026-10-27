@@ -1873,6 +1873,76 @@ sys.stdout.write(json.dumps(heard))
   assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
 });
 
+// Left out, requestDump's timeout is what the profile's request deserves (the plug-in's
+// "answerWaitMs" query): a fixed 3000 ms reported an AN1x request, whose own timeout is 4000 ms, as
+// unanswered while its reply was on the way. A given timeout still wins, and a kind that is no
+// request keeps the 3000 ms.
+test('requestDump waits as long as the profile asks, in every prelude', async (t) => {
+  const query = (kind, payload) => (kind === 'answerWaitMs' && payload?.request === 'requestVoice' ? 4500 : undefined);
+  const want = [4500, 3000, 50];
+  {
+    const waits = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, { get: (_t, prop) => (prop === 'deviceQuery' ? query : () => undefined) });
+    sandbox.after = (ms) => { waits.push(ms); };
+    sandbox.requestDump('requestVoice', () => {});
+    sandbox.requestDump('voiceCommon', () => {});
+    sandbox.requestDump('requestVoice', () => {}, { timeout: 50 });
+    assert.deepEqual(waits, want, 'JS prelude');
+  }
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'startTimer', 'stopTimer', '__transportState', '__requestDump', 'on']) {
+        lua.global.set(name, () => {});
+      }
+      lua.global.set('__deviceQuery', (kind, payload) => query(kind, payload));
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const waits = [];
+      lua.global.set('after', (ms) => { waits.push(Number(ms)); });
+      await lua.doString(`requestDump("requestVoice", function() end)
+requestDump("voiceCommon", function() end)
+requestDump("requestVoice", function() end, { timeout = 50 })`);
+      assert.deepEqual(waits, want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its wait was not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name):
+        if name == "deviceQuery":
+            return lambda kind, payload=None: 4500 if kind == "answerWaitMs" and (payload or {}).get("request") == "requestVoice" else None
+        return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "logWarn", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+waits = []
+g["after"] = lambda ms, fn: waits.append(ms)
+g["requestDump"]("requestVoice", lambda values, info: None)
+g["requestDump"]("voiceCommon", lambda values, info: None)
+g["requestDump"]("requestVoice", lambda values, info: None, { "timeout": 50 })
+sys.stdout.write(json.dumps(waits))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
 test('the note lists and their words are read, refused and said alike in every engine', async (t) => {
   resetScriptStateForTesting();
   clearScriptTrace();

@@ -8205,7 +8205,7 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   const role = DEFAULT_ROLE;
 
   if (typeof fn === 'function') {
-    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
+    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : requestWaitMs(role, key);
     // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     // so that is what the callback waits for, in every runtime; waiting for the request's own id,
     // it heard only the timeout.
@@ -8247,6 +8247,23 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) — no device host`);
   return false;
 }
+
+/**
+ * How long requestDump(kind, fn) waits when the script gives no timeout: the request's own timeoutMs
+ * for every try the profile allows (the service sends it 1 + retries times), and never less than the
+ * 3000 ms it always waited. A fixed 3000 ms reported an AN1x request, whose profile gives it 4000 ms,
+ * as unanswered while its reply was still on the way. The plug-in's "answerWaitMs" query is the
+ * same sum.
+ */
+function requestWaitMs(role, kind) {
+  const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
+  if (!request) return 3000;
+  const timeoutMs = Number(request.timeoutMs) > 0 ? Math.round(Number(request.timeoutMs)) : 2000;
+  const retries = Number(request.retries) > 0 ? Math.round(Number(request.retries)) : 0;
+  return Math.max(3000, timeoutMs * (1 + retries) + 500);
+}
+
+export function requestWaitMsForTesting(role, kind) { return requestWaitMs(role, kind); }
 
 /** The dump a request of the role's profile answers with, or null (the plug-in's "answers" query). */
 function requestAnswer(role, kind) {

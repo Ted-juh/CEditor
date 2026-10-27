@@ -3219,7 +3219,10 @@ end
 function requestDump(kind, fn, opts)
   kind = tostring(kind or "")
   if type(fn) == "function" then
-    local ms = 3000
+    -- Left out, the wait the profile's request deserves: its timeout for every try it allows.
+    -- Held in a local first: a query that returns nothing gives tonumber no value at all, which it refuses.
+    local wait = __deviceQuery("answerWaitMs", { role = "mainSynth", request = kind })
+    local ms = tonumber(wait) or 3000
     if opts ~= nil and tonumber(opts.timeout) ~= nil and tonumber(opts.timeout) > 0 then ms = tonumber(opts.timeout) end
     -- A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     -- so that is what the callback waits for; waiting for the request's own id, it heard only the

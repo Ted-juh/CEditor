@@ -3648,7 +3648,9 @@ def __resolveDumps(kind, role, values, err):
 def requestDump(kind, fn=None, opts=None):
     kind = str(kind if kind is not None else "")
     if callable(fn):
-        ms = 3000
+        # Left out, the wait the profile's request deserves: its timeout for every try it allows.
+        wait = __deviceQuery("answerWaitMs", { "role": "mainSynth", "request": kind })
+        ms = float(wait) if isinstance(wait, (int, float)) and wait > 0 else 3000
         if opts is not None and opts.get("timeout") is not None and float(opts.get("timeout")) > 0:
             ms = float(opts.get("timeout"))
         # A request's answer arrives under the dump it answers with ("requestSystem" brings

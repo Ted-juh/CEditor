@@ -149,6 +149,10 @@ private:
         juce::String scanId;
         double createdAtMs = 0.0;
         double timeoutAtMs = 0.0;
+        // What was sent and how long each try waits, so a request whose reply did not come can be
+        // sent again (processPendingRequestTimeouts) rather than only counting its retries.
+        MidiTransaction transaction;
+        int timeoutMs = 0;
         int retriesRemaining = 0;
         int continuationCount = 0;
         bool continueSent = false;

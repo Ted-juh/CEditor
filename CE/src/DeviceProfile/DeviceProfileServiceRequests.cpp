@@ -80,8 +80,10 @@ juce::var DeviceProfileService::startDeviceSync (const juce::var& payload)
             pendingRequest.scanId = scanId;
             pendingRequest.slot = slot;
             pendingRequest.createdAtMs = nowMs();
-            pendingRequest.timeoutAtMs = pendingRequest.createdAtMs + juce::jmax (1, request.timeoutMs);
-            pendingRequest.retriesRemaining = request.retries;
+            pendingRequest.timeoutMs = juce::jmax (1, request.timeoutMs);
+            pendingRequest.timeoutAtMs = pendingRequest.createdAtMs + pendingRequest.timeoutMs;
+            pendingRequest.transaction = request.transaction;
+            pendingRequest.retriesRemaining = juce::jmax (0, request.retries);
             addPendingDeviceRequest (pendingRequest);
             pending = true;
             updateRoleSessionState (deviceRole,
@@ -415,11 +417,36 @@ void DeviceProfileService::processPendingRequestTimeouts()
     auto now = nowMs();
     for (auto it = pendingDeviceRequests.begin(); it != pendingDeviceRequests.end();)
     {
-        const auto& request = it->second;
+        auto& request = it->second;
         if (request.timeoutAtMs > now)
         {
             ++it;
             continue;
+        }
+
+        // A profile's `retries` was stored here and never used: one lost reply was a failed read,
+        // whatever the profile asked for. Send the request again while tries remain; only the last
+        // one times out.
+        if (request.retriesRemaining > 0 && ! request.transaction.messages.isEmpty())
+        {
+            --request.retriesRemaining;
+            const auto status = sendOrQueueTransaction (request.deviceRole, request.transaction);
+            const auto resent = status.startsWith ("Sent") || status.startsWith ("Queued");
+            appendMonitorEvent (resent ? "out" : "error",
+                                request.deviceRole,
+                                "request",
+                                request.requestId,
+                                request.sentHex,
+                                resent ? "No reply; sent again (" + juce::String (request.retriesRemaining) + " more "
+                                             + (request.retriesRemaining == 1 ? "try" : "tries") + " left): " + status
+                                       : "No reply, and it could not be sent again: " + status);
+            if (resent)
+            {
+                request.timeoutAtMs = now + juce::jmax (1, request.timeoutMs);
+                publishMonitorEvents();
+                ++it;
+                continue;
+            }
         }
 
         auto timedOut = pendingDeviceRequestToVar (request);
