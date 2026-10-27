@@ -206,6 +206,18 @@ test('changes sort by how far they moved through their own range, not by raw del
   assert.deepEqual(result.changed.map((c) => c.id), ['narrow', 'wide']);
 });
 
+test('a choice id or a name compares as itself, not as a number', () => {
+  // Number() turned both into NaN, so two snapshots with the same waveform and the same name
+  // still listed both as changed.
+  const result = diffSnapshots(
+    snap({ wave: 'saw', name: 'INIT PATCH  ', other: 'square', label: 'Pad' }),
+    snap({ wave: 'saw', name: 'INIT PATCH', other: 'sine', label: 'Lead' }));
+  assert.equal(result.same, 2);
+  assert.deepEqual(result.changed.map((c) => c.id).sort(), ['label', 'other']);
+  const other = result.changed.find((c) => c.id === 'other');
+  assert.deepEqual([other.from, other.to, other.delta, other.magnitude], ['square', 'sine', null, 1]);
+});
+
 test('a diff of a snapshot with itself is all-same', () => {
   const a = snap({ 'k.value': 20, 'w.value': 1 });
   const result = diffSnapshots(a, a, PARAMS);
