@@ -66,6 +66,14 @@ struct DeviceProfileServiceTestAccess
     }
     static void runTimeouts (DeviceProfileService& service)  { service.processPendingRequestTimeouts(); }
     static int pendingCount (const DeviceProfileService& service)  { return (int) service.pendingDeviceRequests.size(); }
+    /** Every status line in the MIDI log, oldest first (the page is sent it later, on a timer). */
+    static juce::StringArray loggedStatuses (const DeviceProfileService& service)
+    {
+        juce::StringArray out;
+        for (const auto& event : service.monitorEvents)
+            out.add (event.getProperty ("status", "").toString());
+        return out;
+    }
 };
 } // namespace ceditor::device
 
@@ -1778,34 +1786,29 @@ int runRequestRetryTests()
 {
     using Access = ceditor::device::DeviceProfileServiceTestAccess;
     ceditor::device::DeviceProfileService service;
-    juce::StringArray logged;
     int timedOut = 0;
-    service.setEventCallback ([&] (const juce::String& name, const juce::var& payload)
+    service.setEventCallback ([&] (const juce::String& name, const juce::var&)
     {
         if (name == "deviceRequestTimedOut") ++timedOut;
-        if (name == "midiMonitorEvents")
-            if (auto* events = payload.getProperty ("events", {}).getArray())
-                for (const auto& event : *events)
-                    logged.add (event.getProperty ("status", "").toString());
     });
+    auto logged = [&] { return Access::loggedStatuses (service).joinIntoString (" | "); };
 
     Access::awaitExpired (service, "mainSynth", "patch", 0);
     Access::runTimeouts (service);
-    if (timedOut != 1 || Access::pendingCount (service) != 0 || logged.joinIntoString ("|").contains ("again"))
+    if (timedOut != 1 || Access::pendingCount (service) != 0 || logged().contains ("again"))
     {
         std::cerr << "[FAIL] a request with no retries times out at once (timed out " << timedOut
                   << ", pending " << Access::pendingCount (service) << ")\n";
         return 1;
     }
 
-    logged.clear();
     timedOut = 0;
     Access::awaitExpired (service, "mainSynth", "voice", 2);
     Access::runTimeouts (service);
-    if (! logged.joinIntoString ("|").contains ("No reply, and it could not be sent again"))
+    if (! logged().contains ("No reply, and it could not be sent again"))
     {
         std::cerr << "[FAIL] a request with retries left is tried again; the log says: "
-                  << logged.joinIntoString (" | ") << "\n";
+                  << logged() << "\n";
         return 1;
     }
     if (timedOut != 1 || Access::pendingCount (service) != 0)
