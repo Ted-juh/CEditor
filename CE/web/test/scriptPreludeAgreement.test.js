@@ -1290,6 +1290,11 @@ const OPTION_ANSWER_CASES = [
   ['devicePorts', [{ dir: 'in' }]], ['checksum', ['roland', [1, 2], { ofset: 1 }]],
   ['panic', [{ reset: false }]], ['encodeJson', [{ a: 1 }, { indnt: 2 }]],
   ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]],
+  ['formatNumber', [1, { decimal: 2 }]], ['formatHz', [440, { flats: true }]], ['formatTime', [5, { scal: 's' }]],
+  ['formatDb', [-6, { fromgain: true }]], ['formatPercent', [0.5, { mx: 2 }]], ['formatPan', [0, { sign: 'always' }]],
+  ['formatRatio', [4, { stile: 'x' }]], ['formatClock', [1000, { hour: true }]], ['formatNote', [60, { middlec: 3 }]],
+  ['formatDivision', [1, { tol: 0.1 }]], ['formatTable', [0, ['a'], { strt: 1 }]], ['formatFit', ['a', 4, { allign: 'right' }]],
+  ['formatLine', ['a', 'b', 8, { gaps: 2 }]], ['formatParse', ['5', { knd: 'hz' }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {

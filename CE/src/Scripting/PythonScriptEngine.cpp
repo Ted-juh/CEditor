@@ -2244,6 +2244,521 @@ def hslToHex(hue=None, sat=None, light=None):
     import math
     return rgbToHex(math.floor(f(0) * 255 + 0.5), math.floor(f(8) * 255 + 0.5), math.floor(f(4) * 255 + 0.5))
 
+# @module ce.format
+# ce.format, ported line for line from formatCore.js (the panel view's; the JavaScript prelude runs
+# that file itself). The same text in every language is the point, so nothing here uses Python's
+# own number formatting or round(): _fmt_fixed rounds half away from zero and writes the digits.
+# Held to the panel view's answers by test/formatParity.test.js and test/support/formatCases.mjs.
+import math as _fmt_math
+import re as _fmt_re
+
+_FMT_PLACEHOLDER = "--"
+_FMT_INF = float("inf")
+_FMT_DIVISIONS = [
+    ("1/1", 4), ("1/2", 2), ("1/4", 1), ("1/8", 0.5), ("1/16", 0.25), ("1/32", 0.125),
+    ("1/2D", 3), ("1/4D", 1.5), ("1/8D", 0.75), ("1/16D", 0.375),
+    ("1/2T", 4 / 3), ("1/4T", 2 / 3), ("1/8T", 1 / 3), ("1/16T", 1 / 6),
+]
+_FMT_ABBREVIATIONS = [
+    ("Amount", "Amt"), ("Attack", "Atk"), ("Balance", "Bal"), ("Bandwidth", "BW"), ("Channel", "Ch"),
+    ("Chorus", "Chor"), ("Coarse", "Crs"), ("Control", "Ctrl"), ("Controller", "Ctrl"), ("Decay", "Dcy"),
+    ("Delay", "Dly"), ("Depth", "Dpth"), ("Destination", "Dest"), ("Distortion", "Dist"), ("Effect", "FX"),
+    ("Effects", "FX"), ("Envelope", "Env"), ("Feedback", "Fdbk"), ("Frequency", "Freq"), ("Keyboard", "Kbd"),
+    ("Length", "Len"), ("Level", "Lvl"), ("Master", "Mstr"), ("Maximum", "Max"), ("Minimum", "Min"),
+    ("Modulation", "Mod"), ("Number", "Num"), ("Octave", "Oct"), ("Oscillator", "Osc"), ("Parameter", "Param"),
+    ("Pattern", "Pat"), ("Portamento", "Porta"), ("Position", "Pos"), ("Pressure", "Press"), ("Program", "Prog"),
+    ("Random", "Rnd"), ("Release", "Rel"), ("Resonance", "Reso"), ("Reverb", "Rvb"), ("Sample", "Smp"),
+    ("Semitone", "Semi"), ("Sequence", "Seq"), ("Sequencer", "Seq"), ("Source", "Src"), ("Sustain", "Sus"),
+    ("Transpose", "Trans"), ("Tremolo", "Trem"), ("Velocity", "Vel"), ("Vibrato", "Vib"), ("Volume", "Vol"),
+    ("Waveform", "Wave"), ("Width", "Wdth"),
+]
+_FMT_SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+_FMT_FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+_FMT_NUMBER_TEXT = _fmt_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+_FMT_PLAIN_NUMBER = _fmt_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)")
+
+def _fmt_say(level, text):
+    if level == "warn":
+        logWarn(text)
+    else:
+        logError(text)
+
+def _fmt_finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and _fmt_math.isfinite(x)
+
+def _fmt_num(v):
+    if isinstance(v, bool):
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str) and _FMT_NUMBER_TEXT.fullmatch(v.strip()):
+        return float(v.strip())
+    return float("nan")
+
+def _fmt_opt(opts, key):
+    if isinstance(opts, dict):
+        return opts.get(key)
+    return None
+
+def _fmt_opt_number(opts, key, fallback):
+    v = _fmt_num(_fmt_opt(opts, key))
+    return v if _fmt_math.isfinite(v) else fallback
+
+def _fmt_clamp_int(v, lo, hi):
+    r = _fmt_math.floor(v + 0.5)
+    return lo if r < lo else hi if r > hi else r
+
+def _fmt_fixed(x, d):
+    neg = x < 0
+    p = 10 ** d
+    r = _fmt_math.floor(abs(x) * p + 0.5 + 1e-9)
+    s = "%.0f" % r
+    while len(s) < d + 1:
+        s = "0" + s
+    body = s[:len(s) - d] + "." + s[len(s) - d:] if d > 0 else s
+    return "-" + body if neg and r != 0 else body
+
+def _fmt_sig_decimals(a, digits):
+    if a == 0:
+        return 0
+    e = _fmt_math.floor(_fmt_math.log10(a))
+    if 10 ** (e + 1) <= a:
+        e += 1
+    if 10 ** e > a:
+        e -= 1
+    d = digits - 1 - e
+    return 0 if d < 0 else 6 if d > 6 else d
+
+def _fmt_strip(s):
+    if "." not in s:
+        return s
+    t = s
+    while t.endswith("0"):
+        t = t[:-1]
+    if t.endswith("."):
+        t = t[:-1]
+    return t
+
+def _fmt_number_text(v, opts, fallback=None):
+    decimals = _fmt_num(_fmt_opt(opts, "decimals"))
+    if _fmt_math.isfinite(decimals):
+        s = _fmt_fixed(v, _fmt_clamp_int(decimals, 0, 6))
+    elif fallback is not None:
+        s = _fmt_fixed(v, fallback)
+    else:
+        s = _fmt_strip(_fmt_fixed(v, _fmt_sig_decimals(abs(v), _fmt_clamp_int(_fmt_opt_number(opts, "digits", 3), 1, 6))))
+    if s == "-0":
+        s = "0"
+    if _fmt_opt(opts, "sign") == "always" and not s.startswith("-") and _fmt_re.search(r"[1-9]", s):
+        s = "+" + s
+    return s
+
+def _fmt_with_unit(text, unit, opts):
+    u = _fmt_opt(opts, "unit")
+    if u is False:
+        return text
+    name = u if isinstance(u, str) else unit
+    if not name:
+        return text
+    space = "" if _fmt_opt(opts, "space") is False or (name == "%" and not isinstance(u, str)) else " "
+    return text + space + name
+
+def _fmt_finish(text, opts):
+    t = text
+    if _fmt_opt(opts, "unicode") is True and t.startswith("-"):
+        t = "−" + t[1:]
+    width = _fmt_num(_fmt_opt(opts, "width"))
+    if _fmt_math.isfinite(width):
+        w = _fmt_clamp_int(width, 0, 200)
+        while len(t) < w:
+            t = " " + t
+    return t
+
+def _fmt_placeholder(opts):
+    p = _fmt_opt(opts, "placeholder")
+    return p if isinstance(p, str) else _FMT_PLACEHOLDER
+
+def _fmt_as_text(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return _fmt_number_text(float(v), {}) if _fmt_math.isfinite(v) else _FMT_PLACEHOLDER
+    if v is None:
+        return ""
+    return str(v)
+
+def formatNumber(v, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    return _fmt_finish(_fmt_with_unit(_fmt_number_text(n, opts), "", opts), opts)
+
+def _fmt_scaled(v, opts, verb, small, large, factor, what):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    if n < 0:
+        _fmt_say("error", "ce.format." + verb + ": " + what + " below 0 is not one, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    scale = str(_fmt_opt(opts, "scale") if _fmt_opt(opts, "scale") is not None else "auto").lower()
+    big = scale == large.lower() or (scale != small.lower() and n >= factor)
+    return _fmt_finish(_fmt_with_unit(_fmt_number_text(n / factor if big else n, opts), large if big else small, opts), opts)
+
+def formatHz(v, opts=None):
+    return _fmt_scaled(v, opts, "hz", "Hz", "kHz", 1000, "a frequency")
+
+def formatTime(ms, opts=None):
+    return _fmt_scaled(ms, opts, "time", "ms", "s", 1000, "a duration")
+
+def formatDb(v, opts=None):
+    n = _fmt_num(v)
+    if _fmt_math.isnan(n):
+        return _fmt_placeholder(opts)
+    if _fmt_opt(opts, "fromGain") is True:
+        n = -144.0 if n <= 0 else 20 * _fmt_math.log10(n)
+        if n < -144:
+            n = -144.0
+    floor = _fmt_opt_number(opts, "floor", -144)
+    unicode = _fmt_opt(opts, "unicode") is True
+    if n <= floor:
+        text = "-∞" if unicode else "-inf"
+    elif n == _FMT_INF:
+        text = "∞" if unicode else "inf"
+    else:
+        text = _fmt_number_text(n, opts, 1)
+    return _fmt_finish(_fmt_with_unit(text, "dB", opts), opts)
+
+def formatPercent(v, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    lo = _fmt_opt_number(opts, "min", 0)
+    hi = _fmt_opt_number(opts, "max", 1)
+    if hi == lo:
+        _fmt_say("error", "ce.format.percent: min and max are the same, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    return _fmt_finish(_fmt_with_unit(_fmt_number_text(((n - lo) / (hi - lo)) * 100, opts, 0), "%", opts), opts)
+
+def formatPan(v, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    custom = _fmt_opt(opts, "min") is not None or _fmt_opt(opts, "max") is not None
+    lo = _fmt_opt_number(opts, "min", -1)
+    hi = _fmt_opt_number(opts, "max", 1)
+    if hi == lo:
+        _fmt_say("error", "ce.format.pan: min and max are the same, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    center = _fmt_opt_number(opts, "center", (lo + hi) / 2)
+    steps = _fmt_opt_number(opts, "steps", 50)
+    amount = n - center if custom else ((n - center) / ((hi - lo) / 2)) * steps
+    t = _fmt_number_text(abs(amount), {"decimals": _fmt_opt(opts, "decimals")}, 0)
+    if not _fmt_re.search(r"[1-9]", t):
+        return _fmt_finish("C", opts)
+    left = amount < 0
+    style = str(_fmt_opt(opts, "style") if _fmt_opt(opts, "style") is not None else "L50")
+    if style == "50L":
+        text = t + ("L" if left else "R")
+    elif style == "<50":
+        text = ("<" if left else ">") + t
+    elif style == "50>":
+        text = t + ("<" if left else ">")
+    else:
+        text = ("L" if left else "R") + t
+    return _fmt_finish(text, opts)
+
+def formatRatio(v, opts=None):
+    n = _fmt_num(v)
+    if _fmt_math.isnan(n):
+        return _fmt_placeholder(opts)
+    if n <= 0:
+        _fmt_say("error", "ce.format.ratio: a ratio must be above 0, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    x = _fmt_opt(opts, "style") == "x"
+    if n == _FMT_INF:
+        text = "∞" if _fmt_opt(opts, "unicode") is True else "inf"
+    else:
+        text = _fmt_number_text(n, opts, 2 if x else None)
+    return _fmt_finish("x" + text if x else text + ":1", opts)
+
+def _fmt_pad2(n):
+    s = "%.0f" % n
+    return "0" + s if len(s) < 2 else s
+
+def formatClock(ms, opts=None):
+    n = _fmt_num(ms)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    d = _fmt_clamp_int(_fmt_opt_number(opts, "decimals", 1), 0, 3)
+    p = 10 ** d
+    # Cut, not rounded: a clock shows the tenth that has passed, never one still to come.
+    units = _fmt_math.floor(abs(n) * p / 1000 + 1e-9)
+    secs = _fmt_math.floor(units / p)
+    frac = units - secs * p
+    h = _fmt_math.floor(secs / 3600)
+    m = _fmt_math.floor((secs % 3600) / 60)
+    s = secs % 60
+    if h > 0 or _fmt_opt(opts, "hours") is True:
+        text = ("%.0f" % h) + ":" + _fmt_pad2(m) + ":" + _fmt_pad2(s)
+    else:
+        text = ("%.0f" % m) + ":" + _fmt_pad2(s)
+    if d > 0:
+        f = "%.0f" % frac
+        while len(f) < d:
+            f = "0" + f
+        text += "." + f
+    return _fmt_finish(("-" if n < 0 and units > 0 else "") + text, opts)
+
+def formatNote(n, opts=None):
+    v = _fmt_num(n)
+    if not _fmt_math.isfinite(v):
+        return _fmt_placeholder(opts)
+    note = -_fmt_math.floor(-v + 0.5) if v < 0 else _fmt_math.floor(v + 0.5)
+    if note < 0 or note > 127:
+        _fmt_say("error", "ce.format.note: a MIDI note is 0 to 127, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    middle_c = _fmt_clamp_int(_fmt_opt_number(opts, "middleC", 4), -2, 9)
+    name = (_FMT_FLATS if _fmt_opt(opts, "flats") is True else _FMT_SHARPS)[note % 12]
+    if _fmt_opt(opts, "unicode") is True:
+        name = name[:1] + name[1:].replace("#", "♯", 1).replace("b", "♭", 1)
+    if _fmt_opt(opts, "octave") is False:
+        return _fmt_finish(name, {"width": _fmt_opt(opts, "width")})
+    octave = _fmt_math.floor(note / 12) - 5 + middle_c
+    return _fmt_finish(name + ("%.0f" % octave), {"width": _fmt_opt(opts, "width")})
+
+def formatDivision(beats, opts=None):
+    n = _fmt_num(beats)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    if n <= 0:
+        _fmt_say("error", "ce.format.division: a length must be above 0 beats, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    tolerance = min(0.5, max(0, _fmt_opt_number(opts, "tolerance", 0.02)))
+    best, best_error = None, _FMT_INF
+    for name, b in _FMT_DIVISIONS:
+        error = abs(n - b) / b
+        if error < best_error:
+            best, best_error = name, error
+    if best_error <= tolerance + 1e-12:
+        return _fmt_finish(best, opts)
+    return _fmt_finish(_fmt_number_text(n, opts) + " beats", opts)
+
+def _fmt_entry_field(entry, key):
+    if isinstance(entry, dict):
+        return entry.get(key)
+    return getattr(entry, key, None)
+
+def formatTable(v, table, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    if not isinstance(table, (list, tuple)) or len(table) == 0:
+        _fmt_say("error", "ce.format.table: the table must be a list of texts, or of { upTo, text } ranges, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    first = table[0]
+    if not isinstance(first, (str, int, float)) and _fmt_entry_field(first, "upTo") is not None:
+        for entry in table:
+            up_to = _fmt_num(_fmt_entry_field(entry, "upTo"))
+            if _fmt_math.isfinite(up_to) and n <= up_to:
+                return _fmt_finish(_fmt_as_text(_fmt_entry_field(entry, "text")), opts)
+        _fmt_say("warn", "ce.format.table: " + _fmt_number_text(n, {}) + " is past the last range, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    start = _fmt_math.floor(_fmt_opt_number(opts, "start", 0) + 0.5)
+    index = (-_fmt_math.floor(-n + 0.5) if n < 0 else _fmt_math.floor(n + 0.5)) - start
+    if index < 0 or index >= len(table):
+        _fmt_say("warn", "ce.format.table: " + _fmt_number_text(n, {}) + " is past the end of the table, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    return _fmt_finish(_fmt_as_text(table[index]), opts)
+
+_FMT_VOWELS = "aeiouAEIOU"
+
+def _fmt_abbreviations(extra):
+    out = {}
+    for word, short in _FMT_ABBREVIATIONS:
+        out[word.lower()] = short
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            out[str(key).lower()] = str(value)
+    return out
+
+def _fmt_shorten(text, width, steps, extra):
+    if len(text) <= width:
+        return text
+    words = [w for w in text.split(" ") if w != ""]
+    join = lambda: " ".join(words)
+    if steps >= 1:
+        table = _fmt_abbreviations(extra)
+        words = [table.get(w.lower(), w) for w in words]
+        if len(join()) <= width:
+            return join()
+    if steps >= 2:
+        while len(join()) > width:
+            pick = -1
+            for i, w in enumerate(words):
+                removable = any(c in _FMT_VOWELS for c in w[1:])
+                if removable and (pick < 0 or len(w) > len(words[pick])):
+                    pick = i
+            if pick < 0:
+                break
+            w = words[pick]
+            k = len(w) - 1
+            while k >= 1 and w[k] not in _FMT_VOWELS:
+                k -= 1
+            words[pick] = w[:k] + w[k + 1:]
+        if len(join()) <= width:
+            return join()
+    if steps >= 3:
+        while len(join()) > width and len(words) > 1:
+            last = words.pop()
+            words[-1] += last
+        if len(join()) <= width:
+            return join()
+    return join()[:width]
+
+def _fmt_pad_to(text, width, align):
+    t = text
+    if align == "right":
+        while len(t) < width:
+            t = " " + t
+        return t
+    if align == "center":
+        t = " " * _fmt_math.floor((width - len(t)) / 2) + t
+    while len(t) < width:
+        t += " "
+    return t
+
+def formatFit(text, width, opts=None):
+    w = _fmt_num(width)
+    if not _fmt_math.isfinite(w) or w < 1:
+        _fmt_say("error", "ce.format.fit: the width must be 1 character or more, so nothing is shown.")
+        return ""
+    width0 = _fmt_math.floor(w)
+    steps = _fmt_clamp_int(_fmt_opt_number(opts, "steps", 4), 1, 4)
+    short = _fmt_shorten(_fmt_as_text(text), width0, steps, _fmt_opt(opts, "abbreviations"))
+    if _fmt_opt(opts, "pad") is False:
+        return short
+    return _fmt_pad_to(short, width0, str(_fmt_opt(opts, "align") if _fmt_opt(opts, "align") is not None else "left"))
+
+def formatLine(left, right, width, opts=None):
+    w = _fmt_num(width)
+    if not _fmt_math.isfinite(w) or w < 1:
+        _fmt_say("error", "ce.format.line: the width must be 1 character or more, so nothing is shown.")
+        return ""
+    width0 = _fmt_math.floor(w)
+    gap = _fmt_clamp_int(_fmt_opt_number(opts, "gap", 1), 0, width0)
+    r = _fmt_as_text(right)
+    if len(r) >= width0:
+        return r[len(r) - width0:]
+    room = width0 - gap - len(r)
+    if room <= 0:
+        return _fmt_pad_to(r, width0, "right")
+    l = _fmt_as_text(left)
+    if len(l) > room:
+        l = _fmt_shorten(l, room, 4, _fmt_opt(opts, "abbreviations"))
+    return l + " " * (width0 - len(l) - len(r)) + r
+
+_FMT_NOTE_BASE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
+_FMT_UNIT_SUFFIXES = [("khz", "hz", 1000), ("hz", "hz", 1), ("ms", "time", 1), ("db", "db", 1),
+                      ("%", "percent", 0.01), ("s", "time", 1000), ("k", "", 1000)]
+
+def _fmt_read_number(s):
+    if s in ("inf", "+inf"):
+        return _FMT_INF
+    if s == "-inf":
+        return -_FMT_INF
+    return float(s) if _FMT_PLAIN_NUMBER.fullmatch(s) else float("nan")
+
+def _fmt_parse_note(s, opts):
+    letter = s[:1]
+    if letter not in _FMT_NOTE_BASE:
+        return float("nan")
+    rest = s[1:]
+    pc = _FMT_NOTE_BASE[letter]
+    if rest.startswith("#"):
+        pc += 1
+        rest = rest[1:]
+    elif rest.startswith("b") and len(rest) > 1:
+        pc -= 1
+        rest = rest[1:]
+    if not _fmt_re.fullmatch(r"-?\d+", rest):
+        return float("nan")
+    middle_c = _fmt_clamp_int(_fmt_opt_number(opts, "middleC", 4), -2, 9)
+    n = pc + (int(rest) - middle_c + 5) * 12
+    return float(n) if 0 <= n <= 127 else float("nan")
+
+def _fmt_parse_pan(s, opts):
+    if s == "c":
+        return _fmt_opt_number(opts, "center", (_fmt_opt_number(opts, "min", -1) + _fmt_opt_number(opts, "max", 1)) / 2)
+    side, digits = "", s
+    head, tail = s[:1], s[-1:]
+    if head in ("l", "<"):
+        side, digits = "l", s[1:]
+    elif head in ("r", ">"):
+        side, digits = "r", s[1:]
+    elif tail in ("l", "<"):
+        side, digits = "l", s[:-1]
+    elif tail in ("r", ">"):
+        side, digits = "r", s[:-1]
+    amount = _fmt_read_number(digits)
+    if not side or not _fmt_math.isfinite(amount):
+        return float("nan")
+    custom = _fmt_opt(opts, "min") is not None or _fmt_opt(opts, "max") is not None
+    lo = _fmt_opt_number(opts, "min", -1)
+    hi = _fmt_opt_number(opts, "max", 1)
+    center = _fmt_opt_number(opts, "center", (lo + hi) / 2)
+    steps = _fmt_opt_number(opts, "steps", 50)
+    signed = -amount if side == "l" else amount
+    return center + signed if custom else center + (signed / steps) * ((hi - lo) / 2)
+
+def _fmt_parse_kind(s, kind, opts):
+    if kind == "note":
+        return _fmt_parse_note(s, opts)
+    if kind == "division":
+        for name, b in _FMT_DIVISIONS:
+            if name.lower() == s:
+                return b
+        return float("nan")
+    if kind == "pan":
+        return _fmt_parse_pan(s, opts)
+    if kind == "ratio":
+        if len(s) > 2 and s.endswith(":1"):
+            return _fmt_read_number(s[:-2])
+        if s.startswith("x"):
+            return _fmt_read_number(s[1:])
+    return float("nan")
+
+def formatParse(text, opts=None):
+    if isinstance(text, bool) or not isinstance(text, (str, int, float)):
+        return None
+    s = _fmt_re.sub(r"\s+", "", str(text).lower())
+    s = s.replace("−", "-").replace("♯", "#").replace("♭", "b").replace("∞", "inf")
+    if s == "":
+        return None
+    kind = str(_fmt_opt(opts, "kind") if _fmt_opt(opts, "kind") is not None else "auto")
+    value = _fmt_parse_kind(s, kind, opts)
+    if _fmt_math.isnan(value):
+        factor, unit_kind = 1, ""
+        for suffix, k, f in _FMT_UNIT_SUFFIXES:
+            if len(s) > len(suffix) and s.endswith(suffix):
+                s = s[:len(s) - len(suffix)]
+                factor, unit_kind = f, k
+                break
+        if unit_kind and kind != "auto" and unit_kind != kind:
+            return None
+        value = _fmt_read_number(s)
+        if _fmt_math.isnan(value):
+            return None
+        if not unit_kind and factor == 1 and kind == "percent":
+            factor = 0.01
+        value = value * factor
+    lo = _fmt_num(_fmt_opt(opts, "min"))
+    hi = _fmt_num(_fmt_opt(opts, "max"))
+    if _fmt_math.isfinite(lo) and value < lo:
+        value = lo
+    if _fmt_math.isfinite(hi) and value > hi:
+        value = hi
+    return value
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -3980,6 +4495,20 @@ __CE_OPTIONS = {
     "checksum": { "path": "ce.midi.checksum", "at": 2, "param": "opts", "refusal": "nothing", "names": ["offset"] },
     "panic": { "path": "ce.midi.panic", "at": 0, "param": "opts", "refusal": "nothing", "names": ["channel", "resetControllers"] },
     "encodeJson": { "path": "ce.storage.encode", "at": 1, "param": "opts", "refusal": "nothing", "names": ["indent"] },
+    "formatNumber": { "path": "ce.format.number", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode"] },
+    "formatHz": { "path": "ce.format.hz", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale"] },
+    "formatTime": { "path": "ce.format.time", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale"] },
+    "formatDb": { "path": "ce.format.db", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "fromGain", "floor"] },
+    "formatPercent": { "path": "ce.format.percent", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "min", "max"] },
+    "formatPan": { "path": "ce.format.pan", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "width", "placeholder", "min", "max", "center", "steps", "style"] },
+    "formatRatio": { "path": "ce.format.ratio", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "width", "placeholder", "unicode", "style"] },
+    "formatClock": { "path": "ce.format.clock", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "unicode", "decimals", "hours"] },
+    "formatNote": { "path": "ce.format.note", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "unicode", "middleC", "flats", "octave"] },
+    "formatDivision": { "path": "ce.format.division", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "width", "placeholder", "tolerance"] },
+    "formatTable": { "path": "ce.format.table", "at": 2, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "start"] },
+    "formatFit": { "path": "ce.format.fit", "at": 2, "param": "opts", "refusal": "nothing", "names": ["abbreviations", "align", "pad", "steps"] },
+    "formatLine": { "path": "ce.format.line", "at": 3, "param": "opts", "refusal": "nothing", "names": ["abbreviations", "gap"] },
+    "formatParse": { "path": "ce.format.parse", "at": 1, "param": "opts", "refusal": "nothing", "names": ["kind", "min", "max", "center", "steps", "middleC"] },
     "bytesRead": { "path": "ce.midi.read", "at": 3, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
     "bytesWrite": { "path": "ce.midi.write", "at": 4, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
 }
@@ -4049,6 +4578,7 @@ __CE_MODULES = {
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -4087,12 +4617,13 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
     { "id": "ce.math", "version": "1.8", "runtime": "any" },
+    { "id": "ce.format", "version": "1.0", "runtime": "any" },
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
     { "id": "ce.time", "version": "1.3", "runtime": "any" },
     { "id": "ce.anim", "version": "1.1", "runtime": "any" },

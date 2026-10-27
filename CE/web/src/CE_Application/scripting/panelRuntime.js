@@ -17,6 +17,10 @@
 // and a fifteenth was spelled differently, and forty-seven panel verbs existed here and nowhere
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
+import {
+  formatNumber, formatHz, formatTime, formatDb, formatPercent, formatPan, formatRatio, formatClock,
+  formatNote, formatDivision, formatTable, formatFit, formatLine, formatParse,
+} from './formatCore.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -1989,6 +1993,11 @@ function unshapeImpl(y, curve, tension) {
   }
 }
 
+// ce.format's console: a rejected argument is an error, a value past the end of a table a warning.
+function formatSay(level, text) {
+  addScriptTrace(level === 'warn' ? 'warn' : 'error', '', text);
+}
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -2088,6 +2097,22 @@ const helpers = {
     const db = 20 * Math.log10(g);
     return db < MIN_DB ? MIN_DB : db;
   },
+  // @module ce.format
+  // Pure, and line for line the preludes' own (formatCore.js says why that matters here).
+  formatNumber: (v, opts) => formatNumber(v, opts, formatSay),
+  formatHz: (v, opts) => formatHz(v, opts, formatSay),
+  formatTime: (ms, opts) => formatTime(ms, opts, formatSay),
+  formatDb: (v, opts) => formatDb(v, opts, formatSay),
+  formatPercent: (v, opts) => formatPercent(v, opts, formatSay),
+  formatPan: (v, opts) => formatPan(v, opts, formatSay),
+  formatRatio: (v, opts) => formatRatio(v, opts, formatSay),
+  formatClock: (ms, opts) => formatClock(ms, opts, formatSay),
+  formatNote: (n, opts) => formatNote(n, opts, formatSay),
+  formatDivision: (beats, opts) => formatDivision(beats, opts, formatSay),
+  formatTable: (v, table, opts) => formatTable(v, table, opts, formatSay),
+  formatFit: (text, width, opts) => formatFit(text, width, opts, formatSay),
+  formatLine: (left, right, width, opts) => formatLine(left, right, width, opts, formatSay),
+  formatParse: (text, opts) => formatParse(text, opts),
   // @module ce.music
   // Two spellings, chosen by whether the second argument is there at all. Omitted, you get this
   // module's own plain-ASCII names (C#4) — what every script written so far compares against, and

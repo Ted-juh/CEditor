@@ -1545,7 +1545,7 @@ Working with the synth through its device profile — the description of the syn
 
 #### `ce.device.requestDump(kind [, fn [, opts]])`
 
-Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request's own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.
+Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request's own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time: as long as the profile gives the request for every try it allows, and never less than 3 seconds, unless `opts.timeout` says otherwise. A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.
 
 *Short name: `requestDump`.*
 
@@ -1553,7 +1553,7 @@ Ask the synth to send a dump — all of a patch's settings in one message. `kind
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `timeout` | number (milliseconds) | 3000 | How long to wait for the reply before giving up and calling `fn` with info.ok = false. |
+| `timeout` | number (milliseconds) | the request's own timeout for every try, at least 3000 | How long to wait for the reply before giving up and calling `fn` with info.ok = false. |
 
 ```lua
 -- Lua
@@ -2507,7 +2507,7 @@ Good to know:
 
 ## Commands: Working out values
 
-Value and range arithmetic, and moving a value over time.
+Value and range arithmetic, a value as text, and moving a value over time.
 
 ### ce.math: numbers, ranges and colours
 
@@ -2742,6 +2742,37 @@ Good to know:
 | `ce.math.random([lo, hi])` | Get a random number. Example: `random(1, 6)` gives a whole number from 1 to 6, as a die does. `lo` (number, optional): The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1. `hi` (number, optional): The highest whole number it can return. It may be below lo. Only whole numbers inside the range: random(1.5, 3.5) gives 2 or 3. With none inside, such as random(1.2, 1.8): an error in the console and no result. Short name: `random`. |
 | `ce.math.seed(n)` | Set where this script's random numbers start, so the same seed gives the same sequence. `n` (number, required): The seed. 0 uses the default. Until you set one, every script starts from the same default, so its numbers repeat each time it loads. Every script and every named stream has its own sequence, so this never affects another script. Short name: `randomSeed`. |
 | `ce.math.stream(name, fn)` | Run a block of code with random numbers from a separate, named sequence. `name` (text, required): The sequence's name. Two scripts using the same name get separate sequences. `fn` (function, required): The code to run. The script's own sequence returns when it ends, even if it ends in an error. Use it so two parts of one script, such as a melody and a drum pattern, do not affect each other's random numbers or seeds. Short name: `randomStream`. |
+
+### ce.format: a value as text
+
+A value written as the text a person reads, and typed text read back as a value. Each command gives the same text in every language and on every computer: rounding is half away from zero, the decimal point is always a point, and a missing value is "--", never 0. The text is plain ASCII by default, because LCD fonts have no minus sign, infinity or sharp sign; `unicode = true` gives the typographic forms for a label in a normal font.
+
+Most commands take the same options: `decimals`, `digits` (significant digits, 3 by default), `sign` ("always" for a plus too), `unit` (false for none, or a unit of your own), `space`, `width`, `placeholder` and `unicode`. A command lists the ones it takes, and an option it does not take refuses the call with a console line naming it.
+
+```lua
+-- Lua: a 16-character LCD line, a label on the left and the value on the right
+ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))
+```
+
+
+#### Helper functions in ce.format
+
+| Function | What it does |
+|---|---|
+| `ce.format.number(v [, opts])` | A number as text, with as many decimals as it needs. Example: `ce.format.number(12, { sign = "always" })` gives "+12". `v` (number, required): The number. Text that is a number, such as "440", is read as one. A whole number has no decimals unless `decimals` asks for them: 3 gives "3", and with `decimals = 1`, "3.0". Otherwise three significant digits, trailing zeros dropped: 2.50 gives "2.5", 0.123456 gives "0.123". Rounding is half away from zero and the point is always a point, in every language and on every computer. No value (nothing, or text that is not a number) gives the placeholder, "--", never "0". Short name: `formatNumber`. |
+| `ce.format.hz(v [, opts])` | A frequency, in Hz or kHz, whichever reads shorter. Example: `ce.format.hz(1250)` gives "1.25 kHz". `v` (number, required): The frequency.<br>Below 0: the placeholder, with a console error. kHz from 1000 Hz up: 999 gives "999 Hz", 1000 gives "1 kHz". Below 1 Hz, as an LFO rate can be: 0.25 gives "0.25 Hz". `space = false` packs it for a narrow display: "12.3kHz". Short name: `formatHz`. |
+| `ce.format.time(ms [, opts])` | A duration, in ms or s, whichever reads shorter. Example: `ce.format.time(1200)` gives "1.2 s". `ms` (number, required): The duration.<br>Below 0: the placeholder, with a console error. Seconds from 1000 ms up; below 1 ms, 0.5 gives "0.5 ms". For a length in beats, use `ce.format.division`; for minutes, `ce.format.clock`. Short name: `formatTime`. |
+| `ce.format.db(v [, opts])` | A level in decibels, with one decimal. Example: `ce.format.db(-6)` gives "-6.0 dB". `v` (number, required): The level, or a gain (1 = 0 dB) with `fromGain`. One decimal by default, because a readout jumping between "-6 dB" and "-5.9 dB" reads as a fault. At or below `floor` it is written "-inf dB": silence, as `ce.math.gainToDb` gives it, is -144 dB. Short name: `formatDb`. |
+| `ce.format.percent(v [, opts])` | A share, as a percentage. Example: `ce.format.percent(0.5)` gives "50%". `v` (number, required): The share, 0 to 1 unless `min` and `max` say otherwise. Whole percentages unless `decimals` asks for more; no space before %. Outside the range it is written as it is, "120%": hold it with `ce.math.clamp` first. Short name: `formatPercent`. |
+| `ce.format.pan(v [, opts])` | A position from left to right, as a synth's display writes it. Example: `ce.format.pan(-0.5)` gives "L25"; `ce.format.pan(0)` gives "C". `v` (number, required): The position. With the default range, -1 to 1, the far left and far right read `steps`: -1 gives "L50", 1 gives "R50". With a range of your own, the number is the distance from the centre as it is, which is what synths show: with `{ min = 0, max = 127, center = 64 }`, 0 reads "L64" and 127 "R63". Short name: `formatPan`. |
+| `ce.format.ratio(v [, opts])` | A ratio, as a compressor or an FM operator shows it. Example: `ce.format.ratio(4)` gives "4:1"; with `style = "x"`, 2 gives "x2.00". `v` (number, required): The ratio.<br>0 or below: the placeholder, with a console error. A ratio of infinity, as a limiter has, is written "inf:1". Short name: `formatRatio`. |
+| `ce.format.clock(ms [, opts])` | A time as a clock shows it: minutes, seconds and tenths. Example: `ce.format.clock(83450)` gives "1:23.4". `ms` (number, required): The time. Hours appear from 60 minutes on: "1:02:03.4". Cut, not rounded: a clock shows the tenth that has passed, never one still to come. For a song position in bars and beats, use `ce.time.position`. Short name: `formatClock`. |
+| `ce.format.note(n [, opts])` | A MIDI note number as a note name, in the octave numbering the synth uses. Example: `ce.format.note(60, { middleC = 3 })` gives "C3", as a Yamaha's display reads middle C. `n` (number, required): The MIDI note, 0 to 127. A fraction is rounded.<br>Outside the range: the placeholder, with a console error. Makers disagree on middle C: Roland and most software say C4, Yamaha says C3, some old gear C5. Get it wrong and every note on the display is an octave off. The same names as `ce.music.name`, which stays for music; this one is for display. Short name: `formatNote`. |
+| `ce.format.division(beats [, opts])` | The note length nearest to a number of beats, by the names the sequencer components use. Example: `ce.format.division(0.25)` gives "1/16"; `ce.format.division(1/3)` gives "1/8T". `beats` (number, required): The length; a quarter note is 1.<br>0 or below: the placeholder, with a console error. The names of `ce.time.divisions()`: "1/1" to "1/32", with "D" for dotted and "T" for triplet. A length near no division gives the beats as a number, "0.3 beats", rather than the wrong name. Short name: `formatDivision`. |
+| `ce.format.table(v, table [, opts])` | Text from a lookup table, for a value whose display follows no formula. Example: `ce.format.table(2, {"Off", "I", "II", "I+II"})` gives "II". `v` (number, required): The value. `table` (list, required): A list of texts, or a list of { upTo, text } ranges.<br>Neither, or empty: the placeholder, with a console error. The first entry is for value 0 in every language, Lua included, because synths count from 0; `start = 1` changes that. A list of ranges, `{ upTo, text }`, is read in order: the first whose upTo the value does not pass. Past the end of the table: the placeholder, with a console warning. Short name: `formatTable`. |
+| `ce.format.fit(text, width [, opts])` | Text made exactly `width` characters long: shortened the way a synth's display shortens it, then padded. Example: `ce.format.fit("Filter Envelope", 10)` gives "Filter Env". `text` (text, required): The text. A number is written as text first. `width` (number, required): The characters, from 1.<br>Below 1: nothing, with a console error. It shortens one step at a time until the text fits: (1) the abbreviation list, Envelope to Env, Resonance to Reso and about 50 more; (2) vowels from the ends of the longest words, never a first letter, Filter to Fltr; (3) the spaces between words, from the right; (4) the end, cut. Characters are counted, which is right for an LCD and any monospaced font; for a proportional font, measure with `ce.text.measure`. Short name: `formatFit`. |
+| `ce.format.line(left, right, width [, opts])` | One display line: a label on the left and a value on the right, with spaces between. Example: `ce.format.line("Cutoff", "12.3k", 16)` gives "Cutoff     12.3k". `left` (text, required): The label. `right` (text, required): The value, usually from another ce.format command. `width` (number, required): The line's width in characters.<br>Below 1: nothing, with a console error. When the two do not fit, the label is shortened, as `ce.format.fit` does, never the value: a wrong-looking value is worse than a short name. A value wider than the line is cut from the left, so its end, where the unit is, stays. Short name: `formatLine`. |
+| `ce.format.parse(text [, opts]) -> number` | A number from text a person typed, in the forms the other ce.format commands write. Example: `ce.format.parse("1.2k")` gives 1200; `ce.format.parse("C4", { kind = "note" })` gives 60. `text` (text, required): What was typed. Without a kind it reads a number, with k for thousands, and Hz, kHz, ms, s, dB and % as units, each turned into the unit its command takes: "1.2 s" gives 1200 (ms), "50%" gives 0.5. With a kind it also reads that kind's forms: a note name, a division ("1/8T"), a pan ("L25"), a ratio ("4:1"); and a bare number is taken in that kind's unit, so "5" is 5 ms as a time. Spaces and case do not matter. Nothing it can read: no result, and no console line, because a person typing is not a script's mistake. Short name: `formatParse`. |
 
 ### ce.anim: smooth movement
 

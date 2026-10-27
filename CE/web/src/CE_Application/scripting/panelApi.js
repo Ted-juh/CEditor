@@ -276,6 +276,17 @@ function optionFields(entries) {
 
 /** The option fields more than one member declares, defined once. */
 const SHARED_OPTION_FIELDS = {
+  /* --- ce.format: the options every formatting command shares ------------- */
+  formatDecimals: { name: 'decimals', type: 'number', default: 'as the command decides', summary: 'Exactly this many decimal places, 0 to 6.' },
+  formatDigits: { name: 'digits', type: 'number', default: '3', summary: 'Significant digits, 1 to 6, when `decimals` is left out.' },
+  formatSign: { name: 'sign', type: 'text', default: '"auto"', values: ['auto', 'always'], summary: '"always" writes a plus too, as in "+12".' },
+  formatUnit: { name: 'unit', type: 'true or false, or text', default: 'true', summary: 'false: no unit. Text: this unit instead, such as "st".' },
+  formatSpace: { name: 'space', type: 'true or false', default: 'true', summary: 'The space between the number and its unit. None before % either way.' },
+  formatWidth: { name: 'width', type: 'number', summary: 'Pad to this many characters, the text on the right. Longer text is not cut (that is ce.format.fit).' },
+  formatPlaceholder: { name: 'placeholder', type: 'text', default: '"--"', summary: 'The text for a missing value.' },
+  formatUnicode: { name: 'unicode', type: 'true or false', default: 'false', summary: 'The typographic characters (−, ∞, ♯, ♭), for a label in a normal font. LCD fonts have none of them.' },
+  formatAbbreviations: { name: 'abbreviations', type: 'table', summary: 'More words to shorten, or the built-in ones changed: { Cutoff = "Cut" }.' },
+
   /* --- persistence ------------------------------------------------------- */
   scope: {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
@@ -879,12 +890,12 @@ export const COMMANDS = [
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
     refusal: 'false',
-    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request\'s own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.',
+    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request\'s own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time: as long as the profile gives the request for every try it allows, and never less than 3 seconds, unless `opts.timeout` says otherwise. A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.',
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
       { name: 'fn', type: 'function', required: false },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
+        { name: 'timeout', type: 'number', default: 'the request\'s own timeout for every try, at least 3000', unit: 'milliseconds',
           summary: 'How long to wait for the reply before giving up and calling `fn` with '
             + 'info.ok = false.' },
       ]) },
@@ -4518,6 +4529,238 @@ export const HELPERS = [
       { name: 'fn', type: 'function', required: true, summary: 'The code to run. The script\'s own sequence returns when it ends, even if it ends in an error.' },
     ],
   },
+  // --- ce.format: a value as text, and text back (docs/design/ce-format-module.md) ---
+  // Pure, and the same text in every language: formatCore.js here, and a line-for-line twin in each
+  // prelude, held together by test/formatParity.test.js. Options are checked as everywhere else: a
+  // key a command does not take refuses the call (the design said "ignored"; the contract's rule won).
+  {
+    id: 'formatNumber', category: 'Formatting', signature: 'formatNumber(v [, opts])', refusal: 'nothing',
+    summary: 'A number as text, with as many decimals as it needs.',
+    example: '`ce.format.number(12, { sign = "always" })` gives "+12".',
+    notes: [
+      'A whole number has no decimals unless `decimals` asks for them: 3 gives "3", and with `decimals = 1`, "3.0".',
+      'Otherwise three significant digits, trailing zeros dropped: 2.50 gives "2.5", 0.123456 gives "0.123".',
+      'Rounding is half away from zero and the point is always a point, in every language and on every computer.',
+      'No value (nothing, or text that is not a number) gives the placeholder, "--", never "0".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The number. Text that is a number, such as "440", is read as one.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode']) },
+    ],
+  },
+  {
+    id: 'formatHz', category: 'Formatting', signature: 'formatHz(v [, opts])', refusal: 'nothing',
+    summary: 'A frequency, in Hz or kHz, whichever reads shorter.',
+    example: '`ce.format.hz(1250)` gives "1.25 kHz".',
+    notes: [
+      'kHz from 1000 Hz up: 999 gives "999 Hz", 1000 gives "1 kHz". Below 1 Hz, as an LFO rate can be: 0.25 gives "0.25 Hz".',
+      '`space = false` packs it for a narrow display: "12.3kHz".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, unit: 'hertz', summary: 'The frequency.\nBelow 0: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'scale', type: 'text', default: '"auto"', values: ['auto', 'Hz', 'kHz'],
+          summary: '"Hz" or "kHz" keeps one, so a column of values lines up.' }]) },
+    ],
+  },
+  {
+    id: 'formatTime', category: 'Formatting', signature: 'formatTime(ms [, opts])', refusal: 'nothing',
+    summary: 'A duration, in ms or s, whichever reads shorter.',
+    example: '`ce.format.time(1200)` gives "1.2 s".',
+    notes: [
+      'Seconds from 1000 ms up; below 1 ms, 0.5 gives "0.5 ms".',
+      'For a length in beats, use `ce.format.division`; for minutes, `ce.format.clock`.',
+    ],
+    params: [
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'The duration.\nBelow 0: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'scale', type: 'text', default: '"auto"', values: ['auto', 'ms', 's'],
+          summary: '"ms" or "s" keeps one, so a column of values lines up.' }]) },
+    ],
+  },
+  {
+    id: 'formatDb', category: 'Formatting', signature: 'formatDb(v [, opts])', refusal: 'nothing',
+    summary: 'A level in decibels, with one decimal.',
+    example: '`ce.format.db(-6)` gives "-6.0 dB".',
+    notes: [
+      'One decimal by default, because a readout jumping between "-6 dB" and "-5.9 dB" reads as a fault.',
+      'At or below `floor` it is written "-inf dB": silence, as `ce.math.gainToDb` gives it, is -144 dB.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, unit: 'dB', summary: 'The level, or a gain (1 = 0 dB) with `fromGain`.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'fromGain', type: 'true or false', default: 'false', summary: '`v` is a gain, converted as `ce.math.gainToDb` does.' },
+        { name: 'floor', type: 'number', default: '-144', unit: 'dB', summary: 'At or below this: "-inf dB". A mixer fader often wants -80.' }]) },
+    ],
+  },
+  {
+    id: 'formatPercent', category: 'Formatting', signature: 'formatPercent(v [, opts])', refusal: 'nothing',
+    summary: 'A share, as a percentage.',
+    example: '`ce.format.percent(0.5)` gives "50%".',
+    notes: [
+      'Whole percentages unless `decimals` asks for more; no space before %.',
+      'Outside the range it is written as it is, "120%": hold it with `ce.math.clamp` first.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The share, 0 to 1 unless `min` and `max` say otherwise.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'min', type: 'number', default: '0', summary: 'The value that is 0%.' },
+        { name: 'max', type: 'number', default: '1', summary: 'The value that is 100%. `max = 127` reads a knob\'s raw value.\nThe same as min: the placeholder, with a console error.' }]) },
+    ],
+  },
+  {
+    id: 'formatPan', category: 'Formatting', signature: 'formatPan(v [, opts])', refusal: 'nothing',
+    summary: 'A position from left to right, as a synth\'s display writes it.',
+    example: '`ce.format.pan(-0.5)` gives "L25"; `ce.format.pan(0)` gives "C".',
+    notes: [
+      'With the default range, -1 to 1, the far left and far right read `steps`: -1 gives "L50", 1 gives "R50".',
+      'With a range of your own, the number is the distance from the centre as it is, which is what synths show: with `{ min = 0, max = 127, center = 64 }`, 0 reads "L64" and 127 "R63".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The position.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatWidth', 'formatPlaceholder',
+        { name: 'min', type: 'number', default: '-1', summary: 'The far left.' },
+        { name: 'max', type: 'number', default: '1', summary: 'The far right.' },
+        { name: 'center', type: 'number', default: 'halfway', summary: 'The value that reads "C".' },
+        { name: 'steps', type: 'number', default: '50', summary: 'What the far left and far right read, for the default range.' },
+        { name: 'style', type: 'text', default: '"L50"', values: ['L50', '50L', '<50', '50>'],
+          summary: '"L50" or "50L"; "<50" (">50" on the right) or "50>" ("50<" on the left) for a display with no letters to spare.' }]) },
+    ],
+  },
+  {
+    id: 'formatRatio', category: 'Formatting', signature: 'formatRatio(v [, opts])', refusal: 'nothing',
+    summary: 'A ratio, as a compressor or an FM operator shows it.',
+    example: '`ce.format.ratio(4)` gives "4:1"; with `style = "x"`, 2 gives "x2.00".',
+    notes: ['A ratio of infinity, as a limiter has, is written "inf:1".'],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The ratio.\n0 or below: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatWidth',
+        'formatPlaceholder', 'formatUnicode',
+        { name: 'style', type: 'text', default: '":"', values: [':', 'x'], summary: '":" for "4:1"; "x" for "x2.00", as an FM ratio reads, two decimals.' }]) },
+    ],
+  },
+  {
+    id: 'formatClock', category: 'Formatting', signature: 'formatClock(ms [, opts])', refusal: 'nothing',
+    summary: 'A time as a clock shows it: minutes, seconds and tenths.',
+    example: '`ce.format.clock(83450)` gives "1:23.4".',
+    notes: [
+      'Hours appear from 60 minutes on: "1:02:03.4".',
+      'Cut, not rounded: a clock shows the tenth that has passed, never one still to come.',
+      'For a song position in bars and beats, use `ce.time.position`.',
+    ],
+    params: [
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'The time.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'decimals', type: 'number', default: '1', summary: 'Decimals of the seconds, 0 to 3.' },
+        { name: 'hours', type: 'true or false', default: 'false', summary: 'Always show hours.' }]) },
+    ],
+  },
+  {
+    id: 'formatNote', category: 'Formatting', signature: 'formatNote(n [, opts])', refusal: 'nothing',
+    summary: 'A MIDI note number as a note name, in the octave numbering the synth uses.',
+    example: '`ce.format.note(60, { middleC = 3 })` gives "C3", as a Yamaha\'s display reads middle C.',
+    notes: [
+      'Makers disagree on middle C: Roland and most software say C4, Yamaha says C3, some old gear C5. Get it wrong and every note on the display is an octave off.',
+      'The same names as `ce.music.name`, which stays for music; this one is for display.',
+    ],
+    params: [
+      { name: 'n', type: 'number', required: true, summary: 'The MIDI note, 0 to 127. A fraction is rounded.\nOutside the range: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'middleC', type: 'number', default: '4', summary: 'The octave number note 60 is written with: 3, 4 or 5.' },
+        { name: 'flats', type: 'true or false', default: 'false', summary: '"Db4" rather than "C#4".' },
+        { name: 'octave', type: 'true or false', default: 'true', summary: 'Off: the letter alone, "C#", for a key or a chord root.' }]) },
+    ],
+  },
+  {
+    id: 'formatDivision', category: 'Formatting', signature: 'formatDivision(beats [, opts])', refusal: 'nothing',
+    summary: 'The note length nearest to a number of beats, by the names the sequencer components use.',
+    example: '`ce.format.division(0.25)` gives "1/16"; `ce.format.division(1/3)` gives "1/8T".',
+    notes: [
+      'The names of `ce.time.divisions()`: "1/1" to "1/32", with "D" for dotted and "T" for triplet.',
+      'A length near no division gives the beats as a number, "0.3 beats", rather than the wrong name.',
+    ],
+    params: [
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'The length; a quarter note is 1.\n0 or below: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatWidth', 'formatPlaceholder',
+        { name: 'tolerance', type: 'number', default: '0.02', summary: 'How far from a division, as a part of it, still counts as that division. 0 to 0.5.' }]) },
+    ],
+  },
+  {
+    id: 'formatTable', category: 'Formatting', signature: 'formatTable(v, table [, opts])', refusal: 'nothing',
+    summary: 'Text from a lookup table, for a value whose display follows no formula.',
+    example: '`ce.format.table(2, {"Off", "I", "II", "I+II"})` gives "II".',
+    notes: [
+      'The first entry is for value 0 in every language, Lua included, because synths count from 0; `start = 1` changes that.',
+      'A list of ranges, `{ upTo, text }`, is read in order: the first whose upTo the value does not pass.',
+      'Past the end of the table: the placeholder, with a console warning.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The value.' },
+      { name: 'table', type: 'list', required: true, summary: 'A list of texts, or a list of { upTo, text } ranges.\nNeither, or empty: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder',
+        { name: 'start', type: 'number', default: '0', summary: 'The value the first entry of a list is for.' }]) },
+    ],
+  },
+  {
+    id: 'formatFit', category: 'Formatting', signature: 'formatFit(text, width [, opts])', refusal: 'nothing',
+    summary: 'Text made exactly `width` characters long: shortened the way a synth\'s display shortens it, then padded.',
+    example: '`ce.format.fit("Filter Envelope", 10)` gives "Filter Env".',
+    notes: [
+      'It shortens one step at a time until the text fits: (1) the abbreviation list, Envelope to Env, Resonance to Reso and about 50 more; (2) vowels from the ends of the longest words, never a first letter, Filter to Fltr; (3) the spaces between words, from the right; (4) the end, cut.',
+      'Characters are counted, which is right for an LCD and any monospaced font; for a proportional font, measure with `ce.text.measure`.',
+    ],
+    params: [
+      { name: 'text', type: 'text', required: true, summary: 'The text. A number is written as text first.' },
+      { name: 'width', type: 'number', required: true, summary: 'The characters, from 1.\nBelow 1: nothing, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatAbbreviations',
+        { name: 'align', type: 'text', default: '"left"', values: ['left', 'right', 'center'], summary: 'Where the padding goes.' },
+        { name: 'pad', type: 'true or false', default: 'true', summary: 'Off: shortened but not padded.' },
+        { name: 'steps', type: 'number', default: '4', summary: 'The last shortening step allowed, 1 to 4: 1 for abbreviations only, so a name is never mangled.' }]) },
+    ],
+  },
+  {
+    id: 'formatLine', category: 'Formatting', signature: 'formatLine(left, right, width [, opts])', refusal: 'nothing',
+    summary: 'One display line: a label on the left and a value on the right, with spaces between.',
+    example: '`ce.format.line("Cutoff", "12.3k", 16)` gives "Cutoff     12.3k".',
+    notes: [
+      'When the two do not fit, the label is shortened, as `ce.format.fit` does, never the value: a wrong-looking value is worse than a short name.',
+      'A value wider than the line is cut from the left, so its end, where the unit is, stays.',
+    ],
+    params: [
+      { name: 'left', type: 'text', required: true, summary: 'The label.' },
+      { name: 'right', type: 'text', required: true, summary: 'The value, usually from another ce.format command.' },
+      { name: 'width', type: 'number', required: true, summary: 'The line\'s width in characters.\nBelow 1: nothing, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatAbbreviations',
+        { name: 'gap', type: 'number', default: '1', summary: 'The fewest spaces between the two.' }]) },
+    ],
+  },
+  {
+    id: 'formatParse', category: 'Formatting', signature: 'formatParse(text [, opts]) -> number', refusal: 'nothing',
+    summary: 'A number from text a person typed, in the forms the other ce.format commands write.',
+    example: '`ce.format.parse("1.2k")` gives 1200; `ce.format.parse("C4", { kind = "note" })` gives 60.',
+    notes: [
+      'Without a kind it reads a number, with k for thousands, and Hz, kHz, ms, s, dB and % as units, each turned into the unit its command takes: "1.2 s" gives 1200 (ms), "50%" gives 0.5.',
+      'With a kind it also reads that kind\'s forms: a note name, a division ("1/8T"), a pan ("L25"), a ratio ("4:1"); and a bare number is taken in that kind\'s unit, so "5" is 5 ms as a time.',
+      'Spaces and case do not matter. Nothing it can read: no result, and no console line, because a person typing is not a script\'s mistake.',
+    ],
+    params: [
+      { name: 'text', type: 'text', required: true, summary: 'What was typed.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'kind', type: 'text', default: '"auto"', values: ['auto', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division'],
+          summary: 'What the value is. A unit that belongs to another kind gives no result.' },
+        { name: 'min', type: 'number', summary: 'The result is held at or above this; for a pan, the far left.' },
+        { name: 'max', type: 'number', summary: 'The result is held at or below this; for a pan, the far right.' },
+        { name: 'center', type: 'number', summary: 'For a pan: the value that reads "C".' },
+        { name: 'steps', type: 'number', default: '50', summary: 'For a pan, as `ce.format.pan` takes it.' },
+        { name: 'middleC', type: 'number', default: '4', summary: 'For a note, as `ce.format.note` takes it.' }]) },
+    ],
+  },
+
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -4939,8 +5182,8 @@ export const MODULE_GROUPS = [
     blurb: 'MIDI in and out, the connected device, music theory, and musical time.',
     modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
-    blurb: 'Value and range arithmetic, and moving a value over time.',
-    modules: ['ce.math', 'ce.anim'] },
+    blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
+    modules: ['ce.math', 'ce.format', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
     blurb: 'Creating and arranging controls, and saving things that outlive the session.',
     modules: ['ce.panel', 'ce.storage'] },
@@ -5001,6 +5244,8 @@ export const MODULES = [
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic: wrapping, curves, list snapping, decibels, colour, and seeded random. Pure — no host involved.' },
+  { id: 'ce.format', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'A value as the text a person reads, and typed text back as a value: numbers, Hz, ms, dB, %, pan, ratios, clock times, note names in the synth\'s own octave numbering, note lengths, lookup tables, and text fitted to a display. The same text in every language.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, snapping a note to a key, key spelling, scale degrees and degree chords, chord naming, voice leading, and arpeggio expansion and ordering.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -5175,6 +5420,13 @@ const MODULE_MEMBERS = {
                // a panel author would give their own helper, so a qualifier would only be noise.
                smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape',
                euclid: 'euclid' },
+  // Every namespaced name is a bare word (`number`, `time`, `table`, `line`, `fit`, `parse`), so
+  // every flat alias keeps the format prefix.
+  'ce.format': {
+    number: 'formatNumber', hz: 'formatHz', time: 'formatTime', db: 'formatDb', percent: 'formatPercent',
+    pan: 'formatPan', ratio: 'formatRatio', clock: 'formatClock', note: 'formatNote', division: 'formatDivision',
+    table: 'formatTable', fit: 'formatFit', line: 'formatLine', parse: 'formatParse',
+  },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote',
                 spelling: 'noteSpelling', inScale: 'inScale', degree: 'scaleDegree',

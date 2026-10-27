@@ -65,6 +65,12 @@ const MODULE_INTROS = {
     + '- A number outside its range: the nearest end, with a console warning, the first time only.\n'
     + '- A number that is not one: the fallback in its row, with a console warning, the first time only.\n'
     + '- Number arguments also accept text that is a number, such as "500"; a timer\'s interval or delay does not.',
+  'ce.format': 'A value written as the text a person reads, and typed text read back as a value. Each command gives the same text in every language and on every computer: rounding is half away from zero, the decimal point is always a point, and a missing value is "--", never 0. The text is plain ASCII by default, because LCD fonts have no minus sign, infinity or sharp sign; `unicode = true` gives the typographic forms for a label in a normal font.\n\n'
+    + 'Most commands take the same options: `decimals`, `digits` (significant digits, 3 by default), `sign` ("always" for a plus too), `unit` (false for none, or a unit of your own), `space`, `width`, `placeholder` and `unicode`. A command lists the ones it takes, and an option it does not take refuses the call with a console line naming it.\n\n'
+    + '```lua\n'
+    + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
+    + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
+    + '```',
   'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.\n\n'
     + '**Colours that every colour command reads**\n'
     + '\n'
@@ -140,6 +146,7 @@ const MODULE_TITLES = {
   'ce.music': 'notes, scales and chords',
   'ce.time': 'timers and musical time',
   'ce.math': 'numbers, ranges and colours',
+  'ce.format': 'a value as text',
   'ce.anim': 'smooth movement',
   'ce.panel': 'building and arranging the panel',
   'ce.storage': 'remembering things',

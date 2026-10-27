@@ -1143,6 +1143,512 @@ function hslToHex(hue, sat, light)
   return rgbToHex(math.floor(f(0) * 255 + 0.5), math.floor(f(8) * 255 + 0.5), math.floor(f(4) * 255 + 0.5))
 end
 
+-- @module ce.format
+-- ce.format, ported line for line from formatCore.js (the panel view's; the JavaScript prelude runs
+-- that file itself). The same text in every language is the point, so nothing here uses
+-- string.format's own rounding: fixedText rounds half away from zero and writes the digits. Held to
+-- the panel view's answers by test/formatParity.test.js and the table in test/support/formatCases.mjs.
+-- Lua tables count from 1; the table a script hands formatTable is still read as "first entry is 0".
+do
+  local PLACEHOLDER = "--"
+  local INF = math.huge
+  local DIVISIONS = {
+    { "1/1", 4 }, { "1/2", 2 }, { "1/4", 1 }, { "1/8", 0.5 }, { "1/16", 0.25 }, { "1/32", 0.125 },
+    { "1/2D", 3 }, { "1/4D", 1.5 }, { "1/8D", 0.75 }, { "1/16D", 0.375 },
+    { "1/2T", 4 / 3 }, { "1/4T", 2 / 3 }, { "1/8T", 1 / 3 }, { "1/16T", 1 / 6 },
+  }
+  local ABBREVIATIONS = {
+    { "Amount", "Amt" }, { "Attack", "Atk" }, { "Balance", "Bal" }, { "Bandwidth", "BW" }, { "Channel", "Ch" },
+    { "Chorus", "Chor" }, { "Coarse", "Crs" }, { "Control", "Ctrl" }, { "Controller", "Ctrl" }, { "Decay", "Dcy" },
+    { "Delay", "Dly" }, { "Depth", "Dpth" }, { "Destination", "Dest" }, { "Distortion", "Dist" }, { "Effect", "FX" },
+    { "Effects", "FX" }, { "Envelope", "Env" }, { "Feedback", "Fdbk" }, { "Frequency", "Freq" }, { "Keyboard", "Kbd" },
+    { "Length", "Len" }, { "Level", "Lvl" }, { "Master", "Mstr" }, { "Maximum", "Max" }, { "Minimum", "Min" },
+    { "Modulation", "Mod" }, { "Number", "Num" }, { "Octave", "Oct" }, { "Oscillator", "Osc" }, { "Parameter", "Param" },
+    { "Pattern", "Pat" }, { "Portamento", "Porta" }, { "Position", "Pos" }, { "Pressure", "Press" }, { "Program", "Prog" },
+    { "Random", "Rnd" }, { "Release", "Rel" }, { "Resonance", "Reso" }, { "Reverb", "Rvb" }, { "Sample", "Smp" },
+    { "Semitone", "Semi" }, { "Sequence", "Seq" }, { "Sequencer", "Seq" }, { "Source", "Src" }, { "Sustain", "Sus" },
+    { "Transpose", "Trans" }, { "Tremolo", "Trem" }, { "Velocity", "Vel" }, { "Vibrato", "Vib" }, { "Volume", "Vol" },
+    { "Waveform", "Wave" }, { "Width", "Wdth" },
+  }
+  local SHARPS = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" }
+  local FLATS = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
+  local MINUS, INFINITY, SHARP, FLAT = "\u{2212}", "\u{221E}", "\u{266F}", "\u{266D}"
+
+  local function say(level, text) if level == "warn" then logWarn(text) else logError(text) end end
+  local function isNaN(x) return x ~= x end
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function optNumber(opts, key, fallback)
+    local v = toNumber(opt(opts, key))
+    if finite(v) then return v end
+    return fallback
+  end
+  local function clampInt(v, lo, hi)
+    local r = math.floor(v + 0.5)
+    if r < lo then return lo elseif r > hi then return hi end
+    return r
+  end
+  local function len(s) return utf8.len(s) or #s end
+
+  local function fixedText(x, d)
+    local neg = x < 0
+    local p = 10 ^ d
+    local r = math.floor(math.abs(x) * p + 0.5 + 1e-9)
+    local s = string.format("%.0f", r)
+    while #s < d + 1 do s = "0" .. s end
+    local body = s
+    if d > 0 then body = s:sub(1, #s - d) .. "." .. s:sub(#s - d + 1) end
+    if neg and r ~= 0 then return "-" .. body end
+    return body
+  end
+  local function significantDecimals(a, digits)
+    if a == 0 then return 0 end
+    local e = math.floor(math.log(a, 10))
+    if 10 ^ (e + 1) <= a then e = e + 1 end
+    if 10 ^ e > a then e = e - 1 end
+    local d = digits - 1 - e
+    if d < 0 then return 0 elseif d > 6 then return 6 end
+    return d
+  end
+  local function stripZeros(s)
+    if not s:find(".", 1, true) then return s end
+    local t = s
+    while t:sub(-1) == "0" do t = t:sub(1, -2) end
+    if t:sub(-1) == "." then t = t:sub(1, -2) end
+    return t
+  end
+  local function numberText(v, opts, fallback)
+    local decimals = toNumber(opt(opts, "decimals"))
+    local s
+    if finite(decimals) then s = fixedText(v, clampInt(decimals, 0, 6))
+    elseif fallback ~= nil then s = fixedText(v, fallback)
+    else s = stripZeros(fixedText(v, significantDecimals(math.abs(v), clampInt(optNumber(opts, "digits", 3), 1, 6)))) end
+    if s == "-0" then s = "0" end
+    if opt(opts, "sign") == "always" and s:sub(1, 1) ~= "-" and s:find("[1-9]") then s = "+" .. s end
+    return s
+  end
+  local function withUnit(text, unit, opts)
+    local u = opt(opts, "unit")
+    if u == false then return text end
+    local name = type(u) == "string" and u or unit
+    if name == nil or name == "" then return text end
+    local space = " "
+    if opt(opts, "space") == false or (name == "%" and type(u) ~= "string") then space = "" end
+    return text .. space .. name
+  end
+  local function finish(text, opts)
+    local t = text
+    if opt(opts, "unicode") == true and t:sub(1, 1) == "-" then t = MINUS .. t:sub(2) end
+    local width = toNumber(opt(opts, "width"))
+    if finite(width) then
+      local w = clampInt(width, 0, 200)
+      while len(t) < w do t = " " .. t end
+    end
+    return t
+  end
+  local function placeholder(opts)
+    local p = opt(opts, "placeholder")
+    if type(p) == "string" then return p end
+    return PLACEHOLDER
+  end
+  local function asText(v)
+    if type(v) == "number" then
+      if finite(v) then return numberText(v, {}) end
+      return PLACEHOLDER
+    end
+    if type(v) == "boolean" then return v and "true" or "false" end
+    if v == nil then return "" end
+    return tostring(v)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatNumber(v, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    return finish(withUnit(numberText(n, opts), "", opts), opts)
+  end
+
+  local function scaled(v, opts, verb, small, large, factor, what)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    if n < 0 then
+      say("error", "ce.format." .. verb .. ": " .. what .. " below 0 is not one, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local scale = string.lower(tostring(opt(opts, "scale") or "auto"))
+    local big = scale == string.lower(large) or (scale ~= string.lower(small) and n >= factor)
+    local value, unit = n, small
+    if big then value, unit = n / factor, large end
+    return finish(withUnit(numberText(value, opts), unit, opts), opts)
+  end
+-- (global; at the line start, where the option check looks for it)
+function formatHz(v, opts) return scaled(v, opts, "hz", "Hz", "kHz", 1000, "a frequency") end
+-- (global; at the line start, where the option check looks for it)
+function formatTime(ms, opts) return scaled(ms, opts, "time", "ms", "s", 1000, "a duration") end
+
+-- (global; at the line start, where the option check looks for it)
+function formatDb(v, opts)
+    local n = toNumber(v)
+    if isNaN(n) then return placeholder(opts) end
+    if opt(opts, "fromGain") == true then
+      if n <= 0 then n = -144 else n = 20 * math.log(n, 10) end
+      if n < -144 then n = -144 end
+    end
+    local floor = optNumber(opts, "floor", -144)
+    local text
+    if n <= floor then text = opt(opts, "unicode") == true and ("-" .. INFINITY) or "-inf"
+    elseif n == INF then text = opt(opts, "unicode") == true and INFINITY or "inf"
+    else text = numberText(n, opts, 1) end
+    return finish(withUnit(text, "dB", opts), opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatPercent(v, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    local min, max = optNumber(opts, "min", 0), optNumber(opts, "max", 1)
+    if max == min then
+      say("error", "ce.format.percent: min and max are the same, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    return finish(withUnit(numberText(((n - min) / (max - min)) * 100, opts, 0), "%", opts), opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatPan(v, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    local custom = opt(opts, "min") ~= nil or opt(opts, "max") ~= nil
+    local min, max = optNumber(opts, "min", -1), optNumber(opts, "max", 1)
+    if max == min then
+      say("error", "ce.format.pan: min and max are the same, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local center = optNumber(opts, "center", (min + max) / 2)
+    local steps = optNumber(opts, "steps", 50)
+    local amount
+    if custom then amount = n - center else amount = ((n - center) / ((max - min) / 2)) * steps end
+    local t = numberText(math.abs(amount), { decimals = opt(opts, "decimals") }, 0)
+    if not t:find("[1-9]") then return finish("C", opts) end
+    local left = amount < 0
+    local style = tostring(opt(opts, "style") or "L50")
+    local text
+    if style == "50L" then text = t .. (left and "L" or "R")
+    elseif style == "<50" then text = (left and "<" or ">") .. t
+    elseif style == "50>" then text = t .. (left and "<" or ">")
+    else text = (left and "L" or "R") .. t end
+    return finish(text, opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatRatio(v, opts)
+    local n = toNumber(v)
+    if isNaN(n) then return placeholder(opts) end
+    if n <= 0 then
+      say("error", "ce.format.ratio: a ratio must be above 0, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local x = opt(opts, "style") == "x"
+    local text
+    if n == INF then text = opt(opts, "unicode") == true and INFINITY or "inf"
+    else text = numberText(n, opts, x and 2 or nil) end
+    if x then return finish("x" .. text, opts) end
+    return finish(text .. ":1", opts)
+  end
+
+  local function pad2(n)
+    local s = string.format("%.0f", n)
+    if #s < 2 then return "0" .. s end
+    return s
+  end
+-- (global; at the line start, where the option check looks for it)
+function formatClock(ms, opts)
+    local n = toNumber(ms)
+    if not finite(n) then return placeholder(opts) end
+    local d = clampInt(optNumber(opts, "decimals", 1), 0, 3)
+    local p = 10 ^ d
+    -- Cut, not rounded: a clock shows the tenth that has passed, never one still to come.
+    local units = math.floor(math.abs(n) * p / 1000 + 1e-9)
+    local secs = math.floor(units / p)
+    local frac = units - secs * p
+    local h = math.floor(secs / 3600)
+    local m = math.floor((secs % 3600) / 60)
+    local s = secs % 60
+    local text
+    if h > 0 or opt(opts, "hours") == true then text = string.format("%.0f", h) .. ":" .. pad2(m) .. ":" .. pad2(s)
+    else text = string.format("%.0f", m) .. ":" .. pad2(s) end
+    if d > 0 then
+      local f = string.format("%.0f", frac)
+      while #f < d do f = "0" .. f end
+      text = text .. "." .. f
+    end
+    if n < 0 and units > 0 then text = "-" .. text end
+    return finish(text, opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatNote(n, opts)
+    local v = toNumber(n)
+    if not finite(v) then return placeholder(opts) end
+    local note
+    if v < 0 then note = -math.floor(-v + 0.5) else note = math.floor(v + 0.5) end
+    if note < 0 or note > 127 then
+      say("error", "ce.format.note: a MIDI note is 0 to 127, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local middleC = clampInt(optNumber(opts, "middleC", 4), -2, 9)
+    local name = (opt(opts, "flats") == true and FLATS or SHARPS)[note % 12 + 1]
+    if opt(opts, "unicode") == true then
+      local rest = name:sub(2):gsub("#", SHARP):gsub("b", FLAT)
+      name = name:sub(1, 1) .. rest
+    end
+    if opt(opts, "octave") == false then return finish(name, { width = opt(opts, "width") }) end
+    local octave = math.floor(note / 12) - 5 + middleC
+    return finish(name .. string.format("%.0f", octave), { width = opt(opts, "width") })
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatDivision(beats, opts)
+    local n = toNumber(beats)
+    if not finite(n) then return placeholder(opts) end
+    if n <= 0 then
+      say("error", "ce.format.division: a length must be above 0 beats, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local tolerance = math.min(0.5, math.max(0, optNumber(opts, "tolerance", 0.02)))
+    local best, bestError = nil, INF
+    for _, entry in ipairs(DIVISIONS) do
+      local err = math.abs(n - entry[2]) / entry[2]
+      if err < bestError then best, bestError = entry[1], err end
+    end
+    if bestError <= tolerance + 1e-12 then return finish(best, opts) end
+    return finish(numberText(n, opts) .. " beats", opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatTable(v, list, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    if type(list) ~= "table" or #list == 0 then
+      say("error", "ce.format.table: the table must be a list of texts, or of { upTo, text } ranges, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local first = list[1]
+    if type(first) == "table" and first.upTo ~= nil then
+      for _, entry in ipairs(list) do
+        local upTo = toNumber(type(entry) == "table" and entry.upTo or nil)
+        if finite(upTo) and n <= upTo then return finish(asText(entry.text), opts) end
+      end
+      say("warn", "ce.format.table: " .. numberText(n, {}) .. " is past the last range, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local start = math.floor(optNumber(opts, "start", 0) + 0.5)
+    local index
+    if n < 0 then index = -math.floor(-n + 0.5) else index = math.floor(n + 0.5) end
+    index = index - start
+    if index < 0 or index >= #list then
+      say("warn", "ce.format.table: " .. numberText(n, {}) .. " is past the end of the table, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    return finish(asText(list[index + 1]), opts)
+  end
+
+  local VOWELS = "aeiouAEIOU"
+  local function isVowel(c) return VOWELS:find(c, 1, true) ~= nil end
+  local function abbreviationMap(extra)
+    local map = {}
+    for _, pair in ipairs(ABBREVIATIONS) do map[string.lower(pair[1])] = pair[2] end
+    if type(extra) == "table" then
+      for key, value in pairs(extra) do
+        if type(key) == "string" then map[string.lower(key)] = tostring(value) end
+      end
+    end
+    return map
+  end
+  local function shorten(text, width, steps, extra)
+    if len(text) <= width then return text end
+    local words = {}
+    for w in text:gmatch("[^ ]+") do words[#words + 1] = w end
+    local function join() return table.concat(words, " ") end
+    if steps >= 1 then
+      local map = abbreviationMap(extra)
+      for i, w in ipairs(words) do
+        local short = map[string.lower(w)]
+        if short ~= nil then words[i] = short end
+      end
+      if len(join()) <= width then return join() end
+    end
+    if steps >= 2 then
+      while len(join()) > width do
+        local pick = -1
+        for i, w in ipairs(words) do
+          local removable = false
+          for k = 2, #w do if isVowel(w:sub(k, k)) then removable = true end end
+          if removable and (pick < 0 or #w > #words[pick]) then pick = i end
+        end
+        if pick < 0 then break end
+        local w = words[pick]
+        local k = #w
+        while k >= 2 and not isVowel(w:sub(k, k)) do k = k - 1 end
+        words[pick] = w:sub(1, k - 1) .. w:sub(k + 1)
+      end
+      if len(join()) <= width then return join() end
+    end
+    if steps >= 3 then
+      while len(join()) > width and #words > 1 do
+        local last = table.remove(words)
+        words[#words] = words[#words] .. last
+      end
+      if len(join()) <= width then return join() end
+    end
+    return join():sub(1, width)
+  end
+  local function padTo(text, width, align)
+    local t = text
+    if align == "right" then
+      while len(t) < width do t = " " .. t end
+      return t
+    end
+    if align == "center" then
+      local before = math.floor((width - len(t)) / 2)
+      for _ = 1, before do t = " " .. t end
+    end
+    while len(t) < width do t = t .. " " end
+    return t
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatFit(text, width, opts)
+    local w = toNumber(width)
+    if not finite(w) or w < 1 then
+      say("error", "ce.format.fit: the width must be 1 character or more, so nothing is shown.")
+      return ""
+    end
+    local width0 = math.floor(w)
+    local steps = clampInt(optNumber(opts, "steps", 4), 1, 4)
+    local short = shorten(asText(text), width0, steps, opt(opts, "abbreviations"))
+    if opt(opts, "pad") == false then return short end
+    return padTo(short, width0, tostring(opt(opts, "align") or "left"))
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatLine(left, right, width, opts)
+    local w = toNumber(width)
+    if not finite(w) or w < 1 then
+      say("error", "ce.format.line: the width must be 1 character or more, so nothing is shown.")
+      return ""
+    end
+    local width0 = math.floor(w)
+    local gap = clampInt(optNumber(opts, "gap", 1), 0, width0)
+    local r = asText(right)
+    if #r >= width0 then return r:sub(#r - width0 + 1) end
+    local room = width0 - gap - #r
+    if room <= 0 then return padTo(r, width0, "right") end
+    local l = asText(left)
+    if len(l) > room then l = shorten(l, room, 4, opt(opts, "abbreviations")) end
+    local spaces = ""
+    while len(l) + #spaces + len(r) < width0 do spaces = spaces .. " " end
+    return l .. spaces .. r
+  end
+
+  local NOTE_BASE = { c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11 }
+  local function readNumber(s)
+    if s == "inf" or s == "+inf" then return INF end
+    if s == "-inf" then return -INF end
+    if s:match("^[+-]?%d+%.?%d*$") or s:match("^[+-]?%.%d+$") then return tonumber(s) end
+    return 0 / 0
+  end
+  local UNIT_SUFFIXES = { { "khz", "hz", 1000 }, { "hz", "hz", 1 }, { "ms", "time", 1 }, { "db", "db", 1 },
+    { "%", "percent", 0.01 }, { "s", "time", 1000 }, { "k", "", 1000 } }
+  local function parseNote(s, opts)
+    local letter = s:sub(1, 1)
+    local pc = NOTE_BASE[letter]
+    if pc == nil then return 0 / 0 end
+    local rest = s:sub(2)
+    if rest:sub(1, 1) == "#" then pc = pc + 1; rest = rest:sub(2)
+    elseif rest:sub(1, 1) == "b" and #rest > 1 then pc = pc - 1; rest = rest:sub(2) end
+    if not rest:match("^%-?%d+$") then return 0 / 0 end
+    local middleC = clampInt(optNumber(opts, "middleC", 4), -2, 9)
+    local n = pc + (tonumber(rest) - middleC + 5) * 12
+    if n >= 0 and n <= 127 then return n end
+    return 0 / 0
+  end
+  local function parsePan(s, opts)
+    if s == "c" then return optNumber(opts, "center", (optNumber(opts, "min", -1) + optNumber(opts, "max", 1)) / 2) end
+    local side, digits = "", s
+    local head, tail = s:sub(1, 1), s:sub(-1)
+    if head == "l" or head == "<" then side, digits = "l", s:sub(2)
+    elseif head == "r" or head == ">" then side, digits = "r", s:sub(2)
+    elseif tail == "l" or tail == "<" then side, digits = "l", s:sub(1, -2)
+    elseif tail == "r" or tail == ">" then side, digits = "r", s:sub(1, -2) end
+    local amount = readNumber(digits)
+    if side == "" or not finite(amount) then return 0 / 0 end
+    local custom = opt(opts, "min") ~= nil or opt(opts, "max") ~= nil
+    local min, max = optNumber(opts, "min", -1), optNumber(opts, "max", 1)
+    local center = optNumber(opts, "center", (min + max) / 2)
+    local steps = optNumber(opts, "steps", 50)
+    local signed = side == "l" and -amount or amount
+    if custom then return center + signed end
+    return center + (signed / steps) * ((max - min) / 2)
+  end
+  local function parseKind(s, kind, opts)
+    if kind == "note" then return parseNote(s, opts) end
+    if kind == "division" then
+      for _, entry in ipairs(DIVISIONS) do if string.lower(entry[1]) == s then return entry[2] end end
+      return 0 / 0
+    end
+    if kind == "pan" then return parsePan(s, opts) end
+    if kind == "ratio" then
+      if #s > 2 and s:sub(-2) == ":1" then return readNumber(s:sub(1, -3)) end
+      if s:sub(1, 1) == "x" then return readNumber(s:sub(2)) end
+    end
+    return 0 / 0
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatParse(text, opts)
+    if type(text) ~= "string" and type(text) ~= "number" then return nil end
+    local s = string.lower(tostring(text)):gsub("%s+", "")
+    s = s:gsub(MINUS, "-"):gsub(SHARP, "#"):gsub(FLAT, "b"):gsub(INFINITY, "inf")
+    if s == "" then return nil end
+    local kind = tostring(opt(opts, "kind") or "auto")
+    local value = parseKind(s, kind, opts)
+    if isNaN(value) then
+      local factor, unitKind = 1, ""
+      for _, entry in ipairs(UNIT_SUFFIXES) do
+        local suffix = entry[1]
+        if #s > #suffix and s:sub(-#suffix) == suffix then
+          s = s:sub(1, #s - #suffix)
+          factor, unitKind = entry[3], entry[2]
+          break
+        end
+      end
+      if unitKind ~= "" and kind ~= "auto" and unitKind ~= kind then return nil end
+      value = readNumber(s)
+      if isNaN(value) then return nil end
+      if unitKind == "" and factor == 1 and kind == "percent" then factor = 0.01 end
+      value = value * factor
+    end
+    local min, max = toNumber(opt(opts, "min")), toNumber(opt(opts, "max"))
+    if finite(min) and value < min then value = min end
+    if finite(max) and value > max then value = max end
+    return value
+  end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -3689,6 +4195,20 @@ local __CE_OPTIONS = {
   ["checksum"] = { path = "ce.midi.checksum", at = 3, refusal = "nothing", names = { "offset" } },
   ["panic"] = { path = "ce.midi.panic", at = 1, refusal = "nothing", names = { "channel", "resetControllers" } },
   ["encodeJson"] = { path = "ce.storage.encode", at = 2, refusal = "nothing", names = { "indent" } },
+  ["formatNumber"] = { path = "ce.format.number", at = 2, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode" } },
+  ["formatHz"] = { path = "ce.format.hz", at = 2, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale" } },
+  ["formatTime"] = { path = "ce.format.time", at = 2, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale" } },
+  ["formatDb"] = { path = "ce.format.db", at = 2, refusal = "nothing", names = { "decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "fromGain", "floor" } },
+  ["formatPercent"] = { path = "ce.format.percent", at = 2, refusal = "nothing", names = { "decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "min", "max" } },
+  ["formatPan"] = { path = "ce.format.pan", at = 2, refusal = "nothing", names = { "decimals", "width", "placeholder", "min", "max", "center", "steps", "style" } },
+  ["formatRatio"] = { path = "ce.format.ratio", at = 2, refusal = "nothing", names = { "decimals", "digits", "width", "placeholder", "unicode", "style" } },
+  ["formatClock"] = { path = "ce.format.clock", at = 2, refusal = "nothing", names = { "width", "placeholder", "unicode", "decimals", "hours" } },
+  ["formatNote"] = { path = "ce.format.note", at = 2, refusal = "nothing", names = { "width", "placeholder", "unicode", "middleC", "flats", "octave" } },
+  ["formatDivision"] = { path = "ce.format.division", at = 2, refusal = "nothing", names = { "decimals", "digits", "width", "placeholder", "tolerance" } },
+  ["formatTable"] = { path = "ce.format.table", at = 3, refusal = "nothing", names = { "width", "placeholder", "start" } },
+  ["formatFit"] = { path = "ce.format.fit", at = 3, refusal = "nothing", names = { "abbreviations", "align", "pad", "steps" } },
+  ["formatLine"] = { path = "ce.format.line", at = 4, refusal = "nothing", names = { "abbreviations", "gap" } },
+  ["formatParse"] = { path = "ce.format.parse", at = 2, refusal = "nothing", names = { "kind", "min", "max", "center", "steps", "middleC" } },
   ["bytesRead"] = { path = "ce.midi.read", at = 4, refusal = "nothing", names = { "bits", "order" } },
   ["bytesWrite"] = { path = "ce.midi.write", at = 5, refusal = "nothing", names = { "bits", "order" } },
 }
@@ -3775,6 +4295,7 @@ local __CE_MODULES = {
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromARGB = "colourFromArgb", fromHsl = "hslToHex", fromRGBA = "colourFromRgba", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.format"] = { clock = "formatClock", db = "formatDb", division = "formatDivision", fit = "formatFit", hz = "formatHz", line = "formatLine", note = "formatNote", number = "formatNumber", pan = "formatPan", parse = "formatParse", percent = "formatPercent", ratio = "formatRatio", table = "formatTable", time = "formatTime" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", play = "animatePlay", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
@@ -3813,12 +4334,13 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
   { id = "ce.math", version = "1.8", runtime = "any" },
+  { id = "ce.format", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.2", runtime = "any" },
   { id = "ce.time", version = "1.3", runtime = "any" },
   { id = "ce.anim", version = "1.1", runtime = "any" },
