@@ -261,6 +261,42 @@ export const WRITTEN = {
     lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
     js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
   },
+  verifyCoverage: {
+    lua: `local c = ce.verify.coverage()\nlog(c.checkable .. " of " .. c.total .. " parameters can be checked")\nfor _, d in ipairs(c.dumps) do\n  if d.expectedBytes ~= d.layoutBytes then logWarn(d.kind .. ": the length does not add up") end\nend`,
+    js: `const c = ce.verify.coverage();\nlog(\`\${c.checkable} of \${c.total} parameters can be checked\`);\nfor (const d of c.dumps) {\n  if (d.expectedBytes !== d.layoutBytes) logWarn(\`\${d.kind}: the length does not add up\`);\n}`,
+  },
+  verifyCheck: {
+    lua: `function onClick()\n  local started = ce.verify.check(function(report)\n    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width = 16 }))\n  end)\n  if not started then ce.components.lcd.text("Display", 1, "Busy or offline") end\nend`,
+    js: `function onClick() {\n  const started = ce.verify.check((report) => {\n    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width: 16 }));\n  });\n  if (!started) ce.components.lcd.text("Display", 1, "Busy or offline");\n}`,
+  },
+  verifyDump: {
+    lua: `ce.verify.dump("common", { times = 3 }, function(report)\n  for _, d in ipairs(report.differed) do log(d.name .. " changes by itself") end\nend)`,
+    js: `ce.verify.dump("common", { times: 3 }, (report) => {\n  for (const d of report.differed) log(\`\${d.name} changes by itself\`);\n});`,
+  },
+  verifyWrite: {
+    lua: `ce.verify.write("tone1.filter.cutoff", 64, function(report)\n  if not report.ok then logWarn(ce.verify.summary(report)) end\nend)`,
+    js: `ce.verify.write("tone1.filter.cutoff", 64, (report) => {\n  if (!report.ok) logWarn(ce.verify.summary(report));\n});`,
+  },
+  verifyProbe: {
+    lua: `ce.verify.probe("tone1.lfo.rate", function(report)\n  for _, p in ipairs(report.probes) do\n    if not p.same then log(p.id .. ": sent " .. tostring(p.value) .. ", got " .. tostring(p.got)) end\n  end\nend)`,
+    js: `ce.verify.probe("tone1.lfo.rate", (report) => {\n  for (const p of report.probes) {\n    if (!p.same) log(\`\${p.id}: sent \${p.value}, got \${p.got}\`);\n  }\n});`,
+  },
+  verifyPatch: {
+    lua: `ce.verify.patch({ group = "Filter" }, function(report)\n  log(ce.verify.summary(report))\nend)`,
+    js: `ce.verify.patch({ group: "Filter" }, (report) => {\n  log(ce.verify.summary(report));\n});`,
+  },
+  verifySummary: {
+    lua: `function onVerifyDone(report)\n  ce.components.lcd.text("Display", 2, ce.verify.summary(report, { width = 16 }))\nend`,
+    js: `function onVerifyDone(report) {\n  ce.components.lcd.text("Display", 2, ce.verify.summary(report, { width: 16 }));\n}`,
+  },
+  verifyRunning: {
+    lua: `local now = ce.verify.running()\nif now then ce.components.lcd.text("Display", 1, now.kind .. " " .. now.done .. "/" .. now.total) end`,
+    js: `const now = ce.verify.running();\nif (now) ce.components.lcd.text("Display", 1, \`\${now.kind} \${now.done}/\${now.total}\`);`,
+  },
+  verifyCancel: {
+    lua: `function onClick()\n  if not ce.verify.cancel() then log("no check was running") end\nend`,
+    js: `function onClick() {\n  if (!ce.verify.cancel()) log("no check was running");\n}`,
+  },
   keysShortcut: {
     lua: `function onPanelReady()\n  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })\nend`,
     js: `function onPanelReady() {\n  ce.keys.shortcut("Ctrl+G", () => run("Random.action"), { description: "Random voice" });\n}`,

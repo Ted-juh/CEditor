@@ -3850,6 +3850,738 @@ def patchScopes(role=None):
 def patchDefine(scope, spec, role=None):
     return _PATCH.define(scope, spec, role)
 
+# @module ce.verify
+# ce.verify, ported line for line from verifyCore.js (the panel view's; the JavaScript prelude runs
+# that file itself). Held to the panel view's answers by test/verifyParity.test.js and the scenario in
+# test/support/verifyScenario.mjs. ce.verify requires ce.device and ce.time, so the globals the host
+# below calls are live whenever a script can reach ce.verify. Every Python script runs this prelude
+# for itself, so a check is the script's own: ce.verify.running and cancel see the checks this
+# script started, where in Lua and JavaScript they see every script's.
+import math as _verify_math
+import re as _verify_re
+
+_VERIFY_WHY_WORDS = {
+    "notInDump": "not in a dump", "noRequest": "no request", "noReply": "no reply", "badChecksum": "bad checksum",
+    "notWritable": "not writable", "moved": "moved", "cancelled": "cancelled",
+}
+_VERIFY_AVOIDABLE = ["noReply", "badChecksum", "moved", "cancelled"]
+_VERIFY_MAIN_ROLE = "mainSynth"
+_VERIFY_TEXT_SAMPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
+_VERIFY_NUMBER_TEXT = _verify_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+def _v_isnum(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+def _v_num(v):
+    if isinstance(v, bool):
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str) and _VERIFY_NUMBER_TEXT.fullmatch(v.strip()):
+        return float(v.strip())
+    return float("nan")
+
+def _v_finite(x):
+    return _v_isnum(x) and _verify_math.isfinite(x)
+
+def _v_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _v_lower(s):
+    return "" if s is None else str(s).lower()
+
+def _v_str(v):
+    if v is None: return ""
+    if v is True: return "true"
+    if v is False: return "false"
+    return str(v)
+
+def _v_eq(a, b):
+    # JavaScript's ===: an on/off is never a number, and a number never text.
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if _v_isnum(a) and _v_isnum(b):
+        return a == b
+    return type(a) is type(b) and a == b
+
+def _v_contains(lst, value):
+    for x in lst:
+        if _v_eq(x, value): return True
+    return False
+
+def _v_list(v):
+    return v if isinstance(v, (list, tuple)) else []
+
+def _v_texts(v):
+    if isinstance(v, str):
+        return [] if v == "" else [v]
+    return [x for x in _v_list(v) if isinstance(x, str) and x != ""]
+
+def _v_role(v):
+    return v if isinstance(v, str) and v != "" else _VERIFY_MAIN_ROLE
+
+def _v_round(x):
+    return -_verify_math.floor(-x + 0.5) if x < 0 else _verify_math.floor(x + 0.5)
+
+def _v_int_or(v, fallback):
+    n = _v_num(v)
+    return _verify_math.floor(n) if _v_finite(n) else fallback
+
+def _v_kind(desc):
+    t = _v_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if t in ("action", "momentary", "trigger"): return "action"
+    if t == "text": return "text"
+    if t in ("choice", "boolean", "enum", "bool"): return "choice"
+    if isinstance(desc, dict) and isinstance(desc.get("choices"), list) and len(desc["choices"]) > 0: return "choice"
+    return "number"
+
+def _v_writable(desc):
+    access = desc.get("access") if isinstance(desc, dict) else None
+    if isinstance(access, str): return "write" in access.lower()
+    if isinstance(access, dict) and access.get("canWrite") is False: return False
+    return True
+
+def _v_whole(desc):
+    return not (isinstance(desc, dict) and desc.get("type") == "float")
+
+def _v_range(desc):
+    rng = desc.get("range") if isinstance(desc, dict) and isinstance(desc.get("range"), dict) else {}
+    lo, hi = _v_num(rng.get("min")), _v_num(rng.get("max"))
+    a = lo if _v_finite(lo) else 0
+    b = hi if _v_finite(hi) else 127
+    return (a, b) if a <= b else (b, a)
+
+def _v_choices(desc):
+    out = []
+    for c in _v_list(desc.get("choices") if isinstance(desc, dict) else None):
+        if isinstance(c, dict):
+            if c.get("id") is not None: out.append(c["id"])
+            elif c.get("value") is not None: out.append(c["value"])
+        elif c is not None:
+            out.append(c)
+    t = _v_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if len(out) == 0 and t in ("boolean", "bool"):
+        out = [False, True]
+    return out
+
+def _v_float_step(desc):
+    lo, hi = _v_range(desc)
+    return (hi - lo) / 16383
+
+def _v_trim(s):
+    return _verify_re.sub(r"[\s\x00]+$", "", _v_str(s))
+
+def _v_same(desc, a, b):
+    if a is None or b is None: return False
+    if isinstance(a, bool) or isinstance(b, bool):
+        x = a if isinstance(a, bool) else _v_num(a) != 0
+        y = b if isinstance(b, bool) else _v_num(b) != 0
+        return x == y
+    if _v_isnum(a) and _v_isnum(b) and _v_finite(a) and _v_finite(b):
+        if _v_whole(desc): return _v_round(a) == _v_round(b)
+        return abs(a - b) <= _v_float_step(desc) / 2 + 1e-9
+    return _v_trim(a) == _v_trim(b)
+
+def _v_raw(desc, got):
+    if _v_kind(desc) != "choice" or got is None or isinstance(got, bool): return None
+    choices = _v_choices(desc)
+    if len(choices) == 0: return None
+    for c in choices:
+        if _v_eq(c, got): return None
+    return got
+
+def _v_width(encoding):
+    e = encoding if isinstance(encoding, dict) else {}
+    t = "u7" if e.get("type") is None else _v_str(e.get("type"))
+    length, nibbles = _v_num(e.get("length")), _v_num(e.get("nibbles"))
+    if t in ("text-ascii", "ascii", "fixed-ascii"):
+        return int(length) if _v_finite(length) and length > 0 else 1
+    if t in ("text-nibbled-ascii", "nibbled-ascii", "packed-nibbled-ascii"):
+        if _v_finite(nibbles) and nibbles > 0: return int(nibbles)
+        return int(length) * 2 if _v_finite(length) and length > 0 else 2
+    if t in ("u14", "u14-msb-lsb", "u14-lsb-msb"): return 2
+    if t == "nibbled": return int(nibbles) if _v_finite(nibbles) and nibbles > 0 else 2
+    return 1
+
+def _v_dumps(layout):
+    lay = layout if isinstance(layout, dict) else {}
+    requests = _v_list(lay.get("requests"))
+    encodings = lay.get("encodings") if isinstance(lay.get("encodings"), dict) else {}
+    out = []
+    for d in _v_list(lay.get("dumps")):
+        if not isinstance(d, dict) or not isinstance(d.get("id"), str) or d["id"] == "": continue
+        request, timeout_ms, retries = "", 2000, 0
+        for r in requests:
+            if not isinstance(r, dict): continue
+            resp = r.get("response")
+            if isinstance(resp, dict) and isinstance(resp.get("dump"), str): answer = resp["dump"]
+            elif isinstance(r.get("expectedDump"), str): answer = r["expectedDump"]
+            else: answer = ""
+            if answer == d["id"] and isinstance(r.get("id"), str) and r["id"] != "":
+                request = r["id"]
+                timeout_ms = _v_int_or(r.get("timeoutMs"), 2000)
+                retries = _v_int_or(r.get("retries"), 0)
+                break
+        matcher = d.get("matcher") if isinstance(d.get("matcher"), dict) else {}
+        prefix, suffix = len(_v_list(matcher.get("prefix"))), len(_v_list(matcher.get("suffix")))
+        payload = d.get("payload") if isinstance(d.get("payload"), dict) else {}
+        payload_offset = _v_int_or(payload.get("offset"), prefix)
+        payload_size = _v_int_or(payload.get("size"), 0)
+        pack = payload.get("pack") if isinstance(payload.get("pack"), dict) else None
+        wire = payload_size
+        if pack is not None and pack.get("type") == "packed8to7" and payload_size > 0:
+            group = max(1, _v_int_or(pack.get("groupSize"), 7))
+            wire = payload_size + (payload_size + group - 1) // group
+        end = payload_offset + wire
+        checksum = d.get("checksum") if isinstance(d.get("checksum"), dict) else None
+        if checksum is not None and _v_finite(_v_num(checksum.get("byteOffset"))):
+            end = max(end, _v_int_or(checksum.get("byteOffset"), 0) + max(1, _v_int_or(checksum.get("byteCount"), 1)))
+        completion = d.get("completion") if isinstance(d.get("completion"), dict) else {}
+        expected = _v_num(completion.get("expectedBytes"))
+        mappings = []
+        for m in _v_list(d.get("mappings")):
+            if not isinstance(m, dict) or not isinstance(m.get("parameter"), str): continue
+            codec = m["codec"] if isinstance(m.get("codec"), dict) else encodings.get(m["parameter"])
+            mappings.append({"parameter": m["parameter"], "offset": _v_int_or(m.get("offset"), 0), "size": _v_width(codec)})
+        out.append({
+            "id": d["id"],
+            "name": d["name"] if isinstance(d.get("name"), str) and d["name"] != "" else d["id"],
+            "request": request, "timeoutMs": timeout_ms, "retries": retries,
+            "expectedBytes": _verify_math.floor(expected) if _v_finite(expected) else None,
+            "layoutBytes": end + suffix,
+            "payloadSize": payload_size,
+            "mappings": mappings,
+        })
+    return out
+
+def _v_unread(dump):
+    size = dump["payloadSize"]
+    read = [False] * max(0, size)
+    for m in dump["mappings"]:
+        for i in range(m["offset"], m["offset"] + m["size"]):
+            if 0 <= i < size: read[i] = True
+    out = []
+    start = -1
+    for i in range(size):
+        if not read[i] and start < 0: start = i
+        if read[i] and start >= 0:
+            out.append({"from": start, "to": i - 1})
+            start = -1
+    if start >= 0: out.append({"from": start, "to": size - 1})
+    return out
+
+def _v_index(dumps):
+    index = {}
+    for d in dumps:
+        for m in d["mappings"]:
+            if m["parameter"] not in index: index[m["parameter"]] = d
+    return index
+
+def _v_name(desc):
+    return _v_str(desc.get("name")) if desc.get("name") is not None else _v_str(desc.get("id"))
+
+def _v_choose(params, opts, say, verb):
+    ids = _v_texts(_v_opt(opts, "ids"))
+    group = _v_opt(opts, "group")
+    out = []
+    if len(ids) > 0:
+        known = {_v_str(desc.get("id")) for desc in params}
+        for pid in ids:
+            if pid not in known: say("warn", "ce.verify." + verb + ": \"" + pid + "\" is not a parameter of the synth, so it was left out.")
+        return [desc for desc in params if _v_str(desc.get("id")) in ids]
+    if isinstance(group, str) and group != "":
+        out = [desc for desc in params if _v_lower(desc.get("group")) == _v_lower(group)]
+        if len(out) == 0: say("warn", "ce.verify." + verb + ": the synth has no parameters in the group \"" + group + "\".")
+        return out
+    return [desc for desc in params if _v_kind(desc) != "action"]
+
+def _v_coverage(lst, dumps, role):
+    index = _v_index(dumps)
+    unchecked, used = [], []
+    checkable = 0
+    for desc in lst:
+        pid = _v_str(desc.get("id"))
+        d = index.get(pid)
+        if d is None: unchecked.append({"id": pid, "name": _v_name(desc), "why": "notInDump"})
+        elif d["request"] == "": unchecked.append({"id": pid, "name": _v_name(desc), "why": "noRequest"})
+        else: checkable += 1
+        if d is not None and not any(x is d for x in used): used.append(d)
+    out = []
+    for d in dumps:
+        if any(x is d for x in used):
+            out.append({"kind": d["id"], "expectedBytes": d["expectedBytes"], "layoutBytes": d["layoutBytes"], "unread": _v_unread(d)})
+    return {"role": role, "total": len(lst), "checkable": checkable, "unchecked": unchecked, "dumps": out}
+
+def _v_is_report(r):
+    return isinstance(r, dict) and isinstance(r.get("kind"), str) and isinstance(r.get("matched"), list) \
+        and isinstance(r.get("differed"), list) and isinstance(r.get("unchecked"), list)
+
+def _v_short_why(report):
+    for d in _v_list(report.get("dumps")):
+        if isinstance(d, dict) and d.get("status") != "ok":
+            return _VERIFY_WHY_WORDS.get(d.get("status"), _v_str(d.get("status"))) + ": " + _v_str(d.get("kind"))
+    counts = {}
+    best, avoidable = "", ""
+    for u in report["unchecked"]:
+        why = _v_str(u.get("why")) if isinstance(u, dict) else ""
+        counts[why] = counts.get(why, 0) + 1
+        if best == "" or counts[why] > counts[best]: best = why
+        if why in _VERIFY_AVOIDABLE and (avoidable == "" or counts[why] > counts[avoidable]): avoidable = why
+    if avoidable != "": best = avoidable
+    return "" if best == "" else _VERIFY_WHY_WORDS.get(best, best)
+
+def _v_summary(report, opts):
+    total = _v_num(report.get("total"))
+    total = int(total) if _v_finite(total) else len(report["matched"]) + len(report["differed"]) + len(report["unchecked"])
+    lead = "cancelled: " if report.get("cancelled") is True else ""
+    why = _v_short_why(report)
+    base = lead + str(len(report["matched"])) + " of " + str(total) + " match, " + str(len(report["differed"])) + " differ, " \
+        + str(len(report["unchecked"])) + " unchecked"
+    full = base if why == "" else base + " (" + why + ")"
+    width = _v_num(_v_opt(opts, "width"))
+    if not _v_finite(width) or width <= 0: return full
+    w = _verify_math.floor(width)
+    if len(full) <= w: return full
+    if len(base) <= w: return base
+    short = ("cancel " if report.get("cancelled") is True else "") + str(len(report["matched"])) + "/" + str(total) + " ok " \
+        + str(len(report["differed"])) + " diff " + str(len(report["unchecked"])) + " unchk"
+    return short if len(short) <= w else short[:w]
+
+def _verify_commands(host):
+    def say(level, text): host["say"](level, text)
+    running = host["jobs"] if isinstance(host.get("jobs"), dict) else {}
+
+    def finish(job):
+        if job["finished"]: return
+        job["finished"] = True
+        if running.get(job["role"]) is job: del running[job["role"]]
+        r = job["report"]
+        ok = len(r["differed"]) == 0 and r["cancelled"] is not True
+        for u in r["unchecked"]:
+            if u["why"] in _VERIFY_AVOIDABLE: ok = False
+        for d in r["dumps"]:
+            if d["status"] != "ok": ok = False
+        r["ok"] = ok
+        r["ms"] = max(0, _verify_math.floor(host["clock"]() - job["start"]))
+        try:
+            job["fn"](r)
+        except Exception as e:
+            say("error", "ce.verify." + r["kind"] + ": the function given to it failed: " + str(e))
+        host["emit"](r)
+
+    def new_job(kind, role, fn, total, steps):
+        job = {
+            "kind": kind, "role": role, "fn": fn, "steps": steps, "at": 0, "finished": False, "cancelled": False,
+            "step": None, "start": host["clock"](),
+            "report": {"kind": kind, "role": role, "ok": False, "total": total, "matched": [], "differed": [], "unchecked": [],
+                       "dumps": [], "probes": [], "ms": 0, "cancelled": False},
+            "onCancel": None,
+        }
+        running[role] = job
+        return job
+
+    def may_start(verb, role, fn):
+        if not callable(fn):
+            say("error", "ce.verify." + verb + ": fn must be a function to call with the report, so nothing was checked.")
+            return False
+        if role != _VERIFY_MAIN_ROLE:
+            say("error", "ce.verify." + verb + ": only the main synth can be asked for a dump, and \"" + role + "\" is not it, so nothing was checked.")
+            return False
+        if running.get(role) is not None: return False
+        return host["connected"](role) is True
+
+    def ask(job, dump, done):
+        step = {"settled": False}
+        job["step"] = step
+        def answer(values, info=None):
+            if step["settled"] or job["finished"]: return
+            step["settled"] = True
+            job["step"] = None
+            ok = isinstance(info, dict) and info.get("ok") is True and isinstance(values, dict)
+            done(values if ok else None)
+        asked = host["requestDump"](dump["request"], answer)
+        if asked is False: answer(None, {"ok": False})
+
+    def later(job, ms, fn):
+        def run():
+            if not job["finished"]: fn()
+        host["after"](max(1, _verify_math.floor(ms)), run)
+
+    def context(role):
+        params = host["parameters"](role)
+        if not isinstance(params, list): params = []
+        layout = host["layout"](role)
+        dumps = _v_dumps(layout)
+        gap = _v_num(layout.get("gapMs") if isinstance(layout, dict) else None)
+        return {
+            "role": role, "params": params, "dumps": dumps, "index": _v_index(dumps),
+            "gapMs": gap if _v_finite(gap) and gap > 0 else 0,
+            "encodings": layout["encodings"] if isinstance(layout, dict) and isinstance(layout.get("encodings"), dict) else {},
+        }
+
+    def leave(job, desc, why):
+        job["report"]["unchecked"].append({"id": _v_str(desc.get("id")), "name": _v_name(desc), "why": why})
+
+    def judge(job, desc, expected, got):
+        if _v_same(desc, expected, got):
+            job["report"]["matched"].append(_v_str(desc.get("id")))
+        else:
+            job["report"]["differed"].append({"id": _v_str(desc.get("id")), "name": _v_name(desc), "expected": expected, "got": got, "raw": _v_raw(desc, got)})
+
+    def plan(job, ctx, lst):
+        steps = []
+        for d in ctx["dumps"]:
+            if d["request"] == "": continue
+            held = [desc for desc in lst if ctx["index"].get(_v_str(desc.get("id"))) is d]
+            if len(held) > 0: steps.append({"dump": d, "params": held})
+        for desc in lst:
+            d = ctx["index"].get(_v_str(desc.get("id")))
+            if d is None: leave(job, desc, "notInDump")
+            elif d["request"] == "": leave(job, desc, "noRequest")
+        return steps
+
+    def push_dump(job, d, values):
+        job["report"]["dumps"].append({"kind": d["id"], "status": "ok" if values is not None else "noReply", "expectedBytes": d["expectedBytes"]})
+
+    def compare_steps(job, ctx, steps, before):
+        job["steps"] = steps
+        job["at"] = 0
+        def on_cancel():
+            for i in range(job["at"], len(steps)):
+                for desc in steps[i]["params"]: leave(job, desc, "cancelled")
+        job["onCancel"] = on_cancel
+        def next_step():
+            if job["at"] >= len(steps):
+                finish(job)
+                return
+            step = steps[job["at"]]
+            expected = {}
+            for desc in step["params"]: expected[_v_str(desc.get("id"))] = host["read"](_v_str(desc.get("id")), ctx["role"])
+            def got(values):
+                job["at"] += 1
+                push_dump(job, step["dump"], values)
+                for desc in step["params"]:
+                    pid = _v_str(desc.get("id"))
+                    if values is None: leave(job, desc, "noReply")
+                    elif not _v_same(desc, before.get(pid), expected.get(pid)) and (before.get(pid) is not None or expected.get(pid) is not None): leave(job, desc, "moved")
+                    elif values.get(pid) is None: leave(job, desc, "noReply")
+                    else: judge(job, desc, expected.get(pid), values[pid])
+                if job["at"] >= len(steps): finish(job)
+                else: later(job, ctx["gapMs"], next_step)
+            ask(job, step["dump"], got)
+        next_step()
+
+    def snapshot(ctx, lst):
+        return {_v_str(desc.get("id")): host["read"](_v_str(desc.get("id")), ctx["role"]) for desc in lst}
+
+    def split_args(a, b):
+        return (None, a) if callable(a) else (a, b)
+
+    def coverage(opts=None):
+        ctx = context(_v_role(_v_opt(opts, "role")))
+        return _v_coverage(_v_choose(ctx["params"], opts, say, "coverage"), ctx["dumps"], ctx["role"])
+
+    def check(a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not may_start("check", role, fn): return False
+        ctx = context(role)
+        lst = _v_choose(ctx["params"], opts, say, "check")
+        job = new_job("check", role, fn, len(lst), [])
+        compare_steps(job, ctx, plan(job, ctx, lst), snapshot(ctx, lst))
+        return True
+
+    def dump(kind, a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not isinstance(kind, str) or kind == "":
+            say("error", "ce.verify.dump: kind must be the id of a dump in the profile, so nothing was checked.")
+            return False
+        if not may_start("dump", role, fn): return False
+        ctx = context(role)
+        d = None
+        for x in ctx["dumps"]:
+            if x["id"] == kind or (x["request"] != "" and x["request"] == kind):
+                d = x
+                break
+        if d is None or d["request"] == "":
+            say("error", "ce.verify.dump: the profile has " + ("no dump" if d is None else "no request for the dump") + " \"" + kind + "\", so nothing was checked.")
+            return False
+        times_given = _v_num(_v_opt(opts, "times"))
+        times = min(10, max(2, _verify_math.floor(times_given))) if _v_finite(times_given) else 2
+        gap_given = _v_num(_v_opt(opts, "gapMs"))
+        gap_ms = gap_given if _v_finite(gap_given) and gap_given >= 0 else 500
+        lst = [desc for desc in ctx["params"] if ctx["index"].get(_v_str(desc.get("id"))) is d]
+        job = new_job("dump", role, fn, len(lst), [])
+        replies = []
+        asked = [0]
+        def on_cancel():
+            for desc in lst: leave(job, desc, "cancelled")
+        job["onCancel"] = on_cancel
+        def end():
+            if len(replies) < times:
+                for desc in lst: leave(job, desc, "noReply")
+            else:
+                first, last = replies[0], replies[-1]
+                for desc in lst:
+                    pid = _v_str(desc.get("id"))
+                    if first.get(pid) is None or last.get(pid) is None: leave(job, desc, "noReply")
+                    else: judge(job, desc, first[pid], last[pid])
+            finish(job)
+        def next_ask():
+            asked[0] += 1
+            def got(values):
+                push_dump(job, d, values)
+                job["at"] = asked[0]
+                if values is None:
+                    end()
+                    return
+                replies.append(values)
+                if asked[0] >= times: end()
+                else: later(job, gap_ms, next_ask)
+            ask(job, d, got)
+        job["steps"] = [d] * times
+        next_ask()
+        return True
+
+    def find_param(ctx, pid, verb):
+        for desc in ctx["params"]:
+            if _v_str(desc.get("id")) == pid: return desc
+        say("error", "ce.verify." + verb + ": \"" + pid + "\" is not a parameter of the synth, so nothing was checked.")
+        return None
+
+    def settle_of(opts):
+        given = _v_num(_v_opt(opts, "settleMs"))
+        return given if _v_finite(given) and given >= 0 else 100
+
+    def write_and_read(job, ctx, desc, value, settle_ms, done):
+        pid = _v_str(desc.get("id"))
+        d = ctx["index"].get(pid)
+        host["write"](pid, value, ctx["role"])
+        if d is None:
+            done(None, "notInDump")
+            return
+        if d["request"] == "":
+            done(None, "noRequest")
+            return
+        def settled():
+            now = host["read"](pid, ctx["role"])
+            if now is not None and not _v_same(desc, now, value):
+                done(None, "moved")
+                return
+            def got(values):
+                push_dump(job, d, values)
+                if values is None or values.get(pid) is None: done(None, "noReply")
+                else: done(values[pid], "")
+            ask(job, d, got)
+        later(job, settle_ms, settled)
+
+    def write(pid, value, a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not may_start("write", role, fn): return False
+        ctx = context(role)
+        desc = find_param(ctx, "" if pid is None else _v_str(pid), "write")
+        if desc is None: return False
+        if value is None:
+            say("error", "ce.verify.write: value must be given, so nothing was checked.")
+            return False
+        job = new_job("write", role, fn, 1, [ctx["index"].get(_v_str(desc.get("id")))])
+        job["onCancel"] = lambda: leave(job, desc, "cancelled")
+        if not _v_writable(desc):
+            leave(job, desc, "notWritable")
+            finish(job)
+            return True
+        def done(got, why):
+            job["at"] = 1
+            if why != "": leave(job, desc, why)
+            else: judge(job, desc, value, got)
+            finish(job)
+        write_and_read(job, ctx, desc, value, settle_of(opts), done)
+        return True
+
+    def probe_values(desc, ctx):
+        kind = _v_kind(desc)
+        out = []
+        def add(v):
+            if not _v_contains(out, v): out.append(v)
+        if kind == "choice":
+            choices = _v_choices(desc)
+            if len(choices) <= 16:
+                for c in choices: add(c)
+            else:
+                add(choices[0])
+                add(choices[len(choices) // 2])
+                add(choices[-1])
+            return out
+        if kind == "text":
+            enc = ctx["encodings"].get(_v_str(desc.get("id")))
+            length = _v_num(enc.get("length") if isinstance(enc, dict) else None)
+            n = min(len(_VERIFY_TEXT_SAMPLE), _verify_math.floor(length)) if _v_finite(length) and length > 0 else 8
+            add(_VERIFY_TEXT_SAMPLE[:n])
+            add("")
+            return out
+        lo, hi = _v_range(desc)
+        step = 1 if _v_whole(desc) else (hi - lo) / 100
+        mid = lo + (hi - lo) / 2
+        if _v_whole(desc): mid = _v_round(mid)
+        for v in [lo, lo + step, mid, hi - step, hi]:
+            if lo <= v <= hi: add(v)
+        return out
+
+    def probe(pid, a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not may_start("probe", role, fn): return False
+        ctx = context(role)
+        desc = find_param(ctx, "" if pid is None else _v_str(pid), "probe")
+        if desc is None: return False
+        given = _v_opt(opts, "values")
+        if given is not None and (not isinstance(given, list) or len(given) == 0):
+            say("error", "ce.verify.probe: values must be a list of values to try, so nothing was checked.")
+            return False
+        values = list(given) if given is not None else probe_values(desc, ctx)
+        settle_ms = settle_of(opts)
+        key = _v_str(desc.get("id"))
+        old = host["read"](key, role)
+        job = new_job("probe", role, fn, 1, values)
+        job["report"]["restored"] = False
+        held = ctx["index"].get(key)
+        cannot = "notWritable" if not _v_writable(desc) else ("notInDump" if held is None else ("noRequest" if held["request"] == "" else ""))
+        if cannot != "":
+            leave(job, desc, cannot)
+            finish(job)
+            return True
+        state = {"failed": False, "why": ""}
+        def restore(then):
+            if old is None:
+                then()
+                return
+            def back(got, reason):
+                job["report"]["restored"] = reason == "" and _v_same(desc, old, got)
+                then()
+            write_and_read(job, ctx, desc, old, settle_ms, back)
+        def on_cancel():
+            if old is not None: host["write"](key, old, role)
+            if len(job["report"]["matched"]) == 0 and len(job["report"]["differed"]) == 0: leave(job, desc, "cancelled")
+        job["onCancel"] = on_cancel
+        def end():
+            if state["why"] != "": leave(job, desc, state["why"])
+            elif not state["failed"]: job["report"]["matched"].append(key)
+            restore(lambda: finish(job))
+        def next_value():
+            if job["at"] >= len(values):
+                end()
+                return
+            value = values[job["at"]]
+            def got(answer, reason):
+                job["at"] += 1
+                if reason != "":
+                    state["why"] = reason
+                    end()
+                    return
+                ok = _v_same(desc, value, answer)
+                job["report"]["probes"].append({"id": key, "value": value, "got": answer, "same": ok})
+                if not ok:
+                    state["failed"] = True
+                    job["report"]["differed"].append({"id": key, "name": _v_name(desc), "expected": value, "got": answer, "raw": _v_raw(desc, answer)})
+                next_value()
+            write_and_read(job, ctx, desc, value, settle_ms, got)
+        next_value()
+        return True
+
+    def patch(a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        via = _v_opt(opts, "via")
+        if via is not None and via != "dump" and via != "parameters":
+            say("error", "ce.verify.patch: via \"" + _v_str(via) + "\" is not \"dump\" or \"parameters\", so nothing was checked.")
+            return False
+        if not may_start("patch", role, fn): return False
+        ctx = context(role)
+        lst = _v_choose(ctx["params"], opts, say, "patch")
+        job = new_job("patch", role, fn, len(lst), [])
+        chosen = []
+        for desc in lst:
+            if _v_writable(desc): chosen.append(desc)
+            else: leave(job, desc, "notWritable")
+        before = snapshot(ctx, chosen)
+        steps = plan(job, ctx, chosen)
+        if _v_opt(opts, "send") is not False:
+            section = host["patchSection"](role)
+            deliver = section["deliver"] if isinstance(section, dict) and isinstance(section.get("deliver"), str) else ""
+            how = via if via is not None else ("dump" if deliver == "dump" else "parameters")
+            if how == "dump":
+                for step in steps: host["sendDump"](step["dump"]["id"])
+            else:
+                for desc in chosen:
+                    v = before.get(_v_str(desc.get("id")))
+                    if v is not None: host["write"](_v_str(desc.get("id")), v, role)
+        if len(steps) == 0:
+            finish(job)
+            return True
+        later(job, settle_of(opts), lambda: compare_steps(job, ctx, steps, before))
+        return True
+
+    def summary(report, opts=None):
+        if not _v_is_report(report):
+            say("error", "ce.verify.summary: that is not a report, as a check gives them, so there is nothing to say.")
+            return None
+        return _v_summary(report, opts)
+
+    def running_now(role=None):
+        job = running.get(_v_role(role))
+        if job is None: return None
+        return {"kind": job["kind"], "role": job["role"], "done": job["at"], "total": len(job["steps"]),
+                "ms": max(0, _verify_math.floor(host["clock"]() - job["start"]))}
+
+    def cancel(role=None):
+        job = running.get(_v_role(role))
+        if job is None: return False
+        job["cancelled"] = True
+        job["report"]["cancelled"] = True
+        if job["step"] is not None: job["step"]["settled"] = True
+        if job["onCancel"] is not None: job["onCancel"]()
+        finish(job)
+        return True
+
+    return {"coverage": coverage, "check": check, "dump": dump, "write": write, "probe": probe, "patch": patch,
+            "summary": summary, "running": running_now, "cancel": cancel}
+
+_VERIFY = _verify_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "parameters": lambda role: __deviceQuery("parameters", {"role": role}) or [],
+    "layout": lambda role: __deviceQuery("dumpLayout", {"role": role}),
+    "read": lambda pid, role: __deviceQuery("read", {"role": role, "id": str(pid)}),
+    "write": lambda pid, value, role: deviceWrite(pid, value, role) is True,
+    "sendDump": lambda kind: sendDump(kind),
+    "patchSection": lambda role: __deviceQuery("patch", {"role": role}),
+    "connected": lambda role: deviceConnected(role) is True,
+    "requestDump": lambda kind, fn: requestDump(kind, fn),
+    "after": lambda ms, fn: after(ms, fn),
+    "clock": lambda: nowMs(),
+    "emit": lambda report: emit("onVerifyDone", report),
+})
+
+def verifyCoverage(opts=None):
+    return _VERIFY["coverage"](opts)
+def verifyCheck(opts=None, fn=None):
+    return _VERIFY["check"](opts, fn)
+def verifyDump(kind, opts=None, fn=None):
+    return _VERIFY["dump"](kind, opts, fn)
+def verifyWrite(id, value, opts=None, fn=None):
+    return _VERIFY["write"](id, value, opts, fn)
+def verifyProbe(id, opts=None, fn=None):
+    return _VERIFY["probe"](id, opts, fn)
+def verifyPatch(opts=None, fn=None):
+    return _VERIFY["patch"](opts, fn)
+def verifySummary(report, opts=None):
+    return _VERIFY["summary"](report, opts)
+def verifyRunning(role=None):
+    return _VERIFY["running"](role)
+def verifyCancel(role=None):
+    return _VERIFY["cancel"](role)
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -5596,6 +6328,13 @@ __CE_OPTIONS = {
     "patchList": { "path": "ce.patch.list", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "scope"] },
     "patchForget": { "path": "ce.patch.forget", "at": 1, "param": "opts", "refusal": "false", "names": ["role"] },
     "patchWrite": { "path": "ce.patch.write", "at": 2, "param": "opts", "refusal": "result", "names": ["role"] },
+    "verifyCoverage": { "path": "ce.verify.coverage", "at": 0, "param": "opts", "refusal": "nothing", "names": ["role", "ids", "group"] },
+    "verifyCheck": { "path": "ce.verify.check", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "ids", "group"] },
+    "verifyDump": { "path": "ce.verify.dump", "at": 1, "param": "opts", "refusal": "false", "names": ["role", "times", "gapMs"] },
+    "verifyWrite": { "path": "ce.verify.write", "at": 2, "param": "opts", "refusal": "false", "names": ["role", "settleMs"] },
+    "verifyProbe": { "path": "ce.verify.probe", "at": 1, "param": "opts", "refusal": "false", "names": ["role", "settleMs", "values"] },
+    "verifyPatch": { "path": "ce.verify.patch", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "ids", "group", "settleMs", "via", "send"] },
+    "verifySummary": { "path": "ce.verify.summary", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width"] },
     "syncTimer": { "path": "ce.time.syncTimer", "at": 2, "param": "opts", "refusal": "nothing", "names": ["follow"] },
     "deviceParameters": { "path": "ce.device.parameters", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "query", "group", "type", "access", "limit"] },
     "deviceDefineParameter": { "path": "ce.device.defineParameter", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], "nested": { "nrpn": { "names": ["msb", "lsb"] } } },
@@ -5698,6 +6437,7 @@ __CE_MODULES = {
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
     "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
     "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
     "ce.text": { "axis": "textAxis", "fit": "textFit", "font": "textFont", "fonts": "textFonts", "measure": "textMeasure", "read": "textRead", "style": "textStyle" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "read": "splitRead", "transpose": "splitTranspose" },
@@ -5729,7 +6469,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -5745,6 +6485,7 @@ __CE_META = [
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
     { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.verify", "version": "1.0", "runtime": "any" },
     { "id": "ce.keys", "version": "1.0", "runtime": "webview" },
     { "id": "ce.text", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },

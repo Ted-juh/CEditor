@@ -286,6 +286,12 @@ const SHARED_OPTION_FIELDS = {
   patchScope: { name: 'scope', type: 'text', default: '"voice"', summary: 'The part of the synth, when the command takes no patch to read it from.' },
   patchSeed: { name: 'seed', type: 'number', default: 'the script\'s random stream', summary: 'Where the random numbers start: the same seed gives the same patch, in every language.' },
 
+  /* --- ce.verify: the options its checks share ----------------------------- */
+  verifyRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device. Every check but coverage asks the main synth only.' },
+  verifyIds: { name: 'ids', type: 'list of text', default: 'every parameter', sample: '{"cutoff", "resonance"}', summary: 'Only these parameters, by id.' },
+  verifyGroup: { name: 'group', type: 'text', default: 'every group', summary: 'Only the parameters of this group, as the profile names it, in any case.' },
+  verifySettle: { name: 'settleMs', type: 'number', default: '100', unit: 'milliseconds', summary: 'The wait between sending and asking the synth for the value back.' },
+
   /* --- ce.format: the options every formatting command shares ------------- */
   formatDecimals: { name: 'decimals', type: 'number', default: 'as the command decides', summary: 'Exactly this many decimal places, 0 to 6.' },
   formatDigits: { name: 'digits', type: 'number', default: '3', summary: 'Significant digits, 1 to 6, when `decimals` is left out.' },
@@ -626,6 +632,8 @@ export const DEVICE_EVENTS = [
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
+  // ce.verify: raised after a check's own function has run, so one script can show what any script checked.
+  { id: 'verifyDone', fn: 'onVerifyDone', payload: 'report', decoded: true, summary: 'A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too.' },
   { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset.' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.' },
@@ -2475,6 +2483,145 @@ export const COMMANDS = [
       { name: 'spec', type: 'table', required: true, summary: 'The scope: groups, only, except and dumps, as lists of names.' },
       { name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device.' },
     ],
+    scopes: 'any',
+  },
+  // verify
+  // Asking the synth whether it holds what was sent (docs/design/ce-verify-module.md). The deciding is
+  // verifyCore.js, the same in every runtime; each check ends in one report, handed to its function
+  // and raised as onVerifyDone.
+  {
+    id: 'verifyCoverage', category: 'Verify', signature: 'verifyCoverage([opts]) -> table', refusal: 'nothing',
+    summary: 'Which parameters a check can read back from the synth, which it cannot and why, and whether each dump\'s length adds up. Sends nothing.',
+    example: '`ce.verify.coverage().checkable` is how many of the synth\'s parameters can be checked.',
+    notes: [
+      'Returns { role, total, checkable, unchecked, dumps }: `unchecked` lists { id, name, why }, `why` "notInDump" (no dump holds it) or "noRequest" (the profile cannot ask for that dump).',
+      '`dumps` lists { kind, expectedBytes, layoutBytes, unread } for every dump these parameters are in. `expectedBytes` is the length the profile gives, `layoutBytes` what its layout adds up to; when the two differ, the profile is wrong in one of them. `unread` lists the payload bytes no parameter reads, as { from, to }.',
+      'Reads only the profile, so it works without a synth connected.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyCheck', category: 'Verify', signature: 'verifyCheck([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Ask the synth for its values and compare them with what the panel shows. Writes nothing.',
+    example: '`ce.verify.check(function(report) log(ce.verify.summary(report)) end)` checks every parameter and logs one line.',
+    notes: [
+      'Asks only for the dumps that hold the parameters asked about, one after another, with the profile\'s gap between them. Each reply fills the panel, as a dump always does.',
+      'The report: { kind, role, ok, total, matched, differed, unchecked, dumps, probes, ms, cancelled }. `matched` lists ids; `differed` lists { id, name, expected, got, raw }, `expected` what the panel held and `got` what the synth sent, `raw` the number the synth sent for a choice the profile does not name; `unchecked` lists { id, name, why }; `dumps` lists { kind, status, expectedBytes }, `status` "ok" or "noReply".',
+      '`why` is "notInDump", "noRequest", "noReply" (asked, asked again, no answer in time), "moved" (the value changed while it was checked), "notWritable" or "cancelled".',
+      '`ok` is true when nothing differed and nothing was left unchecked by no reply, a move or a cancel.',
+      'Returns true when started; false while a check runs on that device, when the synth is not connected, or for any device but the main synth.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyDump', category: 'Verify', signature: 'verifyDump(kind [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Ask for the same dump several times and compare the first reply with the last. Writes nothing.',
+    example: '`ce.verify.dump("common", function(report) log(#report.differed) end)` logs how many values changed between two asks.',
+    notes: [
+      'A value that changes when nothing was sent is one the synth changes by itself, such as a counter or a clock. Every check that compares it will find it different.',
+      '`differed` holds the parameters that changed, `expected` the first reply\'s value and `got` the last.',
+      'A dump the profile has no request for: false, with a console error.',
+    ],
+    params: [
+      { name: 'kind', type: 'dumpKind', required: true, summary: 'The dump, by the id the profile gives it, or the id of its request.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole',
+        { name: 'times', type: 'number', default: '2', summary: 'How many times to ask, 2 to 10.' },
+        { name: 'gapMs', type: 'number', default: '500', unit: 'milliseconds', summary: 'The wait between the asks.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyWrite', category: 'Verify', signature: 'verifyWrite(id, value [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Send one value, ask the synth for it back, and compare.',
+    example: '`ce.verify.write("tone1.filter.cutoff", 64, fn)` sends 64 and reports whether the synth holds 64.',
+    notes: [
+      'Sent as ce.device.write() sends it, so the panel\'s control follows. ce.device.write() says the message left; this says whether it landed.',
+      'A parameter no dump holds is still sent, and is reported unchecked with the reason.',
+    ],
+    params: [
+      { name: 'id', type: 'text', required: true, summary: 'The parameter id, as the profile names it.' },
+      { name: 'value', type: 'number or text', required: true, summary: 'The value, in the parameter\'s own units, as ce.device.write() takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifySettle']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyProbe', category: 'Verify', signature: 'verifyProbe(id [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Try a parameter at several values, read each one back, then put the old value back.',
+    example: '`ce.verify.probe("tone1.lfo.rate", fn)` tries the lowest, middle and highest rate and the two next to each end.',
+    notes: [
+      'Left out, `values` is: for a number, the lowest, the one above it, the middle, the one below the highest, and the highest; for a choice, every choice up to 16, else the first, middle and last; for on/off, both; for text, a name of full length and an empty one.',
+      'The report\'s `probes` lists { id, value, got, same } for each value tried, and `differed` the values that did not land. `restored` is true when the old value was read back too.',
+      'The old value is sent back when the probe ends, fails or is cancelled. A parameter that cannot be read back is not sent at all.',
+    ],
+    params: [
+      { name: 'id', type: 'text', required: true, summary: 'The parameter id.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifySettle',
+        { name: 'values', type: 'list', default: 'as the notes say', summary: 'The values to try, in the parameter\'s own units.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyPatch', category: 'Verify', signature: 'verifyPatch([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Send the panel\'s whole sound, ask for every dump that holds it, and compare every value.',
+    example: '`ce.verify.patch(fn)` after building a sound in the panel, before saving it on the synth.',
+    notes: [
+      '`via` left out: whole dumps when the profile\'s patch section says `deliver = "dump"`, else one message per parameter.',
+      'Parameters the profile says cannot be written are reported unchecked as "notWritable".',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup', 'verifySettle',
+        { name: 'via', type: 'text', default: 'as the profile delivers a patch', values: ['dump', 'parameters'], summary: 'How the sound is sent: whole dumps, or one value at a time.' },
+        { name: 'send', type: 'true or false', default: 'true', summary: 'Off: compare without sending first, as check does.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifySummary', category: 'Verify', signature: 'verifySummary(report [, opts]) -> text', refusal: 'nothing',
+    summary: 'A report as one line of text.',
+    example: '`ce.verify.summary(report)` gives "1180 of 1222 match, 3 differ, 39 unchecked (no reply: tone3)".',
+    notes: [
+      'Counts, then in brackets the dump that did not answer, or the most common reason a parameter was left unchecked. A cancelled check says so first.',
+      'Not a report: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'report', type: 'table', required: true, summary: 'A report from any check.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'width', type: 'number', default: 'no limit', summary: 'The most characters to give, for an LCD line. Too long: the part in brackets goes first, then the words are shortened ("5/9 ok 1 diff 3 unchk"), then the line is cut.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyRunning', category: 'Verify', signature: 'verifyRunning([role]) -> table', refusal: 'nothing',
+    summary: 'The check running now on a device: { kind, role, done, total, ms }, or nothing.',
+    example: '`ce.verify.running()` while a patch check runs gives { kind = "patch", done = 3, total = 5, ms = 1840 }.',
+    notes: [
+      '`done` and `total` count dumps asked for (for a probe, values tried), so a script can show progress.',
+      'In Lua and JavaScript every script sees every check on the panel. In Python a script sees the checks it started.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyCancel', category: 'Verify', signature: 'verifyCancel([role]) -> boolean', refusal: 'false',
+    summary: 'Stop the check running on a device.',
+    example: '`ce.verify.cancel()` from a "Stop" button.',
+    notes: [
+      'The check\'s function is still called, with what was read so far and `cancelled` true; what was not read is unchecked as "cancelled". A probe sends the old value back first.',
+      'Returns true when a check was running.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
     scopes: 'any',
   },
   // keys
@@ -5598,8 +5745,8 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, the connected device and its patches, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.device', 'ce.patch', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, the connected device, its patches and checking what it holds, music theory, and musical time.',
+    modules: ['ce.midi', 'ce.device', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
@@ -5695,6 +5842,9 @@ export const MODULES = [
   // requires the four whose commands it reads and sends through, so they are there whenever it is.
   { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
     summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
+  // requires ce.device, whose dumps it asks for, and ce.time, whose after() spaces the asks.
+  { id: 'ce.verify', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Asking the synth whether it holds what was sent: which parameters can be read back, whether the synth agrees with the panel, whether a value or a whole sound landed, and a parameter tried at its ends. Each check ends in a report that names what matched, what differed and what could not be checked, and why.' },
   { id: 'ce.keys', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'The computer keyboard: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. Key events are keyDown and keyUp. In the panel view only.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -5894,6 +6044,10 @@ const MODULE_MEMBERS = {
     random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
     apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
     scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.verify': {
+    coverage: 'verifyCoverage', check: 'verifyCheck', dump: 'verifyDump', write: 'verifyWrite', probe: 'verifyProbe',
+    patch: 'verifyPatch', summary: 'verifySummary', running: 'verifyRunning', cancel: 'verifyCancel',
   },
   'ce.keys': {
     shortcut: 'keysShortcut', remove: 'keysRemove', list: 'keysList', isDown: 'keysIsDown', held: 'keysHeld',

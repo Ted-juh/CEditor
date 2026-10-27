@@ -29,6 +29,7 @@ import {
   setKeysPanelResolver,
 } from './scriptKeys.js';
 import { patchCommands } from './patchCore.js';
+import { verifyCommands } from './verifyCore.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -8344,6 +8345,8 @@ export function clearDeviceRuntimeDefinitions() {
     waiter.done = true;
     if (waiter.timerId) stopTimer(waiter.timerId);
   }
+  // A check outliving its panel would never finish, and its device would stay busy.
+  for (const role of Object.keys(verifyJobs)) delete verifyJobs[role];
 }
 
 // @module ce.storage
@@ -8812,8 +8815,50 @@ function patchHostFor(scriptId) {
   };
 }
 
+/**
+ * ce.verify's host for one script (docs/design/ce-verify-module.md). The checks themselves are the
+ * panel's, in verifyJobs, so a script's Stop button can cancel what another script's Check button
+ * started; the report reaches every script as onVerifyDone.
+ */
+const verifyJobs = {};
+
+function verifyHostFor(scriptId) {
+  return {
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    parameters: (role) => deviceParametersRead({ role: role || DEFAULT_ROLE }),
+    layout: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE);
+      if (!source) return null;
+      const encodings = {};
+      for (const p of Array.isArray(source.parameters) ? source.parameters : []) {
+        if (p && typeof p.id === 'string' && p.encoding && typeof p.encoding === 'object') encodings[p.id] = p.encoding;
+      }
+      return {
+        dumps: Array.isArray(source.dumpDefinitions) ? source.dumpDefinitions : [],
+        requests: Array.isArray(source.requests) ? source.requests : [],
+        encodings,
+        gapMs: deviceTimingRead(role || DEFAULT_ROLE)?.minDelayBetweenMessagesMs,
+      };
+    },
+    read: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    write: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    sendDump: (kind) => midiApi.sendDump(kind),
+    patchSection: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE, { own: true });
+      return source && typeof source.patch === 'object' ? source.patch : null;
+    },
+    connected: (role) => deviceConnectedRead(role || DEFAULT_ROLE) === true,
+    requestDump: (kind, fn) => requestDumpImpl(kind, fn, undefined, scriptId),
+    after: (ms, fn) => afterFor(scriptId, ms, fn, 'ce.verify'),
+    clock: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+    emit: (report) => deliverEmit('onVerifyDone', null, report),
+    jobs: verifyJobs,
+  };
+}
+
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const patch = patchCommands(patchHostFor(scriptId));
+  const verify = verifyCommands(verifyHostFor(scriptId));
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
       typeof form === 'string' || isOptionsTable(form) ? form : ''),
@@ -9168,6 +9213,17 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     patchWrite: (p, slot, opts) => patch.write(p, slot, opts),
     patchScopes: (role) => patch.scopes(role),
     patchDefine: (scope, spec, role) => patch.define(scope, spec, role),
+
+    // ce.verify (docs/design/ce-verify-module.md): verifyCore.js, the same code the JavaScript prelude runs.
+    verifyCoverage: (opts) => verify.coverage(opts),
+    verifyCheck: (opts, fn) => verify.check(opts, fn),
+    verifyDump: (kind, opts, fn) => verify.dump(kind, opts, fn),
+    verifyWrite: (id, value, opts, fn) => verify.write(id, value, opts, fn),
+    verifyProbe: (id, opts, fn) => verify.probe(id, opts, fn),
+    verifyPatch: (opts, fn) => verify.patch(opts, fn),
+    verifySummary: (report, opts) => verify.summary(report, opts),
+    verifyRunning: (role) => verify.running(role),
+    verifyCancel: (role) => verify.cancel(role),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),

@@ -2329,6 +2329,36 @@ private:
                 return {};
             }
 
+            // ce.verify: the dumps as the profile wrote them, what asks for each, every parameter's
+            // encoding (how many payload bytes it reads) and the gap between messages, from which
+            // verifyCore.js works out which dump holds a parameter and how long a dump should be.
+            if (kind == "dumpLayout")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr) return {};
+                auto* out = new juce::DynamicObject();
+                out->setProperty ("dumps", docObj->getProperty ("dumpDefinitions"));
+                out->setProperty ("requests", docObj->getProperty ("requests"));
+                auto* encodings = new juce::DynamicObject();
+                if (auto* arr = docObj->getProperty ("parameters").getArray())
+                    for (const auto& item : *arr)
+                        if (auto* o = item.getDynamicObject())
+                            if (const auto id = o->getProperty ("id").toString(); id.isNotEmpty() && o->hasProperty ("encoding"))
+                                encodings->setProperty (juce::Identifier (id), o->getProperty ("encoding"));
+                out->setProperty ("encodings", juce::var (encodings));
+                // The effective gap, as "timing" reads it: the profile's, with the mapping's on top.
+                juce::var gap;
+                if (auto* timing = docObj->getProperty ("timing").getDynamicObject())
+                    gap = timing->getProperty ("minDelayBetweenMessagesMs");
+                if (recordObj != nullptr)
+                    if (auto* overrides = recordObj->getProperty ("timingOverrides").getDynamicObject())
+                        if (overrides->hasProperty ("minDelayBetweenMessagesMs"))
+                            gap = overrides->getProperty ("minDelayBetweenMessagesMs");
+                out->setProperty ("gapMs", gap);
+                return juce::var (out);
+            }
+
             // ce.patch: when a patch was kept. The engines have no clock of their own that is a date.
             // UTC in the panel view's form (toISOString), so the two sort together as text.
             if (kind == "now")

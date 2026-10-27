@@ -1303,6 +1303,9 @@ const OPTION_ANSWER_CASES = [
   ['patchDiff', [{}, {}, { exept: ['x'] }]], ['patchEqual', [{}, {}, { lok: ['x'] }]],
   ['patchApply', [{}, { sned: 'none' }]], ['patchSave', ['x', {}, { replce: true }]],
   ['patchList', [{ scpe: 'voice' }]], ['patchForget', ['x', { rle: 'a' }]], ['patchWrite', [{}, 1, { rle: 'a' }]],
+  ['verifyCoverage', [{ grop: 'x' }]], ['verifyCheck', [{ idz: ['x'] }, 'fn']], ['verifyDump', ['common', { tims: 2 }, 'fn']],
+  ['verifyWrite', ['x', 1, { setleMs: 5 }, 'fn']], ['verifyProbe', ['x', { valus: [1] }, 'fn']],
+  ['verifyPatch', [{ vai: 'dump' }, 'fn']], ['verifySummary', [{}, { widht: 8 }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {

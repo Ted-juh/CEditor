@@ -71,6 +71,17 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.verify': 'Asking the synth whether it holds what was sent. `coverage` says which parameters can be read back at all, and why not the rest, without sending anything. `check` compares the synth with the panel, `dump` asks for one dump twice to find values the synth changes by itself, and `write`, `probe` and `patch` send first and then read back: one value, one parameter at several values, or the whole sound.\n\n'
+    + 'Every check returns at once and calls its function with a report when it is done; the same report is raised as onVerifyDone. A report names every parameter that matched, every one that differed, with both values, and every one that could not be checked, with the reason. The read-back is always a dump the synth sent after the check asked for it, never what the panel last sent.\n\n'
+    + 'Only `write`, `probe` and `patch` change the synth, and `probe` puts the old value back. One check runs on a device at a time, and only the main synth can be asked.\n\n'
+    + '```lua\n'
+    + '-- Lua: a "Check" button that shows the result on an LCD\n'
+    + 'function onClick()\n'
+    + '  ce.verify.check(function(report)\n'
+    + '    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width = 16 }))\n'
+    + '  end)\n'
+    + 'end\n'
+    + '```',
   'ce.patch': 'A synth\'s sound as one value you can hold, change, compare, send and keep. `current` captures it, `morph`, `blend`, `random`, `mutate` and `merge` make new ones without sending anything, `diff` and `equal` compare two, and `apply` puts one on the panel and sends it the way the synth takes a patch.\n\n'
     + 'A patch is a table: `device` (the device profile\'s id), `role`, `scope` (which part of the synth: "voice" unless the profile names others), `name`, `values` (parameter id to value, in the parameter\'s own units; a choice is its id), `missing` (ids nothing is known for) and `source`.\n\n'
     + 'Every command that works on parameters takes the same choosing options: `groups`, `only`, `except`, `lock` and `include`. The transforms leave the patch name and the parameters the synth cannot be sent alone unless `include` names them. A profile can describe its patches in a `patch` section: which scopes a patch can hold and the dumps that read and send each, how `apply` sends one (`deliver`), and how `write` stores a slot.\n\n'
@@ -171,6 +182,7 @@ const MODULE_TITLES = {
   'ce.panel': 'building and arranging the panel',
   'ce.storage': 'remembering things',
   'ce.patch': 'the synth\'s sound as a value',
+  'ce.verify': 'checking what the synth holds',
   'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',
   'ce.image': 'images and icons',

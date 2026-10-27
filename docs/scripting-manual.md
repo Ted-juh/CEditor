@@ -862,6 +862,7 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 |---|---|
 | `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
 | `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
+| `onVerifyDone(report)` | A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too. |
 | `onPresetChange(preset)` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
 | `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
 | `onCcIn(cc)` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. |
@@ -1095,7 +1096,7 @@ ce.core.error("message")
 
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, the connected device and its patches, music theory, and musical time.
+MIDI in and out, the connected device, its patches and checking what it holds, music theory, and musical time.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -2419,6 +2420,222 @@ Good to know:
 - Lasts while the panel is open; call it in onPanelLoad.
 
 *Short name: `patchDefine`.*
+
+### ce.verify: checking what the synth holds
+
+Asking the synth whether it holds what was sent. `coverage` says which parameters can be read back at all, and why not the rest, without sending anything. `check` compares the synth with the panel, `dump` asks for one dump twice to find values the synth changes by itself, and `write`, `probe` and `patch` send first and then read back: one value, one parameter at several values, or the whole sound.
+
+Every check returns at once and calls its function with a report when it is done; the same report is raised as onVerifyDone. A report names every parameter that matched, every one that differed, with both values, and every one that could not be checked, with the reason. The read-back is always a dump the synth sent after the check asked for it, never what the panel last sent.
+
+Only `write`, `probe` and `patch` change the synth, and `probe` puts the old value back. One check runs on a device at a time, and only the main synth can be asked.
+
+```lua
+-- Lua: a "Check" button that shows the result on an LCD
+function onClick()
+  ce.verify.check(function(report)
+    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width = 16 }))
+  end)
+end
+```
+
+#### `ce.verify.coverage([opts]) -> table`
+
+Which parameters a check can read back from the synth, which it cannot and why, and whether each dump's length adds up. Sends nothing.
+
+Example: `ce.verify.coverage().checkable` is how many of the synth's parameters can be checked.
+
+Good to know:
+
+- Returns { role, total, checkable, unchecked, dumps }: `unchecked` lists { id, name, why }, `why` "notInDump" (no dump holds it) or "noRequest" (the profile cannot ask for that dump).
+- `dumps` lists { kind, expectedBytes, layoutBytes, unread } for every dump these parameters are in. `expectedBytes` is the length the profile gives, `layoutBytes` what its layout adds up to; when the two differ, the profile is wrong in one of them. `unread` lists the payload bytes no parameter reads, as { from, to }.
+- Reads only the profile, so it works without a synth connected.
+
+*Short name: `verifyCoverage`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `ids` | list of text | every parameter | Only these parameters, by id. |
+| `group` | text | every group | Only the parameters of this group, as the profile names it, in any case. |
+
+#### `ce.verify.check([opts,] fn) -> boolean`
+
+Ask the synth for its values and compare them with what the panel shows. Writes nothing.
+
+Example: `ce.verify.check(function(report) log(ce.verify.summary(report)) end)` checks every parameter and logs one line.
+
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- Asks only for the dumps that hold the parameters asked about, one after another, with the profile's gap between them. Each reply fills the panel, as a dump always does.
+- The report: { kind, role, ok, total, matched, differed, unchecked, dumps, probes, ms, cancelled }. `matched` lists ids; `differed` lists { id, name, expected, got, raw }, `expected` what the panel held and `got` what the synth sent, `raw` the number the synth sent for a choice the profile does not name; `unchecked` lists { id, name, why }; `dumps` lists { kind, status, expectedBytes }, `status` "ok" or "noReply".
+- `why` is "notInDump", "noRequest", "noReply" (asked, asked again, no answer in time), "moved" (the value changed while it was checked), "notWritable" or "cancelled".
+- `ok` is true when nothing differed and nothing was left unchecked by no reply, a move or a cancel.
+- Returns true when started; false while a check runs on that device, when the synth is not connected, or for any device but the main synth.
+
+*Short name: `verifyCheck`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `ids` | list of text | every parameter | Only these parameters, by id. |
+| `group` | text | every group | Only the parameters of this group, as the profile names it, in any case. |
+
+#### `ce.verify.dump(kind [, opts], fn) -> boolean`
+
+Ask for the same dump several times and compare the first reply with the last. Writes nothing.
+
+Example: `ce.verify.dump("common", function(report) log(#report.differed) end)` logs how many values changed between two asks.
+
+- `kind` (text, required): The dump, by the id the profile gives it, or the id of its request.
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- A value that changes when nothing was sent is one the synth changes by itself, such as a counter or a clock. Every check that compares it will find it different.
+- `differed` holds the parameters that changed, `expected` the first reply's value and `got` the last.
+- A dump the profile has no request for: false, with a console error.
+
+*Short name: `verifyDump`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `times` | number | 2 | How many times to ask, 2 to 10. |
+| `gapMs` | number (milliseconds) | 500 | The wait between the asks. |
+
+#### `ce.verify.write(id, value [, opts], fn) -> boolean`
+
+Send one value, ask the synth for it back, and compare.
+
+Example: `ce.verify.write("tone1.filter.cutoff", 64, fn)` sends 64 and reports whether the synth holds 64.
+
+- `id` (text, required): The parameter id, as the profile names it.
+- `value` (number or text, required): The value, in the parameter's own units, as ce.device.write() takes it.
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- Sent as ce.device.write() sends it, so the panel's control follows. ce.device.write() says the message left; this says whether it landed.
+- A parameter no dump holds is still sent, and is reported unchecked with the reason.
+
+*Short name: `verifyWrite`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `settleMs` | number (milliseconds) | 100 | The wait between sending and asking the synth for the value back. |
+
+#### `ce.verify.probe(id [, opts], fn) -> boolean`
+
+Try a parameter at several values, read each one back, then put the old value back.
+
+Example: `ce.verify.probe("tone1.lfo.rate", fn)` tries the lowest, middle and highest rate and the two next to each end.
+
+- `id` (text, required): The parameter id.
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- Left out, `values` is: for a number, the lowest, the one above it, the middle, the one below the highest, and the highest; for a choice, every choice up to 16, else the first, middle and last; for on/off, both; for text, a name of full length and an empty one.
+- The report's `probes` lists { id, value, got, same } for each value tried, and `differed` the values that did not land. `restored` is true when the old value was read back too.
+- The old value is sent back when the probe ends, fails or is cancelled. A parameter that cannot be read back is not sent at all.
+
+*Short name: `verifyProbe`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `settleMs` | number (milliseconds) | 100 | The wait between sending and asking the synth for the value back. |
+| `values` | list | as the notes say | The values to try, in the parameter's own units. |
+
+#### `ce.verify.patch([opts,] fn) -> boolean`
+
+Send the panel's whole sound, ask for every dump that holds it, and compare every value.
+
+Example: `ce.verify.patch(fn)` after building a sound in the panel, before saving it on the synth.
+
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- `via` left out: whole dumps when the profile's patch section says `deliver = "dump"`, else one message per parameter.
+- Parameters the profile says cannot be written are reported unchecked as "notWritable".
+
+*Short name: `verifyPatch`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `ids` | list of text | every parameter | Only these parameters, by id. |
+| `group` | text | every group | Only the parameters of this group, as the profile names it, in any case. |
+| `settleMs` | number (milliseconds) | 100 | The wait between sending and asking the synth for the value back. |
+| `via` | text | as the profile delivers a patch | How the sound is sent: whole dumps, or one value at a time.<br>One of "dump" or "parameters". |
+| `send` | true or false | true | Off: compare without sending first, as check does. |
+
+#### `ce.verify.summary(report [, opts]) -> text`
+
+A report as one line of text.
+
+Example: `ce.verify.summary(report)` gives "1180 of 1222 match, 3 differ, 39 unchecked (no reply: tone3)".
+
+- `report` (table, required): A report from any check.
+
+Good to know:
+
+- Counts, then in brackets the dump that did not answer, or the most common reason a parameter was left unchecked. A cancelled check says so first.
+- Not a report: nothing, with a console error.
+
+*Short name: `verifySummary`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `width` | number | no limit | The most characters to give, for an LCD line. Too long: the part in brackets goes first, then the words are shortened ("5/9 ok 1 diff 3 unchk"), then the line is cut. |
+
+#### `ce.verify.running([role]) -> table`
+
+The check running now on a device: { kind, role, done, total, ms }, or nothing.
+
+Example: `ce.verify.running()` while a patch check runs gives { kind = "patch", done = 3, total = 5, ms = 1840 }.
+
+- `role` (text, optional): The device; left out: "mainSynth".
+
+Good to know:
+
+- `done` and `total` count dumps asked for (for a probe, values tried), so a script can show progress.
+- In Lua and JavaScript every script sees every check on the panel. In Python a script sees the checks it started.
+
+*Short name: `verifyRunning`.*
+
+#### `ce.verify.cancel([role]) -> boolean`
+
+Stop the check running on a device.
+
+Example: `ce.verify.cancel()` from a "Stop" button.
+
+- `role` (text, optional): The device; left out: "mainSynth".
+
+Good to know:
+
+- The check's function is still called, with what was read so far and `cancelled` true; what was not read is unchecked as "cancelled". A probe sends the old value back first.
+- Returns true when a check was running.
+
+*Short name: `verifyCancel`.*
 
 ### ce.music: notes, scales and chords
 

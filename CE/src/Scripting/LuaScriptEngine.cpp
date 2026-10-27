@@ -2747,6 +2747,808 @@ function patchScopes(role) return P.scopes(role) end
 function patchDefine(scope, spec, role) return P.define(scope, spec, role) end
 end
 
+-- @module ce.verify
+-- ce.verify, ported line for line from verifyCore.js (the panel view's; the JavaScript prelude runs
+-- that file itself). Held to the panel view's answers by test/verifyParity.test.js and the scenario
+-- in test/support/verifyScenario.mjs. ce.verify requires ce.device and ce.time, so the globals the
+-- host below calls are live whenever a script can reach ce.verify. The prelude runs once for every
+-- script on the panel, so the checks below are every script's: one script can cancel another's.
+do
+  local WHY_WORDS = {
+    notInDump = "not in a dump", noRequest = "no request", noReply = "no reply", badChecksum = "bad checksum",
+    notWritable = "not writable", moved = "moved", cancelled = "cancelled",
+  }
+  local AVOIDABLE = { "noReply", "badChecksum", "moved", "cancelled" }
+  local MAIN_ROLE = "mainSynth"
+  local TEXT_SAMPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
+  local INF = math.huge
+
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function lower(s) if s == nil then return "" end return string.lower(tostring(s)) end
+  local function str(v) if v == nil then return "" end return tostring(v) end
+  local function contains(list, value)
+    for _, x in ipairs(list) do if x == value then return true end end
+    return false
+  end
+  local function listOf(v) if type(v) == "table" then return v end return {} end
+  local function textList(v)
+    if type(v) == "string" then if v == "" then return {} end return { v } end
+    local out = {}
+    for _, x in ipairs(listOf(v)) do if type(x) == "string" and x ~= "" then out[#out + 1] = x end end
+    return out
+  end
+  local function roleOf(v) if type(v) == "string" and v ~= "" then return v end return MAIN_ROLE end
+  local function roundHalfAway(x)
+    if x < 0 then return -math.floor(-x + 0.5) end
+    return math.floor(x + 0.5)
+  end
+  local function present(v) return v ~= nil end
+  local function intOr(v, fallback)
+    local n = toNumber(v)
+    if finite(n) then return math.floor(n) end
+    return fallback
+  end
+
+  local function kindOf(desc)
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if t == "action" or t == "momentary" or t == "trigger" then return "action" end
+    if t == "text" then return "text" end
+    if t == "choice" or t == "boolean" or t == "enum" or t == "bool" then return "choice" end
+    if type(desc) == "table" and type(desc.choices) == "table" and #desc.choices > 0 then return "choice" end
+    return "number"
+  end
+  local function writable(desc)
+    local access = type(desc) == "table" and desc.access or nil
+    if type(access) == "string" then return string.find(lower(access), "write", 1, true) ~= nil end
+    if type(access) == "table" and access.canWrite == false then return false end
+    return true
+  end
+  local function isWhole(desc) return not (type(desc) == "table" and desc.type == "float") end
+  local function rangeOf(desc)
+    local range = type(desc) == "table" and type(desc.range) == "table" and desc.range or {}
+    local lo, hi = toNumber(range.min), toNumber(range.max)
+    local a = finite(lo) and lo or 0
+    local b = finite(hi) and hi or 127
+    if a <= b then return a, b end
+    return b, a
+  end
+  local function choicesOf(desc)
+    local out = {}
+    for _, c in ipairs(type(desc) == "table" and listOf(desc.choices) or {}) do
+      if type(c) == "table" then
+        if c.id ~= nil then out[#out + 1] = c.id elseif c.value ~= nil then out[#out + 1] = c.value end
+      elseif c ~= nil then
+        out[#out + 1] = c
+      end
+    end
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if #out == 0 and (t == "boolean" or t == "bool") then out[1] = false; out[2] = true end
+    return out
+  end
+  local function floatStep(desc)
+    local lo, hi = rangeOf(desc)
+    return (hi - lo) / 16383
+  end
+  local function trimPad(s) return (tostring(s):gsub("[%s\0]+$", "")) end
+
+  local function same(desc, a, b)
+    if a == nil or b == nil then return false end
+    if type(a) == "boolean" or type(b) == "boolean" then
+      local x, y
+      if type(a) == "boolean" then x = a else x = toNumber(a) ~= 0 end
+      if type(b) == "boolean" then y = b else y = toNumber(b) ~= 0 end
+      return x == y
+    end
+    if type(a) == "number" and type(b) == "number" and finite(a) and finite(b) then
+      if isWhole(desc) then return roundHalfAway(a) == roundHalfAway(b) end
+      return math.abs(a - b) <= floatStep(desc) / 2 + 1e-9
+    end
+    return trimPad(a) == trimPad(b)
+  end
+  local function rawOf(desc, got)
+    if kindOf(desc) ~= "choice" or got == nil or type(got) == "boolean" then return nil end
+    local choices = choicesOf(desc)
+    if #choices == 0 then return nil end
+    for _, c in ipairs(choices) do if c == got then return nil end end
+    return got
+  end
+
+  local function byteWidth(encoding)
+    local e = type(encoding) == "table" and encoding or {}
+    local t = e.type == nil and "u7" or tostring(e.type)
+    local length, nibbles = toNumber(e.length), toNumber(e.nibbles)
+    if t == "text-ascii" or t == "ascii" or t == "fixed-ascii" then
+      if finite(length) and length > 0 then return length end
+      return 1
+    end
+    if t == "text-nibbled-ascii" or t == "nibbled-ascii" or t == "packed-nibbled-ascii" then
+      if finite(nibbles) and nibbles > 0 then return nibbles end
+      if finite(length) and length > 0 then return length * 2 end
+      return 2
+    end
+    if t == "u14" or t == "u14-msb-lsb" or t == "u14-lsb-msb" then return 2 end
+    if t == "nibbled" then if finite(nibbles) and nibbles > 0 then return nibbles end return 2 end
+    return 1
+  end
+
+  local function dumpsOf(layout)
+    local requests = listOf(type(layout) == "table" and layout.requests or nil)
+    local encodings = type(layout) == "table" and type(layout.encodings) == "table" and layout.encodings or {}
+    local out = {}
+    for _, d in ipairs(listOf(type(layout) == "table" and layout.dumps or nil)) do
+      if type(d) == "table" and type(d.id) == "string" and d.id ~= "" then
+        local request, timeoutMs, retries = "", 2000, 0
+        for _, r in ipairs(requests) do
+          if type(r) == "table" then
+            local answer = ""
+            if type(r.response) == "table" and type(r.response.dump) == "string" then answer = r.response.dump
+            elseif type(r.expectedDump) == "string" then answer = r.expectedDump end
+            if answer == d.id and type(r.id) == "string" and r.id ~= "" then
+              request = r.id
+              timeoutMs = intOr(r.timeoutMs, 2000)
+              retries = intOr(r.retries, 0)
+              break
+            end
+          end
+        end
+        local matcher = type(d.matcher) == "table" and d.matcher or {}
+        local prefix, suffix = #listOf(matcher.prefix), #listOf(matcher.suffix)
+        local payload = type(d.payload) == "table" and d.payload or {}
+        local payloadOffset = intOr(payload.offset, prefix)
+        local payloadSize = intOr(payload.size, 0)
+        local pack = type(payload.pack) == "table" and payload.pack or nil
+        local wire = payloadSize
+        if pack ~= nil and pack.type == "packed8to7" and payloadSize > 0 then
+          local group = math.max(1, intOr(pack.groupSize, 7))
+          wire = payloadSize + (payloadSize + group - 1) // group
+        end
+        local stop = payloadOffset + wire
+        local checksum = type(d.checksum) == "table" and d.checksum or nil
+        if checksum ~= nil and finite(toNumber(checksum.byteOffset)) then
+          stop = math.max(stop, intOr(checksum.byteOffset, 0) + math.max(1, intOr(checksum.byteCount, 1)))
+        end
+        local completion = type(d.completion) == "table" and d.completion or {}
+        local expected = toNumber(completion.expectedBytes)
+        local mappings = {}
+        for _, m in ipairs(listOf(d.mappings)) do
+          if type(m) == "table" and type(m.parameter) == "string" then
+            local codec = type(m.codec) == "table" and m.codec or encodings[m.parameter]
+            mappings[#mappings + 1] = { parameter = m.parameter, offset = intOr(m.offset, 0), size = byteWidth(codec) }
+          end
+        end
+        out[#out + 1] = {
+          id = d.id,
+          name = (type(d.name) == "string" and d.name ~= "") and d.name or d.id,
+          request = request, timeoutMs = timeoutMs, retries = retries,
+          expectedBytes = finite(expected) and math.floor(expected) or nil,
+          layoutBytes = stop + suffix,
+          payloadSize = payloadSize,
+          mappings = mappings,
+        }
+      end
+    end
+    return out
+  end
+
+  local function unreadOf(dump)
+    local read = {}
+    for i = 0, dump.payloadSize - 1 do read[i] = false end
+    for _, m in ipairs(dump.mappings) do
+      for i = m.offset, m.offset + m.size - 1 do if i >= 0 and i < dump.payloadSize then read[i] = true end end
+    end
+    local out = {}
+    local from = -1
+    for i = 0, dump.payloadSize - 1 do
+      if not read[i] and from < 0 then from = i end
+      if read[i] and from >= 0 then
+        out[#out + 1] = { from = from, to = i - 1 }
+        from = -1
+      end
+    end
+    if from >= 0 then out[#out + 1] = { from = from, to = dump.payloadSize - 1 } end
+    return out
+  end
+
+  local function dumpIndex(dumps)
+    local index = {}
+    for _, d in ipairs(dumps) do
+      for _, m in ipairs(d.mappings) do if index[m.parameter] == nil then index[m.parameter] = d end end
+    end
+    return index
+  end
+
+  local function choose(params, opts, say, verb)
+    local ids = textList(opt(opts, "ids"))
+    local group = opt(opts, "group")
+    local out = {}
+    if #ids > 0 then
+      local known = {}
+      for _, desc in ipairs(params) do known[tostring(desc.id)] = true end
+      for _, id in ipairs(ids) do
+        if not known[id] then say("warn", "ce.verify." .. verb .. ": \"" .. id .. "\" is not a parameter of the synth, so it was left out.") end
+      end
+      for _, desc in ipairs(params) do if contains(ids, tostring(desc.id)) then out[#out + 1] = desc end end
+      return out
+    end
+    if type(group) == "string" and group ~= "" then
+      for _, desc in ipairs(params) do if lower(desc.group) == lower(group) then out[#out + 1] = desc end end
+      if #out == 0 then say("warn", "ce.verify." .. verb .. ": the synth has no parameters in the group \"" .. group .. "\".") end
+      return out
+    end
+    for _, desc in ipairs(params) do if kindOf(desc) ~= "action" then out[#out + 1] = desc end end
+    return out
+  end
+
+  local function nameOf(desc) if desc.name ~= nil then return tostring(desc.name) end return tostring(desc.id) end
+
+  local function coverageOf(list, dumps, role)
+    local index = dumpIndex(dumps)
+    local unchecked, used = {}, {}
+    local checkable = 0
+    for _, desc in ipairs(list) do
+      local id = tostring(desc.id)
+      local d = index[id]
+      if d == nil then unchecked[#unchecked + 1] = { id = id, name = nameOf(desc), why = "notInDump" }
+      elseif d.request == "" then unchecked[#unchecked + 1] = { id = id, name = nameOf(desc), why = "noRequest" }
+      else checkable = checkable + 1 end
+      if d ~= nil and not contains(used, d) then used[#used + 1] = d end
+    end
+    local out = {}
+    for _, d in ipairs(dumps) do
+      if contains(used, d) then
+        out[#out + 1] = { kind = d.id, expectedBytes = d.expectedBytes, layoutBytes = d.layoutBytes, unread = unreadOf(d) }
+      end
+    end
+    return { role = role, total = #list, checkable = checkable, unchecked = unchecked, dumps = out }
+  end
+
+  local function isReport(r)
+    return type(r) == "table" and type(r.kind) == "string" and type(r.matched) == "table"
+      and type(r.differed) == "table" and type(r.unchecked) == "table"
+  end
+
+  local function shortWhy(report)
+    for _, d in ipairs(listOf(report.dumps)) do
+      if type(d) == "table" and d.status ~= "ok" then
+        return (WHY_WORDS[d.status] or str(d.status)) .. ": " .. str(d.kind)
+      end
+    end
+    local counts = {}
+    local best, avoidable = "", ""
+    for _, u in ipairs(report.unchecked) do
+      local why = type(u) == "table" and str(u.why) or ""
+      counts[why] = (counts[why] or 0) + 1
+      if best == "" or counts[why] > counts[best] then best = why end
+      if contains(AVOIDABLE, why) and (avoidable == "" or counts[why] > counts[avoidable]) then avoidable = why end
+    end
+    if avoidable ~= "" then best = avoidable end
+    if best == "" then return "" end
+    return WHY_WORDS[best] or best
+  end
+
+  local function summaryOf(report, opts)
+    local total = toNumber(report.total)
+    if not finite(total) then total = #report.matched + #report.differed + #report.unchecked end
+    local lead = report.cancelled == true and "cancelled: " or ""
+    local why = shortWhy(report)
+    local base = lead .. #report.matched .. " of " .. string.format("%d", total) .. " match, " .. #report.differed .. " differ, "
+      .. #report.unchecked .. " unchecked"
+    local full = base
+    if why ~= "" then full = base .. " (" .. why .. ")" end
+    local width = toNumber(opt(opts, "width"))
+    if not finite(width) or width <= 0 then return full end
+    local w = math.floor(width)
+    if #full <= w then return full end
+    if #base <= w then return base end
+    local short = (report.cancelled == true and "cancel " or "") .. #report.matched .. "/" .. string.format("%d", total) .. " ok "
+      .. #report.differed .. " diff " .. #report.unchecked .. " unchk"
+    if #short <= w then return short end
+    return short:sub(1, w)
+  end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local running = type(host.jobs) == "table" and host.jobs or {}
+
+    local function finish(job)
+      if job.finished then return end
+      job.finished = true
+      if running[job.role] == job then running[job.role] = nil end
+      local r = job.report
+      local ok = #r.differed == 0 and r.cancelled ~= true
+      for _, u in ipairs(r.unchecked) do if contains(AVOIDABLE, u.why) then ok = false end end
+      for _, d in ipairs(r.dumps) do if d.status ~= "ok" then ok = false end end
+      r.ok = ok
+      r.ms = math.max(0, math.floor(host.clock() - job.start))
+      local fine, err = pcall(job.fn, r)
+      if not fine then say("error", "ce.verify." .. r.kind .. ": the function given to it failed: " .. tostring(err)) end
+      host.emit(r)
+    end
+
+    local function newJob(kind, role, fn, total, steps)
+      local job = {
+        kind = kind, role = role, fn = fn, steps = steps, at = 0, finished = false, cancelled = false, step = nil,
+        start = host.clock(),
+        report = { kind = kind, role = role, ok = false, total = total, matched = {}, differed = {}, unchecked = {},
+                   dumps = {}, probes = {}, ms = 0, cancelled = false },
+        onCancel = nil,
+      }
+      running[role] = job
+      return job
+    end
+
+    local function mayStart(verb, role, fn)
+      if type(fn) ~= "function" then
+        say("error", "ce.verify." .. verb .. ": fn must be a function to call with the report, so nothing was checked.")
+        return false
+      end
+      if role ~= MAIN_ROLE then
+        say("error", "ce.verify." .. verb .. ": only the main synth can be asked for a dump, and \"" .. role .. "\" is not it, so nothing was checked.")
+        return false
+      end
+      if running[role] ~= nil then return false end
+      return host.connected(role) == true
+    end
+
+    local function ask(job, dump, done)
+      local step = { settled = false }
+      job.step = step
+      local function answer(values, info)
+        if step.settled or job.finished then return end
+        step.settled = true
+        job.step = nil
+        local ok = type(info) == "table" and info.ok == true and type(values) == "table"
+        if ok then done(values) else done(nil) end
+      end
+      local asked = host.requestDump(dump.request, answer)
+      if asked == false then answer(nil, { ok = false }) end
+    end
+
+    local function later(job, ms, fn)
+      host.after(math.max(1, math.floor(ms)), function()
+        if not job.finished then fn() end
+      end)
+    end
+
+    local function context(role)
+      local params = host.parameters(role)
+      if type(params) ~= "table" then params = {} end
+      local layout = host.layout(role)
+      local dumps = dumpsOf(layout)
+      local gap = toNumber(type(layout) == "table" and layout.gapMs or nil)
+      return {
+        role = role, params = params, dumps = dumps, index = dumpIndex(dumps),
+        gapMs = (finite(gap) and gap > 0) and gap or 0,
+        encodings = type(layout) == "table" and type(layout.encodings) == "table" and layout.encodings or {},
+      }
+    end
+
+    local function leave(job, desc, why)
+      local u = job.report.unchecked
+      u[#u + 1] = { id = tostring(desc.id), name = nameOf(desc), why = why }
+    end
+
+    local function judge(job, desc, expected, got)
+      if same(desc, expected, got) then
+        local m = job.report.matched
+        m[#m + 1] = tostring(desc.id)
+      else
+        local d = job.report.differed
+        d[#d + 1] = { id = tostring(desc.id), name = nameOf(desc), expected = expected, got = got, raw = rawOf(desc, got) }
+      end
+    end
+
+    local function plan(job, ctx, list)
+      local steps = {}
+      for _, d in ipairs(ctx.dumps) do
+        if d.request ~= "" then
+          local held = {}
+          for _, desc in ipairs(list) do if ctx.index[tostring(desc.id)] == d then held[#held + 1] = desc end end
+          if #held > 0 then steps[#steps + 1] = { dump = d, params = held } end
+        end
+      end
+      for _, desc in ipairs(list) do
+        local d = ctx.index[tostring(desc.id)]
+        if d == nil then leave(job, desc, "notInDump")
+        elseif d.request == "" then leave(job, desc, "noRequest") end
+      end
+      return steps
+    end
+
+    local function pushDump(job, d, values)
+      local list = job.report.dumps
+      list[#list + 1] = { kind = d.id, status = values ~= nil and "ok" or "noReply", expectedBytes = d.expectedBytes }
+    end
+
+    local function compareSteps(job, ctx, steps, before)
+      job.steps = steps
+      job.at = 0
+      job.onCancel = function()
+        for i = job.at + 1, #steps do for _, desc in ipairs(steps[i].params) do leave(job, desc, "cancelled") end end
+      end
+      local next
+      next = function()
+        if job.at >= #steps then finish(job); return end
+        local step = steps[job.at + 1]
+        local expected = {}
+        for _, desc in ipairs(step.params) do expected[tostring(desc.id)] = host.read(tostring(desc.id), ctx.role) end
+        ask(job, step.dump, function(values)
+          job.at = job.at + 1
+          pushDump(job, step.dump, values)
+          for _, desc in ipairs(step.params) do
+            local id = tostring(desc.id)
+            if values == nil then leave(job, desc, "noReply")
+            elseif not same(desc, before[id], expected[id]) and (before[id] ~= nil or expected[id] ~= nil) then leave(job, desc, "moved")
+            elseif values[id] == nil then leave(job, desc, "noReply")
+            else judge(job, desc, expected[id], values[id]) end
+          end
+          if job.at >= #steps then finish(job) else later(job, ctx.gapMs, next) end
+        end)
+      end
+      next()
+    end
+
+    local function snapshot(ctx, list)
+      local out = {}
+      for _, desc in ipairs(list) do out[tostring(desc.id)] = host.read(tostring(desc.id), ctx.role) end
+      return out
+    end
+
+    local function splitArgs(a, b)
+      if type(a) == "function" then return nil, a end
+      return a, b
+    end
+
+    local function coverage(opts)
+      local ctx = context(roleOf(opt(opts, "role")))
+      return coverageOf(choose(ctx.params, opts, say, "coverage"), ctx.dumps, ctx.role)
+    end
+
+    local function check(a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if not mayStart("check", role, fn) then return false end
+      local ctx = context(role)
+      local list = choose(ctx.params, opts, say, "check")
+      local job = newJob("check", role, fn, #list, {})
+      compareSteps(job, ctx, plan(job, ctx, list), snapshot(ctx, list))
+      return true
+    end
+
+    local function dump(kind, a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if type(kind) ~= "string" or kind == "" then
+        say("error", "ce.verify.dump: kind must be the id of a dump in the profile, so nothing was checked.")
+        return false
+      end
+      if not mayStart("dump", role, fn) then return false end
+      local ctx = context(role)
+      local d = nil
+      for _, x in ipairs(ctx.dumps) do
+        if x.id == kind or (x.request ~= "" and x.request == kind) then d = x; break end
+      end
+      if d == nil or d.request == "" then
+        say("error", "ce.verify.dump: the profile has " .. (d == nil and "no dump" or "no request for the dump") .. " \"" .. kind .. "\", so nothing was checked.")
+        return false
+      end
+      local timesGiven = toNumber(opt(opts, "times"))
+      local times = 2
+      if finite(timesGiven) then times = math.min(10, math.max(2, math.floor(timesGiven))) end
+      local gapGiven = toNumber(opt(opts, "gapMs"))
+      local gapMs = 500
+      if finite(gapGiven) and gapGiven >= 0 then gapMs = gapGiven end
+      local list = {}
+      for _, desc in ipairs(ctx.params) do if ctx.index[tostring(desc.id)] == d then list[#list + 1] = desc end end
+      local job = newJob("dump", role, fn, #list, {})
+      local replies = {}
+      local asked = 0
+      job.onCancel = function() for _, desc in ipairs(list) do leave(job, desc, "cancelled") end end
+      local function stop()
+        if #replies < times then
+          for _, desc in ipairs(list) do leave(job, desc, "noReply") end
+        else
+          local first, last = replies[1], replies[#replies]
+          for _, desc in ipairs(list) do
+            local id = tostring(desc.id)
+            if first[id] == nil or last[id] == nil then leave(job, desc, "noReply")
+            else judge(job, desc, first[id], last[id]) end
+          end
+        end
+        finish(job)
+      end
+      local next
+      next = function()
+        asked = asked + 1
+        ask(job, d, function(values)
+          pushDump(job, d, values)
+          job.at = asked
+          if values == nil then stop(); return end
+          replies[#replies + 1] = values
+          if asked >= times then stop() else later(job, gapMs, next) end
+        end)
+      end
+      job.steps = {}
+      for i = 1, times do job.steps[i] = d end
+      next()
+      return true
+    end
+
+    local function findParam(ctx, id, verb)
+      for _, desc in ipairs(ctx.params) do if tostring(desc.id) == id then return desc end end
+      say("error", "ce.verify." .. verb .. ": \"" .. id .. "\" is not a parameter of the synth, so nothing was checked.")
+      return nil
+    end
+
+    local function settleOf(opts)
+      local given = toNumber(opt(opts, "settleMs"))
+      if finite(given) and given >= 0 then return given end
+      return 100
+    end
+
+    local function writeAndRead(job, ctx, desc, value, settleMs, done)
+      local id = tostring(desc.id)
+      local d = ctx.index[id]
+      host.write(id, value, ctx.role)
+      if d == nil then done(nil, "notInDump"); return end
+      if d.request == "" then done(nil, "noRequest"); return end
+      later(job, settleMs, function()
+        local now = host.read(id, ctx.role)
+        if now ~= nil and not same(desc, now, value) then done(nil, "moved"); return end
+        ask(job, d, function(values)
+          pushDump(job, d, values)
+          if values == nil or values[id] == nil then done(nil, "noReply") else done(values[id], "") end
+        end)
+      end)
+    end
+
+    local function write(id, value, a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if not mayStart("write", role, fn) then return false end
+      local ctx = context(role)
+      local desc = findParam(ctx, id == nil and "" or tostring(id), "write")
+      if desc == nil then return false end
+      if value == nil then
+        say("error", "ce.verify.write: value must be given, so nothing was checked.")
+        return false
+      end
+      local job = newJob("write", role, fn, 1, { ctx.index[tostring(desc.id)] or false })
+      job.onCancel = function() leave(job, desc, "cancelled") end
+      if not writable(desc) then
+        leave(job, desc, "notWritable")
+        finish(job)
+        return true
+      end
+      writeAndRead(job, ctx, desc, value, settleOf(opts), function(got, why)
+        job.at = 1
+        if why ~= "" then leave(job, desc, why) else judge(job, desc, value, got) end
+        finish(job)
+      end)
+      return true
+    end
+
+    local function probeValues(desc, ctx)
+      local kind = kindOf(desc)
+      local out = {}
+      local function add(v)
+        for _, x in ipairs(out) do if x == v then return end end
+        out[#out + 1] = v
+      end
+      if kind == "choice" then
+        local choices = choicesOf(desc)
+        if #choices <= 16 then
+          for _, c in ipairs(choices) do add(c) end
+        else
+          add(choices[1])
+          add(choices[#choices // 2 + 1])
+          add(choices[#choices])
+        end
+        return out
+      end
+      if kind == "text" then
+        local enc = ctx.encodings[tostring(desc.id)]
+        local length = toNumber(type(enc) == "table" and enc.length or nil)
+        local n = 8
+        if finite(length) and length > 0 then n = math.min(#TEXT_SAMPLE, math.floor(length)) end
+        add(TEXT_SAMPLE:sub(1, n))
+        add("")
+        return out
+      end
+      local lo, hi = rangeOf(desc)
+      local step = isWhole(desc) and 1 or (hi - lo) / 100
+      local mid = lo + (hi - lo) / 2
+      if isWhole(desc) then mid = roundHalfAway(mid) end
+      for _, v in ipairs({ lo, lo + step, mid, hi - step, hi }) do if v >= lo and v <= hi then add(v) end end
+      return out
+    end
+
+    local function probe(id, a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if not mayStart("probe", role, fn) then return false end
+      local ctx = context(role)
+      local desc = findParam(ctx, id == nil and "" or tostring(id), "probe")
+      if desc == nil then return false end
+      local given = opt(opts, "values")
+      if given ~= nil and (type(given) ~= "table" or #given == 0) then
+        say("error", "ce.verify.probe: values must be a list of values to try, so nothing was checked.")
+        return false
+      end
+      local values = {}
+      if given ~= nil then for i, v in ipairs(given) do values[i] = v end else values = probeValues(desc, ctx) end
+      local settleMs = settleOf(opts)
+      local pid = tostring(desc.id)
+      local old = host.read(pid, role)
+      local job = newJob("probe", role, fn, 1, values)
+      job.report.restored = false
+      local held = ctx.index[pid]
+      local cannot = ""
+      if not writable(desc) then cannot = "notWritable"
+      elseif held == nil then cannot = "notInDump"
+      elseif held.request == "" then cannot = "noRequest" end
+      if cannot ~= "" then
+        leave(job, desc, cannot)
+        finish(job)
+        return true
+      end
+      local failed = false
+      local why = ""
+      local function restore(andThen)
+        if old == nil then andThen(); return end
+        writeAndRead(job, ctx, desc, old, settleMs, function(got, reason)
+          job.report.restored = reason == "" and same(desc, old, got)
+          andThen()
+        end)
+      end
+      job.onCancel = function()
+        if old ~= nil then host.write(pid, old, role) end
+        if #job.report.matched == 0 and #job.report.differed == 0 then leave(job, desc, "cancelled") end
+      end
+      local function stop()
+        if why ~= "" then leave(job, desc, why)
+        elseif not failed then job.report.matched[#job.report.matched + 1] = pid end
+        restore(function() finish(job) end)
+      end
+      local next
+      next = function()
+        if job.at >= #values then stop(); return end
+        local value = values[job.at + 1]
+        writeAndRead(job, ctx, desc, value, settleMs, function(got, reason)
+          job.at = job.at + 1
+          if reason ~= "" then why = reason; stop(); return end
+          local ok = same(desc, value, got)
+          local p = job.report.probes
+          p[#p + 1] = { id = pid, value = value, got = got, same = ok }
+          if not ok then
+            failed = true
+            local d = job.report.differed
+            d[#d + 1] = { id = pid, name = nameOf(desc), expected = value, got = got, raw = rawOf(desc, got) }
+          end
+          next()
+        end)
+      end
+      next()
+      return true
+    end
+
+    local function patch(a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      local via = opt(opts, "via")
+      if via ~= nil and via ~= "dump" and via ~= "parameters" then
+        say("error", "ce.verify.patch: via \"" .. tostring(via) .. "\" is not \"dump\" or \"parameters\", so nothing was checked.")
+        return false
+      end
+      if not mayStart("patch", role, fn) then return false end
+      local ctx = context(role)
+      local list = choose(ctx.params, opts, say, "patch")
+      local job = newJob("patch", role, fn, #list, {})
+      local chosen = {}
+      for _, desc in ipairs(list) do
+        if writable(desc) then chosen[#chosen + 1] = desc else leave(job, desc, "notWritable") end
+      end
+      local before = snapshot(ctx, chosen)
+      local steps = plan(job, ctx, chosen)
+      if opt(opts, "send") ~= false then
+        local section = host.patchSection(role)
+        local deliver = (type(section) == "table" and type(section.deliver) == "string") and section.deliver or ""
+        local how = via
+        if how == nil then how = deliver == "dump" and "dump" or "parameters" end
+        if how == "dump" then
+          for _, step in ipairs(steps) do host.sendDump(step.dump.id) end
+        else
+          for _, desc in ipairs(chosen) do
+            local v = before[tostring(desc.id)]
+            if v ~= nil then host.write(tostring(desc.id), v, role) end
+          end
+        end
+      end
+      if #steps == 0 then
+        finish(job)
+        return true
+      end
+      later(job, settleOf(opts), function() compareSteps(job, ctx, steps, before) end)
+      return true
+    end
+
+    local function summary(report, opts)
+      if not isReport(report) then
+        say("error", "ce.verify.summary: that is not a report, as a check gives them, so there is nothing to say.")
+        return nil
+      end
+      return summaryOf(report, opts)
+    end
+
+    local function runningNow(role)
+      local job = running[roleOf(role)]
+      if job == nil then return nil end
+      return { kind = job.kind, role = job.role, done = job.at, total = #job.steps, ms = math.max(0, math.floor(host.clock() - job.start)) }
+    end
+
+    local function cancel(role)
+      local job = running[roleOf(role)]
+      if job == nil then return false end
+      job.cancelled = true
+      job.report.cancelled = true
+      if job.step ~= nil then job.step.settled = true end
+      if job.onCancel ~= nil then job.onCancel() end
+      finish(job)
+      return true
+    end
+
+    return { coverage = coverage, check = check, dump = dump, write = write, probe = probe, patch = patch,
+             summary = summary, running = runningNow, cancel = cancel }
+  end
+
+  local V = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    parameters = function(role) return __deviceQuery("parameters", { role = role }) or {} end,
+    layout = function(role) return __deviceQuery("dumpLayout", { role = role }) end,
+    read = function(id, role) return __deviceQuery("read", { role = role, id = tostring(id) }) end,
+    write = function(id, value, role) return deviceWrite(id, value, role) == true end,
+    sendDump = function(kind) return sendDump(kind) end,
+    patchSection = function(role) return __deviceQuery("patch", { role = role }) end,
+    connected = function(role) return deviceConnected(role) == true end,
+    requestDump = function(kind, fn) return requestDump(kind, fn) end,
+    after = function(ms, fn) return after(ms, fn) end,
+    clock = function() return nowMs() end,
+    emit = function(report) emit("onVerifyDone", report) end,
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function verifyCoverage(opts) return V.coverage(opts) end
+-- (global; at the line start, where the option check looks for it)
+function verifyCheck(opts, fn) return V.check(opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyDump(kind, opts, fn) return V.dump(kind, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyWrite(id, value, opts, fn) return V.write(id, value, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyProbe(id, opts, fn) return V.probe(id, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyPatch(opts, fn) return V.patch(opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifySummary(report, opts) return V.summary(report, opts) end
+-- (global; at the line start, where the option check looks for it)
+function verifyRunning(role) return V.running(role) end
+-- (global; at the line start, where the option check looks for it)
+function verifyCancel(role) return V.cancel(role) end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -5303,6 +6105,13 @@ local __CE_OPTIONS = {
   ["patchList"] = { path = "ce.patch.list", at = 1, refusal = "empty list", names = { "role", "scope" } },
   ["patchForget"] = { path = "ce.patch.forget", at = 2, refusal = "false", names = { "role" } },
   ["patchWrite"] = { path = "ce.patch.write", at = 3, refusal = "result", names = { "role" } },
+  ["verifyCoverage"] = { path = "ce.verify.coverage", at = 1, refusal = "nothing", names = { "role", "ids", "group" } },
+  ["verifyCheck"] = { path = "ce.verify.check", at = 1, refusal = "false", names = { "role", "ids", "group" } },
+  ["verifyDump"] = { path = "ce.verify.dump", at = 2, refusal = "false", names = { "role", "times", "gapMs" } },
+  ["verifyWrite"] = { path = "ce.verify.write", at = 3, refusal = "false", names = { "role", "settleMs" } },
+  ["verifyProbe"] = { path = "ce.verify.probe", at = 2, refusal = "false", names = { "role", "settleMs", "values" } },
+  ["verifyPatch"] = { path = "ce.verify.patch", at = 1, refusal = "false", names = { "role", "ids", "group", "settleMs", "via", "send" } },
+  ["verifySummary"] = { path = "ce.verify.summary", at = 2, refusal = "nothing", names = { "width" } },
   ["syncTimer"] = { path = "ce.time.syncTimer", at = 3, refusal = "nothing", names = { "follow" } },
   ["deviceParameters"] = { path = "ce.device.parameters", at = 1, refusal = "empty list", names = { "role", "query", "group", "type", "access", "limit" } },
   ["deviceDefineParameter"] = { path = "ce.device.defineParameter", at = 2, refusal = "false", names = { "name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad" }, nested = { ["nrpn"] = { names = { "msb", "lsb" } } } },
@@ -5422,6 +6231,7 @@ local __CE_MODULES = {
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.verify"] = { cancel = "verifyCancel", check = "verifyCheck", coverage = "verifyCoverage", dump = "verifyDump", patch = "verifyPatch", probe = "verifyProbe", running = "verifyRunning", summary = "verifySummary", write = "verifyWrite" },
   ["ce.keys"] = { focus = "keysFocus", focused = "keysFocused", held = "keysHeld", isDown = "keysIsDown", list = "keysList", piano = "keysPiano", pianoInfo = "keysPianoInfo", remove = "keysRemove", shortcut = "keysShortcut" },
   ["ce.text"] = { axis = "textAxis", fit = "textFit", font = "textFont", fonts = "textFonts", measure = "textMeasure", read = "textRead", style = "textStyle" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", read = "splitRead", transpose = "splitTranspose" },
@@ -5453,7 +6263,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -5469,6 +6279,7 @@ local __CE_META = {
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.verify", version = "1.0", runtime = "any" },
   { id = "ce.keys", version = "1.0", runtime = "webview" },
   { id = "ce.text", version = "1.0", runtime = "webview" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
