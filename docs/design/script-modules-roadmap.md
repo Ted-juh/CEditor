@@ -1,6 +1,6 @@
 # Script modules: what is missing
 
-*Survey, 2026-10-27. Six modules designed and approved (`ce.patch`, `ce.format`, `ce.file`, MIDI input and `ce.mpe`, `ce.daw`, `ce.verify`), the rest proposed.* Which
+*Survey, 2026-10-27. Seven modules designed and approved (`ce.patch`, `ce.format`, `ce.file`, MIDI input and `ce.mpe`, `ce.daw`, `ce.verify`, `ce.keys`), the rest proposed.* Which
 scripting modules the API lacks, why, and in what order to design them. Each module gets its own
 design record when its design is approved; this page keeps the list and the status.
 
@@ -30,8 +30,8 @@ needs new native code is not.
 | 4 | MIDI input completed, and MPE | Events for incoming pitch bend, aftertouch, program change and clock (scripts decode raw `midiIn` today); MPE with per-note bend, pressure, timbre and channel allocation. | everywhere | high: every engine, plus the player | **Designed and approved**, [midi-input-and-mpe.md](midi-input-and-mpe.md). Not built. |
 | 5 | `ce.daw` | The exported plug-in's host: expose and rename DAW parameters, automation gestures, react to automation. `RUNTIME_PLAYER` exists and holds only `onDawSaveState` and `onDawRestoreState`. | exported plug-in | high: native | **Designed and approved**, [ce-daw-module.md](ce-daw-module.md). Not built. |
 | 6 | `ce.verify` | Round-trip checks: send a parameter, ask for a dump, compare, report. The "verifiable" half of the project's aim, which no script can do today. | everywhere | medium: builds on `ce.device` | **Designed and approved**, [ce-verify-module.md](ce-verify-module.md). Not built. |
-| 7 | `ce.keys` | The computer keyboard: key events on the panel, shortcuts, a QWERTY piano. | panel view | low | Next to design. |
-| 8 | `ce.ci` | MIDI-CI discovery and properties for scripts. The app already discovers devices (`midiCiDiscovered`); scripts cannot see it. | everywhere | medium | Proposed. |
+| 7 | `ce.keys` | The computer keyboard: key events on the panel, shortcuts, a QWERTY piano. | panel view | low | **Designed and approved**, [ce-keys-module.md](ce-keys-module.md). Not built. |
+| 8 | `ce.ci` | MIDI-CI discovery and properties for scripts. The app already discovers devices (`midiCiDiscovered`); scripts cannot see it. | everywhere | medium | Next to design. |
 | 9 | `ce.osc` | OSC in and out, for TouchOSC or Max. `juce_osc` is vendored and not linked. | everywhere | high: native, a new transport | Proposed. |
 
 ## Found on the way
