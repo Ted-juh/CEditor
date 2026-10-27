@@ -867,10 +867,18 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 | `onCiProfileChanged(profile)` | A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state. |
 | `onVerifyDone(report)` | A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too. |
 | `onPresetChange(preset)` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
-| `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
-| `onCcIn(cc)` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. |
-| `onNoteIn(note)` | A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. |
-| `onNoteOffIn(note)` | A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. |
+| `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. `midi.from` is the device it came from. |
+| `onCcIn(cc)` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. `cc.from` is the device it came from. |
+| `onNoteIn(note)` | A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. `note.from` is the device it came from, and `note.id` the note's id while ce.mpe.listen() reads that device. |
+| `onNoteOffIn(note)` | A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. `note.from` and `note.id` are as noteIn gives them. |
+| `onBendIn(bend)` | A pitch bend arrived. `bend.value` is -8192 to 8191, 0 in the middle; `bend.amount` the same from -1 to 1; `bend.raw` 0 to 16383, as the two bytes carry it. `bend.channel` is 1 to 16 and `bend.from` the device. Raised at most once every 10 ms per channel, with the latest value. |
+| `onPressureIn(pressure)` | Channel pressure arrived. `pressure.value` is 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per channel. |
+| `onPolyPressureIn(pressure)` | Pressure on one note arrived. `pressure.note` is the note, `pressure.value` 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per note. |
+| `onProgramIn(program)` | A program change arrived. `program.program` is 0 to 127, as the message carries it, and `program.number` 1 to 128, as most synths show it. `program.bankMsb` and `program.bankLsb` are the bank select that came just before it on this channel, when one did. `program.channel` is 1 to 16 and `program.from` the device. |
+| `onNrpnIn(nrpn)` | An NRPN arrived, put together from its controllers (99, 98, then 6 and 38). `nrpn.msb` and `nrpn.lsb` are the parameter number's halves, as sendNRPN takes them, and `nrpn.parameter` the two as one number. `nrpn.value` is 0 to 16383 when the fine half came (`nrpn.fine` true), else 0 to 127. For an increment or decrement, `nrpn.step` is 1 or -1 instead. The controllers still raise ccIn too. |
+| `onRpnIn(rpn)` | An RPN arrived, put together from controllers 101 and 100, then 6 and 38. The fields are those of nrpnIn, and `rpn.name` is "bendRange", "fineTuning", "coarseTuning" or "mpeConfiguration" for the numbers that have one. |
+| `onTransportIn(transport)` | A device sent start, stop, continue or a song position. `transport.action` is "start", "stop", "continue" or "position"; for "position", `transport.beat` is where it points, in beats from the start. `transport.from` is the device. Clock ticks are not raised one by one. |
+| `onExpressionIn(expression)` | A note read with ce.mpe.listen() moved. `expression.id` is the note's id, as noteIn gave it, `expression.note` the note and `expression.channel` its member channel. `expression.bend` is in semitones, `expression.pressure` and `expression.timbre` 0 to 1, and `expression.changed` says which moved: "bend", "pressure" or "timbre". Raised at most once every 10 ms per note. |
 | `onSysexIn(bytes)` | A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers. |
 | `onDeviceConnected(device)` | A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile. |
 | `onDeviceDisconnected(device)` | A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why. |
@@ -1099,7 +1107,7 @@ ce.core.error("message")
 
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.
+MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -1544,6 +1552,175 @@ ce.midi.panic()
 | `ce.midi.fromHex(text) -> list` | Read hex text into a list of bytes. Example: `bytesFromHex("F0 41 10 F7")` gives {240, 65, 16, 247}. `text` (text, required): One or two digits a byte, with or without 0x, with spaces or commas between, as every send reads it. Text with a longer run, such as "F04110", is refused with a message, and so is anything that is not text. Short name: `bytesFromHex`. |
 | `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, to keep a dump in a setting or in state. Example: `bytesToBase64({240, 65, 16, 247})` gives "8EEQ9w==". `bytes` (bytes, required): The bytes, as a list. Base64 is about a third shorter than hex. It uses the standard alphabet, with = padding. Short name: `bytesToBase64`. |
 | `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Example: `bytesFromBase64("8EEQ9w==")` gives {240, 65, 16, 247}. `text` (text, required): The base64 text. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
+
+### ce.mpe: MPE
+
+MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself: pitch bend for pitch, channel pressure for pressure, controller 74 for timbre. A zone is one manager channel and the member channels its notes use.
+
+A script plays notes by id: `noteOn` picks a free member channel, sends the note's starting bend, timbre and pressure there, and gives back the id; `express` moves one note; `noteOff` ends it and frees its channel. `zone` sets the zone up and tells the synth; without it, the first note sets up a lower zone of 15.
+
+MPE coming in is the other half: `listen` reads an MPE controller's notes back, so `noteIn` carries each note's id and `expressionIn` says how it moves.
+
+```lua
+-- Lua: an MPE controller's notes, played on the synth through MPE
+function onPanelLoad()
+  state.out = {}
+  ce.mpe.listen({ from = "controller" })
+end
+
+function onNoteIn(note)
+  if note.from == "controller" then state.out[note.id] = ce.mpe.noteOn(note.note, note.velocity) end
+end
+
+function onExpressionIn(e)
+  local out = state.out[e.id]
+  if out then ce.mpe.express(out, { bend = e.bend, pressure = e.pressure, timbre = e.timbre }) end
+end
+
+function onNoteOffIn(note)
+  local out = state.out[note.id]
+  if out then ce.mpe.noteOff(out); state.out[note.id] = nil end
+end
+```
+
+#### `ce.mpe.zone([opts]) -> boolean`
+
+Set up the MPE zone the panel plays into, and tell the synth.
+
+Example: `ce.mpe.zone({ members = 7 })` plays into a lower zone of seven channels, 2 to 8.
+
+Good to know:
+
+- MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself. A zone is one manager channel and the member channels its notes use: the lower zone has channel 1 as manager and members from 2 upwards; the upper zone has 16 and members from 15 down.
+- With `send` on, the synth gets the MPE Configuration Message (RPN 6) on the manager channel and the bend range (RPN 0) on every channel of the zone, so both ends agree.
+- Changing the zone ends every sounding note first. Returns true when the zone is set.
+
+*Short name: `mpeZone`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `zone` | string | "lower" | "lower" (manager channel 1) or "upper" (manager channel 16). |
+| `members` | number | 15 | How many member channels, 1 to 15, and so how many notes can sound at once. |
+| `bendRange` | number (semitones) | 48 | How far a full bend goes on a member channel. MPE's own default. |
+| `managerBendRange` | number (semitones) | 2 | The same, for the manager channel. |
+| `send` | boolean | true | Send the setup to the synth. Off for a synth set up by hand. |
+| `role` | string | "mainSynth" | The device to play. |
+
+#### `ce.mpe.noteOn(note, velocity [, opts]) -> number`
+
+Play a note on a member channel of its own, and get its id.
+
+Example: `local id = ce.mpe.noteOn("C4", 100)` plays middle C and keeps its id.
+
+- `note` (number or text, required): The note, 0 to 127, or a name such as "C4".
+- `velocity` (number, required): 1 to 127.
+
+Good to know:
+
+- The channel is the free member channel released longest ago, so a release tail on the synth is not cut off. Every channel busy: the oldest note is ended first, with a console line the first time.
+- The starting bend, timbre and pressure are sent before the note, as MPE asks, so a note never starts at the last note's bend.
+- Before ce.mpe.zone(): a lower zone of 15 is set up first, and sent.
+- Returns the note's id, a number.
+
+*Short name: `mpeNoteOn`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `bend` | number (semitones) | 0 | The bend the note starts with, held to the zone's bend range. |
+| `pressure` | number | 0 | The pressure it starts with, 0 to 1. |
+| `timbre` | number | 0.5 | The timbre it starts with, 0 to 1 (controller 74). |
+
+#### `ce.mpe.express(id, values) -> boolean`
+
+Change one sounding note's bend, pressure or timbre.
+
+Example: `ce.mpe.express(id, { bend = 0.5, pressure = 0.8 })` bends the note up a quarter tone and presses it.
+
+- `id` (number, required): A note's id, from ce.mpe.noteOn().
+
+Good to know:
+
+- What is left out is not sent.
+- A note that has ended: false, and nothing sent, so a late gesture does not land on the next note to use that channel. Returns true when sent.
+
+*Short name: `mpeExpress`.*
+
+**`values`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `bend` | number (semitones) | not sent | The note's bend, held to the zone's bend range. |
+| `pressure` | number | not sent | Its pressure, 0 to 1. |
+| `timbre` | number | not sent | Its timbre, 0 to 1 (controller 74). |
+
+#### `ce.mpe.noteOff(id [, velocity]) -> boolean`
+
+End a note played with ce.mpe.noteOn().
+
+Example: `ce.mpe.noteOff(id)` releases the note.
+
+- `id` (number, required): The note's id.
+- `velocity` (number, optional): The release velocity, 0 to 127.
+
+Good to know:
+
+- Returns true when the note was sounding; false when it had already ended.
+
+*Short name: `mpeNoteOff`.*
+
+#### `ce.mpe.allOff() -> number`
+
+End every note the panel plays through MPE, and set each member channel's bend back to the middle.
+
+Example: `ce.mpe.allOff()` in onPanelClose leaves the synth silent.
+
+Good to know:
+
+- Returns how many notes were ended.
+- ce.midi.panic() silences these too, as it does every note; call this as well, so ce.mpe.notes() is empty again.
+
+*Short name: `mpeAllOff`.*
+
+#### `ce.mpe.notes() -> list`
+
+The notes sounding now through ce.mpe.
+
+Example: `#ce.mpe.notes()` is how many are held.
+
+Good to know:
+
+- Each is { id, note, channel, velocity, bend, pressure, timbre }, oldest first; none: an empty list.
+
+*Short name: `mpeNotes`.*
+
+#### `ce.mpe.listen([opts]) -> boolean`
+
+Read MPE from a device: give each note an id, and raise expressionIn as it moves.
+
+Example: `ce.mpe.listen({ from = "controller" })` reads MPE from the device the panel calls "controller".
+
+Good to know:
+
+- An MPE controller sends each note on its own channel, with its bend, pressure and timbre on that channel. This turns them back into notes.
+- While listening, noteIn and noteOffIn from that device carry `note.id`, the same id expressionIn gives, and bendIn, pressureIn and controller 74 on its member channels are raised as expressionIn instead.
+- The zone comes from the MPE Configuration Message the device sends, when it sends one; else from `zone` and `members` here.
+- Returns true when listening. `listen({ off = true })` stops.
+
+*Short name: `mpeListen`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `from` | string | every input | The device to read, by its role. |
+| `zone` | string | "lower" | "lower" or "upper", until the device says which. |
+| `members` | number | 15 | How many member channels, 1 to 15, until the device says. |
+| `bendRange` | number (semitones) | 48 | For turning a member channel's bend into semitones. |
+| `off` | boolean | false | True stops reading the device. |
 
 ### ce.device: your synth
 

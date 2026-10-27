@@ -1043,6 +1043,14 @@ target_link_libraries(CEditorScriptFilesTests PRIVATE juce::juce_core)
 add_test(NAME ScriptFiles COMMAND CEditorScriptFilesTests)
 ce_configure_test(CEditorScriptFilesTests)
 
+# The MIDI a device sends, decoded for the plug-in's window-shut scripts (Scripting/MidiInDecoder.h),
+# against the table the panel view's midiInDecoder.js is held to as well.
+add_executable(CEditorMidiInDecoderTests "${CE_ROOT}/tests/MidiInDecoderTests.cpp")
+target_include_directories(CEditorMidiInDecoderTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorMidiInDecoderTests PRIVATE juce::juce_core)
+add_test(NAME MidiInDecoder COMMAND CEditorMidiInDecoderTests "${CE_ROOT}/tests/fixtures/midiInCases.json")
+ce_configure_test(CEditorMidiInDecoderTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: docs/design/screen-builder-design.md.

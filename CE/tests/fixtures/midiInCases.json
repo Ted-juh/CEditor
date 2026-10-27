@@ -1,0 +1,966 @@
+{
+  "about": "Messages a device sends, and the events scripts are raised for them (docs/design/midi-input-and-mpe.md). Read by CE/web/test/midiInDecoder.test.js for the panel view's decoder and by CE/tests/MidiInDecoderTests.cpp for the plug-in's. Each step is { at, role, bytes } for a message, { at, flush: true } for the time going by, or { listen: role, opts } for ce.mpe.listen (opts null stops). `events` is every event the case raises, in order.",
+  "cases": [
+    {
+      "name": "a bend: value, amount and the two bytes",
+      "steps": [
+        {
+          "at": 0,
+          "role": "controller",
+          "bytes": [
+            224,
+            0,
+            64
+          ]
+        },
+        {
+          "at": 20,
+          "role": "controller",
+          "bytes": [
+            224,
+            127,
+            127
+          ]
+        },
+        {
+          "at": 40,
+          "role": "controller",
+          "bytes": [
+            225,
+            0,
+            0
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 1,
+            "value": 0,
+            "amount": 0,
+            "raw": 8192,
+            "from": "controller"
+          }
+        },
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 1,
+            "value": 8191,
+            "amount": 1,
+            "raw": 16383,
+            "from": "controller"
+          }
+        },
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 2,
+            "value": -8192,
+            "amount": -1,
+            "raw": 0,
+            "from": "controller"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a fast bend is thinned to one every 10 ms, the latest, and a note on its channel lets it go first",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            224,
+            0,
+            64
+          ]
+        },
+        {
+          "at": 2,
+          "role": "mainSynth",
+          "bytes": [
+            224,
+            0,
+            65
+          ]
+        },
+        {
+          "at": 4,
+          "role": "mainSynth",
+          "bytes": [
+            224,
+            0,
+            66
+          ]
+        },
+        {
+          "at": 9,
+          "flush": true
+        },
+        {
+          "at": 10,
+          "flush": true
+        },
+        {
+          "at": 12,
+          "role": "mainSynth",
+          "bytes": [
+            224,
+            0,
+            67
+          ]
+        },
+        {
+          "at": 14,
+          "role": "mainSynth",
+          "bytes": [
+            144,
+            60,
+            100
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 1,
+            "value": 0,
+            "amount": 0,
+            "raw": 8192,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 1,
+            "value": 256,
+            "amount": 0.03125381516298376,
+            "raw": 8448,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 1,
+            "value": 384,
+            "amount": 0.04688072274447565,
+            "raw": 8576,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 1,
+            "note": 60,
+            "velocity": 100,
+            "from": "mainSynth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pressure and poly pressure, thinned each on its own",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            208,
+            127
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            160,
+            60,
+            64
+          ]
+        },
+        {
+          "at": 2,
+          "role": "mainSynth",
+          "bytes": [
+            160,
+            62,
+            32
+          ]
+        },
+        {
+          "at": 3,
+          "role": "mainSynth",
+          "bytes": [
+            160,
+            60,
+            0
+          ]
+        },
+        {
+          "at": 20,
+          "flush": true
+        }
+      ],
+      "events": [
+        {
+          "event": "onPressureIn",
+          "payload": {
+            "channel": 1,
+            "value": 127,
+            "amount": 1,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onPolyPressureIn",
+          "payload": {
+            "channel": 1,
+            "note": 60,
+            "value": 64,
+            "amount": 0.5039370078740157,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onPolyPressureIn",
+          "payload": {
+            "channel": 1,
+            "note": 62,
+            "value": 32,
+            "amount": 0.25196850393700787,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onPolyPressureIn",
+          "payload": {
+            "channel": 1,
+            "note": 60,
+            "value": 0,
+            "amount": 0,
+            "from": "mainSynth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a program change carries the bank select that came before it, once",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            0,
+            1
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            32,
+            2
+          ]
+        },
+        {
+          "at": 2,
+          "role": "mainSynth",
+          "bytes": [
+            192,
+            5
+          ]
+        },
+        {
+          "at": 3,
+          "role": "mainSynth",
+          "bytes": [
+            192,
+            6
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onProgramIn",
+          "payload": {
+            "channel": 1,
+            "program": 5,
+            "number": 6,
+            "bankMsb": 1,
+            "bankLsb": 2,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onProgramIn",
+          "payload": {
+            "channel": 1,
+            "program": 6,
+            "number": 7,
+            "from": "mainSynth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an NRPN put together from its four controllers, and one with only its coarse half",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            99,
+            1
+          ]
+        },
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            98,
+            8
+          ]
+        },
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            6,
+            64
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            38,
+            3
+          ]
+        },
+        {
+          "at": 10,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            6,
+            10
+          ]
+        },
+        {
+          "at": 14,
+          "flush": true
+        },
+        {
+          "at": 15,
+          "flush": true
+        },
+        {
+          "at": 16,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            38,
+            1
+          ]
+        },
+        {
+          "at": 20,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            96,
+            0
+          ]
+        },
+        {
+          "at": 21,
+          "role": "mainSynth",
+          "bytes": [
+            176,
+            97,
+            0
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onNrpnIn",
+          "payload": {
+            "channel": 1,
+            "from": "mainSynth",
+            "msb": 1,
+            "lsb": 8,
+            "parameter": 136,
+            "value": 8195,
+            "fine": true
+          }
+        },
+        {
+          "event": "onNrpnIn",
+          "payload": {
+            "channel": 1,
+            "from": "mainSynth",
+            "msb": 1,
+            "lsb": 8,
+            "parameter": 136,
+            "value": 10,
+            "fine": false
+          }
+        },
+        {
+          "event": "onNrpnIn",
+          "payload": {
+            "channel": 1,
+            "from": "mainSynth",
+            "msb": 1,
+            "lsb": 8,
+            "parameter": 136,
+            "step": 1
+          }
+        },
+        {
+          "event": "onNrpnIn",
+          "payload": {
+            "channel": 1,
+            "from": "mainSynth",
+            "msb": 1,
+            "lsb": 8,
+            "parameter": 136,
+            "step": -1
+          }
+        }
+      ]
+    },
+    {
+      "name": "an RPN named, and the null RPN ends it",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            101,
+            0
+          ]
+        },
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            100,
+            0
+          ]
+        },
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            6,
+            12
+          ]
+        },
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            38,
+            0
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            101,
+            127
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            100,
+            127
+          ]
+        },
+        {
+          "at": 2,
+          "role": "mainSynth",
+          "bytes": [
+            177,
+            6,
+            5
+          ]
+        },
+        {
+          "at": 20,
+          "flush": true
+        }
+      ],
+      "events": [
+        {
+          "event": "onRpnIn",
+          "payload": {
+            "channel": 2,
+            "from": "mainSynth",
+            "msb": 0,
+            "lsb": 0,
+            "parameter": 0,
+            "value": 1536,
+            "fine": true,
+            "name": "bendRange"
+          }
+        }
+      ]
+    },
+    {
+      "name": "transport from a device",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            250
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            252
+          ]
+        },
+        {
+          "at": 2,
+          "role": "mainSynth",
+          "bytes": [
+            242,
+            16,
+            1
+          ]
+        },
+        {
+          "at": 3,
+          "role": "mainSynth",
+          "bytes": [
+            251
+          ]
+        },
+        {
+          "at": 4,
+          "role": "mainSynth",
+          "bytes": [
+            248
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onTransportIn",
+          "payload": {
+            "action": "start",
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onTransportIn",
+          "payload": {
+            "action": "stop",
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onTransportIn",
+          "payload": {
+            "action": "position",
+            "beat": 36,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onTransportIn",
+          "payload": {
+            "action": "continue",
+            "from": "mainSynth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "notes, a note-on with velocity 0 is a note off",
+      "steps": [
+        {
+          "at": 0,
+          "role": "mainSynth",
+          "bytes": [
+            144,
+            60,
+            100
+          ]
+        },
+        {
+          "at": 1,
+          "role": "mainSynth",
+          "bytes": [
+            144,
+            60,
+            0
+          ]
+        },
+        {
+          "at": 2,
+          "role": "mainSynth",
+          "bytes": [
+            143,
+            61,
+            50
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 1,
+            "note": 60,
+            "velocity": 100,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onNoteOffIn",
+          "payload": {
+            "channel": 1,
+            "note": 60,
+            "velocity": 0,
+            "from": "mainSynth"
+          }
+        },
+        {
+          "event": "onNoteOffIn",
+          "payload": {
+            "channel": 16,
+            "note": 61,
+            "velocity": 50,
+            "from": "mainSynth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MPE read back into notes: ids, expression on member channels, starting values kept",
+      "steps": [
+        {
+          "listen": "controller",
+          "opts": {
+            "zone": "lower",
+            "members": 15,
+            "bendRange": 48
+          }
+        },
+        {
+          "at": 0,
+          "role": "controller",
+          "bytes": [
+            225,
+            0,
+            64
+          ]
+        },
+        {
+          "at": 0,
+          "role": "controller",
+          "bytes": [
+            177,
+            74,
+            64
+          ]
+        },
+        {
+          "at": 0,
+          "role": "controller",
+          "bytes": [
+            145,
+            60,
+            100
+          ]
+        },
+        {
+          "at": 1,
+          "role": "controller",
+          "bytes": [
+            146,
+            64,
+            90
+          ]
+        },
+        {
+          "at": 2,
+          "role": "controller",
+          "bytes": [
+            209,
+            127
+          ]
+        },
+        {
+          "at": 3,
+          "role": "controller",
+          "bytes": [
+            225,
+            127,
+            127
+          ]
+        },
+        {
+          "at": 20,
+          "flush": true
+        },
+        {
+          "at": 21,
+          "role": "controller",
+          "bytes": [
+            224,
+            0,
+            0
+          ]
+        },
+        {
+          "at": 22,
+          "role": "controller",
+          "bytes": [
+            210,
+            64
+          ]
+        },
+        {
+          "at": 23,
+          "role": "controller",
+          "bytes": [
+            129,
+            60,
+            0
+          ]
+        },
+        {
+          "at": 24,
+          "role": "controller",
+          "bytes": [
+            209,
+            10
+          ]
+        },
+        {
+          "at": 25,
+          "role": "mainSynth",
+          "bytes": [
+            145,
+            60,
+            100
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 2,
+            "note": 60,
+            "velocity": 100,
+            "from": "controller",
+            "id": 1
+          }
+        },
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 3,
+            "note": 64,
+            "velocity": 90,
+            "from": "controller",
+            "id": 2
+          }
+        },
+        {
+          "event": "onExpressionIn",
+          "payload": {
+            "id": 1,
+            "note": 60,
+            "channel": 2,
+            "bend": 0,
+            "pressure": 1,
+            "timbre": 0.5039370078740157,
+            "changed": "pressure",
+            "from": "controller"
+          }
+        },
+        {
+          "event": "onExpressionIn",
+          "payload": {
+            "id": 1,
+            "note": 60,
+            "channel": 2,
+            "bend": 48,
+            "pressure": 1,
+            "timbre": 0.5039370078740157,
+            "changed": "bend",
+            "from": "controller"
+          }
+        },
+        {
+          "event": "onBendIn",
+          "payload": {
+            "channel": 1,
+            "value": -8192,
+            "amount": -1,
+            "raw": 0,
+            "from": "controller"
+          }
+        },
+        {
+          "event": "onExpressionIn",
+          "payload": {
+            "id": 2,
+            "note": 64,
+            "channel": 3,
+            "bend": 0,
+            "pressure": 0.5039370078740157,
+            "timbre": 0,
+            "changed": "pressure",
+            "from": "controller"
+          }
+        },
+        {
+          "event": "onNoteOffIn",
+          "payload": {
+            "channel": 2,
+            "note": 60,
+            "velocity": 0,
+            "from": "controller",
+            "id": 1
+          }
+        },
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 2,
+            "note": 60,
+            "velocity": 100,
+            "from": "mainSynth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the device's MPE Configuration Message sets the zone it is read with",
+      "steps": [
+        {
+          "listen": "",
+          "opts": {
+            "zone": "lower",
+            "members": 15
+          }
+        },
+        {
+          "at": 0,
+          "role": "seaboard",
+          "bytes": [
+            191,
+            101,
+            0
+          ]
+        },
+        {
+          "at": 0,
+          "role": "seaboard",
+          "bytes": [
+            191,
+            100,
+            6
+          ]
+        },
+        {
+          "at": 0,
+          "role": "seaboard",
+          "bytes": [
+            191,
+            6,
+            4
+          ]
+        },
+        {
+          "at": 10,
+          "flush": true
+        },
+        {
+          "at": 11,
+          "role": "seaboard",
+          "bytes": [
+            155,
+            60,
+            100
+          ]
+        },
+        {
+          "at": 12,
+          "role": "seaboard",
+          "bytes": [
+            145,
+            61,
+            100
+          ]
+        }
+      ],
+      "events": [
+        {
+          "event": "onRpnIn",
+          "payload": {
+            "channel": 16,
+            "from": "seaboard",
+            "msb": 0,
+            "lsb": 6,
+            "parameter": 6,
+            "value": 4,
+            "fine": false,
+            "name": "mpeConfiguration"
+          }
+        },
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 12,
+            "note": 60,
+            "velocity": 100,
+            "from": "seaboard",
+            "id": 1
+          }
+        },
+        {
+          "event": "onNoteIn",
+          "payload": {
+            "channel": 2,
+            "note": 61,
+            "velocity": 100,
+            "from": "seaboard"
+          }
+        }
+      ]
+    }
+  ]
+}

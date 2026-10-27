@@ -4237,6 +4237,287 @@ function ciProfiles(muid, fn) return C.profiles(muid, fn) end
 function ciSetProfile(muid, id, on, opts) return C.setProfile(muid, id, on, opts) end
 end
 
+-- @module ce.mpe
+-- ce.mpe, ported line for line from mpeCore.js (the panel view's; the JavaScript prelude runs that
+-- file itself). Held to the panel view's answers by test/mpeParity.test.js and the scenario in
+-- test/support/mpeScenario.mjs. Reading MPE back in is the input decoder's; listen only tells it how.
+do
+  local ZONES = { "lower", "upper" }
+  local INF = math.huge
+  local function finite(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function clamp(x, lo, hi) if x < lo then return lo end if x > hi then return hi end return x end
+  local function roundHalfAway(x) if x < 0 then return -math.floor(-x + 0.5) end return math.floor(x + 0.5) end
+  local function contains(list, v) for _, x in ipairs(list) do if x == v then return true end end return false end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local zone = nil
+    local sounding = {}
+    local released = {}
+    local releases = 0
+    local nextId = 1
+    local warnedFull = false
+
+    local function members()
+      local out = {}
+      for i = 0, zone.members - 1 do out[#out + 1] = zone.upper and (15 - i) or (2 + i) end
+      return out
+    end
+    local function send(bytes) host.send(bytes, zone.role) end
+    local function rpn(channel, msb, lsb, value)
+      local status = 0xB0 + channel - 1
+      send({ status, 101, msb }); send({ status, 100, lsb }); send({ status, 6, value })
+      send({ status, 38, 0 }); send({ status, 101, 127 }); send({ status, 100, 127 })
+    end
+    local function bendBytes(channel, semitones)
+      local v = clamp(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383)
+      return { 0xE0 + channel - 1, v % 128, v // 128 }
+    end
+    local function amount7(x) return clamp(roundHalfAway(clamp(x, 0, 1) * 127), 0, 127) end
+    local function release(n, velocity)
+      send({ 0x80 + n.channel - 1, n.note, velocity })
+      local keep = {}
+      for _, x in ipairs(sounding) do if x ~= n then keep[#keep + 1] = x end end
+      sounding = keep
+      releases = releases + 1
+      released[n.channel] = releases
+    end
+    local function allOff()
+      if zone == nil then return 0 end
+      local count = #sounding
+      local copy = {}
+      for i, x in ipairs(sounding) do copy[i] = x end
+      for _, n in ipairs(copy) do release(n, 64) end
+      for _, channel in ipairs(members()) do send({ 0xE0 + channel - 1, 0, 64 }) end
+      return count
+    end
+    local function semitones(verb, value, name)
+      if not finite(value) then
+        say("error", "ce.mpe." .. verb .. ": " .. name .. " must be a number of semitones, so nothing was done.")
+        return nil
+      end
+      return value
+    end
+    local function isWhole(v) return finite(v) and math.floor(v) == v end
+
+    local function setZone(opts)
+      local which = opt(opts, "zone")
+      if which == nil then which = "lower" end
+      if not contains(ZONES, which) then
+        say("error", "ce.mpe.zone: zone must be \"lower\" or \"upper\", so nothing was done.")
+        return false
+      end
+      local count = opt(opts, "members")
+      if count == nil then count = 15 end
+      if not isWhole(count) or count < 1 or count > 15 then
+        say("error", "ce.mpe.zone: members must be a whole number from 1 to 15, so nothing was done.")
+        return false
+      end
+      local bendRange = 48
+      if opt(opts, "bendRange") ~= nil then bendRange = semitones("zone", opt(opts, "bendRange"), "bendRange") end
+      if bendRange == nil then return false end
+      local managerBendRange = 2
+      if opt(opts, "managerBendRange") ~= nil then managerBendRange = semitones("zone", opt(opts, "managerBendRange"), "managerBendRange") end
+      if managerBendRange == nil then return false end
+      if bendRange <= 0 or bendRange > 96 or managerBendRange <= 0 or managerBendRange > 96 then
+        say("error", "ce.mpe.zone: a bend range must be above 0 and at most 96 semitones, so nothing was done.")
+        return false
+      end
+      local role = opt(opts, "role")
+      allOff()
+      zone = { upper = which == "upper", members = math.floor(count), bendRange = bendRange, managerBendRange = managerBendRange,
+               role = (type(role) == "string" and role ~= "") and role or "mainSynth" }
+      sounding = {}
+      released = {}
+      if opt(opts, "send") ~= false then
+        local manager = zone.upper and 16 or 1
+        rpn(manager, 0, 6, zone.members)
+        rpn(manager, 0, 0, roundHalfAway(managerBendRange))
+        for _, channel in ipairs(members()) do rpn(channel, 0, 0, roundHalfAway(bendRange)) end
+      end
+      return true
+    end
+
+    local function startValues(verb, values)
+      local out = { bend = 0, pressure = 0, timbre = 0.5 }
+      if values == nil then return out end
+      if type(values) ~= "table" then
+        say("error", "ce.mpe." .. verb .. ": values must be a table of bend, pressure and timbre, so nothing was sent.")
+        return nil
+      end
+      for _, key in ipairs({ "bend", "pressure", "timbre" }) do
+        local v = values[key]
+        if v ~= nil then
+          if not finite(v) then
+            say("error", "ce.mpe." .. verb .. ": " .. key .. " must be a number, so nothing was sent.")
+            return nil
+          end
+          out[key] = v
+        end
+      end
+      return out
+    end
+
+    local function noteOn(note, velocity, opts)
+      local n = host.note(note)
+      if n == nil then
+        say("error", "ce.mpe.noteOn: note must be 0 to 127 or a name such as \"C4\", so nothing was sent.")
+        return nil
+      end
+      if not isWhole(velocity) or velocity < 1 or velocity > 127 then
+        say("error", "ce.mpe.noteOn: velocity must be a whole number from 1 to 127, so nothing was sent.")
+        return nil
+      end
+      local start = startValues("noteOn", opts)
+      if start == nil then return nil end
+      if zone == nil then setZone({}) end
+      local busy = {}
+      for _, x in ipairs(sounding) do busy[x.channel] = true end
+      local channel, best = 0, INF
+      for _, c in ipairs(members()) do
+        if not busy[c] then
+          local when = released[c] or 0
+          if when < best then best = when; channel = c end
+        end
+      end
+      if channel == 0 then
+        local oldest = sounding[1]
+        if not warnedFull then
+          warnedFull = true
+          say("warn", "ce.mpe.noteOn: every member channel is busy, so the oldest note was ended. More members, or fewer notes at once, avoid it.")
+        end
+        channel = oldest.channel
+        release(oldest, 64)
+      end
+      local bend = clamp(start.bend, -zone.bendRange, zone.bendRange)
+      send(bendBytes(channel, bend))
+      send({ 0xB0 + channel - 1, 74, amount7(start.timbre) })
+      send({ 0xD0 + channel - 1, amount7(start.pressure) })
+      send({ 0x90 + channel - 1, n, math.floor(velocity) })
+      local id = nextId
+      nextId = nextId + 1
+      sounding[#sounding + 1] = { id = id, note = n, channel = channel, velocity = math.floor(velocity), bend = bend,
+                                  pressure = clamp(start.pressure, 0, 1), timbre = clamp(start.timbre, 0, 1) }
+      return id
+    end
+
+    local function find(id)
+      for _, n in ipairs(sounding) do if n.id == id then return n end end
+      return nil
+    end
+
+    local function express(id, values)
+      local n = find(id)
+      if n == nil then return false end
+      if type(values) ~= "table" then
+        say("error", "ce.mpe.express: values must be a table of bend, pressure and timbre, so nothing was sent.")
+        return false
+      end
+      if startValues("express", values) == nil then return false end
+      if values.bend ~= nil then
+        n.bend = clamp(values.bend, -zone.bendRange, zone.bendRange)
+        send(bendBytes(n.channel, n.bend))
+      end
+      if values.pressure ~= nil then
+        n.pressure = clamp(values.pressure, 0, 1)
+        send({ 0xD0 + n.channel - 1, amount7(n.pressure) })
+      end
+      if values.timbre ~= nil then
+        n.timbre = clamp(values.timbre, 0, 1)
+        send({ 0xB0 + n.channel - 1, 74, amount7(n.timbre) })
+      end
+      return true
+    end
+
+    local function noteOff(id, velocity)
+      local n = find(id)
+      if n == nil then return false end
+      local v = 64
+      if velocity ~= nil then
+        if not isWhole(velocity) or velocity < 0 or velocity > 127 then
+          say("error", "ce.mpe.noteOff: velocity must be a whole number from 0 to 127, so the note was ended at 64.")
+        else
+          v = math.floor(velocity)
+        end
+      end
+      release(n, v)
+      return true
+    end
+
+    local function notes()
+      local out = {}
+      for i, n in ipairs(sounding) do
+        out[i] = { id = n.id, note = n.note, channel = n.channel, velocity = n.velocity, bend = n.bend, pressure = n.pressure, timbre = n.timbre }
+      end
+      return out
+    end
+
+    local function listen(opts)
+      local from = opt(opts, "from")
+      local role = type(from) == "string" and from or ""
+      if opt(opts, "off") == true then
+        host.listen(role, nil)
+        return true
+      end
+      local which = opt(opts, "zone")
+      if which == nil then which = "lower" end
+      if not contains(ZONES, which) then
+        say("error", "ce.mpe.listen: zone must be \"lower\" or \"upper\", so nothing was done.")
+        return false
+      end
+      local count = opt(opts, "members")
+      if count == nil then count = 15 end
+      if not isWhole(count) or count < 1 or count > 15 then
+        say("error", "ce.mpe.listen: members must be a whole number from 1 to 15, so nothing was done.")
+        return false
+      end
+      local bendRange = 48
+      if opt(opts, "bendRange") ~= nil then bendRange = semitones("listen", opt(opts, "bendRange"), "bendRange") end
+      if bendRange == nil then return false end
+      if bendRange <= 0 or bendRange > 96 then
+        say("error", "ce.mpe.listen: bendRange must be above 0 and at most 96 semitones, so nothing was done.")
+        return false
+      end
+      host.listen(role, { zone = which, members = math.floor(count), bendRange = bendRange })
+      return true
+    end
+
+    return { zone = setZone, noteOn = noteOn, express = express, noteOff = noteOff, allOff = allOff, notes = notes, listen = listen }
+  end
+
+  local M = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    send = function(bytes, role)
+      if role ~= nil and role ~= "mainSynth" then routeMidi(role, function() sendMidi(bytes) end) else sendMidi(bytes) end
+    end,
+    -- A note as sendNote reads it: a number, rounded, or a name such as "C4".
+    note = function(v)
+      local n = nil
+      if type(v) == "string" then n = noteNumber(v)
+      elseif finite(v) then n = math.floor(v + 0.5) end
+      if n ~= nil and n >= 0 and n <= 127 then return n end
+      return nil
+    end,
+    listen = function(role, opts) __deviceQuery("mpeListen", { role = role, opts = opts }) end,
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function mpeZone(opts) return M.zone(opts) end
+-- (global; at the line start, where the option check looks for it)
+function mpeNoteOn(note, velocity, opts) return M.noteOn(note, velocity, opts) end
+-- (global; at the line start, where the option check looks for it)
+function mpeExpress(id, values) return M.express(id, values) end
+-- (global; at the line start, where the option check looks for it)
+function mpeNoteOff(id, velocity) return M.noteOff(id, velocity) end
+-- (global; at the line start, where the option check looks for it)
+function mpeAllOff() return M.allOff() end
+-- (global; at the line start, where the option check looks for it)
+function mpeNotes() return M.notes() end
+-- (global; at the line start, where the option check looks for it)
+function mpeListen(opts) return M.listen(opts) end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -6802,6 +7083,10 @@ local __CE_OPTIONS = {
   ["ciSet"] = { path = "ce.ci.set", at = 4, refusal = "false", names = { "resId", "timeoutMs", "partial", "mediaType" } },
   ["ciSubscribe"] = { path = "ce.ci.subscribe", at = 3, refusal = "nothing", names = { "resId" } },
   ["ciSetProfile"] = { path = "ce.ci.setProfile", at = 4, refusal = "false", names = { "channel" } },
+  ["mpeZone"] = { path = "ce.mpe.zone", at = 1, refusal = "false", names = { "zone", "members", "bendRange", "managerBendRange", "send", "role" } },
+  ["mpeNoteOn"] = { path = "ce.mpe.noteOn", at = 3, refusal = "nothing", names = { "bend", "pressure", "timbre" } },
+  ["mpeExpress"] = { path = "ce.mpe.express", at = 2, refusal = "false", names = { "bend", "pressure", "timbre" } },
+  ["mpeListen"] = { path = "ce.mpe.listen", at = 1, refusal = "false", names = { "from", "zone", "members", "bendRange", "off" } },
   ["fileSyxSplit"] = { path = "ce.file.syxSplit", at = 2, refusal = "empty list", names = { "partial", "prefix" } },
   ["fileMidiRead"] = { path = "ce.file.midiRead", at = 2, refusal = "nothing", names = { "track" } },
   ["fileMidiWrite"] = { path = "ce.file.midiWrite", at = 2, refusal = "nothing", names = { "tempo", "name", "channel" } },
@@ -6931,6 +7216,7 @@ local __CE_MODULES = {
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.mpe"] = { allOff = "mpeAllOff", express = "mpeExpress", listen = "mpeListen", noteOff = "mpeNoteOff", noteOn = "mpeNoteOn", notes = "mpeNotes", zone = "mpeZone" },
   ["ce.ci"] = { devices = "ciDevices", discover = "ciDiscover", draftProfile = "ciDraftProfile", get = "ciGet", profiles = "ciProfiles", set = "ciSet", setProfile = "ciSetProfile", subscribe = "ciSubscribe", unsubscribe = "ciUnsubscribe" },
   ["ce.file"] = { folder = "fileFolder", list = "fileList", midiRead = "fileMidiRead", midiWrite = "fileMidiWrite", open = "fileOpen", read = "fileRead", save = "fileSave", saveIn = "fileSaveIn", syxJoin = "fileSyxJoin", syxSplit = "fileSyxSplit", write = "fileWrite" },
   ["ce.verify"] = { cancel = "verifyCancel", check = "verifyCheck", coverage = "verifyCoverage", dump = "verifyDump", patch = "verifyPatch", probe = "verifyProbe", running = "verifyRunning", summary = "verifySummary", write = "verifyWrite" },
@@ -6965,7 +7251,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.mpe", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -6981,6 +7267,7 @@ local __CE_META = {
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.mpe", version = "1.0", runtime = "any" },
   { id = "ce.ci", version = "1.0", runtime = "any" },
   { id = "ce.file", version = "1.0", runtime = "any" },
   { id = "ce.verify", version = "1.0", runtime = "any" },

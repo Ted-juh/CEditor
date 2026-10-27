@@ -71,6 +71,27 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.mpe': 'MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself: pitch bend for pitch, channel pressure for pressure, controller 74 for timbre. A zone is one manager channel and the member channels its notes use.\n\n'
+    + 'A script plays notes by id: `noteOn` picks a free member channel, sends the note\'s starting bend, timbre and pressure there, and gives back the id; `express` moves one note; `noteOff` ends it and frees its channel. `zone` sets the zone up and tells the synth; without it, the first note sets up a lower zone of 15.\n\n'
+    + 'MPE coming in is the other half: `listen` reads an MPE controller\'s notes back, so `noteIn` carries each note\'s id and `expressionIn` says how it moves.\n\n'
+    + '```lua\n'
+    + '-- Lua: an MPE controller\'s notes, played on the synth through MPE\n'
+    + 'function onPanelLoad()\n'
+    + '  state.out = {}\n'
+    + '  ce.mpe.listen({ from = "controller" })\n'
+    + 'end\n\n'
+    + 'function onNoteIn(note)\n'
+    + '  if note.from == "controller" then state.out[note.id] = ce.mpe.noteOn(note.note, note.velocity) end\n'
+    + 'end\n\n'
+    + 'function onExpressionIn(e)\n'
+    + '  local out = state.out[e.id]\n'
+    + '  if out then ce.mpe.express(out, { bend = e.bend, pressure = e.pressure, timbre = e.timbre }) end\n'
+    + 'end\n\n'
+    + 'function onNoteOffIn(note)\n'
+    + '  local out = state.out[note.id]\n'
+    + '  if out then ce.mpe.noteOff(out); state.out[note.id] = nil end\n'
+    + 'end\n'
+    + '```',
   'ce.ci': 'MIDI-CI lets a script ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Most synths do not speak MIDI-CI, and say nothing: an empty answer to `discover` is the usual one.\n\n'
     + 'A device is found by `discover`, and named by its `muid`, a number it keeps until it is switched off. `get`, `set` and `subscribe` work on its named resources (property exchange): `DeviceInfo`, `ResourceList`, controller and program lists, and resources of its own whose names start with `X-`. `profiles` and `setProfile` work on its MIDI-CI profiles, agreed ways for a device to behave, which are not CEditor\'s device profiles.\n\n'
     + 'Nothing waits: every command that talks to a device returns at once and calls its function when the answer comes, or when it does not, after a timeout. The talking is done once, in the device layer, so the editor, the player and an exported plug-in, window open or shut, see the same devices and answers. It goes out on the role\'s own MIDI ports. Not yet tried against a real MIDI-CI device.\n\n'
@@ -212,6 +233,7 @@ const MODULE_TITLES = {
   'ce.patch': 'the synth\'s sound as a value',
   'ce.verify': 'checking what the synth holds',
   'ce.file': 'files, through the person\'s own dialogs',
+  'ce.mpe': 'MPE',
   'ce.ci': 'MIDI-CI',
   'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',

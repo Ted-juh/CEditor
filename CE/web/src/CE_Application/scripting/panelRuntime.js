@@ -33,6 +33,8 @@ import { verifyCommands } from './verifyCore.js';
 import { fileCommands } from './fileCore.js';
 import { createFileDialogs } from './scriptFileHost.js';
 import { createCiBridge } from './ciHost.js';
+import { createMidiInDecoder } from './midiInDecoder.js';
+import { mpeCommands } from './mpeCore.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -7454,6 +7456,8 @@ function stopAllTimers() {
     sendRawMidiForRole([0x80 | active.channel, active.note, 0], `noteoff_${active.note}`, active.role);
   }
   activeScriptNotes.clear();
+  // ce.mpe's notes likewise: ended, with each member channel's bend put back, before the panel goes.
+  if (mpeShared !== null) { mpeShared.allOff(); mpeShared = null; }
   afterCallbacks.clear();   // a one-shot outliving its panel would fire into nothing
   for (const handle of timers.values()) clearInterval(handle);
   timers.clear();
@@ -8352,6 +8356,9 @@ export function clearDeviceRuntimeDefinitions() {
   for (const role of Object.keys(verifyJobs)) delete verifyJobs[role];
   forgetChosenFiles();
   ciBridge.reset();   // …and a device's answer to a panel that is gone reaches nobody
+  midiInDecode.reset();     // …and a bend half way through its thinning belongs to no panel
+  mpeShared = null;         // …and a new panel sets its own zone
+  if (midiInTimer !== null) { clearTimeout(midiInTimer); midiInTimer = null; }
 }
 
 // @module ce.storage
@@ -9330,6 +9337,15 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     ciProfiles: (muid, fn) => ci().profiles(muid, fn),
     ciSetProfile: (muid, id, on, opts) => ci().setProfile(muid, id, on, opts),
     ciDraftProfile: (muid, fn) => ci().draftProfile(muid, fn),
+
+    // ce.mpe: mpeCore.js, one per panel; reading MPE back in is the input decoder's.
+    mpeZone: (opts) => mpeFor(scriptId).zone(opts),
+    mpeNoteOn: (note, velocity, opts) => mpeFor(scriptId).noteOn(note, velocity, opts),
+    mpeExpress: (id, values) => mpeFor(scriptId).express(id, values),
+    mpeNoteOff: (id, velocity) => mpeFor(scriptId).noteOff(id, velocity),
+    mpeAllOff: () => mpeFor(scriptId).allOff(),
+    mpeNotes: () => mpeFor(scriptId).notes(),
+    mpeListen: (opts) => mpeFor(scriptId).listen(opts),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
@@ -11242,24 +11258,73 @@ function noteEventFor(bytes) {
   return { event: off ? 'onNoteOffIn' : 'onNoteIn', payload };
 }
 
+/**
+ * The MIDI a device sends, decoded once for every script (midiInDecoder.js; the plug-in's
+ * MidiInDecoder.h decodes it the same way with its window shut): notes with their MPE ids, bends,
+ * pressure, programs with their bank select, NRPNs and RPNs, transport. A thinned bend, or an NRPN's
+ * coarse half, waits for its time; the timer below lets it go.
+ */
+const midiInDecode = createMidiInDecoder();
+let midiInTimer = null;
+const midiInNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function scheduleMidiInFlush() {
+  if (midiInTimer !== null) return;
+  const due = midiInDecode.nextDue();
+  if (due === null) return;
+  midiInTimer = setTimeout(() => {
+    midiInTimer = null;
+    const events = midiInDecode.flush(midiInNow()).map((e) => ({ event: e.event, controlName: null, payload: e.payload }));
+    if (events.length && !live.dispatching && live.enabledGlobal) dispatchEvents(events, { inbound: true });
+    scheduleMidiInFlush();
+  }, Math.max(1, Math.ceil(due - midiInNow())));
+}
+
+/** ce.mpe.listen's reading of MPE, for the decoder. */
+export function midiInListen(role, opts) { midiInDecode.listen(role, opts); }
+
+// ce.mpe (docs/design/midi-input-and-mpe.md): one zone and one set of sounding notes for the panel,
+// as the JavaScript prelude has (it runs once per panel). What it says goes to the script that called.
+let mpeSayTo = '';
+let mpeShared = null;
+function mpeFor(scriptId) {
+  mpeSayTo = scriptId;
+  mpeShared ??= mpeCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', mpeSayTo, text),
+    send: (bytes, role) => sendRawMidiForRole(bytes, 'mpe', role || DEFAULT_ROLE),
+    note: midiNote,
+    listen: (role, opts) => midiInDecode.listen(role, opts),
+  });
+  return mpeShared;
+}
+
+/** Tests feed the decoder through the same door the bridge does, at a time they choose. */
+export function midiInputForTesting(payload) { onMidiInputMessage(payload); }
+export function midiInFlushForTesting(now) {
+  const events = midiInDecode.flush(now).map((e) => ({ event: e.event, controlName: null, payload: e.payload }));
+  if (events.length) dispatchEvents(events, { inbound: true });
+}
+
 function onMidiInputMessage(payload) {
   if (live.dispatching || !live.enabledGlobal) return;
   if (!payload) return;
   const bytes = hexToBytes(payload.hex);
   if (!bytes.length) return;
   const status = bytes[0] ?? 0;
+  const from = String(payload.deviceRole ?? '') || DEFAULT_ROLE;
   const events = [{
     event: 'onMidiIn',
     controlName: null,
-    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0 },
+    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0, from },
   }];
-  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3) {
+  const decoded = midiInDecode.feed(from, bytes, Number.isFinite(payload.atForTesting) ? payload.atForTesting : midiInNow());
+  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3 && !decoded.ccTaken) {
     events.push({ event: 'onCcIn', controlName: null,
-      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2] } });
+      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2], from } });
   }
-  const note = noteEventFor(bytes);
-  if (note) events.push({ event: note.event, controlName: null, payload: note.payload });
+  for (const e of decoded.events) events.push({ event: e.event, controlName: null, payload: e.payload });
   dispatchEvents(events, { inbound: true });
+  if (!Number.isFinite(payload.atForTesting)) scheduleMidiInFlush();
 
   // A Program Change is the instrument saying which preset it is on. Raised AFTER the events above
   // rather than folded into them, because onPresetChange carries the profile's reading of the slot

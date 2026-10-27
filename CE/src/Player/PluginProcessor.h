@@ -33,6 +33,7 @@
  #include "SharedPropertiesFile.h"
  #include "Scripting/BridgeScriptHost.h"
  #include "Scripting/TimerManager.h"
+ #include "Scripting/MidiInDecoder.h"
 #endif
 
 /**
@@ -1595,14 +1596,24 @@ private:
         mo->setProperty ("bytes", juce::var (bytes));
         mo->setProperty ("status", status);
         mo->setProperty ("channel", status != 0 ? (status & 0x0F) : 0);
-        scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
 
-        if (messageType == "cc" && bytes.size() >= 3)
+        // Decoded once, here, as the panel view's midiInDecoder.js decodes it (MidiInDecoder.h):
+        // notes with their MPE ids, bends, pressure, programs, NRPNs, RPNs and transport.
+        auto role = o->getProperty ("deviceRole").toString();
+        if (role.isEmpty()) role = "mainSynth";
+        mo->setProperty ("from", role);
+        scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
+        std::vector<int> raw;
+        for (const auto& b : bytes) raw.push_back ((int) b);
+        const auto decoded = midiInDecoder.feed (role, raw, juce::Time::getMillisecondCounterHiRes());
+
+        if (messageType == "cc" && bytes.size() >= 3 && ! decoded.ccTaken)
         {
             auto* co = new juce::DynamicObject();
             co->setProperty ("channel", ((int) bytes.getReference (0)) & 0x0F);
             co->setProperty ("cc", (int) bytes.getReference (1));
             co->setProperty ("value", (int) bytes.getReference (2));
+            co->setProperty ("from", role);
             scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
         }
 
@@ -1641,28 +1652,26 @@ private:
             }
         }
 
-        // Notes. Classified from the STATUS BYTE rather than from messageType, so this and the
-        // WebView (panelRuntime noteEventFor) cannot decide differently — and because only the
-        // status byte settles the case below.
-        if (bytes.size() >= 3)
-        {
-            const int kind = status & 0xF0;
-            if (kind == 0x90 || kind == 0x80)
-            {
-                auto* no = new juce::DynamicObject();
-                // 1-16, matching sendNote, so onNoteIn -> sendNote echoes correctly.
-                no->setProperty ("channel", (status & 0x0F) + 1);
-                no->setProperty ("note", (int) bytes.getReference (1));
-                no->setProperty ("velocity", (int) bytes.getReference (2));
-                // A note-on with velocity 0 IS a note-off. Devices using running status send them
-                // constantly, and a panel that treated one as a note-on would hang a voice on every
-                // key release.
-                const bool off = (kind == 0x80) || ((int) bytes.getReference (2) == 0);
-                scriptRuntime->dispatchEvent (off ? "onNoteOffIn" : "onNoteIn", "", juce::var (no));
-            }
-        }
+        for (const auto& e : decoded.events) scriptRuntime->dispatchEvent (e.name, "", e.payload);
+        scheduleMidiInFlush();
     }
 
+    /** The thinned events whose time has come (a bend, pressure or expression that waited its 10 ms,
+        an NRPN's coarse half that waited 5 ms for its fine half), and the next wait. */
+    void flushMidiIn()
+    {
+        midiInFlushTimer.stopTimer();
+        if (scriptRuntime != nullptr && getActiveEditor() == nullptr)
+            for (const auto& e : midiInDecoder.flush (juce::Time::getMillisecondCounterHiRes()))
+                scriptRuntime->dispatchEvent (e.name, "", e.payload);
+        scheduleMidiInFlush();
+    }
+
+    void scheduleMidiInFlush()
+    {
+        if (const auto due = midiInDecoder.nextDue())
+            midiInFlushTimer.startTimer (juce::jmax (1, (int) std::ceil (*due - juce::Time::getMillisecondCounterHiRes())));
+    }
 
     void installScriptDeviceCallback()
     {
@@ -2329,6 +2338,16 @@ private:
             // Answers at once; what the device says comes later as the "__ciReply" event.
             if (kind == "ci") return deviceService.ciCommand (payload);
 
+            // ce.mpe.listen: how the input decoder reads MPE from a role ("" for every input); no
+            // opts stops reading it. Answered here, on the thread the decoder is fed on.
+            if (kind == "mpeListen")
+            {
+                auto* p = payload.getDynamicObject();
+                if (p == nullptr) return false;
+                midiInDecoder.listen (p->getProperty ("role").toString(), p->getProperty ("opts"));
+                return true;
+            }
+
             // ce.patch: the profile's `patch` section, as the author wrote it (which dumps make a
             // patch, how to store a slot). Void when the profile has none, and ce.patch works out the
             // rest from the parameters.
@@ -2633,6 +2652,10 @@ private:
     ceditor::PanelValueModel scriptValues;
     std::unique_ptr<ceditor::scripting::BridgeScriptHost> scriptHost;
     std::unique_ptr<ceditor::scripting::ScriptRuntime> scriptRuntime;
+    // The MIDI a device sends, decoded once for the window-shut scripts (Scripting/MidiInDecoder.h),
+    // and the timer that lets a thinned bend or a lone NRPN coarse half go when its time comes.
+    ceditor::scripting::MidiInDecoder midiInDecoder;
+    juce::TimedCallback midiInFlushTimer { [this] { flushMidiIn(); } };
     // Declared after scriptRuntime so it is destroyed FIRST (stops its juce::Timer before the
     // runtime the fire callback references goes away).
     ceditor::scripting::TimerManager scriptTimers;

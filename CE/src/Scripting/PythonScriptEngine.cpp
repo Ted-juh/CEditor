@@ -5139,6 +5139,254 @@ def ciProfiles(muid, fn=None):
 def ciSetProfile(muid, id, on, opts=None):
     return _CI["setProfile"](muid, id, on, opts)
 
+# @module ce.mpe
+# ce.mpe, ported line for line from mpeCore.js (the panel view's; the JavaScript prelude runs that file
+# itself). Held to the panel view's answers by test/mpeParity.test.js and the scenario in
+# test/support/mpeScenario.mjs. Reading MPE back in is the input decoder's; listen only tells it how.
+# Every Python script runs this prelude for itself, so its zone and notes are its own.
+import math as _mpe_math
+
+_MPE_ZONES = ["lower", "upper"]
+
+def _mpe_finite(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and _mpe_math.isfinite(v)
+
+def _mpe_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _mpe_clamp(x, lo, hi):
+    return lo if x < lo else (hi if x > hi else x)
+
+def _mpe_round(x):
+    return -_mpe_math.floor(-x + 0.5) if x < 0 else _mpe_math.floor(x + 0.5)
+
+def _mpe_whole(v):
+    return _mpe_finite(v) and _mpe_math.floor(v) == v
+
+def _mpe_commands(host):
+    def say(level, text): host["say"](level, text)
+    st = {"zone": None, "sounding": [], "released": {}, "releases": 0, "nextId": 1, "warnedFull": False}
+
+    def members():
+        z = st["zone"]
+        return [(15 - i) if z["upper"] else (2 + i) for i in range(z["members"])]
+
+    def send(data): host["send"](data, st["zone"]["role"])
+
+    def rpn(channel, msb, lsb, value):
+        status = 0xB0 + channel - 1
+        for b in ([status, 101, msb], [status, 100, lsb], [status, 6, value], [status, 38, 0], [status, 101, 127], [status, 100, 127]):
+            send(b)
+
+    def bend_bytes(channel, semitones):
+        v = int(_mpe_clamp(_mpe_round(8192 + (semitones / st["zone"]["bendRange"]) * 8192), 0, 16383))
+        return [0xE0 + channel - 1, v % 128, v // 128]
+
+    def amount7(x): return int(_mpe_clamp(_mpe_round(_mpe_clamp(x, 0, 1) * 127), 0, 127))
+
+    def release(n, velocity):
+        send([0x80 + n["channel"] - 1, n["note"], velocity])
+        st["sounding"] = [x for x in st["sounding"] if x is not n]
+        st["releases"] += 1
+        st["released"][n["channel"]] = st["releases"]
+
+    def all_off():
+        if st["zone"] is None: return 0
+        count = len(st["sounding"])
+        for n in list(st["sounding"]): release(n, 64)
+        for channel in members(): send([0xE0 + channel - 1, 0, 64])
+        return count
+
+    def semitones(verb, value, name):
+        if not _mpe_finite(value):
+            say("error", "ce.mpe." + verb + ": " + name + " must be a number of semitones, so nothing was done.")
+            return None
+        return value
+
+    def set_zone(opts=None):
+        which = _mpe_opt(opts, "zone")
+        if which is None: which = "lower"
+        if which not in _MPE_ZONES:
+            say("error", "ce.mpe.zone: zone must be \"lower\" or \"upper\", so nothing was done.")
+            return False
+        count = _mpe_opt(opts, "members")
+        if count is None: count = 15
+        if not _mpe_whole(count) or count < 1 or count > 15:
+            say("error", "ce.mpe.zone: members must be a whole number from 1 to 15, so nothing was done.")
+            return False
+        bend_range = semitones("zone", _mpe_opt(opts, "bendRange"), "bendRange") if _mpe_opt(opts, "bendRange") is not None else 48
+        if bend_range is None: return False
+        manager_range = semitones("zone", _mpe_opt(opts, "managerBendRange"), "managerBendRange") if _mpe_opt(opts, "managerBendRange") is not None else 2
+        if manager_range is None: return False
+        if bend_range <= 0 or bend_range > 96 or manager_range <= 0 or manager_range > 96:
+            say("error", "ce.mpe.zone: a bend range must be above 0 and at most 96 semitones, so nothing was done.")
+            return False
+        role = _mpe_opt(opts, "role")
+        all_off()
+        st["zone"] = {"upper": which == "upper", "members": int(count), "bendRange": bend_range, "managerBendRange": manager_range,
+                      "role": role if isinstance(role, str) and role != "" else "mainSynth"}
+        st["sounding"] = []
+        st["released"] = {}
+        if _mpe_opt(opts, "send") is not False:
+            manager = 16 if st["zone"]["upper"] else 1
+            rpn(manager, 0, 6, int(count))
+            rpn(manager, 0, 0, int(_mpe_round(manager_range)))
+            for channel in members(): rpn(channel, 0, 0, int(_mpe_round(bend_range)))
+        return True
+
+    def start_values(verb, values):
+        out = {"bend": 0, "pressure": 0, "timbre": 0.5}
+        if values is None: return out
+        if not isinstance(values, dict):
+            say("error", "ce.mpe." + verb + ": values must be a table of bend, pressure and timbre, so nothing was sent.")
+            return None
+        for key in ("bend", "pressure", "timbre"):
+            v = values.get(key)
+            if v is None: continue
+            if not _mpe_finite(v):
+                say("error", "ce.mpe." + verb + ": " + key + " must be a number, so nothing was sent.")
+                return None
+            out[key] = v
+        return out
+
+    def note_on(note, velocity, opts=None):
+        n = host["note"](note)
+        if n is None:
+            say("error", "ce.mpe.noteOn: note must be 0 to 127 or a name such as \"C4\", so nothing was sent.")
+            return None
+        if not _mpe_whole(velocity) or velocity < 1 or velocity > 127:
+            say("error", "ce.mpe.noteOn: velocity must be a whole number from 1 to 127, so nothing was sent.")
+            return None
+        start = start_values("noteOn", opts)
+        if start is None: return None
+        if st["zone"] is None: set_zone({})
+        busy = {x["channel"] for x in st["sounding"]}
+        channel, best = 0, float("inf")
+        for c in members():
+            if c in busy: continue
+            when = st["released"].get(c, 0)
+            if when < best:
+                best = when
+                channel = c
+        if channel == 0:
+            oldest = st["sounding"][0]
+            if not st["warnedFull"]:
+                st["warnedFull"] = True
+                say("warn", "ce.mpe.noteOn: every member channel is busy, so the oldest note was ended. More members, or fewer notes at once, avoid it.")
+            channel = oldest["channel"]
+            release(oldest, 64)
+        z = st["zone"]
+        bend = _mpe_clamp(start["bend"], -z["bendRange"], z["bendRange"])
+        send(bend_bytes(channel, bend))
+        send([0xB0 + channel - 1, 74, amount7(start["timbre"])])
+        send([0xD0 + channel - 1, amount7(start["pressure"])])
+        send([0x90 + channel - 1, n, int(velocity)])
+        nid = st["nextId"]
+        st["nextId"] += 1
+        st["sounding"].append({"id": nid, "note": n, "channel": channel, "velocity": int(velocity), "bend": bend,
+                               "pressure": _mpe_clamp(start["pressure"], 0, 1), "timbre": _mpe_clamp(start["timbre"], 0, 1)})
+        return nid
+
+    def find(nid):
+        for n in st["sounding"]:
+            if n["id"] == nid and not isinstance(nid, bool): return n
+        return None
+
+    def express(nid, values=None):
+        n = find(nid)
+        if n is None: return False
+        if not isinstance(values, dict):
+            say("error", "ce.mpe.express: values must be a table of bend, pressure and timbre, so nothing was sent.")
+            return False
+        if start_values("express", values) is None: return False
+        z = st["zone"]
+        if values.get("bend") is not None:
+            n["bend"] = _mpe_clamp(values["bend"], -z["bendRange"], z["bendRange"])
+            send(bend_bytes(n["channel"], n["bend"]))
+        if values.get("pressure") is not None:
+            n["pressure"] = _mpe_clamp(values["pressure"], 0, 1)
+            send([0xD0 + n["channel"] - 1, amount7(n["pressure"])])
+        if values.get("timbre") is not None:
+            n["timbre"] = _mpe_clamp(values["timbre"], 0, 1)
+            send([0xB0 + n["channel"] - 1, 74, amount7(n["timbre"])])
+        return True
+
+    def note_off(nid, velocity=None):
+        n = find(nid)
+        if n is None: return False
+        v = 64
+        if velocity is not None:
+            if not _mpe_whole(velocity) or velocity < 0 or velocity > 127:
+                say("error", "ce.mpe.noteOff: velocity must be a whole number from 0 to 127, so the note was ended at 64.")
+            else:
+                v = int(velocity)
+        release(n, v)
+        return True
+
+    def notes():
+        return [{"id": n["id"], "note": n["note"], "channel": n["channel"], "velocity": n["velocity"], "bend": n["bend"],
+                 "pressure": n["pressure"], "timbre": n["timbre"]} for n in st["sounding"]]
+
+    def listen(opts=None):
+        frm = _mpe_opt(opts, "from")
+        role = frm if isinstance(frm, str) else ""
+        if _mpe_opt(opts, "off") is True:
+            host["listen"](role, None)
+            return True
+        which = _mpe_opt(opts, "zone")
+        if which is None: which = "lower"
+        if which not in _MPE_ZONES:
+            say("error", "ce.mpe.listen: zone must be \"lower\" or \"upper\", so nothing was done.")
+            return False
+        count = _mpe_opt(opts, "members")
+        if count is None: count = 15
+        if not _mpe_whole(count) or count < 1 or count > 15:
+            say("error", "ce.mpe.listen: members must be a whole number from 1 to 15, so nothing was done.")
+            return False
+        bend_range = semitones("listen", _mpe_opt(opts, "bendRange"), "bendRange") if _mpe_opt(opts, "bendRange") is not None else 48
+        if bend_range is None: return False
+        if bend_range <= 0 or bend_range > 96:
+            say("error", "ce.mpe.listen: bendRange must be above 0 and at most 96 semitones, so nothing was done.")
+            return False
+        host["listen"](role, {"zone": which, "members": int(count), "bendRange": bend_range})
+        return True
+
+    return {"zone": set_zone, "noteOn": note_on, "express": express, "noteOff": note_off, "allOff": all_off, "notes": notes, "listen": listen}
+
+def _mpe_send(data, role):
+    if role is not None and role != "mainSynth":
+        routeMidi(role, lambda: sendMidi(data))
+    else:
+        sendMidi(data)
+
+def _mpe_note(v):
+    n = None
+    if isinstance(v, str): n = noteNumber(v)
+    elif _mpe_finite(v): n = int(_mpe_math.floor(v + 0.5))
+    return n if n is not None and 0 <= n <= 127 else None
+
+_MPE = _mpe_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "send": _mpe_send,
+    "note": _mpe_note,
+    "listen": lambda role, opts: __deviceQuery("mpeListen", {"role": role, "opts": opts}),
+})
+
+def mpeZone(opts=None):
+    return _MPE["zone"](opts)
+def mpeNoteOn(note, velocity=None, opts=None):
+    return _MPE["noteOn"](note, velocity, opts)
+def mpeExpress(id, values=None):
+    return _MPE["express"](id, values)
+def mpeNoteOff(id, velocity=None):
+    return _MPE["noteOff"](id, velocity)
+def mpeAllOff():
+    return _MPE["allOff"]()
+def mpeNotes():
+    return _MPE["notes"]()
+def mpeListen(opts=None):
+    return _MPE["listen"](opts)
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -6894,6 +7142,10 @@ __CE_OPTIONS = {
     "ciSet": { "path": "ce.ci.set", "at": 3, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "partial", "mediaType"] },
     "ciSubscribe": { "path": "ce.ci.subscribe", "at": 2, "param": "opts", "refusal": "nothing", "names": ["resId"] },
     "ciSetProfile": { "path": "ce.ci.setProfile", "at": 3, "param": "opts", "refusal": "false", "names": ["channel"] },
+    "mpeZone": { "path": "ce.mpe.zone", "at": 0, "param": "opts", "refusal": "false", "names": ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
+    "mpeNoteOn": { "path": "ce.mpe.noteOn", "at": 2, "param": "opts", "refusal": "nothing", "names": ["bend", "pressure", "timbre"] },
+    "mpeExpress": { "path": "ce.mpe.express", "at": 1, "param": "values", "refusal": "false", "names": ["bend", "pressure", "timbre"] },
+    "mpeListen": { "path": "ce.mpe.listen", "at": 0, "param": "opts", "refusal": "false", "names": ["from", "zone", "members", "bendRange", "off"] },
     "fileSyxSplit": { "path": "ce.file.syxSplit", "at": 1, "param": "opts", "refusal": "empty list", "names": ["partial", "prefix"] },
     "fileMidiRead": { "path": "ce.file.midiRead", "at": 1, "param": "opts", "refusal": "nothing", "names": ["track"] },
     "fileMidiWrite": { "path": "ce.file.midiWrite", "at": 1, "param": "opts", "refusal": "nothing", "names": ["tempo", "name", "channel"] },
@@ -7006,6 +7258,7 @@ __CE_MODULES = {
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
     "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
     "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
     "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
     "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
@@ -7040,7 +7293,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -7056,6 +7309,7 @@ __CE_META = [
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
     { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.mpe", "version": "1.0", "runtime": "any" },
     { "id": "ce.ci", "version": "1.0", "runtime": "any" },
     { "id": "ce.file", "version": "1.0", "runtime": "any" },
     { "id": "ce.verify", "version": "1.0", "runtime": "any" },

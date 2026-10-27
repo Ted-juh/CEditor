@@ -4487,6 +4487,296 @@ function ciProfiles(muid, fn) { return __ci.profiles(muid, fn); }
 function ciSetProfile(muid, id, on, opts) { return __ci.setProfile(muid, id, on, opts); }
 // END GENERATED ce.ci
 
+// BEGIN GENERATED ce.mpe — tools/scripts/gen-mpe-prelude.mjs, from mpeCore.js. Do not edit by hand.
+// @module ce.mpe
+var __mpeCore = (function () {
+  // ce.mpe — playing MPE, the part that is the same in every runtime (docs/design/midi-input-and-mpe.md).
+  // A script plays notes by id; this picks each note's member channel, sends its expression on that
+  // channel alone, and frees the channel when the note ends. Reading MPE back in is the input decoder's
+  // (midiInDecoder.js, MidiInDecoder.h); listen() only tells it how. The JavaScript prelude runs this
+  // file itself (tools/scripts/gen-mpe-prelude.mjs); the Lua and Python preludes are ports held to the
+  // same answers by test/mpeParity.test.js.
+  //
+  // The host: `{ say(level, text), send(bytes, role), note(v) -> 0..127 or undefined, listen(role, opts) }`.
+
+  const ZONES = ['lower', 'upper'];
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  function finite(v) {
+    return typeof v === 'number' && Number.isFinite(v);
+  }
+
+  function clamp(x, lo, hi) {
+    return x < lo ? lo : (x > hi ? hi : x);
+  }
+
+  function roundHalfAway(x) {
+    return x < 0 ? -Math.floor(-x + 0.5) : Math.floor(x + 0.5);
+  }
+
+  function __mpeCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    let zone = null;            // { upper, members, bendRange, managerBendRange, role }
+    let sounding = [];          // { id, note, channel, velocity, bend, pressure, timbre }, oldest first
+    let released = {};          // channel -> when it was last freed (a count), for the longest-free rule
+    let releases = 0;
+    let nextId = 1;
+    let warnedFull = false;
+
+    function members() {
+      const out = [];
+      for (let i = 0; i < zone.members; i += 1) out.push(zone.upper ? 15 - i : 2 + i);
+      return out;
+    }
+
+    function send(bytes) {
+      host.send(bytes, zone.role);
+    }
+
+    function rpn(channel, msb, lsb, value) {
+      const status = 0xB0 + channel - 1;
+      send([status, 101, msb]);
+      send([status, 100, lsb]);
+      send([status, 6, value]);
+      send([status, 38, 0]);
+      send([status, 101, 127]);
+      send([status, 100, 127]);
+    }
+
+    function bendBytes(channel, semitones) {
+      const v = clamp(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383);
+      return [0xE0 + channel - 1, v % 128, Math.floor(v / 128)];
+    }
+
+    function amount7(x) {
+      return clamp(roundHalfAway(clamp(x, 0, 1) * 127), 0, 127);
+    }
+
+    function release(n, velocity) {
+      send([0x80 + n.channel - 1, n.note, velocity]);
+      sounding = sounding.filter((x) => x !== n);
+      releases += 1;
+      released[n.channel] = releases;
+    }
+
+    function allOff() {
+      if (zone === null) return 0;
+      const count = sounding.length;
+      for (const n of sounding.slice()) release(n, 64);
+      for (const channel of members()) send([0xE0 + channel - 1, 0, 64]);
+      return count;
+    }
+
+    function semitones(verb, value, name) {
+      if (!finite(value)) {
+        say('error', `ce.mpe.${verb}: ${name} must be a number of semitones, so nothing was done.`);
+        return null;
+      }
+      return value;
+    }
+
+    function setZone(opts) {
+      const which = present(opt(opts, 'zone')) ? opt(opts, 'zone') : 'lower';
+      if (!ZONES.includes(which)) {
+        say('error', `ce.mpe.zone: zone must be "lower" or "upper", so nothing was done.`);
+        return false;
+      }
+      const count = present(opt(opts, 'members')) ? opt(opts, 'members') : 15;
+      if (!finite(count) || Math.floor(count) !== count || count < 1 || count > 15) {
+        say('error', 'ce.mpe.zone: members must be a whole number from 1 to 15, so nothing was done.');
+        return false;
+      }
+      const bendRange = present(opt(opts, 'bendRange')) ? semitones('zone', opt(opts, 'bendRange'), 'bendRange') : 48;
+      if (bendRange === null) return false;
+      const managerBendRange = present(opt(opts, 'managerBendRange')) ? semitones('zone', opt(opts, 'managerBendRange'), 'managerBendRange') : 2;
+      if (managerBendRange === null) return false;
+      if (bendRange <= 0 || bendRange > 96 || managerBendRange <= 0 || managerBendRange > 96) {
+        say('error', 'ce.mpe.zone: a bend range must be above 0 and at most 96 semitones, so nothing was done.');
+        return false;
+      }
+      const role = opt(opts, 'role');
+      allOff();
+      zone = {
+        upper: which === 'upper', members: count, bendRange, managerBendRange,
+        role: typeof role === 'string' && role !== '' ? role : 'mainSynth',
+      };
+      sounding = [];
+      released = {};
+      if (opt(opts, 'send') !== false) {
+        const manager = zone.upper ? 16 : 1;
+        rpn(manager, 0, 6, count);
+        rpn(manager, 0, 0, roundHalfAway(managerBendRange));
+        for (const channel of members()) rpn(channel, 0, 0, roundHalfAway(bendRange));
+      }
+      return true;
+    }
+
+    function startValues(verb, values) {
+      const out = { bend: 0, pressure: 0, timbre: 0.5 };
+      if (!present(values)) return out;
+      if (typeof values !== 'object') {
+        say('error', `ce.mpe.${verb}: values must be a table of bend, pressure and timbre, so nothing was sent.`);
+        return null;
+      }
+      for (const key of ['bend', 'pressure', 'timbre']) {
+        const v = values[key];
+        if (!present(v)) continue;
+        if (!finite(v)) {
+          say('error', `ce.mpe.${verb}: ${key} must be a number, so nothing was sent.`);
+          return null;
+        }
+        out[key] = v;
+      }
+      return out;
+    }
+
+    function noteOn(note, velocity, opts) {
+      const n = host.note(note);
+      if (!present(n)) {
+        say('error', 'ce.mpe.noteOn: note must be 0 to 127 or a name such as "C4", so nothing was sent.');
+        return undefined;
+      }
+      if (!finite(velocity) || Math.floor(velocity) !== velocity || velocity < 1 || velocity > 127) {
+        say('error', 'ce.mpe.noteOn: velocity must be a whole number from 1 to 127, so nothing was sent.');
+        return undefined;
+      }
+      const start = startValues('noteOn', opts);
+      if (start === null) return undefined;
+      if (zone === null) setZone({});
+      const busy = {};
+      for (const x of sounding) busy[x.channel] = true;
+      let channel = 0;
+      let best = Infinity;
+      for (const c of members()) {
+        if (busy[c]) continue;
+        const when = released[c] ?? 0;
+        if (when < best) { best = when; channel = c; }
+      }
+      if (channel === 0) {
+        const oldest = sounding[0];
+        if (!warnedFull) {
+          warnedFull = true;
+          say('warn', 'ce.mpe.noteOn: every member channel is busy, so the oldest note was ended. More members, or fewer notes at once, avoid it.');
+        }
+        channel = oldest.channel;
+        release(oldest, 64);
+      }
+      const bend = clamp(start.bend, -zone.bendRange, zone.bendRange);
+      // As MPE asks: the note's bend and timbre first, so it never starts at the last note's.
+      send(bendBytes(channel, bend));
+      send([0xB0 + channel - 1, 74, amount7(start.timbre)]);
+      send([0xD0 + channel - 1, amount7(start.pressure)]);
+      send([0x90 + channel - 1, n, velocity]);
+      const id = nextId;
+      nextId += 1;
+      sounding.push({ id, note: n, channel, velocity, bend, pressure: clamp(start.pressure, 0, 1), timbre: clamp(start.timbre, 0, 1) });
+      return id;
+    }
+
+    function find(id) {
+      for (const n of sounding) if (n.id === id) return n;
+      return null;
+    }
+
+    function express(id, values) {
+      const n = find(id);
+      if (n === null) return false;
+      if (!values || typeof values !== 'object') {
+        say('error', 'ce.mpe.express: values must be a table of bend, pressure and timbre, so nothing was sent.');
+        return false;
+      }
+      const v = startValues('express', values);
+      if (v === null) return false;
+      if (present(values.bend)) {
+        n.bend = clamp(values.bend, -zone.bendRange, zone.bendRange);
+        send(bendBytes(n.channel, n.bend));
+      }
+      if (present(values.pressure)) {
+        n.pressure = clamp(values.pressure, 0, 1);
+        send([0xD0 + n.channel - 1, amount7(n.pressure)]);
+      }
+      if (present(values.timbre)) {
+        n.timbre = clamp(values.timbre, 0, 1);
+        send([0xB0 + n.channel - 1, 74, amount7(n.timbre)]);
+      }
+      return true;
+    }
+
+    function noteOff(id, velocity) {
+      const n = find(id);
+      if (n === null) return false;
+      let v = 64;
+      if (present(velocity)) {
+        if (!finite(velocity) || Math.floor(velocity) !== velocity || velocity < 0 || velocity > 127) {
+          say('error', 'ce.mpe.noteOff: velocity must be a whole number from 0 to 127, so the note was ended at 64.');
+        } else {
+          v = velocity;
+        }
+      }
+      release(n, v);
+      return true;
+    }
+
+    function notes() {
+      return sounding.map((n) => ({ id: n.id, note: n.note, channel: n.channel, velocity: n.velocity, bend: n.bend, pressure: n.pressure, timbre: n.timbre }));
+    }
+
+    function listen(opts) {
+      const from = opt(opts, 'from');
+      const role = typeof from === 'string' ? from : '';
+      if (opt(opts, 'off') === true) {
+        host.listen(role, null);
+        return true;
+      }
+      const which = present(opt(opts, 'zone')) ? opt(opts, 'zone') : 'lower';
+      if (!ZONES.includes(which)) {
+        say('error', 'ce.mpe.listen: zone must be "lower" or "upper", so nothing was done.');
+        return false;
+      }
+      const count = present(opt(opts, 'members')) ? opt(opts, 'members') : 15;
+      if (!finite(count) || Math.floor(count) !== count || count < 1 || count > 15) {
+        say('error', 'ce.mpe.listen: members must be a whole number from 1 to 15, so nothing was done.');
+        return false;
+      }
+      const bendRange = present(opt(opts, 'bendRange')) ? semitones('listen', opt(opts, 'bendRange'), 'bendRange') : 48;
+      if (bendRange === null) return false;
+      if (bendRange <= 0 || bendRange > 96) {
+        say('error', 'ce.mpe.listen: bendRange must be above 0 and at most 96 semitones, so nothing was done.');
+        return false;
+      }
+      host.listen(role, { zone: which, members: count, bendRange });
+      return true;
+    }
+
+    return { zone: setZone, noteOn, express, noteOff, allOff, notes, listen };
+  }
+return { mpeCommands: __mpeCommands };
+})();
+var __mpe = __mpeCore.mpeCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  send: function (bytes, role) {
+    if (role && role !== "mainSynth") routeMidi(role, function () { sendMidi(bytes); });
+    else sendMidi(bytes);
+  },
+  note: function (v) { return __note(v); },
+  listen: function (role, opts) { __deviceQuery("mpeListen", { role: role, opts: opts }); }
+});
+function mpeZone(opts) { return __mpe.zone(opts); }
+function mpeNoteOn(note, velocity, opts) { return __mpe.noteOn(note, velocity, opts); }
+function mpeExpress(id, values) { return __mpe.express(id, values); }
+function mpeNoteOff(id, velocity) { return __mpe.noteOff(id, velocity); }
+function mpeAllOff() { return __mpe.allOff(); }
+function mpeNotes() { return __mpe.notes(); }
+function mpeListen(opts) { return __mpe.listen(opts); }
+// END GENERATED ce.mpe
+
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function __m12(n) { return ((Math.floor(n) % 12) + 12) % 12; }
@@ -6634,6 +6924,10 @@ var __CE_OPTIONS = {
   "ciSet": { path: "ce.ci.set", at: 3, refusal: "false", names: ["resId", "timeoutMs", "partial", "mediaType"] },
   "ciSubscribe": { path: "ce.ci.subscribe", at: 2, refusal: "nothing", names: ["resId"] },
   "ciSetProfile": { path: "ce.ci.setProfile", at: 3, refusal: "false", names: ["channel"] },
+  "mpeZone": { path: "ce.mpe.zone", at: 0, refusal: "false", names: ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
+  "mpeNoteOn": { path: "ce.mpe.noteOn", at: 2, refusal: "nothing", names: ["bend", "pressure", "timbre"] },
+  "mpeExpress": { path: "ce.mpe.express", at: 1, refusal: "false", names: ["bend", "pressure", "timbre"] },
+  "mpeListen": { path: "ce.mpe.listen", at: 0, refusal: "false", names: ["from", "zone", "members", "bendRange", "off"] },
   "fileSyxSplit": { path: "ce.file.syxSplit", at: 1, refusal: "empty list", names: ["partial", "prefix"] },
   "fileMidiRead": { path: "ce.file.midiRead", at: 1, refusal: "nothing", names: ["track"] },
   "fileMidiWrite": { path: "ce.file.midiWrite", at: 1, refusal: "nothing", names: ["tempo", "name", "channel"] },
@@ -6746,6 +7040,7 @@ var __CE_MODULES = {
   "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
   "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+  "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
   "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
   "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
   "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
@@ -6780,8 +7075,8 @@ var __CE_MODULES = {
   "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
   "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.mpe","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

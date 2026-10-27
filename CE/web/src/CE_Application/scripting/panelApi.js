@@ -645,16 +645,34 @@ export const DEVICE_EVENTS = [
   { id: 'verifyDone', fn: 'onVerifyDone', payload: 'report', decoded: true, summary: 'A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too.' },
   { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.' },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. `midi.from` is the device it came from.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. `cc.from` is the device it came from.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
   // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
   { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
-    summary: 'A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead.' },
+    summary: 'A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. `note.from` is the device it came from, and `note.id` the note\'s id while ce.mpe.listen() reads that device.' },
   { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
-    summary: 'A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.' },
+    summary: 'A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. `note.from` and `note.id` are as noteIn gives them.' },
+  // The rest of a device's MIDI, decoded once before any script (midiInDecoder.js, MidiInDecoder.h).
+  // Bends, pressure and expression are thinned to one every 10 ms per channel, never reordered.
+  { id: 'bendIn', fn: 'onBendIn', payload: 'bend', decoded: false,
+    summary: 'A pitch bend arrived. `bend.value` is -8192 to 8191, 0 in the middle; `bend.amount` the same from -1 to 1; `bend.raw` 0 to 16383, as the two bytes carry it. `bend.channel` is 1 to 16 and `bend.from` the device. Raised at most once every 10 ms per channel, with the latest value.' },
+  { id: 'pressureIn', fn: 'onPressureIn', payload: 'pressure', decoded: false,
+    summary: 'Channel pressure arrived. `pressure.value` is 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per channel.' },
+  { id: 'polyPressureIn', fn: 'onPolyPressureIn', payload: 'pressure', decoded: false,
+    summary: 'Pressure on one note arrived. `pressure.note` is the note, `pressure.value` 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per note.' },
+  { id: 'programIn', fn: 'onProgramIn', payload: 'program', decoded: false,
+    summary: 'A program change arrived. `program.program` is 0 to 127, as the message carries it, and `program.number` 1 to 128, as most synths show it. `program.bankMsb` and `program.bankLsb` are the bank select that came just before it on this channel, when one did. `program.channel` is 1 to 16 and `program.from` the device.' },
+  { id: 'nrpnIn', fn: 'onNrpnIn', payload: 'nrpn', decoded: false,
+    summary: 'An NRPN arrived, put together from its controllers (99, 98, then 6 and 38). `nrpn.msb` and `nrpn.lsb` are the parameter number\'s halves, as sendNRPN takes them, and `nrpn.parameter` the two as one number. `nrpn.value` is 0 to 16383 when the fine half came (`nrpn.fine` true), else 0 to 127. For an increment or decrement, `nrpn.step` is 1 or -1 instead. The controllers still raise ccIn too.' },
+  { id: 'rpnIn', fn: 'onRpnIn', payload: 'rpn', decoded: false,
+    summary: 'An RPN arrived, put together from controllers 101 and 100, then 6 and 38. The fields are those of nrpnIn, and `rpn.name` is "bendRange", "fineTuning", "coarseTuning" or "mpeConfiguration" for the numbers that have one.' },
+  { id: 'transportIn', fn: 'onTransportIn', payload: 'transport', decoded: false,
+    summary: 'A device sent start, stop, continue or a song position. `transport.action` is "start", "stop", "continue" or "position"; for "position", `transport.beat` is where it points, in beats from the start. `transport.from` is the device. Clock ticks are not raised one by one.' },
+  { id: 'expressionIn', fn: 'onExpressionIn', payload: 'expression', decoded: false,
+    summary: 'A note read with ce.mpe.listen() moved. `expression.id` is the note\'s id, as noteIn gave it, `expression.note` the note and `expression.channel` its member channel. `expression.bend` is in semitones, `expression.pressure` and `expression.timbre` 0 to 1, and `expression.changed` says which moved: "bend", "pressure" or "timbre". Raised at most once every 10 ms per note.' },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.' },
   { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.' },
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.' },
@@ -2627,6 +2645,116 @@ export const COMMANDS = [
     params: [
       { name: 'muid', type: 'number', required: true, summary: 'The device.' },
       { name: 'fn', type: 'function', required: true, summary: 'Called with the draft.' },
+    ],
+    scopes: 'any',
+  },
+  // mpe
+  // MPE out (docs/design/midi-input-and-mpe.md): mpeCore.js picks each note's member channel and sends
+  // its expression there, the same in every runtime. One zone per panel; Python's is per script.
+  {
+    id: 'mpeZone', category: 'MPE', signature: 'mpeZone([opts]) -> boolean', refusal: 'false',
+    summary: 'Set up the MPE zone the panel plays into, and tell the synth.',
+    example: '`ce.mpe.zone({ members = 7 })` plays into a lower zone of seven channels, 2 to 8.',
+    notes: [
+      'MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself. A zone is one manager channel and the member channels its notes use: the lower zone has channel 1 as manager and members from 2 upwards; the upper zone has 16 and members from 15 down.',
+      'With `send` on, the synth gets the MPE Configuration Message (RPN 6) on the manager channel and the bend range (RPN 0) on every channel of the zone, so both ends agree.',
+      'Changing the zone ends every sounding note first. Returns true when the zone is set.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'zone', type: 'string', default: '"lower"', summary: '"lower" (manager channel 1) or "upper" (manager channel 16).' },
+        { name: 'members', type: 'number', default: '15', summary: 'How many member channels, 1 to 15, and so how many notes can sound at once.' },
+        { name: 'bendRange', type: 'number', default: '48', unit: 'semitones', summary: 'How far a full bend goes on a member channel. MPE\'s own default.' },
+        { name: 'managerBendRange', type: 'number', default: '2', unit: 'semitones', summary: 'The same, for the manager channel.' },
+        { name: 'send', type: 'boolean', default: 'true', summary: 'Send the setup to the synth. Off for a synth set up by hand.' },
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device to play.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNoteOn', category: 'MPE', signature: 'mpeNoteOn(note, velocity [, opts]) -> number', refusal: 'nothing',
+    summary: 'Play a note on a member channel of its own, and get its id.',
+    example: '`local id = ce.mpe.noteOn("C4", 100)` plays middle C and keeps its id.',
+    notes: [
+      'The channel is the free member channel released longest ago, so a release tail on the synth is not cut off. Every channel busy: the oldest note is ended first, with a console line the first time.',
+      'The starting bend, timbre and pressure are sent before the note, as MPE asks, so a note never starts at the last note\'s bend.',
+      'Before ce.mpe.zone(): a lower zone of 15 is set up first, and sent.',
+      'Returns the note\'s id, a number.',
+    ],
+    params: [
+      { name: 'note', type: 'number or text', required: true, summary: 'The note, 0 to 127, or a name such as "C4".' },
+      { name: 'velocity', type: 'number', required: true, summary: '1 to 127.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'bend', type: 'number', default: '0', unit: 'semitones', summary: 'The bend the note starts with, held to the zone\'s bend range.' },
+        { name: 'pressure', type: 'number', default: '0', summary: 'The pressure it starts with, 0 to 1.' },
+        { name: 'timbre', type: 'number', default: '0.5', summary: 'The timbre it starts with, 0 to 1 (controller 74).' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeExpress', category: 'MPE', signature: 'mpeExpress(id, values) -> boolean', refusal: 'false',
+    summary: 'Change one sounding note\'s bend, pressure or timbre.',
+    example: '`ce.mpe.express(id, { bend = 0.5, pressure = 0.8 })` bends the note up a quarter tone and presses it.',
+    notes: [
+      'What is left out is not sent.',
+      'A note that has ended: false, and nothing sent, so a late gesture does not land on the next note to use that channel. Returns true when sent.',
+    ],
+    params: [
+      { name: 'id', type: 'number', required: true, summary: 'A note\'s id, from ce.mpe.noteOn().' },
+      { name: 'values', type: 'object', required: true, fields: optionFields([
+        { name: 'bend', type: 'number', default: 'not sent', unit: 'semitones', summary: 'The note\'s bend, held to the zone\'s bend range.' },
+        { name: 'pressure', type: 'number', default: 'not sent', summary: 'Its pressure, 0 to 1.' },
+        { name: 'timbre', type: 'number', default: 'not sent', summary: 'Its timbre, 0 to 1 (controller 74).' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNoteOff', category: 'MPE', signature: 'mpeNoteOff(id [, velocity]) -> boolean', refusal: 'false',
+    summary: 'End a note played with ce.mpe.noteOn().',
+    example: '`ce.mpe.noteOff(id)` releases the note.',
+    notes: ['Returns true when the note was sounding; false when it had already ended.'],
+    params: [
+      { name: 'id', type: 'number', required: true, summary: 'The note\'s id.' },
+      { name: 'velocity', type: 'number', required: false, default: '64', summary: 'The release velocity, 0 to 127.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeAllOff', category: 'MPE', signature: 'mpeAllOff() -> number', refusal: 'zero',
+    summary: 'End every note the panel plays through MPE, and set each member channel\'s bend back to the middle.',
+    example: '`ce.mpe.allOff()` in onPanelClose leaves the synth silent.',
+    notes: [
+      'Returns how many notes were ended.',
+      'ce.midi.panic() silences these too, as it does every note; call this as well, so ce.mpe.notes() is empty again.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNotes', category: 'MPE', signature: 'mpeNotes() -> list', refusal: 'empty list',
+    summary: 'The notes sounding now through ce.mpe.',
+    example: '`#ce.mpe.notes()` is how many are held.',
+    notes: ['Each is { id, note, channel, velocity, bend, pressure, timbre }, oldest first; none: an empty list.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeListen', category: 'MPE', signature: 'mpeListen([opts]) -> boolean', refusal: 'false',
+    summary: 'Read MPE from a device: give each note an id, and raise expressionIn as it moves.',
+    example: '`ce.mpe.listen({ from = "controller" })` reads MPE from the device the panel calls "controller".',
+    notes: [
+      'An MPE controller sends each note on its own channel, with its bend, pressure and timbre on that channel. This turns them back into notes.',
+      'While listening, noteIn and noteOffIn from that device carry `note.id`, the same id expressionIn gives, and bendIn, pressureIn and controller 74 on its member channels are raised as expressionIn instead.',
+      'The zone comes from the MPE Configuration Message the device sends, when it sends one; else from `zone` and `members` here.',
+      'Returns true when listening. `listen({ off = true })` stops.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'from', type: 'string', kind: 'deviceRole', default: 'every input', summary: 'The device to read, by its role.' },
+        { name: 'zone', type: 'string', default: '"lower"', summary: '"lower" or "upper", until the device says which.' },
+        { name: 'members', type: 'number', default: '15', summary: 'How many member channels, 1 to 15, until the device says.' },
+        { name: 'bendRange', type: 'number', default: '48', unit: 'semitones', summary: 'For turning a member channel\'s bend into semitones.' },
+        { name: 'off', type: 'boolean', default: 'false', summary: 'True stops reading the device.' }]) },
     ],
     scopes: 'any',
   },
@@ -6077,8 +6205,8 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, and musical time.',
+    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
@@ -6174,6 +6302,9 @@ export const MODULES = [
   // requires the four whose commands it reads and sends through, so they are there whenever it is.
   { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
     summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
+  // requires ce.midi, whose sends MPE goes out through and whose note names it reads.
+  { id: 'ce.mpe', version: '1.0', requires: ['ce.core', 'ce.midi'], runtime: RUNTIME_ANY,
+    summary: 'MPE: play each note on a channel of its own, so each note can bend, swell and change tone by itself, and read an MPE controller\'s notes back in with their expression.' },
   // requires ce.device, whose role ports MIDI-CI goes out and comes back on.
   { id: 'ce.ci', version: '1.0', requires: ['ce.core', 'ce.device'], runtime: RUNTIME_ANY,
     summary: 'MIDI-CI: ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Not yet tried against a real MIDI-CI device.' },
@@ -6383,6 +6514,10 @@ const MODULE_MEMBERS = {
     random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
     apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
     scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.mpe': {
+    zone: 'mpeZone', noteOn: 'mpeNoteOn', express: 'mpeExpress', noteOff: 'mpeNoteOff',
+    allOff: 'mpeAllOff', notes: 'mpeNotes', listen: 'mpeListen',
   },
   'ce.ci': {
     discover: 'ciDiscover', devices: 'ciDevices', get: 'ciGet', set: 'ciSet', subscribe: 'ciSubscribe',

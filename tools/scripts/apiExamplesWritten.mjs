@@ -261,6 +261,34 @@ export const WRITTEN = {
     lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
     js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
   },
+  mpeZone: {
+    lua: `function onPanelLoad()\n  ce.mpe.zone({ members = 7, bendRange = 24 })\nend`,
+    js: `function onPanelLoad() {\n  ce.mpe.zone({ members: 7, bendRange: 24 });\n}`,
+  },
+  mpeNoteOn: {
+    lua: `function onPointerDown()\n  state.id = ce.mpe.noteOn("C4", 100, { timbre = 0.3 })\nend`,
+    js: `function onPointerDown() {\n  state.id = ce.mpe.noteOn("C4", 100, { timbre: 0.3 });\n}`,
+  },
+  mpeExpress: {
+    lua: `function onValueChange(value)\n  if state.id then ce.mpe.express(state.id, { pressure = value / 127 }) end\nend`,
+    js: `function onValueChange(value) {\n  if (state.id) ce.mpe.express(state.id, { pressure: value / 127 });\n}`,
+  },
+  mpeNoteOff: {
+    lua: `function onPointerUp()\n  if state.id then ce.mpe.noteOff(state.id); state.id = nil end\nend`,
+    js: `function onPointerUp() {\n  if (state.id) { ce.mpe.noteOff(state.id); state.id = null; }\n}`,
+  },
+  mpeAllOff: {
+    lua: `function onPanelClose()\n  ce.mpe.allOff()\nend`,
+    js: `function onPanelClose() {\n  ce.mpe.allOff();\n}`,
+  },
+  mpeNotes: {
+    lua: `for _, n in ipairs(ce.mpe.notes()) do log(n.note .. " on channel " .. n.channel) end`,
+    js: `for (const n of ce.mpe.notes()) log(\`\${n.note} on channel \${n.channel}\`);`,
+  },
+  mpeListen: {
+    lua: `function onPanelLoad()\n  ce.mpe.listen({ from = "controller" })\nend\n\nfunction onExpressionIn(e)\n  set("Bend.value", e.bend)\nend`,
+    js: `function onPanelLoad() {\n  ce.mpe.listen({ from: "controller" });\n}\n\nfunction onExpressionIn(e) {\n  set("Bend.value", e.bend);\n}`,
+  },
   ciDiscover: {
     lua: `function onPanelReady()\n  ce.ci.discover(function(found)\n    for _, d in ipairs(found) do\n      if d.matchesProfile then state.synth = d.muid return end\n    end\n    ce.components.lcd.text("Display", 1, "No MIDI-CI")\n  end)\nend`,
     js: `function onPanelReady() {\n  ce.ci.discover((found) => {\n    const d = found.find((x) => x.matchesProfile);\n    if (d) state.synth = d.muid;\n    else ce.components.lcd.text("Display", 1, "No MIDI-CI");\n  });\n}`,
