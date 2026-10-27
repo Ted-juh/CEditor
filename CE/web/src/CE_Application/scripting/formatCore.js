@@ -117,7 +117,7 @@ function withUnit(text, unit, opts) {
 /** The rules every command ends with: the typographic minus when asked, and the width. */
 function finish(text, opts) {
   let t = text;
-  if (opt(opts, 'unicode') === true && t.startsWith('-')) t = '−' + t.slice(1);
+  if (opt(opts, 'unicode') === true && t.startsWith('-')) t = '\u2212' + t.slice(1);
   const width = toNumber(opt(opts, 'width'));
   if (Number.isFinite(width)) {
     const w = clampInt(width, 0, 200);
@@ -170,8 +170,8 @@ export function formatDb(v, opts, say) {
   }
   const floor = optNumber(opts, 'floor', -144);
   let text;
-  if (n <= floor) text = opt(opts, 'unicode') === true ? '-∞' : '-inf';
-  else if (n === Infinity) text = opt(opts, 'unicode') === true ? '∞' : 'inf';
+  if (n <= floor) text = opt(opts, 'unicode') === true ? '-\u221e' : '-inf';
+  else if (n === Infinity) text = opt(opts, 'unicode') === true ? '\u221e' : 'inf';
   else text = numberText(n, opts, 1);
   return finish(withUnit(text, 'dB', opts), opts);
 }
@@ -222,7 +222,7 @@ export function formatRatio(v, opts, say) {
   }
   const x = opt(opts, 'style') === 'x';
   let text;
-  if (n === Infinity) text = opt(opts, 'unicode') === true ? '∞' : 'inf';
+  if (n === Infinity) text = opt(opts, 'unicode') === true ? '\u221e' : 'inf';
   else text = numberText(n, opts, x ? 2 : undefined);
   return finish(x ? 'x' + text : text + ':1', opts);
 }
@@ -268,7 +268,7 @@ export function formatNote(n, opts, say) {
   }
   const middleC = clampInt(optNumber(opts, 'middleC', 4), -2, 9);
   let name = (opt(opts, 'flats') === true ? FLATS : SHARPS)[note % 12];
-  if (opt(opts, 'unicode') === true) name = name.slice(0, 1) + name.slice(1).replace('#', '♯').replace('b', '♭');
+  if (opt(opts, 'unicode') === true) name = name.slice(0, 1) + name.slice(1).replace('#', '\u266f').replace('b', '\u266d');
   if (opt(opts, 'octave') === false) return finish(name, { width: opt(opts, 'width') });
   const octave = Math.floor(note / 12) - 5 + middleC;
   return finish(name + octave.toFixed(0), { width: opt(opts, 'width') });
@@ -483,7 +483,7 @@ function parseKind(s, kind, opts) {
 /** The number typed, or undefined when there is none to read. */
 export function formatParse(text, opts) {
   if (typeof text !== 'string' && typeof text !== 'number') return undefined;
-  let s = String(text).toLowerCase().replace(/\s+/g, '').replace(/−/g, '-').replace(/♯/g, '#').replace(/♭/g, 'b').replace(/∞/g, 'inf');
+  let s = String(text).toLowerCase().replace(/\s+/g, '').replace(/\u2212/g, '-').replace(/\u266f/g, '#').replace(/\u266d/g, 'b').replace(/\u221e/g, 'inf');
   if (s === '') return undefined;
   const kind = String(opt(opts, 'kind') ?? 'auto');
   let value = parseKind(s, kind, opts);

@@ -280,7 +280,7 @@ const SHARED_OPTION_FIELDS = {
   formatDecimals: { name: 'decimals', type: 'number', default: 'as the command decides', summary: 'Exactly this many decimal places, 0 to 6.' },
   formatDigits: { name: 'digits', type: 'number', default: '3', summary: 'Significant digits, 1 to 6, when `decimals` is left out.' },
   formatSign: { name: 'sign', type: 'text', default: '"auto"', values: ['auto', 'always'], summary: '"always" writes a plus too, as in "+12".' },
-  formatUnit: { name: 'unit', type: 'true or false, or text', default: 'true', summary: 'false: no unit. Text: this unit instead, such as "st".' },
+  formatUnit: { name: 'unit', type: 'true or false, or text', default: 'true', summary: 'Off for no unit, or text for a unit of its own, such as "st".' },
   formatSpace: { name: 'space', type: 'true or false', default: 'true', summary: 'The space between the number and its unit. None before % either way.' },
   formatWidth: { name: 'width', type: 'number', summary: 'Pad to this many characters, the text on the right. Longer text is not cut (that is ce.format.fit).' },
   formatPlaceholder: { name: 'placeholder', type: 'text', default: '"--"', summary: 'The text for a missing value.' },
@@ -890,7 +890,11 @@ export const COMMANDS = [
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
     refusal: 'false',
-    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request\'s own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time: as long as the profile gives the request for every try it allows, and never less than 3 seconds, unless `opts.timeout` says otherwise. A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.',
+    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request\'s own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)` once the dump arrives; `info.ok` is false when nothing arrived in time.',
+    notes: [
+      'In time means: as long as the profile gives the request for every try it allows, and never less than 3 seconds, unless `opts.timeout` says otherwise.',
+      'A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.',
+    ],
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
       { name: 'fn', type: 'function', required: false },
@@ -4634,7 +4638,7 @@ export const HELPERS = [
   },
   {
     id: 'formatRatio', category: 'Formatting', signature: 'formatRatio(v [, opts])', refusal: 'nothing',
-    summary: 'A ratio, as a compressor or an FM operator shows it.',
+    summary: 'A ratio, as a compressor or a frequency-modulation operator shows it.',
     example: '`ce.format.ratio(4)` gives "4:1"; with `style = "x"`, 2 gives "x2.00".',
     notes: ['A ratio of infinity, as a limiter has, is written "inf:1".'],
     params: [
@@ -5728,10 +5732,13 @@ export function resolveModules(declared) {
 // What a reference to a member looks like in the languages a panel can be written in. Both
 // spellings count: the flat alias (`sendCC(`) and the namespaced path (`ce.midi.sendCC`).
 // Value members have no call parens, so they are matched as bare words.
-function memberReferenceRe(memberId, shortName) {
+function memberReferenceRe(memberId, shortName, isModuleName = false) {
   const flat = escapeForRe(memberId);
   const short = escapeForRe(shortName);
-  return new RegExp(`\\b${flat}\\b|\\.\\s*${short}\\b`);
+  // A member whose short name is also a module's (ce.format.time beside ce.time) would otherwise be
+  // found in every script that reaches for that module, so `ce.time` itself does not count for it.
+  const before = isModuleName ? '(?<!\\bce\\s*)' : '';
+  return new RegExp(`\\b${flat}\\b|${before}\\.\\s*${short}\\b`);
 }
 
 function escapeForRe(s) {
@@ -5759,7 +5766,10 @@ function scanMatchers() {
   const known = allModules();
   const members = Object.entries(memberModule())
     .filter(([, at]) => !moduleById(at.module)?.global)
-    .map(([id, at]) => ({ module: at.module, re: memberReferenceRe(id, at.name) }));
+    .map(([id, at]) => ({
+      module: at.module,
+      re: memberReferenceRe(id, at.name, known.some((m) => m.id === `ce.${at.name}`)),
+    }));
   const paths = known.filter((module) => !module.global)
     .map((module) => ({ module: module.id, re: new RegExp(`\\b${escapeForRe(module.id)}\\b`) }));
   return moduleScanMatchers = { known, members, paths };

@@ -238,7 +238,11 @@ test('what each checked member answers when it refuses', () => {
   for (const [path, answer] of Object.entries(answers)) (byAnswer[answer] ??= []).push(path);
   for (const list of Object.values(byAnswer)) list.sort();
   assert.deepEqual(byAnswer, {
-    nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform', 'ce.midi.checksum', 'ce.midi.panic',
+    nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform',
+      'ce.format.clock', 'ce.format.db', 'ce.format.division', 'ce.format.fit', 'ce.format.hz', 'ce.format.line',
+      'ce.format.note', 'ce.format.number', 'ce.format.pan', 'ce.format.parse', 'ce.format.percent',
+      'ce.format.ratio', 'ce.format.table', 'ce.format.time',
+      'ce.midi.checksum', 'ce.midi.panic',
       'ce.midi.read', 'ce.midi.write', 'ce.panel.clone', 'ce.panel.create', 'ce.storage.encode', 'ce.text.fit', 'ce.time.syncTimer',
       'ce.ui.notify', 'set'],
     false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.device.bind', 'ce.device.defineDump',

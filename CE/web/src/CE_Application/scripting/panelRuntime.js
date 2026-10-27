@@ -10837,7 +10837,7 @@ export async function collectDawSaveState() {
     try {
       // A copy: a handler that writes into `store` instead of returning would otherwise change what
       // the next handler is given, and the C++ engines do not let it.
-      const answer = await fn(structuredClone(store));
+      const answer = await fn(deepClone(store));
       if (answer && typeof answer === 'object' && !Array.isArray(answer)) Object.assign(store, answer);
     } catch (e) {
       reportScriptError(s.id, e);
