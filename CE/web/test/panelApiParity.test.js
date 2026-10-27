@@ -188,12 +188,16 @@ test('the WebView runtime raises every event it is expected to raise', () => {
   // with no source is the same defect one step earlier — the probe list is right and nothing ever
   // pushes the event. onDaw* are excluded by their runtime:'player' marker: the editor has no DAW.
   //
-  // Two places can raise one: panelRuntime itself, and the preview surface, which calls
+  // The places that raise one: panelRuntime itself; the preview surface, which calls
   // dispatchInteraction for the transient pointer events (onWheel/onDoubleClick/onPointerMove)
-  // that cannot be recovered from a session diff. Both count.
+  // that cannot be recovered from a session diff; the MIDI-CI bridge, which raises what a device
+  // said (onCiDiscovered...); and the input decoder, whose events panelRuntime dispatches as they
+  // come (onBendIn...). All count.
   const sources = [
     join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'),
     join(here, '..', 'src', 'CE_Application', 'editor', 'PanelPreviewSurface.svelte'),
+    join(here, '..', 'src', 'CE_Application', 'scripting', 'ciHost.js'),
+    join(here, '..', 'src', 'CE_Application', 'scripting', 'midiInDecoder.js'),
   ].map((f) => readText(f)).join('\n');
 
   const missing = handlerNamesForRuntime(RUNTIME_WEBVIEW)
