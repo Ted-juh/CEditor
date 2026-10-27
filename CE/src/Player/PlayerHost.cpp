@@ -188,6 +188,13 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
                              (float) (double) payload.getProperty ("value", 0.0));
     });
 
+    options = options.withEventListener ("paramGesture", [this] (const juce::var& payload)
+    {
+        if (onUiParamGesture != nullptr)
+            onUiParamGesture (payload.getProperty ("id", "").toString(),
+                              payload.getProperty ("phase", "").toString() == "begin");
+    });
+
     // The JS player finished loading the panel and wants every parameter's current value pushed
     // (so the on-screen controls reflect a restored/automated state on open).
     options = options.withEventListener ("requestParamSync", [this] (const juce::var&)

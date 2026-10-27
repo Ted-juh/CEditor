@@ -30,6 +30,9 @@ public:
     // Called when the user moves a control in the panel (JS "paramChanged"): the plugin sets the
     // matching host parameter so the DAW records automation. Set by the plugin editor.
     std::function<void (const juce::String& parameterId, float value)> onUiParamChange;
+    // The page's press on a control began or ended (JS "paramGesture"): every value between is one
+    // DAW gesture, so a DAW writing in touch mode holds the parameter for the whole drag.
+    std::function<void (const juce::String& parameterId, bool begin)> onUiParamGesture;
 
     // Push a host-parameter value into the panel UI (automation playback -> on-screen control moves).
     void pushParamToUi (const juce::String& parameterId, float value);

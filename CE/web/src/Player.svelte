@@ -11,6 +11,7 @@
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { hostWindowShown } from './CE_Application/stores/hostWindow.js';
   import { installHostKeyForwarding } from './CE_Application/utils/hostKeys.js';
+  import { paramEvents, endOpenGestures } from './CE_Application/utils/playerParamEvents.js';
   import { DEFAULT_PANIC_SHORTCUT, isPanicShortcut } from './CE_Application/utils/panicLayout.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
   import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
@@ -229,15 +230,15 @@
     }
   }
 
-  // The user moved a control -> tell C++ to drive the matching host parameter (records automation).
+  // The user moved a control -> tell C++ to drive the matching host parameter (records automation),
+  // with a drag held as one DAW gesture (utils/playerParamEvents.js says why).
+  const openGestures = new Set();
   function emitChangedParams(sessions, backend) {
-    for (const parameterId in controlByParam) {
-      const { controlId, leaf, choiceParam, sectionField } = controlByParam[parameterId];
-      const v = controlParamValue(sessions?.[controlId], leaf, choiceParam, sectionField);
-      if (v === undefined || lastParamValue[parameterId] === v) continue;
-      lastParamValue[parameterId] = v;
-      if (paramSyncReady) backend.emitEvent('paramChanged', { id: parameterId, value: v });
-    }
+    const events = paramEvents(sessions, controlByParam, {
+      lastParamValue, openGestures, ready: paramSyncReady,
+      valueOf: (session, { leaf, choiceParam, sectionField }) => controlParamValue(session, leaf, choiceParam, sectionField),
+    });
+    for (const [name, payload] of events) backend.emitEvent(name, payload);
     paramSyncReady = true;  // first pass only seeds lastParamValue, never emits
   }
 
@@ -689,6 +690,9 @@
       if (inMsgUnsub) inMsgUnsub();
       if (sysexUnsub) sysexUnsub();
       if (sessionsUnsub) sessionsUnsub();
+      // A press the page never finished must not hold a DAW parameter in touch mode (the processor
+      // ends any it still has when the window closes, too).
+      for (const [name, payload] of endOpenGestures(openGestures)) backend?.emitEvent(name, payload);
       if (deviceUnsub) deviceUnsub();
       setPreviewModeEnabled(false);
       setRuntimeHost(null);

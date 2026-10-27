@@ -540,14 +540,41 @@ public:
 
     // The panel UI moved a control -> drive the matching host parameter with a gesture so the DAW
     // records the automation. Called on the message thread from the editor.
+    //
+    // A value inside a press (beginUiGesture .. endUiGesture) is part of that one gesture. Every
+    // value used to be a gesture of its own, so a drag of 200 steps was 200 gestures and a DAW
+    // writing in touch or latch mode saw the knob let go 200 times.
     void setParamFromUi (const juce::String& parameterId, float value)
     {
         if (auto* p = apvts.getParameter (parameterId))
         {
-            p->beginChangeGesture();
+            const auto inGesture = uiGestures.count (parameterId) > 0;
+            if (! inGesture) p->beginChangeGesture();
             p->setValueNotifyingHost (p->convertTo0to1 (value));
-            p->endChangeGesture();
+            if (! inGesture) p->endChangeGesture();
         }
+    }
+
+    void beginUiGesture (const juce::String& parameterId)
+    {
+        if (auto* p = apvts.getParameter (parameterId))
+            if (uiGestures.insert (parameterId).second)
+                p->beginChangeGesture();
+    }
+
+    void endUiGesture (const juce::String& parameterId)
+    {
+        if (uiGestures.erase (parameterId) > 0)
+            if (auto* p = apvts.getParameter (parameterId))
+                p->endChangeGesture();
+    }
+
+    /** Ends every open press: the window is closing, and a gesture left open holds the DAW's
+        parameter in touch mode until the project is closed. */
+    void endAllUiGestures()
+    {
+        for (const auto& id : std::vector<juce::String> (uiGestures.begin(), uiGestures.end()))
+            endUiGesture (id);
     }
 
     // The processor owns the MIDI engine so it survives the editor window closing. The editor's
@@ -557,6 +584,9 @@ public:
 
 private:
 #if CEDITOR_VALUE_LAYER
+    // Parameters the page holds a press on (beginUiGesture .. endUiGesture). Message thread only.
+    std::set<juce::String> uiGestures;
+
     // Window-closed automation -> MIDI. While the editor is open the WebView/JS sends (and we skip,
     // to avoid double-sends); when it closes we re-send current values then stream changes.
    #if CEDITOR_SCRIPTING
@@ -2686,6 +2716,7 @@ public:
        #if CEDITOR_VALUE_LAYER
         // UI -> host parameter: the user moved a control, so record automation.
         host.onUiParamChange = [&p] (const juce::String& id, float value) { p.setParamFromUi (id, value); };
+        host.onUiParamGesture = [&p] (const juce::String& id, bool begin) { if (begin) p.beginUiGesture (id); else p.endUiGesture (id); };
         // UI is ready -> force a full re-push of current parameter values on the next tick.
         host.onResyncRequest = [this] { lastPushed.clear(); };
         // Total Recall S2: the processor decides WHEN to ask, the panel is WHERE the question goes.
@@ -2718,6 +2749,8 @@ public:
         // than a theoretical one. host.onRestoreAnswer needs no such care: it lives on `host`,
         // which is a member and dies here.
         processor.onRestorePrompt = nullptr;
+        // A press the closing window never finished must not hold a DAW parameter in touch mode.
+        processor.endAllUiGestures();
        #endif
     }
 
