@@ -33,9 +33,12 @@ test('adoption copies the profile\'s display format, table and middle C onto the
   assert.equal(adopted(SPLIT).displayMiddleC, 3);
   // A rebind writes them all, so nothing of the old parameter's display survives it.
   const plain = adopted(OCTAVE);
-  assert.equal(plain.displayFormat, null);
-  assert.equal(plain.displayTable, null);
-  assert.equal(plain.displayMiddleC, null);
+  for (const key of ['displayFormat', 'displayTable', 'displayMiddleC']) {
+    assert.ok(key in plain, `${key} is written, so a rebind clears it`);
+    assert.equal(plain[key], undefined, `${key} is undefined, so JSON leaves it out`);
+  }
+  assert.equal(JSON.stringify(plain).includes('display'), true, 'displayMin/Max are still there as before');
+  assert.equal(/displayFormat|displayTable|displayMiddleC/.test(JSON.stringify(plain)), false);
   // And the table is a copy: changing the control's must not change the profile's.
   adopted(RATE).displayTable.push('x');
   assert.equal(RATE.display.table.length, 4);
