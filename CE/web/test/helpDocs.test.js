@@ -63,7 +63,7 @@ test('helpDocById finds a document and refuses an unknown one', () => {
 
 test('the bundle is not so large it becomes the reason the app is slow to start', () => {
   // Not a network budget — this is read off local disk — and not a start-up cost either: the help
-  // overlay loads the bundle the first time it opens (HelpOverlay.svelte). It is a parse when help
+  // viewer loads the bundle the first time it opens (DocumentationView.svelte). It is a parse when help
   // first opens. The scripting manual gave every component command a full entry at the owner's
   // word (2026-10-25, the LCD's review, item 12), which took the bundle from about 470 KB to about
   // 780 KB. A limit that catches growth by an order of magnitude, not one meant to be met.

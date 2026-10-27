@@ -1,6 +1,6 @@
 <script>
   import ScriptTrustBanner from './CE_Application/components/ScriptTrustBanner.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
 
   let menuBarHeight = $state(28);
   let contextBarElement = $state();
@@ -19,7 +19,6 @@
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
   import AboutOverlay from './CE_Application/layout/AboutOverlay.svelte';
   import { runStartupUpdateCheck } from './CE_Application/stores/updateChannel.js';
-  import HelpOverlay from './CE_Application/layout/HelpOverlay.svelte';
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
@@ -48,6 +47,7 @@
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { initDeviceReadOffer } from './CE_Application/stores/deviceReadOffer.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
+  import { installDocumentationWindowEvents, openDocumentation } from './CE_Application/stores/documentation.js';
   import { aboutSignal, documentationSignal, requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
   import { colorTarget } from './CE_Application/stores/colorTarget.js';
@@ -198,8 +198,9 @@
   // boolean, so the menu asks and the overlay owns its own closing.
   $effect(() => { if ($aboutSignal > 0) showAbout = true; });
 
-  let showDocumentation = $state(false);
-  $effect(() => { if ($documentationSignal > 0) showDocumentation = true; });
+  // The manual is a tab or a window of its own now, not an overlay: stores/documentation.js decides
+  // which, and remembers the reader's choice.
+  $effect(() => { if ($documentationSignal > 0) untrack(() => openDocumentation()); });
   let isSettingsTab = $derived($activeEditorTab?.type === 'settings');
   let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 900);
 
@@ -378,7 +379,9 @@
     // Delayed past the first frames: a network call has no business competing with panel restore
     // for the message thread while the window is still painting.
     const updateTimer = setTimeout(() => runStartupUpdateCheck(), 4000);
-    return () => clearTimeout(updateTimer);
+    // The manual's own window asks, through the native side, to go back into a tab.
+    const offDocumentationDocked = installDocumentationWindowEvents();
+    return () => { clearTimeout(updateTimer); offDocumentationDocked(); };
   });
 
 </script>
@@ -492,9 +495,6 @@
   {/if}
   {#if showAbout}
     <AboutOverlay show={showAbout} onclose={() => showAbout = false} />
-  {/if}
-  {#if showDocumentation}
-    <HelpOverlay show={showDocumentation} onclose={() => showDocumentation = false} />
   {/if}
 {/if}
 

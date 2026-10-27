@@ -454,6 +454,9 @@ export const settingsTabOpen = writable(false);
 /** Settings page requested by a menu or a contextual "Manage" link. */
 export const settingsSection = writable('general');
 export const instrumentHostTabOpen = writable(false);
+/** Whether the Documentation tab is open. The manual's place (tab or its own window) and what it
+ *  shows are stores/documentation.js's; only the tab itself lives here, beside its siblings. */
+export const documentationTabOpen = writable(false);
 
 // The CTRL49 belongs to HoSTage while its tab is open, and goes back to its own screen when the
 // tab closes — not only when the whole program exits. Sent on changes only, and never before the
@@ -468,7 +471,7 @@ instrumentHostTabOpen.subscribe((open) => {
 /** Open device profile editor tabs */
 export const deviceProfileTabs = writable([]);
 
-/** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile'|'component'|'script', id } */
+/** Active editor tab descriptor: { type: 'panel'|'settings'|'documentation'|'deviceProfile'|'component'|'script', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
 /** Per-panel Device Profile Designer companions keyed by panel id. */
@@ -508,8 +511,8 @@ export const scriptRuntimePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, instrumentHostTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments],
-  ([$panels, $settingsTabOpen, $instrumentHostTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments]) => {
+  [panels, settingsTabOpen, instrumentHostTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments, documentationTabOpen],
+  ([$panels, $settingsTabOpen, $instrumentHostTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments, $documentationTabOpen]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -531,6 +534,15 @@ export const editorTabs = derived(
         id: 'instrumentHost',
         tabType: 'instrumentHost',
         name: 'Hostage',
+        modified: false,
+      });
+    }
+
+    if ($documentationTabOpen) {
+      tabs.push({
+        id: 'documentation',
+        tabType: 'documentation',
+        name: 'Documentation',
         modified: false,
       });
     }
@@ -579,6 +591,7 @@ function resolvePanelSelection(list, activeId, tab) {
   if (!Array.isArray(list) || list.length === 0) return null;
   if (tab?.type === 'settings') return null;
   if (tab?.type === 'instrumentHost') return null;
+  if (tab?.type === 'documentation') return null;
   if (tab?.type === 'component') return null;
   if (tab?.type === 'deviceProfile') return null;
   // Script tabs edit script documents, not panels. Falling through here made
@@ -657,6 +670,30 @@ export function closeInstrumentHostTab() {
     activeEditorTab.set({ type: 'panel', id: panelId });
   } else if (get(settingsTabOpen)) {
     activeEditorTab.set({ type: 'settings', id: 'settings' });
+  } else {
+    activeEditorTab.set({ type: 'panel', id: null });
+  }
+}
+
+/** Open the Documentation tab and bring it to the front. What it shows: stores/documentation.js. */
+export function openDocumentationTab() {
+  documentationTabOpen.set(true);
+  activeEditorTab.set({ type: 'documentation', id: 'documentation' });
+}
+
+/** Close the Documentation tab, falling back to the panel, then Settings, then Hostage. */
+export function closeDocumentationTab() {
+  const wasActive = get(activeEditorTab)?.type === 'documentation';
+  documentationTabOpen.set(false);
+  if (!wasActive) return;
+
+  const panelId = get(activePanelId);
+  if (panelId != null) {
+    activeEditorTab.set({ type: 'panel', id: panelId });
+  } else if (get(settingsTabOpen)) {
+    activeEditorTab.set({ type: 'settings', id: 'settings' });
+  } else if (get(instrumentHostTabOpen)) {
+    activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
   } else {
     activeEditorTab.set({ type: 'panel', id: null });
   }
@@ -980,6 +1017,11 @@ export function setActiveEditorTab(tab) {
     return;
   }
 
+  if (tab.tabType === 'documentation' || tab.type === 'documentation') {
+    openDocumentationTab();
+    return;
+  }
+
   if (tab.tabType === 'deviceProfile' || tab.type === 'deviceProfile') {
     const nextTab = { type: 'deviceProfile', id: tab.id };
     activeEditorTab.set(nextTab);
@@ -1038,6 +1080,11 @@ export function closeActiveEditorTab() {
 
   if (tab.type === 'instrumentHost') {
     closeInstrumentHostTab();
+    return;
+  }
+
+  if (tab.type === 'documentation') {
+    closeDocumentationTab();
     return;
   }
 
@@ -1260,7 +1307,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'instrumentHost' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
+  if (tab?.type === 'settings' || tab?.type === 'instrumentHost' || tab?.type === 'documentation' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);

@@ -38,6 +38,10 @@
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
   import InstrumentHostView from '../sections/InstrumentHostView.svelte';
+  import DocumentationView from '../layout/DocumentationView.svelte';
+  import AppWindow from 'lucide-svelte/icons/app-window';
+  import { documentationRequest, moveDocumentationToWindow, noteDocumentShown } from '../stores/documentation.js';
+  import { canOpenDocumentationWindow } from '../bridge/documentationWindow.js';
   import { isEditorShortcutFocus } from '../utils/editorShortcutFocus.js';
   import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
@@ -612,6 +616,9 @@
 
   function handleEditorKeyDown(e) {
     if (componentSurfaceWorkspaceActive) return;
+    // A reading page: Space scrolls it and the arrows move through it. None of the canvas's keys
+    // (Space-to-pan above all) mean anything there.
+    if ($activeEditorTab?.type === 'documentation') return;
     // Text fields inside the canvas chrome keep their keys — Delete in an input must never delete
     // controls. The Settings view also renders INSIDE this wrapper, so every keystroke in a settings
     // text box arrives here too. Without this, Backspace in a field never reached the field — and if
@@ -1070,6 +1077,16 @@
         <SettingsView />
       {:else if $activeEditorTab?.type === 'instrumentHost'}
         <InstrumentHostView />
+      {:else if $activeEditorTab?.type === 'documentation'}
+        <DocumentationView
+          request={$documentationRequest}
+          ondocument={noteDocumentShown}
+          placeAction={canOpenDocumentationWindow() ? {
+            label: 'Own window',
+            title: 'Move the manual into a window of its own, which you can move, resize and put on another screen',
+            icon: AppWindow,
+            run: (position) => moveDocumentationToWindow(position),
+          } : null} />
       {:else if $activeEditorTab?.type === 'screen'}
         {#key $activeEditorTab.id}
           <ScreenBuilderEditor documentId={$activeEditorTab.id} />
