@@ -19,7 +19,8 @@
 
 import {
   formatNumber, formatHz, formatTime, formatDb, formatPercent, formatPan, formatRatio, formatClock,
-  formatNote, formatDivision, formatTable, formatFit, formatLine, formatParse,
+  formatNote, formatDivision, formatTable, formatFit, formatLine, formatParse, formatDescribed,
+  formatPlaceholderFor,
 } from './formatCore.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
@@ -2113,6 +2114,17 @@ const helpers = {
   formatFit: (text, width, opts) => formatFit(text, width, opts, formatSay),
   formatLine: (left, right, width, opts) => formatLine(left, right, width, opts, formatSay),
   formatParse: (text, opts) => formatParse(text, opts),
+  // The one ce.format command that reads the device: the profile's description, then the pure part.
+  formatParameter: (id, v, opts) => {
+    const role = opts && typeof opts === 'object' && opts.role ? String(opts.role) : DEFAULT_ROLE;
+    const desc = deviceParameterRead(id, role);
+    if (!desc || typeof desc !== 'object') {
+      const shown = formatPlaceholderFor(opts);
+      formatSay('error', `ce.format.parameter: the device profile has no parameter "${String(id)}", so "${shown}" is shown.`);
+      return shown;
+    }
+    return formatDescribed(desc, v, opts, formatSay);
+  },
   // @module ce.music
   // Two spellings, chosen by whether the second argument is there at all. Omitted, you get this
   // module's own plain-ASCII names (C#4) — what every script written so far compares against, and

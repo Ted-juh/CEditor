@@ -6,6 +6,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import { SLIDER_TICK_LIMITS, clampSliderTickCount } from '../utils/sliderGeometry.js';
+  import { DISPLAY_FORMATS } from '../utils/parameterDisplay.js';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Cloud from 'lucide-svelte/icons/cloud';
@@ -182,6 +183,13 @@
   // Absent, not zero: the readout range is off until someone sets it, and `null` is how the model
   // says so — the same tri-state the section padding uses, for the same reason.
   let displayScaleOff = $derived(behavior?.displayMin == null && behavior?.displayMax == null);
+  const DISPLAY_FORMAT_LABELS = {
+    number: 'Number', hz: 'Frequency (Hz)', time: 'Time (ms, s)', db: 'Level (dB)', percent: 'Percent',
+    pan: 'Pan (L, C, R)', ratio: 'Ratio (4:1)', note: 'Note name', division: 'Note length', table: 'Table from the profile',
+  };
+  let readoutFormat = $derived(Array.isArray(behavior?.displayTable) && behavior.displayTable.length
+    ? 'table'
+    : (typeof behavior?.displayFormat === 'string' && behavior.displayFormat ? behavior.displayFormat : 'number'));
   let parts = $derived(getSection(control, 'Parts'));
   let geometry = $derived(String(behavior?.geometry ?? 'linear'));
   let valueMode = $derived(String(behavior?.valueMode ?? 'single'));
@@ -523,6 +531,24 @@
     </PropertyCell>
     <PropertyCell label="Show Sign" span={1} hint="Show a plus sign for positive values.">
       <PropertyToggle value={behavior.showSign === true} onchange={() => set('Behavior.showSign', !(behavior.showSign === true))} />
+    </PropertyCell>
+    <!-- How the synth writes the value (utils/parameterDisplay.js). Binding to a device parameter
+         sets it from the profile; a table comes only from there, so it is listed only when present. -->
+    <PropertyCell label="Writes as" span={2}
+                  hint="Write the value the way the synth does: as a frequency, a time, a pan, a note and so on. Typing into the readout reads it back the same way.">
+      <select class="val" value={readoutFormat}
+              onchange={(event) => {
+                const next = event.target.value;
+                if (next === 'table') return;
+                set('Behavior.displayFormat', next === 'number' ? null : next);
+                if (Array.isArray(behavior.displayTable)) set('Behavior.displayTable', null);
+              }}>
+        {#each DISPLAY_FORMATS as format (format)}
+          {#if format !== 'table' || readoutFormat === 'table'}
+            <option value={format}>{DISPLAY_FORMAT_LABELS[format] ?? format}</option>
+          {/if}
+        {/each}
+      </select>
     </PropertyCell>
 
     <!-- The readout's own range, when it differs from the wire's. A synth parameter stored 61..67

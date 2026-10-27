@@ -3174,6 +3174,57 @@ int runMidiCiTests()
 }
 }
 
+/**
+ * A profile's display.middleC reaches every parameter's descriptor, unless the parameter has its
+ * own, and the profile document itself is left as it was. ce.format.parameter and the value
+ * readouts write a note parameter from the descriptor, so this is where a Yamaha's C3 comes from.
+ */
+int runProfileMiddleCTests (const juce::File& file)
+{
+    auto document = juce::JSON::parse (file.loadFileAsString());
+    auto* root = document.getDynamicObject();
+    auto* parameters = document.getProperty ("parameters", {}).getArray();
+    if (root == nullptr || parameters == nullptr || parameters->size() < 2)
+    {
+        std::cerr << "[FAIL] middleC: the test profile has fewer than two parameters\n";
+        return 1;
+    }
+    auto* profileDisplay = new juce::DynamicObject();
+    profileDisplay->setProperty ("middleC", 3);
+    root->setProperty ("display", juce::var (profileDisplay));
+    auto* own = new juce::DynamicObject();
+    own->setProperty ("middleC", 4);
+    own->setProperty ("format", "note");
+    if (auto* second = parameters->getReference (1).getDynamicObject())
+        second->setProperty ("display", juce::var (own));
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (juce::JSON::toString (document), error))
+    {
+        std::cerr << "[FAIL] middleC: profile did not load: " << error << "\n";
+        return 1;
+    }
+    int failures = 0;
+    for (int pass = 0; pass < 2; ++pass)   // twice: the first answer must not have changed the document
+    {
+        const auto descriptors = engine.listParameterDescriptors();
+        auto* list = descriptors.getArray();
+        if (list == nullptr || list->size() < 2) { std::cerr << "[FAIL] middleC: no descriptors\n"; return 1; }
+        const auto first = (*list)[0].getProperty ("display", {}).getProperty ("middleC", {});
+        const auto second = (*list)[1].getProperty ("display", {});
+        if (! first.isInt() && ! first.isDouble()) { std::cerr << "[FAIL] middleC: the profile's 3 did not reach the first parameter\n"; ++failures; }
+        else if ((int) first != 3) { std::cerr << "[FAIL] middleC: first parameter got " << first.toString() << ", not 3\n"; ++failures; }
+        if ((int) second.getProperty ("middleC", {}) != 4 || second.getProperty ("format", {}).toString() != "note")
+        {
+            std::cerr << "[FAIL] middleC: the parameter's own 4 (and its format) did not survive: " << juce::JSON::toString (second, true) << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0) std::cout << "[PASS] a profile's display.middleC reaches each parameter that has none of its own\n";
+    return failures;
+}
+
 int main (int argc, char** argv)
 {
     if (argc == 4 && juce::String (argv[1]) == "--hold-request")
@@ -3240,6 +3291,7 @@ int main (int argc, char** argv)
     failures += runDumpMemorySlotTests (root.getChildFile ("yamaha-an1x-dpd.ceditor-device.json"),
                                         root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPresetRecallTests (root);
+    failures += runProfileMiddleCTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
 
     if (failures == 0)
     {

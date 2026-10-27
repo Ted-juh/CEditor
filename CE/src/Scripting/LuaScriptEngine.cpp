@@ -1647,6 +1647,95 @@ function formatParse(text, opts)
     if finite(max) and value > max then value = max end
     return value
   end
+
+  -- As the synth shows it: formatCore.js formatDescribed, from the parameter the profile describes.
+  local function describedOptions(d, kind, opts)
+    local o = {}
+    local precision = toNumber(d.precision)
+    if finite(precision) then o.decimals = precision end
+    if type(d.unit) == "string" and d.unit ~= "" and (kind == "" or kind == "number") then o.unit = d.unit end
+    local middleC = toNumber(d.middleC)
+    if finite(middleC) then o.middleC = middleC end
+    if type(opts) == "table" then
+      for key, value in pairs(opts) do if key ~= "role" then o[key] = value end end
+    end
+    return o
+  end
+  local function withOptions(base, extra)
+    local o = {}
+    for key, value in pairs(base) do o[key] = value end
+    for key, value in pairs(extra) do if o[key] == nil then o[key] = value end end
+    return o
+  end
+  local function formatDescribed(desc, v, opts)
+    local p = type(desc) == "table" and desc or {}
+    local d = type(p.display) == "table" and p.display or {}
+    local kind = type(d.format) == "string" and d.format or ""
+    local o = describedOptions(d, kind, opts)
+
+    if d.mode == "text" or p.type == "text" then return finish(asText(v), o) end
+
+    if type(p.choices) == "table" then
+      local wanted = toNumber(v)
+      for _, c in ipairs(p.choices) do
+        if type(c) == "table" then
+          local value = toNumber(c.value)
+          if (finite(wanted) and value == wanted) or (type(v) == "string" and c.id == v) then
+            local label = c.label
+            if label == nil then label = c.id end
+            return finish(asText(label), o)
+          end
+        end
+      end
+    end
+
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(o) end
+    local range = type(p.range) == "table" and p.range or {}
+    local lo, hi = toNumber(range.min), toNumber(range.max)
+    local wireMin = finite(lo) and lo or 0
+    local wireMax = finite(hi) and hi or 127
+
+    if type(d.table) == "table" and #d.table > 0 then return formatTable(n, d.table, withOptions(o, { start = wireMin })) end
+
+    local dmin, dmax = toNumber(d.min), toNumber(d.max)
+    local scaledRange = finite(dmin) and finite(dmax) and wireMax ~= wireMin
+    local shown = n
+    if scaledRange then shown = dmin + ((n - wireMin) / (wireMax - wireMin)) * (dmax - dmin) end
+
+    if kind == "hz" then return formatHz(shown, o) end
+    if kind == "time" then return formatTime(shown, o) end
+    if kind == "db" then return formatDb(shown, o) end
+    if kind == "ratio" then return formatRatio(shown, o) end
+    if kind == "note" then return formatNote(shown, o) end
+    if kind == "division" then return formatDivision(shown, o) end
+    if kind == "percent" then return formatPercent(n, withOptions(o, { min = wireMin, max = wireMax })) end
+    if kind == "pan" then
+      local a, b = wireMin, wireMax
+      if scaledRange then a, b = dmin, dmax end
+      local center = math.floor((a + b) / 2 + 0.5)
+      if a < 0 and b > 0 then center = 0 end
+      return formatPan(shown, withOptions(o, { min = a, max = b, center = center }))
+    end
+    return formatNumber(shown, o)
+  end
+  __fmtDescribed = formatDescribed
+
+-- (global; at the line start, where the option check looks for it)
+function formatParameter(id, v, opts)
+    -- The host query itself, not deviceParameter: that is ce.device's, and gated when a script
+    -- does not use ce.device.
+    local role = nil
+    if type(opts) == "table" then role = opts.role end
+    if role == nil or role == "" then role = "mainSynth" else role = tostring(role) end
+    local d = __deviceQuery("parameter", { role = role, id = tostring(id) })
+    if type(d) ~= "table" then
+      local shown = placeholder(opts)
+      say("error", "ce.format.parameter: the device profile has no parameter \"" .. tostring(id) .. "\", so \"" .. shown .. "\" is shown.")
+      return shown
+    end
+    return formatDescribed(d, v, opts)
+  end
 end
 
 -- @module ce.music
@@ -4205,6 +4294,7 @@ local __CE_OPTIONS = {
   ["formatClock"] = { path = "ce.format.clock", at = 2, refusal = "nothing", names = { "width", "placeholder", "unicode", "decimals", "hours" } },
   ["formatNote"] = { path = "ce.format.note", at = 2, refusal = "nothing", names = { "width", "placeholder", "unicode", "middleC", "flats", "octave" } },
   ["formatDivision"] = { path = "ce.format.division", at = 2, refusal = "nothing", names = { "decimals", "digits", "width", "placeholder", "tolerance" } },
+  ["formatParameter"] = { path = "ce.format.parameter", at = 3, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "role" } },
   ["formatTable"] = { path = "ce.format.table", at = 3, refusal = "nothing", names = { "width", "placeholder", "start" } },
   ["formatFit"] = { path = "ce.format.fit", at = 3, refusal = "nothing", names = { "abbreviations", "align", "pad", "steps" } },
   ["formatLine"] = { path = "ce.format.line", at = 4, refusal = "nothing", names = { "abbreviations", "gap" } },
@@ -4295,7 +4385,7 @@ local __CE_MODULES = {
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromARGB = "colourFromArgb", fromHsl = "hslToHex", fromRGBA = "colourFromRgba", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
-  ["ce.format"] = { clock = "formatClock", db = "formatDb", division = "formatDivision", fit = "formatFit", hz = "formatHz", line = "formatLine", note = "formatNote", number = "formatNumber", pan = "formatPan", parse = "formatParse", percent = "formatPercent", ratio = "formatRatio", table = "formatTable", time = "formatTime" },
+  ["ce.format"] = { clock = "formatClock", db = "formatDb", division = "formatDivision", fit = "formatFit", hz = "formatHz", line = "formatLine", note = "formatNote", number = "formatNumber", pan = "formatPan", parameter = "formatParameter", parse = "formatParse", percent = "formatPercent", ratio = "formatRatio", table = "formatTable", time = "formatTime" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", play = "animatePlay", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
@@ -4340,7 +4430,7 @@ local __CE_META = {
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
   { id = "ce.math", version = "1.8", runtime = "any" },
-  { id = "ce.format", version = "1.0", runtime = "any" },
+  { id = "ce.format", version = "1.1", runtime = "any" },
   { id = "ce.music", version = "1.2", runtime = "any" },
   { id = "ce.time", version = "1.3", runtime = "any" },
   { id = "ce.anim", version = "1.1", runtime = "any" },

@@ -64,6 +64,16 @@ export function applyParameterAdoption(set, controlType, parameter) {
     set('Behavior.displayMax', remapped ? displayMax : null);
     set('Behavior.unit', parameter?.display?.unit ? String(parameter.display.unit) : '');
     set('Behavior.showSign', remapped && displayMin < 0);
+    // How the synth writes it (parameterDisplay.js): Hz, a pan, a note, a table. Written on every
+    // adoption for the same reason as the four above — a cutoff's "kHz" must not outlive a rebind
+    // to a level.
+    const format = typeof parameter?.display?.format === 'string' ? parameter.display.format : '';
+    const table = Array.isArray(parameter?.display?.table) && parameter.display.table.length
+      ? structuredClone(parameter.display.table) : null;
+    const middleC = Number(parameter?.display?.middleC);
+    set('Behavior.displayFormat', format && format !== 'number' ? format : null);
+    set('Behavior.displayTable', table);
+    set('Behavior.displayMiddleC', Number.isFinite(middleC) && parameter?.display?.middleC !== null ? middleC : null);
   }
 
   if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {

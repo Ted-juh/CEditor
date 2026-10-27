@@ -2759,6 +2759,101 @@ def formatParse(text, opts=None):
         value = hi
     return value
 
+# As the synth shows it: formatCore.js formatDescribed, from the parameter the profile describes.
+def _fmt_described_options(d, kind, opts):
+    o = {}
+    precision = _fmt_num(d.get("precision"))
+    if _fmt_math.isfinite(precision):
+        o["decimals"] = precision
+    unit = d.get("unit")
+    if isinstance(unit, str) and unit != "" and kind in ("", "number"):
+        o["unit"] = unit
+    middle_c = _fmt_num(d.get("middleC"))
+    if _fmt_math.isfinite(middle_c):
+        o["middleC"] = middle_c
+    if isinstance(opts, dict):
+        for key, value in opts.items():
+            if key != "role":
+                o[key] = value
+    return o
+
+def _fmt_with_options(base, extra):
+    o = dict(base)
+    for key, value in extra.items():
+        if o.get(key) is None:
+            o[key] = value
+    return o
+
+def _fmt_described(desc, v, opts):
+    p = desc if isinstance(desc, dict) else {}
+    d = p.get("display") if isinstance(p.get("display"), dict) else {}
+    kind = d.get("format") if isinstance(d.get("format"), str) else ""
+    o = _fmt_described_options(d, kind, opts)
+
+    if d.get("mode") == "text" or p.get("type") == "text":
+        return _fmt_finish(_fmt_as_text(v), o)
+
+    choices = p.get("choices")
+    if isinstance(choices, (list, tuple)):
+        wanted = _fmt_num(v)
+        for c in choices:
+            if not isinstance(c, dict):
+                continue
+            value = _fmt_num(c.get("value"))
+            if (_fmt_math.isfinite(wanted) and value == wanted) or (isinstance(v, str) and c.get("id") == v):
+                label = c.get("label")
+                return _fmt_finish(_fmt_as_text(label if label is not None else c.get("id")), o)
+
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(o)
+    rng = p.get("range") if isinstance(p.get("range"), dict) else {}
+    lo = _fmt_num(rng.get("min"))
+    hi = _fmt_num(rng.get("max"))
+    wire_min = lo if _fmt_math.isfinite(lo) else 0
+    wire_max = hi if _fmt_math.isfinite(hi) else 127
+
+    table = d.get("table")
+    if isinstance(table, (list, tuple)) and len(table) > 0:
+        return formatTable(n, table, _fmt_with_options(o, {"start": wire_min}))
+
+    dmin = _fmt_num(d.get("min"))
+    dmax = _fmt_num(d.get("max"))
+    scaled = _fmt_math.isfinite(dmin) and _fmt_math.isfinite(dmax) and wire_max != wire_min
+    shown = dmin + ((n - wire_min) / (wire_max - wire_min)) * (dmax - dmin) if scaled else n
+
+    if kind == "hz":
+        return formatHz(shown, o)
+    if kind == "time":
+        return formatTime(shown, o)
+    if kind == "db":
+        return formatDb(shown, o)
+    if kind == "ratio":
+        return formatRatio(shown, o)
+    if kind == "note":
+        return formatNote(shown, o)
+    if kind == "division":
+        return formatDivision(shown, o)
+    if kind == "percent":
+        return formatPercent(n, _fmt_with_options(o, {"min": wire_min, "max": wire_max}))
+    if kind == "pan":
+        a, b = (dmin, dmax) if scaled else (wire_min, wire_max)
+        center = 0 if a < 0 and b > 0 else _fmt_math.floor((a + b) / 2 + 0.5)
+        return formatPan(shown, _fmt_with_options(o, {"min": a, "max": b, "center": center}))
+    return formatNumber(shown, o)
+
+def formatParameter(id, v, opts=None):
+    # The host query itself, not deviceParameter: that is ce.device's, and gated when a script
+    # does not use ce.device.
+    role = opts.get("role") if isinstance(opts, dict) else None
+    role = "mainSynth" if role is None or role == "" else str(role)
+    d = __deviceQuery("parameter", { "role": role, "id": str(id) })
+    if not isinstance(d, dict):
+        shown = _fmt_placeholder(opts)
+        _fmt_say("error", "ce.format.parameter: the device profile has no parameter \"" + str(id) + "\", so \"" + shown + "\" is shown.")
+        return shown
+    return _fmt_described(d, v, opts)
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -4505,6 +4600,7 @@ __CE_OPTIONS = {
     "formatClock": { "path": "ce.format.clock", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "unicode", "decimals", "hours"] },
     "formatNote": { "path": "ce.format.note", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "unicode", "middleC", "flats", "octave"] },
     "formatDivision": { "path": "ce.format.division", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "width", "placeholder", "tolerance"] },
+    "formatParameter": { "path": "ce.format.parameter", "at": 2, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "role"] },
     "formatTable": { "path": "ce.format.table", "at": 2, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "start"] },
     "formatFit": { "path": "ce.format.fit", "at": 2, "param": "opts", "refusal": "nothing", "names": ["abbreviations", "align", "pad", "steps"] },
     "formatLine": { "path": "ce.format.line", "at": 3, "param": "opts", "refusal": "nothing", "names": ["abbreviations", "gap"] },
@@ -4578,7 +4674,7 @@ __CE_MODULES = {
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
-    "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
+    "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parameter": "formatParameter", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -4623,7 +4719,7 @@ __CE_META = [
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
     { "id": "ce.math", "version": "1.8", "runtime": "any" },
-    { "id": "ce.format", "version": "1.0", "runtime": "any" },
+    { "id": "ce.format", "version": "1.1", "runtime": "any" },
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
     { "id": "ce.time", "version": "1.3", "runtime": "any" },
     { "id": "ce.anim", "version": "1.1", "runtime": "any" },

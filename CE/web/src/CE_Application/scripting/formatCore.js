@@ -321,6 +321,92 @@ export function formatTable(v, list, opts, say) {
   return finish(asText(list[index]), opts);
 }
 
+/* -------------------------------------------------------------- as the synth shows it */
+
+/** The options a command gets from a profile `display`, before the call's own (which win). */
+function describedOptions(d, kind, opts) {
+  const o = {};
+  const precision = toNumber(d.precision);
+  if (Number.isFinite(precision)) o.decimals = precision;
+  if (typeof d.unit === 'string' && d.unit !== '' && (kind === '' || kind === 'number')) o.unit = d.unit;
+  const middleC = toNumber(d.middleC);
+  if (Number.isFinite(middleC)) o.middleC = middleC;
+  if (opts && typeof opts === 'object') {
+    for (const key of Object.keys(opts)) if (key !== 'role') o[key] = opts[key];
+  }
+  return o;
+}
+
+function withOptions(base, extra) {
+  const o = {};
+  for (const key of Object.keys(base)) o[key] = base[key];
+  for (const key of Object.keys(extra)) if (o[key] === undefined) o[key] = extra[key];
+  return o;
+}
+
+/**
+ * A parameter's value as the synth's display writes it, from the parameter as the device profile
+ * describes it (`ce.device.parameter(id)`): its choices, `display.table`, `display.min`/`max` over
+ * `range`, `display.format`, `display.unit`, `display.precision`, and `display.middleC`.
+ * ce.format.parameter is this after the lookup; the panel's readouts use it for a bound control.
+ */
+export function formatDescribed(desc, v, opts, say) {
+  const p = desc && typeof desc === 'object' ? desc : {};
+  const d = p.display && typeof p.display === 'object' ? p.display : {};
+  const kind = typeof d.format === 'string' ? d.format : '';
+  const o = describedOptions(d, kind, opts);
+
+  if (d.mode === 'text' || p.type === 'text') return finish(asText(v), o);
+
+  if (Array.isArray(p.choices)) {
+    const wanted = toNumber(v);
+    for (const c of p.choices) {
+      if (!c || typeof c !== 'object') continue;
+      const value = toNumber(c.value);
+      if ((Number.isFinite(wanted) && value === wanted) || (typeof v === 'string' && c.id === v)) {
+        return finish(asText(c.label !== undefined && c.label !== null ? c.label : c.id), o);
+      }
+    }
+  }
+
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(o);
+  const range = p.range && typeof p.range === 'object' ? p.range : {};
+  const lo = toNumber(range.min);
+  const hi = toNumber(range.max);
+  const wireMin = Number.isFinite(lo) ? lo : 0;
+  const wireMax = Number.isFinite(hi) ? hi : 127;
+
+  // A list's first entry is for the lowest stored value, as a synth's manual lists them.
+  if (Array.isArray(d.table) && d.table.length > 0) return formatTable(n, d.table, withOptions(o, { start: wireMin }), say);
+
+  const dmin = toNumber(d.min);
+  const dmax = toNumber(d.max);
+  const scaled = Number.isFinite(dmin) && Number.isFinite(dmax) && wireMax !== wireMin;
+  const shown = scaled ? dmin + ((n - wireMin) / (wireMax - wireMin)) * (dmax - dmin) : n;
+
+  if (kind === 'hz') return formatHz(shown, o, say);
+  if (kind === 'time') return formatTime(shown, o, say);
+  if (kind === 'db') return formatDb(shown, o, say);
+  if (kind === 'ratio') return formatRatio(shown, o, say);
+  if (kind === 'note') return formatNote(shown, o, say);
+  if (kind === 'division') return formatDivision(shown, o, say);
+  // How far along the stored range, so it needs no display range of its own.
+  if (kind === 'percent') return formatPercent(n, withOptions(o, { min: wireMin, max: wireMax }), say);
+  if (kind === 'pan') {
+    const a = scaled ? dmin : wireMin;
+    const b = scaled ? dmax : wireMax;
+    const center = a < 0 && b > 0 ? 0 : Math.floor((a + b) / 2 + 0.5);
+    return formatPan(shown, withOptions(o, { min: a, max: b, center }), say);
+  }
+  return formatNumber(shown, o, say);
+}
+
+/** What a command shows for a value it cannot write: the call's `placeholder`, else "--". */
+export function formatPlaceholderFor(opts) {
+  return placeholder(opts);
+}
+
 /* ------------------------------------------------------------------- fitting a display */
 
 /** Text as given; a number written by numberText, never by the language (Lua writes 2 as "2.0"). */

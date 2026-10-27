@@ -698,11 +698,31 @@ juce::var DeviceProfileEngine::listParameterDescriptors() const
     if (parameters == nullptr)
         return descriptors;
 
+    // The profile's own display.middleC (3 on a Yamaha, where middle C is C3) is how every note
+    // parameter on it is written, so each descriptor carries it unless the parameter says otherwise.
+    // ce.format.parameter and the value readouts read it from the descriptor, in every runtime.
+    juce::var profileMiddleC;
+    if (auto* profileDisplay = asObject (root->getProperty ("display")))
+        profileMiddleC = profileDisplay->getProperty ("middleC");
+
     for (const auto& parameterValue : *parameters)
     {
         auto* parameter = asObject (parameterValue);
         if (parameter == nullptr)
             continue;
+
+        auto display = parameter->getProperty ("display");
+        if (! profileMiddleC.isVoid())
+        {
+            auto* own = asObject (display);
+            if (own == nullptr || ! own->hasProperty ("middleC"))
+            {
+                // A copy: the profile document is shared, and this answer must not change it.
+                auto* withMiddleC = own != nullptr ? own->clone().release() : new juce::DynamicObject();
+                withMiddleC->setProperty ("middleC", profileMiddleC);
+                display = juce::var (withMiddleC);
+            }
+        }
 
         auto* descriptor = new juce::DynamicObject();
         descriptor->setProperty ("id", propString (*parameter, "id"));
@@ -712,7 +732,7 @@ juce::var DeviceProfileEngine::listParameterDescriptors() const
         descriptor->setProperty ("default", parameter->getProperty ("default"));
         descriptor->setProperty ("range", parameter->getProperty ("range"));
         descriptor->setProperty ("choices", parameter->getProperty ("choices"));
-        descriptor->setProperty ("display", parameter->getProperty ("display"));
+        descriptor->setProperty ("display", display);
         descriptor->setProperty ("access", parameter->getProperty ("access"));
         descriptor->setProperty ("sendPolicy", parameter->getProperty ("sendPolicy"));
         descriptor->setProperty ("ui", parameter->getProperty ("ui"));

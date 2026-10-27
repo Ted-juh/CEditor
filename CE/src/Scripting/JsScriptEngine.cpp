@@ -1538,6 +1538,92 @@ function __formatTable(v, list, opts, say) {
   return finish(asText(list[index]), opts);
 }
 
+/* -------------------------------------------------------------- as the synth shows it */
+
+/** The options a command gets from a profile `display`, before the call's own (which win). */
+function describedOptions(d, kind, opts) {
+  const o = {};
+  const precision = toNumber(d.precision);
+  if (Number.isFinite(precision)) o.decimals = precision;
+  if (typeof d.unit === 'string' && d.unit !== '' && (kind === '' || kind === 'number')) o.unit = d.unit;
+  const middleC = toNumber(d.middleC);
+  if (Number.isFinite(middleC)) o.middleC = middleC;
+  if (opts && typeof opts === 'object') {
+    for (const key of Object.keys(opts)) if (key !== 'role') o[key] = opts[key];
+  }
+  return o;
+}
+
+function withOptions(base, extra) {
+  const o = {};
+  for (const key of Object.keys(base)) o[key] = base[key];
+  for (const key of Object.keys(extra)) if (o[key] === undefined) o[key] = extra[key];
+  return o;
+}
+
+/**
+ * A parameter's value as the synth's display writes it, from the parameter as the device profile
+ * describes it (`ce.device.parameter(id)`): its choices, `display.table`, `display.min`/`max` over
+ * `range`, `display.format`, `display.unit`, `display.precision`, and `display.middleC`.
+ * ce.format.parameter is this after the lookup; the panel's readouts use it for a bound control.
+ */
+function __formatDescribed(desc, v, opts, say) {
+  const p = desc && typeof desc === 'object' ? desc : {};
+  const d = p.display && typeof p.display === 'object' ? p.display : {};
+  const kind = typeof d.format === 'string' ? d.format : '';
+  const o = describedOptions(d, kind, opts);
+
+  if (d.mode === 'text' || p.type === 'text') return finish(asText(v), o);
+
+  if (Array.isArray(p.choices)) {
+    const wanted = toNumber(v);
+    for (const c of p.choices) {
+      if (!c || typeof c !== 'object') continue;
+      const value = toNumber(c.value);
+      if ((Number.isFinite(wanted) && value === wanted) || (typeof v === 'string' && c.id === v)) {
+        return finish(asText(c.label !== undefined && c.label !== null ? c.label : c.id), o);
+      }
+    }
+  }
+
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(o);
+  const range = p.range && typeof p.range === 'object' ? p.range : {};
+  const lo = toNumber(range.min);
+  const hi = toNumber(range.max);
+  const wireMin = Number.isFinite(lo) ? lo : 0;
+  const wireMax = Number.isFinite(hi) ? hi : 127;
+
+  // A list's first entry is for the lowest stored value, as a synth's manual lists them.
+  if (Array.isArray(d.table) && d.table.length > 0) return formatTable(n, d.table, withOptions(o, { start: wireMin }), say);
+
+  const dmin = toNumber(d.min);
+  const dmax = toNumber(d.max);
+  const scaled = Number.isFinite(dmin) && Number.isFinite(dmax) && wireMax !== wireMin;
+  const shown = scaled ? dmin + ((n - wireMin) / (wireMax - wireMin)) * (dmax - dmin) : n;
+
+  if (kind === 'hz') return formatHz(shown, o, say);
+  if (kind === 'time') return formatTime(shown, o, say);
+  if (kind === 'db') return formatDb(shown, o, say);
+  if (kind === 'ratio') return formatRatio(shown, o, say);
+  if (kind === 'note') return formatNote(shown, o, say);
+  if (kind === 'division') return formatDivision(shown, o, say);
+  // How far along the stored range, so it needs no display range of its own.
+  if (kind === 'percent') return formatPercent(n, withOptions(o, { min: wireMin, max: wireMax }), say);
+  if (kind === 'pan') {
+    const a = scaled ? dmin : wireMin;
+    const b = scaled ? dmax : wireMax;
+    const center = a < 0 && b > 0 ? 0 : Math.floor((a + b) / 2 + 0.5);
+    return formatPan(shown, withOptions(o, { min: a, max: b, center }), say);
+  }
+  return formatNumber(shown, o, say);
+}
+
+/** What a command shows for a value it cannot write: the call's `placeholder`, else "--". */
+function __formatPlaceholderFor(opts) {
+  return placeholder(opts);
+}
+
 /* ------------------------------------------------------------------- fitting a display */
 
 /** Text as given; a number written by numberText, never by the language (Lua writes 2 as "2.0"). */
@@ -1727,7 +1813,7 @@ function __formatParse(text, opts) {
   if (Number.isFinite(max) && value > max) value = max;
   return value;
 }
-return { formatNumber: __formatNumber, formatHz: __formatHz, formatTime: __formatTime, formatDb: __formatDb, formatPercent: __formatPercent, formatPan: __formatPan, formatRatio: __formatRatio, formatClock: __formatClock, formatNote: __formatNote, formatDivision: __formatDivision, formatTable: __formatTable, formatFit: __formatFit, formatLine: __formatLine, formatParse: __formatParse };
+return { formatNumber: __formatNumber, formatHz: __formatHz, formatTime: __formatTime, formatDb: __formatDb, formatPercent: __formatPercent, formatPan: __formatPan, formatRatio: __formatRatio, formatClock: __formatClock, formatNote: __formatNote, formatDivision: __formatDivision, formatTable: __formatTable, formatFit: __formatFit, formatLine: __formatLine, formatParse: __formatParse, formatDescribed: __formatDescribed, formatPlaceholderFor: __formatPlaceholderFor };
 })();
 function formatNumber(v, opts) { return __fmt.formatNumber(v, opts, __fmtSay); }
 function formatHz(v, opts) { return __fmt.formatHz(v, opts, __fmtSay); }
@@ -1743,6 +1829,16 @@ function formatTable(v, table, opts) { return __fmt.formatTable(v, table, opts, 
 function formatFit(text, width, opts) { return __fmt.formatFit(text, width, opts, __fmtSay); }
 function formatLine(left, right, width, opts) { return __fmt.formatLine(left, right, width, opts, __fmtSay); }
 function formatParse(text, opts) { return __fmt.formatParse(text, opts); }
+function formatParameter(id, v, opts) {
+  var role = opts && typeof opts === "object" ? opts.role : undefined;
+  var d = __deviceQuery("parameter", { role: (role === undefined || role === null || role === "") ? "mainSynth" : String(role), id: String(id) });
+  if (!d || typeof d !== "object") {
+    var shown = __fmt.formatPlaceholderFor(opts);
+    __fmtSay("error", "ce.format.parameter: the device profile has no parameter \"" + String(id) + "\", so \"" + shown + "\" is shown.");
+    return shown;
+  }
+  return __fmt.formatDescribed(d, v, opts, __fmtSay);
+}
 // END GENERATED ce.format
 
 // @module ce.music
@@ -3883,6 +3979,7 @@ var __CE_OPTIONS = {
   "formatClock": { path: "ce.format.clock", at: 1, refusal: "nothing", names: ["width", "placeholder", "unicode", "decimals", "hours"] },
   "formatNote": { path: "ce.format.note", at: 1, refusal: "nothing", names: ["width", "placeholder", "unicode", "middleC", "flats", "octave"] },
   "formatDivision": { path: "ce.format.division", at: 1, refusal: "nothing", names: ["decimals", "digits", "width", "placeholder", "tolerance"] },
+  "formatParameter": { path: "ce.format.parameter", at: 2, refusal: "nothing", names: ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "role"] },
   "formatTable": { path: "ce.format.table", at: 2, refusal: "nothing", names: ["width", "placeholder", "start"] },
   "formatFit": { path: "ce.format.fit", at: 2, refusal: "nothing", names: ["abbreviations", "align", "pad", "steps"] },
   "formatLine": { path: "ce.format.line", at: 3, refusal: "nothing", names: ["abbreviations", "gap"] },
@@ -3956,7 +4053,7 @@ var __CE_MODULES = {
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
-  "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
+  "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parameter": "formatParameter", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
   "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -3996,7 +4093,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

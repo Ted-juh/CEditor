@@ -4695,6 +4695,27 @@ export const HELPERS = [
     ],
   },
   {
+    id: 'formatParameter', category: 'Formatting', signature: 'formatParameter(id, v [, opts])', refusal: 'nothing',
+    summary: 'A synth parameter\'s value, written the way the synth\'s own display writes it, from the device profile.',
+    example: '`ce.format.parameter("octaveShift", 61)` gives "-3" on a GAIA, where the value is stored 61 to 67 and the panel reads -3 to +3.',
+    notes: [
+      'What it reads from the profile, in order: a choice\'s label; `display.table`, its first entry for the lowest stored value; `display.min` and `display.max` to scale the stored range to the shown one; `display.format` to pick the command (`hz`, `time`, `db`, `percent`, `pan`, `ratio`, `note`, `division`); `display.unit`; `display.precision`; and `display.middleC`, from the parameter or the profile.',
+      'A parameter the profile says nothing more about is written as its number, which is what the panel shows today.',
+      'A `percent` is how far along the stored range the value is; a `pan` is the distance from the middle of the shown range, or from 0 when the range runs through 0.',
+      'What the call passes wins over what the profile says: `decimals = 0` writes a parameter whose profile gives one decimal without it.',
+      'The one command most panels need: `ce.components.lcd.text("Display", 1, ce.format.parameter(id, value))` shows any parameter as the synth does, once its profile says how.',
+    ],
+    requiresDeviceHost: true,
+    params: [
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter', summary: 'The parameter, by its id in the device profile.\nNot one of its parameters: the placeholder, with a console error.' },
+      { name: 'v', type: 'number or text', required: true, summary: 'The value as the synth stores it, as `ce.device.read()` gives it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
+          summary: 'Which device\'s profile to read, when the panel names more than one.' }]) },
+    ],
+  },
+  {
     id: 'formatTable', category: 'Formatting', signature: 'formatTable(v, table [, opts])', refusal: 'nothing',
     summary: 'Text from a lookup table, for a value whose display follows no formula.',
     example: '`ce.format.table(2, {"Off", "I", "II", "I+II"})` gives "II".',
@@ -5248,7 +5269,7 @@ export const MODULES = [
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic: wrapping, curves, list snapping, decibels, colour, and seeded random. Pure — no host involved.' },
-  { id: 'ce.format', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.format', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'A value as the text a person reads, and typed text back as a value: numbers, Hz, ms, dB, %, pan, ratios, clock times, note names in the synth\'s own octave numbering, note lengths, lookup tables, and text fitted to a display. The same text in every language.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, snapping a note to a key, key spelling, scale degrees and degree chords, chord naming, voice leading, and arpeggio expansion and ordering.' },
@@ -5429,7 +5450,7 @@ const MODULE_MEMBERS = {
   'ce.format': {
     number: 'formatNumber', hz: 'formatHz', time: 'formatTime', db: 'formatDb', percent: 'formatPercent',
     pan: 'formatPan', ratio: 'formatRatio', clock: 'formatClock', note: 'formatNote', division: 'formatDivision',
-    table: 'formatTable', fit: 'formatFit', line: 'formatLine', parse: 'formatParse',
+    parameter: 'formatParameter', table: 'formatTable', fit: 'formatFit', line: 'formatLine', parse: 'formatParse',
   },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote',

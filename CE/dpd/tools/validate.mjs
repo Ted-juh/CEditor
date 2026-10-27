@@ -18,6 +18,32 @@ const PARAM_ENCODING_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 // per-offset dump codecs: the value-encoding set plus the two text (patch-name) codecs.
 const DUMP_CODEC_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
+// $defs.parameterDisplay.format: the ce.format command that writes the value.
+const DISPLAY_FORMATS = ['number', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division', 'table'];
+
+/** A parameter's or the profile's `display`; `where` names it in the message. */
+function checkDisplay(display, where, E) {
+  if (display === undefined) return;
+  if (!display || typeof display !== 'object' || Array.isArray(display)) { E(`${where}: display must be an object`); return; }
+  if (display.format !== undefined && !DISPLAY_FORMATS.includes(display.format)) E(`${where}: bad display.format ${display.format}`);
+  if (display.table !== undefined) {
+    if (!Array.isArray(display.table) || display.table.length === 0) E(`${where}: display.table needs entries`);
+    else display.table.forEach((entry, i) => {
+      const plain = typeof entry === 'string' || typeof entry === 'number';
+      const range = entry && typeof entry === 'object' && typeof entry.upTo === 'number' && entry.text !== undefined;
+      if (!plain && !range) E(`${where}: display.table[${i}] must be a text or { upTo, text }`);
+    });
+  }
+  for (const key of ['min', 'max']) {
+    if (display[key] !== undefined && typeof display[key] !== 'number') E(`${where}: display.${key} must be a number`);
+  }
+  if (display.precision !== undefined && !(Number.isInteger(display.precision) && display.precision >= 0 && display.precision <= 6)) {
+    E(`${where}: display.precision must be a whole number from 0 to 6`);
+  }
+  if (display.middleC !== undefined && !(Number.isInteger(display.middleC) && display.middleC >= -2 && display.middleC <= 9)) {
+    E(`${where}: display.middleC must be a whole number from -2 to 9`);
+  }
+}
 
 export function validateProfile(profile) {
   const errs = [];
@@ -40,6 +66,8 @@ export function validateProfile(profile) {
     else if (!SHAPE_KINDS.includes(s.kind)) E(`messageShape ${s.id}: bad kind ${s.kind}`);
     if (s.checksum?.type && !CHECKSUM_TYPES.includes(s.checksum.type)) E(`messageShape ${s.id}: bad checksum.type ${s.checksum.type}`);
   }
+
+  checkDisplay(profile.display, 'profile', E);
 
   for (const [sk, sc] of Object.entries(profile.scopes ?? {})) {
     if (sc.kind && !SCOPE_KINDS.includes(sc.kind)) E(`scope ${sk}: bad kind ${sc.kind}`);
@@ -68,6 +96,7 @@ export function validateProfile(profile) {
         E(`${sk}.${id}: text size ${p.size} does not match its encoding length`);
       }
       if (p.address && !ADDRESS_RE.test(p.address)) E(`${sk}.${id}: bad address`);
+      checkDisplay(p.display, `${sk}.${id}`, E);
       for (const w of [p.rxLive, ...(p.wires ?? [])].filter(Boolean)) {
         if (!WIRE_DIRS.includes(w.dir)) E(`${sk}.${id}: bad wire dir ${w.dir}`);
         if (!WIRE_MSGS.includes(w.msg)) E(`${sk}.${id}: bad wire msg ${w.msg}`);

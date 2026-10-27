@@ -89,6 +89,18 @@
 
     "presets": { "$ref": "#/$defs/presets" },
 
+    "display": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How the synth's own display writes values, for the whole profile. Optional.",
+      "properties": {
+        "middleC": {
+          "type": "integer", "minimum": -2, "maximum": 9,
+          "description": "The octave number middle C (MIDI note 60) has on this synth: 4 by default, 3 on a Yamaha. Every note parameter is written with it unless the parameter's own display says otherwise."
+        }
+      }
+    },
+
     "overrides": {
       "type": "array",
       "items": { "$ref": "#/$defs/overrideOp" },
@@ -234,6 +246,7 @@
           "additionalProperties": true,
           "properties": { "preferredComponent": { "type": "string" } }
         },
+        "display": { "$ref": "#/$defs/parameterDisplay" },
         "provenance": { "$ref": "#/$defs/provenance" }
       },
       "allOf": [
@@ -310,6 +323,38 @@
       }
     },
 
+    "parameterDisplay": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How the synth's own display writes this parameter's value: read by ce.format.parameter and by the value readout of a control bound to it. Optional; a parameter without it is shown as its number.",
+      "properties": {
+        "format": {
+          "enum": ["number", "hz", "time", "db", "percent", "pan", "ratio", "note", "division", "table"],
+          "description": "Which kind of value it is. hz, time (milliseconds), db, ratio, note and division write the shown value (after min/max); percent is how far along the stored range the value is; pan is the distance from the middle of the shown range, or from 0 when it runs through 0."
+        },
+        "table": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The text for each stored value, for a display that follows no formula: a list whose first entry is for the lowest stored value, or a list of { upTo, text } ranges read in order.",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              {
+                "type": "object",
+                "required": ["upTo", "text"],
+                "properties": { "upTo": { "type": "number" }, "text": { "type": ["string", "number"] } }
+              }
+            ]
+          }
+        },
+        "min": { "type": "number", "description": "The shown value of the lowest stored value, when it differs (the GAIA stores Octave Shift 61..67 and shows -3..+3)." },
+        "max": { "type": "number", "description": "The shown value of the highest stored value." },
+        "unit": { "type": "string", "description": "The unit after a plain number, such as \"cent\"." },
+        "precision": { "type": "integer", "minimum": 0, "maximum": 6, "description": "Decimals shown." },
+        "middleC": { "type": "integer", "minimum": -2, "maximum": 9, "description": "For a note: the octave number of middle C, when it differs from the profile's." }
+      }
+    },
     "presets": {
       "type": "object",
       "additionalProperties": false,

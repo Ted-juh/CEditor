@@ -32,11 +32,27 @@ export function formatPreludeBlock(core = readFileSync(CORE, 'utf8')) {
   // globals below are the only formatX), which the duplicate-name check holds every prelude to.
   const body = core.replace(/\r\n/g, '\n').replace(/^export /gm, '')
     .replace(/^function (format[A-Z]\w*)\(/gm, 'function __$1(').trimEnd();
-  const names = COMMANDS.map(([n]) => `${n}: __${n}`).join(', ');
+  const names = [...COMMANDS.map(([n]) => n), 'formatDescribed', 'formatPlaceholderFor']
+    .map((n) => `${n}: __${n}`).join(', ');
   const globals = COMMANDS.map(([name, args]) => {
     const pass = name === 'formatParse' ? args : `${args}, __fmtSay`;
     return `function ${name}(${args}) { return __fmt.${name}(${pass}); }`;
   }).join('\n');
+  // parameter() is the one command that reads the device: the lookup, then the pure formatting.
+  const parameter = [
+    'function formatParameter(id, v, opts) {',
+    // The host query itself, not deviceParameter: that is ce.device's, and gated when a script
+    // does not use ce.device.
+    '  var role = opts && typeof opts === "object" ? opts.role : undefined;',
+    '  var d = __deviceQuery("parameter", { role: (role === undefined || role === null || role === "") ? "mainSynth" : String(role), id: String(id) });',
+    '  if (!d || typeof d !== "object") {',
+    '    var shown = __fmt.formatPlaceholderFor(opts);',
+    '    __fmtSay("error", "ce.format.parameter: the device profile has no parameter \\"" + String(id) + "\\", so \\"" + shown + "\\" is shown.");',
+    '    return shown;',
+    '  }',
+    '  return __fmt.formatDescribed(d, v, opts, __fmtSay);',
+    '}',
+  ].join('\n');
   return `${BEGIN}
 // @module ce.format
 // A rejected argument is an error, a value past the end of a table a warning, as in the panel view.
@@ -46,6 +62,7 @@ ${body}
 return { ${names} };
 })();
 ${globals}
+${parameter}
 ${END}`;
 }
 

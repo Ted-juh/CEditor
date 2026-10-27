@@ -202,6 +202,10 @@ export const WRITTEN = {
     lua: `local p = ce.device.parameter("filter.cutoff")\nif p then set("Cutoff.Behavior.max", p.max) end`,
     js: `const p = ce.device.parameter("filter.cutoff");\nif (p) set("Cutoff.Behavior.max", p.max);`,
   },
+  formatParameter: {
+    lua: `local v = ce.device.read("octaveShift")\nce.components.lcd.text("Display", 1, ce.format.line("Octave", ce.format.parameter("octaveShift", v), 16))`,
+    js: `const v = ce.device.read("octaveShift");\nce.components.lcd.text("Display", 1, ce.format.line("Octave", ce.format.parameter("octaveShift", v), 16));`,
+  },
   deviceConnected: {
     lua: `if ce.device.connected() then ce.device.requestDump("patch") end`,
     js: `if (ce.device.connected()) ce.device.requestDump("patch");`,

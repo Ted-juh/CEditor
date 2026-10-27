@@ -1295,6 +1295,7 @@ const OPTION_ANSWER_CASES = [
   ['formatRatio', [4, { stile: 'x' }]], ['formatClock', [1000, { hour: true }]], ['formatNote', [60, { middlec: 3 }]],
   ['formatDivision', [1, { tol: 0.1 }]], ['formatTable', [0, ['a'], { strt: 1 }]], ['formatFit', ['a', 4, { allign: 'right' }]],
   ['formatLine', ['a', 'b', 8, { gaps: 2 }]], ['formatParse', ['5', { knd: 'hz' }]],
+  ['formatParameter', ['cutoff', 5, { rol: 'mainSynth' }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {
