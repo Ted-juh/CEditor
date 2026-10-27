@@ -10450,6 +10450,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
     if (epoch === executionEpoch) {
       snapshotValues();          // absorb panels writes our scripts just made
       live.dispatching = false;
+      scheduleDawStateSave();    // the processor saves what the scripts would now say
       // Changes that raised declared events skipped the reactive pass while this async
       // dispatch was busy. Settle their watchers before absorbing the session baseline.
       runReactive();
@@ -10762,6 +10763,82 @@ function onPreviewSessionsChanged(sessions) {
 
 let previewStopWork = null;
 let previewStartWork = null;
+
+/* --- the DAW-state hooks, in the panel view (exported plug-in, window open) ---
+ *
+ * onDawSaveState and onDawRestoreState were raised only by the window-shut engines. With the
+ * plug-in's window open the scripts that run are these, so the state the DAW saved with the project
+ * was the window-shut engines', frozen at the moment the window opened, and a project restored with
+ * the window open never reached these scripts at all.
+ *
+ * Now, in the player (setDawStateSink installs the way out; the editor has none and raises neither):
+ *   - after anything a script does, the page's onDawSaveState handlers are run and their merged
+ *     answer handed to the processor, which saves it with the project while the window is open;
+ *   - the panel starts from the processor's state: onDawRestoreState runs after onPanelBuild, before
+ *     onPanelReady, with what the window-shut engines last saved (setDawRestoreForNextStart);
+ *   - a project restored while the window is open is raised here too (raiseDawRestoreState).
+ * When the window closes, the processor hands the page's last state to the window-shut engines.
+ * The contract is the C++ one (ScriptRuntime::onDawSaveState): a handler RETURNS its keys, which are
+ * merged into one store; `store` is for reading.
+ */
+let dawStateSink = null;
+let dawStateTimer = null;
+let dawRestoreForNextStart = null;
+
+export function setDawStateSink(fn) {
+  dawStateSink = typeof fn === 'function' ? fn : null;
+  if (!dawStateSink && dawStateTimer) { clearTimeout(dawStateTimer); dawStateTimer = null; }
+}
+
+export function setDawRestoreForNextStart(store) {
+  dawRestoreForNextStart = store && typeof store === 'object' && Object.keys(store).length ? store : null;
+}
+
+function hasDawSaveScripts() {
+  return activeScripts().some((s) => s.enabled !== false && s.event === 'onDawSaveState');
+}
+
+/** Every onDawSaveState handler's answer, merged into one store, as ScriptRuntime does it. */
+export async function collectDawSaveState() {
+  const store = {};
+  if (!ensurePanelExecutionApproved()) return store;
+  const epoch = executionEpoch;
+  for (const s of activeScripts()) {
+    if (s.enabled === false || s.event !== 'onDawSaveState') continue;
+    const handlers = await handlersFor(s);
+    if (epoch !== executionEpoch) return store;
+    const fn = handlers?.onDawSaveState;
+    if (typeof fn !== 'function') continue;
+    try {
+      // A copy: a handler that writes into `store` instead of returning would otherwise change what
+      // the next handler is given, and the C++ engines do not let it.
+      const answer = await fn(structuredClone(store));
+      if (answer && typeof answer === 'object' && !Array.isArray(answer)) Object.assign(store, answer);
+    } catch (e) {
+      reportScriptError(s.id, e);
+    }
+  }
+  return store;
+}
+
+/** Hand the processor the page's state soon after scripts have run; coalesced, and only when a
+    script saves anything, so a panel without save handlers never claims the state. */
+function scheduleDawStateSave() {
+  if (!dawStateSink || dawStateTimer || !hasDawSaveScripts()) return;
+  dawStateTimer = setTimeout(async () => {
+    dawStateTimer = null;
+    const sink = dawStateSink;
+    if (!sink) return;
+    const store = await collectDawSaveState();
+    if (sink === dawStateSink) sink(store);
+  }, 150);
+}
+
+export function raiseDawRestoreState(store) {
+  if (!store || typeof store !== 'object') return Promise.resolve();
+  return dispatchEvents([{ event: 'onDawRestoreState', controlName: null, payload: store }]);
+}
+
 function onPreviewModeChanged(on) {
   if (on && !ensurePanelExecutionApproved()) {
     live.prevPreviewOn = false;
@@ -10778,9 +10855,13 @@ function onPreviewModeChanged(on) {
     // declares what it declares, rather than accumulating a second copy on every run.
     clearGeneratedControls();
     clearDeviceRuntimeDefinitions();
+    const restore = dawStateSink ? dawRestoreForNextStart : null;
+    dawRestoreForNextStart = null;
     previewStartWork = dispatchEvents([
       { event: 'onPanelLoad', controlName: null, payload: undefined },
       { event: 'onPanelBuild', controlName: null, payload: undefined },
+      // The plug-in's window opening: the scripts start from what was saved (see setDawStateSink).
+      ...(restore ? [{ event: 'onDawRestoreState', controlName: null, payload: restore }] : []),
       { event: 'onPanelReady', controlName: null, payload: { firstTime } },
     ]);
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {

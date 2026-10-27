@@ -210,6 +210,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         if (onScriptSetting != nullptr) onScriptSetting (payload);
     });
 
+    // What the page's onDawSaveState handlers would save now (panelRuntime.js, setDawStateSink).
+    options = options.withEventListener ("scriptDawState", [this] (const juce::var& payload)
+    {
+        if (onScriptDawState != nullptr) onScriptDawState (payload.getProperty ("state", {}));
+    });
+
     // The answer to the restore question: "always", "never", or "load" (take the synth's patch
     // instead). "Not now" simply dismisses the bar, because a restore the user deferred is still
     // pending and should be offered again next time the project opens.
@@ -332,6 +338,13 @@ void PlayerHost::showRestorePrompt (const juce::String& deviceName)
     emitToWebView ("restorePrompt", juce::var (obj));
 }
 
+void PlayerHost::pushDawRestoreToPage (const juce::var& state)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("state", state);
+    emitToWebView ("scriptDawRestore", juce::var (obj));
+}
+
 void PlayerHost::notifySessionRestored()
 {
     emitToWebView ("sessionRestored", juce::var (new juce::DynamicObject()));
@@ -392,8 +405,12 @@ void PlayerHost::loadPanelIntoWebView()
     // And whether the keys it does not use go to the host (utils/hostKeys.js).
     const bool restored = isSessionRestored != nullptr && isSessionRestored();
     const auto stores = scriptStores != nullptr ? juce::JSON::toString (scriptStores(), true) : juce::String ("null");
+    // Present only for a plug-in instance: the page installs its DAW-state hand-off when it is.
+    const auto dawState = scriptDawState != nullptr
+        ? ", dawState: " + juce::JSON::toString (scriptDawState(), true)
+        : juce::String();
     webView->evaluateJavascript (juce::String ("window.__CE_PLAYER_SESSION__ = { restored: ")
-                                 + (restored ? "true" : "false") + ", storage: " + stores
+                                 + (restored ? "true" : "false") + ", storage: " + stores + dawState
                                  + ", hostKeys: " + (keysGoToHost() ? "true" : "false") + " };"
                                  + "if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
 }

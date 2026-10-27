@@ -530,11 +530,13 @@ export const LIFECYCLE_HOOKS = [
   // ScriptRuntime::onDawSaveState merges the returned keys into the shared store.
   //
   // Player-only. The editor has no DAW to save a project, so these never fire in preview — test
-  // them in the exported plugin.
+  // them in the exported plugin. With the plug-in's window open the page's scripts run them
+  // (panelRuntime.js, setDawStateSink), and the state passes between page and window-shut engines
+  // as the window opens and closes (PluginProcessor.h, applyDawStateFromPage).
   {
     id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawSaveState(store) -> object',
-    summary: 'Runs when the DAW saves the project. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.',
+    summary: 'Runs so that the DAW can save your values with the project: shortly after your scripts have run, whether the plug-in\'s window is open or shut. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.',
     params: [{ name: 'store', type: 'object' }],
     snippet: {
       lua: 'function onDawSaveState(store)\n  return { ${1:key} = ${2:value} }$0\nend',
@@ -544,7 +546,7 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawRestoreState(store)',
-    summary: 'Runs when the DAW reopens the project. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.',
+    summary: 'Runs when the DAW reopens the project, and when the plug-in\'s window opens or closes, so the scripts that run next carry on from the same values. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.',
     params: [{ name: 'store', type: 'object' }],
     snippet: { lua: 'function onDawRestoreState(store)\n  $0\nend', javascript: 'function onDawRestoreState(store) {\n  $0\n}' },
   },

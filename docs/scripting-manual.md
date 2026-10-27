@@ -772,7 +772,7 @@ function onPanelDestroy() {
 
 ### `onDawSaveState(store) -> object`
 
-Runs when the DAW saves the project. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.
+Runs so that the DAW can save your values with the project: shortly after your scripts have run, whether the plug-in's window is open or shut. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.
 
 *Exported plugin only — never runs in the editor.*
 
@@ -791,7 +791,7 @@ function onDawSaveState(store) {
 
 ### `onDawRestoreState(store)`
 
-Runs when the DAW reopens the project. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.
+Runs when the DAW reopens the project, and when the plug-in's window opens or closes, so the scripts that run next carry on from the same values. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.
 
 *Exported plugin only — never runs in the editor.*
 

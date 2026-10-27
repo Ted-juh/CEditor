@@ -613,7 +613,9 @@ private:
         auto settingsJson = juce::JSON::toString (settingsToVar (scriptSettings));
         auto localJson = juce::JSON::toString (localSettingsForState());
         const juce::SpinLock::ScopedLockType lock (scriptStateLock);
-        cachedScriptStateJson = std::move (stateJson);
+        // With the window open the page's scripts are the running ones; their state stands.
+        if (! pageOwnsScriptState)
+            cachedScriptStateJson = std::move (stateJson);
         cachedScriptSettingsJson = std::move (settingsJson);
         cachedScriptLocalJson = std::move (localJson);
     }
@@ -643,7 +645,19 @@ private:
         if (hasSettings) settingsFromVar (scriptSettings, juce::JSON::parse (settingsJson));
         if (hasLocal)    localSettingsFromState (juce::JSON::parse (localJson));
         if (hasState)
-            scriptRuntime->onDawRestoreState (juce::JSON::parse (stateJson));
+        {
+            const auto state = juce::JSON::parse (stateJson);
+            scriptRuntime->onDawRestoreState (state);
+            // The window is open: its scripts are the ones running, so they are told as well, and
+            // until they answer, the restored state is what a save would write.
+            if (pageOwnsScriptState)
+            {
+                const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+                cachedScriptStateJson = stateJson;
+            }
+            if (onDawRestoreForPage != nullptr)
+                onDawRestoreForPage (state);
+        }
         refreshScriptStateCache();
     }
 
@@ -712,7 +726,21 @@ private:
         {
             // GUI lifecycle edges: scripts keep running window-closed; these fire only on open/close.
             if (windowOpen && ! scriptWindowWasOpen)      { scriptRuntime->onPanelReady (! scriptReadyFired); scriptReadyFired = true; }
-            else if (! windowOpen && scriptWindowWasOpen) { scriptRuntime->onPanelClose(); installScriptDeviceCallback(); } // PlayerHost nulled it on close — reclaim
+            else if (! windowOpen && scriptWindowWasOpen)
+            {
+               #if CEDITOR_VALUE_LAYER
+                // The page's scripts ran while the window was open; the window-shut engines carry on
+                // from what they last saved, rather than from where they stopped when it opened.
+                if (pageOwnsScriptState)
+                {
+                    pageOwnsScriptState = false;
+                    scriptRuntime->onDawRestoreState (scriptDawStateForPage());
+                    refreshScriptStateCache();
+                }
+               #endif
+                scriptRuntime->onPanelClose();
+                installScriptDeviceCallback();   // PlayerHost nulled it on close — reclaim
+            }
             scriptWindowWasOpen = windowOpen;
             // A host can construct and destroy an editor to query it between timer ticks.
             // PlayerHost then clears the callback without an observable open/close edge.
@@ -2552,6 +2580,10 @@ private:
     std::atomic<bool> scriptRuntimeReady { false };
     std::atomic<bool> scriptRestorePending { false };
     std::atomic<bool> scriptStateDirty { false };
+    // True while the window's page has handed over its scripts' state (applyDawStateFromPage): the
+    // page's scripts are the ones running, so theirs is what the project saves, and the window-shut
+    // engines' must not overwrite it. Message thread only.
+    bool pageOwnsScriptState = false;
    #endif
     // …and "local" scope: this machine only, and this instance only. It is not the panel's to carry
     // — a session handed to somebody else should carry the patch, not the sender's MIDI port choice
@@ -2650,6 +2682,42 @@ public:
         return juce::var (o);
     }
 
+    /** What the instance last saved for its scripts, for the page to start from when the window
+        opens (its onDawRestoreState runs with it). */
+    juce::var scriptDawStateForPage() const
+    {
+       #if CEDITOR_VALUE_LAYER
+        juce::String json;
+        {
+            const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+            json = cachedScriptStateJson;
+        }
+        const auto parsed = juce::JSON::parse (json);
+        return parsed.isObject() ? parsed : juce::var (new juce::DynamicObject());
+       #else
+        return juce::var (new juce::DynamicObject());
+       #endif
+    }
+
+    /** What the page's onDawSaveState handlers would save now, window open. It is what the project
+        saves until the window closes, when the window-shut engines are handed it to continue from. */
+    void applyDawStateFromPage (const juce::var& state)
+    {
+       #if CEDITOR_VALUE_LAYER
+        auto json = juce::JSON::toString (state.isObject() ? state : juce::var (new juce::DynamicObject()));
+        {
+            const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+            cachedScriptStateJson = std::move (json);
+        }
+        pageOwnsScriptState = true;
+       #else
+        juce::ignoreUnused (state);
+       #endif
+    }
+
+    /** A project restored while the window is open: set by the editor, so the page hears it too. */
+    std::function<void (const juce::var& state)> onDawRestoreForPage;
+
     /** A write the page made, window open: { store, key, value } or { store, key, forget: true }. */
     void applyScriptSettingFromPage (const juce::var& change)
     {
@@ -2731,6 +2799,11 @@ public:
         // them, so one store serves the window open and closed.
         host.scriptStores = [&p] { return p.scriptStoresForPage(); };
         host.onScriptSetting = [&p] (const juce::var& change) { p.applyScriptSettingFromPage (change); };
+        // The DAW-state hooks, window open: the page starts from the instance's saved state, hands
+        // back what it would save, and hears a restore that arrives while it is open.
+        host.scriptDawState = [&p] { return p.scriptDawStateForPage(); };
+        host.onScriptDawState = [&p] (const juce::var& state) { p.applyDawStateFromPage (state); };
+        p.onDawRestoreForPage = [this] (const juce::var& state) { host.pushDawRestoreToPage (state); };
        #endif
         seenSessionRestore = p.sessionRestoreGeneration();
         // host parameter -> UI: poll the (atomic) parameter values and push changes to the panel so
@@ -2749,6 +2822,9 @@ public:
         // than a theoretical one. host.onRestoreAnswer needs no such care: it lives on `host`,
         // which is a member and dies here.
         processor.onRestorePrompt = nullptr;
+       #if CEDITOR_SCRIPTING
+        processor.onDawRestoreForPage = nullptr;   // the same lambda-captures-this hazard
+       #endif
         // A press the closing window never finished must not hold a DAW parameter in touch mode.
         processor.endAllUiGestures();
        #endif

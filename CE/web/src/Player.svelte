@@ -13,7 +13,7 @@
   import { installHostKeyForwarding } from './CE_Application/utils/hostKeys.js';
   import { paramEvents, endOpenGestures } from './CE_Application/utils/playerParamEvents.js';
   import { DEFAULT_PANIC_SHORTCUT, isPanicShortcut } from './CE_Application/utils/panicLayout.js';
-  import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
+  import { initPanelRuntime, setRuntimeHost, setDawStateSink, setDawRestoreForNextStart, raiseDawRestoreState } from './CE_Application/scripting/panelRuntime.js';
   import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
@@ -518,6 +518,13 @@
       instanceStorage = session?.storage && backendForStorage
         ? createInstanceStorage(session.storage, (change) => backendForStorage.emitEvent('scriptSetting', change))
         : null;
+      // The DAW-state hooks, window open (panelRuntime.js, setDawStateSink): the scripts start from
+      // what the instance last saved, and what they would save now goes back to it, so the project
+      // saves the state of the scripts that are running. Only a plug-in instance has a dawState to
+      // give; the CEditor Player app has none and raises neither hook, as before.
+      const instanceHasState = Boolean(session && backendForStorage && Object.hasOwn(session, 'dawState'));
+      setDawStateSink(instanceHasState ? (store) => backendForStorage.emitEvent('scriptDawState', { state: store }) : null);
+      setDawRestoreForNextStart(instanceHasState ? session.dawState : null);
     }
     const storage = instanceStorage;
     setRuntimeHost(createPlayerHost(
@@ -614,6 +621,7 @@
     let deviceUnsub = null;
     let restoreToken = null;
     let sessionToken = null;
+    let dawRestoreToken = null;
     let hostWindowToken = null;
     let stopHostKeys = null;
     if (backend) {
@@ -650,6 +658,11 @@
       // Whether the host's window is showing ours (stores/hostWindow.js): a plug-in's page is not
       // told by the browser, so PlayerHost looks and says.
       hostWindowToken = backend.addEventListener('hostWindow', (payload) => hostWindowShown.set(payload?.shown !== false));
+      // A project restored while the window is open: the page's scripts hear it as the window-shut
+      // engines do (the processor sends the store after its own engines have had it).
+      dawRestoreToken = backend.addEventListener('scriptDawRestore', (payload) => {
+        if (payload?.state && typeof payload.state === 'object') raiseDawRestoreState(payload.state);
+      });
       sessionToken = backend.addEventListener('sessionRestored', () => {
         sessionRestored = true;
         if (synthSyncTimer) { clearTimeout(synthSyncTimer); synthSyncTimer = 0; startupReadPort = null; }
@@ -682,6 +695,8 @@
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
       if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
+      if (backend && dawRestoreToken != null) backend.removeEventListener(dawRestoreToken);
+      setDawStateSink(null);
       if (backend && hostWindowToken != null) backend.removeEventListener(hostWindowToken);
       hostWindowShown.set(true);
       if (stopHostKeys) stopHostKeys();

@@ -83,6 +83,16 @@ public:
     std::function<juce::var()> scriptStores;
     std::function<void (const juce::var& change)> onScriptSetting;
 
+    // --- The DAW-state hooks, window open -----------------------------------------------------------
+    // What the instance last saved for its scripts (onDawSaveState's merged store), handed to the page
+    // with the panel so its scripts start from it; and what the page's scripts would save now
+    // (JS "scriptDawState"), handed back so the project saves the state of the scripts that run.
+    // Unset (the CEditor Player app), the page raises neither hook.
+    std::function<juce::var()> scriptDawState;
+    std::function<void (const juce::var& state)> onScriptDawState;
+    /** A project restored while the window is open: the page's onDawRestoreState hears it too. */
+    void pushDawRestoreToPage (const juce::var& state);
+
     // --- Whether the webview came up ------------------------------------------------------------
     /** The name of the WebView2 profile folder this window's webview was given; empty when there
         is no webview (the runtime is missing). Off Windows the folder is made and goes unused. */
