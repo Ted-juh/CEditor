@@ -1095,7 +1095,7 @@ ce.core.error("message")
 
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, the connected device, music theory, and musical time.
+MIDI in and out, the connected device and its patches, music theory, and musical time.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -1992,6 +1992,433 @@ for _, id in ipairs(ce.device.requests()) do log(id) end
 // JavaScript
 for (const id of ce.device.requests()) log(id);
 ```
+
+### ce.patch: the synth's sound as a value
+
+A synth's sound as one value you can hold, change, compare, send and keep. `current` captures it, `morph`, `blend`, `random`, `mutate` and `merge` make new ones without sending anything, `diff` and `equal` compare two, and `apply` puts one on the panel and sends it the way the synth takes a patch.
+
+A patch is a table: `device` (the device profile's id), `role`, `scope` (which part of the synth: "voice" unless the profile names others), `name`, `values` (parameter id to value, in the parameter's own units; a choice is its id), `missing` (ids nothing is known for) and `source`.
+
+Every command that works on parameters takes the same choosing options: `groups`, `only`, `except`, `lock` and `include`. The transforms leave the patch name and the parameters the synth cannot be sent alone unless `include` names them. A profile can describe its patches in a `patch` section: which scopes a patch can hold and the dumps that read and send each, how `apply` sends one (`deliver`), and how `write` stores a slot.
+
+```lua
+-- Lua: a knob morphs from the patch kept as A to the one kept as B
+function onValueChange(value)
+  ce.patch.apply(ce.patch.morph(ce.patch.load("A"), ce.patch.load("B"), value / 127), { live = true })
+end
+```
+
+#### `ce.patch.current([scope [, opts]]) -> patch`
+
+Capture the patch as the panel knows it now: the values the synth last reported, or the controls hold.
+
+Example: `local before = ce.patch.current()` keeps the voice as it is now.
+
+- `scope` (text, optional): The part of the synth: "voice" when left out, or a scope ce.patch.scopes() lists.<br>Not one: no result, with a console error.
+
+Good to know:
+
+- A patch is a table: { device, role, scope, name, values, missing, source }. `values` is parameter id to value, in the parameter's own units; a choice is its id, such as "saw".
+- Asks the synth nothing. A parameter the synth never reported is listed in `missing`.
+- A panel without a device profile still works: `values` is then keyed by control name.
+
+*Short name: `patchCurrent`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `scope` | text | "voice" | The part of the synth, when the command takes no patch to read it from. |
+
+#### `ce.patch.read(scope, fn [, opts]) -> boolean`
+
+Ask the synth for a patch, and get it when the reply arrives: fn(patch, info).
+
+Example: `ce.patch.read("voice", function(p, info) if info.ok then state.original = p end end)` asks the synth for the voice it is playing.
+
+- `scope` (text, required): The part of the synth.
+- `fn` (function, required): Called as fn(patch, info) when the reply arrives, or when it does not.
+
+Good to know:
+
+- Asks for the scope's dumps, one after another, with ce.device.requestDump(); the panel's controls are filled from each reply, as a dump always fills them.
+- `info.ok` is false when a reply did not arrive in time; the patch is then what the panel knows. `info.missing` lists the ids no reply held.
+- A scope with no dumps to ask for (the profile's patch section, or define(), names them): false, with a console error.
+
+*Short name: `patchRead`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `timeout` | number (milliseconds) | as long as the profile asks | How long to wait for each dump. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.load(name [, opts]) -> patch`
+
+Get a patch kept with ce.patch.save(), by its name.
+
+Example: `ce.patch.apply(ce.patch.load("Warm pad"))` plays the patch kept as "Warm pad".
+
+- `name` (text, required): The name it was kept under, in any case.
+
+Good to know:
+
+- Loading sends nothing: pass the result to apply() to hear it.
+- No patch by that name, or one kept for another synth: no result, with a console error naming it.
+
+*Short name: `patchLoad`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.morph(a, b, t [, opts]) -> patch`
+
+A patch part of the way from one patch to another.
+
+Example: `ce.patch.morph(warm, bright, 0.25)` gives a patch a quarter of the way from warm to bright.
+
+- `a` (table, required): The patch at 0.
+- `b` (table, required): The patch at 1.
+- `t` (number, required): Range: 0 to 1 (a to b).<br>Outside the range: held at 0 or 1.
+
+Good to know:
+
+- A number moves in a straight line from a to b, then is rounded to its step and held inside its range. A choice or an on/off is a's below `switchAt` and b's from it. The patch name stays a's.
+- A parameter only one of the two patches holds keeps that patch's value.
+- To morph from a knob, call it in the knob's onValueChange and pass the result to apply(p, { live = true }).
+- b of another synth or scope: no result, with a console error.
+
+*Short name: `patchMorph`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `switchAt` | number | 0.5 | Where a choice or an on/off changes from a's value to b's, 0 to 1. |
+
+#### `ce.patch.blend(patches, weights [, opts]) -> patch`
+
+One patch made of several, each counting as much as its weight.
+
+Example: `ce.patch.blend({ a, b, c }, { 0.5, 0.3, 0.2 })` leans mostly towards a.
+
+- `patches` (list, required): Two or more patches of the same synth and scope.
+- `weights` (list of numbers, required): How much each counts.
+
+Good to know:
+
+- The weights need not add up to 1; a patch without a weight counts 0. Adding up to 0 or less: no result, with a console error.
+- A choice or an on/off takes the value of the patch with the largest weight.
+- The weights from ce.math.weightsFor() go straight in, for a morph pad.
+
+*Short name: `patchBlend`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.random([opts]) -> patch`
+
+A new patch with random values, within each parameter's range.
+
+Example: `ce.patch.random({ groups = {"Filter"}, seed = 7 })` gives the current patch with a new filter section.
+
+Good to know:
+
+- What is not chosen keeps its value from `from`. The patch name never changes.
+- The same `seed` gives the same patch, in every language.
+- A panel without a device profile does not say each control's range: no result, with a console error.
+
+*Short name: `patchRandom`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `scope` | text | "voice" | The part of the synth, when the command takes no patch to read it from. |
+| `seed` | number | the script's random stream | Where the random numbers start: the same seed gives the same patch, in every language. |
+| `from` | table | ce.patch.current() | The patch whose unchosen values are kept. |
+| `within` | table | each parameter's whole range | Narrower ranges by id; outside the parameter's range they are held inside it. |
+
+#### `ce.patch.mutate(patch, amount [, opts]) -> patch`
+
+A variation of a patch: every chosen value moved a little, at random.
+
+Example: `ce.patch.mutate(p, 0.1)` moves each number by up to a tenth of its range.
+
+- `patch` (table, required): The patch to vary.
+- `amount` (number, required): Range: 0 to 1 (no change to any value).<br>Outside the range: held at 0 or 1.
+
+Good to know:
+
+- Numbers move by up to `amount` of their range, more often a little than a lot.
+- A choice or an on/off changes with a chance of `amount`, to another of its values. Text never changes.
+
+*Short name: `patchMutate`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `seed` | number | the script's random stream | Where the random numbers start: the same seed gives the same patch, in every language. |
+
+#### `ce.patch.merge(base, other, opts) -> patch`
+
+A patch with the chosen parameters taken from another patch.
+
+Example: `ce.patch.merge(mine, theirs, { groups = {"Filter"} })` keeps mine with the filter from theirs.
+
+- `base` (table, required): The patch that gives everything not chosen.
+- `other` (table, required): The patch that gives the chosen parameters.
+
+Good to know:
+
+- One of `groups` or `only` is needed: taking every value is `other` itself. Neither: no result, with a console error.
+
+*Short name: `patchMerge`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.diff(a, b [, opts]) -> list`
+
+List the parameters whose values differ between two patches: { id, name, group, from, to }.
+
+Example: `ce.patch.diff(saved, ce.patch.current())` lists what has changed since the patch was saved.
+
+- `a` (table, required): The first patch.
+- `b` (table, required): The second patch.
+
+Good to know:
+
+- In the profile's parameter order; the same patches give an empty list.
+- A parameter only one patch holds is listed, with no value on the other side.
+- Two numbers closer than the parameter's step count as the same, and so do two names that differ only in trailing spaces.
+
+*Short name: `patchDiff`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.equal(a, b [, opts]) -> boolean`
+
+Tell whether two patches hold the same values.
+
+Example: `if not ce.patch.equal(state.saved, ce.patch.current()) then ... end` runs when the patch has been changed.
+
+- `a` (table, required): The first patch.
+- `b` (table, required): The second patch.
+
+Good to know:
+
+- The same as an empty ce.patch.diff(a, b, opts).
+
+*Short name: `patchEqual`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.apply(patch [, opts]) -> table`
+
+Put a patch on the panel and send it to the synth, the way this synth takes a patch.
+
+Example: `ce.patch.apply(p)` makes the panel and the synth play p.
+
+- `patch` (table, required): The patch to apply.
+
+Good to know:
+
+- The panel's controls always take the values, whatever `send` says.
+- Returns { ok, via, applied, sent, skipped }: `via` is "parameters", "dump" or "none"; `skipped` lists { id, why }. Refused: ok false, with a console error.
+- "auto" sends the scope's dumps when the profile's patch section says `deliver = "dump"`, and one message per changed parameter otherwise.
+- A patch of another synth: refused, naming it.
+
+*Short name: `patchApply`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `send` | text | "auto" | How it goes to the synth: "none" sets the panel only.<br>One of "auto", "parameters", "dump" or "none". |
+| `changedOnly` | true or false | true | Send only values that differ from what the synth last had. |
+| `live` | true or false | false | For a value moving under a hand: the 32 parameters that moved most now, the rest with the next apply without live. |
+
+#### `ce.patch.save(name, patch [, opts]) -> boolean`
+
+Keep a patch by name, for this synth.
+
+Example: `ce.patch.save("Warm pad", p)` keeps p as "Warm pad".
+
+- `name` (text, required): Up to 64 characters.
+- `patch` (table, required): The patch.
+
+Good to know:
+
+- Kept with the panel, as ce.storage.saveSetting() keeps a value: in the editor with the panel document, in an exported plug-in in the DAW project.
+- A name of 1 to 64 characters; anything else: false, with a console error.
+
+*Short name: `patchSave`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `replace` | true or false | true | Off: a name already in use is refused, with a console error. |
+
+#### `ce.patch.list([opts]) -> list`
+
+List the patches kept for this synth: { name, scope, savedAt }, newest first.
+
+Example: `ce.patch.list()` gives every kept patch's name.
+
+*Short name: `patchList`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `scope` | text | every scope | Only the patches of this scope. |
+
+#### `ce.patch.forget(name [, opts]) -> boolean`
+
+Remove a kept patch.
+
+Example: `ce.patch.forget("Warm pad")` removes it.
+
+- `name` (text, required): Its name, in any case.
+
+Good to know:
+
+- Returns true when one was removed; no patch by that name: false, without a word.
+
+*Short name: `patchForget`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.write(patch, slot [, opts]) -> table`
+
+Store a patch in the synth's own memory, in a writable slot.
+
+Example: `ce.patch.write(p, 130)` stores p in preset 130.
+
+- `patch` (table, required): The patch.
+- `slot` (number, required): The preset number across all banks, counted from 0, as ce.device.recallPreset() takes it.
+
+Good to know:
+
+- Overwrites what the slot held. The synth does not ask, so ask first with ce.ui.choose().
+- How it is stored is the profile's patch section: `write = { via = "dump", dump = "..." }` sets the "slot" variable and sends that dump. A profile that does not say: refused, with a console error.
+- Returns { ok, slot, error }.
+
+*Short name: `patchWrite`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.scopes([role]) -> list`
+
+Describe the parts of the synth a patch can hold: { id, name, parameters, canRead, canSend, via }.
+
+Example: `ce.patch.scopes()` might give a voice and a system scope.
+
+- `role` (text, optional): The device; left out: "mainSynth".
+
+Good to know:
+
+- Without a patch section in the profile: "voice" is every parameter but actions and the System, Global, Utility and Performance groups, and "system" those groups.
+- A panel without a device profile: one scope, "voice", holding the panel's controls.
+
+*Short name: `patchScopes`.*
+
+#### `ce.patch.define(scope, spec [, role]) -> boolean`
+
+Describe a scope from the script, for a synth whose profile has no patch section, or to change one.
+
+Example: `ce.patch.define("voice", { groups = {"Osc", "Filter", "Amp"}, dumps = {"voice"} })` makes the voice those three groups, read and sent as the voice dump.
+
+- `scope` (text, required): The scope's id. An existing one is replaced for this panel.
+- `spec` (table, required): The scope: groups, only, except and dumps, as lists of names.
+- `role` (text, optional): The device.
+
+Good to know:
+
+- spec takes the fields the profile's patch section takes for one scope: name, groups, only, except, dumps, read, transform. Anything else: false, with a console error.
+- Lasts while the panel is open; call it in onPanelLoad.
+
+*Short name: `patchDefine`.*
 
 ### ce.music: notes, scales and chords
 

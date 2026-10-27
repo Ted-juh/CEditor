@@ -26,12 +26,24 @@ export const COMMANDS = [
   ['formatFit', 'text, width, opts'], ['formatLine', 'left, right, width, opts'], ['formatParse', 'text, opts'],
 ];
 
+/**
+ * The core's own functions are named __formatX or __patchX inside the wrapper, at their definitions AND where
+ * the core calls them. The globals of the same name are wrapped by the option check (gen-script-
+ * modules.mjs), which refuses an option the command does not take: a call from inside the core
+ * hands its own options on (a note's middleC beside a frequency), and must reach the function itself.
+ */
+export function privateCalls(text, prefix) {
+  const defined = [...text.matchAll(new RegExp(`^function (${prefix}[A-Z]\\w*)\\(`, 'gm'))].map((m) => m[1]);
+  let out = text;
+  for (const name of defined) out = out.replace(new RegExp(`(?<![\\w.$])${name}\\(`, 'g'), `__${name}(`);
+  return out;
+}
+
 /** The prelude block, from formatCore.js's text. */
 export function formatPreludeBlock(core = readFileSync(CORE, 'utf8')) {
   // Inside the wrapper the commands are __formatX, so each name is defined once in the prelude (the
   // globals below are the only formatX), which the duplicate-name check holds every prelude to.
-  const body = core.replace(/\r\n/g, '\n').replace(/^export /gm, '')
-    .replace(/^function (format[A-Z]\w*)\(/gm, 'function __$1(').trimEnd();
+  const body = privateCalls(core.replace(/\r\n/g, '\n').replace(/^export /gm, ''), 'format').trimEnd();
   const names = [...COMMANDS.map(([n]) => n), 'formatDescribed', 'formatPlaceholderFor']
     .map((n) => `${n}: __${n}`).join(', ');
   const globals = COMMANDS.map(([name, args]) => {

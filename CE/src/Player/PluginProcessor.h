@@ -2318,6 +2318,28 @@ private:
                 return {};
             }
 
+            // ce.patch: the profile's `patch` section, as the author wrote it (which dumps make a
+            // patch, how to store a slot). Void when the profile has none, and ce.patch works out the
+            // rest from the parameters.
+            if (kind == "patch")
+            {
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    return docObj->getProperty ("patch");
+                return {};
+            }
+
+            // ce.patch: when a patch was kept. The engines have no clock of their own that is a date.
+            // UTC in the panel view's form (toISOString), so the two sort together as text.
+            if (kind == "now")
+            {
+                const auto local = juce::Time::getCurrentTime();
+                const juce::Time utc (local.toMilliseconds() - (juce::int64) local.getUTCOffsetSeconds() * 1000);
+                return juce::String::formatted ("%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", utc.getYear(), utc.getMonth() + 1,
+                                                utc.getDayOfMonth(), utc.getHours(), utc.getMinutes(), utc.getSeconds(),
+                                                utc.getMilliseconds());
+            }
+
             // The ids of what a profile can build or ask for.
             // The dumps the profile defines, by id: what requestDump, sendDump and buildDump take
             // (BridgeScriptHost::unknownDumpKind). Void, not empty, when there is no document to

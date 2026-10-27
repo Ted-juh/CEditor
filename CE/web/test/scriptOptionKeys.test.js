@@ -238,19 +238,21 @@ test('what each checked member answers when it refuses', () => {
   for (const [path, answer] of Object.entries(answers)) (byAnswer[answer] ??= []).push(path);
   for (const list of Object.values(byAnswer)) list.sort();
   assert.deepEqual(byAnswer, {
-    nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform',
-      'ce.format.clock', 'ce.format.db', 'ce.format.division', 'ce.format.fit', 'ce.format.hz', 'ce.format.line',
-      'ce.format.note', 'ce.format.number', 'ce.format.pan', 'ce.format.parameter', 'ce.format.parse', 'ce.format.percent',
-      'ce.format.ratio', 'ce.format.table', 'ce.format.time',
-      'ce.keys.shortcut', 'ce.midi.checksum', 'ce.midi.panic',
-      'ce.midi.read', 'ce.midi.write', 'ce.panel.clone', 'ce.panel.create', 'ce.storage.encode', 'ce.text.fit', 'ce.time.syncTimer',
-      'ce.ui.notify', 'set'],
+    nothing: ['ce.draw.measure', 'ce.draw.stroke', 'ce.draw.transform', 'ce.format.clock', 'ce.format.db',
+      'ce.format.division', 'ce.format.fit', 'ce.format.hz', 'ce.format.line', 'ce.format.note',
+      'ce.format.number', 'ce.format.pan', 'ce.format.parameter', 'ce.format.parse', 'ce.format.percent',
+      'ce.format.ratio', 'ce.format.table', 'ce.format.time', 'ce.keys.shortcut', 'ce.midi.checksum',
+      'ce.midi.panic', 'ce.midi.read', 'ce.midi.write', 'ce.panel.clone', 'ce.panel.create',
+      'ce.patch.blend', 'ce.patch.current', 'ce.patch.diff', 'ce.patch.equal', 'ce.patch.load',
+      'ce.patch.merge', 'ce.patch.morph', 'ce.patch.mutate', 'ce.patch.random', 'ce.storage.encode',
+      'ce.text.fit', 'ce.time.syncTimer', 'ce.ui.notify', 'set'],
     false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.device.bind', 'ce.device.defineDump',
       'ce.device.defineParameter', 'ce.device.requestDump', 'ce.draw.curve', 'ce.draw.grid', 'ce.draw.image',
-      'ce.draw.polygon', 'ce.draw.text', 'ce.image.icon', 'ce.keys.piano', 'ce.ui.status', 'ce.ui.update'],
+      'ce.draw.polygon', 'ce.draw.text', 'ce.image.icon', 'ce.keys.piano', 'ce.patch.forget',
+      'ce.patch.read', 'ce.patch.save', 'ce.ui.status', 'ce.ui.update'],
     zero: ['ce.panel.align', 'ce.panel.circle', 'ce.panel.distribute', 'ce.panel.grid', 'ce.panel.match'],
-    'empty list': ['ce.device.parameters', 'ce.device.ports', 'ce.image.assets', 'ce.text.fonts'],
-    result: ['ce.device.recallPreset'],
+    'empty list': ['ce.device.parameters', 'ce.device.ports', 'ce.image.assets', 'ce.patch.list', 'ce.text.fonts'],
+    result: ['ce.device.recallPreset', 'ce.patch.apply', 'ce.patch.write'],
     unanswered: ['ce.ui.choose', 'ce.ui.dialog', 'ce.ui.prompt'],
   });
   assert.equal(refusalOf({ signature: 'x() -> boolean' }), 'false');

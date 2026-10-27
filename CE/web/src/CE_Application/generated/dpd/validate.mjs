@@ -21,6 +21,33 @@ const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
 // $defs.parameterDisplay.format: the ce.format command that writes the value.
 const DISPLAY_FORMATS = ['number', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division', 'table'];
 
+/** $defs.patchSection: what a patch of this synth is, for ce.patch. */
+function checkPatchSection(patch, E) {
+  if (patch === undefined) return;
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) { E('patch: must be an object'); return; }
+  if (patch.scopes !== undefined) {
+    if (!Array.isArray(patch.scopes)) E('patch.scopes: must be a list');
+    else {
+      const seen = new Set();
+      patch.scopes.forEach((scope, i) => {
+        if (!scope || typeof scope !== 'object' || typeof scope.id !== 'string' || scope.id === '') { E(`patch.scopes[${i}]: needs an id`); return; }
+        if (seen.has(scope.id)) E(`patch.scopes[${i}]: "${scope.id}" is there twice`);
+        seen.add(scope.id);
+        for (const key of ['groups', 'only', 'except', 'dumps']) {
+          if (scope[key] !== undefined && (!Array.isArray(scope[key]) || scope[key].some((x) => typeof x !== 'string'))) {
+            E(`patch.scopes[${i}].${key}: must be a list of names`);
+          }
+        }
+      });
+    }
+  }
+  if (patch.deliver !== undefined && !['parameters', 'dump'].includes(patch.deliver)) E(`patch.deliver: bad value ${patch.deliver}`);
+  if (patch.write !== undefined) {
+    if (!patch.write || typeof patch.write !== 'object' || !['dump', 'command'].includes(patch.write.via)) E('patch.write: needs via "dump" or "command"');
+    else if (patch.write.via === 'dump' && !(typeof patch.write.dump === 'string' && patch.write.dump)) E('patch.write: via "dump" needs the dump to send');
+  }
+}
+
 /** A parameter's or the profile's `display`; `where` names it in the message. */
 function checkDisplay(display, where, E) {
   if (display === undefined) return;
@@ -68,6 +95,7 @@ export function validateProfile(profile) {
   }
 
   checkDisplay(profile.display, 'profile', E);
+  checkPatchSection(profile.patch, E);
 
   for (const [sk, sc] of Object.entries(profile.scopes ?? {})) {
     if (sc.kind && !SCOPE_KINDS.includes(sc.kind)) E(`scope ${sk}: bad kind ${sc.kind}`);

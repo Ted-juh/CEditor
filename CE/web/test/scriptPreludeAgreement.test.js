@@ -1296,6 +1296,13 @@ const OPTION_ANSWER_CASES = [
   ['formatDivision', [1, { tol: 0.1 }]], ['formatTable', [0, ['a'], { strt: 1 }]], ['formatFit', ['a', 4, { allign: 'right' }]],
   ['formatLine', ['a', 'b', 8, { gaps: 2 }]], ['formatParse', ['5', { knd: 'hz' }]],
   ['formatParameter', ['cutoff', 5, { rol: 'mainSynth' }]],
+  ['patchCurrent', ['voice', { grups: ['x'] }]], ['patchRead', ['voice', 'fn', { tmeout: 5 }]],
+  ['patchLoad', ['x', { rle: 'a' }]], ['patchMorph', [{}, {}, 0.5, { switchat: 0.5 }]],
+  ['patchBlend', [[{}, {}], [1, 1], { onlly: ['x'] }]], ['patchRandom', [{ sed: 1 }]],
+  ['patchMutate', [{}, 0.1, { sed: 1 }]], ['patchMerge', [{}, {}, { grups: ['x'] }]],
+  ['patchDiff', [{}, {}, { exept: ['x'] }]], ['patchEqual', [{}, {}, { lok: ['x'] }]],
+  ['patchApply', [{}, { sned: 'none' }]], ['patchSave', ['x', {}, { replce: true }]],
+  ['patchList', [{ scpe: 'voice' }]], ['patchForget', ['x', { rle: 'a' }]], ['patchWrite', [{}, 1, { rle: 'a' }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {

@@ -71,6 +71,15 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.patch': 'A synth\'s sound as one value you can hold, change, compare, send and keep. `current` captures it, `morph`, `blend`, `random`, `mutate` and `merge` make new ones without sending anything, `diff` and `equal` compare two, and `apply` puts one on the panel and sends it the way the synth takes a patch.\n\n'
+    + 'A patch is a table: `device` (the device profile\'s id), `role`, `scope` (which part of the synth: "voice" unless the profile names others), `name`, `values` (parameter id to value, in the parameter\'s own units; a choice is its id), `missing` (ids nothing is known for) and `source`.\n\n'
+    + 'Every command that works on parameters takes the same choosing options: `groups`, `only`, `except`, `lock` and `include`. The transforms leave the patch name and the parameters the synth cannot be sent alone unless `include` names them. A profile can describe its patches in a `patch` section: which scopes a patch can hold and the dumps that read and send each, how `apply` sends one (`deliver`), and how `write` stores a slot.\n\n'
+    + '```lua\n'
+    + '-- Lua: a knob morphs from the patch kept as A to the one kept as B\n'
+    + 'function onValueChange(value)\n'
+    + '  ce.patch.apply(ce.patch.morph(ce.patch.load("A"), ce.patch.load("B"), value / 127), { live = true })\n'
+    + 'end\n'
+    + '```',
   'ce.keys': 'The computer keyboard on a panel: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. In the panel view only, the editor\'s preview and an exported plug-in with its window open; with the window shut there is no keyboard.\n\n'
     + 'Who gets a key, in order; a kept key goes no further: (1) typing into a text box or an LCD keeps every key; (2) the panic key; (3) shortcuts, those with a modifier at once and those without after the focused control; (4) the piano, when it is on; (5) the focused control\'s own keys, the arrows on a knob and Space on a button; (6) keyDown, for any script that listens, which keeps the key by returning true; (7) whatever is around the panel, the DAW or the editor. When the panel loses the keyboard (the window loses focus or is hidden, or the panel closes) every held key gets its keyUp and every piano note its note-off.\n\n'
     + '```lua\n'
@@ -161,6 +170,7 @@ const MODULE_TITLES = {
   'ce.anim': 'smooth movement',
   'ce.panel': 'building and arranging the panel',
   'ce.storage': 'remembering things',
+  'ce.patch': 'the synth\'s sound as a value',
   'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',
   'ce.image': 'images and icons',

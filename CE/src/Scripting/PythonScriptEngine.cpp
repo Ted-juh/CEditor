@@ -2760,6 +2760,13 @@ def formatParse(text, opts=None):
     return value
 
 # As the synth shows it: formatCore.js formatDescribed, from the parameter the profile describes.
+# The commands as defined above, before the option check wraps the globals: formatDescribed hands
+# them options of its own (a note's middleC beside a frequency) that a script's call would not.
+_FMT_RAW = {
+    "number": formatNumber, "hz": formatHz, "time": formatTime, "db": formatDb, "percent": formatPercent,
+    "pan": formatPan, "ratio": formatRatio, "note": formatNote, "division": formatDivision, "table": formatTable,
+}
+
 def _fmt_described_options(d, kind, opts):
     o = {}
     precision = _fmt_num(d.get("precision"))
@@ -2815,7 +2822,7 @@ def _fmt_described(desc, v, opts):
 
     table = d.get("table")
     if isinstance(table, (list, tuple)) and len(table) > 0:
-        return formatTable(n, table, _fmt_with_options(o, {"start": wire_min}))
+        return _FMT_RAW["table"](n, table, _fmt_with_options(o, {"start": wire_min}))
 
     dmin = _fmt_num(d.get("min"))
     dmax = _fmt_num(d.get("max"))
@@ -2823,24 +2830,24 @@ def _fmt_described(desc, v, opts):
     shown = dmin + ((n - wire_min) / (wire_max - wire_min)) * (dmax - dmin) if scaled else n
 
     if kind == "hz":
-        return formatHz(shown, o)
+        return _FMT_RAW["hz"](shown, o)
     if kind == "time":
-        return formatTime(shown, o)
+        return _FMT_RAW["time"](shown, o)
     if kind == "db":
-        return formatDb(shown, o)
+        return _FMT_RAW["db"](shown, o)
     if kind == "ratio":
-        return formatRatio(shown, o)
+        return _FMT_RAW["ratio"](shown, o)
     if kind == "note":
-        return formatNote(shown, o)
+        return _FMT_RAW["note"](shown, o)
     if kind == "division":
-        return formatDivision(shown, o)
+        return _FMT_RAW["division"](shown, o)
     if kind == "percent":
-        return formatPercent(n, _fmt_with_options(o, {"min": wire_min, "max": wire_max}))
+        return _FMT_RAW["percent"](n, _fmt_with_options(o, {"min": wire_min, "max": wire_max}))
     if kind == "pan":
         a, b = (dmin, dmax) if scaled else (wire_min, wire_max)
         center = 0 if a < 0 and b > 0 else _fmt_math.floor((a + b) / 2 + 0.5)
-        return formatPan(shown, _fmt_with_options(o, {"min": a, "max": b, "center": center}))
-    return formatNumber(shown, o)
+        return _FMT_RAW["pan"](shown, _fmt_with_options(o, {"min": a, "max": b, "center": center}))
+    return _FMT_RAW["number"](shown, o)
 
 def formatParameter(id, v, opts=None):
     # The host query itself, not deviceParameter: that is ce.device's, and gated when a script
@@ -2853,6 +2860,995 @@ def formatParameter(id, v, opts=None):
         _fmt_say("error", "ce.format.parameter: the device profile has no parameter \"" + str(id) + "\", so \"" + shown + "\" is shown.")
         return shown
     return _fmt_described(d, v, opts)
+
+# @module ce.patch
+# ce.patch, ported line for line from patchCore.js (the panel view's; the JavaScript prelude runs
+# that file itself). Held to the panel view's answers by test/patchParity.test.js and the scenario in
+# test/support/patchScenario.mjs. ce.patch requires ce.device, ce.panel, ce.math and ce.storage, so
+# the globals the host below calls are live whenever a script can reach ce.patch.
+import math as _patch_math
+import re as _patch_re
+
+_PATCH_LEAVE_OUT_GROUPS = ["system", "global", "utility", "performance"]
+_PATCH_DEFAULT_SEED = 0x9E3779B9
+_PATCH_SEND_MODES = ["auto", "parameters", "dump", "none"]
+_PATCH_LIVE_BUDGET = 32
+_PATCH_DEFINE_FIELDS = ["name", "groups", "only", "except", "dumps", "read", "transform"]
+_PATCH_STORE_PREFIX = "ce.patch:"
+_PATCH_NUMBER_TEXT = _patch_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+def _patch_num(v):
+    if isinstance(v, bool):
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str) and _PATCH_NUMBER_TEXT.fullmatch(v.strip()):
+        t = float(v.strip())
+        return int(t) if t.is_integer() and "." not in v and "e" not in v.lower() else t
+    return float("nan")
+
+def _patch_finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and _patch_math.isfinite(x)
+
+def _patch_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _patch_names(v):
+    if isinstance(v, str):
+        return [] if v == "" else [v]
+    if not isinstance(v, (list, tuple)):
+        return []
+    return [x for x in v if isinstance(x, str) and x != ""]
+
+def _patch_lower(s):
+    return "" if s is None else str(s).lower()
+
+def _patch_str(v):
+    return "" if v is None else (v if isinstance(v, str) else _patch_text(v))
+
+def _patch_text(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+def _patch_has(values, key):
+    return isinstance(values, dict) and values.get(key) is not None
+
+def _patch_copy(values):
+    return {k: v for k, v in values.items() if v is not None} if isinstance(values, dict) else {}
+
+def _patch_round(x):
+    return -_patch_math.floor(-x + 0.5) if x < 0 else _patch_math.floor(x + 0.5)
+
+def _patch_kind(desc):
+    t = _patch_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if t in ("action", "momentary", "trigger"):
+        return "action"
+    if t == "text":
+        return "text"
+    if t in ("choice", "boolean", "enum", "bool"):
+        return "choice"
+    if isinstance(desc, dict) and isinstance(desc.get("choices"), (list, tuple)) and len(desc.get("choices")) > 0:
+        return "choice"
+    return "number"
+
+def _patch_writable(desc):
+    access = desc.get("access") if isinstance(desc, dict) else None
+    if isinstance(access, str):
+        return "write" in access.lower()
+    if isinstance(access, dict) and access.get("canWrite") is False:
+        return False
+    return True
+
+def _patch_whole(desc):
+    return not (isinstance(desc, dict) and desc.get("type") == "float")
+
+def _patch_range(desc):
+    rng = desc.get("range") if isinstance(desc, dict) and isinstance(desc.get("range"), dict) else {}
+    lo = _patch_num(rng.get("min"))
+    hi = _patch_num(rng.get("max"))
+    a = lo if _patch_finite(lo) else 0
+    b = hi if _patch_finite(hi) else 127
+    return (a, b) if a <= b else (b, a)
+
+def _patch_choices(desc):
+    out = []
+    if isinstance(desc, dict) and isinstance(desc.get("choices"), (list, tuple)):
+        for c in desc["choices"]:
+            if isinstance(c, dict):
+                if c.get("id") is not None:
+                    out.append(c["id"])
+                elif c.get("value") is not None:
+                    out.append(c["value"])
+            elif c is not None:
+                out.append(c)
+    t = _patch_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if len(out) == 0 and t in ("boolean", "bool"):
+        out = [False, True]
+    return out
+
+def _patch_settle(desc, v):
+    x = v
+    if _patch_whole(desc):
+        x = _patch_round(x)
+    lo, hi = _patch_range(desc)
+    if x < lo:
+        x = lo
+    if x > hi:
+        x = hi
+    return x
+
+def _patch_same(desc, a, b):
+    x = _patch_num(a)
+    y = _patch_num(b)
+    if not isinstance(a, bool) and not isinstance(b, bool) and _patch_finite(x) and _patch_finite(y):
+        return abs(x - y) < (0.5 if _patch_whole(desc) else 1e-9)
+    if a is b or (type(a) == type(b) and a == b):
+        return True
+    if a is None or b is None:
+        return False
+    if isinstance(a, bool) or isinstance(b, bool):
+        return _patch_text(a) == _patch_text(b)
+    return str(a).rstrip() == str(b).rstrip()
+
+def _patch_left_out(desc):
+    return _patch_lower(desc.get("group") if isinstance(desc, dict) else None) in _PATCH_LEAVE_OUT_GROUPS
+
+def _patch_matches(desc, names):
+    group = _patch_lower(desc.get("group"))
+    for name in names:
+        if name == desc.get("id"):
+            return True
+        if group != "" and name.lower() == group:
+            return True
+    return False
+
+def _patch_scope_params(params, scope, defs):
+    lst = params if isinstance(params, (list, tuple)) else []
+    sid = "voice" if scope is None else str(scope)
+    d = defs.get(sid) if isinstance(defs, dict) else None
+    out = []
+    if isinstance(d, dict):
+        groups = _patch_names(d.get("groups"))
+        only = _patch_names(d.get("only"))
+        exc = _patch_names(d.get("except"))
+        for desc in lst:
+            if _patch_kind(desc) == "action":
+                continue
+            if (groups or only) and not _patch_matches(desc, groups) and desc.get("id") not in only:
+                continue
+            if _patch_matches(desc, exc):
+                continue
+            out.append(desc)
+        return out
+    if sid == "voice":
+        return [desc for desc in lst if _patch_kind(desc) != "action" and not _patch_left_out(desc)]
+    if sid == "system":
+        return [desc for desc in lst if _patch_kind(desc) != "action" and _patch_left_out(desc)]
+    return None
+
+def _patch_name_parameter(scoped):
+    found = ""
+    for desc in scoped:
+        if _patch_kind(desc) != "text":
+            continue
+        if found != "":
+            return ""
+        found = str(desc.get("id"))
+    return found
+
+def _patch_warn_unknown(scoped, names, what, verb, say, words):
+    for name in names:
+        if words is not None and name in words:
+            continue
+        known = False
+        for desc in scoped:
+            if desc.get("id") == name or (_patch_lower(desc.get("group")) != "" and _patch_lower(desc.get("group")) == name.lower()):
+                known = True
+                break
+        if not known:
+            say("warn", "ce.patch." + verb + ": the profile has no parameter or group \"" + name + "\" in this scope, in " + what + "; the rest goes ahead.")
+
+def _patch_choose(scoped, opts, say, verb, for_apply):
+    groups = _patch_names(_patch_opt(opts, "groups"))
+    only = _patch_names(_patch_opt(opts, "only"))
+    exc = _patch_names(_patch_opt(opts, "except"))
+    include = _patch_names(_patch_opt(opts, "include"))
+    _patch_warn_unknown(scoped, groups, "groups", verb, say, None)
+    _patch_warn_unknown(scoped, only, "only", verb, say, None)
+    _patch_warn_unknown(scoped, exc, "except", verb, say, None)
+    _patch_warn_unknown(scoped, include, "include", verb, say, ["name", "readOnly", "leaveOut"])
+    _patch_warn_unknown(scoped, _patch_names(_patch_opt(opts, "lock")), "lock", verb, say, None)
+    chosen = []
+    for desc in scoped:
+        included = _patch_matches(desc, include)
+        if not for_apply and not included:
+            if _patch_kind(desc) == "text" and "name" not in include:
+                continue
+            if not _patch_writable(desc) and "readOnly" not in include:
+                continue
+        if (groups or only) and not _patch_matches(desc, groups) and desc.get("id") not in only:
+            continue
+        if _patch_matches(desc, exc):
+            continue
+        chosen.append(str(desc.get("id")))
+    if not chosen and (groups or only):
+        say("error", "ce.patch." + verb + ": groups and only leave no parameter chosen, so nothing was done.")
+        return None
+    return chosen
+
+def _patch_locked(scoped, opts):
+    lock = _patch_names(_patch_opt(opts, "lock"))
+    return [str(desc.get("id")) for desc in scoped if _patch_matches(desc, lock)]
+
+def _patch_by_id(scoped):
+    return {str(desc.get("id")): desc for desc in scoped}
+
+def _patch_is(p):
+    return isinstance(p, dict) and isinstance(p.get("values"), dict)
+
+def _patch_make(base, values, scoped, source):
+    missing = [str(desc.get("id")) for desc in scoped if _patch_kind(desc) != "action" and not _patch_has(values, str(desc.get("id")))]
+    name_id = _patch_name_parameter(scoped)
+    b = base if isinstance(base, dict) else {}
+    patch = {
+        "device": _patch_str(b.get("device")),
+        "role": _patch_str(b.get("role")) if b.get("role") is not None else "mainSynth",
+        "scope": _patch_str(b.get("scope")) if b.get("scope") is not None else "voice",
+        "values": values,
+        "missing": missing,
+        "source": source,
+    }
+    if name_id != "" and _patch_has(values, name_id):
+        patch["name"] = _patch_text(values[name_id])
+    elif isinstance(b.get("name"), str):
+        patch["name"] = b["name"]
+    return patch
+
+def _patch_same_patches(a, b, verb, what, say):
+    if not _patch_is(a) or not _patch_is(b):
+        say("error", "ce.patch." + verb + ": " + what + " must be patches, as ce.patch.current() gives them, so nothing was done.")
+        return False
+    if _patch_str(a.get("device")) != _patch_str(b.get("device")) or _patch_str(a.get("scope")) != _patch_str(b.get("scope")):
+        say("error", "ce.patch." + verb + ": a patch of " + _patch_str(b.get("device")) + " (" + _patch_str(b.get("scope")) + ") cannot be used with one of " + _patch_str(a.get("device")) + " (" + _patch_str(a.get("scope")) + "), so nothing was done.")
+        return False
+    return True
+
+def _patch_clamp01(v):
+    n = _patch_num(v)
+    if not _patch_finite(n):
+        return float("nan")
+    return 0 if n < 0 else 1 if n > 1 else n
+
+def _patch_morph(a, b, t, scoped, opts, say):
+    if not _patch_same_patches(a, b, "morph", "a and b", say):
+        return None
+    at = _patch_clamp01(t)
+    if _patch_math.isnan(at):
+        say("error", "ce.patch.morph: t must be a number from 0 to 1, so nothing was done.")
+        return None
+    switch_at = _patch_clamp01(_patch_opt(opts, "switchAt"))
+    if _patch_math.isnan(switch_at):
+        switch_at = 0.5
+    ids = _patch_choose(scoped, opts, say, "morph", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    out = _patch_copy(a["values"])
+    for k, v in b["values"].items():
+        if not _patch_has(out, k) and v is not None:
+            out[k] = v
+    for i in ids:
+        if i in locked or not _patch_has(a["values"], i) or not _patch_has(b["values"], i):
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            x = _patch_num(a["values"][i])
+            y = _patch_num(b["values"][i])
+            if _patch_finite(x) and _patch_finite(y):
+                out[i] = _patch_settle(desc, x + (y - x) * at)
+        elif kind == "choice":
+            out[i] = a["values"][i] if at < switch_at else b["values"][i]
+    return _patch_make(a, out, scoped, "made")
+
+def _patch_blend(patches, weights, scoped, opts, say):
+    if not isinstance(patches, (list, tuple)) or len(patches) < 2:
+        say("error", "ce.patch.blend: patches must be a list of two or more patches, so nothing was done.")
+        return None
+    for i in range(1, len(patches)):
+        if not _patch_same_patches(patches[0], patches[i], "blend", "patches", say):
+            return None
+    w = []
+    total = 0
+    for i in range(len(patches)):
+        n = _patch_num(weights[i]) if isinstance(weights, (list, tuple)) and i < len(weights) else float("nan")
+        v = n if _patch_finite(n) and n > 0 else 0
+        w.append(v)
+        total += v
+    if not total > 0:
+        say("error", "ce.patch.blend: the weights add up to 0 or less, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "blend", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    out = _patch_copy(patches[0]["values"])
+    for p in patches[1:]:
+        for k, v in p["values"].items():
+            if not _patch_has(out, k) and v is not None:
+                out[k] = v
+    for i in ids:
+        if i in locked:
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            total_v = 0
+            weight = 0
+            for j, p in enumerate(patches):
+                x = _patch_num(p["values"].get(i))
+                if not _patch_finite(x) or w[j] <= 0:
+                    continue
+                total_v += x * w[j]
+                weight += w[j]
+            if weight > 0:
+                out[i] = _patch_settle(desc, total_v / weight)
+        elif kind == "choice":
+            best = -1
+            for j, p in enumerate(patches):
+                if not _patch_has(p["values"], i) or w[j] <= 0:
+                    continue
+                if best < 0 or w[j] > w[best]:
+                    best = j
+            if best >= 0:
+                out[i] = patches[best]["values"][i]
+    return _patch_make(patches[0], out, scoped, "made")
+
+def _patch_random_source(seed):
+    n = _patch_num(seed)
+    x = int(_patch_math.floor(n)) % 4294967296 if _patch_finite(n) else 0
+    if x == 0:
+        x = _PATCH_DEFAULT_SEED
+    state = [x]
+    def nxt():
+        s = state[0]
+        s = (s ^ ((s << 13) & 0xFFFFFFFF)) & 0xFFFFFFFF
+        s = (s ^ (s >> 17)) & 0xFFFFFFFF
+        s = (s ^ ((s << 5) & 0xFFFFFFFF)) & 0xFFFFFFFF
+        state[0] = s
+        return s / 4294967296
+    return nxt
+
+def _patch_within(desc, within):
+    lo, hi = _patch_range(desc)
+    narrow = within.get(str(desc.get("id"))) if isinstance(within, dict) else None
+    if isinstance(narrow, (list, tuple)) and len(narrow) >= 2:
+        a = _patch_num(narrow[0])
+        b = _patch_num(narrow[1])
+        if _patch_finite(a) and _patch_finite(b):
+            low = max(lo, min(a, b))
+            high = min(hi, max(a, b))
+            if low <= high:
+                lo, hi = low, high
+    return lo, hi
+
+def _patch_random(frm, scoped, opts, nxt, say):
+    if not _patch_is(frm):
+        say("error", "ce.patch.random: from must be a patch, as ce.patch.current() gives them, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "random", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    within = _patch_opt(opts, "within")
+    out = _patch_copy(frm["values"])
+    for i in ids:
+        if i in locked:
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            lo, hi = _patch_within(desc, within)
+            r = nxt()
+            if _patch_whole(desc):
+                out[i] = min(_patch_math.floor(hi), _patch_math.ceil(lo) + _patch_math.floor(r * (_patch_math.floor(hi) - _patch_math.ceil(lo) + 1)))
+            else:
+                out[i] = lo + r * (hi - lo)
+        elif kind == "choice":
+            choices = _patch_choices(desc)
+            r = nxt()
+            if choices:
+                out[i] = choices[min(len(choices) - 1, _patch_math.floor(r * len(choices)))]
+    return _patch_make(frm, out, scoped, "made")
+
+def _patch_mutate(patch, amount, scoped, opts, nxt, say):
+    if not _patch_is(patch):
+        say("error", "ce.patch.mutate: patch must be a patch, as ce.patch.current() gives them, so nothing was done.")
+        return None
+    by = _patch_clamp01(amount)
+    if _patch_math.isnan(by):
+        say("error", "ce.patch.mutate: amount must be a number from 0 to 1, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "mutate", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    out = _patch_copy(patch["values"])
+    for i in ids:
+        if i in locked or not _patch_has(out, i):
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            x = _patch_num(out[i])
+            if not _patch_finite(x):
+                continue
+            lo, hi = _patch_range(desc)
+            r1 = nxt()
+            r2 = nxt()
+            out[i] = _patch_settle(desc, x + (r1 - r2) * by * (hi - lo))
+        elif kind == "choice":
+            r1 = nxt()
+            r2 = nxt()
+            if r1 >= by:
+                continue
+            others = [c for c in _patch_choices(desc) if not _patch_same(desc, c, out[i])]
+            if others:
+                out[i] = others[min(len(others) - 1, _patch_math.floor(r2 * len(others)))]
+    return _patch_make(patch, out, scoped, "made")
+
+def _patch_merge(base, other, scoped, opts, say):
+    if not _patch_same_patches(base, other, "merge", "base and other", say):
+        return None
+    if not _patch_names(_patch_opt(opts, "groups")) and not _patch_names(_patch_opt(opts, "only")):
+        say("error", "ce.patch.merge: name the parameters to take, with groups or only; taking every value is other itself, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "merge", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    out = _patch_copy(base["values"])
+    for i in ids:
+        if i not in locked and _patch_has(other["values"], i):
+            out[i] = other["values"][i]
+    return _patch_make(base, out, scoped, "made")
+
+def _patch_diff(a, b, scoped, opts, say):
+    if not _patch_same_patches(a, b, "diff", "a and b", say):
+        return None
+    ids = _patch_choose(scoped, opts, say, "diff", False)
+    if ids is None:
+        return None
+    descs = _patch_by_id(scoped)
+    out = []
+    for i in ids:
+        in_a = _patch_has(a["values"], i)
+        in_b = _patch_has(b["values"], i)
+        if not in_a and not in_b:
+            continue
+        if in_a and in_b and _patch_same(descs.get(i), a["values"][i], b["values"][i]):
+            continue
+        desc = descs.get(i) or {}
+        entry = {"id": i, "name": _patch_str(desc.get("name")) if desc.get("name") is not None else i, "group": _patch_str(desc.get("group"))}
+        if in_a:
+            entry["from"] = a["values"][i]
+        if in_b:
+            entry["to"] = b["values"][i]
+        out.append(entry)
+    return out
+
+def _patch_apply_plan(patch, known, scoped, opts, say):
+    ids = _patch_choose(scoped, opts, say, "apply", True)
+    if ids is None:
+        return None
+    descs = _patch_by_id(scoped)
+    changed_only = _patch_opt(opts, "changedOnly") is not False
+    send = []
+    values = {}
+    skipped = []
+    for i in ids:
+        if not _patch_has(patch["values"], i):
+            continue
+        value = patch["values"][i]
+        values[i] = value
+        if not _patch_writable(descs.get(i)):
+            skipped.append({"id": i, "why": "the synth cannot be sent it"})
+            continue
+        if changed_only and _patch_has(known, i) and _patch_same(descs.get(i), known[i], value):
+            continue
+        send.append([i, value])
+    for key in sorted(patch["values"].keys()):
+        if key not in descs:
+            skipped.append({"id": key, "why": "not a parameter of this scope"})
+    return {"send": send, "values": values, "skipped": skipped}
+
+def _patch_live_plan(send, known, scoped, budget):
+    descs = _patch_by_id(scoped)
+    moved = []
+    for i, entry in enumerate(send):
+        pid, value = entry[0], entry[1]
+        lo, hi = _patch_range(descs.get(pid))
+        x = _patch_num(value)
+        y = _patch_num(known.get(pid))
+        delta = abs(x - y) / ((hi - lo) or 1) if _patch_finite(x) and _patch_finite(y) else 2
+        moved.append((delta, i))
+    moved.sort(key=lambda m: (-m[0], m[1]))
+    now = [send[m[1]] for k, m in enumerate(moved) if k < budget]
+    later = [send[m[1]] for k, m in enumerate(moved) if k >= budget]
+    return now, later
+
+def _patch_list_of_scopes(section):
+    scopes = section.get("scopes") if isinstance(section, dict) else None
+    if not isinstance(scopes, (list, tuple)):
+        return []
+    return [s for s in scopes if isinstance(s, dict) and isinstance(s.get("id"), str) and s.get("id") != ""]
+
+class _PatchCommands:
+    """The commands over a host, as patchCore.js's patchCommands."""
+
+    def __init__(self, host):
+        self.host = host
+        self.say = host["say"]
+        self.defined = {}
+        self.waiting = {}
+
+    def context(self, role):
+        r = role if isinstance(role, str) and role != "" else "mainSynth"
+        profile = self.host["profile"](r)
+        if not isinstance(profile, dict) or not isinstance(profile.get("id"), str) or profile.get("id") == "":
+            return {"role": r, "device": "panel", "params": None, "section": None}
+        params = self.host["parameters"](r)
+        section = self.host["patchSection"](r)
+        return {"role": r, "device": profile["id"], "params": params if isinstance(params, (list, tuple)) else [],
+                "section": section if isinstance(section, dict) else None}
+
+    def scope_defs(self, ctx):
+        defs = {}
+        for s in _patch_list_of_scopes(ctx["section"]):
+            defs[s["id"]] = s
+        own = self.defined.get(ctx["role"])
+        if own:
+            for k, v in own.items():
+                defs[k] = v
+        return defs
+
+    def panel_descriptors(self, values):
+        out = []
+        for name in sorted((values or {}).keys()):
+            v = values[name]
+            t = "boolean" if isinstance(v, bool) else "float" if isinstance(v, (int, float)) else "text"
+            out.append({"id": name, "name": name, "group": "", "type": t})
+        return out
+
+    def scoped(self, ctx, scope, verb):
+        if ctx["params"] is None:
+            if scope != "voice":
+                self.say("error", "ce.patch." + verb + ": a panel without a device profile has one scope, \"voice\", so nothing was done.")
+                return None
+            return self.panel_descriptors(self.host["snapshot"]())
+        lst = _patch_scope_params(ctx["params"], scope, self.scope_defs(ctx))
+        if lst is None:
+            self.say("error", "ce.patch." + verb + ": \"" + str(scope) + "\" is not a scope of " + ctx["device"] + ", so nothing was done. ce.patch.scopes() lists them.")
+        return lst
+
+    def for_patch(self, patch, verb):
+        if not _patch_is(patch):
+            self.say("error", "ce.patch." + verb + ": that is not a patch, as ce.patch.current() gives them, so nothing was done.")
+            return None
+        ctx = self.context(patch.get("role") if isinstance(patch.get("role"), str) else "mainSynth")
+        if _patch_str(patch.get("device")) != ctx["device"]:
+            self.say("error", "ce.patch." + verb + ": the patch is one of " + _patch_str(patch.get("device")) + ", and this panel's synth is " + ctx["device"] + ", so nothing was done.")
+            return None
+        lst = self.scoped(ctx, _patch_str(patch.get("scope")) if patch.get("scope") is not None else "voice", verb)
+        if lst is None:
+            return None
+        return ctx, lst
+
+    @staticmethod
+    def scope_of(scope, opts):
+        if isinstance(scope, str) and scope != "":
+            return scope
+        from_opts = _patch_opt(opts, "scope")
+        return from_opts if isinstance(from_opts, str) and from_opts != "" else "voice"
+
+    def current(self, scope=None, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        sid = self.scope_of(scope, opts)
+        lst = self.scoped(ctx, sid, "current")
+        if lst is None:
+            return None
+        narrowed = bool(_patch_names(_patch_opt(opts, "groups")) or _patch_names(_patch_opt(opts, "only")) or _patch_names(_patch_opt(opts, "except")))
+        ids = None
+        if narrowed:
+            ids = _patch_choose(lst, opts, self.say, "current", True)
+            if ids is None:
+                return None
+        if ctx["params"] is None:
+            values = _patch_copy(self.host["snapshot"]())
+            if ids is not None:
+                values = {k: v for k, v in values.items() if k in ids}
+        else:
+            values = {}
+            for desc in lst:
+                pid = str(desc.get("id"))
+                if ids is not None and pid not in ids:
+                    continue
+                v = self.host["read"](pid, ctx["role"])
+                if v is not None:
+                    values[pid] = v
+        return _patch_make({"device": ctx["device"], "role": ctx["role"], "scope": sid}, values, lst, "panel")
+
+    def seeded(self, opts, verb):
+        seed = _patch_opt(opts, "seed")
+        if seed is not None:
+            if not _patch_finite(_patch_num(seed)):
+                self.say("error", "ce.patch." + verb + ": seed must be a number, so nothing was done.")
+                return None
+            return _patch_random_source(seed)
+        return _patch_random_source(_patch_math.floor(self.host["random"]() * 4294967296))
+
+    def known_values(self, ctx, lst):
+        known = {}
+        if ctx["params"] is None:
+            return known
+        for desc in lst:
+            v = self.host["read"](str(desc.get("id")), ctx["role"])
+            if v is not None:
+                known[str(desc.get("id"))] = v
+        return known
+
+    def scope_dumps(self, ctx, scope):
+        d = self.scope_defs(ctx).get(scope)
+        return _patch_names(d.get("dumps")) if d else []
+
+    def apply(self, patch, opts=None):
+        refused = {"ok": False, "via": "none", "applied": 0, "sent": 0, "skipped": []}
+        at = self.for_patch(patch, "apply")
+        if at is None:
+            return refused
+        ctx, lst = at
+        scope = _patch_str(patch.get("scope")) if patch.get("scope") is not None else "voice"
+        send = _patch_opt(opts, "send")
+        if send is None:
+            send = "auto"
+        if send not in _PATCH_SEND_MODES:
+            self.say("error", "ce.patch.apply: send \"" + _patch_str(send) + "\" is not one of \"auto\", \"parameters\", \"dump\" or \"none\", so nothing was done.")
+            return refused
+        known = self.known_values(ctx, lst)
+        plan = _patch_apply_plan(patch, known, lst, opts, self.say)
+        if plan is None:
+            return refused
+        applied = len(plan["values"])
+        if ctx["params"] is None:
+            self.host["restore"](plan["values"])
+            return {"ok": True, "via": "none", "applied": applied, "sent": 0, "skipped": plan["skipped"]}
+        dumps = self.scope_dumps(ctx, scope)
+        section = ctx["section"]
+        deliver = section.get("deliver") if isinstance(section, dict) and isinstance(section.get("deliver"), str) else ""
+        via = send
+        if send == "auto":
+            via = "dump" if deliver == "dump" and dumps else "parameters"
+        if via == "dump" and not dumps:
+            self.say("error", "ce.patch.apply: " + ctx["device"] + " has no dumps for the \"" + scope + "\" scope, so it cannot take a patch as a dump, and nothing was done.")
+            return refused
+        self.host["fill"](plan["values"])
+        if via == "none":
+            return {"ok": True, "via": via, "applied": applied, "sent": 0, "skipped": plan["skipped"]}
+        if via == "dump":
+            for kind in dumps:
+                self.host["sendDump"](kind)
+            return {"ok": True, "via": via, "applied": applied, "sent": len(dumps), "skipped": plan["skipped"]}
+        key = ctx["role"] + "\0" + scope
+        to_send = plan["send"]
+        if _patch_opt(opts, "live") is True:
+            now, later = _patch_live_plan(plan["send"], known, lst, _PATCH_LIVE_BUDGET)
+            to_send = now
+            self.waiting[key] = later
+        else:
+            later = self.waiting.pop(key, [])
+            planned = {entry[0] for entry in to_send}
+            to_send = list(to_send) + [entry for entry in later if entry[0] not in planned]
+        sent = 0
+        skipped = list(plan["skipped"])
+        for pid, value in to_send:
+            if self.host["write"](pid, value, ctx["role"]) is True:
+                sent += 1
+            else:
+                skipped.append({"id": pid, "why": "not sent"})
+        return {"ok": True, "via": via, "applied": applied, "sent": sent, "skipped": skipped}
+
+    def read(self, scope, fn, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        sid = scope if isinstance(scope, str) and scope != "" else "voice"
+        if not callable(fn):
+            self.say("error", "ce.patch.read: fn must be a function to call with the patch, so nothing was asked.")
+            return False
+        if self.scoped(ctx, sid, "read") is None:
+            return False
+        dumps = [] if ctx["params"] is None else self.scope_dumps(ctx, sid)
+        if not dumps:
+            self.say("error", "ce.patch.read: the \"" + sid + "\" scope has no dumps to ask the synth for, so it cannot be read. ce.patch.define() can name them.")
+            return False
+        state = {"ok": True, "at": 0}
+        timeout = _patch_num(_patch_opt(opts, "timeout"))
+        dump_opts = {"timeout": timeout} if _patch_finite(timeout) and timeout > 0 else None
+
+        def nxt():
+            if state["at"] >= len(dumps):
+                patch = self.current(sid, {"role": ctx["role"]})
+                fn(patch, {"ok": state["ok"], "missing": patch["missing"] if patch else []})
+                return
+            kind = dumps[state["at"]]
+            state["at"] += 1
+
+            def answered(values=None, answer=None):
+                if not isinstance(answer, dict) or answer.get("ok") is not True:
+                    state["ok"] = False
+                nxt()
+            asked = self.host["requestDump"](kind, answered, dump_opts)
+            if asked is False:
+                state["ok"] = False
+                nxt()
+        nxt()
+        return True
+
+    def scopes(self, role=None):
+        ctx = self.context(role)
+        if ctx["params"] is None:
+            return [{"id": "voice", "name": "Voice", "parameters": len(self.host["snapshot"]() or {}), "canRead": False, "canSend": True, "via": "none"}]
+        defs = self.scope_defs(ctx)
+        ids = [] if "voice" in defs else ["voice"]
+        for s in _patch_list_of_scopes(ctx["section"]):
+            if s["id"] not in ids:
+                ids.append(s["id"])
+        for sid in sorted((self.defined.get(ctx["role"]) or {}).keys()):
+            if sid not in ids:
+                ids.append(sid)
+        section = ctx["section"]
+        deliver = section.get("deliver") if isinstance(section, dict) and isinstance(section.get("deliver"), str) else ""
+        out = []
+        for sid in ids:
+            lst = _patch_scope_params(ctx["params"], sid, defs)
+            if lst is None or (len(lst) == 0 and sid not in defs):
+                continue
+            dumps = _patch_names(defs[sid].get("dumps")) if sid in defs else []
+            name = defs[sid]["name"] if sid in defs and isinstance(defs[sid].get("name"), str) else sid[:1].upper() + sid[1:]
+            out.append({"id": sid, "name": name, "parameters": len(lst), "canRead": len(dumps) > 0, "canSend": True,
+                        "via": "dump" if deliver == "dump" and dumps else "parameters"})
+        if "system" not in defs:
+            system = _patch_scope_params(ctx["params"], "system", defs)
+            if system:
+                out.append({"id": "system", "name": "System", "parameters": len(system), "canRead": False, "canSend": True, "via": "parameters"})
+        return out
+
+    def define(self, scope, spec, role=None):
+        if not isinstance(scope, str) or scope == "":
+            self.say("error", "ce.patch.define: scope must be a name, such as \"voice\", so nothing was defined.")
+            return False
+        if not isinstance(spec, dict):
+            self.say("error", "ce.patch.define: spec must be a table of groups, only, except and dumps, so nothing was defined.")
+            return False
+        for key in sorted(spec.keys()):
+            if key not in _PATCH_DEFINE_FIELDS:
+                self.say("error", "ce.patch.define: \"" + key + "\" is not one of the fields a scope takes (" + ", ".join(_PATCH_DEFINE_FIELDS) + "), so nothing was defined.")
+                return False
+        for key in ("groups", "only", "except", "dumps"):
+            v = spec.get(key)
+            if v is not None and not isinstance(v, (str, list, tuple)):
+                self.say("error", "ce.patch.define: " + key + " must be a list of names, so nothing was defined.")
+                return False
+        r = role if isinstance(role, str) and role != "" else "mainSynth"
+        d = {"id": scope}
+        d.update(spec)
+        self.defined.setdefault(r, {})[scope] = d
+        return True
+
+    @staticmethod
+    def store_key(device, name):
+        return _PATCH_STORE_PREFIX + device + ":" + _patch_lower(name)
+
+    def save(self, name, patch, opts=None):
+        if not isinstance(name, str) or name.strip() == "" or len(name) > 64:
+            self.say("error", "ce.patch.save: name must be text of 1 to 64 characters, so nothing was kept.")
+            return False
+        if not _patch_is(patch):
+            self.say("error", "ce.patch.save: that is not a patch, as ce.patch.current() gives them, so nothing was kept.")
+            return False
+        key = self.store_key(_patch_str(patch.get("device")), name)
+        if _patch_opt(opts, "replace") is False and self.host["store"]["get"](key) is not None:
+            self.say("error", "ce.patch.save: a patch called \"" + name + "\" is already kept, and replace is off, so nothing was kept.")
+            return False
+        return self.host["store"]["set"](key, {
+            "name": name, "device": _patch_str(patch.get("device")),
+            "role": _patch_str(patch.get("role")) if patch.get("role") is not None else "mainSynth",
+            "scope": _patch_str(patch.get("scope")) if patch.get("scope") is not None else "voice",
+            "savedAt": _patch_str(self.host["now"]()), "values": _patch_copy(patch.get("values")),
+        }) is not False
+
+    def load(self, name, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        record = self.host["store"]["get"](self.store_key(ctx["device"], _patch_str(name)))
+        if not isinstance(record, dict):
+            for key in sorted(self.host["store"]["keys"]() or []):
+                if not key.startswith(_PATCH_STORE_PREFIX) or key[key.rfind(":") + 1:] != _patch_lower(name):
+                    continue
+                other = self.host["store"]["get"](key)
+                if isinstance(other, dict):
+                    self.say("error", "ce.patch.load: \"" + _patch_str(name) + "\" was kept for " + _patch_str(other.get("device")) + ", and this panel's synth is " + ctx["device"] + ", so there is no patch.")
+                    return None
+            self.say("error", "ce.patch.load: no patch called \"" + _patch_str(name) + "\" is kept for " + ctx["device"] + ", so there is no patch.")
+            return None
+        scope = record["scope"] if isinstance(record.get("scope"), str) else "voice"
+        lst = self.scoped(ctx, scope, "load") or []
+        patch = _patch_make({"device": ctx["device"], "role": ctx["role"], "scope": scope, "name": record.get("name")}, _patch_copy(record.get("values")), lst, "library")
+        patch["name"] = _patch_str(record.get("name")) if record.get("name") is not None else _patch_str(name)
+        return patch
+
+    def list(self, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        scope = _patch_opt(opts, "scope")
+        prefix = _PATCH_STORE_PREFIX + ctx["device"] + ":"
+        out = []
+        for key in self.host["store"]["keys"]() or []:
+            if not key.startswith(prefix):
+                continue
+            record = self.host["store"]["get"](key)
+            if not isinstance(record, dict):
+                continue
+            if isinstance(scope, str) and scope != "" and record.get("scope") != scope:
+                continue
+            out.append({"name": _patch_str(record.get("name")), "scope": _patch_str(record.get("scope")) if record.get("scope") is not None else "voice", "savedAt": _patch_str(record.get("savedAt"))})
+        out.sort(key=lambda e: e["name"])
+        out.sort(key=lambda e: e["savedAt"], reverse=True)
+        return out
+
+    def forget(self, name, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        key = self.store_key(ctx["device"], _patch_str(name))
+        if self.host["store"]["get"](key) is None:
+            return False
+        self.host["store"]["remove"](key)
+        return True
+
+    def write(self, patch, slot, opts=None):
+        at = self.for_patch(patch, "write")
+        if at is None:
+            return {"ok": False, "slot": slot, "error": "not a patch of this synth"}
+        ctx = at[0]
+        section = ctx["section"]
+        how = section.get("write") if isinstance(section, dict) and isinstance(section.get("write"), dict) else None
+        n = _patch_num(slot)
+        if not _patch_finite(n) or n < 0 or _patch_math.floor(n) != n:
+            self.say("error", "ce.patch.write: slot must be a whole number from 0, so nothing was stored.")
+            return {"ok": False, "slot": slot, "error": "not a slot"}
+        n = int(n)
+        if not how or how.get("via") != "dump" or not isinstance(how.get("dump"), str) or how.get("dump") == "":
+            why = ("its profile stores a slot with a write command, which ce.patch cannot send yet"
+                   if how and how.get("via") == "command" else "its profile does not say how to store a slot (patch.write)")
+            self.say("error", "ce.patch.write: " + ctx["device"] + " cannot be written to: " + why + ", so nothing was stored.")
+            return {"ok": False, "slot": n, "error": why}
+        self.host["setVariable"]("slot", n, ctx["role"])
+        self.host["fill"](_patch_copy(patch.get("values")))
+        self.host["sendDump"](how["dump"])
+        return {"ok": True, "slot": n}
+
+    def morph(self, a, b, t, opts=None):
+        at = self.for_patch(a, "morph")
+        return None if at is None else _patch_morph(a, b, t, at[1], opts, self.say)
+
+    def blend(self, patches, weights, opts=None):
+        first = patches[0] if isinstance(patches, (list, tuple)) and patches else None
+        at = self.for_patch(first, "blend")
+        return None if at is None else _patch_blend(patches, weights, at[1], opts, self.say)
+
+    def random(self, opts=None):
+        frm = _patch_opt(opts, "from")
+        base = frm if frm is not None else self.current(_patch_opt(opts, "scope"), {"role": _patch_opt(opts, "role")})
+        if base is None:
+            return None
+        at = self.for_patch(base, "random")
+        if at is None:
+            return None
+        if at[0]["params"] is None:
+            self.say("error", "ce.patch.random: a panel without a device profile does not say each control's range, so nothing was drawn.")
+            return None
+        nxt = self.seeded(opts, "random")
+        return None if nxt is None else _patch_random(base, at[1], opts, nxt, self.say)
+
+    def mutate(self, patch, amount, opts=None):
+        at = self.for_patch(patch, "mutate")
+        if at is None:
+            return None
+        if at[0]["params"] is None:
+            self.say("error", "ce.patch.mutate: a panel without a device profile does not say each control's range, so nothing was changed.")
+            return None
+        nxt = self.seeded(opts, "mutate")
+        return None if nxt is None else _patch_mutate(patch, amount, at[1], opts, nxt, self.say)
+
+    def merge(self, base, other, opts=None):
+        at = self.for_patch(base, "merge")
+        return None if at is None else _patch_merge(base, other, at[1], opts, self.say)
+
+    def diff(self, a, b, opts=None):
+        at = self.for_patch(a, "diff")
+        return None if at is None else _patch_diff(a, b, at[1], opts, self.say)
+
+    def equal(self, a, b, opts=None):
+        at = self.for_patch(a, "equal")
+        if at is None:
+            return None
+        d = _patch_diff(a, b, at[1], opts, self.say)
+        return None if d is None else len(d) == 0
+
+def _patch_now():
+    t = __deviceQuery("now", None)
+    return t if isinstance(t, str) else ""
+
+# The host looks each global up when it is called, so the real one answers whatever replaced it.
+_PATCH = _PatchCommands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "profile": lambda role: __deviceQuery("profile", {"role": role}),
+    "parameters": lambda role: __deviceQuery("parameters", {"role": role}) or [],
+    "read": lambda pid, role: __deviceQuery("read", {"role": role, "id": str(pid)}),
+    "write": lambda pid, value, role: deviceWrite(pid, value, role) is True,
+    "fill": lambda values: applyDump(values),
+    "snapshot": lambda: panelSnapshot() or {},
+    "restore": lambda values: panelRestore(values),
+    "requestDump": lambda kind, fn, opts: requestDump(kind, fn, opts),
+    "sendDump": lambda kind: sendDump(kind),
+    "setVariable": lambda name, value, role: deviceSetVariable(name, value, role),
+    "patchSection": lambda role: __deviceQuery("patch", {"role": role}),
+    "random": lambda: random(),
+    "now": lambda: _patch_now(),
+    "store": {
+        "get": lambda key: loadSetting(key),
+        "set": lambda key, value: saveSetting(key, value),
+        "keys": lambda: listSettings() or [],
+        "remove": lambda key: forgetSetting(key),
+    },
+})
+
+def patchCurrent(scope=None, opts=None):
+    return _PATCH.current(scope, opts)
+def patchRead(scope, fn, opts=None):
+    return _PATCH.read(scope, fn, opts)
+def patchLoad(name, opts=None):
+    return _PATCH.load(name, opts)
+def patchMorph(a, b, t, opts=None):
+    return _PATCH.morph(a, b, t, opts)
+def patchBlend(patches, weights, opts=None):
+    return _PATCH.blend(patches, weights, opts)
+def patchRandom(opts=None):
+    return _PATCH.random(opts)
+def patchMutate(patch, amount, opts=None):
+    return _PATCH.mutate(patch, amount, opts)
+def patchMerge(base, other, opts=None):
+    return _PATCH.merge(base, other, opts)
+def patchDiff(a, b, opts=None):
+    return _PATCH.diff(a, b, opts)
+def patchEqual(a, b, opts=None):
+    return _PATCH.equal(a, b, opts)
+def patchApply(patch, opts=None):
+    return _PATCH.apply(patch, opts)
+def patchSave(name, patch, opts=None):
+    return _PATCH.save(name, patch, opts)
+def patchList(opts=None):
+    return _PATCH.list(opts)
+def patchForget(name, opts=None):
+    return _PATCH.forget(name, opts)
+def patchWrite(patch, slot, opts=None):
+    return _PATCH.write(patch, slot, opts)
+def patchScopes(role=None):
+    return _PATCH.scopes(role)
+def patchDefine(scope, spec, role=None):
+    return _PATCH.define(scope, spec, role)
 
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
@@ -4585,6 +5581,21 @@ __CE_OPTIONS = {
     "animateTo": { "path": "ce.anim.to", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
     "animateSpring": { "path": "ce.anim.spring", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
     "animateEnvelope": { "path": "ce.anim.envelope", "at": 2, "param": "opts", "refusal": "false", "names": ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "patchCurrent": { "path": "ce.patch.current", "at": 1, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "scope"] },
+    "patchRead": { "path": "ce.patch.read", "at": 2, "param": "opts", "refusal": "false", "names": ["timeout", "role"] },
+    "patchLoad": { "path": "ce.patch.load", "at": 1, "param": "opts", "refusal": "nothing", "names": ["role"] },
+    "patchMorph": { "path": "ce.patch.morph", "at": 3, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "switchAt"] },
+    "patchBlend": { "path": "ce.patch.blend", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchRandom": { "path": "ce.patch.random", "at": 0, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "scope", "seed", "from", "within"] },
+    "patchMutate": { "path": "ce.patch.mutate", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "seed"] },
+    "patchMerge": { "path": "ce.patch.merge", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchDiff": { "path": "ce.patch.diff", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchEqual": { "path": "ce.patch.equal", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchApply": { "path": "ce.patch.apply", "at": 1, "param": "opts", "refusal": "result", "names": ["groups", "only", "except", "lock", "include", "role", "send", "changedOnly", "live"] },
+    "patchSave": { "path": "ce.patch.save", "at": 2, "param": "opts", "refusal": "false", "names": ["replace"] },
+    "patchList": { "path": "ce.patch.list", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "scope"] },
+    "patchForget": { "path": "ce.patch.forget", "at": 1, "param": "opts", "refusal": "false", "names": ["role"] },
+    "patchWrite": { "path": "ce.patch.write", "at": 2, "param": "opts", "refusal": "result", "names": ["role"] },
     "syncTimer": { "path": "ce.time.syncTimer", "at": 2, "param": "opts", "refusal": "nothing", "names": ["follow"] },
     "deviceParameters": { "path": "ce.device.parameters", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "query", "group", "type", "access", "limit"] },
     "deviceDefineParameter": { "path": "ce.device.defineParameter", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], "nested": { "nrpn": { "names": ["msb", "lsb"] } } },
@@ -4686,6 +5697,7 @@ __CE_MODULES = {
     "ce.panel": { "align": "panelAlign", "batch": "panelBatch", "circle": "panelCircle", "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "distribute": "panelDistribute", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "flip": "panelFlip", "grid": "panelGrid", "info": "panelInfo", "keep": "panelKeep", "match": "panelMatch", "order": "panelOrder", "parent": "panelParent", "patch": "panelPatch", "rect": "panelRect", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
+    "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
     "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
     "ce.text": { "axis": "textAxis", "fit": "textFit", "font": "textFont", "fonts": "textFonts", "measure": "textMeasure", "read": "textRead", "style": "textStyle" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "read": "splitRead", "transpose": "splitTranspose" },
@@ -4717,7 +5729,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -4732,6 +5744,7 @@ __CE_META = [
     { "id": "ce.panel", "version": "1.4", "runtime": "any" },
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.patch", "version": "1.0", "runtime": "any" },
     { "id": "ce.keys", "version": "1.0", "runtime": "webview" },
     { "id": "ce.text", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },

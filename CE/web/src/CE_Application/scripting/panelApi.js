@@ -276,6 +276,16 @@ function optionFields(entries) {
 
 /** The option fields more than one member declares, defined once. */
 const SHARED_OPTION_FIELDS = {
+  /* --- ce.patch: choosing parameters, the options every patch command shares - */
+  patchGroups: { name: 'groups', type: 'list of text', default: 'every group', sample: '{"Filter", "Amp Env"}', summary: 'Only parameters in these groups, as the profile names them, in any case.' },
+  patchOnly: { name: 'only', type: 'list of text', default: 'every parameter', sample: '{"cutoff"}', summary: 'Only these parameters, by id. With groups: those in either.' },
+  patchExcept: { name: 'except', type: 'list of text', default: 'none', summary: 'Never these parameters, by id or group name. Wins over groups and only.' },
+  patchLock: { name: 'lock', type: 'list of text', default: 'none', summary: 'These keep their value from the first patch, by id or group name. Unlike except, they stay in the result.' },
+  patchInclude: { name: 'include', type: 'list of text', default: 'none', summary: 'Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups.' },
+  patchRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device, by its role as the panel names it.' },
+  patchScope: { name: 'scope', type: 'text', default: '"voice"', summary: 'The part of the synth, when the command takes no patch to read it from.' },
+  patchSeed: { name: 'seed', type: 'number', default: 'the script\'s random stream', summary: 'Where the random numbers start: the same seed gives the same patch, in every language.' },
+
   /* --- ce.format: the options every formatting command shares ------------- */
   formatDecimals: { name: 'decimals', type: 'number', default: 'as the command decides', summary: 'Exactly this many decimal places, 0 to 6.' },
   formatDigits: { name: 'digits', type: 'number', default: '3', summary: 'Significant digits, 1 to 6, when `decimals` is left out.' },
@@ -2210,6 +2220,260 @@ export const COMMANDS = [
           summary: 'Measure this text instead, to size a control for something it does not hold '
             + 'yet.' },
       ]) },
+    ],
+    scopes: 'any',
+  },
+  // patch
+  // A synth's sound as a value (docs/design/ce-patch-module.md). Everything that is the same in
+  // every runtime is patchCore.js; the runtimes read and send around it.
+  {
+    id: 'patchCurrent', category: 'Patches', signature: 'patchCurrent([scope [, opts]]) -> patch', refusal: 'nothing',
+    summary: 'Capture the patch as the panel knows it now: the values the synth last reported, or the controls hold.',
+    example: '`local before = ce.patch.current()` keeps the voice as it is now.',
+    notes: [
+      'A patch is a table: { device, role, scope, name, values, missing, source }. `values` is parameter id to value, in the parameter\'s own units; a choice is its id, such as "saw".',
+      'Asks the synth nothing. A parameter the synth never reported is listed in `missing`.',
+      'A panel without a device profile still works: `values` is then keyed by control name.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: false, summary: 'The part of the synth: "voice" when left out, or a scope ce.patch.scopes() lists.\nNot one: no result, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchScope']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchRead', category: 'Patches', signature: 'patchRead(scope, fn [, opts]) -> boolean', refusal: 'false',
+    summary: 'Ask the synth for a patch, and get it when the reply arrives: fn(patch, info).',
+    example: '`ce.patch.read("voice", function(p, info) if info.ok then state.original = p end end)` asks the synth for the voice it is playing.',
+    notes: [
+      'Asks for the scope\'s dumps, one after another, with ce.device.requestDump(); the panel\'s controls are filled from each reply, as a dump always fills them.',
+      '`info.ok` is false when a reply did not arrive in time; the patch is then what the panel knows. `info.missing` lists the ids no reply held.',
+      'A scope with no dumps to ask for (the profile\'s patch section, or define(), names them): false, with a console error.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: true, summary: 'The part of the synth.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(patch, info) when the reply arrives, or when it does not.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'timeout', type: 'number', unit: 'milliseconds', default: 'as long as the profile asks', summary: 'How long to wait for each dump.' },
+        'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchLoad', category: 'Patches', signature: 'patchLoad(name [, opts]) -> patch', refusal: 'nothing',
+    summary: 'Get a patch kept with ce.patch.save(), by its name.',
+    example: '`ce.patch.apply(ce.patch.load("Warm pad"))` plays the patch kept as "Warm pad".',
+    notes: [
+      'Loading sends nothing: pass the result to apply() to hear it.',
+      'No patch by that name, or one kept for another synth: no result, with a console error naming it.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'The name it was kept under, in any case.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMorph', category: 'Patches', signature: 'patchMorph(a, b, t [, opts]) -> patch', refusal: 'nothing',
+    summary: 'A patch part of the way from one patch to another.',
+    example: '`ce.patch.morph(warm, bright, 0.25)` gives a patch a quarter of the way from warm to bright.',
+    notes: [
+      'A number moves in a straight line from a to b, then is rounded to its step and held inside its range. A choice or an on/off is a\'s below `switchAt` and b\'s from it. The patch name stays a\'s.',
+      'A parameter only one of the two patches holds keeps that patch\'s value.',
+      'To morph from a knob, call it in the knob\'s onValueChange and pass the result to apply(p, { live = true }).',
+      'b of another synth or scope: no result, with a console error.',
+    ],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The patch at 0.' },
+      { name: 'b', type: 'table', required: true, summary: 'The patch at 1.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 to 1 (a to b).\nOutside the range: held at 0 or 1.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole',
+        { name: 'switchAt', type: 'number', default: '0.5', summary: 'Where a choice or an on/off changes from a\'s value to b\'s, 0 to 1.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchBlend', category: 'Patches', signature: 'patchBlend(patches, weights [, opts]) -> patch', refusal: 'nothing',
+    summary: 'One patch made of several, each counting as much as its weight.',
+    example: '`ce.patch.blend({ a, b, c }, { 0.5, 0.3, 0.2 })` leans mostly towards a.',
+    notes: [
+      'The weights need not add up to 1; a patch without a weight counts 0. Adding up to 0 or less: no result, with a console error.',
+      'A choice or an on/off takes the value of the patch with the largest weight.',
+      'The weights from ce.math.weightsFor() go straight in, for a morph pad.',
+    ],
+    params: [
+      { name: 'patches', type: 'list', required: true, summary: 'Two or more patches of the same synth and scope.' },
+      { name: 'weights', type: 'list of numbers', required: true, summary: 'How much each counts.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchRandom', category: 'Patches', signature: 'patchRandom([opts]) -> patch', refusal: 'nothing',
+    summary: 'A new patch with random values, within each parameter\'s range.',
+    example: '`ce.patch.random({ groups = {"Filter"}, seed = 7 })` gives the current patch with a new filter section.',
+    notes: [
+      'What is not chosen keeps its value from `from`. The patch name never changes.',
+      'The same `seed` gives the same patch, in every language.',
+      'A panel without a device profile does not say each control\'s range: no result, with a console error.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchScope', 'patchSeed',
+        { name: 'from', type: 'table', default: 'ce.patch.current()', summary: 'The patch whose unchosen values are kept.' },
+        { name: 'within', type: 'table', default: 'each parameter\'s whole range', sample: '{ cutoff = { 40, 100 } }', summary: 'Narrower ranges by id; outside the parameter\'s range they are held inside it.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMutate', category: 'Patches', signature: 'patchMutate(patch, amount [, opts]) -> patch', refusal: 'nothing',
+    summary: 'A variation of a patch: every chosen value moved a little, at random.',
+    example: '`ce.patch.mutate(p, 0.1)` moves each number by up to a tenth of its range.',
+    notes: [
+      'Numbers move by up to `amount` of their range, more often a little than a lot.',
+      'A choice or an on/off changes with a chance of `amount`, to another of its values. Text never changes.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch to vary.' },
+      { name: 'amount', type: 'number', required: true, summary: 'Range: 0 to 1 (no change to any value).\nOutside the range: held at 0 or 1.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchSeed']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMerge', category: 'Patches', signature: 'patchMerge(base, other, opts) -> patch', refusal: 'nothing',
+    summary: 'A patch with the chosen parameters taken from another patch.',
+    example: '`ce.patch.merge(mine, theirs, { groups = {"Filter"} })` keeps mine with the filter from theirs.',
+    notes: ['One of `groups` or `only` is needed: taking every value is `other` itself. Neither: no result, with a console error.'],
+    params: [
+      { name: 'base', type: 'table', required: true, summary: 'The patch that gives everything not chosen.' },
+      { name: 'other', type: 'table', required: true, summary: 'The patch that gives the chosen parameters.' },
+      { name: 'opts', type: 'object', required: true, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchDiff', category: 'Patches', signature: 'patchDiff(a, b [, opts]) -> list', refusal: 'nothing',
+    summary: 'List the parameters whose values differ between two patches: { id, name, group, from, to }.',
+    example: '`ce.patch.diff(saved, ce.patch.current())` lists what has changed since the patch was saved.',
+    notes: [
+      'In the profile\'s parameter order; the same patches give an empty list.',
+      'A parameter only one patch holds is listed, with no value on the other side.',
+      'Two numbers closer than the parameter\'s step count as the same, and so do two names that differ only in trailing spaces.',
+    ],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The first patch.' },
+      { name: 'b', type: 'table', required: true, summary: 'The second patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchEqual', category: 'Patches', signature: 'patchEqual(a, b [, opts]) -> boolean', refusal: 'nothing',
+    summary: 'Tell whether two patches hold the same values.',
+    example: '`if not ce.patch.equal(state.saved, ce.patch.current()) then ... end` runs when the patch has been changed.',
+    notes: ['The same as an empty ce.patch.diff(a, b, opts).'],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The first patch.' },
+      { name: 'b', type: 'table', required: true, summary: 'The second patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchApply', category: 'Patches', signature: 'patchApply(patch [, opts]) -> table', refusal: 'result',
+    summary: 'Put a patch on the panel and send it to the synth, the way this synth takes a patch.',
+    example: '`ce.patch.apply(p)` makes the panel and the synth play p.',
+    notes: [
+      'The panel\'s controls always take the values, whatever `send` says.',
+      'Returns { ok, via, applied, sent, skipped }: `via` is "parameters", "dump" or "none"; `skipped` lists { id, why }. Refused: ok false, with a console error.',
+      '"auto" sends the scope\'s dumps when the profile\'s patch section says `deliver = "dump"`, and one message per changed parameter otherwise.',
+      'A patch of another synth: refused, naming it.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch to apply.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole',
+        { name: 'send', type: 'text', default: '"auto"', values: ['auto', 'parameters', 'dump', 'none'], summary: 'How it goes to the synth: "none" sets the panel only.' },
+        { name: 'changedOnly', type: 'true or false', default: 'true', summary: 'Send only values that differ from what the synth last had.' },
+        { name: 'live', type: 'true or false', default: 'false', summary: 'For a value moving under a hand: the 32 parameters that moved most now, the rest with the next apply without live.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchSave', category: 'Patches', signature: 'patchSave(name, patch [, opts]) -> boolean', refusal: 'false',
+    summary: 'Keep a patch by name, for this synth.',
+    example: '`ce.patch.save("Warm pad", p)` keeps p as "Warm pad".',
+    notes: [
+      'Kept with the panel, as ce.storage.saveSetting() keeps a value: in the editor with the panel document, in an exported plug-in in the DAW project.',
+      'A name of 1 to 64 characters; anything else: false, with a console error.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'Up to 64 characters.' },
+      { name: 'patch', type: 'table', required: true, summary: 'The patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'replace', type: 'true or false', default: 'true', summary: 'Off: a name already in use is refused, with a console error.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchList', category: 'Patches', signature: 'patchList([opts]) -> list', refusal: 'empty list',
+    summary: 'List the patches kept for this synth: { name, scope, savedAt }, newest first.',
+    example: '`ce.patch.list()` gives every kept patch\'s name.',
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole',
+        { name: 'scope', type: 'text', default: 'every scope', summary: 'Only the patches of this scope.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchForget', category: 'Patches', signature: 'patchForget(name [, opts]) -> boolean', refusal: 'false',
+    summary: 'Remove a kept patch.',
+    example: '`ce.patch.forget("Warm pad")` removes it.',
+    notes: ['Returns true when one was removed; no patch by that name: false, without a word.'],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'Its name, in any case.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchWrite', category: 'Patches', signature: 'patchWrite(patch, slot [, opts]) -> table', refusal: 'result',
+    summary: 'Store a patch in the synth\'s own memory, in a writable slot.',
+    example: '`ce.patch.write(p, 130)` stores p in preset 130.',
+    notes: [
+      'Overwrites what the slot held. The synth does not ask, so ask first with ce.ui.choose().',
+      'How it is stored is the profile\'s patch section: `write = { via = "dump", dump = "..." }` sets the "slot" variable and sends that dump. A profile that does not say: refused, with a console error.',
+      'Returns { ok, slot, error }.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch.' },
+      { name: 'slot', type: 'number', required: true, summary: 'The preset number across all banks, counted from 0, as ce.device.recallPreset() takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchScopes', category: 'Patches', signature: 'patchScopes([role]) -> list', refusal: 'empty list',
+    summary: 'Describe the parts of the synth a patch can hold: { id, name, parameters, canRead, canSend, via }.',
+    example: '`ce.patch.scopes()` might give a voice and a system scope.',
+    notes: [
+      'Without a patch section in the profile: "voice" is every parameter but actions and the System, Global, Utility and Performance groups, and "system" those groups.',
+      'A panel without a device profile: one scope, "voice", holding the panel\'s controls.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  {
+    id: 'patchDefine', category: 'Patches', signature: 'patchDefine(scope, spec [, role]) -> boolean', refusal: 'false',
+    summary: 'Describe a scope from the script, for a synth whose profile has no patch section, or to change one.',
+    example: '`ce.patch.define("voice", { groups = {"Osc", "Filter", "Amp"}, dumps = {"voice"} })` makes the voice those three groups, read and sent as the voice dump.',
+    notes: [
+      'spec takes the fields the profile\'s patch section takes for one scope: name, groups, only, except, dumps, read, transform. Anything else: false, with a console error.',
+      'Lasts while the panel is open; call it in onPanelLoad.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: true, summary: 'The scope\'s id. An existing one is replaced for this panel.' },
+      { name: 'spec', type: 'table', required: true, summary: 'The scope: groups, only, except and dumps, as lists of names.' },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device.' },
     ],
     scopes: 'any',
   },
@@ -5334,8 +5598,8 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, the connected device, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, the connected device and its patches, music theory, and musical time.',
+    modules: ['ce.midi', 'ce.device', 'ce.patch', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
@@ -5428,6 +5692,9 @@ export const MODULES = [
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they draw from. Background layers composite; text layers are exclusive. Reports which image sources survive an export.' },
+  // requires the four whose commands it reads and sends through, so they are there whenever it is.
+  { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
+    summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
   { id: 'ce.keys', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'The computer keyboard: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. Key events are keyDown and keyUp. In the panel view only.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -5622,6 +5889,12 @@ const MODULE_MEMBERS = {
   // §1 once more, and this module is the clearest case of it: every namespaced spelling here is a
   // bare English word, so every flat alias keeps the text prefix. `read`, `style`, `fit` and
   // `measure` as globals would be four collisions waiting to happen.
+  'ce.patch': {
+    current: 'patchCurrent', read: 'patchRead', load: 'patchLoad', morph: 'patchMorph', blend: 'patchBlend',
+    random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
+    apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
+    scopes: 'patchScopes', define: 'patchDefine',
+  },
   'ce.keys': {
     shortcut: 'keysShortcut', remove: 'keysRemove', list: 'keysList', isDown: 'keysIsDown', held: 'keysHeld',
     piano: 'keysPiano', pianoInfo: 'keysPianoInfo', focus: 'keysFocus', focused: 'keysFocused',

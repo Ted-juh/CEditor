@@ -1649,6 +1649,12 @@ function formatParse(text, opts)
   end
 
   -- As the synth shows it: formatCore.js formatDescribed, from the parameter the profile describes.
+  -- The commands as defined above, before the option check wraps the globals: formatDescribed hands
+  -- them options of its own (a note's middleC beside a frequency) that a script's call would not.
+  local RAW = {
+    number = formatNumber, hz = formatHz, time = formatTime, db = formatDb, percent = formatPercent,
+    pan = formatPan, ratio = formatRatio, note = formatNote, division = formatDivision, table = formatTable,
+  }
   local function describedOptions(d, kind, opts)
     local o = {}
     local precision = toNumber(d.precision)
@@ -1696,28 +1702,28 @@ function formatParse(text, opts)
     local wireMin = finite(lo) and lo or 0
     local wireMax = finite(hi) and hi or 127
 
-    if type(d.table) == "table" and #d.table > 0 then return formatTable(n, d.table, withOptions(o, { start = wireMin })) end
+    if type(d.table) == "table" and #d.table > 0 then return RAW.table(n, d.table, withOptions(o, { start = wireMin })) end
 
     local dmin, dmax = toNumber(d.min), toNumber(d.max)
     local scaledRange = finite(dmin) and finite(dmax) and wireMax ~= wireMin
     local shown = n
     if scaledRange then shown = dmin + ((n - wireMin) / (wireMax - wireMin)) * (dmax - dmin) end
 
-    if kind == "hz" then return formatHz(shown, o) end
-    if kind == "time" then return formatTime(shown, o) end
-    if kind == "db" then return formatDb(shown, o) end
-    if kind == "ratio" then return formatRatio(shown, o) end
-    if kind == "note" then return formatNote(shown, o) end
-    if kind == "division" then return formatDivision(shown, o) end
-    if kind == "percent" then return formatPercent(n, withOptions(o, { min = wireMin, max = wireMax })) end
+    if kind == "hz" then return RAW.hz(shown, o) end
+    if kind == "time" then return RAW.time(shown, o) end
+    if kind == "db" then return RAW.db(shown, o) end
+    if kind == "ratio" then return RAW.ratio(shown, o) end
+    if kind == "note" then return RAW.note(shown, o) end
+    if kind == "division" then return RAW.division(shown, o) end
+    if kind == "percent" then return RAW.percent(n, withOptions(o, { min = wireMin, max = wireMax })) end
     if kind == "pan" then
       local a, b = wireMin, wireMax
       if scaledRange then a, b = dmin, dmax end
       local center = math.floor((a + b) / 2 + 0.5)
       if a < 0 and b > 0 then center = 0 end
-      return formatPan(shown, withOptions(o, { min = a, max = b, center = center }))
+      return RAW.pan(shown, withOptions(o, { min = a, max = b, center = center }))
     end
-    return formatNumber(shown, o)
+    return RAW.number(shown, o)
   end
   __fmtDescribed = formatDescribed
 
@@ -1736,6 +1742,1009 @@ function formatParameter(id, v, opts)
     end
     return formatDescribed(d, v, opts)
   end
+end
+
+-- @module ce.patch
+-- ce.patch, ported line for line from patchCore.js (the panel view's; the JavaScript prelude runs
+-- that file itself). Held to the panel view's answers by test/patchParity.test.js and the scenario in
+-- test/support/patchScenario.mjs. ce.patch requires ce.device, ce.panel, ce.math and ce.storage, so
+-- the globals the host below calls are live whenever a script can reach ce.patch.
+do
+  local LEAVE_OUT_GROUPS = { "system", "global", "utility", "performance" }
+  local DEFAULT_SEED = 0x9E3779B9
+  local SEND_MODES = { "auto", "parameters", "dump", "none" }
+  local LIVE_BUDGET = 32
+  local DEFINE_FIELDS = { "name", "groups", "only", "except", "dumps", "read", "transform" }
+  local STORE_PREFIX = "ce.patch:"
+  local INF = math.huge
+
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function isList(v)
+    if type(v) ~= "table" then return false end
+    local n = 0
+    for _ in pairs(v) do n = n + 1 end
+    return n == #v
+  end
+  local function names(v)
+    if type(v) == "string" then if v == "" then return {} end return { v } end
+    if type(v) ~= "table" then return {} end
+    local out = {}
+    for _, x in ipairs(v) do if type(x) == "string" and x ~= "" then out[#out + 1] = x end end
+    return out
+  end
+  local function lower(s) if s == nil then return "" end return string.lower(tostring(s)) end
+  local function contains(list, value)
+    for _, x in ipairs(list) do if x == value then return true end end
+    return false
+  end
+  local function hasValue(values, id) return type(values) == "table" and values[id] ~= nil end
+  local function copyValues(values)
+    local out = {}
+    if type(values) == "table" then for k, v in pairs(values) do out[k] = v end end
+    return out
+  end
+  local function sortedKeys(t)
+    local out = {}
+    if type(t) == "table" then for k in pairs(t) do out[#out + 1] = tostring(k) end end
+    table.sort(out)
+    return out
+  end
+  local function roundHalfAway(x)
+    if x < 0 then return -math.floor(-x + 0.5) end
+    return math.floor(x + 0.5)
+  end
+  local function join(list, sep)
+    local parts = {}
+    for i, x in ipairs(list) do parts[i] = tostring(x) end
+    return table.concat(parts, sep)
+  end
+  local function str(v) if v == nil then return "" end return tostring(v) end
+
+  local function kindOf(desc)
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if t == "action" or t == "momentary" or t == "trigger" then return "action" end
+    if t == "text" then return "text" end
+    if t == "choice" or t == "boolean" or t == "enum" or t == "bool" then return "choice" end
+    if type(desc) == "table" and type(desc.choices) == "table" and #desc.choices > 0 then return "choice" end
+    return "number"
+  end
+  local function writable(desc)
+    local access = type(desc) == "table" and desc.access or nil
+    if type(access) == "string" then return string.find(lower(access), "write", 1, true) ~= nil end
+    if type(access) == "table" and access.canWrite == false then return false end
+    return true
+  end
+  local function isWhole(desc) return not (type(desc) == "table" and desc.type == "float") end
+  local function rangeOf(desc)
+    local range = type(desc) == "table" and type(desc.range) == "table" and desc.range or {}
+    local lo, hi = toNumber(range.min), toNumber(range.max)
+    local a = finite(lo) and lo or 0
+    local b = finite(hi) and hi or 127
+    if a <= b then return a, b end
+    return b, a
+  end
+  local function choicesOf(desc)
+    local out = {}
+    if type(desc) == "table" and type(desc.choices) == "table" then
+      for _, c in ipairs(desc.choices) do
+        if type(c) == "table" then
+          if c.id ~= nil then out[#out + 1] = c.id elseif c.value ~= nil then out[#out + 1] = c.value end
+        elseif c ~= nil then
+          out[#out + 1] = c
+        end
+      end
+    end
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if #out == 0 and (t == "boolean" or t == "bool") then out[1] = false; out[2] = true end
+    return out
+  end
+  local function settle(desc, v)
+    local x = v
+    if isWhole(desc) then x = roundHalfAway(x) end
+    local lo, hi = rangeOf(desc)
+    if x < lo then x = lo end
+    if x > hi then x = hi end
+    return x
+  end
+  local function trimEnd(s) return (tostring(s):gsub("%s+$", "")) end
+  local function sameValue(desc, a, b)
+    local x, y = toNumber(a), toNumber(b)
+    if type(a) ~= "boolean" and type(b) ~= "boolean" and finite(x) and finite(y) then
+      local step = isWhole(desc) and 0.5 or 1e-9
+      return math.abs(x - y) < step
+    end
+    if a == b then return true end
+    if a == nil or b == nil then return false end
+    if type(a) == "boolean" or type(b) == "boolean" then return tostring(a) == tostring(b) end
+    return trimEnd(a) == trimEnd(b)
+  end
+
+  local function leftOutGroup(desc) return contains(LEAVE_OUT_GROUPS, lower(type(desc) == "table" and desc.group or nil)) end
+  local function matchesNameList(desc, list)
+    local group = lower(desc.group)
+    for _, name in ipairs(list) do
+      if name == desc.id then return true end
+      if group ~= "" and lower(name) == group then return true end
+    end
+    return false
+  end
+
+  local function scopeParams(params, scope, defs)
+    local list = type(params) == "table" and params or {}
+    local id = scope == nil and "voice" or tostring(scope)
+    local def = type(defs) == "table" and defs[id] or nil
+    local out = {}
+    if type(def) == "table" then
+      local groups, only, except = names(def.groups), names(def.only), names(def.except)
+      for _, desc in ipairs(list) do
+        if kindOf(desc) ~= "action"
+          and not ((#groups > 0 or #only > 0) and not matchesNameList(desc, groups) and not contains(only, desc.id))
+          and not matchesNameList(desc, except) then
+          out[#out + 1] = desc
+        end
+      end
+      return out
+    end
+    if id == "voice" then
+      for _, desc in ipairs(list) do if kindOf(desc) ~= "action" and not leftOutGroup(desc) then out[#out + 1] = desc end end
+      return out
+    end
+    if id == "system" then
+      for _, desc in ipairs(list) do if kindOf(desc) ~= "action" and leftOutGroup(desc) then out[#out + 1] = desc end end
+      return out
+    end
+    return nil
+  end
+
+  local function nameParameter(scoped)
+    local found = ""
+    for _, desc in ipairs(scoped) do
+      if kindOf(desc) == "text" then
+        if found ~= "" then return "" end
+        found = tostring(desc.id)
+      end
+    end
+    return found
+  end
+
+  local function warnUnknown(scoped, list, what, verb, say, words)
+    for _, name in ipairs(list) do
+      if not (words and contains(words, name)) then
+        local known = false
+        for _, desc in ipairs(scoped) do
+          if desc.id == name or (lower(desc.group) ~= "" and lower(desc.group) == lower(name)) then known = true; break end
+        end
+        if not known then
+          say("warn", "ce.patch." .. verb .. ": the profile has no parameter or group \"" .. name .. "\" in this scope, in " .. what .. "; the rest goes ahead.")
+        end
+      end
+    end
+  end
+
+  local function choose(scoped, opts, say, verb, forApply)
+    local groups, only, except, include = names(opt(opts, "groups")), names(opt(opts, "only")), names(opt(opts, "except")), names(opt(opts, "include"))
+    warnUnknown(scoped, groups, "groups", verb, say, nil)
+    warnUnknown(scoped, only, "only", verb, say, nil)
+    warnUnknown(scoped, except, "except", verb, say, nil)
+    warnUnknown(scoped, include, "include", verb, say, { "name", "readOnly", "leaveOut" })
+    warnUnknown(scoped, names(opt(opts, "lock")), "lock", verb, say, nil)
+    local chosen = {}
+    for _, desc in ipairs(scoped) do
+      local included = matchesNameList(desc, include)
+      local skip = false
+      if not forApply and not included then
+        if kindOf(desc) == "text" and not contains(include, "name") then skip = true end
+        if not skip and not writable(desc) and not contains(include, "readOnly") then skip = true end
+      end
+      if not skip and (#groups > 0 or #only > 0) and not matchesNameList(desc, groups) and not contains(only, desc.id) then skip = true end
+      if not skip and matchesNameList(desc, except) then skip = true end
+      if not skip then chosen[#chosen + 1] = tostring(desc.id) end
+    end
+    if #chosen == 0 and (#groups > 0 or #only > 0) then
+      say("error", "ce.patch." .. verb .. ": groups and only leave no parameter chosen, so nothing was done.")
+      return nil
+    end
+    return chosen
+  end
+
+  local function lockedIds(scoped, opts)
+    local lock = names(opt(opts, "lock"))
+    local out = {}
+    for _, desc in ipairs(scoped) do if matchesNameList(desc, lock) then out[#out + 1] = tostring(desc.id) end end
+    return out
+  end
+  local function byId(scoped)
+    local map = {}
+    for _, desc in ipairs(scoped) do map[tostring(desc.id)] = desc end
+    return map
+  end
+
+  local function isPatch(p) return type(p) == "table" and type(p.values) == "table" end
+
+  local function make(base, values, scoped, source)
+    local missing = {}
+    for _, desc in ipairs(scoped) do
+      if kindOf(desc) ~= "action" and not hasValue(values, tostring(desc.id)) then missing[#missing + 1] = tostring(desc.id) end
+    end
+    local nameId = nameParameter(scoped)
+    local patch = {
+      device = str(type(base) == "table" and base.device or nil),
+      role = type(base) == "table" and base.role ~= nil and tostring(base.role) or "mainSynth",
+      scope = type(base) == "table" and base.scope ~= nil and tostring(base.scope) or "voice",
+      values = values,
+      missing = missing,
+      source = source,
+    }
+    if nameId ~= "" and hasValue(values, nameId) then patch.name = tostring(values[nameId])
+    elseif type(base) == "table" and type(base.name) == "string" then patch.name = base.name end
+    return patch
+  end
+
+  local function samePatches(a, b, verb, what, say)
+    if not isPatch(a) or not isPatch(b) then
+      say("error", "ce.patch." .. verb .. ": " .. what .. " must be patches, as ce.patch.current() gives them, so nothing was done.")
+      return false
+    end
+    if str(a.device) ~= str(b.device) or str(a.scope) ~= str(b.scope) then
+      say("error", "ce.patch." .. verb .. ": a patch of " .. str(b.device) .. " (" .. str(b.scope) .. ") cannot be used with one of " .. str(a.device) .. " (" .. str(a.scope) .. "), so nothing was done.")
+      return false
+    end
+    return true
+  end
+
+  local function clamp01(v)
+    local n = toNumber(v)
+    if not finite(n) then return 0 / 0 end
+    if n < 0 then return 0 elseif n > 1 then return 1 end
+    return n
+  end
+  local function isNaN(x) return x ~= x end
+
+  local function morph(a, b, t, scoped, opts, say)
+    if not samePatches(a, b, "morph", "a and b", say) then return nil end
+    local at = clamp01(t)
+    if isNaN(at) then say("error", "ce.patch.morph: t must be a number from 0 to 1, so nothing was done."); return nil end
+    local switchAt = clamp01(opt(opts, "switchAt"))
+    if isNaN(switchAt) then switchAt = 0.5 end
+    local ids = choose(scoped, opts, say, "morph", false)
+    if ids == nil then return nil end
+    local locked, descs, out = lockedIds(scoped, opts), byId(scoped), copyValues(a.values)
+    for k, v in pairs(b.values) do if out[k] == nil then out[k] = v end end
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) and hasValue(a.values, id) and hasValue(b.values, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local x, y = toNumber(a.values[id]), toNumber(b.values[id])
+          if finite(x) and finite(y) then out[id] = settle(desc, x + (y - x) * at) end
+        elseif kind == "choice" then
+          if at < switchAt then out[id] = a.values[id] else out[id] = b.values[id] end
+        end
+      end
+    end
+    return make(a, out, scoped, "made")
+  end
+
+  local function blend(patches, weights, scoped, opts, say)
+    if type(patches) ~= "table" or #patches < 2 then
+      say("error", "ce.patch.blend: patches must be a list of two or more patches, so nothing was done.")
+      return nil
+    end
+    for i = 2, #patches do if not samePatches(patches[1], patches[i], "blend", "patches", say) then return nil end end
+    local w, total = {}, 0
+    for i = 1, #patches do
+      local n = type(weights) == "table" and toNumber(weights[i]) or 0 / 0
+      local v = (finite(n) and n > 0) and n or 0
+      w[i] = v
+      total = total + v
+    end
+    if not (total > 0) then say("error", "ce.patch.blend: the weights add up to 0 or less, so nothing was done."); return nil end
+    local ids = choose(scoped, opts, say, "blend", false)
+    if ids == nil then return nil end
+    local locked, descs, out = lockedIds(scoped, opts), byId(scoped), copyValues(patches[1].values)
+    for i = 2, #patches do for k, v in pairs(patches[i].values) do if out[k] == nil then out[k] = v end end end
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local sum, weight = 0, 0
+          for i = 1, #patches do
+            local x = toNumber(patches[i].values[id])
+            if finite(x) and w[i] > 0 then sum = sum + x * w[i]; weight = weight + w[i] end
+          end
+          if weight > 0 then out[id] = settle(desc, sum / weight) end
+        elseif kind == "choice" then
+          local best = 0
+          for i = 1, #patches do
+            if hasValue(patches[i].values, id) and w[i] > 0 and (best == 0 or w[i] > w[best]) then best = i end
+          end
+          if best > 0 then out[id] = patches[best].values[id] end
+        end
+      end
+    end
+    return make(patches[1], out, scoped, "made")
+  end
+
+  local function randomSource(seed)
+    local n = toNumber(seed)
+    local x = 0
+    if finite(n) then x = math.floor(n) % 4294967296 end
+    x = math.tointeger(x) or 0
+    if x == 0 then x = DEFAULT_SEED end
+    return function()
+      x = x ~ ((x << 13) & 0xFFFFFFFF)
+      x = x ~ (x >> 17)
+      x = x ~ ((x << 5) & 0xFFFFFFFF)
+      return x / 4294967296
+    end
+  end
+
+  local function withinRange(desc, within)
+    local lo, hi = rangeOf(desc)
+    local narrow = type(within) == "table" and within[tostring(desc.id)] or nil
+    if type(narrow) == "table" and #narrow >= 2 then
+      local a, b = toNumber(narrow[1]), toNumber(narrow[2])
+      if finite(a) and finite(b) then
+        local low, high = math.max(lo, math.min(a, b)), math.min(hi, math.max(a, b))
+        if low <= high then lo, hi = low, high end
+      end
+    end
+    return lo, hi
+  end
+
+  local function randomPatch(from, scoped, opts, next, say)
+    if not isPatch(from) then
+      say("error", "ce.patch.random: from must be a patch, as ce.patch.current() gives them, so nothing was done.")
+      return nil
+    end
+    local ids = choose(scoped, opts, say, "random", false)
+    if ids == nil then return nil end
+    local locked, descs, within, out = lockedIds(scoped, opts), byId(scoped), opt(opts, "within"), copyValues(from.values)
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local lo, hi = withinRange(desc, within)
+          local r = next()
+          if isWhole(desc) then
+            out[id] = math.min(math.floor(hi), math.ceil(lo) + math.floor(r * (math.floor(hi) - math.ceil(lo) + 1)))
+          else
+            out[id] = lo + r * (hi - lo)
+          end
+        elseif kind == "choice" then
+          local choices = choicesOf(desc)
+          local r = next()
+          if #choices > 0 then out[id] = choices[math.min(#choices - 1, math.floor(r * #choices)) + 1] end
+        end
+      end
+    end
+    return make(from, out, scoped, "made")
+  end
+
+  local function mutate(patch, amount, scoped, opts, next, say)
+    if not isPatch(patch) then
+      say("error", "ce.patch.mutate: patch must be a patch, as ce.patch.current() gives them, so nothing was done.")
+      return nil
+    end
+    local by = clamp01(amount)
+    if isNaN(by) then say("error", "ce.patch.mutate: amount must be a number from 0 to 1, so nothing was done."); return nil end
+    local ids = choose(scoped, opts, say, "mutate", false)
+    if ids == nil then return nil end
+    local locked, descs, out = lockedIds(scoped, opts), byId(scoped), copyValues(patch.values)
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) and hasValue(out, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local x = toNumber(out[id])
+          if finite(x) then
+            local lo, hi = rangeOf(desc)
+            local r1 = next()
+            local r2 = next()
+            out[id] = settle(desc, x + (r1 - r2) * by * (hi - lo))
+          end
+        elseif kind == "choice" then
+          local r1 = next()
+          local r2 = next()
+          if r1 < by then
+            local others = {}
+            for _, c in ipairs(choicesOf(desc)) do if not sameValue(desc, c, out[id]) then others[#others + 1] = c end end
+            if #others > 0 then out[id] = others[math.min(#others - 1, math.floor(r2 * #others)) + 1] end
+          end
+        end
+      end
+    end
+    return make(patch, out, scoped, "made")
+  end
+
+  local function merge(base, other, scoped, opts, say)
+    if not samePatches(base, other, "merge", "base and other", say) then return nil end
+    if #names(opt(opts, "groups")) == 0 and #names(opt(opts, "only")) == 0 then
+      say("error", "ce.patch.merge: name the parameters to take, with groups or only; taking every value is other itself, so nothing was done.")
+      return nil
+    end
+    local ids = choose(scoped, opts, say, "merge", false)
+    if ids == nil then return nil end
+    local locked, out = lockedIds(scoped, opts), copyValues(base.values)
+    for _, id in ipairs(ids) do if not contains(locked, id) and hasValue(other.values, id) then out[id] = other.values[id] end end
+    return make(base, out, scoped, "made")
+  end
+
+  local function diff(a, b, scoped, opts, say)
+    if not samePatches(a, b, "diff", "a and b", say) then return nil end
+    local ids = choose(scoped, opts, say, "diff", false)
+    if ids == nil then return nil end
+    local descs, out = byId(scoped), {}
+    for _, id in ipairs(ids) do
+      local inA, inB = hasValue(a.values, id), hasValue(b.values, id)
+      if (inA or inB) and not (inA and inB and sameValue(descs[id], a.values[id], b.values[id])) then
+        local desc = descs[id]
+        local entry = { id = id, name = desc.name ~= nil and tostring(desc.name) or id, group = str(desc.group) }
+        if inA then entry.from = a.values[id] end
+        if inB then entry.to = b.values[id] end
+        out[#out + 1] = entry
+      end
+    end
+    return out
+  end
+
+  local function applyPlan(patch, known, scoped, opts, say)
+    local ids = choose(scoped, opts, say, "apply", true)
+    if ids == nil then return nil end
+    local descs = byId(scoped)
+    local changedOnly = opt(opts, "changedOnly") ~= false
+    local send, values, skipped = {}, {}, {}
+    for _, id in ipairs(ids) do
+      if hasValue(patch.values, id) then
+        local value = patch.values[id]
+        values[id] = value
+        if not writable(descs[id]) then
+          skipped[#skipped + 1] = { id = id, why = "the synth cannot be sent it" }
+        elseif not (changedOnly and hasValue(known, id) and sameValue(descs[id], known[id], value)) then
+          send[#send + 1] = { id, value }
+        end
+      end
+    end
+    for _, key in ipairs(sortedKeys(patch.values)) do
+      if descs[key] == nil then skipped[#skipped + 1] = { id = key, why = "not a parameter of this scope" } end
+    end
+    return { send = send, values = values, skipped = skipped }
+  end
+
+  local function livePlan(send, known, scoped, budget)
+    local descs, moved = byId(scoped), {}
+    for i, entry in ipairs(send) do
+      local id, value = entry[1], entry[2]
+      local lo, hi = rangeOf(descs[id])
+      local x, y = toNumber(value), toNumber(known[id])
+      local delta = 2
+      if finite(x) and finite(y) then
+        local span = hi - lo
+        if span == 0 then span = 1 end
+        delta = math.abs(x - y) / span
+      end
+      moved[#moved + 1] = { delta, i }
+    end
+    table.sort(moved, function(p, q)
+      if p[1] ~= q[1] then return p[1] > q[1] end
+      return p[2] < q[2]
+    end)
+    local now, later = {}, {}
+    for k, m in ipairs(moved) do
+      if k <= budget then now[#now + 1] = send[m[2]] else later[#later + 1] = send[m[2]] end
+    end
+    return now, later
+  end
+
+  local function listOfScopes(section)
+    local out = {}
+    local scopes = type(section) == "table" and section.scopes or nil
+    if type(scopes) == "table" then
+      for _, s in ipairs(scopes) do if type(s) == "table" and type(s.id) == "string" and s.id ~= "" then out[#out + 1] = s end end
+    end
+    return out
+  end
+
+  -- The commands over a host, as patchCore.js's patchCommands.
+  local function commands(host)
+    local say = host.say
+    local defined, waiting = {}, {}
+
+    local function context(role)
+      local r = (type(role) == "string" and role ~= "") and role or "mainSynth"
+      local profile = host.profile(r)
+      if type(profile) ~= "table" or type(profile.id) ~= "string" or profile.id == "" then
+        return { role = r, device = "panel", params = nil, section = nil, panel = true }
+      end
+      local params = host.parameters(r)
+      local section = host.patchSection(r)
+      return { role = r, device = profile.id, params = type(params) == "table" and params or {}, section = type(section) == "table" and section or nil, panel = false }
+    end
+    local function scopeDefs(ctx)
+      local defs = {}
+      for _, s in ipairs(listOfScopes(ctx.section)) do defs[s.id] = s end
+      local own = defined[ctx.role]
+      if own then for id, s in pairs(own) do defs[id] = s end end
+      return defs
+    end
+    local function panelDescriptors(values)
+      local out = {}
+      for _, name in ipairs(sortedKeys(values)) do
+        local v = values[name]
+        local t = "text"
+        if type(v) == "number" then t = "float" elseif type(v) == "boolean" then t = "boolean" end
+        out[#out + 1] = { id = name, name = name, group = "", type = t }
+      end
+      return out
+    end
+    local function scoped(ctx, scope, verb)
+      if ctx.panel then
+        if scope ~= "voice" then
+          say("error", "ce.patch." .. verb .. ": a panel without a device profile has one scope, \"voice\", so nothing was done.")
+          return nil
+        end
+        return panelDescriptors(host.snapshot())
+      end
+      local list = scopeParams(ctx.params, scope, scopeDefs(ctx))
+      if list == nil then say("error", "ce.patch." .. verb .. ": \"" .. tostring(scope) .. "\" is not a scope of " .. ctx.device .. ", so nothing was done. ce.patch.scopes() lists them.") end
+      return list
+    end
+    local function forPatch(patch, verb)
+      if not isPatch(patch) then
+        say("error", "ce.patch." .. verb .. ": that is not a patch, as ce.patch.current() gives them, so nothing was done.")
+        return nil
+      end
+      local ctx = context(type(patch.role) == "string" and patch.role or "mainSynth")
+      if str(patch.device) ~= ctx.device then
+        say("error", "ce.patch." .. verb .. ": the patch is one of " .. str(patch.device) .. ", and this panel's synth is " .. ctx.device .. ", so nothing was done.")
+        return nil
+      end
+      local list = scoped(ctx, patch.scope ~= nil and tostring(patch.scope) or "voice", verb)
+      if list == nil then return nil end
+      return { ctx = ctx, list = list }
+    end
+    local function scopeOf(scope, opts)
+      if type(scope) == "string" and scope ~= "" then return scope end
+      local fromOpts = opt(opts, "scope")
+      if type(fromOpts) == "string" and fromOpts ~= "" then return fromOpts end
+      return "voice"
+    end
+
+    local function current(scope, opts)
+      local ctx = context(opt(opts, "role"))
+      local id = scopeOf(scope, opts)
+      local list = scoped(ctx, id, "current")
+      if list == nil then return nil end
+      local narrowed = #names(opt(opts, "groups")) > 0 or #names(opt(opts, "only")) > 0 or #names(opt(opts, "except")) > 0
+      local ids = nil
+      if narrowed then
+        ids = choose(list, opts, say, "current", true)
+        if ids == nil then return nil end
+      end
+      local values
+      if ctx.panel then
+        values = copyValues(host.snapshot())
+        if ids ~= nil then for _, key in ipairs(sortedKeys(values)) do if not contains(ids, key) then values[key] = nil end end end
+      else
+        values = {}
+        for _, desc in ipairs(list) do
+          if ids == nil or contains(ids, tostring(desc.id)) then
+            local v = host.read(tostring(desc.id), ctx.role)
+            if v ~= nil then values[tostring(desc.id)] = v end
+          end
+        end
+      end
+      return make({ device = ctx.device, role = ctx.role, scope = id }, values, list, "panel")
+    end
+
+    local function seeded(opts, verb)
+      local seed = opt(opts, "seed")
+      if seed ~= nil then
+        if not finite(toNumber(seed)) then say("error", "ce.patch." .. verb .. ": seed must be a number, so nothing was done."); return nil end
+        return randomSource(seed)
+      end
+      return randomSource(math.floor(host.random() * 4294967296))
+    end
+
+    local function knownValues(ctx, list)
+      local known = {}
+      if ctx.panel then return known end
+      for _, desc in ipairs(list) do
+        local v = host.read(tostring(desc.id), ctx.role)
+        if v ~= nil then known[tostring(desc.id)] = v end
+      end
+      return known
+    end
+    local function scopeDumps(ctx, scope)
+      local def = scopeDefs(ctx)[scope]
+      if def then return names(def.dumps) end
+      return {}
+    end
+    local function refusedApply() return { ok = false, via = "none", applied = 0, sent = 0, skipped = {} } end
+    local function countKeys(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
+
+    local function apply(patch, opts)
+      local at = forPatch(patch, "apply")
+      if at == nil then return refusedApply() end
+      local ctx, list = at.ctx, at.list
+      local scope = patch.scope ~= nil and tostring(patch.scope) or "voice"
+      local send = opt(opts, "send")
+      if send == nil then send = "auto" end
+      if not contains(SEND_MODES, send) then
+        say("error", "ce.patch.apply: send \"" .. tostring(send) .. "\" is not one of \"auto\", \"parameters\", \"dump\" or \"none\", so nothing was done.")
+        return refusedApply()
+      end
+      local known = knownValues(ctx, list)
+      local plan = applyPlan(patch, known, list, opts, say)
+      if plan == nil then return refusedApply() end
+      local applied = countKeys(plan.values)
+      if ctx.panel then
+        host.restore(plan.values)
+        return { ok = true, via = "none", applied = applied, sent = 0, skipped = plan.skipped }
+      end
+      local dumps = scopeDumps(ctx, scope)
+      local deliver = (ctx.section and type(ctx.section.deliver) == "string") and ctx.section.deliver or ""
+      local via = send
+      if send == "auto" then
+        if deliver == "dump" and #dumps > 0 then via = "dump" else via = "parameters" end
+      end
+      if via == "dump" and #dumps == 0 then
+        say("error", "ce.patch.apply: " .. ctx.device .. " has no dumps for the \"" .. scope .. "\" scope, so it cannot take a patch as a dump, and nothing was done.")
+        return refusedApply()
+      end
+      host.fill(plan.values)
+      if via == "none" then return { ok = true, via = via, applied = applied, sent = 0, skipped = plan.skipped } end
+      if via == "dump" then
+        for _, kind in ipairs(dumps) do host.sendDump(kind) end
+        return { ok = true, via = via, applied = applied, sent = #dumps, skipped = plan.skipped }
+      end
+      local key = ctx.role .. "\0" .. scope
+      local toSend = plan.send
+      if opt(opts, "live") == true then
+        local now, later = livePlan(plan.send, known, list, LIVE_BUDGET)
+        toSend = now
+        waiting[key] = later
+      else
+        local later = waiting[key] or {}
+        waiting[key] = nil
+        local planned = {}
+        for _, entry in ipairs(toSend) do planned[entry[1]] = true end
+        local combined = {}
+        for _, entry in ipairs(toSend) do combined[#combined + 1] = entry end
+        for _, entry in ipairs(later) do if not planned[entry[1]] then combined[#combined + 1] = entry end end
+        toSend = combined
+      end
+      local sent = 0
+      local skipped = {}
+      for _, s in ipairs(plan.skipped) do skipped[#skipped + 1] = s end
+      for _, entry in ipairs(toSend) do
+        if host.write(entry[1], entry[2], ctx.role) == true then sent = sent + 1
+        else skipped[#skipped + 1] = { id = entry[1], why = "not sent" } end
+      end
+      return { ok = true, via = via, applied = applied, sent = sent, skipped = skipped }
+    end
+
+    local function read(scope, fn, opts)
+      local ctx = context(opt(opts, "role"))
+      local id = (type(scope) == "string" and scope ~= "") and scope or "voice"
+      if type(fn) ~= "function" then
+        say("error", "ce.patch.read: fn must be a function to call with the patch, so nothing was asked.")
+        return false
+      end
+      if scoped(ctx, id, "read") == nil then return false end
+      local dumps = ctx.panel and {} or scopeDumps(ctx, id)
+      if #dumps == 0 then
+        say("error", "ce.patch.read: the \"" .. id .. "\" scope has no dumps to ask the synth for, so it cannot be read. ce.patch.define() can name them.")
+        return false
+      end
+      local ok = true
+      local timeout = toNumber(opt(opts, "timeout"))
+      local dumpOpts = nil
+      if finite(timeout) and timeout > 0 then dumpOpts = { timeout = timeout } end
+      local at = 0
+      local next
+      next = function()
+        if at >= #dumps then
+          local patch = current(id, { role = ctx.role })
+          fn(patch, { ok = ok, missing = patch and patch.missing or {} })
+          return
+        end
+        at = at + 1
+        local asked = host.requestDump(dumps[at], function(values, answer)
+          if type(answer) ~= "table" or answer.ok ~= true then ok = false end
+          next()
+        end, dumpOpts)
+        if asked == false then ok = false; next() end
+      end
+      next()
+      return true
+    end
+
+    local function scopes(role)
+      local ctx = context(role)
+      if ctx.panel then
+        return { { id = "voice", name = "Voice", parameters = countKeys(host.snapshot() or {}), canRead = false, canSend = true, via = "none" } }
+      end
+      local defs = scopeDefs(ctx)
+      local ids = {}
+      if not defs.voice then ids[1] = "voice" end
+      local listed = {}
+      for _, s in ipairs(listOfScopes(ctx.section)) do if not listed[s.id] then ids[#ids + 1] = s.id; listed[s.id] = true end end
+      local ownIds = sortedKeys(defined[ctx.role])
+      for _, sid in ipairs(ownIds) do if not listed[sid] then ids[#ids + 1] = sid; listed[sid] = true end end
+      local deliver = (ctx.section and type(ctx.section.deliver) == "string") and ctx.section.deliver or ""
+      local out = {}
+      for _, sid in ipairs(ids) do
+        local list = scopeParams(ctx.params, sid, defs)
+        if list ~= nil and not (#list == 0 and not defs[sid]) then
+          local dumps = defs[sid] and names(defs[sid].dumps) or {}
+          local name = (defs[sid] and type(defs[sid].name) == "string") and defs[sid].name or (string.upper(string.sub(sid, 1, 1)) .. string.sub(sid, 2))
+          out[#out + 1] = { id = sid, name = name, parameters = #list, canRead = #dumps > 0, canSend = true,
+                            via = (deliver == "dump" and #dumps > 0) and "dump" or "parameters" }
+        end
+      end
+      if not defs.system then
+        local system = scopeParams(ctx.params, "system", defs)
+        if system ~= nil and #system > 0 then
+          out[#out + 1] = { id = "system", name = "System", parameters = #system, canRead = false, canSend = true, via = "parameters" }
+        end
+      end
+      return out
+    end
+
+    local function define(scope, spec, role)
+      if type(scope) ~= "string" or scope == "" then
+        say("error", "ce.patch.define: scope must be a name, such as \"voice\", so nothing was defined.")
+        return false
+      end
+      if type(spec) ~= "table" or (isList(spec) and #spec > 0) then
+        say("error", "ce.patch.define: spec must be a table of groups, only, except and dumps, so nothing was defined.")
+        return false
+      end
+      for _, key in ipairs(sortedKeys(spec)) do
+        if not contains(DEFINE_FIELDS, key) then
+          say("error", "ce.patch.define: \"" .. key .. "\" is not one of the fields a scope takes (" .. join(DEFINE_FIELDS, ", ") .. "), so nothing was defined.")
+          return false
+        end
+      end
+      for _, key in ipairs({ "groups", "only", "except", "dumps" }) do
+        local v = spec[key]
+        if v ~= nil and type(v) ~= "string" and type(v) ~= "table" then
+          say("error", "ce.patch.define: " .. key .. " must be a list of names, so nothing was defined.")
+          return false
+        end
+      end
+      local r = (type(role) == "string" and role ~= "") and role or "mainSynth"
+      local def = { id = scope }
+      for k, v in pairs(spec) do def[k] = v end
+      defined[r] = defined[r] or {}
+      defined[r][scope] = def
+      return true
+    end
+
+    local function storeKey(device, name) return STORE_PREFIX .. device .. ":" .. lower(name) end
+
+    local function save(name, patch, opts)
+      if type(name) ~= "string" or name:match("^%s*$") or (utf8.len(name) or #name) > 64 then
+        say("error", "ce.patch.save: name must be text of 1 to 64 characters, so nothing was kept.")
+        return false
+      end
+      if not isPatch(patch) then
+        say("error", "ce.patch.save: that is not a patch, as ce.patch.current() gives them, so nothing was kept.")
+        return false
+      end
+      local key = storeKey(str(patch.device), name)
+      if opt(opts, "replace") == false and host.store.get(key) ~= nil then
+        say("error", "ce.patch.save: a patch called \"" .. name .. "\" is already kept, and replace is off, so nothing was kept.")
+        return false
+      end
+      return host.store.set(key, {
+        name = name, device = str(patch.device), role = patch.role ~= nil and tostring(patch.role) or "mainSynth",
+        scope = patch.scope ~= nil and tostring(patch.scope) or "voice", savedAt = str(host.now()), values = copyValues(patch.values),
+      }) ~= false
+    end
+
+    local function load(name, opts)
+      local ctx = context(opt(opts, "role"))
+      local record = host.store.get(storeKey(ctx.device, str(name)))
+      if type(record) ~= "table" then
+        local keys = host.store.keys() or {}
+        local sorted = {}
+        for _, k in ipairs(keys) do sorted[#sorted + 1] = k end
+        table.sort(sorted)
+        for _, key in ipairs(sorted) do
+          if string.sub(key, 1, #STORE_PREFIX) == STORE_PREFIX and string.match(key, ":([^:]*)$") == lower(name) then
+            local other = host.store.get(key)
+            if type(other) == "table" then
+              say("error", "ce.patch.load: \"" .. str(name) .. "\" was kept for " .. str(other.device) .. ", and this panel's synth is " .. ctx.device .. ", so there is no patch.")
+              return nil
+            end
+          end
+        end
+        say("error", "ce.patch.load: no patch called \"" .. str(name) .. "\" is kept for " .. ctx.device .. ", so there is no patch.")
+        return nil
+      end
+      local scope = type(record.scope) == "string" and record.scope or "voice"
+      local list = scoped(ctx, scope, "load") or {}
+      local patch = make({ device = ctx.device, role = ctx.role, scope = scope, name = record.name }, copyValues(record.values), list, "library")
+      patch.name = record.name ~= nil and tostring(record.name) or str(name)
+      return patch
+    end
+
+    local function listKept(opts)
+      local ctx = context(opt(opts, "role"))
+      local scope = opt(opts, "scope")
+      local prefix = STORE_PREFIX .. ctx.device .. ":"
+      local out = {}
+      for _, key in ipairs(host.store.keys() or {}) do
+        if string.sub(key, 1, #prefix) == prefix then
+          local record = host.store.get(key)
+          if type(record) == "table" and not (type(scope) == "string" and scope ~= "" and record.scope ~= scope) then
+            out[#out + 1] = { name = str(record.name), scope = record.scope ~= nil and tostring(record.scope) or "voice", savedAt = str(record.savedAt) }
+          end
+        end
+      end
+      table.sort(out, function(a, b)
+        if a.savedAt ~= b.savedAt then return a.savedAt > b.savedAt end
+        return a.name < b.name
+      end)
+      return out
+    end
+
+    local function forget(name, opts)
+      local ctx = context(opt(opts, "role"))
+      local key = storeKey(ctx.device, str(name))
+      if host.store.get(key) == nil then return false end
+      host.store.remove(key)
+      return true
+    end
+
+    local function write(patch, slot, opts)
+      local at = forPatch(patch, "write")
+      if at == nil then return { ok = false, slot = slot, error = "not a patch of this synth" } end
+      local how = (at.ctx.section and type(at.ctx.section.write) == "table") and at.ctx.section.write or nil
+      local n = toNumber(slot)
+      if not finite(n) or n < 0 or math.floor(n) ~= n then
+        say("error", "ce.patch.write: slot must be a whole number from 0, so nothing was stored.")
+        return { ok = false, slot = slot, error = "not a slot" }
+      end
+      n = math.tointeger(n) or n
+      if not how or how.via ~= "dump" or type(how.dump) ~= "string" or how.dump == "" then
+        local why = (how and how.via == "command")
+          and "its profile stores a slot with a write command, which ce.patch cannot send yet"
+          or "its profile does not say how to store a slot (patch.write)"
+        say("error", "ce.patch.write: " .. at.ctx.device .. " cannot be written to: " .. why .. ", so nothing was stored.")
+        return { ok = false, slot = n, error = why }
+      end
+      host.setVariable("slot", n, at.ctx.role)
+      host.fill(copyValues(patch.values))
+      host.sendDump(how.dump)
+      return { ok = true, slot = n }
+    end
+
+    return {
+      current = current, read = read, load = load, apply = apply, save = save, list = listKept, forget = forget,
+      write = write, scopes = scopes, define = define,
+      morph = function(a, b, t, opts)
+        local at = forPatch(a, "morph"); if at == nil then return nil end
+        return morph(a, b, t, at.list, opts, say)
+      end,
+      blend = function(patches, weights, opts)
+        local first = type(patches) == "table" and patches[1] or nil
+        local at = forPatch(first, "blend"); if at == nil then return nil end
+        return blend(patches, weights, at.list, opts, say)
+      end,
+      random = function(opts)
+        local from = opt(opts, "from")
+        local base = from
+        if base == nil then base = current(opt(opts, "scope"), { role = opt(opts, "role") }) end
+        if base == nil then return nil end
+        local at = forPatch(base, "random"); if at == nil then return nil end
+        if at.ctx.panel then
+          say("error", "ce.patch.random: a panel without a device profile does not say each control's range, so nothing was drawn.")
+          return nil
+        end
+        local next = seeded(opts, "random"); if next == nil then return nil end
+        return randomPatch(base, at.list, opts, next, say)
+      end,
+      mutate = function(patch, amount, opts)
+        local at = forPatch(patch, "mutate"); if at == nil then return nil end
+        if at.ctx.panel then
+          say("error", "ce.patch.mutate: a panel without a device profile does not say each control's range, so nothing was changed.")
+          return nil
+        end
+        local next = seeded(opts, "mutate"); if next == nil then return nil end
+        return mutate(patch, amount, at.list, opts, next, say)
+      end,
+      merge = function(base, other, opts)
+        local at = forPatch(base, "merge"); if at == nil then return nil end
+        return merge(base, other, at.list, opts, say)
+      end,
+      diff = function(a, b, opts)
+        local at = forPatch(a, "diff"); if at == nil then return nil end
+        return diff(a, b, at.list, opts, say)
+      end,
+      equal = function(a, b, opts)
+        local at = forPatch(a, "equal"); if at == nil then return nil end
+        local d = diff(a, b, at.list, opts, say)
+        if d == nil then return nil end
+        return #d == 0
+      end,
+    }
+  end
+
+  local P = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    profile = function(role) return __deviceQuery("profile", { role = role }) end,
+    parameters = function(role) return __deviceQuery("parameters", { role = role }) or {} end,
+    read = function(id, role) return __deviceQuery("read", { role = role, id = tostring(id) }) end,
+    write = function(id, value, role) return deviceWrite(id, value, role) == true end,
+    fill = function(values) return applyDump(values) end,
+    snapshot = function() return panelSnapshot() or {} end,
+    restore = function(values) return panelRestore(values) end,
+    requestDump = function(kind, fn, opts) return requestDump(kind, fn, opts) end,
+    sendDump = function(kind) return sendDump(kind) end,
+    setVariable = function(name, value, role) return deviceSetVariable(name, value, role) end,
+    patchSection = function(role) return __deviceQuery("patch", { role = role }) end,
+    random = function() return random() end,
+    now = function() local t = __deviceQuery("now", nil); if type(t) == "string" then return t end return "" end,
+    store = {
+      get = function(key) return loadSetting(key) end,
+      set = function(key, value) return saveSetting(key, value) end,
+      keys = function() return listSettings() or {} end,
+      remove = function(key) return forgetSetting(key) end,
+    },
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function patchCurrent(scope, opts) return P.current(scope, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchRead(scope, fn, opts) return P.read(scope, fn, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchLoad(name, opts) return P.load(name, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchMorph(a, b, t, opts) return P.morph(a, b, t, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchBlend(patches, weights, opts) return P.blend(patches, weights, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchRandom(opts) return P.random(opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchMutate(patch, amount, opts) return P.mutate(patch, amount, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchMerge(base, other, opts) return P.merge(base, other, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchDiff(a, b, opts) return P.diff(a, b, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchEqual(a, b, opts) return P.equal(a, b, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchApply(patch, opts) return P.apply(patch, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchSave(name, patch, opts) return P.save(name, patch, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchList(opts) return P.list(opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchForget(name, opts) return P.forget(name, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchWrite(patch, slot, opts) return P.write(patch, slot, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchScopes(role) return P.scopes(role) end
+-- (global; at the line start, where the option check looks for it)
+function patchDefine(scope, spec, role) return P.define(scope, spec, role) end
 end
 
 -- @module ce.music
@@ -4279,6 +5288,21 @@ local __CE_OPTIONS = {
   ["animateTo"] = { path = "ce.anim.to", at = 3, refusal = "false", names = { "duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done" } },
   ["animateSpring"] = { path = "ce.anim.spring", at = 3, refusal = "false", names = { "duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
   ["animateEnvelope"] = { path = "ce.anim.envelope", at = 3, refusal = "false", names = { "from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["patchCurrent"] = { path = "ce.patch.current", at = 2, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "scope" } },
+  ["patchRead"] = { path = "ce.patch.read", at = 3, refusal = "false", names = { "timeout", "role" } },
+  ["patchLoad"] = { path = "ce.patch.load", at = 2, refusal = "nothing", names = { "role" } },
+  ["patchMorph"] = { path = "ce.patch.morph", at = 4, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "switchAt" } },
+  ["patchBlend"] = { path = "ce.patch.blend", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchRandom"] = { path = "ce.patch.random", at = 1, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "scope", "seed", "from", "within" } },
+  ["patchMutate"] = { path = "ce.patch.mutate", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "seed" } },
+  ["patchMerge"] = { path = "ce.patch.merge", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchDiff"] = { path = "ce.patch.diff", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchEqual"] = { path = "ce.patch.equal", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchApply"] = { path = "ce.patch.apply", at = 2, refusal = "result", names = { "groups", "only", "except", "lock", "include", "role", "send", "changedOnly", "live" } },
+  ["patchSave"] = { path = "ce.patch.save", at = 3, refusal = "false", names = { "replace" } },
+  ["patchList"] = { path = "ce.patch.list", at = 1, refusal = "empty list", names = { "role", "scope" } },
+  ["patchForget"] = { path = "ce.patch.forget", at = 2, refusal = "false", names = { "role" } },
+  ["patchWrite"] = { path = "ce.patch.write", at = 3, refusal = "result", names = { "role" } },
   ["syncTimer"] = { path = "ce.time.syncTimer", at = 3, refusal = "nothing", names = { "follow" } },
   ["deviceParameters"] = { path = "ce.device.parameters", at = 1, refusal = "empty list", names = { "role", "query", "group", "type", "access", "limit" } },
   ["deviceDefineParameter"] = { path = "ce.device.defineParameter", at = 2, refusal = "false", names = { "name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad" }, nested = { ["nrpn"] = { names = { "msb", "lsb" } } } },
@@ -4397,6 +5421,7 @@ local __CE_MODULES = {
   ["ce.panel"] = { align = "panelAlign", batch = "panelBatch", circle = "panelCircle", clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", distribute = "panelDistribute", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", flip = "panelFlip", grid = "panelGrid", info = "panelInfo", keep = "panelKeep", match = "panelMatch", order = "panelOrder", parent = "panelParent", patch = "panelPatch", rect = "panelRect", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
+  ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
   ["ce.keys"] = { focus = "keysFocus", focused = "keysFocused", held = "keysHeld", isDown = "keysIsDown", list = "keysList", piano = "keysPiano", pianoInfo = "keysPianoInfo", remove = "keysRemove", shortcut = "keysShortcut" },
   ["ce.text"] = { axis = "textAxis", fit = "textFit", font = "textFont", fonts = "textFonts", measure = "textMeasure", read = "textRead", style = "textStyle" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", read = "splitRead", transpose = "splitTranspose" },
@@ -4428,7 +5453,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -4443,6 +5468,7 @@ local __CE_META = {
   { id = "ce.panel", version = "1.4", runtime = "any" },
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
+  { id = "ce.patch", version = "1.0", runtime = "any" },
   { id = "ce.keys", version = "1.0", runtime = "webview" },
   { id = "ce.text", version = "1.0", runtime = "webview" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },

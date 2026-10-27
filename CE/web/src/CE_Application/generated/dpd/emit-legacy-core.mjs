@@ -391,6 +391,8 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
 
   // The profile-wide display defaults (middleC): the engine hands them to each parameter.
   if (resolved.display && typeof resolved.display === 'object') legacy.display = structuredClone(resolved.display);
+  // What a patch of this synth is (ce.patch): read from the document as the author wrote it.
+  if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = structuredClone(resolved.patch);
 
   if (embedDpdModel) legacy.dpdModel = embedDpdModel;
   return legacy;

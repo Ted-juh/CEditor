@@ -22,6 +22,10 @@ export const PARAMETERS = {
   sync: { id: 'sync', type: 'integer', range: { min: 0, max: 127 }, display: { table: [{ upTo: 63, text: 'Free' }, { upTo: 127, text: 'Sync' }] } },
   ratio: { id: 'ratio', type: 'integer', range: { min: 1, max: 20 }, display: { format: 'ratio' } },
   length: { id: 'length', type: 'integer', range: { min: 0, max: 127 }, display: { format: 'division', min: 0, max: 4 } },
+  // What the engine gives every parameter of a profile with display.middleC: the note's option on a
+  // frequency, which hz does not take and must never be handed.
+  cutoffC: { id: 'cutoffC', type: 'integer', range: { min: 0, max: 127 }, display: { format: 'hz', min: 20, max: 20000, middleC: 3 } },
+  levelC: { id: 'levelC', type: 'integer', range: { min: 0, max: 127 }, display: { format: 'db', min: -60, max: 6, middleC: 3, precision: 0 } },
 };
 
 /** [parameter id, stored value, opts or null, the text] */
@@ -46,5 +50,8 @@ export const PARAMETER_CASES = [
   ['sync', 100, null, 'Sync'], ['sync', 10, null, 'Free'],
   ['ratio', 4, null, '4:1'],
   ['length', 127, null, '1/1'],
+  ['cutoffC', 127, null, '20 kHz'], ['levelC', 127, null, '6 dB'],
+  // A shared option the command behind it does not take (a note has no decimals) is no refusal.
+  ['split', 60, { decimals: 1 }, 'C3'], ['remain', 1, { decimals: 2 }, 'ON'], ['rate', 2, { sign: 'always' }, 'Fast'],
   ['missing', 3, null, '--'],
 ];

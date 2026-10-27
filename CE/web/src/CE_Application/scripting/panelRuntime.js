@@ -28,6 +28,7 @@ import {
   focusControl as keysFocusControl, focusedControl as keysFocusedControl, resetKeys, setShortcutRunner,
   setKeysPanelResolver,
 } from './scriptKeys.js';
+import { patchCommands } from './patchCore.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -8779,7 +8780,40 @@ export function optionCheckedMembersForTesting() {
 }
 
 // @module -
+/**
+ * ce.patch over the panel view: patchCore.js's commands, reading and sending through the same
+ * functions the ce.device, ce.panel, ce.math and ce.storage commands use, for this script.
+ */
+function patchHostFor(scriptId) {
+  return {
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    profile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
+    parameters: (role) => deviceParametersRead({ role: role || DEFAULT_ROLE }),
+    read: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    write: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    fill: (values) => midiApi.applyDump(values),
+    snapshot: () => panelSnapshotImpl(),
+    restore: (values) => panelRestoreImpl(values),
+    requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),
+    sendDump: (kind) => midiApi.sendDump(kind),
+    setVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
+    patchSection: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE, { own: true });
+      return source && typeof source.patch === 'object' ? source.patch : null;
+    },
+    random: () => randomImpl(scriptId),
+    now: () => new Date().toISOString(),
+    store: {
+      get: (key) => loadSetting(key, undefined, undefined, scriptId),
+      set: (key, value) => saveSetting(key, value, undefined, scriptId),
+      keys: () => listSettings(undefined, scriptId) ?? [],
+      remove: (key) => forgetSetting(key, undefined, scriptId),
+    },
+  };
+}
+
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
+  const patch = patchCommands(patchHostFor(scriptId));
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
       typeof form === 'string' || isOptionsTable(form) ? form : ''),
@@ -9115,6 +9149,25 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     keysPianoInfo: () => keysPianoInfoRead(),
     keysFocus: (control) => keysFocusControl(control),
     keysFocused: () => keysFocusedControl(),
+
+    // ce.patch (docs/design/ce-patch-module.md): patchCore.js, the same code the JavaScript prelude runs.
+    patchCurrent: (scope, opts) => patch.current(scope, opts),
+    patchRead: (scope, fn, opts) => patch.read(scope, fn, opts),
+    patchLoad: (name, opts) => patch.load(name, opts),
+    patchMorph: (a, b, t, opts) => patch.morph(a, b, t, opts),
+    patchBlend: (patches, weights, opts) => patch.blend(patches, weights, opts),
+    patchRandom: (opts) => patch.random(opts),
+    patchMutate: (p, amount, opts) => patch.mutate(p, amount, opts),
+    patchMerge: (base, other, opts) => patch.merge(base, other, opts),
+    patchDiff: (a, b, opts) => patch.diff(a, b, opts),
+    patchEqual: (a, b, opts) => patch.equal(a, b, opts),
+    patchApply: (p, opts) => patch.apply(p, opts),
+    patchSave: (name, p, opts) => patch.save(name, p, opts),
+    patchList: (opts) => patch.list(opts),
+    patchForget: (name, opts) => patch.forget(name, opts),
+    patchWrite: (p, slot, opts) => patch.write(p, slot, opts),
+    patchScopes: (role) => patch.scopes(role),
+    patchDefine: (scope, spec, role) => patch.define(scope, spec, role),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),

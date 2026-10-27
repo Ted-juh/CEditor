@@ -202,6 +202,65 @@ export const WRITTEN = {
     lua: `local p = ce.device.parameter("filter.cutoff")\nif p then set("Cutoff.Behavior.max", p.max) end`,
     js: `const p = ce.device.parameter("filter.cutoff");\nif (p) set("Cutoff.Behavior.max", p.max);`,
   },
+  patchCurrent: {
+    lua: `local before = ce.patch.current()\nlog(before.name .. ": " .. #before.missing .. " values not known")`,
+    js: `const before = ce.patch.current();\nlog(\`\${before.name}: \${before.missing.length} values not known\`);`,
+  },
+  patchRead: {
+    lua: `ce.patch.read("voice", function(p, info)\n  if info.ok then state.original = p end\nend)`,
+    js: `ce.patch.read("voice", (p, info) => {\n  if (info.ok) state.original = p;\n});`,
+  },
+  patchLoad: { code: 'ce.patch.apply(ce.patch.load("Warm pad"))' },
+  patchMorph: {
+    lua: `function onValueChange(value)\n  ce.patch.apply(ce.patch.morph(state.a, state.b, value / 127), { live = true })\nend`,
+    js: `function onValueChange(value) {\n  ce.patch.apply(ce.patch.morph(state.a, state.b, value / 127), { live: true });\n}`,
+  },
+  patchBlend: {
+    lua: `ce.patch.apply(ce.patch.blend({ state.a, state.b, state.c }, { 0.5, 0.3, 0.2 }), { live = true })`,
+    js: `ce.patch.apply(ce.patch.blend([state.a, state.b, state.c], [0.5, 0.3, 0.2]), { live: true });`,
+  },
+  patchRandom: {
+    lua: `ce.patch.apply(ce.patch.random({ groups = { "Filter" }, seed = 7 }))`,
+    js: `ce.patch.apply(ce.patch.random({ groups: ["Filter"], seed: 7 }));`,
+  },
+  patchMutate: {
+    lua: `state.p = ce.patch.mutate(state.p, 0.1, { lock = { "Amp Env" } })\nce.patch.apply(state.p)`,
+    js: `state.p = ce.patch.mutate(state.p, 0.1, { lock: ["Amp Env"] });\nce.patch.apply(state.p);`,
+  },
+  patchMerge: {
+    lua: `ce.patch.apply(ce.patch.merge(state.mine, state.theirs, { groups = { "Filter" } }))`,
+    js: `ce.patch.apply(ce.patch.merge(state.mine, state.theirs, { groups: ["Filter"] }));`,
+  },
+  patchDiff: {
+    lua: `for _, d in ipairs(ce.patch.diff(state.saved, ce.patch.current())) do\n  log(d.name .. ": " .. tostring(d.from) .. " to " .. tostring(d.to))\nend`,
+    js: `for (const d of ce.patch.diff(state.saved, ce.patch.current())) {\n  log(\`\${d.name}: \${d.from} to \${d.to}\`);\n}`,
+  },
+  patchEqual: {
+    lua: `if not ce.patch.equal(state.saved, ce.patch.current()) then logWarn("the patch has changed") end`,
+    js: `if (!ce.patch.equal(state.saved, ce.patch.current())) logWarn("the patch has changed");`,
+  },
+  patchApply: {
+    lua: `local result = ce.patch.apply(p)\nif #result.skipped > 0 then logWarn(#result.skipped .. " parameters not sent") end`,
+    js: `const result = ce.patch.apply(p);\nif (result.skipped.length) logWarn(\`\${result.skipped.length} parameters not sent\`);`,
+  },
+  patchSave: { code: 'ce.patch.save("Warm pad", ce.patch.current())' },
+  patchList: {
+    lua: `for row, p in ipairs(ce.patch.list()) do\n  ce.components.lcd.text("Patches", row, p.name)\nend`,
+    js: `ce.patch.list().forEach((p, i) => ce.components.lcd.text("Patches", i + 1, p.name));`,
+  },
+  patchForget: { code: 'ce.patch.forget("Warm pad")' },
+  patchWrite: {
+    lua: `local result = ce.patch.write(ce.patch.current(), 130)\nif not result.ok then logError(result.error) end`,
+    js: `const result = ce.patch.write(ce.patch.current(), 130);\nif (!result.ok) logError(result.error);`,
+  },
+  patchScopes: {
+    lua: `for _, s in ipairs(ce.patch.scopes()) do log(s.id .. ": " .. s.parameters .. " parameters") end`,
+    js: `for (const s of ce.patch.scopes()) log(\`\${s.id}: \${s.parameters} parameters\`);`,
+  },
+  patchDefine: {
+    lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
+    js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
+  },
   keysShortcut: {
     lua: `function onPanelReady()\n  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })\nend`,
     js: `function onPanelReady() {\n  ce.keys.shortcut("Ctrl+G", () => run("Random.action"), { description: "Random voice" });\n}`,
