@@ -620,11 +620,14 @@ the synth.
 }
 ```
 
-**Roland GAIA:** no dumps; it is read and written one address at a time, and has writable user banks.
+**Roland GAIA:** read in address blocks, each asked for with an RQ1 and answered by one DT1 (the
+profile the GAIA panel uses, `roland-gaia-sh01`, has 26 such blocks); written one address at a time;
+has writable user banks.
 
 ```json
 "patch": {
-  "scopes": [{ "id": "voice", "name": "Tone", "read": "parameters" }],
+  "scopes": [{ "id": "voice", "name": "Tone",
+               "dumps": ["common", "tone1", "tone2", "tone3", "distortion", "flanger", "delay", "reverb"] }],
   "write": { "via": "command", "recipe": "writeTone" }
 }
 ```
