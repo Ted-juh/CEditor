@@ -7653,6 +7653,8 @@
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
     window.removeEventListener('pointercancel', handleKeyboardCancel);
+    window.removeEventListener('blur', handlePressLost);
+    document.removeEventListener('visibilitychange', handlePressLost);
     rangeScrub?.end();
     rangeScrub = null;
     sliderScrub?.end();
@@ -8202,9 +8204,7 @@
           ...knobFocus,
         });
       }
-      window.addEventListener('pointermove', handleWindowPointerMove);
-      window.addEventListener('pointerup', handleWindowPointerUp);
-      window.addEventListener('pointercancel', handleKeyboardCancel);
+      addPressListeners();
       return;
     }
 
@@ -8277,9 +8277,24 @@
       updateSliderRangeFromPointer(control, event, nextSliderHandle);
     }
 
+    addPressListeners();
+  }
+
+  // While a press is held, the page must hear its end however it comes. A pointerup that lands in
+  // another window never arrives: switching to the DAW or alt-tabbing with a key, pad or ribbon held
+  // left its note sounding until the panel closed. Losing focus and being hidden end the press the
+  // way a cancelled pointer does — Hostage's keyboard does the same on blur and on a hidden page.
+  function addPressListeners() {
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
     window.addEventListener('pointercancel', handleKeyboardCancel);
+    window.addEventListener('blur', handlePressLost);
+    document.addEventListener('visibilitychange', handlePressLost);
+  }
+
+  function handlePressLost() {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus?.()) return;
+    handleKeyboardCancel({ clientX: Number.NaN, clientY: Number.NaN });
   }
 
   function handleWindowPointerMove(event) {

@@ -464,6 +464,22 @@ try {
     const count=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='triggerRawMidiAction').length);
     assert.ok(await count()>=2);await node(id).dispatchEvent('pointercancel',{pointerId:1,bubbles:true});const cancelled=await count();await page.waitForTimeout(180);assert.equal(await count(),cancelled,'cancelled pointer must not leave the repeat timer running');
   });
+  await check('A Keyboard key held while the window loses focus is released, once',async()=>{
+    // A sibling bound to a device gives the panel one, so its notes have somewhere to go.
+    const id=await fixture('Keyboard',{},[],[{type:'Knob',sections:{DeviceBindings:{enabled:true,bindings:[{kind:'midiControl',port:'value',deviceRole:'mainSynth',message:'cc',controller:74,channel:1,dryRun:true}]}}}]);
+    await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
+    const notes=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='triggerRawMidiAction').map(e=>String(e.payload.message??'')));
+    const b=await node(id).boundingBox();await page.mouse.move(b.x+8,b.y+b.height-8);await page.mouse.down();await settle();
+    assert.ok((await notes()).some(m=>/^9/.test(m)),`pressing a key sends its note-on (saw: ${JSON.stringify(await page.evaluate(()=>window.__behaviorMidi))})`);
+    // A pointerup that lands in another window never reaches the page; losing focus is all it hears.
+    await page.evaluate(()=>{document.hasFocus=()=>false;window.dispatchEvent(new Event('blur'));});await settle();
+    const afterBlur=await notes();
+    assert.ok(afterBlur.some(m=>/^8/.test(m)),`losing focus must send the note-off (sent: ${afterBlur.join(' | ')})`);
+    await page.evaluate(()=>{delete document.hasFocus;});
+    await page.mouse.up();await settle();
+    assert.equal((await notes()).length,afterBlur.length,'the late pointerup must not send a second note-off');
+    await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();
+  });
   await check('Ribbon text stays visible and wheel styles honour Touch glow off',async()=>{
     const id=await fixture('Ribbon',{Ribbon:{label:'Pitch',showValue:true,value:0.75,bipolar:true,showGlow:false,glowColour:'FFFF0000'}});
     const texts=await node(id).locator('svg.ribbon text').evaluateAll(es=>es.map(e=>{const b=e.getBBox();return {text:e.textContent,x:b.x,y:b.y,w:b.width,h:b.height};}));
