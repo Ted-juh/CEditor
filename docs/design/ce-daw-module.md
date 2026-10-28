@@ -1,6 +1,6 @@
 # `ce.daw`: the exported plug-in and its DAW
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* `ce.daw` gives a script in an
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* `ce.daw` gives a script in an
 exported plug-in a view of its DAW and a say in what the DAW sees: 10 commands and 2 new events, plus
 one command beside the module, `origin()`, that says who made the change a handler is running for.
 It runs in the exported plug-in, with its window open or shut. In the editor there is no DAW, so the

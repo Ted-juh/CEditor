@@ -1,6 +1,6 @@
 # MIDI input, completed, and `ce.mpe`
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* Two halves of one gap. Scripts
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* Two halves of one gap. Scripts
 hear only some of what a synth or a controller sends, so seven input events fill in the rest. And
 scripts cannot play or hear MPE at all, so a new module, `ce.mpe`, adds 7 commands and one more
 event for it. Every entry is written in the scripting manual's form, so it can go into `panelApi.js`

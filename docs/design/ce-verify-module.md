@@ -1,6 +1,6 @@
 # `ce.verify`: asking the synth whether it holds what was sent
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* `ce.verify` asks the synth what it
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* `ce.verify` asks the synth what it
 holds and compares it with what the panel sent: 9 commands and 1 event. Each check ends in a report
 that names every parameter that matched, every one that differed (with both values), and every one
 it could not check, with the reason. It runs everywhere, as `ce.device` does, and the comparing is

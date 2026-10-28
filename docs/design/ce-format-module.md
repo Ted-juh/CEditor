@@ -1,6 +1,6 @@
 # `ce.format`: a value as text, and text back as a value
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* The design for a scripting
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* The design for a scripting
 module that turns a value into the text a person reads, and typed text back into a value: 15
 commands, every one a plain function that sends nothing and gives the same text in all seven
 languages. Every command entry is written in the scripting manual's form, so it can go into

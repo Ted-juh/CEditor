@@ -1,6 +1,6 @@
 # `ce.osc`: Open Sound Control in and out
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* `ce.osc` lets a panel receive and
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* `ce.osc` lets a panel receive and
 send Open Sound Control: from a tablet running TouchOSC or Lemur, from Max or Pure Data, to a DAW or a
 lighting desk. 8 commands and 1 event for scripts, and OSC learn on a control for panels without a
 script. It runs everywhere: the editor, the player, and an exported plug-in with its window open or

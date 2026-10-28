@@ -1,6 +1,6 @@
 # `ce.keys`: the computer keyboard on a panel
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* `ce.keys` lets a panel use the
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* `ce.keys` lets a panel use the
 computer keyboard: key events, shortcuts, the keys held down, a piano played from the letter keys,
 and keyboard focus. 9 commands and 2 events. It runs in the panel view only, in the editor's preview
 and in an exported plug-in with its window open; with the window shut there is no keyboard. Every

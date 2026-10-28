@@ -1,6 +1,6 @@
 # `ce.patch`: a synth's sound as a value
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* The design for a scripting
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* The design for a scripting
 module that lets a script hold, change, compare, send and keep a synth's sound. Every command entry
 below is written in the scripting manual's form (summary, example, parameters with their rules,
 "Good to know", options), so it can go into `panelApi.js` as it stands when the module is built.

@@ -1,6 +1,6 @@
 # `ce.file`: librarian files, through the person's own dialogs
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* The design for a scripting
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* The design for a scripting
 module that reads and writes the files a librarian works with: `.syx` banks, `.mid` files, JSON and
 text. 11 commands: two dialogs, reading and writing a chosen file again, a chosen folder, and two
 pairs that take `.syx` and `.mid` files apart and put them together. Every command entry is written

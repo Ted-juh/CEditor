@@ -1,6 +1,6 @@
 # `ce.ci`: MIDI-CI for scripts
 
-*Designed and approved by the owner on 2026-10-27. Nothing built.* `ce.ci` lets a script ask a
+*Designed and approved by the owner on 2026-10-27. Built on 2026-10-28 on the `script-modules-build` branch; what differs from this record is listed in [the roadmap](script-modules-roadmap.md).* `ce.ci` lets a script ask a
 MIDI-CI device who it is, read and change its properties, follow them as they change, and turn its
 profiles on and off: 9 commands and 3 events. It runs wherever the device layer runs: the editor,
 the player and an exported plug-in, with the window open or shut. One command, `draftProfile`, runs
