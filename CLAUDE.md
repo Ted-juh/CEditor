@@ -144,6 +144,10 @@ first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Wi
 their own beside the web tests and the C++ build; run them locally when you touch rendering, the
 docks, the player inbound path or the learn chips.
 
+`npm run test:everything` runs `test:all`, `test:browser` and `test:component-behavior` one after
+the other, each whatever the one before did, and ends on a summary; on Windows the browser checks
+find Chrome or Edge themselves when `CHROMIUM_PATH` is not set.
+
 `npm run test:component-behavior` runs the component acceptance harness, `componentBehavior.mjs`:
 95 cases, each a control edited through the inspector, driven by the pointer and the keys, saved
 and reopened. About seventeen minutes here, and CI's longest job, `component-behavior`. Run it when

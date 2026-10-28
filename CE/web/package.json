@@ -33,6 +33,7 @@
     "docs:editor": "node --import ./test/support/register-svelte.mjs scripts/generate-editor-manual.mjs",
     "gen:google-icons": "node scripts/generate-google-icon-names.mjs",
     "test:all": "npm test && npm run test:script-exports",
+    "test:everything": "node scripts/test-everything.mjs",
     "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/runAll.mjs",
     "gen:panel-validator": "node scripts/generate-panel-validator.mjs"
   },
